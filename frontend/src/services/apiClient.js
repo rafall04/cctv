@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// VITE_API_URL should be set in the production environment (.env.production).
+// This fallback assumes the backend is running on the same domain as the frontend, but on port 3000.
+const API_URL = import.meta.env.VITE_API_URL || 'http://cctv.raf.my.id:3000';
 
 // Create axios instance
 const apiClient = axios.create({
