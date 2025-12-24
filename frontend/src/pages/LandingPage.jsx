@@ -11,7 +11,7 @@ const Icon = {
     Search: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>,
     X: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M6 18L18 6M6 6l12 12"/></svg>,
     Fullscreen: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>,
-    ExitFullscreen: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3"/></svg>,
+    ExitFS: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3"/></svg>,
     MapPin: () => <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/><circle cx="12" cy="11" r="3"/></svg>,
     Plus: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M12 5v14m-7-7h14"/></svg>,
     Minus: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M5 12h14"/></svg>,
@@ -21,24 +21,22 @@ const Icon = {
     Check: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M5 13l4 4L19 7"/></svg>,
     Refresh: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>,
     Clock: () => <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>,
+    ZoomIn: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M11 8v6m-3-3h6"/></svg>,
+    ZoomOut: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M8 11h6"/></svg>,
 };
 
 
-// Video Player - simplified controls
-const VideoPlayer = memo(function VideoPlayer({ camera, streams, isModal, isMultiView, onRemove }) {
+// Video Player Component
+const VideoPlayer = memo(function VideoPlayer({ camera, streams, showControls = true, isMultiView, onRemove }) {
     const videoRef = useRef(null);
     const hlsRef = useRef(null);
     const containerRef = useRef(null);
     const [status, setStatus] = useState('connecting');
     const [isFS, setIsFS] = useState(false);
-    const [zoom, setZoom] = useState(1);
-    const [pan, setPan] = useState({ x: 0, y: 0 });
-    const [dragging, setDragging] = useState(false);
-    const dragRef = useRef({ x: 0, y: 0, px: 0, py: 0 });
 
     const url = streams?.hls;
 
-    // HLS init
+    // HLS Setup
     useEffect(() => {
         if (!url || !videoRef.current) return;
         const video = videoRef.current;
@@ -74,7 +72,7 @@ const VideoPlayer = memo(function VideoPlayer({ camera, streams, isModal, isMult
         return () => { document.removeEventListener('fullscreenchange', onChange); document.removeEventListener('webkitfullscreenchange', onChange); };
     }, []);
 
-    // Direct fullscreen toggle
+    // Direct fullscreen
     const goFullscreen = async (e) => {
         e?.stopPropagation();
         const el = containerRef.current;
@@ -87,96 +85,53 @@ const VideoPlayer = memo(function VideoPlayer({ camera, streams, isModal, isMult
         } catch {}
     };
 
-    // Zoom/Pan - only in modal or fullscreen
-    const canZoom = isModal || isFS;
-    const maxPan = 200 * (zoom - 1);
-
-    const onWheel = (e) => { if (!canZoom) return; e.preventDefault(); setZoom(z => { const nz = Math.max(1, Math.min(4, z + (e.deltaY > 0 ? -0.2 : 0.2))); if (nz === 1) setPan({ x: 0, y: 0 }); return nz; }); };
-    const onPointerDown = (e) => { if (!canZoom || zoom <= 1) return; e.preventDefault(); setDragging(true); dragRef.current = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y }; };
-    const onPointerMove = (e) => { if (!dragging) return; setPan({ x: Math.max(-maxPan, Math.min(maxPan, dragRef.current.px + (e.clientX - dragRef.current.x))), y: Math.max(-maxPan, Math.min(maxPan, dragRef.current.py + (e.clientY - dragRef.current.y))) }); };
-    const onPointerUp = () => setDragging(false);
-
-    const zoomIn = (e) => { e?.stopPropagation(); setZoom(z => Math.min(4, z + 0.5)); };
-    const zoomOut = (e) => { e?.stopPropagation(); setZoom(z => { const nz = Math.max(1, z - 0.5); if (nz === 1) setPan({ x: 0, y: 0 }); return nz; }); };
-    const zoomReset = (e) => { e?.stopPropagation(); setZoom(1); setPan({ x: 0, y: 0 }); };
-
     const statusColor = status === 'live' ? 'bg-emerald-500' : status === 'connecting' ? 'bg-amber-500' : 'bg-red-500';
 
     return (
-        <div
-            ref={containerRef}
-            className={`relative w-full h-full bg-black overflow-hidden group ${isModal || isMultiView ? '' : 'rounded-2xl'}`}
-            style={{ touchAction: zoom > 1 ? 'none' : 'auto' }}
-            onWheel={onWheel}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerLeave={onPointerUp}
-        >
+        <div ref={containerRef} className="relative w-full h-full bg-black overflow-hidden group">
             <video
                 ref={videoRef}
-                onPointerDown={onPointerDown}
-                className="w-full h-full"
-                style={{
-                    objectFit: isModal || isFS ? 'contain' : 'cover',
-                    transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
-                    cursor: zoom > 1 ? (dragging ? 'grabbing' : 'grab') : 'default',
-                }}
+                className="w-full h-full object-cover"
+                style={{ objectFit: isFS ? 'contain' : 'cover' }}
                 muted playsInline autoPlay
             />
 
-            {/* Overlay gradient */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+            {/* Gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
 
-            {/* Status badge - top left */}
-            <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold text-white ${statusColor}`}>
-                    <Icon.Signal />
-                    {status === 'live' ? 'LIVE' : status === 'connecting' ? '...' : 'OFF'}
-                </span>
-            </div>
+            {/* Status badge */}
+            {showControls && (
+                <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold text-white ${statusColor}`}>
+                        <Icon.Signal />
+                        {status === 'live' ? 'LIVE' : status === 'connecting' ? '...' : 'OFF'}
+                    </span>
+                </div>
+            )}
 
             {/* Remove button for multi-view */}
             {isMultiView && onRemove && (
-                <button
-                    onClick={(e) => { e.stopPropagation(); onRemove(); }}
-                    className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-red-500 rounded-lg text-white opacity-0 group-hover:opacity-100 transition-all"
-                >
+                <button onClick={(e) => { e.stopPropagation(); onRemove(); }} className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-red-500 rounded-lg text-white opacity-0 group-hover:opacity-100 transition-all">
                     <Icon.X />
                 </button>
             )}
 
-            {/* Bottom bar */}
-            <div className="absolute bottom-0 left-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <div className="flex items-end justify-between gap-2">
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                        <h3 className={`text-white font-semibold truncate ${isMultiView ? 'text-xs' : 'text-sm'}`}>{camera.name}</h3>
-                        {!isMultiView && camera.location && (
-                            <p className="text-white/60 text-[10px] flex items-center gap-1 truncate mt-0.5">
-                                <Icon.MapPin />{camera.location}
-                            </p>
-                        )}
-                    </div>
-
-                    {/* Controls */}
-                    <div className="flex items-center gap-1">
-                        {/* Zoom controls - only in modal/fullscreen */}
-                        {canZoom && (
-                            <div className="flex items-center gap-0.5 bg-black/50 rounded-lg p-0.5 mr-1">
-                                <button onClick={zoomOut} className="p-1 hover:bg-white/20 rounded text-white/80"><Icon.Minus /></button>
-                                <span className="text-[9px] text-white/60 w-8 text-center">{Math.round(zoom * 100)}%</span>
-                                <button onClick={zoomIn} className="p-1 hover:bg-white/20 rounded text-white/80"><Icon.Plus /></button>
-                                {zoom > 1 && <button onClick={zoomReset} className="p-1 hover:bg-white/20 rounded text-white/80"><Icon.Reset /></button>}
-                            </div>
-                        )}
-
-                        {/* Fullscreen button - always visible */}
-                        <button onClick={goFullscreen} className="p-1.5 bg-white/10 hover:bg-white/25 rounded-lg text-white">
-                            {isFS ? <Icon.ExitFullscreen /> : <Icon.Fullscreen />}
+            {/* Bottom controls */}
+            {showControls && (
+                <div className="absolute bottom-0 left-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-end justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                            <h3 className={`text-white font-semibold truncate ${isMultiView ? 'text-xs' : 'text-sm'}`}>{camera.name}</h3>
+                            {!isMultiView && camera.location && (
+                                <p className="text-white/60 text-[10px] flex items-center gap-1 truncate"><Icon.MapPin />{camera.location}</p>
+                            )}
+                        </div>
+                        <button onClick={goFullscreen} className="p-1.5 bg-white/10 hover:bg-white/25 rounded-lg text-white flex-shrink-0">
+                            {isFS ? <Icon.ExitFS /> : <Icon.Fullscreen />}
                         </button>
                     </div>
                 </div>
-            </div>
+            )}
 
             {/* Loading */}
             {status === 'connecting' && (
@@ -196,11 +151,12 @@ const VideoPlayer = memo(function VideoPlayer({ camera, streams, isModal, isMult
 });
 
 
-// Camera Card - click to open popup
+// Camera Card - video plays here, click opens popup
 const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMulti }) {
     const [visible, setVisible] = useState(false);
     const ref = useRef(null);
 
+    // Lazy load - only render video when visible
     useEffect(() => {
         const el = ref.current;
         if (!el) return;
@@ -227,10 +183,9 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
             <button
                 onClick={(e) => { e.stopPropagation(); onAddMulti(); }}
                 disabled={inMulti}
-                className={`absolute top-2 right-2 p-1.5 rounded-lg transition-all opacity-0 group-hover/card:opacity-100 ${
+                className={`absolute top-2 right-2 p-1.5 rounded-lg transition-all opacity-0 group-hover/card:opacity-100 z-10 ${
                     inMulti ? 'bg-emerald-500 text-white' : 'bg-black/60 hover:bg-sky-500 text-white'
                 }`}
-                title={inMulti ? 'Added' : 'Add to Multi-View'}
             >
                 {inMulti ? <Icon.Check /> : <Icon.Plus />}
             </button>
@@ -238,8 +193,17 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
     );
 });
 
-// Expanded Popup Modal - click camera to open this
-function ExpandedModal({ camera, onClose }) {
+// Popup Modal - smaller, centered, with zoom controls
+function PopupModal({ camera, onClose }) {
+    const videoRef = useRef(null);
+    const hlsRef = useRef(null);
+    const [zoom, setZoom] = useState(1);
+    const [pan, setPan] = useState({ x: 0, y: 0 });
+    const [dragging, setDragging] = useState(false);
+    const dragRef = useRef({ x: 0, y: 0, px: 0, py: 0 });
+
+    const url = camera.streams?.hls;
+
     useEffect(() => {
         const onKey = (e) => e.key === 'Escape' && onClose();
         document.addEventListener('keydown', onKey);
@@ -247,51 +211,115 @@ function ExpandedModal({ camera, onClose }) {
         return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
     }, [onClose]);
 
-    return (
-        <div className="fixed inset-0 z-50 bg-black/95 flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between p-3 sm:p-4">
-                <div className="text-white min-w-0 flex-1">
-                    <h2 className="text-base sm:text-lg font-bold truncate">{camera.name}</h2>
-                    {camera.location && (
-                        <p className="text-xs sm:text-sm text-white/50 flex items-center gap-1 truncate">
-                            <Icon.MapPin /> {camera.location}
-                        </p>
-                    )}
-                </div>
-                <button onClick={onClose} className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white ml-3 flex-shrink-0">
-                    <Icon.X />
-                </button>
-            </div>
+    // HLS for popup
+    useEffect(() => {
+        if (!url || !videoRef.current) return;
+        const video = videoRef.current;
+        let hls = null;
 
-            {/* Video */}
-            <div className="flex-1 px-2 pb-2 sm:px-4 sm:pb-4">
-                <div className="w-full h-full rounded-xl overflow-hidden">
-                    <VideoPlayer camera={camera} streams={camera.streams} isModal />
+        if (Hls.isSupported()) {
+            hls = new Hls({ enableWorker: true, lowLatencyMode: true, backBufferLength: 60 });
+            hlsRef.current = hls;
+            hls.loadSource(url);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
+            hls.on(Hls.Events.ERROR, (_, d) => {
+                if (d.fatal) {
+                    if (d.type === Hls.ErrorTypes.NETWORK_ERROR) setTimeout(() => hls?.startLoad(), 3000);
+                    else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) hls?.recoverMediaError();
+                }
+            });
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = url;
+            video.play().catch(() => {});
+        }
+        return () => { if (hls) { hls.destroy(); hlsRef.current = null; } };
+    }, [url]);
+
+    // Zoom/Pan
+    const maxPan = 200 * (zoom - 1);
+    const onWheel = (e) => { e.preventDefault(); setZoom(z => { const nz = Math.max(1, Math.min(4, z + (e.deltaY > 0 ? -0.2 : 0.2))); if (nz === 1) setPan({ x: 0, y: 0 }); return nz; }); };
+    const onPointerDown = (e) => { if (zoom <= 1) return; e.preventDefault(); setDragging(true); dragRef.current = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y }; };
+    const onPointerMove = (e) => { if (!dragging) return; setPan({ x: Math.max(-maxPan, Math.min(maxPan, dragRef.current.px + (e.clientX - dragRef.current.x))), y: Math.max(-maxPan, Math.min(maxPan, dragRef.current.py + (e.clientY - dragRef.current.y))) }); };
+    const onPointerUp = () => setDragging(false);
+
+    const zoomIn = () => setZoom(z => Math.min(4, z + 0.5));
+    const zoomOut = () => { const nz = Math.max(1, zoom - 0.5); setZoom(nz); if (nz === 1) setPan({ x: 0, y: 0 }); };
+    const zoomReset = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8 bg-black/80 backdrop-blur-sm" onClick={onClose}>
+            <div className="relative w-full max-w-4xl bg-gray-900 rounded-2xl overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                {/* Header */}
+                <div className="flex items-center justify-between p-3 border-b border-white/10">
+                    <div className="min-w-0 flex-1">
+                        <h2 className="text-white font-bold truncate">{camera.name}</h2>
+                        {camera.location && (
+                            <p className="text-gray-400 text-xs flex items-center gap-1 truncate">
+                                <Icon.MapPin /> {camera.location}
+                            </p>
+                        )}
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg text-white ml-3">
+                        <Icon.X />
+                    </button>
+                </div>
+
+                {/* Video with zoom */}
+                <div
+                    className="relative aspect-video bg-black overflow-hidden"
+                    style={{ touchAction: zoom > 1 ? 'none' : 'auto' }}
+                    onWheel={onWheel}
+                    onPointerMove={onPointerMove}
+                    onPointerUp={onPointerUp}
+                    onPointerLeave={onPointerUp}
+                >
+                    <video
+                        ref={videoRef}
+                        onPointerDown={onPointerDown}
+                        className="w-full h-full object-contain"
+                        style={{
+                            transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+                            cursor: zoom > 1 ? (dragging ? 'grabbing' : 'grab') : 'default',
+                        }}
+                        muted playsInline autoPlay
+                    />
+                </div>
+
+                {/* Zoom Controls */}
+                <div className="flex items-center justify-center gap-2 p-3 border-t border-white/10">
+                    <button onClick={zoomOut} disabled={zoom <= 1} className="p-2 bg-white/10 hover:bg-white/20 disabled:opacity-30 rounded-lg text-white transition-colors">
+                        <Icon.ZoomOut />
+                    </button>
+                    <span className="text-white text-sm font-medium w-16 text-center">{Math.round(zoom * 100)}%</span>
+                    <button onClick={zoomIn} disabled={zoom >= 4} className="p-2 bg-white/10 hover:bg-white/20 disabled:opacity-30 rounded-lg text-white transition-colors">
+                        <Icon.ZoomIn />
+                    </button>
+                    {zoom > 1 && (
+                        <button onClick={zoomReset} className="p-2 bg-white/10 hover:bg-white/20 rounded-lg text-white transition-colors ml-2">
+                            <Icon.Reset />
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
     );
 }
 
-// Multi-View Panel - responsive layout
+
+// Multi-View Panel
 function MultiViewPanel({ selectedIds, allCameras, onRemove, onClear, onClose }) {
     const selected = selectedIds.map(id => allCameras.find(c => c.id === id)).filter(Boolean);
     const count = selected.length;
 
-    // Responsive layout classes
-    // Mobile: always stack vertically
-    // Desktop: 1=full, 2=side-by-side, 3=2+1
     const getLayoutClass = () => {
         if (count === 1) return 'grid-cols-1';
         if (count === 2) return 'grid-cols-1 sm:grid-cols-2';
-        // 3 cameras: stack on mobile, 2+1 on desktop
         return 'grid-cols-1 sm:grid-cols-2';
     };
 
     return (
         <div className="fixed inset-0 z-50 bg-black flex flex-col">
-            {/* Header */}
             <div className="flex items-center justify-between p-3 border-b border-white/10">
                 <div className="flex items-center gap-2 text-white">
                     <Icon.Layout />
@@ -299,44 +327,25 @@ function MultiViewPanel({ selectedIds, allCameras, onRemove, onClear, onClose })
                     <span className="text-xs text-gray-500">({count}/3)</span>
                 </div>
                 <div className="flex items-center gap-2">
-                    {count > 0 && (
-                        <button onClick={onClear} className="px-2.5 py-1 text-xs bg-white/10 hover:bg-red-500/20 text-white hover:text-red-400 rounded-lg transition-colors">
-                            Clear
-                        </button>
-                    )}
-                    <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-lg text-white">
-                        <Icon.X />
-                    </button>
+                    {count > 0 && <button onClick={onClear} className="px-2.5 py-1 text-xs bg-white/10 hover:bg-red-500/30 text-white rounded-lg">Clear</button>}
+                    <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-lg text-white"><Icon.X /></button>
                 </div>
             </div>
 
-            {/* Content */}
             <div className="flex-1 p-2 sm:p-3 overflow-auto">
                 {count === 0 ? (
                     <div className="h-full flex items-center justify-center">
                         <div className="text-center px-4">
-                            <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-3 text-gray-600">
-                                <Icon.Layout />
-                            </div>
-                            <p className="text-gray-400 text-sm font-medium">No cameras selected</p>
-                            <p className="text-gray-600 text-xs mt-1">Tap + on cameras to add (max 3)</p>
+                            <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-3 text-gray-600"><Icon.Layout /></div>
+                            <p className="text-gray-400 text-sm">No cameras selected</p>
+                            <p className="text-gray-600 text-xs mt-1">Tap + on cameras to add</p>
                         </div>
                     </div>
                 ) : (
                     <div className={`grid ${getLayoutClass()} gap-2 sm:gap-3 h-full auto-rows-fr`}>
                         {selected.map((cam, i) => (
-                            <div
-                                key={cam.id}
-                                className={`rounded-xl overflow-hidden bg-gray-900 ${
-                                    count === 3 && i === 2 ? 'sm:col-span-2' : ''
-                                }`}
-                            >
-                                <VideoPlayer
-                                    camera={cam}
-                                    streams={cam.streams}
-                                    isMultiView
-                                    onRemove={() => onRemove(cam.id)}
-                                />
+                            <div key={cam.id} className={`rounded-xl overflow-hidden ${count === 3 && i === 2 ? 'sm:col-span-2' : ''}`}>
+                                <VideoPlayer camera={cam} streams={cam.streams} isMultiView onRemove={() => onRemove(cam.id)} />
                             </div>
                         ))}
                     </div>
@@ -354,7 +363,7 @@ function LandingPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [search, setSearch] = useState('');
-    const [expanded, setExpanded] = useState(null);
+    const [popup, setPopup] = useState(null);
     const [cols, setCols] = useState(2);
     const [showMulti, setShowMulti] = useState(false);
     const [multiIds, setMultiIds] = useState([]);
@@ -421,14 +430,14 @@ function LandingPage() {
                             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center text-white shadow-lg shadow-sky-500/20">
                                 <Icon.Camera />
                             </div>
-                            <div className="hidden xs:block">
+                            <div className="hidden sm:block">
                                 <h1 className={`text-sm font-bold ${dark ? 'text-white' : 'text-gray-900'}`}>RAF NET</h1>
                                 <p className={`text-[10px] ${dark ? 'text-gray-500' : 'text-gray-500'}`}>{cameras.length} cameras</p>
                             </div>
                         </div>
 
                         {/* Search */}
-                        <div className="flex-1 max-w-[200px] sm:max-w-xs">
+                        <div className="flex-1 max-w-[180px] sm:max-w-xs">
                             <div className="relative">
                                 <input
                                     type="text"
@@ -449,9 +458,7 @@ function LandingPage() {
                             <button
                                 onClick={() => setShowMulti(true)}
                                 className={`h-9 px-2 sm:px-3 rounded-xl text-sm font-medium flex items-center gap-1.5 transition-all ${
-                                    multiIds.length > 0
-                                        ? 'bg-sky-500 text-white shadow-lg shadow-sky-500/25'
-                                        : dark ? 'bg-white/5 text-gray-400 hover:bg-white/10' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    multiIds.length > 0 ? 'bg-sky-500 text-white shadow-lg shadow-sky-500/25' : dark ? 'bg-white/5 text-gray-400 hover:bg-white/10' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                 }`}
                             >
                                 <Icon.Layout />
@@ -459,35 +466,22 @@ function LandingPage() {
                                 {multiIds.length > 0 && <span className="w-5 h-5 rounded-full bg-white/20 text-xs flex items-center justify-center">{multiIds.length}</span>}
                             </button>
 
-                            {/* Grid - desktop only */}
+                            {/* Grid - desktop */}
                             <div className={`hidden sm:flex items-center rounded-xl p-0.5 ${dark ? 'bg-white/5' : 'bg-gray-100'}`}>
                                 {[1, 2, 3].map(n => (
-                                    <button
-                                        key={n}
-                                        onClick={() => setCols(n)}
-                                        className={`w-7 h-7 rounded-lg text-xs font-semibold transition-all ${
-                                            cols === n ? 'bg-sky-500 text-white' : dark ? 'text-gray-500 hover:text-white' : 'text-gray-500 hover:text-gray-900'
-                                        }`}
-                                    >
+                                    <button key={n} onClick={() => setCols(n)} className={`w-7 h-7 rounded-lg text-xs font-semibold transition-all ${cols === n ? 'bg-sky-500 text-white' : dark ? 'text-gray-500 hover:text-white' : 'text-gray-500 hover:text-gray-900'}`}>
                                         {n}
                                     </button>
                                 ))}
                             </div>
 
                             {/* Refresh */}
-                            <button
-                                onClick={fetchCameras}
-                                className={`w-9 h-9 rounded-xl flex items-center justify-center ${dark ? 'bg-white/5 text-gray-400 hover:bg-white/10' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
-                                title={lastUpdate ? `Updated: ${lastUpdate.toLocaleTimeString()}` : 'Refresh'}
-                            >
+                            <button onClick={fetchCameras} className={`w-9 h-9 rounded-xl flex items-center justify-center ${dark ? 'bg-white/5 text-gray-400 hover:bg-white/10' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`} title={lastUpdate ? `Updated: ${lastUpdate.toLocaleTimeString()}` : 'Refresh'}>
                                 <Icon.Refresh />
                             </button>
 
                             {/* Theme */}
-                            <button
-                                onClick={toggleTheme}
-                                className={`w-9 h-9 rounded-xl flex items-center justify-center ${dark ? 'bg-white/5 text-gray-400 hover:bg-white/10' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
-                            >
+                            <button onClick={toggleTheme} className={`w-9 h-9 rounded-xl flex items-center justify-center ${dark ? 'bg-white/5 text-gray-400 hover:bg-white/10' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
                                 {dark ? <Icon.Sun /> : <Icon.Moon />}
                             </button>
                         </div>
@@ -495,64 +489,36 @@ function LandingPage() {
                 </div>
             </header>
 
-            {/* Stats bar */}
+            {/* Stats */}
             <div className={`max-w-7xl mx-auto px-3 sm:px-6 py-3 flex items-center gap-4 text-xs ${dark ? 'text-gray-500' : 'text-gray-500'}`}>
-                <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                    {cameras.length} Online
-                </span>
-                {lastUpdate && (
-                    <span className="flex items-center gap-1">
-                        <Icon.Clock />
-                        {lastUpdate.toLocaleTimeString()}
-                    </span>
-                )}
-                {multiIds.length > 0 && (
-                    <span className="text-sky-400">{multiIds.length} in Multi-View</span>
-                )}
+                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500" />{cameras.length} Online</span>
+                {lastUpdate && <span className="flex items-center gap-1"><Icon.Clock />{lastUpdate.toLocaleTimeString()}</span>}
+                {multiIds.length > 0 && <span className="text-sky-400">{multiIds.length} in Multi-View</span>}
             </div>
 
             {/* Content */}
             <main className="max-w-7xl mx-auto px-3 sm:px-6 pb-6">
                 {filtered.length === 0 ? (
                     <div className="text-center py-16">
-                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3 ${dark ? 'bg-white/5 text-gray-600' : 'bg-gray-100 text-gray-400'}`}>
-                            <Icon.Camera />
-                        </div>
+                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3 ${dark ? 'bg-white/5 text-gray-600' : 'bg-gray-100 text-gray-400'}`}><Icon.Camera /></div>
                         <p className={dark ? 'text-gray-500' : 'text-gray-600'}>{search ? 'No results' : 'No cameras'}</p>
                         {search && <button onClick={() => setSearch('')} className="mt-2 text-sm text-sky-500">Clear</button>}
                     </div>
                 ) : (
                     <div className={`grid ${gridCls} gap-3 sm:gap-4`}>
                         {filtered.map((cam) => (
-                            <CameraCard
-                                key={cam.id}
-                                camera={cam}
-                                inMulti={multiIds.includes(cam.id)}
-                                onClick={() => setExpanded(cam)}
-                                onAddMulti={() => addToMulti(cam.id)}
-                            />
+                            <CameraCard key={cam.id} camera={cam} inMulti={multiIds.includes(cam.id)} onClick={() => setPopup(cam)} onAddMulti={() => addToMulti(cam.id)} />
                         ))}
                     </div>
                 )}
             </main>
 
             {/* Footer */}
-            <footer className={`py-4 text-center text-xs ${dark ? 'text-gray-700' : 'text-gray-400'}`}>
-                © 2025 RAF NET
-            </footer>
+            <footer className={`py-4 text-center text-xs ${dark ? 'text-gray-700' : 'text-gray-400'}`}>© 2025 RAF NET</footer>
 
             {/* Modals */}
-            {expanded && <ExpandedModal camera={expanded} onClose={() => setExpanded(null)} />}
-            {showMulti && (
-                <MultiViewPanel
-                    selectedIds={multiIds}
-                    allCameras={cameras}
-                    onRemove={removeFromMulti}
-                    onClear={() => setMultiIds([])}
-                    onClose={() => setShowMulti(false)}
-                />
-            )}
+            {popup && <PopupModal camera={popup} onClose={() => setPopup(null)} />}
+            {showMulti && <MultiViewPanel selectedIds={multiIds} allCameras={cameras} onRemove={removeFromMulti} onClear={() => setMultiIds([])} onClose={() => setShowMulti(false)} />}
         </div>
     );
 }
