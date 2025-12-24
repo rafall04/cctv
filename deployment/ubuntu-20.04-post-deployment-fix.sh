@@ -146,12 +146,90 @@ mkdir -p data
 chmod 755 logs data
 echo "   ✅ Directories ready"
 
-# 5. Start PM2 with fresh daemon
+# 5. Check and setup MediaMTX if not exists
 echo ""
-echo "🔧 Step 5: Starting PM2 with fresh daemon..."
+echo "🔧 Step 5: Checking MediaMTX installation..."
+
+if [ ! -f "mediamtx/mediamtx" ]; then
+    echo "   MediaMTX binary not found. Downloading..."
+    
+    # Clean any existing mediamtx directory
+    rm -rf mediamtx
+    mkdir -p mediamtx
+    
+    # Download MediaMTX v1.8.5 for Ubuntu 20.04
+    MEDIAMTX_VERSION="v1.8.5"
+    MEDIAMTX_URL="https://github.com/bluenviron/mediamtx/releases/download/${MEDIAMTX_VERSION}/mediamtx_${MEDIAMTX_VERSION}_linux_amd64.tar.gz"
+    
+    echo "   Downloading from: $MEDIAMTX_URL"
+    wget -q --show-progress "$MEDIAMTX_URL" -O /tmp/mediamtx.tar.gz
+    
+    # Extract
+    tar -xzf /tmp/mediamtx.tar.gz -C mediamtx
+    rm -f /tmp/mediamtx.tar.gz
+    
+    # Make executable
+    chmod +x mediamtx/mediamtx
+    
+    echo "   ✅ MediaMTX downloaded and extracted"
+else
+    echo "   ✅ MediaMTX binary exists"
+fi
+
+# Create MediaMTX configuration if not exists
+if [ ! -f "mediamtx/mediamtx.yml" ]; then
+    echo "   Creating MediaMTX configuration..."
+    cat > mediamtx/mediamtx.yml << 'MTXEOF'
+# MediaMTX Configuration for RAF NET CCTV - Ubuntu 20.04
+
+logLevel: info
+logDestinations: [stdout]
+
+api: yes
+apiAddress: 0.0.0.0:9997
+
+rtsp: yes
+rtspAddress: :8554
+protocols: [tcp, udp]
+
+hls: yes
+hlsAddress: 0.0.0.0:8888
+hlsAlwaysRemux: no
+hlsVariant: mpegts
+hlsSegmentCount: 3
+hlsSegmentDuration: 1s
+
+webrtc: yes
+webrtcAddress: 0.0.0.0:8889
+
+rtmp: yes
+rtmpAddress: :1935
+
+srt: no
+record: no
+
+pathDefaults:
+  recordDeleteAfter: 24h
+  readUser: ""
+  readPass: ""
+  publishUser: ""
+  publishPass: ""
+
+paths:
+  all:
+    source: publisher
+MTXEOF
+    echo "   ✅ MediaMTX configuration created"
+else
+    echo "   ✅ MediaMTX configuration exists"
+fi
+
+# 6. Start PM2 with fresh daemon
+echo ""
+echo "🔧 Step 6: Starting PM2 with fresh daemon..."
 
 # Start PM2 daemon fresh
-pm2 start deployment/ecosystem.ubuntu20.config.cjs --env production
+pm2 start deployment/ecosystem.ubuntu20.config.cjs
 
 # Wait for services to start
 sleep 5
@@ -161,9 +239,9 @@ pm2 save
 
 echo "   ✅ PM2 started successfully"
 
-# 6. Verify services
+# 7. Verify services
 echo ""
-echo "🔧 Step 6: Verifying services..."
+echo "🔧 Step 7: Verifying services..."
 
 echo ""
 echo "📊 PM2 Process Status:"
