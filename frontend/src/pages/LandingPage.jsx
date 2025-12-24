@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, memo, lazy, Suspense } from 'react';
+import { useEffect, useState, useCallback, useRef, memo } from 'react';
 import { Link } from 'react-router-dom';
 import { streamService } from '../services/streamService';
 import { useTheme } from '../contexts/ThemeContext';
