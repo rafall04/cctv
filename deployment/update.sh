@@ -28,11 +28,16 @@ npm install
 npm run build
 cd ..
 
-# 4. Restart Services
+# 4. Sync MediaMTX Config
+echo "⚙️ Syncing MediaMTX Config..."
+cp deployment/mediamtx.yml mediamtx/mediamtx.yml
+
+# 5. Restart Services
 echo "🚀 Restarting Services with PM2..."
 pm2 restart deployment/ecosystem.config.cjs --env production
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "✅ Update Completed Successfully!"
+echo "💡 If you see 'PM2 is out-of-date', run: pm2 update"
 pm2 list
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

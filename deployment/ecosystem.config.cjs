@@ -20,15 +20,19 @@ module.exports = {
         {
             name: 'rafnet-cctv-frontend',
             script: 'serve',
-            cwd: path.join(ROOT_DIR, 'frontend'),
-            args: '-s dist -l 8080',
+            env: {
+                PM2_SERVE_PATH: path.join(ROOT_DIR, 'frontend/dist'),
+                PM2_SERVE_PORT: 8080,
+                PM2_SERVE_SPA: 'true',
+                PM2_SERVE_HOMEPAGE: './index.html'
+            },
             instances: 1,
             autorestart: true,
             watch: false
         },
         {
             name: 'mediamtx',
-            script: './mediamtx',
+            script: path.join(ROOT_DIR, 'mediamtx/mediamtx'),
             cwd: path.join(ROOT_DIR, 'mediamtx'),
             instances: 1,
             autorestart: true,

@@ -21,6 +21,12 @@ rtmp: yes
 rtmpAddress: :1935
 
 # Path settings
+pathDefaults:
+  # Delete segments after this timespan.
+  # Set to 0s to disable automatic deletion.
+  # Use 'h' instead of 'd' as some versions don't support 'd'.
+  recordDeleteAfter: 0s
+
 paths:
   all:
     # Allow all sources (backend will manage this via API)
