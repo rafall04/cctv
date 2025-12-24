@@ -123,7 +123,7 @@ const start = async () => {
         console.log('');
 
         // Initial sync with MediaMTX
-        mediaMtxService.syncCameras();
+        await mediaMtxService.syncCameras();
     } catch (err) {
         fastify.log.error(err);
         process.exit(1);

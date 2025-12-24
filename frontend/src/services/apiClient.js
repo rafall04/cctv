@@ -1,8 +1,8 @@
 import axios from 'axios';
 
 // VITE_API_URL should be set in the production environment (.env.production).
-// This fallback assumes the backend is running on the same domain as the frontend, but on port 3000.
-const API_URL = import.meta.env.VITE_API_URL || 'http://cctv.raf.my.id:3000';
+// This fallback points to the Nginx reverse proxy for the backend API.
+const API_URL = import.meta.env.VITE_API_URL || 'https://api-cctv.raf.my.id';
 
 // Create axios instance
 const apiClient = axios.create({

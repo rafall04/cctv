@@ -1,11 +1,13 @@
-# MediaMTX Configuration with On-Demand Streaming Logic
+# MediaMTX Configuration - Minimal & Stable
 
 logLevel: info
 logDestinations: [stdout]
 
-# Listeners
+# API for backend management
 api: yes
 apiAddress: :9997
+
+# Listeners for streaming protocols
 hls: yes
 hlsAddress: :8888
 webrtc: yes
@@ -15,12 +17,6 @@ rtmpAddress: :1935
 rtsp: yes
 rtspAddress: :8554
 
-# Path Logic
+# Path defaults are minimal. The backend service will manage path configurations.
 paths:
-  all:
-    # When a stream is requested, run the backend script to fetch the source.
-    # The script uses the MediaMTX API to add or update the path config.
-    runOnDemand: node /var/www/rafnet-cctv/backend/sync_mediamtx.js
-    runOnDemandRestart: yes
-    runOnDemandStartTimeout: 10s
-    runOnDemandCloseAfter: 10s
+  all_others: {}
