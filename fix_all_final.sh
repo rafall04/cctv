@@ -44,7 +44,6 @@ pm2 stop all || echo "PM2 services not running."
 # 2. Deploy Clean MediaMTX and Nginx Configs
 echo "⚙️ Deploying clean configurations for MediaMTX and Nginx..."
 sudo mkdir -p "$MEDIAMTX_DEST_DIR"
-sudo cp "$MEDIAMTX_SRC_CONFIG" "$MEDIAMTX_DEST_FILE"
 sudo cp "$NGINX_SRC_CONFIG" "$NGINX_DEST_FILE"
 echo "  - Configurations copied."
 
