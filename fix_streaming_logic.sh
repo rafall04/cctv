@@ -36,15 +36,6 @@ echo "🚀 Starting Streaming Logic Fix for RAF NET CCTV Hub..."
 echo "🛑 Stopping all PM2 services..."
 pm2 stop all || echo "PM2 not running."
 
-# 2. Deploy Updated MediaMTX Configuration
-echo "🔧 Applying 'runOnDemand' logic to MediaMTX..."
-if [ -f "$MEDIAMTX_SRC_CONFIG" ]; then
-    sudo cp "$MEDIAMTX_SRC_CONFIG" "$MEDIAMTX_DEST_CONFIG"
-    echo "  ✅ MediaMTX configuration updated."
-else
-    echo "  ❌ ERROR: Source MediaMTX config '$MEDIAMTX_SRC_CONFIG' not found. Aborting."
-    exit 1
-fi
 
 # 3. Deploy Updated Nginx Configuration
 echo "🌐 Applying HLS proxy block to Nginx..."
