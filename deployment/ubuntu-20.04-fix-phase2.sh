@@ -73,8 +73,10 @@ echo "📦 Step 3: Installing backend dependencies..."
 echo "   This may take several minutes for native compilation..."
 
 # Set npm configuration for better compilation
-npm config set python python3
-npm config set node_gyp $(which node-gyp)
+export PYTHON=$(which python3)
+export npm_config_python=$(which python3)
+npm config set python python3 2>/dev/null || true
+npm config set node-gyp $(which node-gyp) 2>/dev/null || true
 
 # Install dependencies with specific flags for Ubuntu 20.04
 npm install --verbose --no-optional
