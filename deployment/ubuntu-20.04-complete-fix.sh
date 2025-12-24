@@ -6,7 +6,7 @@
 # 
 # This master script runs all 5 phases of Ubuntu 20.04 fixes
 # 
-# Usage:
+# Usage (as root):
 #   bash deployment/ubuntu-20.04-complete-fix.sh
 # 
 # Or run individual phases:
@@ -25,10 +25,10 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "🔧 Running all 5 phases of Ubuntu 20.04 compatibility fixes"
 echo ""
 
-# Check if running as root
-if [[ $EUID -eq 0 ]]; then
-   echo "❌ This script should NOT be run as root"
-   echo "   Run without sudo, it will ask for password when needed"
+# Check if running as root (REQUIRED)
+if [[ $EUID -ne 0 ]]; then
+   echo "❌ This script MUST be run as root"
+   echo "   Run with: sudo bash deployment/ubuntu-20.04-complete-fix.sh"
    exit 1
 fi
 

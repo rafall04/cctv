@@ -15,6 +15,7 @@
 # 4. Validates system requirements
 # 5. Pre-compiles native modules
 # 
+# MUST BE RUN AS ROOT
 # =================================================================
 
 set -e
@@ -24,21 +25,21 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "📋 Phase 1: System Dependencies & Build Environment"
 echo ""
 
-# Check if running as root
-if [[ $EUID -eq 0 ]]; then
-   echo "❌ This script should NOT be run as root"
-   echo "   Run without sudo, it will ask for password when needed"
+# Check if running as root (REQUIRED)
+if [[ $EUID -ne 0 ]]; then
+   echo "❌ This script MUST be run as root"
+   echo "   Run with: sudo bash deployment/ubuntu-20.04-fix-phase1.sh"
    exit 1
 fi
 
 # 1. Update system packages
 echo "📦 Step 1: Updating system packages..."
-sudo apt update
-sudo apt upgrade -y
+apt update
+apt upgrade -y
 
 # 2. Install essential build tools for Ubuntu 20.04
 echo "🔨 Step 2: Installing build tools and dependencies..."
-sudo apt install -y \
+apt install -y \
     curl \
     wget \
     git \
@@ -63,7 +64,7 @@ sudo apt install -y \
 # 3. Fix Python symlinks for node-gyp (Ubuntu 20.04 specific)
 echo "🐍 Step 3: Fixing Python environment for node-gyp..."
 if ! command -v python &> /dev/null; then
-    sudo ln -sf /usr/bin/python3 /usr/bin/python
+    ln -sf /usr/bin/python3 /usr/bin/python
 fi
 
 # Verify Python setup
@@ -73,11 +74,11 @@ python3 --version
 # 4. Install Node.js 18 LTS (Ubuntu 20.04 compatible)
 echo "🟢 Step 4: Installing Node.js 18 LTS..."
 # Remove any existing Node.js
-sudo apt remove -y nodejs npm || true
+apt remove -y nodejs npm || true
 
 # Add NodeSource repository for Node.js 18
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-sudo apt install -y nodejs
+curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+apt install -y nodejs
 
 # Verify Node.js installation
 echo "📊 Node.js version check:"
@@ -93,8 +94,8 @@ fi
 
 # 5. Install and configure npm global packages
 echo "📦 Step 5: Installing global npm packages..."
-sudo npm install -g pm2@latest
-sudo npm install -g node-gyp@latest
+npm install -g pm2@latest
+npm install -g node-gyp@latest
 
 # 6. Configure npm for native compilation
 echo "🔧 Step 6: Configuring npm for native compilation..."
@@ -140,22 +141,25 @@ if [ "$MEMORY_GB" -lt 1 ]; then
     echo "      Consider adding swap space for compilation"
 fi
 
-# 9. Create project directory structure
+# 9. Create project directory structure (as root)
 echo "📁 Step 9: Preparing project directory..."
-sudo mkdir -p /var/www/rafnet-cctv
-sudo chown -R $USER:$USER /var/www/rafnet-cctv
+mkdir -p /opt/cctv
+chown -R root:root /opt/cctv
+chmod -R 755 /opt/cctv
 
-# 10. Firewall configuration check
-echo "🔥 Step 10: Firewall configuration check..."
+# 10. Firewall configuration
+echo "🔥 Step 10: Configuring firewall..."
 if command -v ufw &> /dev/null; then
-    echo "   UFW firewall detected"
-    echo "   Required ports: 80, 443, 1935, 8888, 8889"
-    echo "   Run these commands after Phase 5:"
-    echo "   sudo ufw allow 80/tcp"
-    echo "   sudo ufw allow 443/tcp"
-    echo "   sudo ufw allow 1935/tcp"
-    echo "   sudo ufw allow 8888/tcp"
-    echo "   sudo ufw allow 8889/tcp"
+    echo "   Configuring UFW firewall..."
+    ufw --force enable
+    ufw allow 22/tcp    # SSH
+    ufw allow 80/tcp    # HTTP
+    ufw allow 443/tcp   # HTTPS
+    ufw allow 3000/tcp  # Backend API
+    ufw allow 8888/tcp  # MediaMTX HLS
+    ufw allow 8889/tcp  # MediaMTX WebRTC
+    ufw allow 9997/tcp  # MediaMTX API
+    echo "   ✅ Firewall configured"
 else
     echo "   No UFW firewall detected"
 fi
@@ -170,7 +174,8 @@ echo "   ✓ Build tools installed (gcc, python3, node-gyp)"
 echo "   ✓ Node.js 18 LTS installed and verified"
 echo "   ✓ PM2 process manager installed"
 echo "   ✓ Native compilation tested successfully"
-echo "   ✓ Project directory prepared"
+echo "   ✓ Project directory prepared at /opt/cctv"
+echo "   ✓ Firewall configured"
 echo ""
 echo "🚀 Ready for Phase 2: Backend Dependencies & Database Setup"
 echo "   Run: bash deployment/ubuntu-20.04-fix-phase2.sh"

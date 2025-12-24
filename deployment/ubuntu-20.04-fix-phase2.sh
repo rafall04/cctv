@@ -11,9 +11,10 @@
 # 1. Installs backend dependencies with proper native compilation
 # 2. Fixes better-sqlite3 and bcrypt compilation issues
 # 3. Sets up database with proper permissions
-# 4. Configures production environment variables
+# 4. Configures production environment variables (NO CORS filtering)
 # 5. Tests backend functionality
 # 
+# MUST BE RUN AS ROOT
 # =================================================================
 
 set -e
@@ -23,6 +24,13 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "📋 Phase 2: Backend Dependencies & Database Setup"
 echo ""
 
+# Check if running as root (REQUIRED)
+if [[ $EUID -ne 0 ]]; then
+   echo "❌ This script MUST be run as root"
+   echo "   Run with: sudo bash deployment/ubuntu-20.04-fix-phase2.sh"
+   exit 1
+fi
+
 # Check if Phase 1 was completed
 if ! command -v node &> /dev/null || ! command -v pm2 &> /dev/null; then
     echo "❌ Phase 1 not completed. Please run phase 1 first:"
@@ -31,7 +39,7 @@ if ! command -v node &> /dev/null || ! command -v pm2 &> /dev/null; then
 fi
 
 # Navigate to project root
-PROJECT_ROOT="/var/www/rafnet-cctv"
+PROJECT_ROOT="/opt/cctv"
 if [ ! -d "$PROJECT_ROOT" ]; then
     echo "❌ Project directory not found. Please run Phase 1 first."
     exit 1
@@ -111,11 +119,12 @@ try {
 echo "📊 Step 5: Setting up database..."
 mkdir -p data
 chmod 755 data
+chown -R root:root data
 
-# Create production environment file
+# Create production environment file with NO CORS filtering
 echo "⚙️ Step 6: Creating production environment configuration..."
 cat > .env << EOF
-# RAF NET CCTV - Production Configuration
+# RAF NET CCTV - Ubuntu 20.04 Production Configuration
 NODE_ENV=production
 PORT=3000
 HOST=0.0.0.0
@@ -130,16 +139,16 @@ MEDIAMTX_HLS_URL=http://localhost:8888
 MEDIAMTX_WEBRTC_URL=http://localhost:8889
 
 # Database
-DATABASE_PATH=./data/cctv.db
+DATABASE_PATH=/opt/cctv/data/cctv.db
 
-# CORS Configuration
-CORS_ORIGIN=https://cctv.raf.my.id,http://localhost:5173
+# CORS Configuration - NO FILTERING (Ubuntu 20.04 fix)
+CORS_ORIGIN=*
 
 # Logging
 LOG_LEVEL=info
 EOF
 
-echo "   ✅ Environment configuration created"
+echo "   ✅ Environment configuration created (NO CORS filtering)"
 
 # 6. Initialize database
 echo "🗄️ Step 7: Initializing database..."
@@ -197,24 +206,25 @@ fi
 kill $SERVER_PID 2>/dev/null || true
 wait $SERVER_PID 2>/dev/null || true
 
-# 9. Set proper file permissions
+# 9. Set proper file permissions (root ownership)
 echo "🔒 Step 10: Setting file permissions..."
 chmod +x ../deployment/*.sh
 chmod 644 .env
 chmod 755 data
 chmod 644 data/cctv.db
+chown -R root:root /opt/cctv
 
-# 10. Create systemd service file for backup
-echo "🔧 Step 11: Creating systemd service template..."
-sudo tee /etc/systemd/system/rafnet-cctv-backend.service > /dev/null << EOF
+# 10. Create systemd service file
+echo "🔧 Step 11: Creating systemd service..."
+tee /etc/systemd/system/rafnet-cctv-backend.service > /dev/null << EOF
 [Unit]
 Description=RAF NET CCTV Backend
 After=network.target
 
 [Service]
 Type=simple
-User=$USER
-WorkingDirectory=$PROJECT_ROOT/backend
+User=root
+WorkingDirectory=/opt/cctv/backend
 ExecStart=/usr/bin/node server.js
 Restart=always
 RestartSec=10
@@ -224,7 +234,8 @@ Environment=NODE_ENV=production
 WantedBy=multi-user.target
 EOF
 
-echo "   ✅ Systemd service template created"
+systemctl daemon-reload
+echo "   ✅ Systemd service created"
 
 cd ..
 
@@ -236,9 +247,10 @@ echo "📋 What was fixed:"
 echo "   ✓ Backend dependencies installed with native compilation"
 echo "   ✓ better-sqlite3 and bcrypt verified working"
 echo "   ✓ Database initialized with proper permissions"
-echo "   ✓ Production environment configured"
+echo "   ✓ Production environment configured (NO CORS filtering)"
 echo "   ✓ Backend server tested successfully"
-echo "   ✓ Systemd service template created"
+echo "   ✓ Systemd service created"
+echo "   ✓ Root ownership and permissions set"
 echo ""
 echo "🚀 Ready for Phase 3: Frontend Build & Configuration"
 echo "   Run: bash deployment/ubuntu-20.04-fix-phase3.sh"
