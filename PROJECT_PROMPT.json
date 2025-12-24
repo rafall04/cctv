@@ -1,0 +1,61 @@
+{
+  "project_name": "RAF NET Secure CCTV Hub",
+  "version": "2.2",
+  "tech_stack": {
+    "frontend": {
+      "framework": "React",
+      "styling": "Tailwind CSS",
+      "video_engine": "HLS.js",
+      "features": [
+        "Digital Zoom & Pan (Desktop/Mobile)",
+        "Multi-Layout Grid (Grid, Focus, Sidebar)",
+        "RT/Gang Grouping & Filtering",
+        "Responsive Design (Mobile Optimized)"
+      ]
+    },
+    "backend": {
+      "framework": "Fastify (Node.js)",
+      "database": "SQLite (better-sqlite3)",
+      "streaming_server": "MediaMTX",
+      "features": [
+        "MediaMTX Control API Integration",
+        "Automatic Path Syncing",
+        "Audit Logging",
+        "JWT Authentication"
+      ]
+    }
+  },
+  "database_schema": {
+    "cameras": {
+      "columns": [
+        "id (PK)",
+        "name",
+        "private_rtsp_url",
+        "description",
+        "location",
+        "group_name (RT/Gang)",
+        "enabled",
+        "created_at",
+        "updated_at"
+      ]
+    }
+  },
+  "best_practices": [
+    "Clean Code: Descriptive naming and single responsibility components.",
+    "DRY: Reusable services and helper components.",
+    "Security: Parameterized SQL queries and JWT for admin routes.",
+    "Performance: HLS streaming and optimized SQLite transactions."
+  ],
+  "recent_updates": [
+    "Implemented RT/Gang grouping and filtering on the landing page.",
+    "Enabled Multi-Layout selector for mobile devices.",
+    "Fixed popup UI: Camera name and description now appear above the video.",
+    "Standardized MediaMTX path naming to camera{id}."
+  ],
+  "future_roadmap": [
+    "Motion Detection & Notifications",
+    "Recording & Playback (NVR)",
+    "PWA Support",
+    "Role-Based Access Control"
+  ]
+}

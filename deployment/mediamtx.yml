@@ -1,0 +1,32 @@
+# MediaMTX Configuration for RAF NET CCTV Production
+
+# API settings
+api: yes
+apiAddress: 127.0.0.1:9997
+
+# HLS settings
+hls: yes
+hlsAddress: :8888
+hlsAlwaysRemux: yes
+hlsVariant: lowLatency
+
+# WebRTC settings
+webrtc: yes
+webrtcAddress: :8889
+webrtcICEUDP: yes
+webrtcICEUDPServerPort: 8189
+
+# RTMP settings (for camera input)
+rtmp: yes
+rtmpAddress: :1935
+
+# Path settings
+paths:
+  all:
+    # Allow all sources (backend will manage this via API)
+    source: publisher
+    # Enable on-demand to save bandwidth
+    sourceOnDemand: yes
+    # Disable authentication for public viewing (managed by our backend logic)
+    readUser: 
+    readPass: 

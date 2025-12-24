@@ -1,0 +1,20 @@
+# MediaMTX Configuration Template
+# Copy this file to mediamtx.yml and customize for your cameras
+
+# IMPORTANT: Update the RTSP URLs below to match your actual camera IPs
+
+paths:
+  camera1:
+    source: rtsp://YOUR_CAMERA_IP_1:554/stream
+    sourceProtocol: tcp
+    sourceOnDemand: no
+
+  camera2:
+    source: rtsp://YOUR_CAMERA_IP_2:554/stream
+    sourceProtocol: tcp
+    sourceOnDemand: no
+
+  camera3:
+    source: rtsp://YOUR_CAMERA_IP_3:554/stream
+    sourceProtocol: tcp
+    sourceOnDemand: no
