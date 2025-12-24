@@ -29,8 +29,8 @@ if ! command -v node &> /dev/null || ! command -v pm2 &> /dev/null; then
     exit 1
 fi
 
-# Navigate to project root
-PROJECT_ROOT="/var/www/rafnet-cctv"
+# Navigate to project root - Following steering rules
+PROJECT_ROOT="/opt/cctv"
 if [ ! -d "$PROJECT_ROOT" ]; then
     echo "❌ Project directory not found. Please run Phase 1 first."
     exit 1
@@ -47,18 +47,18 @@ fi
 # 1. Stop any running services
 echo "🛑 Step 1: Stopping existing services..."
 pm2 stop all || echo "No PM2 processes running"
-sudo systemctl stop nginx || echo "Nginx not running"
+systemctl stop nginx || echo "Nginx not running"
 
 # 2. Create Ubuntu 20.04 optimized Nginx configuration
 echo "🌐 Step 2: Creating Ubuntu 20.04 optimized Nginx configuration..."
 
-# Backup existing nginx config
+# Backup existing nginx config (as root)
 if [ -f "/etc/nginx/sites-available/rafnet-cctv" ]; then
-    sudo cp /etc/nginx/sites-available/rafnet-cctv /etc/nginx/sites-available/rafnet-cctv.backup
+    cp /etc/nginx/sites-available/rafnet-cctv /etc/nginx/sites-available/rafnet-cctv.backup
 fi
 
-# Create optimized nginx configuration
-sudo tee /etc/nginx/sites-available/rafnet-cctv > /dev/null << EOF
+# Create optimized nginx configuration (as root)
+tee /etc/nginx/sites-available/rafnet-cctv > /dev/null << EOF
 # RAF NET CCTV - Ubuntu 20.04 Optimized Nginx Configuration
 
 # Frontend Server Block
@@ -68,7 +68,7 @@ server {
     
     server_name cctv.raf.my.id 172.17.11.12;
     
-    root /var/www/rafnet-cctv/frontend/dist;
+    root /opt/cctv/frontend/dist;
     index index.html;
     
     # Security headers
@@ -208,14 +208,14 @@ echo "   ✅ Ubuntu 20.04 optimized Nginx configuration created"
 # 3. Enable site and test configuration
 echo "🔧 Step 3: Enabling site and testing Nginx configuration..."
 
-# Remove default site
-sudo rm -f /etc/nginx/sites-enabled/default
+# Remove default site (as root)
+rm -f /etc/nginx/sites-enabled/default
 
-# Enable our site
-sudo ln -sf /etc/nginx/sites-available/rafnet-cctv /etc/nginx/sites-enabled/
+# Enable our site (as root)
+ln -sf /etc/nginx/sites-available/rafnet-cctv /etc/nginx/sites-enabled/
 
-# Test nginx configuration
-if sudo nginx -t; then
+# Test nginx configuration (as root)
+if nginx -t; then
     echo "   ✅ Nginx configuration test passed"
 else
     echo "   ❌ Nginx configuration test failed"
@@ -304,15 +304,15 @@ pm2 start deployment/ecosystem.ubuntu20.config.cjs --env production
 # Save PM2 configuration
 pm2 save
 
-# Setup PM2 startup script for Ubuntu 20.04
-sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u $USER --hp $HOME
+# Setup PM2 startup script for Ubuntu 20.04 (as root)
+env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u root --hp /root
 
 echo "   ✅ PM2 configured for Ubuntu 20.04"
 
 # 7. Start Nginx
 echo "🌐 Step 7: Starting Nginx..."
-sudo systemctl start nginx
-sudo systemctl enable nginx
+systemctl start nginx
+systemctl enable nginx
 
 # 8. Wait for services to initialize
 echo "⏳ Step 8: Waiting for services to initialize..."
@@ -367,12 +367,12 @@ echo "🚀 Starting RAF NET CCTV System..."
 pm2 start deployment/ecosystem.ubuntu20.config.cjs --env production
 
 # Start Nginx
-sudo systemctl start nginx
+systemctl start nginx
 
 echo "✅ System started"
 echo "📊 Status:"
 pm2 list
-sudo systemctl status nginx --no-pager -l
+systemctl status nginx --no-pager -l
 EOF
 
 # System stop script
@@ -384,7 +384,7 @@ echo "🛑 Stopping RAF NET CCTV System..."
 pm2 stop all
 
 # Stop Nginx
-sudo systemctl stop nginx
+systemctl stop nginx
 
 echo "✅ System stopped"
 EOF
@@ -400,7 +400,7 @@ pm2 list
 
 echo ""
 echo "Nginx Status:"
-sudo systemctl status nginx --no-pager -l
+systemctl status nginx --no-pager -l
 
 echo ""
 echo "Port Usage:"
@@ -422,7 +422,7 @@ echo "🔄 Restarting RAF NET CCTV System..."
 pm2 restart all
 
 # Restart Nginx
-sudo systemctl restart nginx
+systemctl restart nginx
 
 echo "✅ System restarted"
 echo "📊 Status:"
@@ -446,7 +446,7 @@ pm2 list
 
 echo ""
 echo "Service Status:"
-echo "   Nginx: $(sudo systemctl is-active nginx)"
+echo "   Nginx: $(systemctl is-active nginx)"
 echo "   Backend: $(pm2 jlist | jq -r '.[] | select(.name=="rafnet-cctv-backend") | .pm2_env.status' 2>/dev/null || echo "unknown")"
 echo "   MediaMTX: $(pm2 jlist | jq -r '.[] | select(.name=="mediamtx") | .pm2_env.status' 2>/dev/null || echo "unknown")"
 
@@ -488,6 +488,18 @@ echo "🔧 Troubleshooting:"
 echo "   pm2 logs             - View all logs"
 echo "   pm2 logs backend     - View backend logs"
 echo "   pm2 logs mediamtx    - View MediaMTX logs"
-echo "   sudo nginx -t        - Test Nginx config"
-echo "   sudo systemctl status nginx - Check Nginx status"
+echo "   nginx -t        - Test Nginx config"
+echo "   systemctl status nginx - Check Nginx status"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# Auto-push changes to GitHub (following steering rules)
+echo ""
+echo "🔄 Auto-pushing Phase 5 completion to GitHub..."
+if command -v git &> /dev/null && [ -d ".git" ]; then
+    git add .
+    git commit -m "Deploy: Ubuntu 20.04 Phase 5 completed - Full deployment finished - $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
+    git push origin main || echo "Push failed - check git configuration"
+    echo "✅ Phase 5 changes pushed to GitHub"
+else
+    echo "⚠️  Git not available or not in git repository"
+fi

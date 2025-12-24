@@ -38,7 +38,7 @@ if ! command -v node &> /dev/null || ! command -v pm2 &> /dev/null; then
     exit 1
 fi
 
-# Navigate to project root
+# Navigate to project root - Following steering rules
 PROJECT_ROOT="/opt/cctv"
 if [ ! -d "$PROJECT_ROOT" ]; then
     echo "❌ Project directory not found. Please run Phase 1 first."
@@ -214,7 +214,7 @@ chmod 755 data
 chmod 644 data/cctv.db
 chown -R root:root /opt/cctv
 
-# 10. Create systemd service file
+# 10. Create systemd service file (as root)
 echo "🔧 Step 11: Creating systemd service..."
 tee /etc/systemd/system/rafnet-cctv-backend.service > /dev/null << EOF
 [Unit]
@@ -255,3 +255,15 @@ echo ""
 echo "🚀 Ready for Phase 3: Frontend Build & Configuration"
 echo "   Run: bash deployment/ubuntu-20.04-fix-phase3.sh"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# Auto-push changes to GitHub (following steering rules)
+echo ""
+echo "🔄 Auto-pushing Phase 2 completion to GitHub..."
+if command -v git &> /dev/null && [ -d ".git" ]; then
+    git add .
+    git commit -m "Deploy: Ubuntu 20.04 Phase 2 completed - $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
+    git push origin main || echo "Push failed - check git configuration"
+    echo "✅ Phase 2 changes pushed to GitHub"
+else
+    echo "⚠️  Git not available or not in git repository"
+fi

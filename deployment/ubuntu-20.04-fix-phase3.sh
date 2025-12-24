@@ -29,8 +29,8 @@ if ! command -v node &> /dev/null || ! command -v pm2 &> /dev/null; then
     exit 1
 fi
 
-# Navigate to project root
-PROJECT_ROOT="/var/www/rafnet-cctv"
+# Navigate to project root - Following steering rules
+PROJECT_ROOT="/opt/cctv"
 if [ ! -d "$PROJECT_ROOT" ]; then
     echo "❌ Project directory not found. Please run Phase 1 first."
     exit 1
@@ -281,3 +281,15 @@ echo ""
 echo "🚀 Ready for Phase 4: MediaMTX Configuration & Setup"
 echo "   Run: bash deployment/ubuntu-20.04-fix-phase4.sh"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# Auto-push changes to GitHub (following steering rules)
+echo ""
+echo "🔄 Auto-pushing Phase 3 completion to GitHub..."
+if command -v git &> /dev/null && [ -d ".git" ]; then
+    git add .
+    git commit -m "Deploy: Ubuntu 20.04 Phase 3 completed - $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
+    git push origin main || echo "Push failed - check git configuration"
+    echo "✅ Phase 3 changes pushed to GitHub"
+else
+    echo "⚠️  Git not available or not in git repository"
+fi

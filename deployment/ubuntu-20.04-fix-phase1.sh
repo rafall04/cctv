@@ -141,9 +141,14 @@ if [ "$MEMORY_GB" -lt 1 ]; then
     echo "      Consider adding swap space for compilation"
 fi
 
-# 9. Create project directory structure (as root)
+# 9. Create project directory structure (as root) - Following steering rules
 echo "📁 Step 9: Preparing project directory..."
 mkdir -p /opt/cctv
+mkdir -p /opt/cctv/backend
+mkdir -p /opt/cctv/frontend
+mkdir -p /opt/cctv/mediamtx
+mkdir -p /opt/cctv/data
+mkdir -p /opt/cctv/logs
 chown -R root:root /opt/cctv
 chmod -R 755 /opt/cctv
 
@@ -180,3 +185,15 @@ echo ""
 echo "🚀 Ready for Phase 2: Backend Dependencies & Database Setup"
 echo "   Run: bash deployment/ubuntu-20.04-fix-phase2.sh"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# Auto-push changes to GitHub (following steering rules)
+echo ""
+echo "🔄 Auto-pushing Phase 1 completion to GitHub..."
+if command -v git &> /dev/null && [ -d ".git" ]; then
+    git add .
+    git commit -m "Deploy: Ubuntu 20.04 Phase 1 completed - $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
+    git push origin main || echo "Push failed - check git configuration"
+    echo "✅ Phase 1 changes pushed to GitHub"
+else
+    echo "⚠️  Git not available or not in git repository"
+fi

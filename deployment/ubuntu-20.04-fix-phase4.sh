@@ -29,8 +29,8 @@ if ! command -v node &> /dev/null || ! command -v pm2 &> /dev/null; then
     exit 1
 fi
 
-# Navigate to project root
-PROJECT_ROOT="/var/www/rafnet-cctv"
+# Navigate to project root - Following steering rules
+PROJECT_ROOT="/opt/cctv"
 if [ ! -d "$PROJECT_ROOT" ]; then
     echo "❌ Project directory not found. Please run Phase 1 first."
     exit 1
@@ -253,10 +253,10 @@ fi
 
 cd ..
 
-# 8. Create MediaMTX systemd service
+# 8. Create MediaMTX systemd service (as root)
 echo "🔧 Step 8: Creating MediaMTX systemd service..."
 
-sudo tee /etc/systemd/system/mediamtx.service > /dev/null << EOF
+tee /etc/systemd/system/mediamtx.service > /dev/null << EOF
 [Unit]
 Description=MediaMTX RTSP Server
 After=network.target
@@ -264,8 +264,8 @@ After=network.target
 [Service]
 Type=simple
 User=$USER
-WorkingDirectory=$PROJECT_ROOT/mediamtx
-ExecStart=$PROJECT_ROOT/mediamtx/mediamtx mediamtx.yml
+WorkingDirectory=/opt/cctv/mediamtx
+ExecStart=/opt/cctv/mediamtx/mediamtx mediamtx.yml
 Restart=always
 RestartSec=5
 StandardOutput=journal
@@ -348,3 +348,15 @@ echo ""
 echo "🚀 Ready for Phase 5: Nginx & PM2 Final Configuration"
 echo "   Run: bash deployment/ubuntu-20.04-fix-phase5.sh"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# Auto-push changes to GitHub (following steering rules)
+echo ""
+echo "🔄 Auto-pushing Phase 4 completion to GitHub..."
+if command -v git &> /dev/null && [ -d ".git" ]; then
+    git add .
+    git commit -m "Deploy: Ubuntu 20.04 Phase 4 completed - $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
+    git push origin main || echo "Push failed - check git configuration"
+    echo "✅ Phase 4 changes pushed to GitHub"
+else
+    echo "⚠️  Git not available or not in git repository"
+fi
