@@ -1,5 +1,5 @@
 import { query, queryOne, execute } from '../database/database.js';
-const mediaMtxService = require('../services/mediaMtxService');
+import mediaMtxService from '../services/mediaMtxService.js';
 
 // Get all cameras (admin only - includes disabled cameras)
 export async function getAllCameras(request, reply) {

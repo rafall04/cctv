@@ -1,6 +1,6 @@
 import os from 'os';
 import { query, queryOne } from '../database/database.js';
-import { mediaMtxService } from '../services/mediaMtxService.js';
+import mediaMtxService from '../services/mediaMtxService.js';
 
 export async function getDashboardStats(request, reply) {
     try {
