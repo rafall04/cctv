@@ -185,8 +185,26 @@ class MediaMtxService {
                 axios.get(`${mediaMtxApiBaseUrl}/config/global/get`),
             ]);
             
+            // Get sessions/readers count from paths data
+            const paths = pathsRes.data?.items || [];
+            const sessions = [];
+            
+            // Extract readers from each path as sessions
+            paths.forEach(path => {
+                if (path.readers && path.readers.length > 0) {
+                    path.readers.forEach(reader => {
+                        sessions.push({
+                            path: path.name,
+                            type: reader.type,
+                            id: reader.id
+                        });
+                    });
+                }
+            });
+            
             return {
-                paths: pathsRes.data?.items || [],
+                paths: paths,
+                sessions: sessions,
                 config: configRes.data || {},
                 error: false
             };
@@ -196,6 +214,7 @@ class MediaMtxService {
             }
             return {
                 paths: [],
+                sessions: [],
                 config: {},
                 error: true,
                 message: error.message

@@ -4,7 +4,6 @@ import mediaMtxService from '../services/mediaMtxService.js';
 
 export async function getDashboardStats(request, reply) {
     try {
-        // 1. Get Camera Stats
         const cameraStats = queryOne(`
             SELECT 
                 COUNT(*) as total,
@@ -13,64 +12,69 @@ export async function getDashboardStats(request, reply) {
             FROM cameras
         `);
 
-        // 2. Get Area Stats
         const areaCount = queryOne('SELECT COUNT(*) as count FROM areas').count;
 
-        // 3. Get MediaMTX Stats
         const mtxStats = await mediaMtxService.getStats();
 
-        const cpus = os.cpus();
+        const cpusList = os.cpus();
+        
+        // Calculate CPU usage
+        let cpuLoadPercent = 0;
+        try {
+            const getCPUTimes = () => {
+                return os.cpus().reduce((acc, cpu) => {
+                    acc.idle += cpu.times.idle;
+                    acc.total += Object.values(cpu.times).reduce((a, b) => a + b, 0);
+                    return acc;
+                }, { idle: 0, total: 0 });
+            };
 
-        // Helper to get CPU times
-        const getCPUTimes = () => {
-            const cpus = os.cpus();
-            return cpus.reduce((acc, cpu) => {
-                acc.idle += cpu.times.idle;
-                acc.total += Object.values(cpu.times).reduce((a, b) => a + b, 0);
-                return acc;
-            }, { idle: 0, total: 0 });
-        };
+            const startTimes = getCPUTimes();
+            await new Promise(resolve => setTimeout(resolve, 100));
+            const endTimes = getCPUTimes();
 
-        const startTimes = getCPUTimes();
-        // Wait 100ms to get a delta
-        await new Promise(resolve => setTimeout(resolve, 100));
-        const endTimes = getCPUTimes();
+            const idleDelta = endTimes.idle - startTimes.idle;
+            const totalDelta = endTimes.total - startTimes.total;
+            cpuLoadPercent = totalDelta > 0 ? Math.round((1 - idleDelta / totalDelta) * 100) : 0;
+        } catch (e) {
+            cpuLoadPercent = 0;
+        }
 
-        const idleDelta = endTimes.idle - startTimes.idle;
-        const totalDelta = endTimes.total - startTimes.total;
-        const cpuLoadPercent = totalDelta > 0 ? Math.round((1 - idleDelta / totalDelta) * 100) : 0;
+        const totalMem = os.totalmem();
+        const freeMem = os.freemem();
+        const usedMem = totalMem - freeMem;
+        const memUsagePercent = Math.round((usedMem / totalMem) * 100);
 
         const systemInfo = {
             platform: os.platform(),
             arch: os.arch(),
-            cpus: cpus.length,
-            cpuModel: cpus.length > 0 ? cpus[0].model : 'Unknown CPU',
+            cpus: cpusList.length,
+            cpuModel: cpusList.length > 0 ? cpusList[0].model : 'Unknown CPU',
             cpuLoad: cpuLoadPercent,
-            totalMem: os.totalmem(),
-            freeMem: os.freemem(),
+            totalMem: totalMem,
+            freeMem: freeMem,
+            usedMem: usedMem,
+            memUsagePercent: memUsagePercent,
             uptime: os.uptime(),
-            loadAvg: os.loadavg(), // [1, 5, 15] minute load averages
+            loadAvg: os.loadavg(),
         };
 
-        // 5. Calculate Active Viewers and Bandwidth
-        // MediaMTX sessions list contains info about active viewers
-        const activeViewers = mtxStats.sessions.length;
+        const sessions = mtxStats.sessions || [];
+        const activeViewers = sessions.length;
 
-        // Map MediaMTX paths to our camera names for better UI
-        const activeStreams = mtxStats.paths.map(p => {
+        const activeStreams = (mtxStats.paths || []).map(p => {
             const cameraId = p.name.replace('camera', '');
             const cam = queryOne('SELECT name FROM cameras WHERE id = ?', [cameraId]);
             return {
                 id: cameraId,
                 name: cam ? cam.name : p.name,
-                state: p.state,
-                viewers: mtxStats.sessions.filter(s => s.path === p.name).length,
+                ready: p.ready || false,
+                viewers: (p.readers || []).length,
                 bytesReceived: p.bytesReceived || 0,
                 bytesSent: p.bytesSent || 0
             };
         });
 
-        // 6. Recent Audit Logs
         const recentLogs = query(`
             SELECT l.*, u.username 
             FROM audit_logs l
@@ -85,7 +89,7 @@ export async function getDashboardStats(request, reply) {
                 minute: '2-digit',
                 second: '2-digit',
                 hour12: false
-            }).format(new Date(log.created_at + ' Z')) // Append Z to treat as UTC
+            }).format(new Date(log.created_at + ' Z'))
         }));
 
         return reply.send({
