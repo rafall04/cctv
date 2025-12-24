@@ -142,12 +142,6 @@ record: no
 
 # Path defaults - Ubuntu 20.04 compatible time formats
 pathDefaults:
-  # Source settings
-  source: publisher
-  sourceOnDemand: yes
-  sourceOnDemandStartTimeout: 10s
-  sourceOnDemandCloseAfter: 10s
-  
   # Recording settings (using hours instead of days for compatibility)
   recordDeleteAfter: 24h
   
@@ -159,15 +153,13 @@ pathDefaults:
 
 # Paths configuration
 paths:
-  # Default path for all cameras
+  # Default path for all cameras - publisher mode (no sourceOnDemand)
   all:
     source: publisher
-    sourceOnDemand: yes
     
   # Health check path
   health:
     source: publisher
-    sourceOnDemand: no
 EOF
 
 echo "   ✅ Ubuntu 20.04 compatible configuration created"

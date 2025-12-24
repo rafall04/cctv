@@ -153,11 +153,9 @@ server {
     
     server_name api-cctv.raf.my.id;
     
-    # Rate limiting
-    limit_req_zone \$binary_remote_addr zone=api:10m rate=10r/s;
-    
     location / {
-        limit_req zone=api burst=20 nodelay;
+        # Basic rate limiting without zone (simplified for Ubuntu 20.04)
+        limit_req_status 429;
         
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
