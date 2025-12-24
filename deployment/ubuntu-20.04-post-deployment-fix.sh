@@ -70,7 +70,10 @@ JWT_SECRET=rafnet-cctv-production-secret-change-this
 JWT_EXPIRATION=24h
 
 # MediaMTX Configuration
+# API URL is internal (localhost) for backend communication
 MEDIAMTX_API_URL=http://127.0.0.1:9997
+# HLS and WebRTC URLs should be accessible from client browsers
+# Set to your server's public IP or domain
 MEDIAMTX_HLS_URL=http://172.17.11.12:8888
 MEDIAMTX_WEBRTC_URL=http://172.17.11.12:8889
 
@@ -78,6 +81,16 @@ MEDIAMTX_WEBRTC_URL=http://172.17.11.12:8889
 CORS_ORIGIN=*
 EOF
     echo "   ✅ Backend .env created with external access configuration"
+fi
+
+# Also update existing .env if HLS URL is still localhost
+if grep -q "MEDIAMTX_HLS_URL=http://localhost" backend/.env 2>/dev/null || grep -q "MEDIAMTX_HLS_URL=http://127.0.0.1" backend/.env 2>/dev/null; then
+    echo "   Updating MediaMTX URLs to use server IP..."
+    sed -i 's|MEDIAMTX_HLS_URL=http://localhost:8888|MEDIAMTX_HLS_URL=http://172.17.11.12:8888|g' backend/.env
+    sed -i 's|MEDIAMTX_HLS_URL=http://127.0.0.1:8888|MEDIAMTX_HLS_URL=http://172.17.11.12:8888|g' backend/.env
+    sed -i 's|MEDIAMTX_WEBRTC_URL=http://localhost:8889|MEDIAMTX_WEBRTC_URL=http://172.17.11.12:8889|g' backend/.env
+    sed -i 's|MEDIAMTX_WEBRTC_URL=http://127.0.0.1:8889|MEDIAMTX_WEBRTC_URL=http://172.17.11.12:8889|g' backend/.env
+    echo "   ✅ MediaMTX URLs updated to use server IP"
 fi
 
 # 3. Update PM2 ecosystem to use 0.0.0.0
