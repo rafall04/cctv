@@ -8,25 +8,25 @@ set -e
 echo "🔄 Starting RAF NET CCTV Update..."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+# Navigate to project root (assuming script is in deployment/)
+cd "$(dirname "$0")/.."
+
 # 1. Pull latest changes
 echo "📥 Pulling latest changes from GitHub..."
 git pull origin main
 
 # 2. Update Backend
 echo "🛠 Updating Backend..."
-cd ../backend
-npm install --production
-# Run migrations if any (setup-db is safe to run as it uses CREATE TABLE IF NOT EXISTS)
-# Note: Be careful if you have destructive changes in setup.js
-# npm run setup-db 
-cd ../deployment
+cd backend
+npm install --omit=dev
+cd ..
 
 # 3. Update Frontend
 echo "🏗 Updating Frontend..."
-cd ../frontend
+cd frontend
 npm install
 npm run build
-cd ../deployment
+cd ..
 
 # 4. Restart Services
 echo "🚀 Restarting Services with PM2..."
