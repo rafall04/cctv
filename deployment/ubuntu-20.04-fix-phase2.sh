@@ -235,7 +235,7 @@ chmod +x ../deployment/*.sh
 chmod 644 .env
 chmod 755 data
 chmod 644 data/cctv.db
-chown -R root:root /opt/cctv
+chown -R root:root /var/www/rafnet-cctv
 
 # 10. Create systemd service file (as root)
 echo "🔧 Step 11: Creating systemd service..."

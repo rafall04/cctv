@@ -1,8 +1,16 @@
 import axios from 'axios';
 import Database from 'better-sqlite3';
+import { config } from '../config/config.js';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
-// Configuration
-const dbPath = './database/cctv.db';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Configuration - use same path resolution as database.js
+const dbPath = config.database.path.startsWith('/') 
+  ? config.database.path 
+  : join(__dirname, '..', config.database.path);
 const mediaMtxApiBaseUrl = 'http://localhost:9997/v3';
 
 class MediaMtxService {
