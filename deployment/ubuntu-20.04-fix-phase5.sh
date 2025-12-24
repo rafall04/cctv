@@ -245,12 +245,12 @@ module.exports = {
             env: {
                 NODE_ENV: 'development',
                 PORT: 3000,
-                HOST: '127.0.0.1'
+                HOST: '0.0.0.0'
             },
             env_production: {
                 NODE_ENV: 'production',
                 PORT: 3000,
-                HOST: '127.0.0.1'
+                HOST: '0.0.0.0'
             },
             log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
             error_file: path.join(ROOT_DIR, 'logs/backend-error.log'),
@@ -271,9 +271,6 @@ module.exports = {
             min_uptime: '10s',
             max_restarts: 10,
             restart_delay: 4000,
-            env: {
-                MEDIAMTX_CONFPATH: 'mediamtx.yml'
-            },
             log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
             error_file: path.join(ROOT_DIR, 'logs/mediamtx-error.log'),
             out_file: path.join(ROOT_DIR, 'logs/mediamtx-out.log'),
@@ -490,14 +487,6 @@ echo "   nginx -t        - Test Nginx config"
 echo "   systemctl status nginx - Check Nginx status"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-# Auto-push changes to GitHub (following steering rules)
+# Note: Git auto-push disabled for server deployment
 echo ""
-echo "🔄 Auto-pushing Phase 5 completion to GitHub..."
-if command -v git &> /dev/null && [ -d ".git" ]; then
-    git add .
-    git commit -m "Deploy: Ubuntu 20.04 Phase 5 completed - Full deployment finished - $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
-    git push origin main || echo "Push failed - check git configuration"
-    echo "✅ Phase 5 changes pushed to GitHub"
-else
-    echo "⚠️  Git not available or not in git repository"
-fi
+echo "ℹ️  Git auto-push disabled on server"

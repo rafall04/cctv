@@ -341,14 +341,6 @@ echo "🚀 Ready for Phase 5: Nginx & PM2 Final Configuration"
 echo "   Run: bash deployment/ubuntu-20.04-fix-phase5.sh"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-# Auto-push changes to GitHub (following steering rules)
+# Note: Git auto-push disabled for server deployment
 echo ""
-echo "🔄 Auto-pushing Phase 4 completion to GitHub..."
-if command -v git &> /dev/null && [ -d ".git" ]; then
-    git add .
-    git commit -m "Deploy: Ubuntu 20.04 Phase 4 completed - $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
-    git push origin main || echo "Push failed - check git configuration"
-    echo "✅ Phase 4 changes pushed to GitHub"
-else
-    echo "⚠️  Git not available or not in git repository"
-fi
+echo "ℹ️  Git auto-push disabled on server"
