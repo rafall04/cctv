@@ -40,6 +40,8 @@ This folder contains all the necessary files to deploy the RAF NET CCTV applicat
 ## File Structure
 - `install.sh`: Main automation script.
 - `update.sh`: Script to pull changes and restart services.
+- `start.sh`: Script to start all services.
+- `stop.sh`: Script to stop all services.
 - `nginx.conf`: Nginx server block configuration.
 - `mediamtx.yml`: MediaMTX production configuration.
 - `backend.env.prod`: Production environment variables for the backend.
@@ -80,6 +82,8 @@ chmod +x update.sh
 ```
 
 ## Maintenance
+- **Start All**: `./deployment/start.sh`
+- **Stop All**: `./deployment/stop.sh`
+- **Update All**: `./deployment/update.sh`
 - **View Logs**: `pm2 logs`
 - **Check Status**: `pm2 list`
-- **Restart All**: `pm2 restart all`

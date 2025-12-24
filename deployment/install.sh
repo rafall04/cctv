@@ -75,26 +75,8 @@ sudo systemctl restart nginx
 
 # 10. Start Services with PM2
 echo "🚀 Starting Services..."
-# Start Backend
+# Start everything (Backend, Frontend, MediaMTX) via ecosystem config
 pm2 start deployment/ecosystem.config.cjs --env production
-
-# Start Frontend (via PM2 serve to ensure it's 'running' as a process)
-pm2 serve frontend/dist 8080 --name "rafnet-cctv-frontend" --spa
-
-# Start MediaMTX
-cat <<EOF > mediamtx/pm2-mediamtx.json
-{
-  "apps": [
-    {
-      "name": "mediamtx",
-      "script": "./mediamtx",
-      "cwd": "/var/www/rafnet-cctv/mediamtx",
-      "autorestart": true
-    }
-  ]
-}
-EOF
-pm2 start mediamtx/pm2-mediamtx.json
 
 # Save PM2 state
 pm2 save

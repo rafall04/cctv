@@ -30,7 +30,7 @@ cd ..
 
 # 4. Restart Services
 echo "🚀 Restarting Services with PM2..."
-pm2 restart all
+pm2 restart deployment/ecosystem.config.cjs --env production
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "✅ Update Completed Successfully!"
