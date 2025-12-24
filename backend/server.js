@@ -27,7 +27,13 @@ const fastify = Fastify({
 
 // Register CORS
 await fastify.register(cors, {
-    origin: config.cors.origin,
+    origin: [
+        'https://cctv.raf.my.id',
+        'http://cctv.raf.my.id',
+        'http://172.17.11.12',
+        'http://localhost:5173',
+        'http://localhost:8080'
+    ],
     credentials: true,
 });
 
