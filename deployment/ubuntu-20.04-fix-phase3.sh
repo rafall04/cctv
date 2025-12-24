@@ -91,8 +91,41 @@ echo "   ✅ Environment configurations created"
 echo "📦 Step 4: Installing frontend dependencies..."
 echo "   This may take a few minutes..."
 
+# Set environment variables for npm
+export PYTHON=$(which python3)
+export npm_config_python=$(which python3)
+
+# Clear npm cache to avoid version conflicts
+npm cache clean --force
+
 # Install with specific npm settings for Ubuntu 20.04
-npm install --no-optional --prefer-offline
+if npm install --no-optional --prefer-offline --legacy-peer-deps; then
+    echo "   ✅ Frontend dependencies installed successfully"
+else
+    echo "   ⚠️  Initial install failed, trying with updated package versions..."
+    
+    # Try to fix browserslist issue by updating it explicitly
+    npm install browserslist@latest --save-dev
+    
+    # Retry installation
+    if npm install --no-optional --legacy-peer-deps; then
+        echo "   ✅ Frontend dependencies installed successfully on retry"
+    else
+        echo "   ❌ Frontend dependency installation failed"
+        echo "   Trying alternative approach..."
+        
+        # Remove package-lock and try again
+        rm -f package-lock.json
+        npm install --no-optional --legacy-peer-deps --force
+        
+        if [ $? -eq 0 ]; then
+            echo "   ✅ Frontend dependencies installed with force flag"
+        else
+            echo "   ❌ All installation attempts failed"
+            exit 1
+        fi
+    fi
+fi
 
 # 5. Verify critical dependencies
 echo "🔍 Step 5: Verifying frontend dependencies..."
