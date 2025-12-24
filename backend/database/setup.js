@@ -12,10 +12,20 @@ const __dirname = dirname(__filename);
 const dataDir = join(__dirname, '..', 'data');
 if (!existsSync(dataDir)) {
   mkdirSync(dataDir, { recursive: true });
-  console.log('✓ Created data directory');
+  console.log('✓ Created data directory:', dataDir);
+} else {
+  console.log('✓ Data directory exists:', dataDir);
 }
 
-const dbPath = join(__dirname, '..', config.database.path);
+const dbPath = config.database.path.startsWith('/') 
+  ? config.database.path 
+  : join(__dirname, '..', config.database.path);
+
+console.log('Database configuration:');
+console.log('  Config path:', config.database.path);
+console.log('  Resolved path:', dbPath);
+console.log('  Data directory:', dataDir);
+
 const db = new Database(dbPath);
 
 console.log('Setting up database...');

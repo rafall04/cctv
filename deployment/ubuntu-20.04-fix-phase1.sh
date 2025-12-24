@@ -99,17 +99,17 @@ npm install -g node-gyp@latest
 
 # 6. Configure npm for native compilation
 echo "🔧 Step 6: Configuring npm for native compilation..."
-npm config set python python3 || echo "Warning: Could not set python config"
-npm config set node-gyp $(which node-gyp) || echo "Warning: Could not set node-gyp config"
 
-# Alternative method for older npm versions
+# For Node.js 20, npm config python/node-gyp is deprecated
+# Use environment variables instead
 export PYTHON=$(which python3)
 export npm_config_python=$(which python3)
+export npm_config_node_gyp=$(which node-gyp)
 
 # Verify configuration
 echo "   Python path: $(which python3)"
 echo "   Node-gyp path: $(which node-gyp)"
-echo "   NPM python config: $(npm config get python 2>/dev/null || echo 'not set')"
+echo "   Environment variables set for native compilation"
 
 # 7. Test native compilation capability
 echo "🧪 Step 7: Testing native compilation..."

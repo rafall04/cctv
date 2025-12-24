@@ -72,11 +72,10 @@ fi
 echo "📦 Step 3: Installing backend dependencies..."
 echo "   This may take several minutes for native compilation..."
 
-# Set npm configuration for better compilation
+# Set environment variables for native compilation (Node.js 20 compatible)
 export PYTHON=$(which python3)
 export npm_config_python=$(which python3)
-npm config set python python3 2>/dev/null || true
-npm config set node-gyp $(which node-gyp) 2>/dev/null || true
+export npm_config_node_gyp=$(which node-gyp)
 
 # Install dependencies with specific flags for Ubuntu 20.04
 npm install --verbose --no-optional
@@ -123,6 +122,13 @@ mkdir -p data
 chmod 755 data
 chown -R root:root data
 
+# Verify data directory exists
+if [ ! -d "data" ]; then
+    echo "   ❌ Failed to create data directory"
+    exit 1
+fi
+echo "   ✅ Data directory created: $(pwd)/data"
+
 # Create production environment file with NO CORS filtering
 echo "⚙️ Step 6: Creating production environment configuration..."
 cat > .env << EOF
@@ -154,11 +160,25 @@ echo "   ✅ Environment configuration created (NO CORS filtering)"
 
 # 6. Initialize database
 echo "🗄️ Step 7: Initializing database..."
+echo "   Current directory: $(pwd)"
+echo "   Data directory exists: $([ -d "data" ] && echo "YES" || echo "NO")"
+echo "   Data directory permissions: $(ls -ld data 2>/dev/null || echo "NOT FOUND")"
+
 if npm run setup-db; then
     echo "   ✅ Database initialized successfully"
 else
     echo "   ❌ Database initialization failed"
-    exit 1
+    echo "   Attempting to create data directory and retry..."
+    mkdir -p data
+    chmod 755 data
+    chown root:root data
+    
+    if npm run setup-db; then
+        echo "   ✅ Database initialized successfully on retry"
+    else
+        echo "   ❌ Database initialization failed on retry"
+        exit 1
+    fi
 fi
 
 # 7. Test database permissions and functionality
