@@ -27,7 +27,7 @@ Admin → [Login] → [Admin Panel] → Fastify API → SQLite → MediaMTX Mana
 
 ## 📋 Prerequisites
 
-- **Node.js** 18+ (for backend and frontend)
+- **Node.js** 20+ (for backend and frontend)
 - **MediaMTX** v1.x ([Download](https://github.com/bluenviron/mediamtx/releases))
 - **Private Network**: Cameras on isolated VLAN accessible only to MediaMTX host
 

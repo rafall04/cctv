@@ -9,7 +9,7 @@
 # This script fixes the fundamental system-level issues that cause
 # deployment failures on Ubuntu 20.04:
 # 
-# 1. Ensures correct Node.js version (18+ LTS)
+# 1. Ensures correct Node.js version (20+ LTS)
 # 2. Installs all required build tools for native dependencies
 # 3. Fixes Python symlinks for node-gyp
 # 4. Validates system requirements
@@ -71,13 +71,13 @@ fi
 python --version
 python3 --version
 
-# 4. Install Node.js 18 LTS (Ubuntu 20.04 compatible)
-echo "🟢 Step 4: Installing Node.js 18 LTS..."
+# 4. Install Node.js 20 LTS (Ubuntu 20.04 compatible)
+echo "🟢 Step 4: Installing Node.js 20 LTS..."
 # Remove any existing Node.js
 apt remove -y nodejs npm || true
 
-# Add NodeSource repository for Node.js 18
-curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+# Add NodeSource repository for Node.js 20
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
 apt install -y nodejs
 
 # Verify Node.js installation
@@ -85,10 +85,10 @@ echo "📊 Node.js version check:"
 node --version
 npm --version
 
-# Check if Node.js version is 18+
+# Check if Node.js version is 20+
 NODE_VERSION=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
-if [ "$NODE_VERSION" -lt 18 ]; then
-    echo "❌ Node.js version $NODE_VERSION is too old. Need 18+"
+if [ "$NODE_VERSION" -lt 20 ]; then
+    echo "❌ Node.js version $NODE_VERSION is too old. Need 20+"
     exit 1
 fi
 
@@ -176,7 +176,7 @@ echo ""
 echo "📋 What was fixed:"
 echo "   ✓ Ubuntu 20.04 system packages updated"
 echo "   ✓ Build tools installed (gcc, python3, node-gyp)"
-echo "   ✓ Node.js 18 LTS installed and verified"
+echo "   ✓ Node.js 20 LTS installed and verified"
 echo "   ✓ PM2 process manager installed"
 echo "   ✓ Native compilation tested successfully"
 echo "   ✓ Project directory prepared at /opt/cctv"

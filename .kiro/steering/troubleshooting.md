@@ -163,12 +163,12 @@ chmod 600 /var/www/rafnet-cctv/data/cctv.db
 # Remove old Node.js
 apt remove nodejs npm
 
-# Install Node.js 18
-curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+# Install Node.js 20
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
 apt install -y nodejs
 
 # Verify version
-node --version  # Should be v18.x.x or higher
+node --version  # Should be v20.x.x or higher
 npm --version
 ```
 

@@ -3,7 +3,7 @@
 ## Core Technologies
 
 ### Backend
-- **Runtime**: Node.js 18+ with ES modules (`"type": "module"`)
+- **Runtime**: Node.js 20+ with ES modules (`"type": "module"`)
 - **Framework**: Fastify 4.x (high-performance web framework)
 - **Database**: SQLite with better-sqlite3 (embedded database)
 - **Authentication**: JWT with @fastify/jwt, bcrypt for password hashing
