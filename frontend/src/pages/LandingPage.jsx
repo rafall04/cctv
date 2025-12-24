@@ -3,287 +3,244 @@ import { streamService } from '../services/streamService';
 import { useTheme } from '../contexts/ThemeContext';
 import Hls from 'hls.js';
 
-// Simple Icons
-const SunIcon = () => (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-    </svg>
-);
-
-const MoonIcon = () => (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-    </svg>
-);
-
-const CameraIcon = () => (
-    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-    </svg>
-);
-
-const SearchIcon = () => (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-    </svg>
-);
-
-const CloseIcon = () => (
-    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-    </svg>
-);
-
-const ExpandIcon = () => (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-    </svg>
-);
-
-const LocationIcon = () => (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-    </svg>
-);
-
-const PlusIcon = () => (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-    </svg>
-);
-
-const MinusIcon = () => (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-    </svg>
-);
-
-const ResetIcon = () => (
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-    </svg>
-);
+// Lightweight SVG Icons - inline for performance
+const Icon = {
+    Sun: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>,
+    Moon: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>,
+    Camera: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>,
+    Search: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>,
+    X: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M6 18L18 6M6 6l12 12"/></svg>,
+    Expand: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>,
+    Shrink: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3"/></svg>,
+    MapPin: () => <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/><circle cx="12" cy="11" r="3"/></svg>,
+    Plus: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M12 5v14m-7-7h14"/></svg>,
+    Minus: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M5 12h14"/></svg>,
+    RotateCcw: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>,
+    Grid2: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>,
+    Signal: () => <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/></svg>,
+};
 
 
-// Video Player Component
-const VideoPlayer = memo(function VideoPlayer({ camera, streams, isExpanded, enableZoom }) {
+// Optimized Video Player - minimal re-renders
+const VideoPlayer = memo(function VideoPlayer({ camera, streams, expanded, onToggleExpand }) {
     const videoRef = useRef(null);
     const hlsRef = useRef(null);
     const containerRef = useRef(null);
-    const [status, setStatus] = useState('loading');
-    const [isFullScreen, setIsFullScreen] = useState(false);
-
-    // Zoom state
+    const [status, setStatus] = useState('connecting');
+    const [fullscreen, setFullscreen] = useState(false);
+    
+    // Zoom/Pan for expanded view
     const [zoom, setZoom] = useState(1);
     const [pan, setPan] = useState({ x: 0, y: 0 });
-    const [isDragging, setIsDragging] = useState(false);
-    const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+    const [dragging, setDragging] = useState(false);
+    const dragRef = useRef({ x: 0, y: 0, px: 0, py: 0 });
 
-    const streamUrl = streams?.hls;
+    const url = streams?.hls;
 
-    // Initialize HLS
+    // HLS Setup
     useEffect(() => {
-        if (!streamUrl || !videoRef.current) return;
-
+        if (!url || !videoRef.current) return;
         const video = videoRef.current;
         let hls = null;
 
-        if (Hls.isSupported()) {
-            hls = new Hls({
-                enableWorker: true,
-                lowLatencyMode: true,
-                backBufferLength: 90,
-            });
-            hlsRef.current = hls;
-            hls.loadSource(streamUrl);
-            hls.attachMedia(video);
-
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                video.play().then(() => setStatus('playing')).catch(() => setStatus('playing'));
-            });
-
-            hls.on(Hls.Events.ERROR, (_, data) => {
-                if (data.fatal) {
-                    if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                        setTimeout(() => hls.startLoad(), 2000);
-                    } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                        hls.recoverMediaError();
-                    } else {
-                        setStatus('error');
+        const init = () => {
+            setStatus('connecting');
+            if (Hls.isSupported()) {
+                hls = new Hls({ enableWorker: true, lowLatencyMode: true, backBufferLength: 60 });
+                hlsRef.current = hls;
+                hls.loadSource(url);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    video.play().catch(() => {});
+                    setStatus('live');
+                });
+                hls.on(Hls.Events.ERROR, (_, d) => {
+                    if (d.fatal) {
+                        if (d.type === Hls.ErrorTypes.NETWORK_ERROR) setTimeout(() => hls?.startLoad(), 3000);
+                        else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) hls?.recoverMediaError();
+                        else setStatus('offline');
                     }
-                }
-            });
-        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            video.src = streamUrl;
-            video.addEventListener('loadedmetadata', () => {
-                video.play().then(() => setStatus('playing')).catch(() => setStatus('playing'));
-            });
-        }
-
-        return () => {
-            if (hls) {
-                hls.destroy();
-                hlsRef.current = null;
+                });
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = url;
+                video.addEventListener('loadedmetadata', () => { video.play().catch(() => {}); setStatus('live'); });
+                video.addEventListener('error', () => setStatus('offline'));
             }
         };
-    }, [streamUrl]);
+        init();
+        return () => { if (hls) { hls.destroy(); hlsRef.current = null; } };
+    }, [url]);
 
     // Fullscreen
     useEffect(() => {
-        const onFSChange = () => setIsFullScreen(!!document.fullscreenElement || !!document.webkitFullscreenElement);
-        document.addEventListener('fullscreenchange', onFSChange);
-        document.addEventListener('webkitfullscreenchange', onFSChange);
+        const onChange = () => setFullscreen(!!document.fullscreenElement || !!document.webkitFullscreenElement);
+        document.addEventListener('fullscreenchange', onChange);
+        document.addEventListener('webkitfullscreenchange', onChange);
         return () => {
-            document.removeEventListener('fullscreenchange', onFSChange);
-            document.removeEventListener('webkitfullscreenchange', onFSChange);
+            document.removeEventListener('fullscreenchange', onChange);
+            document.removeEventListener('webkitfullscreenchange', onChange);
         };
     }, []);
 
-    const toggleFullScreen = async (e) => {
+    const toggleFS = async (e) => {
         e?.stopPropagation();
         const el = containerRef.current;
-        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-            if (el.requestFullscreen) await el.requestFullscreen();
-            else if (el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
-        } else {
-            if (document.exitFullscreen) await document.exitFullscreen();
-            else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
-        }
+        try {
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                await (el.requestFullscreen?.() || el.webkitRequestFullscreen?.());
+            } else {
+                await (document.exitFullscreen?.() || document.webkitExitFullscreen?.());
+            }
+        } catch {}
     };
 
-    // Zoom handlers
-    const handleWheel = (e) => {
-        if (!enableZoom) return;
+    // Zoom handlers (only when expanded)
+    const canZoom = expanded || fullscreen;
+    const maxPan = 200 * (zoom - 1);
+
+    const onWheel = (e) => {
+        if (!canZoom) return;
         e.preventDefault();
-        const delta = e.deltaY > 0 ? -0.3 : 0.3;
         setZoom(z => {
-            const newZ = Math.max(1, Math.min(5, z + delta));
-            if (newZ === 1) setPan({ x: 0, y: 0 });
-            return newZ;
+            const nz = Math.max(1, Math.min(4, z + (e.deltaY > 0 ? -0.2 : 0.2)));
+            if (nz === 1) setPan({ x: 0, y: 0 });
+            return nz;
         });
     };
 
-    const handleMouseDown = (e) => {
-        if (!enableZoom || zoom <= 1) return;
+    const onPointerDown = (e) => {
+        if (!canZoom || zoom <= 1) return;
         e.preventDefault();
-        setIsDragging(true);
-        dragStart.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
+        setDragging(true);
+        dragRef.current = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y };
+        e.target.setPointerCapture?.(e.pointerId);
     };
 
-    const handleMouseMove = (e) => {
-        if (!isDragging || zoom <= 1) return;
-        const dx = e.clientX - dragStart.current.x;
-        const dy = e.clientY - dragStart.current.y;
-        const maxPan = 150 * (zoom - 1);
+    const onPointerMove = (e) => {
+        if (!dragging) return;
+        const dx = e.clientX - dragRef.current.x;
+        const dy = e.clientY - dragRef.current.y;
         setPan({
-            x: Math.max(-maxPan, Math.min(maxPan, dragStart.current.panX + dx)),
-            y: Math.max(-maxPan, Math.min(maxPan, dragStart.current.panY + dy)),
+            x: Math.max(-maxPan, Math.min(maxPan, dragRef.current.px + dx)),
+            y: Math.max(-maxPan, Math.min(maxPan, dragRef.current.py + dy)),
         });
     };
 
-    const handleMouseUp = () => setIsDragging(false);
-
-    // Touch handlers
-    const handleTouchStart = (e) => {
-        if (!enableZoom || zoom <= 1) return;
-        const t = e.touches[0];
-        setIsDragging(true);
-        dragStart.current = { x: t.clientX, y: t.clientY, panX: pan.x, panY: pan.y };
+    const onPointerUp = (e) => {
+        setDragging(false);
+        e.target.releasePointerCapture?.(e.pointerId);
     };
 
-    const handleTouchMove = (e) => {
-        if (!isDragging || zoom <= 1) return;
-        if (e.cancelable) e.preventDefault();
-        const t = e.touches[0];
-        const dx = t.clientX - dragStart.current.x;
-        const dy = t.clientY - dragStart.current.y;
-        const maxPan = 150 * (zoom - 1);
-        setPan({
-            x: Math.max(-maxPan, Math.min(maxPan, dragStart.current.panX + dx)),
-            y: Math.max(-maxPan, Math.min(maxPan, dragStart.current.panY + dy)),
-        });
-    };
-
-    const zoomIn = (e) => { e?.stopPropagation(); setZoom(z => Math.min(5, z + 0.5)); };
+    const zoomIn = (e) => { e?.stopPropagation(); setZoom(z => Math.min(4, z + 0.5)); };
     const zoomOut = (e) => { e?.stopPropagation(); setZoom(z => { const nz = Math.max(1, z - 0.5); if (nz === 1) setPan({ x: 0, y: 0 }); return nz; }); };
-    const resetZoom = (e) => { e?.stopPropagation(); setZoom(1); setPan({ x: 0, y: 0 }); };
+    const zoomReset = (e) => { e?.stopPropagation(); setZoom(1); setPan({ x: 0, y: 0 }); };
+
+    const statusColor = status === 'live' ? 'bg-emerald-500' : status === 'connecting' ? 'bg-amber-500' : 'bg-red-500';
+    const statusText = status === 'live' ? 'LIVE' : status === 'connecting' ? 'CONNECTING' : 'OFFLINE';
 
     return (
         <div
             ref={containerRef}
-            className="relative w-full h-full bg-black overflow-hidden rounded-xl group"
+            className={`relative w-full h-full bg-black overflow-hidden ${expanded ? 'rounded-none' : 'rounded-2xl'} group`}
             style={{ touchAction: zoom > 1 ? 'none' : 'auto' }}
-            onWheel={handleWheel}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleMouseUp}
+            onWheel={onWheel}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerLeave={onPointerUp}
         >
+            {/* Video */}
             <video
                 ref={videoRef}
-                onMouseDown={handleMouseDown}
+                onPointerDown={onPointerDown}
                 className="w-full h-full"
                 style={{
-                    objectFit: isExpanded || isFullScreen ? 'contain' : 'cover',
+                    objectFit: expanded || fullscreen ? 'contain' : 'cover',
                     transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
-                    cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
+                    cursor: zoom > 1 ? (dragging ? 'grabbing' : 'grab') : 'default',
+                    willChange: dragging ? 'transform' : 'auto',
                 }}
                 muted
                 playsInline
                 autoPlay
             />
 
-            {/* Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 opacity-0 group-hover:opacity-100 transition-opacity">
-                {/* Info */}
-                <div className="absolute top-3 left-3 right-12">
-                    <h3 className="text-sm font-bold text-white truncate">{camera.name}</h3>
-                    {camera.location && (
-                        <p className="text-xs text-gray-300 flex items-center gap-1 mt-0.5">
-                            <LocationIcon /> <span className="truncate">{camera.location}</span>
-                        </p>
-                    )}
-                </div>
+            {/* Gradient Overlay */}
+            <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-                {/* Status */}
-                <div className="absolute top-3 right-3">
-                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
-                        status === 'playing' ? 'bg-green-500/30 text-green-400' :
-                        status === 'loading' ? 'bg-yellow-500/30 text-yellow-400' : 'bg-red-500/30 text-red-400'
-                    }`}>
-                        {status === 'playing' ? '● LIVE' : status === 'loading' ? 'LOADING' : 'OFFLINE'}
+            {/* Top Bar - Status */}
+            <div className="absolute top-0 left-0 right-0 p-3 flex items-start justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <div className="flex items-center gap-2">
+                    <span className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-semibold tracking-wide text-white ${statusColor}/90 backdrop-blur-sm`}>
+                        <Icon.Signal />
+                        {statusText}
                     </span>
-                </div>
-
-                {/* Controls */}
-                <div className="absolute bottom-3 left-3 right-3 flex justify-between items-center">
-                    {enableZoom && isExpanded ? (
-                        <div className="flex items-center gap-1 bg-black/60 rounded-lg p-1">
-                            <button onClick={zoomOut} className="p-1.5 hover:bg-white/20 rounded text-white"><MinusIcon /></button>
-                            <span className="text-xs text-white w-10 text-center">{Math.round(zoom * 100)}%</span>
-                            <button onClick={zoomIn} className="p-1.5 hover:bg-white/20 rounded text-white"><PlusIcon /></button>
-                            <button onClick={resetZoom} className="p-1.5 hover:bg-white/20 rounded text-white ml-1"><ResetIcon /></button>
-                        </div>
-                    ) : <div />}
-                    <button onClick={toggleFullScreen} className="p-2 bg-white/10 hover:bg-white/20 rounded-lg text-white">
-                        <ExpandIcon />
-                    </button>
                 </div>
             </div>
 
-            {/* Loading */}
-            {status === 'loading' && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                    <div className="w-8 h-8 border-2 border-white/20 border-t-sky-500 rounded-full animate-spin" />
+            {/* Bottom Bar - Info & Controls */}
+            <div className="absolute bottom-0 left-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <div className="flex items-end justify-between gap-3">
+                    {/* Camera Info */}
+                    <div className="flex-1 min-w-0">
+                        <h3 className="text-white font-semibold text-sm truncate drop-shadow-lg">{camera.name}</h3>
+                        {camera.location && (
+                            <p className="text-white/70 text-xs flex items-center gap-1 mt-0.5 truncate">
+                                <Icon.MapPin />
+                                <span className="truncate">{camera.location}</span>
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Controls */}
+                    <div className="flex items-center gap-1.5">
+                        {/* Zoom Controls - only in expanded/fullscreen */}
+                        {canZoom && (
+                            <div className="flex items-center gap-0.5 bg-black/50 backdrop-blur-sm rounded-lg p-0.5 mr-1">
+                                <button onClick={zoomOut} className="p-1.5 hover:bg-white/20 rounded-md text-white/80 hover:text-white transition-colors"><Icon.Minus /></button>
+                                <span className="text-[10px] text-white/70 w-8 text-center font-medium">{Math.round(zoom * 100)}%</span>
+                                <button onClick={zoomIn} className="p-1.5 hover:bg-white/20 rounded-md text-white/80 hover:text-white transition-colors"><Icon.Plus /></button>
+                                {zoom > 1 && <button onClick={zoomReset} className="p-1.5 hover:bg-white/20 rounded-md text-white/80 hover:text-white transition-colors ml-0.5"><Icon.RotateCcw /></button>}
+                            </div>
+                        )}
+
+                        {/* Expand/Fullscreen */}
+                        {!expanded && (
+                            <button
+                                onClick={onToggleExpand}
+                                className="p-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg text-white transition-all duration-200 hover:scale-105"
+                            >
+                                <Icon.Expand />
+                            </button>
+                        )}
+                        <button
+                            onClick={toggleFS}
+                            className="p-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg text-white transition-all duration-200 hover:scale-105"
+                        >
+                            {fullscreen ? <Icon.Shrink /> : <Icon.Expand />}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Loading State */}
+            {status === 'connecting' && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
+                    <div className="flex flex-col items-center gap-2">
+                        <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                        <span className="text-white/60 text-xs font-medium">Connecting...</span>
+                    </div>
                 </div>
             )}
 
-            {/* Error */}
-            {status === 'error' && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/80">
-                    <p className="text-red-400 text-sm">Stream unavailable</p>
+            {/* Error State */}
+            {status === 'offline' && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                    <div className="text-center">
+                        <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-2">
+                            <Icon.Camera />
+                        </div>
+                        <p className="text-white/60 text-xs">Stream Unavailable</p>
+                    </div>
                 </div>
             )}
         </div>
@@ -291,56 +248,84 @@ const VideoPlayer = memo(function VideoPlayer({ camera, streams, isExpanded, ena
 });
 
 
-// Camera Card
-const CameraCard = memo(function CameraCard({ camera, onClick }) {
+// Camera Card - optimized with lazy loading
+const CameraCard = memo(function CameraCard({ camera, onExpand, index }) {
+    const [visible, setVisible] = useState(false);
+    const ref = useRef(null);
+
+    // Intersection Observer for lazy loading
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        
+        const observer = new IntersectionObserver(
+            ([entry]) => { if (entry.isIntersecting) { setVisible(true); observer.disconnect(); } },
+            { rootMargin: '100px', threshold: 0.1 }
+        );
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, []);
+
     return (
         <div
-            className="aspect-video rounded-xl overflow-hidden cursor-pointer bg-gray-900 shadow-lg hover:shadow-xl transition-shadow ring-1 ring-white/10 hover:ring-sky-500/50"
-            onClick={onClick}
+            ref={ref}
+            className="aspect-video rounded-2xl overflow-hidden cursor-pointer bg-gray-900 shadow-xl ring-1 ring-white/5 hover:ring-white/20 transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] transform-gpu"
+            onClick={onExpand}
+            style={{ animationDelay: `${index * 50}ms` }}
         >
-            <VideoPlayer camera={camera} streams={camera.streams} isExpanded={false} enableZoom={false} />
+            {visible ? (
+                <VideoPlayer camera={camera} streams={camera.streams} expanded={false} onToggleExpand={onExpand} />
+            ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gray-900">
+                    <div className="text-gray-600 animate-pulse"><Icon.Camera /></div>
+                </div>
+            )}
         </div>
     );
 });
 
-// Expanded Modal
-function ExpandedView({ camera, onClose }) {
+// Expanded Modal - fullscreen experience
+function ExpandedModal({ camera, onClose }) {
     useEffect(() => {
-        const onEsc = (e) => e.key === 'Escape' && onClose();
-        document.addEventListener('keydown', onEsc);
+        const onKey = (e) => e.key === 'Escape' && onClose();
+        document.addEventListener('keydown', onKey);
         document.body.style.overflow = 'hidden';
         return () => {
-            document.removeEventListener('keydown', onEsc);
+            document.removeEventListener('keydown', onKey);
             document.body.style.overflow = '';
         };
     }, [onClose]);
 
     return (
-        <div className="fixed inset-0 z-50 bg-black flex flex-col">
+        <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm animate-fadeIn">
             {/* Header */}
-            <div className="flex items-center justify-between p-4">
+            <div className="absolute top-0 left-0 right-0 z-10 p-4 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent">
                 <div className="text-white">
                     <h2 className="text-lg font-bold">{camera.name}</h2>
                     {camera.location && (
-                        <p className="text-sm text-gray-400 flex items-center gap-1">
-                            <LocationIcon /> {camera.location}
+                        <p className="text-sm text-white/60 flex items-center gap-1.5 mt-0.5">
+                            <Icon.MapPin /> {camera.location}
                         </p>
                     )}
                 </div>
-                <button onClick={onClose} className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white">
-                    <CloseIcon />
+                <button
+                    onClick={onClose}
+                    className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all duration-200 hover:rotate-90"
+                >
+                    <Icon.X />
                 </button>
             </div>
+
             {/* Video */}
-            <div className="flex-1 p-4 pt-0">
-                <VideoPlayer camera={camera} streams={camera.streams} isExpanded={true} enableZoom={true} />
+            <div className="absolute inset-0 pt-16 pb-4 px-4">
+                <VideoPlayer camera={camera} streams={camera.streams} expanded={true} />
             </div>
         </div>
     );
 }
 
 
-// Main Page
+// Main Landing Page
 function LandingPage() {
     const { theme, toggleTheme } = useTheme();
     const [cameras, setCameras] = useState([]);
@@ -350,45 +335,37 @@ function LandingPage() {
     const [expanded, setExpanded] = useState(null);
     const [cols, setCols] = useState(2);
 
-    const isDark = theme === 'dark';
+    const dark = theme === 'dark';
 
-    // Fetch
+    // Fetch cameras
     useEffect(() => {
-        const load = async () => {
+        (async () => {
             try {
-                setLoading(true);
                 const res = await streamService.getAllActiveStreams();
-                if (res.success && Array.isArray(res.data)) {
-                    setCameras(res.data);
-                } else {
-                    setError('No cameras found');
-                }
-            } catch (e) {
-                setError('Failed to load cameras');
-            } finally {
-                setLoading(false);
-            }
-        };
-        load();
+                if (res.success && Array.isArray(res.data)) setCameras(res.data);
+                else setError('No cameras available');
+            } catch { setError('Connection failed'); }
+            finally { setLoading(false); }
+        })();
     }, []);
 
     // Filter
     const filtered = search.trim()
-        ? cameras.filter(c =>
-            c.name?.toLowerCase().includes(search.toLowerCase()) ||
-            c.location?.toLowerCase().includes(search.toLowerCase())
-        )
+        ? cameras.filter(c => c.name?.toLowerCase().includes(search.toLowerCase()) || c.location?.toLowerCase().includes(search.toLowerCase()))
         : cameras;
 
-    const gridClass = cols === 1 ? 'grid-cols-1' : cols === 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3';
+    const gridCls = cols === 1 ? 'grid-cols-1' : cols === 2 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
 
     // Loading
     if (loading) {
         return (
-            <div className={`min-h-screen flex items-center justify-center ${isDark ? 'bg-gray-950' : 'bg-gray-100'}`}>
+            <div className={`min-h-screen flex items-center justify-center ${dark ? 'bg-gray-950' : 'bg-gray-50'}`}>
                 <div className="text-center">
-                    <div className="w-10 h-10 border-2 border-sky-500/30 border-t-sky-500 rounded-full animate-spin mx-auto mb-3" />
-                    <p className={isDark ? 'text-gray-400' : 'text-gray-600'}>Loading cameras...</p>
+                    <div className="relative w-12 h-12 mx-auto mb-4">
+                        <div className="absolute inset-0 border-2 border-sky-500/20 rounded-full" />
+                        <div className="absolute inset-0 border-2 border-transparent border-t-sky-500 rounded-full animate-spin" />
+                    </div>
+                    <p className={`text-sm ${dark ? 'text-gray-500' : 'text-gray-600'}`}>Loading cameras...</p>
                 </div>
             </div>
         );
@@ -397,11 +374,15 @@ function LandingPage() {
     // Error
     if (error) {
         return (
-            <div className={`min-h-screen flex items-center justify-center ${isDark ? 'bg-gray-950' : 'bg-gray-100'}`}>
-                <div className="text-center p-6">
-                    <p className="text-red-400 text-lg mb-4">{error}</p>
-                    <button onClick={() => window.location.reload()} className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg">
-                        Retry
+            <div className={`min-h-screen flex items-center justify-center ${dark ? 'bg-gray-950' : 'bg-gray-50'}`}>
+                <div className="text-center px-6">
+                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 ${dark ? 'bg-red-500/10 text-red-400' : 'bg-red-100 text-red-500'}`}>
+                        <Icon.Camera />
+                    </div>
+                    <p className={`font-medium mb-1 ${dark ? 'text-white' : 'text-gray-900'}`}>Oops!</p>
+                    <p className={`text-sm mb-4 ${dark ? 'text-gray-500' : 'text-gray-600'}`}>{error}</p>
+                    <button onClick={() => window.location.reload()} className="px-5 py-2.5 bg-sky-500 hover:bg-sky-600 text-white text-sm font-medium rounded-xl transition-colors">
+                        Try Again
                     </button>
                 </div>
             </div>
@@ -409,76 +390,87 @@ function LandingPage() {
     }
 
     return (
-        <div className={`min-h-screen ${isDark ? 'bg-gray-950' : 'bg-gray-100'}`}>
+        <div className={`min-h-screen transition-colors duration-300 ${dark ? 'bg-gray-950' : 'bg-gray-50'}`}>
             {/* Header */}
-            <header className={`sticky top-0 z-40 backdrop-blur-md border-b ${isDark ? 'bg-gray-900/80 border-gray-800' : 'bg-white/80 border-gray-200'}`}>
-                <div className="max-w-7xl mx-auto px-4 py-3">
-                    <div className="flex items-center justify-between gap-4">
+            <header className={`sticky top-0 z-40 backdrop-blur-xl border-b transition-colors duration-300 ${dark ? 'bg-gray-950/80 border-white/5' : 'bg-white/80 border-gray-200'}`}>
+                <div className="max-w-7xl mx-auto px-4 sm:px-6">
+                    <div className="h-16 flex items-center justify-between gap-4">
                         {/* Logo */}
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-sky-500 to-sky-700 rounded-xl flex items-center justify-center text-white">
-                                <CameraIcon />
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center text-white shadow-lg shadow-sky-500/25">
+                                <Icon.Camera />
                             </div>
-                            <div>
-                                <h1 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>RAF NET CCTV</h1>
-                                <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{cameras.length} camera{cameras.length !== 1 ? 's' : ''}</p>
+                            <div className="hidden xs:block">
+                                <h1 className={`text-base font-bold tracking-tight ${dark ? 'text-white' : 'text-gray-900'}`}>RAF NET</h1>
+                                <p className={`text-[10px] font-medium uppercase tracking-wider ${dark ? 'text-gray-500' : 'text-gray-500'}`}>
+                                    {cameras.length} Camera{cameras.length !== 1 ? 's' : ''} Online
+                                </p>
                             </div>
                         </div>
 
-                        {/* Search Desktop */}
-                        <div className="flex-1 max-w-md hidden sm:block">
+                        {/* Search - Desktop */}
+                        <div className="flex-1 max-w-sm hidden sm:block">
                             <div className="relative">
                                 <input
                                     type="text"
-                                    placeholder="Search..."
+                                    placeholder="Search cameras..."
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
-                                    className={`w-full pl-10 pr-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-sky-500/50 ${
-                                        isDark ? 'bg-gray-800 text-white border-gray-700 placeholder-gray-500' : 'bg-white text-gray-900 border-gray-300 placeholder-gray-400'
+                                    className={`w-full h-10 pl-10 pr-4 rounded-xl text-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-sky-500/50 ${
+                                        dark ? 'bg-white/5 text-white placeholder-gray-500 border border-white/10 focus:bg-white/10' : 'bg-gray-100 text-gray-900 placeholder-gray-500 border border-transparent focus:bg-white focus:border-gray-200'
                                     }`}
                                 />
-                                <div className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                                    <SearchIcon />
+                                <div className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${dark ? 'text-gray-500' : 'text-gray-400'}`}>
+                                    <Icon.Search />
                                 </div>
                             </div>
                         </div>
 
                         {/* Controls */}
                         <div className="flex items-center gap-2">
-                            <div className={`hidden sm:flex items-center gap-1 rounded-lg p-1 ${isDark ? 'bg-gray-800' : 'bg-gray-200'}`}>
+                            {/* Grid Toggle */}
+                            <div className={`hidden sm:flex items-center rounded-xl p-1 ${dark ? 'bg-white/5' : 'bg-gray-100'}`}>
                                 {[1, 2, 3].map(n => (
                                     <button
                                         key={n}
                                         onClick={() => setCols(n)}
-                                        className={`px-3 py-1 rounded text-sm font-medium ${cols === n ? 'bg-sky-600 text-white' : isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                                        className={`w-8 h-8 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                                            cols === n
+                                                ? 'bg-sky-500 text-white shadow-lg shadow-sky-500/25'
+                                                : dark ? 'text-gray-500 hover:text-white hover:bg-white/10' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200'
+                                        }`}
                                     >
                                         {n}
                                     </button>
                                 ))}
                             </div>
+
+                            {/* Theme Toggle */}
                             <button
                                 onClick={toggleTheme}
-                                className={`p-2 rounded-lg ${isDark ? 'bg-gray-800 text-gray-400 hover:text-white' : 'bg-gray-200 text-gray-600 hover:text-gray-900'}`}
+                                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 ${
+                                    dark ? 'bg-white/5 text-gray-400 hover:text-white hover:bg-white/10' : 'bg-gray-100 text-gray-500 hover:text-gray-900 hover:bg-gray-200'
+                                }`}
                             >
-                                {isDark ? <SunIcon /> : <MoonIcon />}
+                                {dark ? <Icon.Sun /> : <Icon.Moon />}
                             </button>
                         </div>
                     </div>
 
-                    {/* Search Mobile */}
-                    <div className="mt-3 sm:hidden">
+                    {/* Search - Mobile */}
+                    <div className="pb-3 sm:hidden">
                         <div className="relative">
                             <input
                                 type="text"
-                                placeholder="Search..."
+                                placeholder="Search cameras..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                className={`w-full pl-10 pr-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-sky-500/50 ${
-                                    isDark ? 'bg-gray-800 text-white border-gray-700 placeholder-gray-500' : 'bg-white text-gray-900 border-gray-300 placeholder-gray-400'
+                                className={`w-full h-10 pl-10 pr-4 rounded-xl text-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-sky-500/50 ${
+                                    dark ? 'bg-white/5 text-white placeholder-gray-500 border border-white/10' : 'bg-gray-100 text-gray-900 placeholder-gray-500 border border-transparent'
                                 }`}
                             />
-                            <div className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                                <SearchIcon />
+                            <div className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${dark ? 'text-gray-500' : 'text-gray-400'}`}>
+                                <Icon.Search />
                             </div>
                         </div>
                     </div>
@@ -486,27 +478,43 @@ function LandingPage() {
             </header>
 
             {/* Content */}
-            <main className="max-w-7xl mx-auto px-4 py-6">
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
                 {filtered.length === 0 ? (
-                    <div className="text-center py-16">
-                        <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${isDark ? 'bg-gray-800 text-gray-500' : 'bg-gray-200 text-gray-400'}`}>
-                            <CameraIcon />
+                    <div className="text-center py-20">
+                        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 ${dark ? 'bg-white/5 text-gray-600' : 'bg-gray-100 text-gray-400'}`}>
+                            <Icon.Camera />
                         </div>
-                        <p className={isDark ? 'text-gray-500' : 'text-gray-600'}>
-                            {search ? 'No cameras match your search' : 'No cameras available'}
+                        <p className={`font-medium ${dark ? 'text-gray-400' : 'text-gray-600'}`}>
+                            {search ? 'No cameras found' : 'No cameras available'}
                         </p>
+                        {search && (
+                            <button onClick={() => setSearch('')} className="mt-3 text-sm text-sky-500 hover:text-sky-400">
+                                Clear search
+                            </button>
+                        )}
                     </div>
                 ) : (
-                    <div className={`grid ${gridClass} gap-4`}>
-                        {filtered.map(cam => (
-                            <CameraCard key={cam.id} camera={cam} onClick={() => setExpanded(cam)} />
+                    <div className={`grid ${gridCls} gap-4 sm:gap-5`}>
+                        {filtered.map((cam, i) => (
+                            <CameraCard key={cam.id} camera={cam} index={i} onExpand={() => setExpanded(cam)} />
                         ))}
                     </div>
                 )}
             </main>
 
-            {/* Expanded */}
-            {expanded && <ExpandedView camera={expanded} onClose={() => setExpanded(null)} />}
+            {/* Footer */}
+            <footer className={`py-6 text-center ${dark ? 'text-gray-600' : 'text-gray-400'}`}>
+                <p className="text-xs">© 2025 RAF NET CCTV System</p>
+            </footer>
+
+            {/* Expanded Modal */}
+            {expanded && <ExpandedModal camera={expanded} onClose={() => setExpanded(null)} />}
+
+            {/* Global Styles */}
+            <style>{`
+                @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+                .animate-fadeIn { animation: fadeIn 0.2s ease-out; }
+            `}</style>
         </div>
     );
 }
