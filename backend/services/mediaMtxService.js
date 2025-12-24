@@ -1,85 +1,107 @@
-import axios from 'axios';
-import { config } from '../config/config.js';
+const Database = require('better-sqlite3');
+const axios = require('axios');
 
-const MEDIAMTX_API_URL = `${config.mediamtx.apiUrl}/v3`;
+// Configuration
+const dbPath = './database/cctv.db';
+const mediaMtxApiBaseUrl = 'http://localhost:9997/v3';
 
-export const mediaMtxService = {
-    // Add or Update a path configuration
-    async addPath(name, source) {
-        try {
-            console.log(`[MediaMTX] Adding/Updating path: ${name}, source: ${source}`);
-
-            // MediaMTX v3 API: POST /config/paths/add/{name}
-            // Payload: { source: "..." }
-            // Note: If path exists, we might need to use PATCH or replace it. 
-            // For simplicity in v3, we often check existence first or just try to add.
-
-            // First, try to get the path to see if it exists
-            try {
-                await axios.get(`${MEDIAMTX_API_URL}/config/paths/get/${name}`);
-                // If successful, it exists. We should update it.
-                // PUT /config/paths/replace/{name}
-                await axios.post(`${MEDIAMTX_API_URL}/config/paths/replace/${name}`, {
-                    source: source,
-                    sourceOnDemand: true,
-                });
-                console.log(`[MediaMTX] Path ${name} updated successfully`);
-            } catch (error) {
-                if (error.response && error.response.status === 404) {
-                    // Path doesn't exist, create it
-                    await axios.post(`${MEDIAMTX_API_URL}/config/paths/add/${name}`, {
-                        source: source,
-                        sourceOnDemand: true,
-                    });
-                    console.log(`[MediaMTX] Path ${name} created successfully`);
-                } else {
-                    throw error;
-                }
-            }
-            return true;
-        } catch (error) {
-            console.error('[MediaMTX] Add/Update path error:', error.message);
-            // Don't throw, just log. We don't want to break the main app flow if MediaMTX is down.
-            return false;
+/**
+ * Fetches all active paths from the MediaMTX API.
+ * @returns {Promise<string[]>} A list of path names.
+ */
+async function getMediaMtxPaths() {
+    try {
+        const response = await axios.get(`${mediaMtxApiBaseUrl}/paths/list`);
+        if (response.data && response.data.items) {
+            return Object.keys(response.data.items);
         }
-    },
-
-    // Remove a path
-    async removePath(name) {
-        try {
-            console.log(`[MediaMTX] Removing path: ${name}`);
-            await axios.delete(`${MEDIAMTX_API_URL}/config/paths/delete/${name}`);
-            console.log(`[MediaMTX] Path ${name} removed successfully`);
-            return true;
-        } catch (error) {
-            // Ignore 404 (already deleted)
-            if (error.response && error.response.status === 404) return true;
-
-            console.error('[MediaMTX] Remove path error:', error.message);
-            return false;
+        return [];
+    } catch (error) {
+        // Don't throw if MediaMTX is not ready, just log it.
+        if (error.code !== 'ECONNREFUSED') {
+            console.error('[MediaMTX Service] Error fetching paths from MediaMTX:', error.message);
         }
-    },
-
-    // Get global stats (paths, sessions, etc.)
-    async getStats() {
-        try {
-            const [paths, sessions] = await Promise.all([
-                axios.get(`${MEDIAMTX_API_URL}/paths/list`),
-                axios.get(`${MEDIAMTX_API_URL}/sessions/list`)
-            ]);
-
-            return {
-                paths: paths.data.items || [],
-                sessions: sessions.data.items || [],
-                timestamp: new Date().toISOString()
-            };
-        } catch (error) {
-            console.error('[MediaMTX] Get stats error:', error.message);
-            return {
-                paths: [],
-                sessions: [],
-                error: error.message
-            };
-        }
+        return [];
     }
+}
+
+/**
+ * Fetches all enabled cameras from the application database.
+ * @returns {any[]} A list of camera objects.
+ */
+function getDatabaseCameras() {
+    try {
+        const db = new Database(dbPath, { readonly: true });
+        const stmt = db.prepare('SELECT id, name, rtsp_url, path_name FROM cameras WHERE enabled = 1');
+        const cameras = stmt.all();
+        db.close();
+        return cameras;
+    } catch (error) {
+        console.error('[MediaMTX Service] Error fetching cameras from database:', error.message);
+        return [];
+    }
+}
+
+/**
+ * Synchronizes the camera configurations between the database and MediaMTX.
+ * This includes adding/updating active cameras and removing orphaned paths.
+ */
+async function syncCameras() {
+    console.log('[MediaMTX Service] Starting camera synchronization...');
+
+    const mediaMtxPaths = await getMediaMtxPaths();
+    const dbCameras = getDatabaseCameras();
+    const dbCameraPaths = new Set(dbCameras.map(cam => cam.path_name));
+
+    // 1. Identify and remove orphaned paths from MediaMTX
+    const orphanedPaths = mediaMtxPaths.filter(path => !dbCameraPaths.has(path) && path !== 'all_others');
+
+    if (orphanedPaths.length > 0) {
+        console.log(`[MediaMTX Service] Found ${orphanedPaths.length} orphaned paths to remove.`);
+        for (const pathName of orphanedPaths) {
+            try {
+                await axios.post(`${mediaMtxApiBaseUrl}/config/paths/delete/${pathName}`);
+                console.log(`[MediaMTX Service]   - Successfully removed orphan path: ${pathName}`);
+            } catch (error) {
+                console.error(`[MediaMTX Service]   - Error removing orphan path ${pathName}:`, error.message);
+            }
+        }
+    } else {
+        console.log('[MediaMTX Service] No orphaned paths found.');
+    }
+
+    // 2. Add or update paths from the database
+    if (dbCameras.length > 0) {
+        console.log(`[MediaMTX Service] Syncing ${dbCameras.length} cameras from database...`);
+        for (const camera of dbCameras) {
+            // Ensure path_name is not null or empty
+            if (!camera.path_name) {
+                console.warn(`[MediaMTX Service]   - Skipping camera '${camera.name}' due to empty path_name.`);
+                continue;
+            }
+
+            const pathConfig = {
+                source: camera.rtsp_url,
+                sourceOnDemand: true,
+                sourceOnDemandStartTimeout: '10s',
+                sourceOnDemandCloseAfter: '10s',
+            };
+
+            try {
+                // Use POST to add/replace the configuration
+                await axios.post(`${mediaMtxApiBaseUrl}/config/paths/edit/${camera.path_name}`, pathConfig);
+                console.log(`[MediaMTX Service]   - Successfully synced camera: ${camera.name} (${camera.path_name})`);
+            } catch (error) {
+                console.error(`[MediaMTX Service]   - Error syncing camera ${camera.name}:`, error.message);
+            }
+        }
+    } else {
+        console.log('[MediaMTX Service] No enabled cameras in database to sync.');
+    }
+
+    console.log('[MediaMTX Service] Synchronization complete.');
+}
+
+module.exports = {
+    syncCameras,
 };

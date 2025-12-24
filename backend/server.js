@@ -11,6 +11,8 @@ import areaRoutes from './routes/areaRoutes.js';
 import streamRoutes from './routes/streamRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 
+const mediaMtxService = require('./services/mediaMtxService');
+
 const fastify = Fastify({
     logger: config.server.env === 'production' ? true : {
         level: 'debug',
@@ -106,6 +108,9 @@ const start = async () => {
         console.log('    DELETE /api/cameras/:id');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         console.log('');
+
+        // Initial sync with MediaMTX
+        mediaMtxService.syncCameras();
     } catch (err) {
         fastify.log.error(err);
         process.exit(1);
