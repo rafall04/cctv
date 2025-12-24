@@ -1,75 +1,26 @@
-# ============================================================
-# RAF NET CCTV Hub - Simplified & Stable MediaMTX Config
-# ============================================================
-# This file contains only the necessary parameters for the project
-# to avoid version conflicts with deprecated or new fields.
+# MediaMTX Configuration with On-Demand Streaming Logic
 
-# Global settings
 logLevel: info
 logDestinations: [stdout]
 
-# ------------------------------------------------------------
 # Listeners
-# ------------------------------------------------------------
-
-# API for backend management
 api: yes
 apiAddress: :9997
-apiAllowOrigins: ['*']
-
-# HLS for web playback
 hls: yes
 hlsAddress: :8888
-hlsAlwaysRemux: yes
-hlsVariant: lowLatency
-hlsAllowOrigins: ['*']
-
-# WebRTC for low-latency playback
 webrtc: yes
 webrtcAddress: :8889
-webrtcLocalUDPAddress: :8189
-webrtcAllowOrigins: ['*']
-
-# RTMP for camera stream ingestion
 rtmp: yes
 rtmpAddress: :1935
-
-# RTSP is enabled by default, which is good practice.
 rtsp: yes
 rtspAddress: :8554
 
-# ------------------------------------------------------------
-# Path Defaults
-# ------------------------------------------------------------
-# These settings apply to all paths unless overridden below.
-
-pathDefaults:
-  # All streams must be published to the server. The backend API
-  # will control which paths are available.
-  source: publisher
-
-  # Pull streams only when a user is watching to save bandwidth.
-  sourceOnDemand: yes
-  sourceOnDemandStartTimeout: 10s
-  sourceOnDemandCloseAfter: 10s
-
-  # Allow the backend to disconnect a publisher if a camera needs to reconnect.
-  overridePublisher: yes
-  
-  # By default, no authentication is required here. The backend and web
-  # application tokens will handle viewing permissions.
-  readUser: ""
-  readPass: ""
-  
-  # Set recording segment deletion policy.
-  # Using 'h' for hours is more compatible across versions than 'd' for days.
-  recordDeleteAfter: 24h
-
-# ------------------------------------------------------------
-# Specific Paths
-# ------------------------------------------------------------
-# The backend will manage paths dynamically via the API.
-# This section is intentionally left empty. All paths will
-# use the 'pathDefaults'.
+# Path Logic
 paths:
-  all_others: {}
+  all:
+    # When a stream is requested, run the backend script to fetch the source.
+    # The script uses the MediaMTX API to add or update the path config.
+    runOnDemand: node /var/www/rafnet-cctv/backend/sync_mediamtx.js
+    runOnDemandRestart: yes
+    runOnDemandStartTimeout: 10s
+    runOnDemandCloseAfter: 10s
