@@ -22,7 +22,8 @@ class MediaMtxService {
         try {
             const response = await axios.get(`${mediaMtxApiBaseUrl}/paths/list`);
             if (response.data && response.data.items) {
-                return Object.keys(response.data.items);
+                // items is an array of path objects with 'name' property
+                return response.data.items.map(item => item.name);
             }
             return [];
         } catch (error) {
@@ -62,6 +63,46 @@ class MediaMtxService {
     }
 
     /**
+     * Add or update a path in MediaMTX configuration
+     * @param {string} pathName - The path name (e.g., 'camera1')
+     * @param {object} pathConfig - The path configuration
+     */
+    async addOrUpdatePath(pathName, pathConfig) {
+        try {
+            // First try to add the path
+            await axios.post(`${mediaMtxApiBaseUrl}/config/paths/add/${pathName}`, pathConfig);
+            return { success: true, action: 'added' };
+        } catch (error) {
+            if (error.response && error.response.status === 400) {
+                // Path already exists, try to patch/update it
+                try {
+                    await axios.patch(`${mediaMtxApiBaseUrl}/config/paths/patch/${pathName}`, pathConfig);
+                    return { success: true, action: 'updated' };
+                } catch (patchError) {
+                    console.error(`[MediaMTX Service] Error patching path ${pathName}:`, patchError.message);
+                    return { success: false, error: patchError.message };
+                }
+            }
+            console.error(`[MediaMTX Service] Error adding path ${pathName}:`, error.message);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * Remove a path from MediaMTX configuration
+     * @param {string} pathName - The path name to remove
+     */
+    async removePath(pathName) {
+        try {
+            await axios.delete(`${mediaMtxApiBaseUrl}/config/paths/delete/${pathName}`);
+            return { success: true };
+        } catch (error) {
+            console.error(`[MediaMTX Service] Error removing path ${pathName}:`, error.message);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
      * Synchronizes the camera configurations between the database and MediaMTX.
      * This includes adding/updating active cameras and removing orphaned paths.
      */
@@ -73,16 +114,22 @@ class MediaMtxService {
         const dbCameraPaths = new Set(dbCameras.map(cam => cam.path_name));
 
         // 1. Identify and remove orphaned paths from MediaMTX
-        const orphanedPaths = mediaMtxPaths.filter(path => !dbCameraPaths.has(path) && path !== 'all_others');
+        // Skip system paths like 'all', 'all_others', etc.
+        const systemPaths = ['all', 'all_others', 'health'];
+        const orphanedPaths = mediaMtxPaths.filter(path => 
+            !dbCameraPaths.has(path) && 
+            !systemPaths.includes(path) &&
+            path.startsWith('camera')
+        );
 
         if (orphanedPaths.length > 0) {
             console.log(`[MediaMTX Service] Found ${orphanedPaths.length} orphaned paths to remove.`);
             for (const pathName of orphanedPaths) {
-                try {
-                    await axios.post(`${mediaMtxApiBaseUrl}/config/paths/delete/${pathName}`);
+                const result = await this.removePath(pathName);
+                if (result.success) {
                     console.log(`[MediaMTX Service]   - Successfully removed orphan path: ${pathName}`);
-                } catch (error) {
-                    console.error(`[MediaMTX Service]   - Error removing orphan path ${pathName}:`, error.message);
+                } else {
+                    console.error(`[MediaMTX Service]   - Error removing orphan path ${pathName}:`, result.error);
                 }
             }
         } else {
@@ -99,16 +146,24 @@ class MediaMtxService {
                     continue;
                 }
 
+                // Validate RTSP URL
+                if (!camera.rtsp_url || !camera.rtsp_url.startsWith('rtsp://')) {
+                    console.warn(`[MediaMTX Service]   - Skipping camera '${camera.name}' due to invalid RTSP URL.`);
+                    continue;
+                }
+
                 const pathConfig = {
                     source: camera.rtsp_url,
+                    sourceOnDemand: true,
+                    sourceOnDemandStartTimeout: '10s',
+                    sourceOnDemandCloseAfter: '10s',
                 };
 
-                try {
-                    // Use POST to add/replace the configuration
-                    await axios.post(`${mediaMtxApiBaseUrl}/config/paths/edit/${camera.path_name}`, pathConfig);
-                    console.log(`[MediaMTX Service]   - Successfully synced camera: ${camera.name} (${camera.path_name})`);
-                } catch (error) {
-                    console.error(`[MediaMTX Service]   - Error syncing camera ${camera.name}:`, error.message);
+                const result = await this.addOrUpdatePath(camera.path_name, pathConfig);
+                if (result.success) {
+                    console.log(`[MediaMTX Service]   - Successfully ${result.action} camera: ${camera.name} (${camera.path_name})`);
+                } else {
+                    console.error(`[MediaMTX Service]   - Error syncing camera ${camera.name}:`, result.error);
                 }
             }
         } else {
@@ -122,15 +177,16 @@ class MediaMtxService {
      * Fetches statistics from the MediaMTX API.
      * @returns {Promise<any>}
      */
-     async getStats() {
+    async getStats() {
         try {
-            const [paths, sessions] = await Promise.all([
+            const [pathsRes, configRes] = await Promise.all([
                 axios.get(`${mediaMtxApiBaseUrl}/paths/list`),
-                axios.get(`${mediaMtxApiBaseUrl}/sessions/list`),
+                axios.get(`${mediaMtxApiBaseUrl}/config/global/get`),
             ]);
+            
             return {
-                paths: paths.data?.items ? Object.values(paths.data.items) : [],
-                sessions: sessions.data?.items ? Object.values(sessions.data.items) : [],
+                paths: pathsRes.data?.items || [],
+                config: configRes.data || {},
                 error: false
             };
         } catch (error) {
@@ -139,9 +195,28 @@ class MediaMtxService {
             }
             return {
                 paths: [],
-                sessions: [],
+                config: {},
                 error: true,
                 message: error.message
+            };
+        }
+    }
+
+    /**
+     * Get MediaMTX server status
+     * @returns {Promise<object>}
+     */
+    async getStatus() {
+        try {
+            const response = await axios.get(`${mediaMtxApiBaseUrl}/config/global/get`);
+            return {
+                online: true,
+                config: response.data
+            };
+        } catch (error) {
+            return {
+                online: false,
+                error: error.message
             };
         }
     }

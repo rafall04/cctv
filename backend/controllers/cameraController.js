@@ -106,6 +106,11 @@ export async function createCamera(request, reply) {
             [request.user.id, 'CREATE_CAMERA', `Created camera: ${name}`, request.ip]
         );
 
+        // Sync with MediaMTX (don't await, run in background)
+        mediaMtxService.syncCameras().catch(err => {
+            console.error('MediaMTX sync error:', err.message);
+        });
+
         return reply.code(201).send({
             success: true,
             message: 'Camera created successfully',
@@ -114,9 +119,6 @@ export async function createCamera(request, reply) {
                 name,
             },
         });
-
-        // Sync with MediaMTX after responding
-        mediaMtxService.syncCameras();
     } catch (error) {
         console.error('Create camera error:', error);
         return reply.code(500).send({
@@ -196,13 +198,15 @@ export async function updateCamera(request, reply) {
             [request.user.id, 'UPDATE_CAMERA', `Updated camera ID: ${id}`, request.ip]
         );
 
+        // Sync with MediaMTX (don't await, run in background)
+        mediaMtxService.syncCameras().catch(err => {
+            console.error('MediaMTX sync error:', err.message);
+        });
+
         return reply.send({
             success: true,
             message: 'Camera updated successfully',
         });
-
-        // Sync with MediaMTX after responding
-        mediaMtxService.syncCameras();
     } catch (error) {
         console.error('Update camera error:', error);
         return reply.code(500).send({
@@ -236,13 +240,16 @@ export async function deleteCamera(request, reply) {
             [request.user.id, 'DELETE_CAMERA', `Deleted camera: ${camera.name} (ID: ${id})`, request.ip]
         );
 
-                return reply.send({
-                    success: true,
-                    message: 'Camera deleted successfully',
-                });
-        
-                // Sync with MediaMTX after responding
-                mediaMtxService.syncCameras();    } catch (error) {
+        // Sync with MediaMTX (don't await, run in background)
+        mediaMtxService.syncCameras().catch(err => {
+            console.error('MediaMTX sync error:', err.message);
+        });
+
+        return reply.send({
+            success: true,
+            message: 'Camera deleted successfully',
+        });
+    } catch (error) {
         console.error('Delete camera error:', error);
         return reply.code(500).send({
             success: false,
