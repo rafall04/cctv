@@ -41,7 +41,17 @@ class MediaMtxService {
     getDatabaseCameras() {
         try {
             const db = new Database(dbPath, { readonly: true });
-            const stmt = db.prepare('SELECT id, name, rtsp_url, path_name FROM cameras WHERE enabled = 1');
+            // Use correct column name: private_rtsp_url instead of rtsp_url
+            // Generate path_name from camera id if not exists
+            const stmt = db.prepare(`
+                SELECT 
+                    id, 
+                    name, 
+                    private_rtsp_url as rtsp_url, 
+                    'camera' || id as path_name 
+                FROM cameras 
+                WHERE enabled = 1
+            `);
             const cameras = stmt.all();
             db.close();
             return cameras;
