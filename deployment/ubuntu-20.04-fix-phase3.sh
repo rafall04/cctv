@@ -29,8 +29,8 @@ if ! command -v node &> /dev/null || ! command -v pm2 &> /dev/null; then
     exit 1
 fi
 
-# Navigate to project root - Following steering rules
-PROJECT_ROOT="/opt/cctv"
+# Navigate to project root - Following existing structure
+PROJECT_ROOT="/var/www/rafnet-cctv"
 if [ ! -d "$PROJECT_ROOT" ]; then
     echo "❌ Project directory not found. Please run Phase 1 first."
     exit 1

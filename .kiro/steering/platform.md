@@ -38,12 +38,12 @@
 
 ### Directory Structure (Ubuntu 20.04)
 ```
-/opt/cctv/                  # Main application directory
-├── backend/                # Fastify API server
-├── frontend/dist/          # Built React application
-├── mediamtx/              # MediaMTX streaming server
-├── logs/                  # Application logs
-└── data/                  # SQLite database and uploads
+/var/www/rafnet-cctv/           # Main application directory
+├── backend/                    # Fastify API server
+├── frontend/dist/              # Built React application
+├── mediamtx/                   # MediaMTX streaming server
+├── logs/                       # Application logs
+└── data/                       # SQLite database and uploads
 ```
 
 ### Service Configuration
@@ -66,7 +66,7 @@ CORS_ORIGIN=*
 # OR completely disable CORS filtering
 
 # Database
-DATABASE_PATH=/opt/cctv/data/cctv.db
+DATABASE_PATH=/var/www/rafnet-cctv/data/cctv.db
 
 # MediaMTX
 MEDIAMTX_API_URL=http://localhost:9997
@@ -117,7 +117,7 @@ apt install -y nodejs npm nginx
 npm install -g pm2
 
 # Deploy application
-cd /opt/cctv
+cd /var/www/rafnet-cctv
 npm install --production
 
 # Build frontend
@@ -175,12 +175,12 @@ export default defineConfig({
 ### Application Files
 ```bash
 # Set ownership to root
-chown -R root:root /opt/cctv
+chown -R root:root /var/www/rafnet-cctv
 
 # Set appropriate permissions
-chmod -R 755 /opt/cctv
-chmod 644 /opt/cctv/backend/.env
-chmod 600 /opt/cctv/data/cctv.db
+chmod -R 755 /var/www/rafnet-cctv
+chmod 644 /var/www/rafnet-cctv/backend/.env
+chmod 600 /var/www/rafnet-cctv/data/cctv.db
 ```
 
 ### Service Files
@@ -361,7 +361,7 @@ const isUbuntu = process.platform === 'linux';
 
 // Platform-specific paths
 const mediamtxBinary = isWindows ? './mediamtx.exe' : './mediamtx';
-const dbPath = isWindows ? './data/cctv.db' : '/opt/cctv/data/cctv.db';
+const dbPath = isWindows ? './data/cctv.db' : '/var/www/rafnet-cctv/data/cctv.db';
 ```
 
 ### In Shell Scripts

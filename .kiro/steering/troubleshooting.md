@@ -12,9 +12,9 @@
 # Windows
 mkdir backend\data
 # Ubuntu 20.04 (as root)
-mkdir -p /opt/cctv/data
-chown root:root /opt/cctv/data
-chmod 755 /opt/cctv/data
+mkdir -p /var/www/rafnet-cctv/data
+chown root:root /var/www/rafnet-cctv/data
+chmod 755 /var/www/rafnet-cctv/data
 ```
 
 #### 2. MediaMTX Connection Refused
@@ -146,13 +146,13 @@ NODE_OPTIONS="--max-old-space-size=4096" npm run build
 
 ### 1. Permission Denied Errors
 ```bash
-# Error: EACCES: permission denied, open '/opt/cctv/data/cctv.db'
+# Error: EACCES: permission denied, open '/var/www/rafnet-cctv/data/cctv.db'
 # Solution: Fix ownership and permissions (as root)
 
-chown -R root:root /opt/cctv
-chmod -R 755 /opt/cctv
-chmod 644 /opt/cctv/backend/.env
-chmod 600 /opt/cctv/data/cctv.db
+chown -R root:root /var/www/rafnet-cctv
+chmod -R 755 /var/www/rafnet-cctv
+chmod 644 /var/www/rafnet-cctv/backend/.env
+chmod 600 /var/www/rafnet-cctv/data/cctv.db
 ```
 
 ### 2. Node.js Version Issues
@@ -355,13 +355,13 @@ db.pragma('synchronous = NORMAL');
 # Solution: Backup and restore database
 
 # Backup current database
-cp /opt/cctv/data/cctv.db /opt/cctv/data/cctv.db.backup
+cp /var/www/rafnet-cctv/data/cctv.db /var/www/rafnet-cctv/data/cctv.db.backup
 
 # Try to repair
-sqlite3 /opt/cctv/data/cctv.db ".recover" | sqlite3 /opt/cctv/data/cctv_recovered.db
+sqlite3 /var/www/rafnet-cctv/data/cctv.db ".recover" | sqlite3 /var/www/rafnet-cctv/data/cctv_recovered.db
 
 # If repair fails, reinitialize database
-cd /opt/cctv/backend
+cd /var/www/rafnet-cctv/backend
 npm run setup-db
 ```
 
@@ -473,24 +473,24 @@ systemctl stop nginx
 pkill -f mediamtx
 
 # Backup current data
-cp -r /opt/cctv/data /opt/cctv/data.backup.$(date +%Y%m%d_%H%M%S)
+cp -r /var/www/rafnet-cctv/data /var/www/rafnet-cctv/data.backup.$(date +%Y%m%d_%H%M%S)
 
 # Reinstall dependencies
-cd /opt/cctv/backend
+cd /var/www/rafnet-cctv/backend
 npm install --production
 
-cd /opt/cctv/frontend
+cd /var/www/rafnet-cctv/frontend
 npm install
 npm run build
 
 # Reinitialize database
-cd /opt/cctv/backend
+cd /var/www/rafnet-cctv/backend
 npm run setup-db
 
 # Restart services
 pm2 start ecosystem.config.cjs
 systemctl start nginx
-cd /opt/cctv/mediamtx && ./mediamtx mediamtx.yml &
+cd /var/www/rafnet-cctv/mediamtx && ./mediamtx mediamtx.yml &
 ```
 
 ### 2. Emergency Rollback
@@ -500,7 +500,7 @@ git log --oneline -10  # Find previous commit
 git reset --hard <previous-commit-hash>
 
 # Restore database backup if needed
-cp /opt/cctv/data.backup.*/cctv.db /opt/cctv/data/cctv.db
+cp /var/www/rafnet-cctv/data.backup.*/cctv.db /var/www/rafnet-cctv/data/cctv.db
 
 # Restart services
 pm2 restart all

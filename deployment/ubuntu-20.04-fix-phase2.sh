@@ -38,8 +38,8 @@ if ! command -v node &> /dev/null || ! command -v pm2 &> /dev/null; then
     exit 1
 fi
 
-# Navigate to project root - Following steering rules
-PROJECT_ROOT="/opt/cctv"
+# Navigate to project root - Following existing structure
+PROJECT_ROOT="/var/www/rafnet-cctv"
 if [ ! -d "$PROJECT_ROOT" ]; then
     echo "❌ Project directory not found. Please run Phase 1 first."
     exit 1
@@ -139,7 +139,7 @@ MEDIAMTX_HLS_URL=http://localhost:8888
 MEDIAMTX_WEBRTC_URL=http://localhost:8889
 
 # Database
-DATABASE_PATH=/opt/cctv/data/cctv.db
+DATABASE_PATH=/var/www/rafnet-cctv/data/cctv.db
 
 # CORS Configuration - NO FILTERING (Ubuntu 20.04 fix)
 CORS_ORIGIN=*
@@ -224,7 +224,7 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/cctv/backend
+WorkingDirectory=/var/www/rafnet-cctv/backend
 ExecStart=/usr/bin/node server.js
 Restart=always
 RestartSec=10

@@ -141,16 +141,16 @@ if [ "$MEMORY_GB" -lt 1 ]; then
     echo "      Consider adding swap space for compilation"
 fi
 
-# 9. Create project directory structure (as root) - Following steering rules
+# 9. Create project directory structure (as root) - Following existing structure
 echo "📁 Step 9: Preparing project directory..."
-mkdir -p /opt/cctv
-mkdir -p /opt/cctv/backend
-mkdir -p /opt/cctv/frontend
-mkdir -p /opt/cctv/mediamtx
-mkdir -p /opt/cctv/data
-mkdir -p /opt/cctv/logs
-chown -R root:root /opt/cctv
-chmod -R 755 /opt/cctv
+mkdir -p /var/www/rafnet-cctv
+mkdir -p /var/www/rafnet-cctv/backend
+mkdir -p /var/www/rafnet-cctv/frontend
+mkdir -p /var/www/rafnet-cctv/mediamtx
+mkdir -p /var/www/rafnet-cctv/data
+mkdir -p /var/www/rafnet-cctv/logs
+chown -R root:root /var/www/rafnet-cctv
+chmod -R 755 /var/www/rafnet-cctv
 
 # 10. Firewall configuration
 echo "🔥 Step 10: Configuring firewall..."
