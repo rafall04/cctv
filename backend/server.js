@@ -10,6 +10,7 @@ import cameraRoutes from './routes/cameraRoutes.js';
 import areaRoutes from './routes/areaRoutes.js';
 import streamRoutes from './routes/streamRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import userRoutes from './routes/userRoutes.js';
 import mediaMtxService from './services/mediaMtxService.js';
 
 const fastify = Fastify({
@@ -76,6 +77,7 @@ await fastify.register(cameraRoutes, { prefix: '/api/cameras' });
 await fastify.register(areaRoutes, { prefix: '/api/areas' });
 await fastify.register(streamRoutes, { prefix: '/api/stream' });
 await fastify.register(adminRoutes, { prefix: '/api/admin' });
+await fastify.register(userRoutes, { prefix: '/api/users' });
 
 // Global error handler
 fastify.setErrorHandler((error, request, reply) => {

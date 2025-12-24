@@ -4,6 +4,7 @@ import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import CameraManagement from './pages/CameraManagement';
 import AreaManagement from './pages/AreaManagement';
+import UserManagement from './pages/UserManagement';
 import Dashboard from './pages/Dashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminLayout from './components/AdminLayout';
@@ -44,6 +45,16 @@ function App() {
                         <ProtectedRoute>
                             <AdminLayout>
                                 <AreaManagement />
+                            </AdminLayout>
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/admin/users"
+                    element={
+                        <ProtectedRoute>
+                            <AdminLayout>
+                                <UserManagement />
                             </AdminLayout>
                         </ProtectedRoute>
                     }
