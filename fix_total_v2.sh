@@ -53,6 +53,8 @@ if [ -f "$MEDIAMTX_CONFIG" ]; then
     sudo sed -i '/authJWTExclude/d' "$MEDIAMTX_CONFIG"
     echo "  - Removing deprecated 'apiAllowOrigins' for safety..."
     sudo sed -i '/apiAllowOrigins/d' "$MEDIAMTX_CONFIG"
+    echo "  - Removing deprecated 'authJWTInHTTPQuery' for safety..."
+    sudo sed -i '/authJWTInHTTPQuery/d' "$MEDIAMTX_CONFIG"
     echo "  - Fixing time unit '1d' to '24h'..."
     sudo sed -i 's/1d/24h/g' "$MEDIAMTX_CONFIG"
     echo "  ✅ MediaMTX config sanitized."
