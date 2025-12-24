@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, memo } from 'react';
 import Hls from 'hls.js';
 
 const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = false }) => {
-    // console.log('VideoPlayer: Render', { cameraId: camera.id, isExpanded, enableZoom });
     const videoRef = useRef(null);
     const hlsRef = useRef(null);
     const [status, setStatus] = useState('loading'); // loading, playing, error
@@ -131,17 +130,14 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
 
     const toggleFullScreen = async (e) => {
         if (e) e.stopPropagation();
-        console.log('VideoPlayer: toggleFullScreen called', { isExpanded, isFullScreen });
         try {
             if (!document.fullscreenElement) {
                 if (containerRef.current.requestFullscreen) {
                     await containerRef.current.requestFullscreen();
-                    console.log('VideoPlayer: Entered native fullscreen');
                 }
             } else {
                 if (document.exitFullscreen) {
                     await document.exitFullscreen();
-                    console.log('VideoPlayer: Exited native fullscreen');
                 }
             }
         } catch (err) {
@@ -157,8 +153,6 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
 
         const delta = e.deltaY * -0.001;
         const newZoom = Math.min(Math.max(1, zoom + delta), 5);
-
-        console.log('VideoPlayer: Zoom changed', newZoom);
         setZoom(newZoom);
 
         // Reset pan if zoomed out completely
