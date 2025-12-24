@@ -34,7 +34,9 @@ cp deployment/mediamtx.yml mediamtx/mediamtx.yml
 
 # 5. Restart Services
 echo "🚀 Restarting Services with PM2..."
-pm2 restart deployment/ecosystem.config.cjs --env production
+# Delete old processes to ensure new config is applied
+pm2 delete all || true
+pm2 start deployment/ecosystem.config.cjs --env production
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "✅ Update Completed Successfully!"

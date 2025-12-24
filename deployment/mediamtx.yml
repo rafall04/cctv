@@ -13,8 +13,7 @@ hlsVariant: lowLatency
 # WebRTC settings
 webrtc: yes
 webrtcAddress: :8889
-webrtcICEUDP: yes
-webrtcICEUDPServerPort: 8189
+webrtcLocalUDPAddress: :8189
 
 # RTMP settings (for camera input)
 rtmp: yes
