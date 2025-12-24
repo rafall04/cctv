@@ -147,7 +147,7 @@ MEDIAMTX_HLS_URL=http://localhost:8888
 MEDIAMTX_WEBRTC_URL=http://localhost:8889
 
 # Database
-DATABASE_PATH=/var/www/rafnet-cctv/data/cctv.db
+DATABASE_PATH=./data/cctv.db
 
 # CORS Configuration - NO FILTERING (Ubuntu 20.04 fix)
 CORS_ORIGIN=*
@@ -157,6 +157,7 @@ LOG_LEVEL=info
 EOF
 
 echo "   ✅ Environment configuration created (NO CORS filtering)"
+echo "   Database path: ./data/cctv.db (relative to backend directory)"
 
 # 6. Initialize database
 echo "🗄️ Step 7: Initializing database..."
