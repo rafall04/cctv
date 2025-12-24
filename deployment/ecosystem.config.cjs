@@ -1,9 +1,13 @@
+const path = require('path');
+
+const ROOT_DIR = path.resolve(__dirname, '..');
+
 module.exports = {
     apps: [
         {
             name: 'rafnet-cctv-backend',
             script: 'server.js',
-            cwd: '../backend',
+            cwd: path.join(ROOT_DIR, 'backend'),
             instances: 1,
             autorestart: true,
             watch: false,
@@ -16,8 +20,8 @@ module.exports = {
         {
             name: 'rafnet-cctv-frontend',
             script: 'serve',
-            cwd: '../frontend',
-            args: 'dist -s -l 8080',
+            cwd: path.join(ROOT_DIR, 'frontend'),
+            args: '-s dist -l 8080',
             instances: 1,
             autorestart: true,
             watch: false
@@ -25,7 +29,7 @@ module.exports = {
         {
             name: 'mediamtx',
             script: './mediamtx',
-            cwd: '../mediamtx',
+            cwd: path.join(ROOT_DIR, 'mediamtx'),
             instances: 1,
             autorestart: true,
             watch: false

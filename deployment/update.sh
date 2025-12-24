@@ -14,19 +14,19 @@ git pull origin main
 
 # 2. Update Backend
 echo "🛠 Updating Backend..."
-cd backend
+cd ../backend
 npm install --production
 # Run migrations if any (setup-db is safe to run as it uses CREATE TABLE IF NOT EXISTS)
 # Note: Be careful if you have destructive changes in setup.js
 # npm run setup-db 
-cd ..
+cd ../deployment
 
 # 3. Update Frontend
 echo "🏗 Updating Frontend..."
-cd frontend
+cd ../frontend
 npm install
 npm run build
-cd ..
+cd ../deployment
 
 # 4. Restart Services
 echo "🚀 Restarting Services with PM2..."
