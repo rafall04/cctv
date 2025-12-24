@@ -50,9 +50,19 @@ This workflow outlines the standard procedures for development, maintenance, and
     - Monitor CPU/Bandwidth usage with multiple cameras.
     - Ensure "Click to Load" is functioning as expected.
 
-## 5. Deployment
-1.  **Syncing**:
-    - Run `node backend/sync_mediamtx.js` to ensure MediaMTX paths match the database.
-2.  **Security**:
+## 5. Deployment & Maintenance
+1.  **Production Deployment**:
+    - SSH into the server.
+    - Run `./deployment/install.sh` for initial setup.
+2.  **Updates**:
+    - Push changes to GitHub: `git push origin main`.
+    - On the server, run: `./deployment/update.sh`.
+    - This script automatically pulls changes, updates dependencies, and restarts services.
+3.  **Service Management**:
+    - **Start All**: `./deployment/start.sh`
+    - **Stop All**: `./deployment/stop.sh`
+    - **Check Status**: `pm2 list` or `pm2 logs`.
+4.  **Security**:
     - Verify JWT authentication is active for all admin routes.
     - Ensure no sensitive RTSP URLs are exposed in frontend API responses.
+    - SSL is managed via Certbot and Nginx.
