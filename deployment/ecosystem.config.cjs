@@ -34,6 +34,7 @@ module.exports = {
             name: 'mediamtx',
             script: path.join(ROOT_DIR, 'mediamtx/mediamtx'),
             cwd: path.join(ROOT_DIR, 'mediamtx'),
+            args: ['mediamtx.yml'],
             instances: 1,
             autorestart: true,
             watch: false
