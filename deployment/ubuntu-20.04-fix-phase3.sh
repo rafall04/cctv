@@ -98,25 +98,29 @@ export npm_config_python=$(which python3)
 # Clear npm cache to avoid version conflicts
 npm cache clean --force
 
-# Install with specific npm settings for Ubuntu 20.04
-if npm install --no-optional --prefer-offline --legacy-peer-deps; then
+# First attempt: Standard installation
+echo "   Attempting standard installation..."
+if npm install --legacy-peer-deps; then
     echo "   ✅ Frontend dependencies installed successfully"
 else
-    echo "   ⚠️  Initial install failed, trying with updated package versions..."
+    echo "   ⚠️  Standard install failed, trying Rollup fix..."
     
-    # Try to fix browserslist issue by updating it explicitly
-    npm install browserslist@latest --save-dev
+    # Remove problematic files
+    rm -rf node_modules package-lock.json
     
-    # Retry installation
-    if npm install --no-optional --legacy-peer-deps; then
-        echo "   ✅ Frontend dependencies installed successfully on retry"
+    # Install Rollup native module explicitly first
+    echo "   Installing Rollup native module for Linux x64..."
+    npm install @rollup/rollup-linux-x64-gnu --save-dev --legacy-peer-deps
+    
+    # Then install all dependencies
+    echo "   Installing all dependencies..."
+    if npm install --legacy-peer-deps; then
+        echo "   ✅ Frontend dependencies installed successfully after Rollup fix"
     else
-        echo "   ❌ Frontend dependency installation failed"
-        echo "   Trying alternative approach..."
+        echo "   ⚠️  Still failing, trying force installation..."
         
-        # Remove package-lock and try again
-        rm -f package-lock.json
-        npm install --no-optional --legacy-peer-deps --force
+        # Force installation as last resort
+        npm install --force --legacy-peer-deps
         
         if [ $? -eq 0 ]; then
             echo "   ✅ Frontend dependencies installed with force flag"
@@ -125,6 +129,15 @@ else
             exit 1
         fi
     fi
+fi
+
+# Verify Rollup native module is installed
+echo "   Verifying Rollup native module..."
+if [ -f "node_modules/@rollup/rollup-linux-x64-gnu/rollup.linux-x64-gnu.node" ]; then
+    echo "   ✅ Rollup native module found"
+else
+    echo "   ⚠️  Rollup native module missing, installing manually..."
+    npm install @rollup/rollup-linux-x64-gnu --save-dev --force
 fi
 
 # 5. Verify critical dependencies
@@ -166,9 +179,26 @@ if (missing.length > 0) {
 # 6. Test Vite configuration
 echo "🔧 Step 6: Testing Vite configuration..."
 if [ -f "vite.config.js" ]; then
-    # Test if vite config is valid
-    npx vite --version > /dev/null
-    echo "   ✅ Vite configuration valid"
+    # Test if vite config is valid with better error handling
+    echo "   Testing Vite configuration..."
+    if timeout 30s npx vite --version > /dev/null 2>&1; then
+        echo "   ✅ Vite configuration valid"
+    else
+        echo "   ⚠️  Vite test failed, checking Rollup dependencies..."
+        
+        # Check if Rollup native module exists
+        if [ ! -f "node_modules/@rollup/rollup-linux-x64-gnu/rollup.linux-x64-gnu.node" ]; then
+            echo "   Installing missing Rollup native module..."
+            npm install @rollup/rollup-linux-x64-gnu --save-dev --force
+        fi
+        
+        # Retry Vite test
+        if timeout 30s npx vite --version > /dev/null 2>&1; then
+            echo "   ✅ Vite configuration valid after Rollup fix"
+        else
+            echo "   ⚠️  Vite still having issues, continuing anyway..."
+        fi
+    fi
 else
     echo "   ❌ vite.config.js not found"
     exit 1
@@ -181,12 +211,32 @@ echo "   This may take several minutes..."
 # Set NODE_ENV for build
 export NODE_ENV=production
 
-# Build with verbose output
-if npm run build; then
+# Ensure Rollup native module is available
+if [ ! -f "node_modules/@rollup/rollup-linux-x64-gnu/rollup.linux-x64-gnu.node" ]; then
+    echo "   Installing Rollup native module before build..."
+    npm install @rollup/rollup-linux-x64-gnu --save-dev --force
+fi
+
+# Build with verbose output and error handling
+if npm run build 2>&1 | tee build.log; then
     echo "   ✅ Production build successful"
 else
     echo "   ❌ Production build failed"
-    exit 1
+    echo "   Build log:"
+    tail -20 build.log
+    
+    echo "   Attempting build fix..."
+    # Try to fix by reinstalling Rollup
+    npm uninstall rollup
+    npm install rollup@latest @rollup/rollup-linux-x64-gnu --save-dev --force
+    
+    # Retry build
+    if npm run build; then
+        echo "   ✅ Production build successful after Rollup fix"
+    else
+        echo "   ❌ Production build failed after all attempts"
+        exit 1
+    fi
 fi
 
 # 8. Verify build output
