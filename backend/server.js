@@ -10,8 +10,7 @@ import cameraRoutes from './routes/cameraRoutes.js';
 import areaRoutes from './routes/areaRoutes.js';
 import streamRoutes from './routes/streamRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
-
-const mediaMtxService = require('./services/mediaMtxService');
+import mediaMtxService from './services/mediaMtxService.js';
 
 const fastify = Fastify({
     logger: config.server.env === 'production' ? true : {
