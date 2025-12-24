@@ -28,14 +28,27 @@ const fastify = Fastify({
 });
 
 // Register CORS
+const allowedOrigins = [
+    'https://cctv.raf.my.id',
+    'http://cctv.raf.my.id',
+    'http://172.17.11.12',
+    'http://localhost:5173',
+    'http://localhost:8080'
+];
+
 await fastify.register(cors, {
-    origin: [
-        'https://cctv.raf.my.id',
-        'http://cctv.raf.my.id',
-        'http://172.17.11.12',
-        'http://localhost:5173',
-        'http://localhost:8080'
-    ],
+    origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            // If the origin is in the whitelist, reflect it
+            callback(null, true);
+        } else {
+            // Otherwise, deny the request
+            callback(new Error('Not allowed by CORS'), false);
+        }
+    },
     credentials: true,
 });
 
