@@ -62,6 +62,8 @@ wget https://github.com/bluenviron/mediamtx/releases/download/${MEDIAMTX_VERSION
 mkdir -p mediamtx
 tar -xf mediamtx_${MEDIAMTX_VERSION}_linux_amd64.tar.gz -C mediamtx
 rm mediamtx_${MEDIAMTX_VERSION}_linux_amd64.tar.gz
+# Ensure binary is executable
+chmod +x mediamtx/mediamtx
 # Copy production config
 cp deployment/mediamtx.yml mediamtx/mediamtx.yml
 

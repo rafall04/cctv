@@ -3,7 +3,7 @@ module.exports = {
         {
             name: 'rafnet-cctv-backend',
             script: 'server.js',
-            cwd: './backend',
+            cwd: '../backend',
             instances: 1,
             autorestart: true,
             watch: false,
@@ -16,7 +16,7 @@ module.exports = {
         {
             name: 'rafnet-cctv-frontend',
             script: 'serve',
-            cwd: './frontend',
+            cwd: '../frontend',
             args: 'dist -s -l 8080',
             instances: 1,
             autorestart: true,
@@ -25,7 +25,7 @@ module.exports = {
         {
             name: 'mediamtx',
             script: './mediamtx',
-            cwd: './mediamtx',
+            cwd: '../mediamtx',
             instances: 1,
             autorestart: true,
             watch: false
