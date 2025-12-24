@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef, memo } from 'react';
 import { streamService } from '../services/streamService';
 import { useTheme } from '../contexts/ThemeContext';
 import Hls from 'hls.js';
@@ -11,462 +11,497 @@ const Icons = {
     Camera: () => <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>,
     Search: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>,
     Close: () => <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
-    Location: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
+    Location: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /></svg>,
     Expand: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>,
-    ZoomIn: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" /></svg>,
-    ZoomOut: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" /></svg>,
-    Reset: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
-    Filter: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>,
-    Layout1: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2" strokeWidth={2} /></svg>,
-    Layout2: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="3" y="3" width="8" height="18" rx="1" strokeWidth={2} /><rect x="13" y="3" width="8" height="18" rx="1" strokeWidth={2} /></svg>,
-    Layout3: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="3" y="3" width="5" height="18" rx="1" strokeWidth={2} /><rect x="10" y="3" width="5" height="18" rx="1" strokeWidth={2} /><rect x="17" y="3" width="4" height="18" rx="1" strokeWidth={2} /></svg>,
-    Check: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
-    Play: () => <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>,
-    Fullscreen: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>,
 };
 
+// HLS Cache - prevent reload when already loaded
+const hlsCache = new Map();
 
-// Video Player Component with zoom support
-function VideoPlayer({ camera, streams, isExpanded = false, onClose }) {
+
+// Memoized Video Player - prevents reload when props unchanged
+const VideoPlayer = memo(({ camera, streams, isExpanded }) => {
     const videoRef = useRef(null);
     const hlsRef = useRef(null);
     const containerRef = useRef(null);
     const [status, setStatus] = useState('loading');
-    const [zoom, setZoom] = useState(1);
-    const [pan, setPan] = useState({ x: 0, y: 0 });
-    const [isDragging, setIsDragging] = useState(false);
-    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [error, setError] = useState(null);
+    const [isFullScreen, setIsFullScreen] = useState(false);
+    const mountedRef = useRef(true);
+
+    // Stable stream URL reference
+    const streamUrl = streams?.hls;
 
     useEffect(() => {
-        if (!streams?.hls || !videoRef.current) return;
+        mountedRef.current = true;
+        return () => { mountedRef.current = false; };
+    }, []);
+
+    useEffect(() => {
+        if (!streamUrl || !videoRef.current) return;
+
         const video = videoRef.current;
-        
+        const cacheKey = `${camera.id}-${streamUrl}`;
+
+        // Check if already loaded in cache
+        if (hlsCache.has(cacheKey) && hlsRef.current) {
+            return;
+        }
+
         const initPlayer = () => {
+            if (!mountedRef.current) return;
             setStatus('loading');
+            setError(null);
+
             if (Hls.isSupported()) {
-                const hls = new Hls({ enableWorker: true, lowLatencyMode: true });
-                hlsRef.current = hls;
-                hls.loadSource(streams.hls);
-                hls.attachMedia(video);
-                hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                    video.play().then(() => setStatus('playing')).catch(() => setStatus('error'));
+                const hls = new Hls({
+                    enableWorker: true,
+                    lowLatencyMode: true,
+                    backBufferLength: 90,
+                    maxBufferLength: 30,
+                    maxMaxBufferLength: 60,
                 });
+
+                hlsRef.current = hls;
+                hlsCache.set(cacheKey, hls);
+
+                hls.loadSource(streamUrl);
+                hls.attachMedia(video);
+
+                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    if (!mountedRef.current) return;
+                    video.play().then(() => {
+                        if (mountedRef.current) setStatus('playing');
+                    }).catch(() => {
+                        if (mountedRef.current) {
+                            setStatus('error');
+                            setError('Autoplay blocked');
+                        }
+                    });
+                });
+
                 hls.on(Hls.Events.ERROR, (_, data) => {
-                    if (data.fatal) setStatus('error');
+                    if (!mountedRef.current) return;
+                    if (data.fatal) {
+                        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                            hls.startLoad();
+                        } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                            hls.recoverMediaError();
+                        } else {
+                            setStatus('error');
+                            setError('Stream unavailable');
+                        }
+                    }
                 });
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = streams.hls;
+                // Safari native HLS
+                video.src = streamUrl;
                 video.addEventListener('loadedmetadata', () => {
-                    video.play().then(() => setStatus('playing')).catch(() => setStatus('error'));
+                    if (!mountedRef.current) return;
+                    video.play().then(() => {
+                        if (mountedRef.current) setStatus('playing');
+                    }).catch(() => {
+                        if (mountedRef.current) setStatus('error');
+                    });
                 });
+            } else {
+                setStatus('error');
+                setError('Browser not supported');
             }
         };
-        initPlayer();
-        return () => { if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; } };
-    }, [streams]);
 
-    useEffect(() => {
-        const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement);
-        document.addEventListener('fullscreenchange', handleFsChange);
-        document.addEventListener('webkitfullscreenchange', handleFsChange);
+        initPlayer();
+
         return () => {
-            document.removeEventListener('fullscreenchange', handleFsChange);
-            document.removeEventListener('webkitfullscreenchange', handleFsChange);
+            if (hlsRef.current) {
+                hlsRef.current.destroy();
+                hlsRef.current = null;
+                hlsCache.delete(cacheKey);
+            }
+        };
+    }, [streamUrl, camera.id]);
+
+    // Fullscreen handling
+    useEffect(() => {
+        const handleFSChange = () => setIsFullScreen(!!document.fullscreenElement);
+        document.addEventListener('fullscreenchange', handleFSChange);
+        document.addEventListener('webkitfullscreenchange', handleFSChange);
+        return () => {
+            document.removeEventListener('fullscreenchange', handleFSChange);
+            document.removeEventListener('webkitfullscreenchange', handleFSChange);
         };
     }, []);
 
-    const handleZoom = (delta) => {
-        const newZoom = Math.min(Math.max(1, zoom + delta), 4);
-        setZoom(newZoom);
-        if (newZoom === 1) setPan({ x: 0, y: 0 });
-    };
-
-    const resetZoom = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
-
-    const handlePointerDown = (e) => {
-        if (zoom <= 1) return;
-        setIsDragging(true);
-        setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
-    };
-
-    const handlePointerMove = (e) => {
-        if (!isDragging || zoom <= 1) return;
-        const bounds = 100 * (zoom - 1);
-        setPan({
-            x: Math.min(Math.max(e.clientX - dragStart.x, -bounds), bounds),
-            y: Math.min(Math.max(e.clientY - dragStart.y, -bounds), bounds)
-        });
-    };
-
-    const handlePointerUp = () => setIsDragging(false);
-
-    const toggleFullscreen = async () => {
-        if (!containerRef.current) return;
+    const toggleFullScreen = async (e) => {
+        e?.stopPropagation();
         try {
             if (!document.fullscreenElement) {
                 await (containerRef.current.requestFullscreen?.() || containerRef.current.webkitRequestFullscreen?.());
             } else {
                 await (document.exitFullscreen?.() || document.webkitExitFullscreen?.());
             }
-        } catch (e) { console.error(e); }
+        } catch (err) { /* ignore */ }
     };
 
     return (
-        <div ref={containerRef} className="relative w-full h-full bg-black overflow-hidden" style={{ touchAction: zoom > 1 ? 'none' : 'auto' }}
-            onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp}>
-            <video ref={videoRef} className="w-full h-full transition-transform duration-100"
-                style={{ transform: `scale(${zoom}) translate(${pan.x/zoom}px, ${pan.y/zoom}px)`, objectFit: isExpanded ? 'contain' : 'cover', cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
-                muted playsInline controls={false} />
-            
-            {status === 'loading' && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-                    <div className="w-10 h-10 border-4 border-gray-600 border-t-blue-500 rounded-full animate-spin" />
+        <div ref={containerRef} className="relative w-full h-full bg-black overflow-hidden rounded-xl group">
+            <video
+                ref={videoRef}
+                className="w-full h-full"
+                style={{ objectFit: isExpanded || isFullScreen ? 'contain' : 'cover' }}
+                muted
+                playsInline
+                autoPlay
+            />
+
+            {/* Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30 opacity-0 group-hover:opacity-100 transition-opacity">
+                {/* Camera Info */}
+                <div className="absolute top-3 left-3 right-12">
+                    <h3 className="text-sm font-bold text-white truncate">{camera.name}</h3>
+                    {camera.location && (
+                        <p className="text-xs text-gray-300 truncate flex items-center gap-1 mt-0.5">
+                            <Icons.Location /> {camera.location}
+                        </p>
+                    )}
                 </div>
-            )}
-            {status === 'error' && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/80">
-                    <div className="text-center text-white">
-                        <p className="text-sm">Stream unavailable</p>
+
+                {/* Status */}
+                <div className="absolute top-3 right-3">
+                    <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
+                        status === 'playing' ? 'bg-green-500/20 text-green-400' :
+                        status === 'loading' ? 'bg-yellow-500/20 text-yellow-400' :
+                        'bg-red-500/20 text-red-400'
+                    }`}>
+                        <div className={`w-1.5 h-1.5 rounded-full ${
+                            status === 'playing' ? 'bg-green-500 animate-pulse' :
+                            status === 'loading' ? 'bg-yellow-500' : 'bg-red-500'
+                        }`} />
+                        {status === 'playing' ? 'LIVE' : status === 'loading' ? 'LOADING' : 'OFFLINE'}
                     </div>
                 </div>
-            )}
 
-            {isExpanded && (
-                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <span className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-400">
-                                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />LIVE
-                            </span>
-                            <span className="text-white text-sm font-medium">{camera.name}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <button onClick={() => handleZoom(-0.5)} className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white"><Icons.ZoomOut /></button>
-                            <span className="px-2 text-white text-xs font-mono">{Math.round(zoom * 100)}%</span>
-                            <button onClick={() => handleZoom(0.5)} className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white"><Icons.ZoomIn /></button>
-                            <button onClick={resetZoom} className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white"><Icons.Reset /></button>
-                            <button onClick={toggleFullscreen} className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white"><Icons.Fullscreen /></button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-}
-
-
-// Camera Card Component
-function CameraCard({ camera, onExpand, isSelected, onSelect, selectionCount }) {
-    const [showPreview, setShowPreview] = useState(false);
-    const canSelect = selectionCount < 3 || isSelected;
-
-    return (
-        <div className={`group relative bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border-2 ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-gray-200 dark:border-gray-700'}`}>
-            <div className="aspect-video bg-gray-100 dark:bg-gray-900 relative"
-                onMouseEnter={() => setShowPreview(true)} onMouseLeave={() => setShowPreview(false)}
-                onTouchStart={() => setShowPreview(true)} onTouchEnd={() => setShowPreview(false)}>
-                {showPreview ? (
-                    <VideoPlayer camera={camera} streams={camera.streams} />
-                ) : (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="text-center">
-                            <div className="w-14 h-14 mx-auto mb-2 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-gray-400">
-                                <Icons.Play />
-                            </div>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Tap to preview</p>
-                        </div>
-                    </div>
-                )}
-                <div className="absolute top-3 left-3 flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />Live
-                    </span>
-                </div>
-                <button onClick={() => canSelect && onSelect(camera.id)}
-                    className={`absolute top-3 right-3 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-blue-500 border-blue-500 text-white' : 'bg-white/80 dark:bg-gray-800/80 border-gray-300 dark:border-gray-600'} ${!canSelect && !isSelected ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
-                    {isSelected && <Icons.Check />}
-                </button>
-            </div>
-            <div className="p-4">
-                <h3 className="font-semibold text-gray-900 dark:text-white truncate">{camera.name}</h3>
-                {camera.location && <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1"><Icons.Location /><span className="truncate">{camera.location}</span></p>}
-                {camera.area_name && <span className="mt-2 inline-block px-2 py-0.5 text-xs font-medium rounded-md bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">{camera.area_name}</span>}
-            </div>
-            <button onClick={() => onExpand(camera)} className="absolute bottom-4 right-4 p-2 rounded-lg bg-gray-900/80 dark:bg-white/10 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-900 dark:hover:bg-white/20">
-                <Icons.Expand />
-            </button>
-        </div>
-    );
-}
-
-
-// Multi-view Layout Component
-function MultiViewLayout({ cameras, layout, onExpand }) {
-    const gridClass = layout === 1 ? 'grid-cols-1' : layout === 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-3';
-    return (
-        <div className={`grid ${gridClass} gap-4`}>
-            {cameras.slice(0, layout).map(camera => (
-                <div key={camera.id} className="relative aspect-video bg-black rounded-2xl overflow-hidden shadow-lg">
-                    <VideoPlayer camera={camera} streams={camera.streams} isExpanded={true} />
-                    <div className="absolute top-3 left-3 px-3 py-1.5 rounded-lg bg-black/60 backdrop-blur-sm">
-                        <p className="text-white text-sm font-medium">{camera.name}</p>
-                    </div>
-                    <button onClick={() => onExpand(camera)} className="absolute top-3 right-3 p-2 rounded-lg bg-black/60 hover:bg-black/80 text-white">
+                {/* Fullscreen Button */}
+                <div className="absolute bottom-3 right-3">
+                    <button
+                        onClick={toggleFullScreen}
+                        className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
+                    >
                         <Icons.Expand />
                     </button>
                 </div>
-            ))}
+            </div>
+
+            {/* Loading */}
+            {status === 'loading' && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                    <div className="w-8 h-8 border-2 border-white/20 border-t-primary-500 rounded-full animate-spin" />
+                </div>
+            )}
+
+            {/* Error */}
+            {status === 'error' && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+                    <div className="text-center p-4">
+                        <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-2">
+                            <Icons.Close />
+                        </div>
+                        <p className="text-red-400 text-sm font-medium">{error || 'Stream unavailable'}</p>
+                    </div>
+                </div>
+            )}
         </div>
     );
-}
+}, (prev, next) => {
+    // Custom comparison - only re-render if these change
+    return prev.camera.id === next.camera.id && 
+           prev.streams?.hls === next.streams?.hls &&
+           prev.isExpanded === next.isExpanded;
+});
 
-// Filter Panel Component
-function FilterPanel({ isOpen, onClose, filters, setFilters, areas, locations }) {
-    if (!isOpen) return null;
+
+// Camera Card - memoized to prevent unnecessary re-renders
+const CameraCard = memo(({ camera, streams, onClick }) => {
     return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
-            <div className="absolute inset-0 bg-black/50" />
-            <div className="relative w-full max-w-md bg-white dark:bg-gray-800 rounded-t-3xl sm:rounded-2xl p-6 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Filters</h3>
-                    <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"><Icons.Close /></button>
+        <div 
+            className="relative aspect-video rounded-xl overflow-hidden cursor-pointer 
+                       bg-dark-800 dark:bg-dark-800 light:bg-gray-100
+                       shadow-lg hover:shadow-xl transition-shadow duration-300
+                       ring-1 ring-white/5 hover:ring-primary-500/30"
+            onClick={onClick}
+        >
+            <VideoPlayer camera={camera} streams={streams} isExpanded={false} />
+        </div>
+    );
+}, (prev, next) => prev.camera.id === next.camera.id && prev.streams?.hls === next.streams?.hls);
+
+// Expanded View Modal
+const ExpandedView = memo(({ camera, streams, onClose }) => {
+    useEffect(() => {
+        const handleEsc = (e) => e.key === 'Escape' && onClose();
+        document.addEventListener('keydown', handleEsc);
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.removeEventListener('keydown', handleEsc);
+            document.body.style.overflow = '';
+        };
+    }, [onClose]);
+
+    return (
+        <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4">
+            {/* Close button */}
+            <button
+                onClick={onClose}
+                className="absolute top-4 right-4 z-10 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+            >
+                <Icons.Close />
+            </button>
+
+            {/* Video container - responsive */}
+            <div className="w-full h-full max-w-7xl max-h-[90vh] flex items-center justify-center">
+                <div className="w-full h-full">
+                    <VideoPlayer camera={camera} streams={streams} isExpanded={true} />
                 </div>
-                <div className="space-y-6">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Area</label>
-                        <div className="flex flex-wrap gap-2">
-                            {areas.map(area => (
-                                <button key={area} onClick={() => setFilters(f => ({ ...f, area }))}
-                                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${filters.area === area ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}>
-                                    {area}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Location</label>
-                        <div className="flex flex-wrap gap-2">
-                            {locations.map(loc => (
-                                <button key={loc} onClick={() => setFilters(f => ({ ...f, location: f.location === loc ? 'All' : loc }))}
-                                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${filters.location === loc ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}>
-                                    {loc}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Sort By</label>
-                        <select value={filters.sortBy} onChange={e => setFilters(f => ({ ...f, sortBy: e.target.value }))}
-                            className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 border-0 rounded-lg text-gray-900 dark:text-white">
-                            <option value="name">Name</option>
-                            <option value="location">Location</option>
-                            <option value="area">Area</option>
-                        </select>
-                    </div>
-                </div>
-                <div className="mt-6 flex gap-3">
-                    <button onClick={() => setFilters({ area: 'All', location: 'All', sortBy: 'name' })}
-                        className="flex-1 px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium">
-                        Reset
-                    </button>
-                    <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl bg-blue-600 text-white font-medium">Apply</button>
-                </div>
+            </div>
+
+            {/* Camera info */}
+            <div className="absolute bottom-4 left-4 text-white">
+                <h2 className="text-xl font-bold">{camera.name}</h2>
+                {camera.location && (
+                    <p className="text-sm text-gray-400 flex items-center gap-1 mt-1">
+                        <Icons.Location /> {camera.location}
+                    </p>
+                )}
             </div>
         </div>
     );
-}
+});
 
 
 // Main Landing Page Component
-export default function LandingPage() {
+function LandingPage() {
     const { theme, toggleTheme } = useTheme();
     const [cameras, setCameras] = useState([]);
+    const [streamsMap, setStreamsMap] = useState({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [expandedCamera, setExpandedCamera] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedIds, setSelectedIds] = useState([]);
-    const [viewMode, setViewMode] = useState('grid'); // grid, multi
-    const [multiLayout, setMultiLayout] = useState(2);
-    const [showFilters, setShowFilters] = useState(false);
-    const [filters, setFilters] = useState({ area: 'All', location: 'All', sortBy: 'name' });
+    const [expandedCamera, setExpandedCamera] = useState(null);
+    const [gridCols, setGridCols] = useState(2);
 
-    useEffect(() => { loadCameras(); }, []);
+    // Fetch cameras
+    useEffect(() => {
+        const fetchCameras = async () => {
+            try {
+                setLoading(true);
+                const response = await streamService.getAllStreams();
+                if (response.success && response.data) {
+                    const cameraList = response.data.map(item => ({
+                        id: item.camera.id,
+                        name: item.camera.name,
+                        location: item.camera.location || item.camera.description,
+                    }));
+                    setCameras(cameraList);
 
-    const loadCameras = async () => {
-        try {
-            setLoading(true);
-            const response = await streamService.getAllActiveStreams();
-            if (response.success) setCameras(response.data);
-            else setError('Failed to load cameras');
-        } catch { setError('Connection failed'); }
-        finally { setLoading(false); }
-    };
+                    // Build streams map
+                    const streams = {};
+                    response.data.forEach(item => {
+                        streams[item.camera.id] = item.streams;
+                    });
+                    setStreamsMap(streams);
+                }
+            } catch (err) {
+                setError('Failed to load cameras');
+            } finally {
+                setLoading(false);
+            }
+        };
 
-    const areas = useMemo(() => ['All', ...new Set(cameras.map(c => c.area_name || 'Uncategorized'))], [cameras]);
-    const locations = useMemo(() => ['All', ...new Set(cameras.filter(c => c.location).map(c => c.location))], [cameras]);
-
-    const filteredCameras = useMemo(() => {
-        let result = cameras.filter(c => {
-            const matchSearch = !searchQuery || c.name.toLowerCase().includes(searchQuery.toLowerCase()) || c.location?.toLowerCase().includes(searchQuery.toLowerCase());
-            const matchArea = filters.area === 'All' || (c.area_name || 'Uncategorized') === filters.area;
-            const matchLoc = filters.location === 'All' || c.location === filters.location;
-            return matchSearch && matchArea && matchLoc;
-        });
-        result.sort((a, b) => {
-            if (filters.sortBy === 'name') return a.name.localeCompare(b.name);
-            if (filters.sortBy === 'location') return (a.location || '').localeCompare(b.location || '');
-            if (filters.sortBy === 'area') return (a.area_name || '').localeCompare(b.area_name || '');
-            return 0;
-        });
-        return result;
-    }, [cameras, searchQuery, filters]);
-
-    const selectedCameras = useMemo(() => selectedIds.map(id => cameras.find(c => c.id === id)).filter(Boolean), [selectedIds, cameras]);
-
-    const toggleSelect = useCallback((id) => {
-        setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : prev.length < 3 ? [...prev, id] : prev);
+        fetchCameras();
     }, []);
 
-    const activeFiltersCount = (filters.area !== 'All' ? 1 : 0) + (filters.location !== 'All' ? 1 : 0);
+    // Filter cameras by search
+    const filteredCameras = useMemo(() => {
+        if (!searchQuery.trim()) return cameras;
+        const query = searchQuery.toLowerCase();
+        return cameras.filter(c => 
+            c.name.toLowerCase().includes(query) ||
+            c.location?.toLowerCase().includes(query)
+        );
+    }, [cameras, searchQuery]);
+
+    // Handle expand
+    const handleExpand = useCallback((camera) => {
+        setExpandedCamera(camera);
+    }, []);
+
+    const handleCloseExpand = useCallback(() => {
+        setExpandedCamera(null);
+    }, []);
+
+    // Grid columns class
+    const gridClass = useMemo(() => {
+        switch (gridCols) {
+            case 1: return 'grid-cols-1';
+            case 2: return 'grid-cols-1 md:grid-cols-2';
+            case 3: return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3';
+            default: return 'grid-cols-1 md:grid-cols-2';
+        }
+    }, [gridCols]);
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-dark-950 dark:bg-dark-950 light:bg-gray-50 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="w-12 h-12 border-2 border-primary-500/30 border-t-primary-500 rounded-full animate-spin mx-auto mb-4" />
+                    <p className="text-dark-400 dark:text-dark-400 light:text-gray-600">Loading cameras...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="min-h-screen bg-dark-950 dark:bg-dark-950 light:bg-gray-50 flex items-center justify-center">
+                <div className="text-center p-8">
+                    <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Icons.Close />
+                    </div>
+                    <p className="text-red-400 text-lg font-medium">{error}</p>
+                    <button 
+                        onClick={() => window.location.reload()}
+                        className="mt-4 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
+                    >
+                        Retry
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
+        <div className="min-h-screen bg-dark-950 dark:bg-dark-950 light:bg-gray-50 transition-colors duration-300">
             {/* Header */}
-            <header className="sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-gray-200 dark:border-gray-800">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between h-16">
+            <header className="sticky top-0 z-40 bg-dark-900/80 dark:bg-dark-900/80 light:bg-white/80 backdrop-blur-lg border-b border-white/5 dark:border-white/5 light:border-gray-200">
+                <div className="max-w-7xl mx-auto px-4 py-3">
+                    <div className="flex items-center justify-between gap-4">
+                        {/* Logo */}
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
+                            <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-700 rounded-xl flex items-center justify-center">
                                 <Icons.Camera />
                             </div>
-                            <div className="hidden sm:block">
-                                <h1 className="text-lg font-bold text-gray-900 dark:text-white">RAF NET CCTV</h1>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Live Monitoring</p>
+                            <div>
+                                <h1 className="text-lg font-bold text-white dark:text-white light:text-gray-900">RAF NET CCTV</h1>
+                                <p className="text-xs text-dark-400 dark:text-dark-400 light:text-gray-500">{cameras.length} cameras online</p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            {selectedIds.length > 0 && (
-                                <div className="hidden sm:flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-                                    {[1, 2, 3].map(n => (
-                                        <button key={n} onClick={() => { setViewMode('multi'); setMultiLayout(n); }} disabled={selectedIds.length < n}
-                                            className={`p-2 rounded-md transition-colors ${viewMode === 'multi' && multiLayout === n ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'} ${selectedIds.length < n ? 'opacity-30' : ''}`}>
-                                            {n === 1 ? <Icons.Layout1 /> : n === 2 ? <Icons.Layout2 /> : <Icons.Layout3 />}
-                                        </button>
-                                    ))}
+
+                        {/* Search */}
+                        <div className="flex-1 max-w-md hidden sm:block">
+                            <div className="relative">
+                                <Icons.Search />
+                                <input
+                                    type="text"
+                                    placeholder="Search cameras..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-2 bg-dark-800 dark:bg-dark-800 light:bg-gray-100 
+                                             text-white dark:text-white light:text-gray-900
+                                             placeholder-dark-400 dark:placeholder-dark-400 light:placeholder-gray-500
+                                             rounded-lg border border-white/5 dark:border-white/5 light:border-gray-200
+                                             focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                                />
+                                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-400">
+                                    <Icons.Search />
                                 </div>
-                            )}
-                            <button onClick={() => setViewMode('grid')} className={`p-2 rounded-lg transition-colors ${viewMode === 'grid' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
-                                <Icons.Grid />
-                            </button>
-                            <button onClick={toggleTheme} className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700">
+                            </div>
+                        </div>
+
+                        {/* Controls */}
+                        <div className="flex items-center gap-2">
+                            {/* Grid toggle */}
+                            <div className="hidden sm:flex items-center gap-1 bg-dark-800 dark:bg-dark-800 light:bg-gray-100 rounded-lg p-1">
+                                {[1, 2, 3].map(cols => (
+                                    <button
+                                        key={cols}
+                                        onClick={() => setGridCols(cols)}
+                                        className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                                            gridCols === cols 
+                                                ? 'bg-primary-600 text-white' 
+                                                : 'text-dark-400 hover:text-white dark:hover:text-white light:hover:text-gray-900'
+                                        }`}
+                                    >
+                                        {cols}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Theme toggle */}
+                            <button
+                                onClick={toggleTheme}
+                                className="p-2 rounded-lg bg-dark-800 dark:bg-dark-800 light:bg-gray-100 
+                                         text-dark-400 hover:text-white dark:hover:text-white light:hover:text-gray-900
+                                         transition-colors"
+                            >
                                 {theme === 'dark' ? <Icons.Sun /> : <Icons.Moon />}
                             </button>
+                        </div>
+                    </div>
+
+                    {/* Mobile search */}
+                    <div className="mt-3 sm:hidden">
+                        <div className="relative">
+                            <input
+                                type="text"
+                                placeholder="Search cameras..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 bg-dark-800 dark:bg-dark-800 light:bg-gray-100 
+                                         text-white dark:text-white light:text-gray-900
+                                         placeholder-dark-400 rounded-lg border border-white/5
+                                         focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                            />
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-400">
+                                <Icons.Search />
+                            </div>
                         </div>
                     </div>
                 </div>
             </header>
 
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-                {/* Search & Filters */}
-                <div className="flex flex-col sm:flex-row gap-3 mb-6">
-                    <div className="relative flex-1">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><Icons.Search /></div>
-                        <input type="text" placeholder="Search cameras..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            {/* Main Content */}
+            <main className="max-w-7xl mx-auto px-4 py-6">
+                {filteredCameras.length === 0 ? (
+                    <div className="text-center py-16">
+                        <Icons.Camera />
+                        <p className="text-dark-400 dark:text-dark-400 light:text-gray-500 mt-4">
+                            {searchQuery ? 'No cameras found' : 'No cameras available'}
+                        </p>
                     </div>
-                    <button onClick={() => setShowFilters(true)} className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-700 dark:text-gray-300 hover:border-blue-300">
-                        <Icons.Filter />
-                        <span>Filters</span>
-                        {activeFiltersCount > 0 && <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center">{activeFiltersCount}</span>}
-                    </button>
-                </div>
-
-                {/* Selection Bar */}
-                {selectedIds.length > 0 && (
-                    <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-6">
-                        <div className="flex items-center gap-3">
-                            <div className="flex -space-x-2">
-                                {selectedCameras.map((c, i) => (
-                                    <div key={c.id} className="w-8 h-8 rounded-full bg-blue-600 border-2 border-white dark:border-gray-900 flex items-center justify-center text-white text-xs font-bold" style={{ zIndex: 3 - i }}>{i + 1}</div>
-                                ))}
-                            </div>
-                            <div>
-                                <p className="text-sm font-medium text-gray-900 dark:text-white">{selectedIds.length}/3 selected</p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Choose layout above to view</p>
-                            </div>
-                        </div>
-                        <button onClick={() => setSelectedIds([])} className="px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg">Clear</button>
+                ) : (
+                    <div className={`grid ${gridClass} gap-4`}>
+                        {filteredCameras.map(camera => (
+                            <CameraCard
+                                key={camera.id}
+                                camera={camera}
+                                streams={streamsMap[camera.id]}
+                                onClick={() => handleExpand(camera)}
+                            />
+                        ))}
                     </div>
-                )}
-
-                {/* Content */}
-                {loading && (
-                    <div className="flex flex-col items-center justify-center py-20">
-                        <div className="w-12 h-12 border-4 border-gray-200 dark:border-gray-700 border-t-blue-500 rounded-full animate-spin" />
-                        <p className="mt-4 text-gray-500 dark:text-gray-400">Loading cameras...</p>
-                    </div>
-                )}
-
-                {error && (
-                    <div className="flex flex-col items-center justify-center py-20">
-                        <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-4">
-                            <svg className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                            </svg>
-                        </div>
-                        <p className="text-gray-900 dark:text-white font-medium mb-4">{error}</p>
-                        <button onClick={loadCameras} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Retry</button>
-                    </div>
-                )}
-
-                {!loading && !error && cameras.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-20">
-                        <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4 text-gray-400"><Icons.Camera /></div>
-                        <p className="text-gray-900 dark:text-white font-medium">No cameras available</p>
-                    </div>
-                )}
-
-                {!loading && !error && filteredCameras.length > 0 && (
-                    <>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Showing {filteredCameras.length} of {cameras.length} cameras</p>
-                        {viewMode === 'multi' && selectedCameras.length > 0 ? (
-                            <MultiViewLayout cameras={selectedCameras} layout={multiLayout} onExpand={setExpandedCamera} />
-                        ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                {filteredCameras.map(camera => (
-                                    <CameraCard key={camera.id} camera={camera} onExpand={setExpandedCamera} isSelected={selectedIds.includes(camera.id)} onSelect={toggleSelect} selectionCount={selectedIds.length} />
-                                ))}
-                            </div>
-                        )}
-                    </>
                 )}
             </main>
 
-            {/* Expanded Modal */}
+            {/* Expanded View */}
             {expandedCamera && (
-                <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-2 sm:p-4" onClick={() => setExpandedCamera(null)}>
-                    <div className="relative w-full max-w-6xl bg-gray-900 rounded-2xl overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-between p-4 border-b border-gray-800">
-                            <div>
-                                <h2 className="text-lg font-semibold text-white">{expandedCamera.name}</h2>
-                                {expandedCamera.location && <p className="text-sm text-gray-400 flex items-center gap-1"><Icons.Location />{expandedCamera.location}</p>}
-                            </div>
-                            <button onClick={() => setExpandedCamera(null)} className="p-2 rounded-lg hover:bg-gray-800 text-gray-400"><Icons.Close /></button>
-                        </div>
-                        <div className="aspect-video"><VideoPlayer camera={expandedCamera} streams={expandedCamera.streams} isExpanded={true} /></div>
-                    </div>
-                </div>
+                <ExpandedView
+                    camera={expandedCamera}
+                    streams={streamsMap[expandedCamera.id]}
+                    onClose={handleCloseExpand}
+                />
             )}
-
-            <FilterPanel isOpen={showFilters} onClose={() => setShowFilters(false)} filters={filters} setFilters={setFilters} areas={areas} locations={locations} />
-
-            <footer className="border-t border-gray-200 dark:border-gray-800 mt-12">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-                    <p className="text-center text-sm text-gray-500 dark:text-gray-400">© {new Date().getFullYear()} RAF NET CCTV</p>
-                </div>
-            </footer>
         </div>
     );
 }
+
+export default LandingPage;
