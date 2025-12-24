@@ -153,10 +153,11 @@ class MediaMtxService {
                 }
 
                 const pathConfig = {
-                    source: camera.rtsp_url,
-                    sourceOnDemand: true,
-                    sourceOnDemandStartTimeout: '10s',
-                    sourceOnDemandCloseAfter: '10s',
+                    source: 'publisher',
+                    runOnDemand: `ffmpeg -rtsp_transport tcp -i ${camera.rtsp_url} -c:v libx264 -preset ultrafast -tune zerolatency -b:v 2M -c:a aac -f rtsp rtsp://localhost:8554/${camera.path_name}`,
+                    runOnDemandRestart: true,
+                    runOnDemandStartTimeout: '30s',
+                    runOnDemandCloseAfter: '30s',
                 };
 
                 const result = await this.addOrUpdatePath(camera.path_name, pathConfig);
