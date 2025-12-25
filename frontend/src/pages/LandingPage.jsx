@@ -3,6 +3,30 @@ import { streamService } from '../services/streamService';
 import { useTheme } from '../contexts/ThemeContext';
 import Hls from 'hls.js';
 
+// ============================================
+// HLS CONFIG - Optimized for all devices including low-end
+// ============================================
+const HLS_CONFIG = {
+    enableWorker: false,              // Disable worker - reduces CPU overhead on low-end devices
+    lowLatencyMode: false,            // Disable LL-HLS - more stable on weak devices
+    backBufferLength: 30,             // Keep 30s back buffer
+    maxBufferLength: 10,              // Smaller buffer = faster start
+    maxMaxBufferLength: 30,           // Max buffer cap
+    maxBufferSize: 30 * 1000 * 1000,  // 30MB max buffer
+    maxBufferHole: 0.5,               // Tolerate small gaps
+    startLevel: -1,                   // Auto-select quality based on bandwidth
+    abrEwmaDefaultEstimate: 500000,   // Start with 500kbps estimate (conservative)
+    abrBandWidthFactor: 0.9,          // Conservative bandwidth factor
+    abrBandWidthUpFactor: 0.7,        // Slower quality upgrade
+    fragLoadingTimeOut: 20000,        // 20s timeout for fragments
+    fragLoadingMaxRetry: 6,           // More retries
+    fragLoadingRetryDelay: 1000,      // 1s between retries
+    manifestLoadingTimeOut: 15000,    // 15s manifest timeout
+    manifestLoadingMaxRetry: 4,       // More manifest retries
+    levelLoadingTimeOut: 15000,       // 15s level timeout
+    levelLoadingMaxRetry: 4,          // More level retries
+};
+
 
 // ============================================
 // ICONS
@@ -212,14 +236,14 @@ function VideoPopup({ camera, onClose }) {
         const video = videoRef.current;
         let hls = null;
         if (Hls.isSupported()) {
-            hls = new Hls();
+            hls = new Hls(HLS_CONFIG);
             hlsRef.current = hls;
             hls.loadSource(url);
             hls.attachMedia(video);
             hls.on(Hls.Events.MANIFEST_PARSED, () => { video.play().catch(() => {}); setStatus('live'); });
             hls.on(Hls.Events.ERROR, (_, d) => {
                 if (d.fatal) {
-                    if (d.type === Hls.ErrorTypes.NETWORK_ERROR) setTimeout(() => hls?.startLoad(), 3000);
+                    if (d.type === Hls.ErrorTypes.NETWORK_ERROR) setTimeout(() => hls?.startLoad(), 2000);
                     else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) hls?.recoverMediaError();
                     else setStatus('error');
                 }
@@ -320,14 +344,14 @@ function MultiViewVideoItem({ camera, onRemove }) {
         const video = videoRef.current;
         let hls = null;
         if (Hls.isSupported()) {
-            hls = new Hls();
+            hls = new Hls(HLS_CONFIG);
             hlsRef.current = hls;
             hls.loadSource(url);
             hls.attachMedia(video);
             hls.on(Hls.Events.MANIFEST_PARSED, () => { video.play().catch(() => {}); setStatus('live'); });
             hls.on(Hls.Events.ERROR, (_, d) => {
                 if (d.fatal) {
-                    if (d.type === Hls.ErrorTypes.NETWORK_ERROR) setTimeout(() => hls?.startLoad(), 3000);
+                    if (d.type === Hls.ErrorTypes.NETWORK_ERROR) setTimeout(() => hls?.startLoad(), 2000);
                     else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) hls?.recoverMediaError();
                     else setStatus('error');
                 }
