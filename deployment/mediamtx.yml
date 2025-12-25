@@ -1,5 +1,5 @@
 # MediaMTX Configuration for RAF NET CCTV Production
-# STABLE MODE - Compatible with H265 cameras
+# fMP4 variant - supports H265 cameras!
 
 logLevel: warn
 logDestinations: [stdout]
@@ -9,13 +9,12 @@ api: yes
 apiAddress: 127.0.0.1:9997
 
 # ============================================
-# HLS Settings - STABLE MODE (mpegts)
-# mpegts works with H265, lowLatency does NOT
+# HLS Settings - fMP4 supports H265
 # ============================================
 hls: yes
 hlsAddress: :8888
 hlsAlwaysRemux: yes
-hlsVariant: mpegts
+hlsVariant: fmp4
 hlsSegmentCount: 3
 hlsSegmentDuration: 1s
 hlsSegmentMaxSize: 50M

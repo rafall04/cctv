@@ -1,4 +1,4 @@
-# MediaMTX Configuration - Stable & Compatible
+# MediaMTX Configuration - H265 Compatible
 
 logLevel: info
 logDestinations: [stdout]
@@ -8,13 +8,12 @@ api: yes
 apiAddress: :9997
 
 # ============================================
-# HLS Settings - STABLE MODE (not lowLatency)
-# lowLatency requires 7+ segments and H264
+# HLS Settings - fMP4 variant supports H265!
 # ============================================
 hls: yes
 hlsAddress: :8888
 hlsAlwaysRemux: yes
-hlsVariant: mpegts
+hlsVariant: fmp4
 hlsSegmentCount: 3
 hlsSegmentDuration: 1s
 hlsSegmentMaxSize: 50M
