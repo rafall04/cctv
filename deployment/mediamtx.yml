@@ -28,13 +28,7 @@ rtmpAddress: :1935
 rtsp: yes
 rtspAddress: :8554
 
-# Path defaults - sourceOnDemand to only connect when requested
-pathDefaults:
-  sourceOnDemand: yes
-  sourceOnDemandStartTimeout: 10s
-  sourceOnDemandCloseAfter: 10s
-  recordDeleteAfter: 24h
-
 # Path configurations managed by backend
+# Note: sourceOnDemand is set per-path by backend, not in defaults
 paths:
   all_others: {}
