@@ -1,4 +1,4 @@
-# MediaMTX Configuration - H265 Compatible
+# MediaMTX Configuration - Minimal & Stable
 
 logLevel: info
 logDestinations: [stdout]
@@ -7,38 +7,16 @@ logDestinations: [stdout]
 api: yes
 apiAddress: :9997
 
-# ============================================
-# HLS Settings - fMP4 variant supports H265!
-# ============================================
+# Listeners for streaming protocols
 hls: yes
 hlsAddress: :8888
-hlsAlwaysRemux: yes
-hlsVariant: fmp4
-hlsSegmentCount: 3
-hlsSegmentDuration: 1s
-hlsSegmentMaxSize: 50M
-hlsAllowOrigin: '*'
-
-# ============================================
-# WebRTC Settings
-# ============================================
 webrtc: yes
 webrtcAddress: :8889
-webrtcAllowOrigin: '*'
-
-# ============================================
-# RTSP/RTMP Settings
-# ============================================
-rtsp: yes
-rtspAddress: :8554
 rtmp: yes
 rtmpAddress: :1935
+rtsp: yes
+rtspAddress: :8554
 
-# ============================================
-# Path defaults
-# ============================================
-pathDefaults:
-  record: no
-
+# Path defaults are minimal. The backend service will manage path configurations.
 paths:
   all_others: {}

@@ -3,34 +3,6 @@ import { streamService } from '../services/streamService';
 import { useTheme } from '../contexts/ThemeContext';
 import Hls from 'hls.js';
 
-// ============================================
-// HLS CONFIG - BALANCED & PROVEN
-// Menggunakan default HLS.js yang sudah teruji + sedikit optimasi
-// ============================================
-const getHlsConfig = (isMultiView = false) => {
-    return {
-        // Gunakan default yang sudah proven, hanya override yang perlu
-        enableWorker: true,
-        startLevel: -1,                    // Auto select quality
-        autoStartLoad: true,
-        debug: false,
-        
-        // Buffer settings - balanced
-        maxBufferLength: isMultiView ? 15 : 30,
-        maxMaxBufferLength: isMultiView ? 30 : 60,
-        backBufferLength: isMultiView ? 0 : 30,
-        
-        // Live stream settings
-        liveSyncDurationCount: 3,          // Default: 3 segments behind live
-        liveMaxLatencyDurationCount: 10,
-        
-        // Loading settings - reasonable timeouts
-        fragLoadingTimeOut: 20000,
-        manifestLoadingTimeOut: 10000,
-        levelLoadingTimeOut: 10000,
-    };
-};
-
 
 // ============================================
 // ICONS
@@ -240,7 +212,7 @@ function VideoPopup({ camera, onClose }) {
         const video = videoRef.current;
         let hls = null;
         if (Hls.isSupported()) {
-            hls = new Hls(getHlsConfig(false));
+            hls = new Hls();
             hlsRef.current = hls;
             hls.loadSource(url);
             hls.attachMedia(video);
@@ -348,7 +320,7 @@ function MultiViewVideoItem({ camera, onRemove }) {
         const video = videoRef.current;
         let hls = null;
         if (Hls.isSupported()) {
-            hls = new Hls(getHlsConfig(true)); // Multi-view config (smaller buffer)
+            hls = new Hls();
             hlsRef.current = hls;
             hls.loadSource(url);
             hls.attachMedia(video);

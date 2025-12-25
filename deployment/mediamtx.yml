@@ -1,46 +1,30 @@
 # MediaMTX Configuration for RAF NET CCTV Production
-# fMP4 variant - supports H265 cameras!
-
-logLevel: warn
-logDestinations: [stdout]
 
 # API settings
 api: yes
 apiAddress: 127.0.0.1:9997
 
-# ============================================
-# HLS Settings - fMP4 supports H265
-# ============================================
+# HLS settings
 hls: yes
 hlsAddress: :8888
 hlsAlwaysRemux: yes
-hlsVariant: fmp4
-hlsSegmentCount: 3
-hlsSegmentDuration: 1s
-hlsSegmentMaxSize: 50M
-hlsAllowOrigin: '*'
 
-# ============================================
-# WebRTC Settings
-# ============================================
+# WebRTC settings
 webrtc: yes
 webrtcAddress: :8889
 webrtcLocalUDPAddress: :8189
-webrtcAllowOrigin: '*'
 
-# ============================================
-# RTSP/RTMP Settings
-# ============================================
-rtsp: yes
-rtspAddress: :8554
+# RTMP settings (for camera input)
 rtmp: yes
 rtmpAddress: :1935
 
-# ============================================
+# RTSP settings
+rtsp: yes
+rtspAddress: :8554
+
 # Path defaults
-# ============================================
 pathDefaults:
-  record: no
+  recordDeleteAfter: 24h
 
 paths:
   all_others: {}
