@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef, memo } from 'react';
 import { streamService } from '../services/streamService';
 import { areaService } from '../services/areaService';
 import { useTheme } from '../contexts/ThemeContext';
+import { createTransformThrottle } from '../utils/rafThrottle';
 
 // ============================================
 // HLS CONFIG - Stable for all devices including low-end
@@ -268,21 +269,44 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
 });
 
 // ============================================
-// ZOOMABLE VIDEO COMPONENT - Ultra smooth pan/zoom
-// Transform on wrapper div, not video. Pure DOM manipulation.
+// ZOOMABLE VIDEO COMPONENT - Ultra smooth pan/zoom with RAF throttling
+// Transform on wrapper div, not video. Uses RAF-based throttling for 60fps max.
 // ============================================
 const ZoomableVideo = memo(function ZoomableVideo({ videoRef, maxZoom = 4, onZoomChange }) {
     const wrapperRef = useRef(null);
+    const transformThrottleRef = useRef(null);
     const stateRef = useRef({ zoom: 1, panX: 0, panY: 0, dragging: false, startX: 0, startY: 0, startPanX: 0, startPanY: 0 });
 
     const getMaxPan = (z) => z <= 1 ? 0 : ((z - 1) / (2 * z)) * 100;
     const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
+    // Initialize RAF throttle on mount
+    useEffect(() => {
+        if (wrapperRef.current) {
+            transformThrottleRef.current = createTransformThrottle(wrapperRef.current);
+        }
+        return () => {
+            transformThrottleRef.current?.cancel();
+        };
+    }, []);
+
     const applyTransform = useCallback((animate = false) => {
         if (!wrapperRef.current) return;
         const { zoom, panX, panY } = stateRef.current;
-        wrapperRef.current.style.transition = animate ? 'transform 0.2s ease-out' : 'none';
-        wrapperRef.current.style.transform = `scale(${zoom}) translate(${panX}%, ${panY}%)`;
+        
+        if (animate) {
+            // For animated transitions, apply directly with CSS transition
+            wrapperRef.current.style.transition = 'transform 0.2s ease-out';
+            wrapperRef.current.style.transform = `scale(${zoom}) translate(${panX}%, ${panY}%)`;
+        } else {
+            // For rapid updates, use RAF throttle
+            wrapperRef.current.style.transition = 'none';
+            if (transformThrottleRef.current) {
+                transformThrottleRef.current.update(zoom, panX, panY);
+            } else {
+                wrapperRef.current.style.transform = `scale(${zoom}) translate(${panX}%, ${panY}%)`;
+            }
+        }
         onZoomChange?.(zoom);
     }, [onZoomChange]);
 
@@ -329,8 +353,12 @@ const ZoomableVideo = memo(function ZoomableVideo({ videoRef, maxZoom = 4, onZoo
         s.panX = clamp(s.startPanX + dx * factor, -max, max);
         s.panY = clamp(s.startPanY + dy * factor, -max, max);
         
-        // Direct DOM update - no React, no RAF needed for simple transform
-        wrapperRef.current.style.transform = `scale(${s.zoom}) translate(${s.panX}%, ${s.panY}%)`;
+        // Use RAF-throttled transform update for smooth 60fps max
+        if (transformThrottleRef.current) {
+            transformThrottleRef.current.update(s.zoom, s.panX, s.panY);
+        } else {
+            wrapperRef.current.style.transform = `scale(${s.zoom}) translate(${s.panX}%, ${s.panY}%)`;
+        }
     }, []);
 
     const handlePointerUp = useCallback((e) => {
