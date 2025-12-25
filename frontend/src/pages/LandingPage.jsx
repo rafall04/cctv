@@ -4,59 +4,56 @@ import { useTheme } from '../contexts/ThemeContext';
 import Hls from 'hls.js';
 
 // ============================================
-// DEVICE DETECTION & HLS CONFIG
-// Optimized for low-end devices (kentang)
+// HLS CONFIG - INSTANT START FOR ALL DEVICES
+// Key: Start playing ASAP with minimal buffer, then grow buffer gradually
 // ============================================
-const isLowEndDevice = (() => {
-    if (typeof navigator === 'undefined') return false;
-    const memory = navigator.deviceMemory || 4; // GB, default 4 if not available
-    const cores = navigator.hardwareConcurrency || 4;
-    const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
-    // Low-end: < 4GB RAM or < 4 cores on mobile
-    return (memory < 4 || (isMobile && cores < 6));
-})();
-
-// HLS config optimized for device capability
 const getHlsConfig = (isMultiView = false) => {
-    if (isLowEndDevice) {
-        // Config untuk HP kentang - prioritas stabilitas
-        return {
-            enableWorker: false, // Disable worker - lebih stabil di device lemah
-            lowLatencyMode: false, // Disable low latency - kurangi CPU usage
-            backBufferLength: 0, // Tidak simpan buffer belakang
-            maxBufferLength: 10, // Buffer kecil (10 detik)
-            maxMaxBufferLength: 15,
-            maxBufferSize: 30 * 1000 * 1000, // 30MB max
-            maxBufferHole: 1,
-            highBufferWatchdogPeriod: 3,
-            nudgeMaxRetry: 5,
-            fragLoadingTimeOut: 20000,
-            fragLoadingMaxRetry: 3,
-            levelLoadingTimeOut: 15000,
-            startLevel: 0, // Mulai dari quality terendah
-            autoStartLoad: true,
-            startFragPrefetch: false, // Jangan prefetch
-            testBandwidth: false, // Skip bandwidth test
-            progressive: true, // Progressive loading
-            // Prefer lower quality
-            abrEwmaDefaultEstimate: 500000, // Assume 500kbps connection
-            abrBandWidthFactor: 0.7,
-            abrBandWidthUpFactor: 0.5,
-        };
-    }
-    
-    // Config untuk device normal/high-end
+    // Universal config - works on all devices from kentang to flagship
+    // Priority: FAST START > Quality > Buffer size
     return {
-        enableWorker: true,
-        lowLatencyMode: true,
-        backBufferLength: isMultiView ? 15 : 30,
-        maxBufferLength: isMultiView ? 20 : 30,
-        maxMaxBufferLength: isMultiView ? 30 : 60,
-        maxBufferSize: 60 * 1000 * 1000,
-        startLevel: -1, // Auto select
-        abrEwmaDefaultEstimate: 1000000,
+        // === INSTANT START SETTINGS ===
+        enableWorker: false,           // Disable worker - faster init, more stable
+        lowLatencyMode: true,          // Enable for faster segment loading
+        liveSyncDuration: 3,           // Sync to 3 seconds from live edge
+        liveMaxLatencyDuration: 10,    // Max 10 seconds behind live
+        liveDurationInfinity: true,    // Treat as infinite live stream
+        
+        // === MINIMAL INITIAL BUFFER (FAST START) ===
+        maxBufferLength: 5,            // Only buffer 5 seconds before play
+        maxMaxBufferLength: isMultiView ? 10 : 20, // Grow to this after start
+        maxBufferSize: 30 * 1000 * 1000, // 30MB max buffer
+        maxBufferHole: 0.5,            // Allow small gaps
+        
+        // === AGGRESSIVE LOADING ===
+        startLevel: 0,                 // ALWAYS start with lowest quality (fastest)
+        autoStartLoad: true,           // Start loading immediately
+        startFragPrefetch: true,       // Prefetch first fragment
+        
+        // === FAST RECOVERY ===
+        fragLoadingTimeOut: 10000,     // 10s timeout (not too long)
+        fragLoadingMaxRetry: 2,        // Quick retry
+        fragLoadingRetryDelay: 500,    // 500ms between retries
+        levelLoadingTimeOut: 8000,     // 8s for level loading
+        manifestLoadingTimeOut: 8000,  // 8s for manifest
+        manifestLoadingMaxRetry: 2,
+        
+        // === ABR - PREFER STABILITY OVER QUALITY ===
+        abrEwmaDefaultEstimate: 800000,  // Assume 800kbps (conservative)
+        abrBandWidthFactor: 0.8,         // Use 80% of measured bandwidth
+        abrBandWidthUpFactor: 0.6,       // Slow to upgrade quality
+        abrMaxWithRealBitrate: true,     // Use real bitrate for decisions
+        
+        // === BUFFER MANAGEMENT ===
+        backBufferLength: 0,           // Don't keep back buffer (save memory)
+        nudgeMaxRetry: 3,
+        nudgeOffset: 0.1,
+        
+        // === PERFORMANCE ===
+        progressive: true,             // Progressive loading
+        testBandwidth: false,          // Skip initial bandwidth test (faster start)
     };
 };
+
 
 // ============================================
 // ICONS
