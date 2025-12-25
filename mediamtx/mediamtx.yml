@@ -1,4 +1,4 @@
-# MediaMTX Configuration - Optimized for All Devices
+# MediaMTX Configuration - Stable & Compatible
 
 logLevel: info
 logDestinations: [stdout]
@@ -8,15 +8,15 @@ api: yes
 apiAddress: :9997
 
 # ============================================
-# HLS Settings - CRITICAL for smooth playback
+# HLS Settings - STABLE MODE (not lowLatency)
+# lowLatency requires 7+ segments and H264
 # ============================================
 hls: yes
 hlsAddress: :8888
 hlsAlwaysRemux: yes
-hlsVariant: lowLatency
+hlsVariant: mpegts
 hlsSegmentCount: 3
 hlsSegmentDuration: 1s
-hlsPartDuration: 200ms
 hlsSegmentMaxSize: 50M
 hlsAllowOrigin: '*'
 
@@ -36,7 +36,7 @@ rtmp: yes
 rtmpAddress: :1935
 
 # ============================================
-# Path defaults - NO AUTH (public CCTV)
+# Path defaults
 # ============================================
 pathDefaults:
   record: no
