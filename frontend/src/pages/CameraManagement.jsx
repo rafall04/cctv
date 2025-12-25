@@ -173,7 +173,7 @@ export default function CameraManagement() {
                                     </span>
                                 </div>
                                 <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
-                                    <p className="text-[10px] font-semibold text-sky-400 mb-0.5">{camera.area_name || 'Uncategorized'}</p>
+                                    <p className="text-[10px] font-semibold text-sky-300 mb-0.5">{camera.area_name || 'Uncategorized'}</p>
                                     <h3 className="text-sm font-bold text-white">{camera.name}</h3>
                                 </div>
                             </div>
