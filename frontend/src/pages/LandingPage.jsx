@@ -501,7 +501,7 @@ function Navbar() {
 // ============================================
 // FILTER DROPDOWN
 // ============================================
-function FilterDropdown({ areas, selected, onChange }) {
+function FilterDropdown({ areas, selected, onChange, cameras }) {
     const [open, setOpen] = useState(false);
     const ref = useRef(null);
 
@@ -512,6 +512,12 @@ function FilterDropdown({ areas, selected, onChange }) {
     }, []);
 
     const selectedArea = areas.find(a => a.id === selected);
+    
+    // Count cameras per area
+    const getCameraCount = (areaId) => {
+        if (!areaId) return cameras.length;
+        return cameras.filter(c => c.area_id === areaId).length;
+    };
 
     return (
         <div ref={ref} className="relative">
@@ -521,25 +527,46 @@ function FilterDropdown({ areas, selected, onChange }) {
             >
                 <Icons.Filter />
                 <span className="text-sm font-medium">{selectedArea?.name || 'All Areas'}</span>
+                <span className="text-xs px-1.5 py-0.5 rounded-full bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-semibold">
+                    {getCameraCount(selected)}
+                </span>
                 <Icons.ChevronDown />
             </button>
             {open && (
-                <div className="absolute top-full left-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50">
+                <div className="absolute top-full left-0 sm:left-auto sm:right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50 max-h-80 overflow-y-auto">
+                    <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-700">
+                        <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Filter by Area</p>
+                    </div>
                     <button
                         onClick={() => { onChange(null); setOpen(false); }}
-                        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${!selected ? 'text-sky-500 font-medium' : 'text-gray-700 dark:text-gray-200'}`}
+                        className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center justify-between transition-colors ${!selected ? 'bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 font-medium' : 'text-gray-700 dark:text-gray-200'}`}
                     >
-                        All Areas
+                        <span className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-gray-400"></span>
+                            All Areas
+                        </span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                            {cameras.length}
+                        </span>
                     </button>
-                    {areas.map(area => (
-                        <button
-                            key={area.id}
-                            onClick={() => { onChange(area.id); setOpen(false); }}
-                            className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${selected === area.id ? 'text-sky-500 font-medium' : 'text-gray-700 dark:text-gray-200'}`}
-                        >
-                            {area.name}
-                        </button>
-                    ))}
+                    {areas.map(area => {
+                        const count = getCameraCount(area.id);
+                        return (
+                            <button
+                                key={area.id}
+                                onClick={() => { onChange(area.id); setOpen(false); }}
+                                className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center justify-between transition-colors ${selected === area.id ? 'bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 font-medium' : 'text-gray-700 dark:text-gray-200'}`}
+                            >
+                                <span className="flex items-center gap-2">
+                                    <span className={`w-2 h-2 rounded-full ${selected === area.id ? 'bg-sky-500' : 'bg-purple-500'}`}></span>
+                                    <span className="truncate max-w-[140px]">{area.name}</span>
+                                </span>
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${count > 0 ? 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300' : 'bg-gray-50 dark:bg-gray-800 text-gray-400'}`}>
+                                    {count}
+                                </span>
+                            </button>
+                        );
+                    })}
                 </div>
             )}
         </div>
@@ -552,16 +579,28 @@ function FilterDropdown({ areas, selected, onChange }) {
 function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, multiCameras }) {
     const [filter, setFilter] = useState(null);
     const filtered = filter ? cameras.filter(c => c.area_id === filter) : cameras;
+    const selectedArea = areas.find(a => a.id === filter);
 
     return (
         <section className="py-8 sm:py-12">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
                     <div>
-                        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Live Cameras</h2>
-                        <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">{filtered.length} camera{filtered.length !== 1 ? 's' : ''} available</p>
+                        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
+                            {filter ? selectedArea?.name : 'Live Cameras'}
+                        </h2>
+                        <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
+                            {filtered.length} camera{filtered.length !== 1 ? 's' : ''} {filter ? 'in this area' : 'available'}
+                        </p>
                     </div>
-                    {areas.length > 0 && <FilterDropdown areas={areas} selected={filter} onChange={setFilter} />}
+                    {areas.length > 0 && (
+                        <FilterDropdown 
+                            areas={areas} 
+                            selected={filter} 
+                            onChange={setFilter}
+                            cameras={cameras}
+                        />
+                    )}
                 </div>
 
                 {loading ? (
@@ -574,7 +613,17 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                             <Icons.Camera />
                         </div>
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Cameras Found</h3>
-                        <p className="text-gray-500 dark:text-gray-400">No cameras available in this area.</p>
+                        <p className="text-gray-500 dark:text-gray-400 mb-4">
+                            {filter ? 'No cameras available in this area.' : 'No cameras available.'}
+                        </p>
+                        {filter && (
+                            <button 
+                                onClick={() => setFilter(null)}
+                                className="text-sky-500 font-medium hover:text-sky-600 transition-colors"
+                            >
+                                View All Cameras →
+                            </button>
+                        )}
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
@@ -642,7 +691,7 @@ export default function LandingPage() {
             try {
                 const [camsRes, areasRes] = await Promise.all([
                     streamService.getAllActiveStreams(),
-                    fetch('/api/areas').then(r => r.ok ? r.json() : { data: [] }).catch(() => ({ data: [] }))
+                    fetch('/api/areas/public').then(r => r.ok ? r.json() : { data: [] }).catch(() => ({ data: [] }))
                 ]);
                 setCameras(camsRes.data || []);
                 setAreas(areasRes.data || []);
