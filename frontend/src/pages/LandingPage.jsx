@@ -30,7 +30,7 @@ const HLS_CONFIG = {
 
 
 // ============================================
-// ICONS
+// ICONS - Extended
 // ============================================
 const Icons = {
     Sun: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>,
@@ -49,6 +49,11 @@ const Icons = {
     ChevronDown: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M19 9l-7 7-7-7"/></svg>,
     ZoomIn: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M11 8v6M8 11h6"/></svg>,
     ZoomOut: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M8 11h6"/></svg>,
+    Shield: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>,
+    Clock: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>,
+    Eye: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>,
+    Signal: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>,
+    Grid: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>,
 };
 
 const Skeleton = ({ className }) => <div className={`animate-pulse bg-gray-300 dark:bg-gray-700 rounded-xl ${className}`} />;
@@ -108,53 +113,50 @@ function ToastContainer({ toasts, removeToast }) {
 // CAMERA CARD - Enhanced with detailed location info
 // ============================================
 const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMulti }) {
-    // Build location string from area details
-    const getLocationDetails = () => {
-        const parts = [];
-        if (camera.rt) parts.push(`RT ${camera.rt}`);
-        if (camera.rw) parts.push(`RW ${camera.rw}`);
-        if (camera.kelurahan) parts.push(camera.kelurahan);
-        if (camera.kecamatan) parts.push(camera.kecamatan);
-        return parts.length > 0 ? parts.join(', ') : null;
-    };
-
-    const locationDetails = getLocationDetails();
-
     return (
-        <div className="relative rounded-2xl overflow-hidden bg-white dark:bg-gray-900 shadow-lg hover:shadow-xl transition-shadow ring-1 ring-gray-200 dark:ring-gray-800 hover:ring-sky-500/50">
+        <div className="relative rounded-2xl overflow-hidden bg-white dark:bg-gray-900 shadow-lg hover:shadow-2xl transition-all duration-300 ring-1 ring-gray-200 dark:ring-gray-800 hover:ring-sky-500/50 hover:-translate-y-1 group/card">
             <button
                 onClick={(e) => { e.stopPropagation(); onAddMulti(); }}
-                className={`absolute top-3 right-3 z-30 p-2.5 rounded-xl shadow-lg transition-colors ${
-                    inMulti ? 'bg-emerald-500 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-sky-500 hover:text-white'
+                className={`absolute top-3 right-3 z-30 p-2.5 rounded-xl shadow-lg transition-all duration-200 ${
+                    inMulti 
+                        ? 'bg-emerald-500 text-white scale-110' 
+                        : 'bg-white/90 dark:bg-gray-800/90 text-gray-600 dark:text-gray-300 hover:bg-sky-500 hover:text-white hover:scale-110'
                 }`}
+                title={inMulti ? 'Remove from Multi-View' : 'Add to Multi-View'}
             >
                 {inMulti ? <Icons.Check /> : <Icons.Plus />}
             </button>
-            <div onClick={onClick} className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 relative cursor-pointer group">
+            <div onClick={onClick} className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 relative cursor-pointer">
                 <div className="absolute inset-0 flex items-center justify-center text-gray-300 dark:text-gray-700">
                     <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={0.5}>
                         <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
                     </svg>
                 </div>
-                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/30 transition-opacity">
-                    <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center text-sky-500 shadow-xl"><Icons.Play /></div>
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/card:opacity-100 bg-black/40 transition-opacity duration-300">
+                    <div className="w-14 h-14 rounded-full bg-white/95 flex items-center justify-center text-sky-500 shadow-xl transform scale-90 group-hover/card:scale-100 transition-transform duration-300">
+                        <Icons.Play />
+                    </div>
                 </div>
                 <div className="absolute top-3 left-3">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500 text-white text-[10px] font-bold shadow-lg">
-                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />LIVE
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/90 backdrop-blur-sm text-white text-[10px] font-bold shadow-lg">
+                        <span className="relative flex h-1.5 w-1.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
+                        </span>
+                        LIVE
                     </span>
                 </div>
                 {/* Area badge on video */}
                 {camera.area_name && (
                     <div className="absolute bottom-3 left-3">
-                        <span className="px-2 py-1 rounded-lg bg-black/60 backdrop-blur-sm text-white text-[10px] font-medium">
+                        <span className="px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-sm text-white text-[10px] font-medium">
                             {camera.area_name}
                         </span>
                     </div>
                 )}
             </div>
             <div className="p-4 cursor-pointer" onClick={onClick}>
-                <h3 className="font-bold text-gray-900 dark:text-white truncate mb-1">{camera.name}</h3>
+                <h3 className="font-bold text-gray-900 dark:text-white truncate mb-1 group-hover/card:text-sky-500 transition-colors">{camera.name}</h3>
                 
                 {/* Description */}
                 {camera.description && (
@@ -201,7 +203,7 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
 // ZOOMABLE VIDEO COMPONENT - Ultra smooth pan/zoom
 // Transform on wrapper div, not video. Pure DOM manipulation.
 // ============================================
-const ZoomableVideo = memo(function ZoomableVideo({ videoRef, status, maxZoom = 4, onZoomChange }) {
+const ZoomableVideo = memo(function ZoomableVideo({ videoRef, maxZoom = 4, onZoomChange }) {
     const wrapperRef = useRef(null);
     const stateRef = useRef({ zoom: 1, panX: 0, panY: 0, dragging: false, startX: 0, startY: 0, startPanX: 0, startPanY: 0 });
 
@@ -403,7 +405,7 @@ function VideoPopup({ camera, onClose }) {
 
                 {/* Video */}
                 <div ref={wrapperRef} className="relative flex-1 min-h-0 bg-black overflow-hidden" onDoubleClick={toggleFS}>
-                    <ZoomableVideo videoRef={videoRef} status={status} maxZoom={4} onZoomChange={setZoom} />
+                    <ZoomableVideo videoRef={videoRef} maxZoom={4} onZoomChange={setZoom} />
                     {status === 'connecting' && <div className="absolute inset-0 flex items-center justify-center bg-black/60 pointer-events-none"><div className="w-10 h-10 border-2 border-white/20 border-t-sky-500 rounded-full animate-spin" /></div>}
                     {status === 'error' && <div className="absolute inset-0 flex items-center justify-center bg-black/80 pointer-events-none"><p className="text-red-400">Stream Unavailable</p></div>}
                 </div>
@@ -570,29 +572,59 @@ function MultiViewLayout({ cameras, onRemove, onClose }) {
 
 
 // ============================================
-// NAVBAR
+// NAVBAR - Enhanced with live indicator
 // ============================================
-function Navbar() {
+function Navbar({ cameraCount }) {
     const { isDark, toggleTheme } = useTheme();
+    const [currentTime, setCurrentTime] = useState(new Date());
+    
+    useEffect(() => {
+        const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+        return () => clearInterval(timer);
+    }, []);
+    
     return (
-        <nav className="sticky top-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800">
+        <nav className="sticky top-0 z-40 bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-800/50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16">
+                    {/* Logo */}
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white shadow-lg">
-                            <Icons.Camera />
+                        <div className="relative">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-sky-500/30">
+                                <Icons.Camera />
+                            </div>
+                            {cameraCount > 0 && (
+                                <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white dark:border-gray-900 animate-pulse"></span>
+                            )}
                         </div>
                         <div>
                             <h1 className="text-lg font-bold text-gray-900 dark:text-white">RAF NET</h1>
-                            <p className="text-[10px] text-gray-500 dark:text-gray-400 -mt-0.5">CCTV Monitoring</p>
+                            <p className="text-[10px] text-gray-500 dark:text-gray-400 -mt-0.5">CCTV Monitoring System</p>
                         </div>
                     </div>
-                    <button
-                        onClick={toggleTheme}
-                        className="p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                    >
-                        {isDark ? <Icons.Sun /> : <Icons.Moon />}
-                    </button>
+                    
+                    {/* Center - Live Time */}
+                    <div className="hidden md:flex items-center gap-3 px-4 py-2 rounded-xl bg-gray-100/80 dark:bg-gray-800/80">
+                        <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">LIVE</span>
+                        </div>
+                        <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
+                        <span className="text-sm font-mono text-gray-600 dark:text-gray-300">
+                            {currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </span>
+                    </div>
+                    
+                    {/* Right - Theme Toggle */}
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={toggleTheme}
+                            className="p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                            title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                        >
+                            {isDark ? <Icons.Sun /> : <Icons.Moon />}
+                        </button>
+                    </div>
                 </div>
             </div>
         </nav>
@@ -910,15 +942,60 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
 }
 
 // ============================================
-// FOOTER
+// FOOTER - Enhanced with more information
 // ============================================
-function Footer() {
+function Footer({ cameraCount, areaCount }) {
     return (
-        <footer className="py-6 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+        <footer className="py-8 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <p className="text-center text-gray-500 dark:text-gray-400 text-sm">
-                    © {new Date().getFullYear()} RAF NET CCTV Hub. All rights reserved.
-                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    {/* Brand */}
+                    <div className="text-center md:text-left">
+                        <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
+                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white">
+                                <Icons.Camera />
+                            </div>
+                            <span className="font-bold text-gray-900 dark:text-white">RAF NET CCTV</span>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Secure video surveillance monitoring system
+                        </p>
+                    </div>
+                    
+                    {/* Stats */}
+                    <div className="text-center">
+                        <div className="flex justify-center gap-6">
+                            <div>
+                                <p className="text-2xl font-bold text-sky-500">{cameraCount}</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Cameras</p>
+                            </div>
+                            <div>
+                                <p className="text-2xl font-bold text-purple-500">{areaCount}</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Areas</p>
+                            </div>
+                            <div>
+                                <p className="text-2xl font-bold text-emerald-500">24/7</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Monitoring</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {/* Features */}
+                    <div className="text-center md:text-right">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Features</p>
+                        <div className="flex flex-wrap justify-center md:justify-end gap-2">
+                            <span className="text-[10px] px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">HD Streaming</span>
+                            <span className="text-[10px] px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">Multi-View</span>
+                            <span className="text-[10px] px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">Zoom & Pan</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
+                    <p className="text-center text-gray-400 dark:text-gray-500 text-xs">
+                        © {new Date().getFullYear()} RAF NET CCTV Hub. All rights reserved. • Powered by MediaMTX
+                    </p>
+                </div>
             </div>
         </footer>
     );
@@ -1088,47 +1165,54 @@ export default function LandingPage() {
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
-            <Navbar />
+            <Navbar cameraCount={cameras.length} />
             
             {/* Hero Section - Enhanced */}
-            <div className="bg-gradient-to-br from-sky-500/10 via-transparent to-purple-500/10 dark:from-sky-500/5 dark:to-purple-500/5">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 text-center">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold mb-4">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <div className="relative overflow-hidden bg-gradient-to-br from-sky-500/10 via-transparent to-purple-500/10 dark:from-sky-500/5 dark:to-purple-500/5">
+                {/* Decorative elements */}
+                <div className="absolute top-0 left-1/4 w-64 h-64 bg-sky-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                
+                <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 text-center">
+                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold mb-4 shadow-sm">
+                        <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
                         LIVE STREAMING
                     </div>
-                    <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-3">
-                        Live CCTV Monitoring
+                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-4">
+                        Live CCTV <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-500 to-blue-600">Monitoring</span>
                     </h1>
-                    <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mb-6">
+                    <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mb-8 text-sm sm:text-base">
                         Real-time surveillance system with secure streaming. Monitor multiple locations simultaneously with our advanced multi-view feature.
                     </p>
                     
-                    {/* Quick Features */}
-                    <div className="flex flex-wrap justify-center gap-4 text-sm">
-                        <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                            <svg className="w-4 h-4 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                            </svg>
-                            <span>HD Streaming</span>
+                    {/* Quick Features - Enhanced */}
+                    <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
+                        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
+                            <div className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-500/20 flex items-center justify-center">
+                                <Icons.Eye />
+                            </div>
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">HD Streaming</span>
                         </div>
-                        <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                            <svg className="w-4 h-4 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                            </svg>
-                            <span>Multi-View (up to 3)</span>
+                        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
+                            <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center">
+                                <Icons.Grid />
+                            </div>
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Multi-View</span>
                         </div>
-                        <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                            <svg className="w-4 h-4 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
-                            </svg>
-                            <span>Zoom & Pan</span>
+                        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
+                            <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center">
+                                <Icons.Shield />
+                            </div>
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Secure</span>
                         </div>
-                        <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                            <svg className="w-4 h-4 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            <span>Snapshot</span>
+                        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
+                            <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center">
+                                <Icons.Clock />
+                            </div>
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">24/7 Live</span>
                         </div>
                     </div>
                 </div>
@@ -1147,7 +1231,7 @@ export default function LandingPage() {
             />
 
             <div className="flex-1" />
-            <Footer />
+            <Footer cameraCount={cameras.length} areaCount={areas.length} />
 
             <MultiViewButton 
                 count={multiCameras.length} 
