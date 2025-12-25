@@ -15,6 +15,7 @@ const Icons = {
     Sun: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>,
     Moon: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>,
     Home: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>,
+    ChevronRight: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>,
 };
 
 export default function AdminLayout({ children }) {
@@ -35,21 +36,21 @@ export default function AdminLayout({ children }) {
     };
 
     const navItems = [
-        { label: 'Dashboard', path: '/admin/dashboard', icon: <Icons.Dashboard /> },
-        { label: 'Cameras', path: '/admin/cameras', icon: <Icons.Camera /> },
-        { label: 'Areas', path: '/admin/areas', icon: <Icons.MapPin /> },
-        { label: 'Users', path: '/admin/users', icon: <Icons.Users /> },
+        { label: 'Dashboard', path: '/admin/dashboard', icon: <Icons.Dashboard />, color: 'sky' },
+        { label: 'Cameras', path: '/admin/cameras', icon: <Icons.Camera />, color: 'emerald' },
+        { label: 'Areas', path: '/admin/areas', icon: <Icons.MapPin />, color: 'purple' },
+        { label: 'Users', path: '/admin/users', icon: <Icons.Users />, color: 'amber' },
     ];
 
     const isActive = (path) => location.pathname === path;
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-950 transition-colors">
+        <div className="min-h-screen bg-gray-100 dark:bg-gray-950 transition-colors">
             {/* Mobile Header */}
-            <header className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800">
+            <header className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800">
                 <div className="flex items-center justify-between px-4 h-16">
                     <Link to="/" className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-gradient-to-br from-sky-500 to-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg">
+                        <div className="w-9 h-9 bg-gradient-to-br from-sky-500 to-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-sky-500/30">
                             <Icons.Camera />
                         </div>
                         <span className="text-lg font-bold text-gray-900 dark:text-white">RAF NET</span>
@@ -57,13 +58,13 @@ export default function AdminLayout({ children }) {
                     <div className="flex items-center gap-2">
                         <button
                             onClick={toggleTheme}
-                            className="p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
+                            className="p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                         >
                             {isDark ? <Icons.Sun /> : <Icons.Moon />}
                         </button>
                         <button
                             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                            className="p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
+                            className="p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                         >
                             {isMobileMenuOpen ? <Icons.X /> : <Icons.Menu />}
                         </button>
@@ -79,8 +80,11 @@ export default function AdminLayout({ children }) {
                 {/* Logo */}
                 <div className="p-6 border-b border-gray-200 dark:border-gray-800">
                     <Link to="/" className="flex items-center gap-3">
-                        <div className="w-11 h-11 bg-gradient-to-br from-sky-500 to-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-sky-500/25">
-                            <Icons.Camera />
+                        <div className="relative">
+                            <div className="w-11 h-11 bg-gradient-to-br from-sky-500 to-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-sky-500/30">
+                                <Icons.Camera />
+                            </div>
+                            <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white dark:border-gray-900"></span>
                         </div>
                         <div>
                             <h1 className="text-xl font-bold text-gray-900 dark:text-white">RAF NET</h1>
@@ -90,34 +94,42 @@ export default function AdminLayout({ children }) {
                 </div>
 
                 {/* Navigation */}
-                <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-                    <p className="px-3 mb-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Menu</p>
+                <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
+                    <p className="px-3 mb-3 text-[10px] font-bold text-gray-400 dark:text-gray-600 uppercase tracking-widest">Main Menu</p>
                     {navItems.map((item) => (
                         <Link
                             key={item.path}
                             to={item.path}
                             onClick={() => setIsMobileMenuOpen(false)}
-                            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${
+                            className={`group flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${
                                 isActive(item.path)
-                                    ? 'bg-sky-500 text-white shadow-lg shadow-sky-500/25'
-                                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+                                    ? 'bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-lg shadow-sky-500/30'
+                                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/80 hover:text-gray-900 dark:hover:text-white'
                             }`}
                         >
-                            {item.icon}
-                            <span>{item.label}</span>
+                            <div className={`${isActive(item.path) ? '' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`}>
+                                {item.icon}
+                            </div>
+                            <span className="flex-1">{item.label}</span>
+                            {isActive(item.path) && <Icons.ChevronRight />}
                         </Link>
                     ))}
 
-                    <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-800">
-                        <p className="px-3 mb-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Quick Links</p>
+                    <div className="pt-6 mt-6 border-t border-gray-200 dark:border-gray-800">
+                        <p className="px-3 mb-3 text-[10px] font-bold text-gray-400 dark:text-gray-600 uppercase tracking-widest">Quick Links</p>
                         <a
                             href="/"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white transition-all"
+                            className="group flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/80 hover:text-gray-900 dark:hover:text-white transition-all"
                         >
-                            <Icons.Home />
-                            <span>Public View</span>
+                            <div className="text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300">
+                                <Icons.Home />
+                            </div>
+                            <span className="flex-1">Public View</span>
+                            <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
                         </a>
                     </div>
                 </nav>
@@ -127,15 +139,17 @@ export default function AdminLayout({ children }) {
                     {/* Theme Toggle (Desktop) */}
                     <button
                         onClick={toggleTheme}
-                        className="hidden lg:flex w-full items-center gap-3 px-4 py-3 rounded-xl font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all"
+                        className="hidden lg:flex w-full items-center gap-3 px-4 py-3 rounded-xl font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/80 transition-all"
                     >
-                        {isDark ? <Icons.Sun /> : <Icons.Moon />}
+                        <div className="text-gray-400 dark:text-gray-500">
+                            {isDark ? <Icons.Sun /> : <Icons.Moon />}
+                        </div>
                         <span>{isDark ? 'Light Mode' : 'Dark Mode'}</span>
                     </button>
 
                     {/* User Info */}
-                    <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm">
+                    <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-sky-500/20">
                             {user?.username?.charAt(0).toUpperCase() || 'A'}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -160,7 +174,7 @@ export default function AdminLayout({ children }) {
             {/* Mobile Backdrop */}
             {isMobileMenuOpen && (
                 <div
-                    className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
                     onClick={() => setIsMobileMenuOpen(false)}
                 />
             )}

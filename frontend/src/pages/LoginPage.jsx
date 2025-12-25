@@ -90,21 +90,26 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-4 py-8 transition-colors">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-4 py-8 transition-colors">
+            {/* Background decoration */}
+            <div className="fixed inset-0 overflow-hidden pointer-events-none">
+                <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl"></div>
+                <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"></div>
+            </div>
+            
             {/* Theme Toggle */}
             <button
                 onClick={toggleTheme}
-                className="fixed top-4 right-4 p-3 rounded-xl bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all z-50"
+                className="fixed top-4 right-4 p-3 rounded-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm shadow-lg border border-gray-200/50 dark:border-gray-700/50 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800 transition-all z-50"
             >
                 {isDark ? <Icons.Sun /> : <Icons.Moon />}
             </button>
 
-            <div className="w-full max-w-md">
+            <div className="relative w-full max-w-md">
                 {/* Logo & Header */}
                 <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-sky-500 to-blue-600 rounded-2xl shadow-xl shadow-sky-500/25 mb-6">
+                    <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-sky-500 to-blue-600 rounded-2xl shadow-2xl shadow-sky-500/30 mb-6 text-white">
                         <Icons.Lock />
-                        <span className="sr-only">Lock Icon</span>
                     </div>
                     <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
                         Welcome Back
@@ -115,11 +120,11 @@ export default function LoginPage() {
                 </div>
 
                 {/* Login Card */}
-                <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 p-8">
+                <div className="bg-white/80 dark:bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 p-8">
                     <form onSubmit={handleSubmit} className="space-y-6">
                         {/* Error Alert */}
                         {error && (
-                            <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl">
+                            <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-xl">
                                 <div className="text-red-500"><Icons.Alert /></div>
                                 <p className="text-red-600 dark:text-red-400 text-sm font-medium">{error}</p>
                             </div>
@@ -131,7 +136,7 @@ export default function LoginPage() {
                                 Username
                             </label>
                             <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400 dark:text-gray-500">
                                     <Icons.User />
                                 </div>
                                 <input
@@ -139,7 +144,7 @@ export default function LoginPage() {
                                     name="username"
                                     value={formData.username}
                                     onChange={handleChange}
-                                    className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
+                                    className="w-full pl-12 pr-4 py-3.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
                                     placeholder="Enter your username"
                                     disabled={loading}
                                     autoComplete="username"
@@ -153,7 +158,7 @@ export default function LoginPage() {
                                 Password
                             </label>
                             <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400 dark:text-gray-500">
                                     <Icons.Key />
                                 </div>
                                 <input
@@ -161,7 +166,7 @@ export default function LoginPage() {
                                     name="password"
                                     value={formData.password}
                                     onChange={handleChange}
-                                    className="w-full pl-12 pr-12 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
+                                    className="w-full pl-12 pr-12 py-3.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
                                     placeholder="Enter your password"
                                     disabled={loading}
                                     autoComplete="current-password"
@@ -169,7 +174,7 @@ export default function LoginPage() {
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                                 >
                                     {showPassword ? <Icons.EyeOff /> : <Icons.Eye />}
                                 </button>
@@ -180,7 +185,7 @@ export default function LoginPage() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full flex items-center justify-center gap-2 py-3.5 px-4 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-sky-500/25 hover:shadow-xl hover:shadow-sky-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            className="w-full flex items-center justify-center gap-2 py-4 px-4 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-sky-500/30 hover:shadow-xl hover:shadow-sky-500/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                         >
                             {loading ? (
                                 <>
@@ -194,7 +199,7 @@ export default function LoginPage() {
                     </form>
 
                     {/* Back Link */}
-                    <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-800">
+                    <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700/50">
                         <a
                             href="/"
                             className="flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-sky-500 dark:hover:text-sky-400 transition-colors"
