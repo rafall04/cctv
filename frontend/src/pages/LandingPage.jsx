@@ -637,7 +637,7 @@ export default function LandingPage() {
         const fetchData = async () => {
             try {
                 const [camsRes, areasRes] = await Promise.all([
-                    streamService.getAllStreams(),
+                    streamService.getAllActiveStreams(),
                     fetch('/api/areas').then(r => r.ok ? r.json() : { data: [] }).catch(() => ({ data: [] }))
                 ]);
                 setCameras(camsRes.data || []);
