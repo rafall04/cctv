@@ -4,13 +4,18 @@ import {
     createArea,
     updateArea,
     deleteArea,
+    getAreaFilters,
 } from '../controllers/areaController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 
 export default async function areaRoutes(fastify, options) {
-    // Public endpoint - for landing page filter
+    // Public endpoints - for landing page filter
     fastify.get('/public', {
         handler: getAllAreas,
+    });
+    
+    fastify.get('/filters', {
+        handler: getAreaFilters,
     });
 
     // Admin endpoints (protected)

@@ -63,27 +63,39 @@ class MediaMtxService {
     }
 
     /**
+     * Check if a path exists in MediaMTX
+     * @param {string} pathName - The path name to check
+     */
+    async pathExists(pathName) {
+        try {
+            await axios.get(`${mediaMtxApiBaseUrl}/config/paths/get/${pathName}`);
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
      * Add or update a path in MediaMTX configuration
      * @param {string} pathName - The path name (e.g., 'camera1')
      * @param {object} pathConfig - The path configuration
      */
     async addOrUpdatePath(pathName, pathConfig) {
         try {
-            // First try to add the path
-            await axios.post(`${mediaMtxApiBaseUrl}/config/paths/add/${pathName}`, pathConfig);
-            return { success: true, action: 'added' };
-        } catch (error) {
-            if (error.response && error.response.status === 400) {
-                // Path already exists, try to patch/update it
-                try {
-                    await axios.patch(`${mediaMtxApiBaseUrl}/config/paths/patch/${pathName}`, pathConfig);
-                    return { success: true, action: 'updated' };
-                } catch (patchError) {
-                    console.error(`[MediaMTX Service] Error patching path ${pathName}:`, patchError.message);
-                    return { success: false, error: patchError.message };
-                }
+            // Check if path exists first to avoid error logs
+            const exists = await this.pathExists(pathName);
+            
+            if (exists) {
+                // Path exists, update it
+                await axios.patch(`${mediaMtxApiBaseUrl}/config/paths/patch/${pathName}`, pathConfig);
+                return { success: true, action: 'updated' };
+            } else {
+                // Path doesn't exist, add it
+                await axios.post(`${mediaMtxApiBaseUrl}/config/paths/add/${pathName}`, pathConfig);
+                return { success: true, action: 'added' };
             }
-            console.error(`[MediaMTX Service] Error adding path ${pathName}:`, error.message);
+        } catch (error) {
+            // Silent fail for common errors
             return { success: false, error: error.message };
         }
     }
@@ -104,31 +116,24 @@ class MediaMtxService {
 
     /**
      * Synchronizes the camera configurations between the database and MediaMTX.
-     * This includes adding/updating active cameras and removing orphaned paths.
      * @param {number} retries - Number of retries if MediaMTX is not ready
      */
     async syncCameras(retries = 5) {
-        console.log('[MediaMTX Service] Starting camera synchronization...');
-
         // Check if MediaMTX is ready
         const status = await this.getStatus();
         if (!status.online) {
             if (retries > 0) {
-                console.log(`[MediaMTX Service] MediaMTX not ready, retrying in 3 seconds... (${retries} retries left)`);
                 await new Promise(resolve => setTimeout(resolve, 3000));
                 return this.syncCameras(retries - 1);
-            } else {
-                console.error('[MediaMTX Service] MediaMTX is not available after multiple retries. Sync aborted.');
-                return;
             }
+            return;
         }
 
         const mediaMtxPaths = await this.getMediaMtxPaths();
         const dbCameras = this.getDatabaseCameras();
         const dbCameraPaths = new Set(dbCameras.map(cam => cam.path_name));
 
-        // 1. Identify and remove orphaned paths from MediaMTX
-        // Skip system paths like 'all', 'all_others', etc.
+        // Remove orphaned camera paths
         const systemPaths = ['all', 'all_others', 'health'];
         const orphanedPaths = mediaMtxPaths.filter(path => 
             !dbCameraPaths.has(path) && 
@@ -136,56 +141,28 @@ class MediaMtxService {
             path.startsWith('camera')
         );
 
-        if (orphanedPaths.length > 0) {
-            console.log(`[MediaMTX Service] Found ${orphanedPaths.length} orphaned paths to remove.`);
-            for (const pathName of orphanedPaths) {
-                const result = await this.removePath(pathName);
-                if (result.success) {
-                    console.log(`[MediaMTX Service]   - Successfully removed orphan path: ${pathName}`);
-                } else {
-                    console.error(`[MediaMTX Service]   - Error removing orphan path ${pathName}:`, result.error);
-                }
-            }
-        } else {
-            console.log('[MediaMTX Service] No orphaned paths found.');
+        for (const pathName of orphanedPaths) {
+            await this.removePath(pathName);
         }
 
-        // 2. Add or update paths from the database
-        if (dbCameras.length > 0) {
-            console.log(`[MediaMTX Service] Syncing ${dbCameras.length} cameras from database...`);
-            for (const camera of dbCameras) {
-                // Ensure path_name is not null or empty
-                if (!camera.path_name) {
-                    console.warn(`[MediaMTX Service]   - Skipping camera '${camera.name}' due to empty path_name.`);
-                    continue;
-                }
+        // Sync cameras from database
+        let synced = 0;
+        for (const camera of dbCameras) {
+            if (!camera.path_name || !camera.rtsp_url?.startsWith('rtsp://')) continue;
 
-                // Validate RTSP URL
-                if (!camera.rtsp_url || !camera.rtsp_url.startsWith('rtsp://')) {
-                    console.warn(`[MediaMTX Service]   - Skipping camera '${camera.name}' due to invalid RTSP URL.`);
-                    continue;
-                }
+            const pathConfig = {
+                source: camera.rtsp_url,
+                sourceProtocol: 'tcp',
+                sourceOnDemand: true,
+                sourceOnDemandStartTimeout: '10s',
+                sourceOnDemandCloseAfter: '10s',
+            };
 
-                const pathConfig = {
-                    source: camera.rtsp_url,
-                    sourceProtocol: 'tcp',
-                    sourceOnDemand: true,
-                    sourceOnDemandStartTimeout: '10s',
-                    sourceOnDemandCloseAfter: '10s',
-                };
-
-                const result = await this.addOrUpdatePath(camera.path_name, pathConfig);
-                if (result.success) {
-                    console.log(`[MediaMTX Service]   - Successfully ${result.action} camera: ${camera.name} (${camera.path_name})`);
-                } else {
-                    console.error(`[MediaMTX Service]   - Error syncing camera ${camera.name}:`, result.error);
-                }
-            }
-        } else {
-            console.log('[MediaMTX Service] No enabled cameras in database to sync.');
+            const result = await this.addOrUpdatePath(camera.path_name, pathConfig);
+            if (result.success) synced++;
         }
 
-        console.log('[MediaMTX Service] Synchronization complete.');
+        console.log(`[MediaMTX] Synced ${synced}/${dbCameras.length} cameras`);
     }
 
     /**

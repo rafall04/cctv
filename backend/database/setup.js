@@ -45,12 +45,16 @@ db.exec(`
 `);
 console.log('✓ Created users table');
 
-// Create areas table
+// Create areas table with detailed location fields
 db.exec(`
   CREATE TABLE IF NOT EXISTS areas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT UNIQUE NOT NULL,
     description TEXT,
+    rt TEXT,
+    rw TEXT,
+    kelurahan TEXT,
+    kecamatan TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )
 `);

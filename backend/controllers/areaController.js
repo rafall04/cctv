@@ -2,13 +2,42 @@ import { query, queryOne, execute, transaction } from '../database/database.js';
 
 export async function getAllAreas(request, reply) {
     try {
-        const areas = query('SELECT * FROM areas ORDER BY name ASC');
+        const areas = query(`
+            SELECT a.*, 
+                   (SELECT COUNT(*) FROM cameras c WHERE c.area_id = a.id) as camera_count
+            FROM areas a 
+            ORDER BY a.kecamatan, a.kelurahan, a.rw, a.rt, a.name ASC
+        `);
         return reply.send({
             success: true,
             data: areas,
         });
     } catch (error) {
         console.error('Get all areas error:', error);
+        return reply.code(500).send({
+            success: false,
+            message: 'Internal server error',
+        });
+    }
+}
+
+// Get unique filter options for hierarchical filtering
+export async function getAreaFilters(request, reply) {
+    try {
+        const kecamatans = query(`SELECT DISTINCT kecamatan FROM areas WHERE kecamatan IS NOT NULL AND kecamatan != '' ORDER BY kecamatan`);
+        const kelurahans = query(`SELECT DISTINCT kelurahan, kecamatan FROM areas WHERE kelurahan IS NOT NULL AND kelurahan != '' ORDER BY kelurahan`);
+        const rws = query(`SELECT DISTINCT rw, kelurahan, kecamatan FROM areas WHERE rw IS NOT NULL AND rw != '' ORDER BY rw`);
+        
+        return reply.send({
+            success: true,
+            data: {
+                kecamatans: kecamatans.map(k => k.kecamatan),
+                kelurahans,
+                rws,
+            },
+        });
+    } catch (error) {
+        console.error('Get area filters error:', error);
         return reply.code(500).send({
             success: false,
             message: 'Internal server error',
@@ -43,7 +72,7 @@ export async function getAreaById(request, reply) {
 
 export async function createArea(request, reply) {
     try {
-        const { name, description } = request.body;
+        const { name, description, rt, rw, kelurahan, kecamatan } = request.body;
 
         if (!name) {
             return reply.code(400).send({
@@ -53,8 +82,8 @@ export async function createArea(request, reply) {
         }
 
         const result = execute(
-            'INSERT INTO areas (name, description) VALUES (?, ?)',
-            [name, description]
+            'INSERT INTO areas (name, description, rt, rw, kelurahan, kecamatan) VALUES (?, ?, ?, ?, ?, ?)',
+            [name, description || null, rt || null, rw || null, kelurahan || null, kecamatan || null]
         );
 
         const newArea = queryOne('SELECT * FROM areas WHERE id = ?', [result.lastInsertRowid]);
@@ -82,7 +111,7 @@ export async function createArea(request, reply) {
 export async function updateArea(request, reply) {
     try {
         const { id } = request.params;
-        const { name, description } = request.body;
+        const { name, description, rt, rw, kelurahan, kecamatan } = request.body;
 
         const area = queryOne('SELECT * FROM areas WHERE id = ?', [id]);
         if (!area) {
@@ -93,8 +122,16 @@ export async function updateArea(request, reply) {
         }
 
         execute(
-            'UPDATE areas SET name = ?, description = ? WHERE id = ?',
-            [name || area.name, description !== undefined ? description : area.description, id]
+            'UPDATE areas SET name = ?, description = ?, rt = ?, rw = ?, kelurahan = ?, kecamatan = ? WHERE id = ?',
+            [
+                name || area.name, 
+                description !== undefined ? description : area.description,
+                rt !== undefined ? (rt || null) : area.rt,
+                rw !== undefined ? (rw || null) : area.rw,
+                kelurahan !== undefined ? (kelurahan || null) : area.kelurahan,
+                kecamatan !== undefined ? (kecamatan || null) : area.kecamatan,
+                id
+            ]
         );
 
         const updatedArea = queryOne('SELECT * FROM areas WHERE id = ?', [id]);
