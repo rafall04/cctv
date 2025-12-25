@@ -72,97 +72,135 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
     );
 });
 
-
 // ============================================
-// ZOOM/PAN HOOK - Smooth with animation control
+// OPTIMIZED ZOOM/PAN HOOK - No lag during drag
+// Uses refs for real-time updates, state only for UI sync
 // ============================================
-function useZoomPan(maxZoom = 4) {
+function useZoomPan(videoRef, maxZoom = 4) {
     const [zoom, setZoom] = useState(1);
-    const [pan, setPan] = useState({ x: 0, y: 0 });
+    const [displayPan, setDisplayPan] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
-    const [isAnimating, setIsAnimating] = useState(false);
-    const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
-    const animationTimer = useRef(null);
+    
+    // Use refs for real-time tracking (no re-renders during drag)
+    const panRef = useRef({ x: 0, y: 0 });
+    const zoomRef = useRef(1);
+    const dragStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+    const rafRef = useRef(null);
 
     const getMaxPan = useCallback((z) => {
         if (z <= 1) return 0;
         return ((z - 1) / (2 * z)) * 100;
     }, []);
 
-    const clampPan = useCallback((x, y, z) => {
-        const max = getMaxPan(z);
-        return { x: Math.max(-max, Math.min(max, x)), y: Math.max(-max, Math.min(max, y)) };
-    }, [getMaxPan]);
+    const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
 
-    // Smooth zoom (button click)
+    // Direct DOM update - bypasses React for smooth performance
+    const updateTransform = useCallback((z, px, py, animate = false) => {
+        if (!videoRef.current) return;
+        const style = videoRef.current.style;
+        style.transform = `scale(${z}) translate(${px}%, ${py}%)`;
+        style.transition = animate ? 'transform 0.2s ease-out' : 'none';
+    }, [videoRef]);
+
+    // Zoom with animation (button click)
     const handleZoom = useCallback((delta) => {
-        setIsAnimating(true);
-        clearTimeout(animationTimer.current);
+        const newZoom = clamp(zoomRef.current + delta, 1, maxZoom);
+        const maxP = getMaxPan(newZoom);
+        const newPanX = newZoom <= 1 ? 0 : clamp(panRef.current.x, -maxP, maxP);
+        const newPanY = newZoom <= 1 ? 0 : clamp(panRef.current.y, -maxP, maxP);
         
-        setZoom(z => {
-            const newZoom = Math.max(1, Math.min(maxZoom, z + delta));
-            if (newZoom <= 1) setPan({ x: 0, y: 0 });
-            else setPan(p => clampPan(p.x, p.y, newZoom));
-            return newZoom;
-        });
+        zoomRef.current = newZoom;
+        panRef.current = { x: newPanX, y: newPanY };
         
-        animationTimer.current = setTimeout(() => setIsAnimating(false), 200);
-    }, [maxZoom, clampPan]);
+        updateTransform(newZoom, newPanX, newPanY, true);
+        setZoom(newZoom);
+        setDisplayPan({ x: newPanX, y: newPanY });
+    }, [maxZoom, getMaxPan, updateTransform]);
 
-    // Wheel zoom (no animation for responsiveness)
+    // Wheel zoom (no animation)
     const handleWheel = useCallback((e) => {
         e.preventDefault();
         const delta = e.deltaY > 0 ? -0.5 : 0.5;
-        setZoom(z => {
-            const newZoom = Math.max(1, Math.min(maxZoom, z + delta));
-            if (newZoom <= 1) setPan({ x: 0, y: 0 });
-            else setPan(p => clampPan(p.x, p.y, newZoom));
-            return newZoom;
-        });
-    }, [maxZoom, clampPan]);
+        const newZoom = clamp(zoomRef.current + delta, 1, maxZoom);
+        const maxP = getMaxPan(newZoom);
+        const newPanX = newZoom <= 1 ? 0 : clamp(panRef.current.x, -maxP, maxP);
+        const newPanY = newZoom <= 1 ? 0 : clamp(panRef.current.y, -maxP, maxP);
+        
+        zoomRef.current = newZoom;
+        panRef.current = { x: newPanX, y: newPanY };
+        
+        updateTransform(newZoom, newPanX, newPanY, false);
+        setZoom(newZoom);
+        setDisplayPan({ x: newPanX, y: newPanY });
+    }, [maxZoom, getMaxPan, updateTransform]);
 
     const handlePointerDown = useCallback((e) => {
-        if (zoom <= 1) return;
+        if (zoomRef.current <= 1) return;
         setIsDragging(true);
-        setIsAnimating(false);
-        dragStart.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
+        dragStartRef.current = { 
+            x: e.clientX, 
+            y: e.clientY, 
+            panX: panRef.current.x, 
+            panY: panRef.current.y 
+        };
         e.currentTarget.setPointerCapture(e.pointerId);
-    }, [zoom, pan]);
+        if (videoRef.current) videoRef.current.style.cursor = 'grabbing';
+    }, [videoRef]);
 
     const handlePointerMove = useCallback((e) => {
-        if (!isDragging || zoom <= 1) return;
-        const dx = e.clientX - dragStart.current.x;
-        const dy = e.clientY - dragStart.current.y;
-        const sensitivity = 3;
-        setPan(clampPan(dragStart.current.panX + dx / sensitivity, dragStart.current.panY + dy / sensitivity, zoom));
-    }, [isDragging, zoom, clampPan]);
+        if (!isDragging || zoomRef.current <= 1) return;
+        
+        // Cancel any pending RAF
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        
+        // Use RAF for smooth 60fps updates
+        rafRef.current = requestAnimationFrame(() => {
+            const dx = e.clientX - dragStartRef.current.x;
+            const dy = e.clientY - dragStartRef.current.y;
+            const maxP = getMaxPan(zoomRef.current);
+            
+            // Direct calculation - no sensitivity divisor for 1:1 feel
+            const newPanX = clamp(dragStartRef.current.panX + (dx / 5), -maxP, maxP);
+            const newPanY = clamp(dragStartRef.current.panY + (dy / 5), -maxP, maxP);
+            
+            panRef.current = { x: newPanX, y: newPanY };
+            updateTransform(zoomRef.current, newPanX, newPanY, false);
+        });
+    }, [isDragging, getMaxPan, updateTransform]);
 
     const handlePointerUp = useCallback((e) => {
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
         setIsDragging(false);
+        setDisplayPan({ ...panRef.current });
+        if (videoRef.current) videoRef.current.style.cursor = zoomRef.current > 1 ? 'grab' : 'default';
         try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
-    }, []);
+    }, [videoRef]);
 
     const reset = useCallback(() => {
-        setIsAnimating(true);
+        zoomRef.current = 1;
+        panRef.current = { x: 0, y: 0 };
+        updateTransform(1, 0, 0, true);
         setZoom(1);
-        setPan({ x: 0, y: 0 });
-        clearTimeout(animationTimer.current);
-        animationTimer.current = setTimeout(() => setIsAnimating(false), 200);
+        setDisplayPan({ x: 0, y: 0 });
+    }, [updateTransform]);
+
+    // Cleanup RAF on unmount
+    useEffect(() => {
+        return () => {
+            if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        };
     }, []);
 
-    useEffect(() => () => clearTimeout(animationTimer.current), []);
-
     return {
-        zoom, pan, isDragging, isAnimating,
-        handleZoom, handleWheel, handlePointerDown, handlePointerMove, handlePointerUp, reset,
-        getTransform: () => `scale(${zoom}) translate(${pan.x}%, ${pan.y}%)`,
-        getStyle: () => ({
-            transform: `scale(${zoom}) translate(${pan.x}%, ${pan.y}%)`,
-            transformOrigin: 'center center',
-            transition: isAnimating ? 'transform 0.2s ease-out' : 'none',
-            cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
-            willChange: 'transform'
-        })
+        zoom,
+        pan: displayPan,
+        isDragging,
+        handleZoom,
+        handleWheel,
+        handlePointerDown,
+        handlePointerMove,
+        handlePointerUp,
+        reset
     };
 }
 
@@ -175,7 +213,7 @@ function VideoPopup({ camera, onClose }) {
     const modalRef = useRef(null);
     const hlsRef = useRef(null);
     const [status, setStatus] = useState('connecting');
-    const zp = useZoomPan(4);
+    const zp = useZoomPan(videoRef, 4);
     const url = camera.streams?.hls;
 
     useEffect(() => {
@@ -261,7 +299,7 @@ function VideoPopup({ camera, onClose }) {
                         onPointerCancel={zp.handlePointerUp}
                         onPointerLeave={zp.handlePointerUp}
                         className="w-full h-full object-contain"
-                        style={zp.getStyle()}
+                        style={{ transformOrigin: 'center center', cursor: zp.zoom > 1 ? 'grab' : 'default', willChange: 'transform' }}
                         muted playsInline autoPlay 
                     />
                     {status === 'connecting' && <div className="absolute inset-0 flex items-center justify-center bg-black/60"><div className="w-10 h-10 border-2 border-white/20 border-t-sky-500 rounded-full animate-spin" /></div>}
@@ -288,7 +326,6 @@ function VideoPopup({ camera, onClose }) {
     );
 }
 
-
 // ============================================
 // MULTI-VIEW VIDEO ITEM
 // ============================================
@@ -297,7 +334,7 @@ function MultiViewVideoItem({ camera, onRemove }) {
     const containerRef = useRef(null);
     const hlsRef = useRef(null);
     const [status, setStatus] = useState('connecting');
-    const zp = useZoomPan(3);
+    const zp = useZoomPan(videoRef, 3);
     const url = camera.streams?.hls;
 
     useEffect(() => {
@@ -356,7 +393,7 @@ function MultiViewVideoItem({ camera, onRemove }) {
                 onPointerCancel={zp.handlePointerUp}
                 onPointerLeave={zp.handlePointerUp}
                 className="w-full h-full object-contain"
-                style={zp.getStyle()}
+                style={{ transformOrigin: 'center center', cursor: zp.zoom > 1 ? 'grab' : 'default', willChange: 'transform' }}
                 muted playsInline autoPlay 
             />
             <div className="absolute top-2 left-2 z-10">
@@ -516,17 +553,11 @@ function FilterDropdown({ areas, selected, onChange }) {
 }
 
 // ============================================
-// CAMERAS SECTION
+// CAMERAS SECTION (Layout switcher removed)
 // ============================================
-function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, multiCameras, cols, setCols }) {
+function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, multiCameras }) {
     const [filter, setFilter] = useState(null);
     const filtered = filter ? cameras.filter(c => c.area_id === filter) : cameras;
-
-    const gridClass = cols === 1 
-        ? 'grid-cols-1' 
-        : cols === 2 
-            ? 'grid-cols-1 sm:grid-cols-2' 
-            : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
 
     return (
         <section className="py-8 sm:py-12">
@@ -537,30 +568,12 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                         <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Live Cameras</h2>
                         <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">{filtered.length} camera{filtered.length !== 1 ? 's' : ''} available</p>
                     </div>
-                    <div className="flex items-center gap-3 flex-wrap">
-                        {areas.length > 0 && <FilterDropdown areas={areas} selected={filter} onChange={setFilter} />}
-                        {/* Layout Switcher */}
-                        <div className="flex items-center bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-1 shadow-sm">
-                            {[1, 2, 3].map(n => (
-                                <button
-                                    key={n}
-                                    onClick={() => setCols(n)}
-                                    className={`w-9 h-9 rounded-lg text-sm font-bold transition-all ${
-                                        cols === n 
-                                            ? 'bg-sky-500 text-white shadow' 
-                                            : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                    }`}
-                                >
-                                    {n}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+                    {areas.length > 0 && <FilterDropdown areas={areas} selected={filter} onChange={setFilter} />}
                 </div>
 
-                {/* Grid */}
+                {/* Grid - Fixed 3 columns responsive */}
                 {loading ? (
-                    <div className={`grid ${gridClass} gap-4 sm:gap-6`}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                         {[1, 2, 3, 4, 5, 6].map(i => <CameraSkeleton key={i} />)}
                     </div>
                 ) : filtered.length === 0 ? (
@@ -572,7 +585,7 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                         <p className="text-gray-500 dark:text-gray-400">No cameras available in this area.</p>
                     </div>
                 ) : (
-                    <div className={`grid ${gridClass} gap-4 sm:gap-6`}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                         {filtered.map(camera => (
                             <CameraCard
                                 key={camera.id}
@@ -631,7 +644,6 @@ export default function LandingPage() {
     const [popup, setPopup] = useState(null);
     const [multiCameras, setMultiCameras] = useState([]);
     const [showMulti, setShowMulti] = useState(false);
-    const [cols, setCols] = useState(3);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -691,8 +703,6 @@ export default function LandingPage() {
                 onCameraClick={setPopup}
                 onAddMulti={handleAddMulti}
                 multiCameras={multiCameras}
-                cols={cols}
-                setCols={setCols}
             />
 
             <div className="flex-1" />
