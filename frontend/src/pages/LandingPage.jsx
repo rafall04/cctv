@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback, useRef, memo } from 'react';
 import { streamService } from '../services/streamService';
 import { areaService } from '../services/areaService';
 import { useTheme } from '../contexts/ThemeContext';
-import Hls from 'hls.js';
 
 // ============================================
 // HLS CONFIG - Optimized for all devices including low-end
@@ -26,6 +25,16 @@ const HLS_CONFIG = {
     manifestLoadingMaxRetry: 4,       // More manifest retries
     levelLoadingTimeOut: 15000,       // 15s level timeout
     levelLoadingMaxRetry: 4,          // More level retries
+};
+
+// Lazy load HLS.js - only when needed
+let HlsModule = null;
+const loadHls = async () => {
+    if (!HlsModule) {
+        const module = await import('hls.js');
+        HlsModule = module.default;
+    }
+    return HlsModule;
 };
 
 
@@ -400,6 +409,7 @@ function VideoPopup({ camera, onClose }) {
         let hls = null;
         let retryCount = 0;
         const maxRetries = 3;
+        let cancelled = false;
 
         setStatus('connecting');
 
@@ -411,34 +421,40 @@ function VideoPopup({ camera, onClose }) {
         video.addEventListener('waiting', handleWaiting);
         video.addEventListener('error', handleError);
 
-        if (Hls.isSupported()) {
-            hls = new Hls(HLS_CONFIG);
-            hlsRef.current = hls;
-            hls.loadSource(url);
-            hls.attachMedia(video);
+        // Lazy load HLS.js
+        loadHls().then(Hls => {
+            if (cancelled) return;
             
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                video.play().catch(() => {});
-            });
-            
-            hls.on(Hls.Events.ERROR, (_, d) => {
-                if (d.fatal) {
-                    if (d.type === Hls.ErrorTypes.NETWORK_ERROR && retryCount < maxRetries) {
-                        retryCount++;
-                        setTimeout(() => hls?.startLoad(), 2000);
-                    } else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                        hls?.recoverMediaError();
-                    } else {
-                        setStatus('error');
+            if (Hls.isSupported()) {
+                hls = new Hls(HLS_CONFIG);
+                hlsRef.current = hls;
+                hls.loadSource(url);
+                hls.attachMedia(video);
+                
+                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    video.play().catch(() => {});
+                });
+                
+                hls.on(Hls.Events.ERROR, (_, d) => {
+                    if (d.fatal) {
+                        if (d.type === Hls.ErrorTypes.NETWORK_ERROR && retryCount < maxRetries) {
+                            retryCount++;
+                            setTimeout(() => hls?.startLoad(), 2000);
+                        } else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                            hls?.recoverMediaError();
+                        } else {
+                            setStatus('error');
+                        }
                     }
-                }
-            });
-        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            video.src = url;
-            video.addEventListener('loadedmetadata', () => video.play().catch(() => {}));
-        }
+                });
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = url;
+                video.addEventListener('loadedmetadata', () => video.play().catch(() => {}));
+            }
+        });
 
         return () => {
+            cancelled = true;
             video.removeEventListener('playing', handlePlaying);
             video.removeEventListener('waiting', handleWaiting);
             video.removeEventListener('error', handleError);
@@ -563,6 +579,7 @@ function MultiViewVideoItem({ camera, onRemove }) {
         let hls = null;
         let retryCount = 0;
         const maxRetries = 3;
+        let cancelled = false;
 
         setStatus('connecting');
 
@@ -574,34 +591,40 @@ function MultiViewVideoItem({ camera, onRemove }) {
         video.addEventListener('waiting', handleWaiting);
         video.addEventListener('error', handleError);
 
-        if (Hls.isSupported()) {
-            hls = new Hls(HLS_CONFIG);
-            hlsRef.current = hls;
-            hls.loadSource(url);
-            hls.attachMedia(video);
+        // Lazy load HLS.js
+        loadHls().then(Hls => {
+            if (cancelled) return;
             
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                video.play().catch(() => {});
-            });
-            
-            hls.on(Hls.Events.ERROR, (_, d) => {
-                if (d.fatal) {
-                    if (d.type === Hls.ErrorTypes.NETWORK_ERROR && retryCount < maxRetries) {
-                        retryCount++;
-                        setTimeout(() => hls?.startLoad(), 2000);
-                    } else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                        hls?.recoverMediaError();
-                    } else {
-                        setStatus('error');
+            if (Hls.isSupported()) {
+                hls = new Hls(HLS_CONFIG);
+                hlsRef.current = hls;
+                hls.loadSource(url);
+                hls.attachMedia(video);
+                
+                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    video.play().catch(() => {});
+                });
+                
+                hls.on(Hls.Events.ERROR, (_, d) => {
+                    if (d.fatal) {
+                        if (d.type === Hls.ErrorTypes.NETWORK_ERROR && retryCount < maxRetries) {
+                            retryCount++;
+                            setTimeout(() => hls?.startLoad(), 2000);
+                        } else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                            hls?.recoverMediaError();
+                        } else {
+                            setStatus('error');
+                        }
                     }
-                }
-            });
-        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            video.src = url;
-            video.addEventListener('loadedmetadata', () => video.play().catch(() => {}));
-        }
+                });
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = url;
+                video.addEventListener('loadedmetadata', () => video.play().catch(() => {}));
+            }
+        });
 
         return () => {
+            cancelled = true;
             video.removeEventListener('playing', handlePlaying);
             video.removeEventListener('waiting', handleWaiting);
             video.removeEventListener('error', handleError);
