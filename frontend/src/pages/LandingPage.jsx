@@ -4,6 +4,61 @@ import { useTheme } from '../contexts/ThemeContext';
 import Hls from 'hls.js';
 
 // ============================================
+// DEVICE DETECTION & HLS CONFIG
+// Optimized for low-end devices (kentang)
+// ============================================
+const isLowEndDevice = (() => {
+    if (typeof navigator === 'undefined') return false;
+    const memory = navigator.deviceMemory || 4; // GB, default 4 if not available
+    const cores = navigator.hardwareConcurrency || 4;
+    const isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
+    // Low-end: < 4GB RAM or < 4 cores on mobile
+    return (memory < 4 || (isMobile && cores < 6));
+})();
+
+// HLS config optimized for device capability
+const getHlsConfig = (isMultiView = false) => {
+    if (isLowEndDevice) {
+        // Config untuk HP kentang - prioritas stabilitas
+        return {
+            enableWorker: false, // Disable worker - lebih stabil di device lemah
+            lowLatencyMode: false, // Disable low latency - kurangi CPU usage
+            backBufferLength: 0, // Tidak simpan buffer belakang
+            maxBufferLength: 10, // Buffer kecil (10 detik)
+            maxMaxBufferLength: 15,
+            maxBufferSize: 30 * 1000 * 1000, // 30MB max
+            maxBufferHole: 1,
+            highBufferWatchdogPeriod: 3,
+            nudgeMaxRetry: 5,
+            fragLoadingTimeOut: 20000,
+            fragLoadingMaxRetry: 3,
+            levelLoadingTimeOut: 15000,
+            startLevel: 0, // Mulai dari quality terendah
+            autoStartLoad: true,
+            startFragPrefetch: false, // Jangan prefetch
+            testBandwidth: false, // Skip bandwidth test
+            progressive: true, // Progressive loading
+            // Prefer lower quality
+            abrEwmaDefaultEstimate: 500000, // Assume 500kbps connection
+            abrBandWidthFactor: 0.7,
+            abrBandWidthUpFactor: 0.5,
+        };
+    }
+    
+    // Config untuk device normal/high-end
+    return {
+        enableWorker: true,
+        lowLatencyMode: true,
+        backBufferLength: isMultiView ? 15 : 30,
+        maxBufferLength: isMultiView ? 20 : 30,
+        maxMaxBufferLength: isMultiView ? 30 : 60,
+        maxBufferSize: 60 * 1000 * 1000,
+        startLevel: -1, // Auto select
+        abrEwmaDefaultEstimate: 1000000,
+    };
+};
+
+// ============================================
 // ICONS
 // ============================================
 const Icons = {
@@ -211,7 +266,7 @@ function VideoPopup({ camera, onClose }) {
         const video = videoRef.current;
         let hls = null;
         if (Hls.isSupported()) {
-            hls = new Hls({ enableWorker: true, lowLatencyMode: true, backBufferLength: 60 });
+            hls = new Hls(getHlsConfig(false));
             hlsRef.current = hls;
             hls.loadSource(url);
             hls.attachMedia(video);
@@ -319,7 +374,7 @@ function MultiViewVideoItem({ camera, onRemove }) {
         const video = videoRef.current;
         let hls = null;
         if (Hls.isSupported()) {
-            hls = new Hls({ enableWorker: true, lowLatencyMode: true, backBufferLength: 30, maxBufferLength: 10 });
+            hls = new Hls(getHlsConfig(true)); // Multi-view config (smaller buffer)
             hlsRef.current = hls;
             hls.loadSource(url);
             hls.attachMedia(video);
