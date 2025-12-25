@@ -1,6 +1,5 @@
-# MediaMTX Configuration - Minimal & Stable
+# MediaMTX Configuration - Optimized for FAST HLS startup
 
-# Set to 'error' to only show errors, 'warn' for warnings+errors
 logLevel: error
 logDestinations: [stdout]
 
@@ -8,22 +7,28 @@ logDestinations: [stdout]
 api: yes
 apiAddress: :9997
 
-# Listeners for streaming protocols
+# HLS - Optimized for fast startup
 hls: yes
 hlsAddress: :8888
 hlsAllowOrigin: '*'
+hlsSegmentCount: 3
+hlsSegmentDuration: 1s
+hlsPartDuration: 200ms
+hlsSegmentMaxSize: 50M
 
+# WebRTC
 webrtc: yes
 webrtcAddress: :8889
 webrtcAllowOrigin: '*'
 
+# RTMP
 rtmp: yes
 rtmpAddress: :1935
 
+# RTSP
 rtsp: yes
 rtspAddress: :8554
 
 # Path configurations managed by backend
-# Note: sourceOnDemand is set per-path by backend, not in defaults
 paths:
   all_others: {}

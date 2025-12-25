@@ -4,27 +4,28 @@ import { areaService } from '../services/areaService';
 import { useTheme } from '../contexts/ThemeContext';
 
 // ============================================
-// HLS CONFIG - Optimized for all devices including low-end
+// HLS CONFIG - Optimized for FAST startup on all devices
 // ============================================
 const HLS_CONFIG = {
-    enableWorker: false,              // Disable worker - reduces CPU overhead on low-end devices
-    lowLatencyMode: false,            // Disable LL-HLS - more stable on weak devices
-    backBufferLength: 30,             // Keep 30s back buffer
-    maxBufferLength: 10,              // Smaller buffer = faster start
-    maxMaxBufferLength: 30,           // Max buffer cap
-    maxBufferSize: 30 * 1000 * 1000,  // 30MB max buffer
-    maxBufferHole: 0.5,               // Tolerate small gaps
-    startLevel: -1,                   // Auto-select quality based on bandwidth
-    abrEwmaDefaultEstimate: 500000,   // Start with 500kbps estimate (conservative)
-    abrBandWidthFactor: 0.9,          // Conservative bandwidth factor
-    abrBandWidthUpFactor: 0.7,        // Slower quality upgrade
-    fragLoadingTimeOut: 20000,        // 20s timeout for fragments
-    fragLoadingMaxRetry: 6,           // More retries
-    fragLoadingRetryDelay: 1000,      // 1s between retries
-    manifestLoadingTimeOut: 15000,    // 15s manifest timeout
-    manifestLoadingMaxRetry: 4,       // More manifest retries
-    levelLoadingTimeOut: 15000,       // 15s level timeout
-    levelLoadingMaxRetry: 4,          // More level retries
+    enableWorker: false,              // Disable worker - faster init on low-end
+    lowLatencyMode: false,            // Disable LL-HLS - more stable
+    backBufferLength: 0,              // No back buffer - faster start
+    maxBufferLength: 5,               // Small buffer = FAST start (5s)
+    maxMaxBufferLength: 15,           // Cap at 15s
+    maxBufferSize: 10 * 1000 * 1000,  // 10MB max
+    maxBufferHole: 0.5,               // Tolerate gaps
+    startLevel: 0,                    // Start with LOWEST quality for fast start
+    abrEwmaDefaultEstimate: 1000000,  // 1Mbps estimate
+    abrBandWidthFactor: 0.95,         // Aggressive bandwidth usage
+    abrBandWidthUpFactor: 0.9,        // Fast quality upgrade
+    fragLoadingTimeOut: 10000,        // 10s timeout (faster fail)
+    fragLoadingMaxRetry: 3,           // Less retries = faster fail
+    fragLoadingRetryDelay: 500,       // 500ms between retries
+    manifestLoadingTimeOut: 8000,     // 8s manifest timeout
+    manifestLoadingMaxRetry: 2,       // Fast fail
+    levelLoadingTimeOut: 8000,        // 8s level timeout
+    levelLoadingMaxRetry: 2,          // Fast fail
+    startFragPrefetch: true,          // Prefetch first fragment
 };
 
 // Lazy load HLS.js - only when needed
