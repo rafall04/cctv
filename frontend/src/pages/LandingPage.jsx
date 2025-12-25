@@ -47,32 +47,30 @@ const CameraSkeleton = () => (
 // ============================================
 const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMulti }) {
     return (
-        <div className="relative rounded-2xl overflow-hidden bg-white dark:bg-gray-900 shadow-lg hover:shadow-xl transition-all duration-300 ring-1 ring-gray-200 dark:ring-gray-800 hover:ring-sky-500/50">
+        <div className="relative rounded-2xl overflow-hidden bg-white dark:bg-gray-900 shadow-lg hover:shadow-xl transition-shadow duration-300 ring-1 ring-gray-200 dark:ring-gray-800 hover:ring-sky-500/50">
             <button
                 onClick={(e) => { e.stopPropagation(); onAddMulti(); }}
-                className={`absolute top-3 right-3 z-30 p-2.5 rounded-xl shadow-lg transition-all ${
-                    inMulti ? 'bg-emerald-500 text-white scale-110' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-sky-500 hover:text-white hover:scale-110'
+                className={`absolute top-3 right-3 z-30 p-2.5 rounded-xl shadow-lg transition-colors ${
+                    inMulti ? 'bg-emerald-500 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-sky-500 hover:text-white'
                 }`}
-                title={inMulti ? 'Remove from Multi-View' : 'Add to Multi-View'}
             >
                 {inMulti ? <Icons.Check /> : <Icons.Plus />}
             </button>
 
             <div onClick={onClick} className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 relative overflow-hidden cursor-pointer group">
-                <div className="absolute inset-0 flex items-center justify-center text-gray-300 dark:text-gray-700 group-hover:scale-110 transition-transform duration-500">
+                <div className="absolute inset-0 flex items-center justify-center text-gray-300 dark:text-gray-700">
                     <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={0.5}>
                         <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
                     </svg>
                 </div>
-                <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-all duration-300">
-                    <div className="w-12 h-12 rounded-full bg-white/90 dark:bg-gray-900/90 flex items-center justify-center text-sky-500 opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 transition-all duration-300 shadow-xl">
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black/30 transition-opacity">
+                    <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center text-sky-500 shadow-xl">
                         <Icons.Play />
                     </div>
                 </div>
-                <div className="absolute top-3 left-3 z-10">
+                <div className="absolute top-3 left-3">
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500 text-white text-[10px] font-bold shadow-lg">
-                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                        LIVE
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />LIVE
                     </span>
                 </div>
             </div>
@@ -96,18 +94,112 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
 
 
 // ============================================
-// VIDEO POPUP - Fixed zoom clipping
+// ZOOMABLE VIDEO HOOK - Optimized for performance
+// ============================================
+function useZoomPan(maxZoom = 4) {
+    const [zoom, setZoom] = useState(1);
+    const [pan, setPan] = useState({ x: 0, y: 0 });
+    const [isDragging, setIsDragging] = useState(false);
+    const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+
+    // Calculate max pan to prevent showing black bars
+    // When zoomed, the visible area is 1/zoom of the total
+    // Max pan = (zoom - 1) / (2 * zoom) * 100 percent
+    const getMaxPan = useCallback((z) => {
+        if (z <= 1) return 0;
+        return ((z - 1) / (2 * z)) * 100;
+    }, []);
+
+    const clampPan = useCallback((x, y, z) => {
+        const max = getMaxPan(z);
+        return {
+            x: Math.max(-max, Math.min(max, x)),
+            y: Math.max(-max, Math.min(max, y))
+        };
+    }, [getMaxPan]);
+
+    const handleZoom = useCallback((delta, smooth = true) => {
+        setZoom(z => {
+            const newZoom = Math.max(1, Math.min(maxZoom, z + delta));
+            if (newZoom <= 1) {
+                setPan({ x: 0, y: 0 });
+            } else {
+                // Clamp pan when zoom changes
+                setPan(p => clampPan(p.x, p.y, newZoom));
+            }
+            return newZoom;
+        });
+    }, [maxZoom, clampPan]);
+
+    const handleWheel = useCallback((e) => {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.5 : 0.5;
+        handleZoom(delta, false);
+    }, [handleZoom]);
+
+    const handlePointerDown = useCallback((e) => {
+        if (zoom <= 1) return;
+        setIsDragging(true);
+        dragStart.current = { 
+            x: e.clientX, 
+            y: e.clientY, 
+            panX: pan.x, 
+            panY: pan.y 
+        };
+        e.currentTarget.setPointerCapture(e.pointerId);
+    }, [zoom, pan]);
+
+    const handlePointerMove = useCallback((e) => {
+        if (!isDragging || zoom <= 1) return;
+        
+        const dx = e.clientX - dragStart.current.x;
+        const dy = e.clientY - dragStart.current.y;
+        
+        // Convert pixel movement to percentage (relative to container)
+        // Smaller divisor = faster pan
+        const sensitivity = 3;
+        const newX = dragStart.current.panX + (dx / sensitivity);
+        const newY = dragStart.current.panY + (dy / sensitivity);
+        
+        setPan(clampPan(newX, newY, zoom));
+    }, [isDragging, zoom, clampPan]);
+
+    const handlePointerUp = useCallback((e) => {
+        setIsDragging(false);
+        try {
+            e.currentTarget.releasePointerCapture(e.pointerId);
+        } catch {}
+    }, []);
+
+    const reset = useCallback(() => {
+        setZoom(1);
+        setPan({ x: 0, y: 0 });
+    }, []);
+
+    return {
+        zoom,
+        pan,
+        isDragging,
+        handleZoom,
+        handleWheel,
+        handlePointerDown,
+        handlePointerMove,
+        handlePointerUp,
+        reset,
+        getTransform: () => `scale(${zoom}) translate(${pan.x}%, ${pan.y}%)`
+    };
+}
+
+
+// ============================================
+// VIDEO POPUP
 // ============================================
 function VideoPopup({ camera, onClose }) {
     const videoRef = useRef(null);
-    const videoWrapperRef = useRef(null);
     const modalRef = useRef(null);
     const hlsRef = useRef(null);
     const [status, setStatus] = useState('connecting');
-    const [zoom, setZoom] = useState(1);
-    const [pan, setPan] = useState({ x: 0, y: 0 });
-    const [dragging, setDragging] = useState(false);
-    const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+    const zoomPan = useZoomPan(4);
     const url = camera.streams?.hls;
 
     useEffect(() => {
@@ -162,48 +254,12 @@ function VideoPopup({ camera, onClose }) {
         link.click();
     };
 
-    const handleZoom = (delta) => {
-        setZoom(z => {
-            const nz = Math.max(1, Math.min(4, z + delta));
-            if (nz === 1) setPan({ x: 0, y: 0 });
-            return nz;
-        });
-    };
-
-    const onWheel = (e) => {
-        e.preventDefault();
-        handleZoom(e.deltaY > 0 ? -0.3 : 0.3);
-    };
-
-    const onPointerDown = (e) => {
-        if (zoom <= 1) return;
-        setDragging(true);
-        dragStart.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
-        e.currentTarget.setPointerCapture(e.pointerId);
-    };
-
-    const onPointerMove = (e) => {
-        if (!dragging) return;
-        const dx = e.clientX - dragStart.current.x;
-        const dy = e.clientY - dragStart.current.y;
-        const maxPan = 50 * (zoom - 1); // percentage based
-        setPan({
-            x: Math.max(-maxPan, Math.min(maxPan, dragStart.current.panX + (dx / 5))),
-            y: Math.max(-maxPan, Math.min(maxPan, dragStart.current.panY + (dy / 5)))
-        });
-    };
-
-    const onPointerUp = (e) => {
-        setDragging(false);
-        e.currentTarget.releasePointerCapture(e.pointerId);
-    };
-
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-2 sm:p-4" onClick={onClose}>
             <div 
                 ref={modalRef} 
                 className="relative w-full max-w-5xl bg-gray-900 rounded-2xl overflow-hidden shadow-2xl flex flex-col"
-                style={{ maxHeight: 'calc(100vh - 32px)' }}
+                style={{ maxHeight: 'calc(100vh - 16px)' }}
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
@@ -227,23 +283,25 @@ function VideoPopup({ camera, onClose }) {
                     </div>
                 </div>
 
-                {/* Video Container - clips zoomed content */}
+                {/* Video Container */}
                 <div 
-                    ref={videoWrapperRef}
                     className="relative flex-1 min-h-0 bg-black overflow-hidden"
-                    onWheel={onWheel}
+                    onWheel={zoomPan.handleWheel}
                     onDoubleClick={toggleFS}
                 >
                     <video 
                         ref={videoRef}
-                        onPointerDown={onPointerDown}
-                        onPointerMove={onPointerMove}
-                        onPointerUp={onPointerUp}
-                        onPointerCancel={onPointerUp}
-                        className="w-full h-full object-contain transition-transform duration-150 ease-out"
+                        onPointerDown={zoomPan.handlePointerDown}
+                        onPointerMove={zoomPan.handlePointerMove}
+                        onPointerUp={zoomPan.handlePointerUp}
+                        onPointerCancel={zoomPan.handlePointerUp}
+                        onPointerLeave={zoomPan.handlePointerUp}
+                        className="w-full h-full object-contain"
                         style={{ 
-                            transform: `scale(${zoom}) translate(${pan.x}%, ${pan.y}%)`,
-                            cursor: zoom > 1 ? (dragging ? 'grabbing' : 'grab') : 'default'
+                            transform: zoomPan.getTransform(),
+                            transformOrigin: 'center center',
+                            cursor: zoomPan.zoom > 1 ? (zoomPan.isDragging ? 'grabbing' : 'grab') : 'default',
+                            willChange: 'transform'
                         }}
                         muted playsInline autoPlay 
                     />
@@ -267,10 +325,10 @@ function VideoPopup({ camera, onClose }) {
                             {camera.area_name && <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400">{camera.area_name}</span>}
                         </div>
                         <div className="flex items-center gap-1 bg-white/5 rounded-xl p-1">
-                            <button onClick={() => handleZoom(-0.5)} disabled={zoom <= 1} className="p-2 hover:bg-white/10 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomOut /></button>
-                            <span className="text-white text-xs font-medium w-12 text-center">{Math.round(zoom * 100)}%</span>
-                            <button onClick={() => handleZoom(0.5)} disabled={zoom >= 4} className="p-2 hover:bg-white/10 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomIn /></button>
-                            {zoom > 1 && <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} className="p-2 hover:bg-white/10 rounded-lg text-white ml-1"><Icons.Reset /></button>}
+                            <button onClick={() => zoomPan.handleZoom(-0.5)} disabled={zoomPan.zoom <= 1} className="p-2 hover:bg-white/10 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomOut /></button>
+                            <span className="text-white text-xs font-medium w-12 text-center">{Math.round(zoomPan.zoom * 100)}%</span>
+                            <button onClick={() => zoomPan.handleZoom(0.5)} disabled={zoomPan.zoom >= 4} className="p-2 hover:bg-white/10 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomIn /></button>
+                            {zoomPan.zoom > 1 && <button onClick={zoomPan.reset} className="p-2 hover:bg-white/10 rounded-lg text-white ml-1"><Icons.Reset /></button>}
                         </div>
                     </div>
                 </div>
@@ -281,17 +339,14 @@ function VideoPopup({ camera, onClose }) {
 
 
 // ============================================
-// MULTI-VIEW VIDEO ITEM - Smooth zoom
+// MULTI-VIEW VIDEO ITEM
 // ============================================
 function MultiViewVideoItem({ camera, onRemove }) {
     const videoRef = useRef(null);
     const containerRef = useRef(null);
     const hlsRef = useRef(null);
     const [status, setStatus] = useState('connecting');
-    const [zoom, setZoom] = useState(1);
-    const [pan, setPan] = useState({ x: 0, y: 0 });
-    const [dragging, setDragging] = useState(false);
-    const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+    const zoomPan = useZoomPan(3);
     const url = camera.streams?.hls;
 
     useEffect(() => {
@@ -339,56 +394,27 @@ function MultiViewVideoItem({ camera, onRemove }) {
         link.click();
     };
 
-    const handleZoom = (delta) => {
-        setZoom(z => {
-            const nz = Math.max(1, Math.min(3, z + delta));
-            if (nz === 1) setPan({ x: 0, y: 0 });
-            return nz;
-        });
-    };
-
-    const onWheel = (e) => {
-        e.preventDefault();
+    // Prevent wheel from scrolling page
+    const handleWheel = (e) => {
         e.stopPropagation();
-        handleZoom(e.deltaY > 0 ? -0.2 : 0.2);
-    };
-
-    const onPointerDown = (e) => {
-        if (zoom <= 1) return;
-        e.stopPropagation();
-        setDragging(true);
-        dragStart.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
-        e.currentTarget.setPointerCapture(e.pointerId);
-    };
-
-    const onPointerMove = (e) => {
-        if (!dragging) return;
-        const dx = e.clientX - dragStart.current.x;
-        const dy = e.clientY - dragStart.current.y;
-        const maxPan = 40 * (zoom - 1);
-        setPan({
-            x: Math.max(-maxPan, Math.min(maxPan, dragStart.current.panX + (dx / 6))),
-            y: Math.max(-maxPan, Math.min(maxPan, dragStart.current.panY + (dy / 6)))
-        });
-    };
-
-    const onPointerUp = (e) => {
-        setDragging(false);
-        try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
+        zoomPan.handleWheel(e);
     };
 
     return (
-        <div ref={containerRef} className="relative w-full h-full bg-black rounded-xl overflow-hidden group" onWheel={onWheel}>
+        <div ref={containerRef} className="relative w-full h-full bg-black rounded-xl overflow-hidden group" onWheel={handleWheel}>
             <video 
                 ref={videoRef}
-                onPointerDown={onPointerDown}
-                onPointerMove={onPointerMove}
-                onPointerUp={onPointerUp}
-                onPointerCancel={onPointerUp}
-                className="w-full h-full object-contain transition-transform duration-150 ease-out"
+                onPointerDown={zoomPan.handlePointerDown}
+                onPointerMove={zoomPan.handlePointerMove}
+                onPointerUp={zoomPan.handlePointerUp}
+                onPointerCancel={zoomPan.handlePointerUp}
+                onPointerLeave={zoomPan.handlePointerUp}
+                className="w-full h-full object-contain"
                 style={{ 
-                    transform: `scale(${zoom}) translate(${pan.x}%, ${pan.y}%)`,
-                    cursor: zoom > 1 ? (dragging ? 'grabbing' : 'grab') : 'default'
+                    transform: zoomPan.getTransform(),
+                    transformOrigin: 'center center',
+                    cursor: zoomPan.zoom > 1 ? (zoomPan.isDragging ? 'grabbing' : 'grab') : 'default',
+                    willChange: 'transform'
                 }}
                 muted playsInline autoPlay 
             />
@@ -413,10 +439,10 @@ function MultiViewVideoItem({ camera, onRemove }) {
                 <div className="flex items-center justify-between gap-2">
                     <p className="text-white text-xs font-medium truncate flex-1">{camera.name}</p>
                     <div className="flex items-center gap-1">
-                        <button onClick={() => handleZoom(-0.5)} disabled={zoom <= 1} className="p-1 bg-white/10 hover:bg-white/20 disabled:opacity-30 rounded text-white"><Icons.ZoomOut /></button>
-                        <span className="text-white/70 text-[10px] w-8 text-center">{Math.round(zoom * 100)}%</span>
-                        <button onClick={() => handleZoom(0.5)} disabled={zoom >= 3} className="p-1 bg-white/10 hover:bg-white/20 disabled:opacity-30 rounded text-white"><Icons.ZoomIn /></button>
-                        {zoom > 1 && <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} className="p-1 bg-white/10 hover:bg-white/20 rounded text-white"><Icons.Reset /></button>}
+                        <button onClick={() => zoomPan.handleZoom(-0.5)} disabled={zoomPan.zoom <= 1} className="p-1 bg-white/10 hover:bg-white/20 disabled:opacity-30 rounded text-white"><Icons.ZoomOut /></button>
+                        <span className="text-white/70 text-[10px] w-8 text-center">{Math.round(zoomPan.zoom * 100)}%</span>
+                        <button onClick={() => zoomPan.handleZoom(0.5)} disabled={zoomPan.zoom >= 3} className="p-1 bg-white/10 hover:bg-white/20 disabled:opacity-30 rounded text-white"><Icons.ZoomIn /></button>
+                        {zoomPan.zoom > 1 && <button onClick={zoomPan.reset} className="p-1 bg-white/10 hover:bg-white/20 rounded text-white"><Icons.Reset /></button>}
                         <div className="w-px h-4 bg-white/20 mx-1" />
                         {status === 'live' && <button onClick={takeSnapshot} className="p-1 bg-white/10 hover:bg-white/20 rounded text-white"><Icons.Image /></button>}
                         <button onClick={toggleFS} className="p-1 bg-white/10 hover:bg-white/20 rounded text-white"><Icons.Fullscreen /></button>
@@ -482,12 +508,6 @@ function MultiViewLayout({ cameras, onRemove, onClose }) {
             </div>
 
             <div ref={containerRef} className="flex-1 p-2 sm:p-3 min-h-0 overflow-hidden">
-                {count === 0 && (
-                    <div className="h-full flex items-center justify-center">
-                        <p className="text-gray-500">No cameras selected</p>
-                    </div>
-                )}
-
                 {count === 1 && (
                     <div className="h-full">
                         <MultiViewVideoItem camera={cameras[0]} onRemove={() => onRemove(cameras[0].id)} />
@@ -618,7 +638,7 @@ function FilterDropdown({ areas, selectedArea, onSelect, dark }) {
 }
 
 // ============================================
-// CAMERAS SECTION - Fixed layout switcher
+// CAMERAS SECTION
 // ============================================
 function CamerasSection({ cameras, loading, error, onRefresh, onCameraClick, onAddMulti, multiIds }) {
     const { dark } = useTheme();
@@ -628,14 +648,10 @@ function CamerasSection({ cameras, loading, error, onRefresh, onCameraClick, onA
     const areas = [...new Set(cameras.map(c => c.area_name).filter(Boolean))];
     const filteredCameras = selectedArea ? cameras.filter(c => c.area_name === selectedArea) : cameras;
 
-    // Grid class based on cols
     const getGridClass = () => {
-        switch (cols) {
-            case 1: return 'grid-cols-1';
-            case 2: return 'grid-cols-1 sm:grid-cols-2';
-            case 3: return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
-            default: return 'grid-cols-1 sm:grid-cols-2';
-        }
+        if (cols === 1) return 'grid-cols-1';
+        if (cols === 2) return 'grid-cols-1 sm:grid-cols-2';
+        return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
     };
 
     return (
@@ -655,19 +671,18 @@ function CamerasSection({ cameras, loading, error, onRefresh, onCameraClick, onA
                                 <FilterDropdown areas={areas} selectedArea={selectedArea} onSelect={setSelectedArea} dark={dark} />
                             )}
 
-                            {/* Layout Switcher */}
                             <div className={`flex items-center p-1 rounded-xl ${dark ? 'bg-gray-800' : 'bg-gray-100'}`}>
                                 {[1, 2, 3].map(n => (
                                     <button 
                                         key={n}
                                         onClick={() => setCols(n)} 
-                                        className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+                                        className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
                                             cols === n 
                                                 ? 'bg-sky-500 text-white shadow' 
                                                 : dark ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
                                         }`}
                                     >
-                                        {n} Col{n > 1 ? 's' : ''}
+                                        {n}
                                     </button>
                                 ))}
                             </div>
