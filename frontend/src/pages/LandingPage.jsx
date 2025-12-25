@@ -413,12 +413,11 @@ function VideoPopup({ camera, onClose }) {
 
         setStatus('connecting');
 
+        // Only change to 'live' once video starts playing - don't revert on buffering
         const handlePlaying = () => setStatus('live');
-        const handleWaiting = () => setStatus(prev => prev === 'live' ? 'connecting' : prev);
         const handleError = () => setStatus('error');
 
         video.addEventListener('playing', handlePlaying);
-        video.addEventListener('waiting', handleWaiting);
         video.addEventListener('error', handleError);
 
         // Lazy load HLS.js
@@ -456,7 +455,6 @@ function VideoPopup({ camera, onClose }) {
         return () => {
             cancelled = true;
             video.removeEventListener('playing', handlePlaying);
-            video.removeEventListener('waiting', handleWaiting);
             video.removeEventListener('error', handleError);
             if (hls) { hls.destroy(); hlsRef.current = null; }
         };
@@ -583,12 +581,11 @@ function MultiViewVideoItem({ camera, onRemove }) {
 
         setStatus('connecting');
 
+        // Only change to 'live' once video starts playing - don't revert on buffering
         const handlePlaying = () => setStatus('live');
-        const handleWaiting = () => setStatus(prev => prev === 'live' ? 'connecting' : prev);
         const handleError = () => setStatus('error');
 
         video.addEventListener('playing', handlePlaying);
-        video.addEventListener('waiting', handleWaiting);
         video.addEventListener('error', handleError);
 
         // Lazy load HLS.js
@@ -626,7 +623,6 @@ function MultiViewVideoItem({ camera, onRemove }) {
         return () => {
             cancelled = true;
             video.removeEventListener('playing', handlePlaying);
-            video.removeEventListener('waiting', handleWaiting);
             video.removeEventListener('error', handleError);
             if (hls) { hls.destroy(); hlsRef.current = null; }
         };
