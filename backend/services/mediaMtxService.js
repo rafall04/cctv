@@ -142,12 +142,28 @@ class MediaMtxService {
 
     /**
      * Check if a path exists in MediaMTX
+     * Uses paths/list endpoint to avoid error logs in MediaMTX
      * @param {string} pathName - The path name to check
      */
     async pathExists(pathName) {
         try {
-            await axios.get(`${mediaMtxApiBaseUrl}/config/paths/get/${pathName}`, { timeout: 5000 });
-            return true;
+            const paths = await this.getMediaMtxPaths();
+            return paths.includes(pathName);
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Check if a path config exists in MediaMTX
+     * Uses config/paths/list endpoint to avoid error logs
+     * @param {string} pathName - The path name to check
+     */
+    async pathConfigExists(pathName) {
+        try {
+            const response = await axios.get(`${mediaMtxApiBaseUrl}/config/paths/list`, { timeout: 5000 });
+            const items = response.data?.items || [];
+            return items.some(item => item.name === pathName);
         } catch {
             return false;
         }
@@ -160,8 +176,8 @@ class MediaMtxService {
      */
     async addOrUpdatePath(pathName, pathConfig) {
         try {
-            // Check if path exists first to avoid error logs
-            const exists = await this.pathExists(pathName);
+            // Check if path config exists using list endpoint (avoids error logs)
+            const exists = await this.pathConfigExists(pathName);
             
             if (exists) {
                 // Path exists, update it
