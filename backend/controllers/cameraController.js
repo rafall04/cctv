@@ -99,10 +99,12 @@ export async function createCamera(request, reply) {
             ? null 
             : parseInt(area_id, 10);
 
+        const isEnabled = enabled !== undefined ? enabled : 1;
+
         // Insert camera
         const result = execute(
             'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [name, private_rtsp_url, description || null, location || null, group_name || null, areaIdValue, enabled !== undefined ? enabled : 1]
+            [name, private_rtsp_url, description || null, location || null, group_name || null, areaIdValue, isEnabled]
         );
 
         // Log action
@@ -111,10 +113,12 @@ export async function createCamera(request, reply) {
             [request.user.id, 'CREATE_CAMERA', `Created camera: ${name}`, request.ip]
         );
 
-        // Sync with MediaMTX (don't await, run in background)
-        mediaMtxService.syncCameras().catch(err => {
-            console.error('MediaMTX sync error:', err.message);
-        });
+        // Add path to MediaMTX if camera is enabled
+        if (isEnabled) {
+            mediaMtxService.updateCameraPath(result.lastInsertRowid, private_rtsp_url).catch(err => {
+                console.error('MediaMTX add path error:', err.message);
+            });
+        }
 
         return reply.code(201).send({
             success: true,
@@ -140,7 +144,7 @@ export async function updateCamera(request, reply) {
         const { name, private_rtsp_url, description, location, group_name, area_id, enabled } = request.body;
 
         // Check if camera exists
-        const existingCamera = queryOne('SELECT id, name FROM cameras WHERE id = ?', [id]);
+        const existingCamera = queryOne('SELECT id, name, private_rtsp_url, enabled FROM cameras WHERE id = ?', [id]);
 
         if (!existingCamera) {
             return reply.code(404).send({
@@ -204,10 +208,23 @@ export async function updateCamera(request, reply) {
             [request.user.id, 'UPDATE_CAMERA', `Updated camera ID: ${id}`, request.ip]
         );
 
-        // Sync with MediaMTX (don't await, run in background)
-        mediaMtxService.syncCameras().catch(err => {
-            console.error('MediaMTX sync error:', err.message);
-        });
+        // Handle MediaMTX path updates
+        const newEnabled = enabled !== undefined ? enabled : existingCamera.enabled;
+        const newRtspUrl = private_rtsp_url !== undefined ? private_rtsp_url : existingCamera.private_rtsp_url;
+        const rtspChanged = private_rtsp_url !== undefined && private_rtsp_url !== existingCamera.private_rtsp_url;
+        const enabledChanged = enabled !== undefined && enabled !== existingCamera.enabled;
+
+        if (newEnabled === 0 || newEnabled === false) {
+            // Camera disabled - remove path
+            mediaMtxService.removeCameraPath(id).catch(err => {
+                console.error('MediaMTX remove path error:', err.message);
+            });
+        } else if (rtspChanged || (enabledChanged && newEnabled)) {
+            // RTSP URL changed or camera re-enabled - update/add path
+            mediaMtxService.updateCameraPath(id, newRtspUrl).catch(err => {
+                console.error('MediaMTX update path error:', err.message);
+            });
+        }
 
         return reply.send({
             success: true,
@@ -246,9 +263,9 @@ export async function deleteCamera(request, reply) {
             [request.user.id, 'DELETE_CAMERA', `Deleted camera: ${camera.name} (ID: ${id})`, request.ip]
         );
 
-        // Sync with MediaMTX (don't await, run in background)
-        mediaMtxService.syncCameras().catch(err => {
-            console.error('MediaMTX sync error:', err.message);
+        // Remove specific path from MediaMTX (don't await, run in background)
+        mediaMtxService.removeCameraPath(id).catch(err => {
+            console.error('MediaMTX remove path error:', err.message);
         });
 
         return reply.send({
