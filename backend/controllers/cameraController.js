@@ -94,10 +94,15 @@ export async function createCamera(request, reply) {
             });
         }
 
+        // Convert empty string area_id to null
+        const areaIdValue = area_id === '' || area_id === null || area_id === undefined 
+            ? null 
+            : parseInt(area_id, 10);
+
         // Insert camera
         const result = execute(
             'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [name, private_rtsp_url, description || null, location || null, group_name || null, area_id || null, enabled !== undefined ? enabled : 1]
+            [name, private_rtsp_url, description || null, location || null, group_name || null, areaIdValue, enabled !== undefined ? enabled : 1]
         );
 
         // Log action
@@ -158,19 +163,20 @@ export async function updateCamera(request, reply) {
         }
         if (description !== undefined) {
             updates.push('description = ?');
-            values.push(description);
+            values.push(description || null);
         }
         if (location !== undefined) {
             updates.push('location = ?');
-            values.push(location);
+            values.push(location || null);
         }
         if (group_name !== undefined) {
             updates.push('group_name = ?');
-            values.push(group_name);
+            values.push(group_name || null);
         }
         if (area_id !== undefined) {
             updates.push('area_id = ?');
-            values.push(area_id);
+            // Convert empty string to null for foreign key
+            values.push(area_id === '' || area_id === null ? null : parseInt(area_id, 10));
         }
         if (enabled !== undefined) {
             updates.push('enabled = ?');
