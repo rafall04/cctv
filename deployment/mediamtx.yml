@@ -41,9 +41,6 @@ rtmpAddress: :1935
 # Path defaults
 # ============================================
 pathDefaults:
-  sourceOnDemand: yes
-  sourceOnDemandStartTimeout: 10s
-  sourceOnDemandCloseAfter: 10s
   record: no
   readUser: ""
   readPass: ""

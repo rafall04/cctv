@@ -36,18 +36,10 @@ rtmp: yes
 rtmpAddress: :1935
 
 # ============================================
-# Path defaults
+# Path defaults - removed sourceOnDemand
 # ============================================
 pathDefaults:
-  # Source settings
-  sourceOnDemand: yes
-  sourceOnDemandStartTimeout: 10s
-  sourceOnDemandCloseAfter: 10s
-  
-  # Recording disabled
   record: no
-  
-  # Read/Publish access
   readUser: ""
   readPass: ""
   publishUser: ""
