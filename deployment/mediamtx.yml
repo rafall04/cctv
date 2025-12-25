@@ -1,5 +1,4 @@
 # MediaMTX Configuration for RAF NET CCTV Production
-# Optimized for Tunnel/Remote Cameras with unstable connections
 
 # Logging - only show errors
 logLevel: error
@@ -9,62 +8,31 @@ logDestinations: [stdout]
 api: yes
 apiAddress: 127.0.0.1:9997
 
-# ============================================
-# RTSP Settings - Optimized for unstable connections
-# ============================================
-rtsp: yes
-rtspAddress: :8554
-
-# Increase timeouts for tunnel/remote cameras
-rtspTransport: tcp
-readTimeout: 30s
-writeTimeout: 30s
-readBufferCount: 2048
-
-# ============================================
-# HLS Settings - For web streaming
-# ============================================
+# HLS settings
 hls: yes
 hlsAddress: :8888
 hlsAlwaysRemux: yes
-hlsSegmentCount: 5
-hlsSegmentDuration: 1s
-hlsPartDuration: 200ms
-hlsSegmentMaxSize: 50M
 hlsAllowOrigin: '*'
 
-# ============================================
-# WebRTC Settings - Low latency streaming
-# ============================================
+# WebRTC settings
 webrtc: yes
 webrtcAddress: :8889
 webrtcLocalUDPAddress: :8189
 webrtcAllowOrigin: '*'
-webrtcICEServers2: []
 
-# ============================================
-# RTMP Settings
-# ============================================
+# RTMP settings
 rtmp: yes
 rtmpAddress: :1935
 
-# ============================================
-# Path Defaults - Applied to all paths
-# ============================================
+# RTSP settings
+rtsp: yes
+rtspAddress: :8554
+
+# Path defaults - sourceOnDemand to only connect when requested
 pathDefaults:
-  # Source settings for unstable connections
   sourceOnDemand: yes
-  sourceOnDemandStartTimeout: 30s
-  sourceOnDemandCloseAfter: 30s
-  
-  # Retry settings for tunnel cameras
-  readTimeout: 30s
-  writeTimeout: 30s
-  
-  # Buffer for unstable connections
-  readBufferCount: 2048
-  
-  # Recording (optional)
+  sourceOnDemandStartTimeout: 10s
+  sourceOnDemandCloseAfter: 10s
   recordDeleteAfter: 24h
 
 # Path configurations managed by backend

@@ -384,6 +384,7 @@ function VideoPopup({ camera, onClose }) {
     const hlsRef = useRef(null);
     const [status, setStatus] = useState('connecting');
     const [zoom, setZoom] = useState(1);
+    const [retryKey, setRetryKey] = useState(0);
     const url = camera.streams?.hls;
 
     useEffect(() => {
@@ -399,6 +400,8 @@ function VideoPopup({ camera, onClose }) {
         let hls = null;
         let retryCount = 0;
         const maxRetries = 3;
+
+        setStatus('connecting');
 
         const handlePlaying = () => setStatus('live');
         const handleWaiting = () => setStatus(prev => prev === 'live' ? 'connecting' : prev);
@@ -441,7 +444,15 @@ function VideoPopup({ camera, onClose }) {
             video.removeEventListener('error', handleError);
             if (hls) { hls.destroy(); hlsRef.current = null; }
         };
-    }, [url]);
+    }, [url, retryKey]);
+
+    const handleRetry = () => {
+        if (hlsRef.current) {
+            hlsRef.current.destroy();
+            hlsRef.current = null;
+        }
+        setRetryKey(k => k + 1);
+    };
 
     const toggleFS = async () => {
         try {
@@ -491,7 +502,26 @@ function VideoPopup({ camera, onClose }) {
                 <div ref={wrapperRef} className="relative flex-1 min-h-0 bg-black overflow-hidden" onDoubleClick={toggleFS}>
                     <ZoomableVideo videoRef={videoRef} maxZoom={4} onZoomChange={setZoom} />
                     {status === 'connecting' && <VideoSkeleton size="large" />}
-                    {status === 'error' && <div className="absolute inset-0 flex items-center justify-center bg-black/80 pointer-events-none"><p className="text-red-400">Stream Unavailable</p></div>}
+                    {status === 'error' && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90">
+                            <div className="text-center p-6">
+                                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/20 flex items-center justify-center">
+                                    <svg className="w-8 h-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                </div>
+                                <h3 className="text-white font-semibold text-lg mb-2">CCTV Tidak Terkoneksi</h3>
+                                <p className="text-gray-400 text-sm mb-4">Kamera sedang offline atau koneksi terputus</p>
+                                <button
+                                    onClick={handleRetry}
+                                    className="inline-flex items-center gap-2 px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg font-medium transition-colors"
+                                >
+                                    <Icons.Reset />
+                                    Coba Lagi
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Footer */}
@@ -524,6 +554,7 @@ function MultiViewVideoItem({ camera, onRemove }) {
     const hlsRef = useRef(null);
     const [status, setStatus] = useState('connecting');
     const [zoom, setZoom] = useState(1);
+    const [retryKey, setRetryKey] = useState(0);
     const url = camera.streams?.hls;
 
     useEffect(() => {
@@ -532,6 +563,8 @@ function MultiViewVideoItem({ camera, onRemove }) {
         let hls = null;
         let retryCount = 0;
         const maxRetries = 3;
+
+        setStatus('connecting');
 
         const handlePlaying = () => setStatus('live');
         const handleWaiting = () => setStatus(prev => prev === 'live' ? 'connecting' : prev);
@@ -574,7 +607,15 @@ function MultiViewVideoItem({ camera, onRemove }) {
             video.removeEventListener('error', handleError);
             if (hls) { hls.destroy(); hlsRef.current = null; }
         };
-    }, [url]);
+    }, [url, retryKey]);
+
+    const handleRetry = () => {
+        if (hlsRef.current) {
+            hlsRef.current.destroy();
+            hlsRef.current = null;
+        }
+        setRetryKey(k => k + 1);
+    };
 
     const toggleFS = async () => {
         try {
@@ -624,7 +665,26 @@ function MultiViewVideoItem({ camera, onRemove }) {
                 </div>
             </div>
             {status === 'connecting' && <VideoSkeleton size="small" />}
-            {status === 'error' && <div className="absolute inset-0 flex items-center justify-center bg-black/70 pointer-events-none"><p className="text-red-400 text-xs">Offline</p></div>}
+            {status === 'error' && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90">
+                    <div className="text-center p-4">
+                        <div className="w-10 h-10 mx-auto mb-2 rounded-full bg-red-500/20 flex items-center justify-center">
+                            <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                        </div>
+                        <p className="text-white text-xs font-medium mb-1">Tidak Terkoneksi</p>
+                        <p className="text-gray-400 text-[10px] mb-3">Kamera offline</p>
+                        <button
+                            onClick={handleRetry}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-xs font-medium transition-colors"
+                        >
+                            <Icons.Reset />
+                            Coba Lagi
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -271,15 +271,12 @@ class MediaMtxService {
             // Skip if path already exists - don't update to avoid stream interruption
             if (configuredPathsSet.has(camera.path_name)) continue;
 
-            // Optimized for tunnel/remote cameras with unstable connections
             const pathConfig = {
                 source: camera.rtsp_url,
                 sourceProtocol: 'tcp',
                 sourceOnDemand: true,
-                sourceOnDemandStartTimeout: '30s',
-                sourceOnDemandCloseAfter: '30s',
-                readTimeout: '30s',
-                writeTimeout: '30s',
+                sourceOnDemandStartTimeout: '10s',
+                sourceOnDemandCloseAfter: '10s',
             };
 
             try {
@@ -303,15 +300,12 @@ class MediaMtxService {
      */
     async updateCameraPath(cameraId, rtspUrl) {
         const pathName = `camera${cameraId}`;
-        // Optimized for tunnel/remote cameras with unstable connections
         const pathConfig = {
             source: rtspUrl,
             sourceProtocol: 'tcp',
             sourceOnDemand: true,
-            sourceOnDemandStartTimeout: '30s',
-            sourceOnDemandCloseAfter: '30s',
-            readTimeout: '30s',
-            writeTimeout: '30s',
+            sourceOnDemandStartTimeout: '10s',
+            sourceOnDemandCloseAfter: '10s',
         };
 
         try {
