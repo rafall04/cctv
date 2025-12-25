@@ -16,7 +16,6 @@ const Icons = {
     Plus: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M12 5v14m-7-7h14"/></svg>,
     Check: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M5 13l4 4L19 7"/></svg>,
     Fullscreen: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>,
-    Minus: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M5 12h14"/></svg>,
     Reset: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>,
     Layout: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>,
     Image: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>,
@@ -24,13 +23,10 @@ const Icons = {
     ChevronDown: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M19 9l-7 7-7-7"/></svg>,
     ZoomIn: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M11 8v6M8 11h6"/></svg>,
     ZoomOut: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M8 11h6"/></svg>,
-    Grid1: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="4" y="4" width="16" height="16" rx="1"/></svg>,
-    Grid2: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="4" y="4" width="7" height="16" rx="1"/><rect x="13" y="4" width="7" height="16" rx="1"/></svg>,
-    Grid3: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="4" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="16" rx="1"/><rect x="16" y="4" width="5" height="16" rx="1"/></svg>,
 };
 
 // ============================================
-// SKELETON LOADER
+// SKELETON
 // ============================================
 const Skeleton = ({ className }) => (
     <div className={`animate-pulse bg-gray-300 dark:bg-gray-700 rounded-xl ${className}`} />
@@ -46,27 +42,22 @@ const CameraSkeleton = () => (
     </div>
 );
 
-
 // ============================================
 // CAMERA CARD
 // ============================================
 const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMulti }) {
     return (
         <div className="relative rounded-2xl overflow-hidden bg-white dark:bg-gray-900 shadow-lg hover:shadow-xl transition-all duration-300 ring-1 ring-gray-200 dark:ring-gray-800 hover:ring-sky-500/50">
-            {/* Multi-view Button - ALWAYS VISIBLE at top */}
             <button
                 onClick={(e) => { e.stopPropagation(); onAddMulti(); }}
                 className={`absolute top-3 right-3 z-30 p-2.5 rounded-xl shadow-lg transition-all ${
-                    inMulti 
-                        ? 'bg-emerald-500 text-white scale-110' 
-                        : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-sky-500 hover:text-white hover:scale-110'
+                    inMulti ? 'bg-emerald-500 text-white scale-110' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-sky-500 hover:text-white hover:scale-110'
                 }`}
                 title={inMulti ? 'Remove from Multi-View' : 'Add to Multi-View'}
             >
                 {inMulti ? <Icons.Check /> : <Icons.Plus />}
             </button>
 
-            {/* Thumbnail Area */}
             <div onClick={onClick} className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 relative overflow-hidden cursor-pointer group">
                 <div className="absolute inset-0 flex items-center justify-center text-gray-300 dark:text-gray-700 group-hover:scale-110 transition-transform duration-500">
                     <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={0.5}>
@@ -86,13 +77,11 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
                 </div>
             </div>
 
-            {/* Info */}
             <div className="p-4 cursor-pointer" onClick={onClick}>
                 <h3 className="font-bold text-gray-900 dark:text-white truncate">{camera.name}</h3>
                 {camera.location && (
                     <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1.5 mt-1">
-                        <Icons.MapPin />
-                        <span className="truncate">{camera.location}</span>
+                        <Icons.MapPin /><span className="truncate">{camera.location}</span>
                     </p>
                 )}
                 {camera.area_name && (
@@ -107,19 +96,18 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
 
 
 // ============================================
-// VIDEO POPUP MODAL - Fixed zoom behavior
+// VIDEO POPUP - Fixed zoom clipping
 // ============================================
 function VideoPopup({ camera, onClose }) {
     const videoRef = useRef(null);
-    const videoContainerRef = useRef(null);
+    const videoWrapperRef = useRef(null);
     const modalRef = useRef(null);
     const hlsRef = useRef(null);
     const [status, setStatus] = useState('connecting');
     const [zoom, setZoom] = useState(1);
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [dragging, setDragging] = useState(false);
-    const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
-    const dragRef = useRef({ x: 0, y: 0, px: 0, py: 0 });
+    const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
     const url = camera.streams?.hls;
 
     useEffect(() => {
@@ -128,19 +116,6 @@ function VideoPopup({ camera, onClose }) {
         document.body.style.overflow = 'hidden';
         return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
     }, [onClose]);
-
-    // Track container size for pan limits
-    useEffect(() => {
-        const updateSize = () => {
-            if (videoContainerRef.current) {
-                const rect = videoContainerRef.current.getBoundingClientRect();
-                setContainerSize({ w: rect.width, h: rect.height });
-            }
-        };
-        updateSize();
-        window.addEventListener('resize', updateSize);
-        return () => window.removeEventListener('resize', updateSize);
-    }, []);
 
     useEffect(() => {
         if (!url || !videoRef.current) return;
@@ -187,13 +162,6 @@ function VideoPopup({ camera, onClose }) {
         link.click();
     };
 
-    // Calculate max pan based on zoom and container size
-    const getMaxPan = () => {
-        const maxX = (containerSize.w * (zoom - 1)) / 2;
-        const maxY = (containerSize.h * (zoom - 1)) / 2;
-        return { maxX, maxY };
-    };
-
     const handleZoom = (delta) => {
         setZoom(z => {
             const nz = Math.max(1, Math.min(4, z + delta));
@@ -204,37 +172,48 @@ function VideoPopup({ camera, onClose }) {
 
     const onWheel = (e) => {
         e.preventDefault();
-        handleZoom(e.deltaY > 0 ? -0.25 : 0.25);
+        handleZoom(e.deltaY > 0 ? -0.3 : 0.3);
     };
 
     const onPointerDown = (e) => {
         if (zoom <= 1) return;
         setDragging(true);
-        dragRef.current = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y };
+        dragStart.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
+        e.currentTarget.setPointerCapture(e.pointerId);
     };
 
     const onPointerMove = (e) => {
         if (!dragging) return;
-        const { maxX, maxY } = getMaxPan();
-        const newX = dragRef.current.px + (e.clientX - dragRef.current.x);
-        const newY = dragRef.current.py + (e.clientY - dragRef.current.y);
+        const dx = e.clientX - dragStart.current.x;
+        const dy = e.clientY - dragStart.current.y;
+        const maxPan = 50 * (zoom - 1); // percentage based
         setPan({
-            x: Math.max(-maxX, Math.min(maxX, newX)),
-            y: Math.max(-maxY, Math.min(maxY, newY))
+            x: Math.max(-maxPan, Math.min(maxPan, dragStart.current.panX + (dx / 5))),
+            y: Math.max(-maxPan, Math.min(maxPan, dragStart.current.panY + (dy / 5)))
         });
     };
 
-    const onPointerUp = () => setDragging(false);
+    const onPointerUp = (e) => {
+        setDragging(false);
+        e.currentTarget.releasePointerCapture(e.pointerId);
+    };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/95" onClick={onClose}>
-            <div ref={modalRef} className="relative w-full max-w-6xl bg-gray-950 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10 flex flex-col max-h-[95vh]" onClick={(e) => e.stopPropagation()}>
-                {/* Header - z-index higher than video */}
-                <div className="relative z-20 flex items-center justify-between p-3 sm:p-4 border-b border-white/10 bg-gray-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-2 sm:p-4" onClick={onClose}>
+            <div 
+                ref={modalRef} 
+                className="relative w-full max-w-5xl bg-gray-900 rounded-2xl overflow-hidden shadow-2xl flex flex-col"
+                style={{ maxHeight: 'calc(100vh - 32px)' }}
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* Header */}
+                <div className="shrink-0 flex items-center justify-between p-3 sm:p-4 bg-gray-900 border-b border-white/10">
                     <div className="flex-1 min-w-0 pr-4">
                         <div className="flex items-center gap-2 flex-wrap">
-                            <h2 className="text-white font-bold text-base sm:text-lg truncate">{camera.name}</h2>
-                            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${status === 'live' ? 'bg-emerald-500/20 text-emerald-400' : status === 'connecting' ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400'}`}>
+                            <h2 className="text-white font-bold text-sm sm:text-lg truncate">{camera.name}</h2>
+                            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                status === 'live' ? 'bg-emerald-500/20 text-emerald-400' : status === 'connecting' ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400'
+                            }`}>
                                 <span className={`w-1.5 h-1.5 rounded-full ${status === 'live' ? 'bg-emerald-400 animate-pulse' : status === 'connecting' ? 'bg-amber-400' : 'bg-red-400'}`} />
                                 {status === 'live' ? 'LIVE' : status === 'connecting' ? 'CONNECTING' : 'OFFLINE'}
                             </span>
@@ -242,51 +221,56 @@ function VideoPopup({ camera, onClose }) {
                         {camera.location && <p className="text-gray-400 text-xs sm:text-sm flex items-center gap-1.5 mt-1 truncate"><Icons.MapPin /> {camera.location}</p>}
                     </div>
                     <div className="flex items-center gap-1 sm:gap-2">
-                        {status === 'live' && <button onClick={takeSnapshot} className="p-2 hover:bg-white/10 rounded-xl text-white" title="Screenshot"><Icons.Image /></button>}
-                        <button onClick={toggleFS} className="p-2 hover:bg-white/10 rounded-xl text-white" title="Fullscreen"><Icons.Fullscreen /></button>
-                        <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl text-white" title="Close"><Icons.X /></button>
+                        {status === 'live' && <button onClick={takeSnapshot} className="p-2 hover:bg-white/10 rounded-xl text-white"><Icons.Image /></button>}
+                        <button onClick={toggleFS} className="p-2 hover:bg-white/10 rounded-xl text-white"><Icons.Fullscreen /></button>
+                        <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl text-white"><Icons.X /></button>
                     </div>
                 </div>
 
-                {/* Video Container - overflow hidden to clip zoomed video */}
+                {/* Video Container - clips zoomed content */}
                 <div 
-                    ref={videoContainerRef}
+                    ref={videoWrapperRef}
                     className="relative flex-1 min-h-0 bg-black overflow-hidden"
-                    style={{ touchAction: zoom > 1 ? 'none' : 'auto' }}
                     onWheel={onWheel}
-                    onPointerMove={onPointerMove}
-                    onPointerUp={onPointerUp}
-                    onPointerLeave={onPointerUp}
                     onDoubleClick={toggleFS}
                 >
-                    {/* Video fills container, zoom clips at edges */}
                     <video 
-                        ref={videoRef} 
+                        ref={videoRef}
                         onPointerDown={onPointerDown}
-                        className="w-full h-full object-contain"
+                        onPointerMove={onPointerMove}
+                        onPointerUp={onPointerUp}
+                        onPointerCancel={onPointerUp}
+                        className="w-full h-full object-contain transition-transform duration-150 ease-out"
                         style={{ 
-                            transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
-                            cursor: zoom > 1 ? (dragging ? 'grabbing' : 'grab') : 'default',
-                            transformOrigin: 'center center'
+                            transform: `scale(${zoom}) translate(${pan.x}%, ${pan.y}%)`,
+                            cursor: zoom > 1 ? (dragging ? 'grabbing' : 'grab') : 'default'
                         }}
                         muted playsInline autoPlay 
                     />
-                    {status === 'connecting' && <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10"><div className="w-10 h-10 border-2 border-white/20 border-t-sky-500 rounded-full animate-spin" /></div>}
-                    {status === 'error' && <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10"><p className="text-red-400">Stream Unavailable</p></div>}
+                    {status === 'connecting' && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                            <div className="w-10 h-10 border-2 border-white/20 border-t-sky-500 rounded-full animate-spin" />
+                        </div>
+                    )}
+                    {status === 'error' && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+                            <p className="text-red-400">Stream Unavailable</p>
+                        </div>
+                    )}
                 </div>
 
-                {/* Footer - z-index higher than video */}
-                <div className="relative z-20 p-3 sm:p-4 border-t border-white/10 bg-gray-900">
+                {/* Footer */}
+                <div className="shrink-0 p-3 sm:p-4 bg-gray-900 border-t border-white/10">
                     <div className="flex items-center justify-between gap-4">
                         <div className="flex-1 min-w-0">
                             {camera.description && <p className="text-gray-400 text-xs sm:text-sm line-clamp-1">{camera.description}</p>}
                             {camera.area_name && <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400">{camera.area_name}</span>}
                         </div>
                         <div className="flex items-center gap-1 bg-white/5 rounded-xl p-1">
-                            <button onClick={() => handleZoom(-0.5)} disabled={zoom <= 1} className="p-2 hover:bg-white/10 disabled:opacity-30 rounded-lg text-white" title="Zoom Out"><Icons.ZoomOut /></button>
+                            <button onClick={() => handleZoom(-0.5)} disabled={zoom <= 1} className="p-2 hover:bg-white/10 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomOut /></button>
                             <span className="text-white text-xs font-medium w-12 text-center">{Math.round(zoom * 100)}%</span>
-                            <button onClick={() => handleZoom(0.5)} disabled={zoom >= 4} className="p-2 hover:bg-white/10 disabled:opacity-30 rounded-lg text-white" title="Zoom In"><Icons.ZoomIn /></button>
-                            {zoom > 1 && <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} className="p-2 hover:bg-white/10 rounded-lg text-white ml-1" title="Reset"><Icons.Reset /></button>}
+                            <button onClick={() => handleZoom(0.5)} disabled={zoom >= 4} className="p-2 hover:bg-white/10 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomIn /></button>
+                            {zoom > 1 && <button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} className="p-2 hover:bg-white/10 rounded-lg text-white ml-1"><Icons.Reset /></button>}
                         </div>
                     </div>
                 </div>
@@ -297,7 +281,7 @@ function VideoPopup({ camera, onClose }) {
 
 
 // ============================================
-// MULTI-VIEW VIDEO ITEM - Fixed zoom/pan
+// MULTI-VIEW VIDEO ITEM - Smooth zoom
 // ============================================
 function MultiViewVideoItem({ camera, onRemove }) {
     const videoRef = useRef(null);
@@ -307,23 +291,8 @@ function MultiViewVideoItem({ camera, onRemove }) {
     const [zoom, setZoom] = useState(1);
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [dragging, setDragging] = useState(false);
-    const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
-    const dragRef = useRef({ x: 0, y: 0, px: 0, py: 0 });
+    const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
     const url = camera.streams?.hls;
-
-    // Track container size
-    useEffect(() => {
-        const updateSize = () => {
-            if (containerRef.current) {
-                const rect = containerRef.current.getBoundingClientRect();
-                setContainerSize({ w: rect.width, h: rect.height });
-            }
-        };
-        updateSize();
-        window.addEventListener('resize', updateSize);
-        const timer = setTimeout(updateSize, 100); // Delayed update for layout
-        return () => { window.removeEventListener('resize', updateSize); clearTimeout(timer); };
-    }, []);
 
     useEffect(() => {
         if (!url || !videoRef.current) return;
@@ -370,13 +339,6 @@ function MultiViewVideoItem({ camera, onRemove }) {
         link.click();
     };
 
-    // Calculate max pan based on zoom and container size
-    const getMaxPan = () => {
-        const maxX = (containerSize.w * (zoom - 1)) / 2;
-        const maxY = (containerSize.h * (zoom - 1)) / 2;
-        return { maxX, maxY };
-    };
-
     const handleZoom = (delta) => {
         setZoom(z => {
             const nz = Math.max(1, Math.min(3, z + delta));
@@ -395,45 +357,43 @@ function MultiViewVideoItem({ camera, onRemove }) {
         if (zoom <= 1) return;
         e.stopPropagation();
         setDragging(true);
-        dragRef.current = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y };
+        dragStart.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
+        e.currentTarget.setPointerCapture(e.pointerId);
     };
 
     const onPointerMove = (e) => {
         if (!dragging) return;
-        const { maxX, maxY } = getMaxPan();
-        const newX = dragRef.current.px + (e.clientX - dragRef.current.x);
-        const newY = dragRef.current.py + (e.clientY - dragRef.current.y);
+        const dx = e.clientX - dragStart.current.x;
+        const dy = e.clientY - dragStart.current.y;
+        const maxPan = 40 * (zoom - 1);
         setPan({
-            x: Math.max(-maxX, Math.min(maxX, newX)),
-            y: Math.max(-maxY, Math.min(maxY, newY))
+            x: Math.max(-maxPan, Math.min(maxPan, dragStart.current.panX + (dx / 6))),
+            y: Math.max(-maxPan, Math.min(maxPan, dragStart.current.panY + (dy / 6)))
         });
     };
 
-    const onPointerUp = () => setDragging(false);
+    const onPointerUp = (e) => {
+        setDragging(false);
+        try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
+    };
 
     return (
-        <div 
-            ref={containerRef} 
-            className="relative w-full h-full bg-black rounded-xl overflow-hidden group"
-            onWheel={onWheel}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerLeave={onPointerUp}
-        >
-            {/* Video */}
+        <div ref={containerRef} className="relative w-full h-full bg-black rounded-xl overflow-hidden group" onWheel={onWheel}>
             <video 
-                ref={videoRef} 
+                ref={videoRef}
                 onPointerDown={onPointerDown}
-                className="w-full h-full object-contain"
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                onPointerCancel={onPointerUp}
+                className="w-full h-full object-contain transition-transform duration-150 ease-out"
                 style={{ 
-                    transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
-                    cursor: zoom > 1 ? (dragging ? 'grabbing' : 'grab') : 'default',
-                    transformOrigin: 'center center'
+                    transform: `scale(${zoom}) translate(${pan.x}%, ${pan.y}%)`,
+                    cursor: zoom > 1 ? (dragging ? 'grabbing' : 'grab') : 'default'
                 }}
                 muted playsInline autoPlay 
             />
 
-            {/* Status Badge */}
+            {/* Status */}
             <div className="absolute top-2 left-2 z-10">
                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold text-white shadow ${
                     status === 'live' ? 'bg-emerald-500' : status === 'connecting' ? 'bg-amber-500' : 'bg-red-500'
@@ -443,17 +403,15 @@ function MultiViewVideoItem({ camera, onRemove }) {
                 </span>
             </div>
 
-            {/* Remove Button */}
-            <button onClick={onRemove} className="absolute top-2 right-2 z-10 p-1.5 bg-red-500/80 hover:bg-red-500 rounded-lg text-white shadow transition-colors" title="Remove">
+            {/* Remove */}
+            <button onClick={onRemove} className="absolute top-2 right-2 z-10 p-1.5 bg-red-500/80 hover:bg-red-500 rounded-lg text-white shadow">
                 <Icons.X />
             </button>
 
-            {/* Bottom Controls */}
+            {/* Controls */}
             <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity z-10">
                 <div className="flex items-center justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                        <p className="text-white text-xs font-medium truncate">{camera.name}</p>
-                    </div>
+                    <p className="text-white text-xs font-medium truncate flex-1">{camera.name}</p>
                     <div className="flex items-center gap-1">
                         <button onClick={() => handleZoom(-0.5)} disabled={zoom <= 1} className="p-1 bg-white/10 hover:bg-white/20 disabled:opacity-30 rounded text-white"><Icons.ZoomOut /></button>
                         <span className="text-white/70 text-[10px] w-8 text-center">{Math.round(zoom * 100)}%</span>
@@ -468,14 +426,14 @@ function MultiViewVideoItem({ camera, onRemove }) {
 
             {/* Loading */}
             {status === 'connecting' && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-5">
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
                     <div className="w-6 h-6 border-2 border-white/20 border-t-sky-500 rounded-full animate-spin" />
                 </div>
             )}
 
             {/* Error */}
             {status === 'error' && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/70 z-5">
+                <div className="absolute inset-0 flex items-center justify-center bg-black/70">
                     <p className="text-red-400 text-xs">Offline</p>
                 </div>
             )}
@@ -507,29 +465,23 @@ function MultiViewLayout({ cameras, onRemove, onClose }) {
 
     return (
         <div className="fixed inset-0 z-50 bg-gray-950 flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between p-3 border-b border-white/10 bg-gray-900 shrink-0">
+            <div className="shrink-0 flex items-center justify-between p-3 bg-gray-900 border-b border-white/10">
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-sky-500/20 flex items-center justify-center text-sky-400">
                         <Icons.Layout />
                     </div>
                     <div>
                         <h2 className="text-white font-bold text-sm sm:text-base">Multi-View</h2>
-                        <p className="text-gray-500 text-[10px] sm:text-xs">{count} camera{count !== 1 ? 's' : ''} • Scroll to zoom • Drag to pan</p>
+                        <p className="text-gray-500 text-[10px] sm:text-xs">{count} camera{count !== 1 ? 's' : ''}</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button onClick={toggleFS} className="p-2 hover:bg-white/10 rounded-xl text-white" title="Fullscreen">
-                        <Icons.Fullscreen />
-                    </button>
-                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl text-white" title="Close">
-                        <Icons.X />
-                    </button>
+                    <button onClick={toggleFS} className="p-2 hover:bg-white/10 rounded-xl text-white"><Icons.Fullscreen /></button>
+                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl text-white"><Icons.X /></button>
                 </div>
             </div>
 
-            {/* Video Grid */}
-            <div ref={containerRef} className="flex-1 p-2 sm:p-3 overflow-hidden">
+            <div ref={containerRef} className="flex-1 p-2 sm:p-3 min-h-0 overflow-hidden">
                 {count === 0 && (
                     <div className="h-full flex items-center justify-center">
                         <p className="text-gray-500">No cameras selected</p>
@@ -552,10 +504,10 @@ function MultiViewLayout({ cameras, onRemove, onClose }) {
 
                 {count === 3 && (
                     <div className="h-full flex flex-col gap-2 sm:gap-3">
-                        <div className="flex-[6] min-h-0">
+                        <div style={{ flex: '1.2 1 0%' }} className="min-h-0">
                             <MultiViewVideoItem camera={cameras[0]} onRemove={() => onRemove(cameras[0].id)} />
                         </div>
-                        <div className="flex-[4] min-h-0 grid grid-cols-2 gap-2 sm:gap-3">
+                        <div style={{ flex: '0.8 1 0%' }} className="min-h-0 grid grid-cols-2 gap-2 sm:gap-3">
                             {cameras.slice(1).map(cam => (
                                 <MultiViewVideoItem key={cam.id} camera={cam} onRemove={() => onRemove(cam.id)} />
                             ))}
@@ -629,9 +581,7 @@ function FilterDropdown({ areas, selectedArea, onSelect, dark }) {
             <button
                 onClick={() => setOpen(!open)}
                 className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-                    dark 
-                        ? 'bg-gray-800 text-white hover:bg-gray-700' 
-                        : 'bg-white text-gray-900 hover:bg-gray-50 shadow-sm'
+                    dark ? 'bg-gray-800 text-white hover:bg-gray-700' : 'bg-white text-gray-900 hover:bg-gray-50 shadow-sm'
                 } ${selectedArea ? 'ring-2 ring-sky-500' : ''}`}
             >
                 <Icons.Filter />
@@ -645,9 +595,7 @@ function FilterDropdown({ areas, selectedArea, onSelect, dark }) {
                     <button
                         onClick={() => { onSelect(null); setOpen(false); }}
                         className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${
-                            !selectedArea 
-                                ? 'bg-sky-500 text-white' 
-                                : dark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-50'
+                            !selectedArea ? 'bg-sky-500 text-white' : dark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-50'
                         }`}
                     >
                         All Areas
@@ -657,9 +605,7 @@ function FilterDropdown({ areas, selectedArea, onSelect, dark }) {
                             key={area}
                             onClick={() => { onSelect(area); setOpen(false); }}
                             className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${
-                                selectedArea === area 
-                                    ? 'bg-sky-500 text-white' 
-                                    : dark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-50'
+                                selectedArea === area ? 'bg-sky-500 text-white' : dark ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-50'
                             }`}
                         >
                             {area}
@@ -672,27 +618,33 @@ function FilterDropdown({ areas, selectedArea, onSelect, dark }) {
 }
 
 // ============================================
-// CAMERAS SECTION
+// CAMERAS SECTION - Fixed layout switcher
 // ============================================
 function CamerasSection({ cameras, loading, error, onRefresh, onCameraClick, onAddMulti, multiIds }) {
     const { dark } = useTheme();
     const [cols, setCols] = useState(2);
     const [selectedArea, setSelectedArea] = useState(null);
-    const gridCols = { 1: 'grid-cols-1', 2: 'grid-cols-1 sm:grid-cols-2', 3: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' };
 
     const areas = [...new Set(cameras.map(c => c.area_name).filter(Boolean))];
     const filteredCameras = selectedArea ? cameras.filter(c => c.area_name === selectedArea) : cameras;
 
+    // Grid class based on cols
+    const getGridClass = () => {
+        switch (cols) {
+            case 1: return 'grid-cols-1';
+            case 2: return 'grid-cols-1 sm:grid-cols-2';
+            case 3: return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
+            default: return 'grid-cols-1 sm:grid-cols-2';
+        }
+    };
+
     return (
         <section className="py-6 sm:py-10">
             <div className="max-w-7xl mx-auto px-4">
-                {/* Header */}
                 <div className="flex flex-col gap-4 mb-6">
                     <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                         <div>
-                            <h2 className={`text-xl sm:text-2xl font-bold ${dark ? 'text-white' : 'text-gray-900'}`}>
-                                Live Cameras
-                            </h2>
+                            <h2 className={`text-xl sm:text-2xl font-bold ${dark ? 'text-white' : 'text-gray-900'}`}>Live Cameras</h2>
                             <p className={`text-sm ${dark ? 'text-gray-500' : 'text-gray-500'}`}>
                                 {loading ? 'Loading...' : `${filteredCameras.length} camera${filteredCameras.length !== 1 ? 's' : ''} ${selectedArea ? `in ${selectedArea}` : 'available'}`}
                             </p>
@@ -703,35 +655,26 @@ function CamerasSection({ cameras, loading, error, onRefresh, onCameraClick, onA
                                 <FilterDropdown areas={areas} selectedArea={selectedArea} onSelect={setSelectedArea} dark={dark} />
                             )}
 
-                            {/* Layout Switcher - with icons */}
-                            <div className={`flex items-center gap-1 p-1 rounded-xl ${dark ? 'bg-gray-800' : 'bg-gray-100'}`}>
-                                <button 
-                                    onClick={() => setCols(1)} 
-                                    className={`p-2 rounded-lg transition-all ${cols === 1 ? 'bg-sky-500 text-white shadow' : dark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
-                                    title="1 Column"
-                                >
-                                    <Icons.Grid1 />
-                                </button>
-                                <button 
-                                    onClick={() => setCols(2)} 
-                                    className={`p-2 rounded-lg transition-all ${cols === 2 ? 'bg-sky-500 text-white shadow' : dark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
-                                    title="2 Columns"
-                                >
-                                    <Icons.Grid2 />
-                                </button>
-                                <button 
-                                    onClick={() => setCols(3)} 
-                                    className={`p-2 rounded-lg transition-all ${cols === 3 ? 'bg-sky-500 text-white shadow' : dark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
-                                    title="3 Columns"
-                                >
-                                    <Icons.Grid3 />
-                                </button>
+                            {/* Layout Switcher */}
+                            <div className={`flex items-center p-1 rounded-xl ${dark ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                                {[1, 2, 3].map(n => (
+                                    <button 
+                                        key={n}
+                                        onClick={() => setCols(n)} 
+                                        className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+                                            cols === n 
+                                                ? 'bg-sky-500 text-white shadow' 
+                                                : dark ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+                                        }`}
+                                    >
+                                        {n} Col{n > 1 ? 's' : ''}
+                                    </button>
+                                ))}
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Error */}
                 {error && !loading && (
                     <div className={`text-center py-12 rounded-2xl ${dark ? 'bg-red-500/10' : 'bg-red-50'}`}>
                         <p className={`font-medium mb-4 ${dark ? 'text-red-400' : 'text-red-600'}`}>{error}</p>
@@ -739,14 +682,12 @@ function CamerasSection({ cameras, loading, error, onRefresh, onCameraClick, onA
                     </div>
                 )}
 
-                {/* Loading */}
                 {loading && (
-                    <div className={`grid ${gridCols[cols]} gap-4 sm:gap-6`}>
+                    <div className={`grid ${getGridClass()} gap-4 sm:gap-6`}>
                         {[...Array(6)].map((_, i) => <CameraSkeleton key={i} />)}
                     </div>
                 )}
 
-                {/* Camera Grid */}
                 {!loading && !error && (
                     filteredCameras.length === 0 ? (
                         <div className="text-center py-16">
@@ -761,7 +702,7 @@ function CamerasSection({ cameras, loading, error, onRefresh, onCameraClick, onA
                             )}
                         </div>
                     ) : (
-                        <div className={`grid ${gridCols[cols]} gap-4 sm:gap-6`}>
+                        <div className={`grid ${getGridClass()} gap-4 sm:gap-6`}>
                             {filteredCameras.map(camera => (
                                 <CameraCard
                                     key={camera.id}
@@ -830,46 +771,30 @@ export default function LandingPage() {
         fetchCameras();
     }, [fetchCameras]);
 
-    const handleCameraClick = (camera) => {
-        setPopupCamera(camera);
-    };
+    const handleCameraClick = (camera) => setPopupCamera(camera);
 
     const handleAddMulti = (cameraId) => {
         setMultiIds(prev => {
-            if (prev.includes(cameraId)) {
-                return prev.filter(id => id !== cameraId);
-            }
-            if (prev.length >= 3) {
-                return prev;
-            }
+            if (prev.includes(cameraId)) return prev.filter(id => id !== cameraId);
+            if (prev.length >= 3) return prev;
             return [...prev, cameraId];
         });
     };
 
-    const handleRemoveMulti = (cameraId) => {
-        setMultiIds(prev => prev.filter(id => id !== cameraId));
-    };
+    const handleRemoveMulti = (cameraId) => setMultiIds(prev => prev.filter(id => id !== cameraId));
 
     const multiCameras = multiIds.map(id => cameras.find(c => c.id === id)).filter(Boolean);
 
     useEffect(() => {
-        if (showMulti && multiCameras.length === 0) {
-            setShowMulti(false);
-        }
+        if (showMulti && multiCameras.length === 0) setShowMulti(false);
     }, [showMulti, multiCameras.length]);
 
     return (
         <div className={`min-h-screen flex flex-col transition-colors ${dark ? 'bg-gray-950' : 'bg-gray-50'}`}>
-            <Navbar
-                cameraCount={cameras.length}
-                multiCount={multiIds.length}
-                onOpenMulti={() => setShowMulti(true)}
-            />
+            <Navbar cameraCount={cameras.length} multiCount={multiIds.length} onOpenMulti={() => setShowMulti(true)} />
 
             <div className={`py-6 sm:py-8 text-center px-4 ${dark ? 'bg-gray-900/50' : 'bg-white'}`}>
-                <h1 className={`text-2xl sm:text-3xl font-bold mb-2 ${dark ? 'text-white' : 'text-gray-900'}`}>
-                    Live CCTV Monitoring
-                </h1>
+                <h1 className={`text-2xl sm:text-3xl font-bold mb-2 ${dark ? 'text-white' : 'text-gray-900'}`}>Live CCTV Monitoring</h1>
                 <p className={`text-sm sm:text-base max-w-xl mx-auto ${dark ? 'text-gray-400' : 'text-gray-600'}`}>
                     Klik kamera untuk melihat stream. Gunakan tombol <span className="inline-flex items-center justify-center w-5 h-5 bg-sky-500 text-white rounded text-xs mx-1">+</span> untuk multi-view (max 3).
                 </p>
@@ -889,13 +814,8 @@ export default function LandingPage() {
 
             <Footer />
 
-            {popupCamera && (
-                <VideoPopup camera={popupCamera} onClose={() => setPopupCamera(null)} />
-            )}
-
-            {showMulti && multiCameras.length > 0 && (
-                <MultiViewLayout cameras={multiCameras} onRemove={handleRemoveMulti} onClose={() => setShowMulti(false)} />
-            )}
+            {popupCamera && <VideoPopup camera={popupCamera} onClose={() => setPopupCamera(null)} />}
+            {showMulti && multiCameras.length > 0 && <MultiViewLayout cameras={multiCameras} onRemove={handleRemoveMulti} onClose={() => setShowMulti(false)} />}
         </div>
     );
 }
