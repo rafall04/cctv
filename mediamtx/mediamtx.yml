@@ -11,10 +11,12 @@ apiAddress: :9997
 hls: yes
 hlsAddress: :8888
 hlsAllowOrigin: '*'
+hlsAlwaysRemux: yes
 hlsSegmentCount: 3
 hlsSegmentDuration: 1s
 hlsPartDuration: 200ms
 hlsSegmentMaxSize: 50M
+hlsVariant: lowLatency
 
 # WebRTC
 webrtc: yes

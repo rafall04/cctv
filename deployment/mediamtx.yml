@@ -16,6 +16,7 @@ hlsSegmentCount: 3
 hlsSegmentDuration: 1s
 hlsPartDuration: 200ms
 hlsSegmentMaxSize: 50M
+hlsVariant: lowLatency
 
 # WebRTC
 webrtc: yes
