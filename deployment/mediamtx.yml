@@ -1,37 +1,54 @@
 # MediaMTX Configuration for RAF NET CCTV Production
+# Optimized for all devices (low-end to high-end)
+
+logLevel: warn
+logDestinations: [stdout]
 
 # API settings
 api: yes
 apiAddress: 127.0.0.1:9997
 
-# HLS settings
+# ============================================
+# HLS Settings - CRITICAL for smooth playback
+# ============================================
 hls: yes
 hlsAddress: :8888
 hlsAlwaysRemux: yes
 hlsVariant: lowLatency
+hlsSegmentCount: 3
+hlsSegmentDuration: 1s
+hlsPartDuration: 200ms
+hlsSegmentMaxSize: 50M
+hlsAllowOrigin: '*'
 
-# WebRTC settings
+# ============================================
+# WebRTC Settings
+# ============================================
 webrtc: yes
 webrtcAddress: :8889
 webrtcLocalUDPAddress: :8189
+webrtcAllowOrigin: '*'
 
-# RTMP settings (for camera input)
+# ============================================
+# RTSP/RTMP Settings
+# ============================================
+rtsp: yes
+rtspAddress: :8554
 rtmp: yes
 rtmpAddress: :1935
 
-# Path settings
+# ============================================
+# Path defaults
+# ============================================
 pathDefaults:
-  # Delete segments after this timespan.
-  # Set to 0s to disable automatic deletion.
-  # Use 'h' instead of 'd' as some versions don't support 'd'.
-  recordDeleteAfter: 24h
+  sourceOnDemand: yes
+  sourceOnDemandStartTimeout: 10s
+  sourceOnDemandCloseAfter: 10s
+  record: no
+  readUser: ""
+  readPass: ""
+  publishUser: ""
+  publishPass: ""
 
 paths:
-  all:
-    # Allow all sources (backend will manage this via API)
-    source: publisher
-    # Enable on-demand to save bandwidth
-    sourceOnDemand: yes
-    # Disable authentication for public viewing (managed by our backend logic)
-    readUser: 
-    readPass: 
+  all_others: {}

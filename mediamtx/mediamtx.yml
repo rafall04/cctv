@@ -1,4 +1,4 @@
-# MediaMTX Configuration - Minimal & Stable
+# MediaMTX Configuration - Optimized for All Devices
 
 logLevel: info
 logDestinations: [stdout]
@@ -7,16 +7,51 @@ logDestinations: [stdout]
 api: yes
 apiAddress: :9997
 
-# Listeners for streaming protocols
+# ============================================
+# HLS Settings - CRITICAL for smooth playback
+# ============================================
 hls: yes
 hlsAddress: :8888
+hlsAlwaysRemux: yes
+hlsVariant: lowLatency
+hlsSegmentCount: 3
+hlsSegmentDuration: 1s
+hlsPartDuration: 200ms
+hlsSegmentMaxSize: 50M
+hlsAllowOrigin: '*'
+
+# ============================================
+# WebRTC Settings
+# ============================================
 webrtc: yes
 webrtcAddress: :8889
-rtmp: yes
-rtmpAddress: :1935
+webrtcAllowOrigin: '*'
+
+# ============================================
+# RTSP/RTMP Settings
+# ============================================
 rtsp: yes
 rtspAddress: :8554
+rtmp: yes
+rtmpAddress: :1935
 
-# Path defaults are minimal. The backend service will manage path configurations.
+# ============================================
+# Path defaults
+# ============================================
+pathDefaults:
+  # Source settings
+  sourceOnDemand: yes
+  sourceOnDemandStartTimeout: 10s
+  sourceOnDemandCloseAfter: 10s
+  
+  # Recording disabled
+  record: no
+  
+  # Read/Publish access
+  readUser: ""
+  readPass: ""
+  publishUser: ""
+  publishPass: ""
+
 paths:
   all_others: {}

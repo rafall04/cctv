@@ -4,53 +4,30 @@ import { useTheme } from '../contexts/ThemeContext';
 import Hls from 'hls.js';
 
 // ============================================
-// HLS CONFIG - INSTANT START FOR ALL DEVICES
-// Key: Start playing ASAP with minimal buffer, then grow buffer gradually
+// HLS CONFIG - BALANCED & PROVEN
+// Menggunakan default HLS.js yang sudah teruji + sedikit optimasi
 // ============================================
 const getHlsConfig = (isMultiView = false) => {
-    // Universal config - works on all devices from kentang to flagship
-    // Priority: FAST START > Quality > Buffer size
     return {
-        // === INSTANT START SETTINGS ===
-        enableWorker: false,           // Disable worker - faster init, more stable
-        lowLatencyMode: true,          // Enable for faster segment loading
-        liveSyncDuration: 3,           // Sync to 3 seconds from live edge
-        liveMaxLatencyDuration: 10,    // Max 10 seconds behind live
-        liveDurationInfinity: true,    // Treat as infinite live stream
+        // Gunakan default yang sudah proven, hanya override yang perlu
+        enableWorker: true,
+        startLevel: -1,                    // Auto select quality
+        autoStartLoad: true,
+        debug: false,
         
-        // === MINIMAL INITIAL BUFFER (FAST START) ===
-        maxBufferLength: 5,            // Only buffer 5 seconds before play
-        maxMaxBufferLength: isMultiView ? 10 : 20, // Grow to this after start
-        maxBufferSize: 30 * 1000 * 1000, // 30MB max buffer
-        maxBufferHole: 0.5,            // Allow small gaps
+        // Buffer settings - balanced
+        maxBufferLength: isMultiView ? 15 : 30,
+        maxMaxBufferLength: isMultiView ? 30 : 60,
+        backBufferLength: isMultiView ? 0 : 30,
         
-        // === AGGRESSIVE LOADING ===
-        startLevel: 0,                 // ALWAYS start with lowest quality (fastest)
-        autoStartLoad: true,           // Start loading immediately
-        startFragPrefetch: true,       // Prefetch first fragment
+        // Live stream settings
+        liveSyncDurationCount: 3,          // Default: 3 segments behind live
+        liveMaxLatencyDurationCount: 10,
         
-        // === FAST RECOVERY ===
-        fragLoadingTimeOut: 10000,     // 10s timeout (not too long)
-        fragLoadingMaxRetry: 2,        // Quick retry
-        fragLoadingRetryDelay: 500,    // 500ms between retries
-        levelLoadingTimeOut: 8000,     // 8s for level loading
-        manifestLoadingTimeOut: 8000,  // 8s for manifest
-        manifestLoadingMaxRetry: 2,
-        
-        // === ABR - PREFER STABILITY OVER QUALITY ===
-        abrEwmaDefaultEstimate: 800000,  // Assume 800kbps (conservative)
-        abrBandWidthFactor: 0.8,         // Use 80% of measured bandwidth
-        abrBandWidthUpFactor: 0.6,       // Slow to upgrade quality
-        abrMaxWithRealBitrate: true,     // Use real bitrate for decisions
-        
-        // === BUFFER MANAGEMENT ===
-        backBufferLength: 0,           // Don't keep back buffer (save memory)
-        nudgeMaxRetry: 3,
-        nudgeOffset: 0.1,
-        
-        // === PERFORMANCE ===
-        progressive: true,             // Progressive loading
-        testBandwidth: false,          // Skip initial bandwidth test (faster start)
+        // Loading settings - reasonable timeouts
+        fragLoadingTimeOut: 20000,
+        manifestLoadingTimeOut: 10000,
+        levelLoadingTimeOut: 10000,
     };
 };
 
