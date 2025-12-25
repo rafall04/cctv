@@ -17,7 +17,8 @@ export async function getStreamUrls(request, reply) {
         const { cameraId } = request.params;
 
         const camera = queryOne(
-            `SELECT c.id, c.name, c.location, c.group_name, c.area_id, a.name as area_name 
+            `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, 
+                    a.name as area_name, a.rt, a.rw, a.kelurahan, a.kecamatan
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 
              WHERE c.id = ? AND c.enabled = 1`,
@@ -37,10 +38,15 @@ export async function getStreamUrls(request, reply) {
                 camera: {
                     id: camera.id,
                     name: camera.name,
+                    description: camera.description,
                     location: camera.location,
                     group_name: camera.group_name,
                     area_id: camera.area_id,
                     area_name: camera.area_name,
+                    rt: camera.rt,
+                    rw: camera.rw,
+                    kelurahan: camera.kelurahan,
+                    kecamatan: camera.kecamatan,
                 },
                 streams: buildStreamUrls(camera.id),
             },
@@ -57,7 +63,8 @@ export async function getStreamUrls(request, reply) {
 export async function getAllActiveStreams(request, reply) {
     try {
         const cameras = query(
-            `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, a.name as area_name 
+            `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, 
+                    a.name as area_name, a.rt, a.rw, a.kelurahan, a.kecamatan
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 
              WHERE c.enabled = 1 

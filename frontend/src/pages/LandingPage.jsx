@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef, memo } from 'react';
 import { streamService } from '../services/streamService';
+import { areaService } from '../services/areaService';
 import { useTheme } from '../contexts/ThemeContext';
 import Hls from 'hls.js';
 
@@ -59,9 +60,21 @@ const CameraSkeleton = () => (
 );
 
 // ============================================
-// CAMERA CARD
+// CAMERA CARD - Enhanced with detailed location info
 // ============================================
 const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMulti }) {
+    // Build location string from area details
+    const getLocationDetails = () => {
+        const parts = [];
+        if (camera.rt) parts.push(`RT ${camera.rt}`);
+        if (camera.rw) parts.push(`RW ${camera.rw}`);
+        if (camera.kelurahan) parts.push(camera.kelurahan);
+        if (camera.kecamatan) parts.push(camera.kecamatan);
+        return parts.length > 0 ? parts.join(', ') : null;
+    };
+
+    const locationDetails = getLocationDetails();
+
     return (
         <div className="relative rounded-2xl overflow-hidden bg-white dark:bg-gray-900 shadow-lg hover:shadow-xl transition-shadow ring-1 ring-gray-200 dark:ring-gray-800 hover:ring-sky-500/50">
             <button
@@ -86,11 +99,54 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
                         <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />LIVE
                     </span>
                 </div>
+                {/* Area badge on video */}
+                {camera.area_name && (
+                    <div className="absolute bottom-3 left-3">
+                        <span className="px-2 py-1 rounded-lg bg-black/60 backdrop-blur-sm text-white text-[10px] font-medium">
+                            {camera.area_name}
+                        </span>
+                    </div>
+                )}
             </div>
             <div className="p-4 cursor-pointer" onClick={onClick}>
-                <h3 className="font-bold text-gray-900 dark:text-white truncate">{camera.name}</h3>
-                {camera.location && <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1.5 mt-1"><Icons.MapPin /><span className="truncate">{camera.location}</span></p>}
-                {camera.area_name && <span className="inline-block mt-2 text-[10px] font-semibold px-2 py-1 rounded-full bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400">{camera.area_name}</span>}
+                <h3 className="font-bold text-gray-900 dark:text-white truncate mb-1">{camera.name}</h3>
+                
+                {/* Description */}
+                {camera.description && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mb-2">{camera.description}</p>
+                )}
+                
+                {/* Location */}
+                {camera.location && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1.5 mb-2">
+                        <Icons.MapPin />
+                        <span className="truncate">{camera.location}</span>
+                    </p>
+                )}
+                
+                {/* Area Details Tags */}
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                    {camera.kecamatan && (
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400">
+                            {camera.kecamatan}
+                        </span>
+                    )}
+                    {camera.kelurahan && (
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400">
+                            {camera.kelurahan}
+                        </span>
+                    )}
+                    {camera.rw && (
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400">
+                            RW {camera.rw}
+                        </span>
+                    )}
+                    {camera.rt && (
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                            RT {camera.rt}
+                        </span>
+                    )}
+                </div>
             </div>
         </div>
     );
@@ -501,7 +557,7 @@ function Navbar() {
 // ============================================
 // FILTER DROPDOWN - Enhanced with hierarchical filtering
 // ============================================
-function FilterDropdown({ areas, selected, onChange, cameras }) {
+function FilterDropdown({ areas, selected, onChange, cameras, kecamatans = [], kelurahans = [] }) {
     const [open, setOpen] = useState(false);
     const [filterType, setFilterType] = useState('area'); // 'area', 'kecamatan', 'kelurahan'
     const ref = useRef(null);
@@ -511,23 +567,13 @@ function FilterDropdown({ areas, selected, onChange, cameras }) {
         document.addEventListener('mousedown', handleClick);
         return () => document.removeEventListener('mousedown', handleClick);
     }, []);
-
-    // Get unique values for hierarchical filtering
-    const kecamatans = [...new Set(areas.map(a => a.kecamatan).filter(Boolean))].sort();
-    const kelurahans = [...new Set(areas.map(a => a.kelurahan).filter(Boolean))].sort();
     
     // Count cameras per filter
     const getCameraCount = (type, value) => {
         if (!value) return cameras.length;
         if (type === 'area') return cameras.filter(c => c.area_id === value).length;
-        if (type === 'kecamatan') {
-            const areaIds = areas.filter(a => a.kecamatan === value).map(a => a.id);
-            return cameras.filter(c => areaIds.includes(c.area_id)).length;
-        }
-        if (type === 'kelurahan') {
-            const areaIds = areas.filter(a => a.kelurahan === value).map(a => a.id);
-            return cameras.filter(c => areaIds.includes(c.area_id)).length;
-        }
+        if (type === 'kecamatan') return cameras.filter(c => c.kecamatan === value).length;
+        if (type === 'kelurahan') return cameras.filter(c => c.kelurahan === value).length;
         return 0;
     };
 
@@ -544,6 +590,19 @@ function FilterDropdown({ areas, selected, onChange, cameras }) {
         onChange(value ? { type, value } : null);
         setOpen(false);
     };
+    
+    // Determine which tabs to show
+    const showAreaTab = areas.length > 0;
+    const showKecamatanTab = kecamatans.length > 0;
+    const showKelurahanTab = kelurahans.length > 0;
+    
+    // Auto-select first available tab
+    useEffect(() => {
+        if (filterType === 'area' && !showAreaTab) {
+            if (showKecamatanTab) setFilterType('kecamatan');
+            else if (showKelurahanTab) setFilterType('kelurahan');
+        }
+    }, [filterType, showAreaTab, showKecamatanTab, showKelurahanTab]);
 
     return (
         <div ref={ref} className="relative">
@@ -562,23 +621,42 @@ function FilterDropdown({ areas, selected, onChange, cameras }) {
                 <div className="absolute top-full left-0 sm:left-auto sm:right-0 mt-2 w-72 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50 max-h-96 overflow-hidden flex flex-col">
                     {/* Filter Type Tabs */}
                     <div className="px-2 pb-2 border-b border-gray-100 dark:border-gray-700 flex gap-1">
-                        {[
-                            { key: 'area', label: 'Area' },
-                            { key: 'kecamatan', label: 'Kecamatan' },
-                            { key: 'kelurahan', label: 'Kelurahan' },
-                        ].map(tab => (
+                        {showAreaTab && (
                             <button
-                                key={tab.key}
-                                onClick={() => setFilterType(tab.key)}
+                                onClick={() => setFilterType('area')}
                                 className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                                    filterType === tab.key 
+                                    filterType === 'area' 
                                         ? 'bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400' 
                                         : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
                                 }`}
                             >
-                                {tab.label}
+                                Area ({areas.length})
                             </button>
-                        ))}
+                        )}
+                        {showKecamatanTab && (
+                            <button
+                                onClick={() => setFilterType('kecamatan')}
+                                className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                                    filterType === 'kecamatan' 
+                                        ? 'bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400' 
+                                        : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                }`}
+                            >
+                                Kecamatan ({kecamatans.length})
+                            </button>
+                        )}
+                        {showKelurahanTab && (
+                            <button
+                                onClick={() => setFilterType('kelurahan')}
+                                className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                                    filterType === 'kelurahan' 
+                                        ? 'bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400' 
+                                        : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                }`}
+                            >
+                                Kelurahan ({kelurahans.length})
+                            </button>
+                        )}
                     </div>
 
                     {/* Options */}
@@ -614,7 +692,7 @@ function FilterDropdown({ areas, selected, onChange, cameras }) {
                                         </span>
                                         {(area.kelurahan || area.kecamatan) && (
                                             <span className="text-[10px] text-gray-400 ml-4 block truncate">
-                                                {[area.kelurahan, area.kecamatan].filter(Boolean).join(', ')}
+                                                {[area.rt && `RT ${area.rt}`, area.rw && `RW ${area.rw}`, area.kelurahan, area.kecamatan].filter(Boolean).join(', ')}
                                             </span>
                                         )}
                                     </div>
@@ -645,15 +723,13 @@ function FilterDropdown({ areas, selected, onChange, cameras }) {
                                 </button>
                             );
                         })}
-                        {filterType === 'kecamatan' && kecamatans.length === 0 && (
-                            <p className="px-4 py-3 text-sm text-gray-400 text-center">No kecamatan data</p>
-                        )}
 
                         {/* Filter by Kelurahan */}
                         {filterType === 'kelurahan' && kelurahans.map(kel => {
                             const count = getCameraCount('kelurahan', kel);
                             const isSelected = selected?.type === 'kelurahan' && selected?.value === kel;
-                            const kec = areas.find(a => a.kelurahan === kel)?.kecamatan;
+                            // Find kecamatan for this kelurahan
+                            const kec = cameras.find(c => c.kelurahan === kel)?.kecamatan || areas.find(a => a.kelurahan === kel)?.kecamatan;
                             return (
                                 <button
                                     key={kel}
@@ -673,9 +749,6 @@ function FilterDropdown({ areas, selected, onChange, cameras }) {
                                 </button>
                             );
                         })}
-                        {filterType === 'kelurahan' && kelurahans.length === 0 && (
-                            <p className="px-4 py-3 text-sm text-gray-400 text-center">No kelurahan data</p>
-                        )}
                     </div>
                 </div>
             )}
@@ -689,18 +762,26 @@ function FilterDropdown({ areas, selected, onChange, cameras }) {
 function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, multiCameras }) {
     const [filter, setFilter] = useState(null);
     
+    // Get unique kecamatan and kelurahan from cameras directly (in case areas table is empty)
+    const kecamatansFromCameras = [...new Set(cameras.map(c => c.kecamatan).filter(Boolean))].sort();
+    const kelurahansFromCameras = [...new Set(cameras.map(c => c.kelurahan).filter(Boolean))].sort();
+    
+    // Merge with areas data
+    const kecamatansFromAreas = [...new Set(areas.map(a => a.kecamatan).filter(Boolean))];
+    const kelurahansFromAreas = [...new Set(areas.map(a => a.kelurahan).filter(Boolean))];
+    
+    const allKecamatans = [...new Set([...kecamatansFromCameras, ...kecamatansFromAreas])].sort();
+    const allKelurahans = [...new Set([...kelurahansFromCameras, ...kelurahansFromAreas])].sort();
+    
+    // Check if we have any filter data
+    const hasFilterData = areas.length > 0 || allKecamatans.length > 0 || allKelurahans.length > 0;
+    
     // Filter cameras based on selected filter
     const filtered = (() => {
         if (!filter) return cameras;
         if (filter.type === 'area') return cameras.filter(c => c.area_id === filter.value);
-        if (filter.type === 'kecamatan') {
-            const areaIds = areas.filter(a => a.kecamatan === filter.value).map(a => a.id);
-            return cameras.filter(c => areaIds.includes(c.area_id));
-        }
-        if (filter.type === 'kelurahan') {
-            const areaIds = areas.filter(a => a.kelurahan === filter.value).map(a => a.id);
-            return cameras.filter(c => areaIds.includes(c.area_id));
-        }
+        if (filter.type === 'kecamatan') return cameras.filter(c => c.kecamatan === filter.value);
+        if (filter.type === 'kelurahan') return cameras.filter(c => c.kelurahan === filter.value);
         return cameras;
     })();
 
@@ -731,12 +812,14 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                             {getSubtitle()}
                         </p>
                     </div>
-                    {areas.length > 0 && (
+                    {hasFilterData && (
                         <FilterDropdown 
                             areas={areas} 
                             selected={filter} 
                             onChange={setFilter}
                             cameras={cameras}
+                            kecamatans={allKecamatans}
+                            kelurahans={allKelurahans}
                         />
                     )}
                 </div>
@@ -827,12 +910,17 @@ export default function LandingPage() {
     useEffect(() => {
         const fetchData = async () => {
             try {
+                // Fetch cameras and areas in parallel
                 const [camsRes, areasRes] = await Promise.all([
                     streamService.getAllActiveStreams(),
-                    fetch('/api/areas/public').then(r => r.ok ? r.json() : { data: [] }).catch(() => ({ data: [] }))
+                    areaService.getPublicAreas().catch(() => ({ success: false, data: [] }))
                 ]);
+                
                 setCameras(camsRes.data || []);
                 setAreas(areasRes.data || []);
+                
+                console.log('Loaded cameras:', camsRes.data?.length || 0);
+                console.log('Loaded areas:', areasRes.data?.length || 0);
             } catch (err) {
                 console.error('Failed to fetch data:', err);
             } finally {

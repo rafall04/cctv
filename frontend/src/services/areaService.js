@@ -1,6 +1,12 @@
 import apiClient from './apiClient';
 
 export const areaService = {
+    // Public - get all areas (no auth required)
+    getPublicAreas: async () => {
+        const response = await apiClient.get('/api/areas/public');
+        return response.data;
+    },
+    
     getAllAreas: async () => {
         const response = await apiClient.get('/api/areas');
         return response.data;
