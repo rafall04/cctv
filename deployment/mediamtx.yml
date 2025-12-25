@@ -1,5 +1,4 @@
 # MediaMTX Configuration for RAF NET CCTV Production
-# Optimized for all devices (low-end to high-end)
 
 logLevel: warn
 logDestinations: [stdout]
@@ -38,14 +37,10 @@ rtmp: yes
 rtmpAddress: :1935
 
 # ============================================
-# Path defaults
+# Path defaults - NO AUTH (public CCTV)
 # ============================================
 pathDefaults:
   record: no
-  readUser: ""
-  readPass: ""
-  publishUser: ""
-  publishPass: ""
 
 paths:
   all_others: {}

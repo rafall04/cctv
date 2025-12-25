@@ -36,14 +36,10 @@ rtmp: yes
 rtmpAddress: :1935
 
 # ============================================
-# Path defaults - removed sourceOnDemand
+# Path defaults - NO AUTH (public CCTV)
 # ============================================
 pathDefaults:
   record: no
-  readUser: ""
-  readPass: ""
-  publishUser: ""
-  publishPass: ""
 
 paths:
   all_others: {}
