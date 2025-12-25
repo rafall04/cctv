@@ -5,19 +5,6 @@ const ROOT_DIR = path.resolve(__dirname, '..');
 module.exports = {
     apps: [
         {
-            name: 'rafnet-cctv-backend',
-            script: 'server.js',
-            cwd: path.join(ROOT_DIR, 'backend'),
-            instances: 1,
-            autorestart: true,
-            watch: false,
-            max_memory_restart: '1G',
-            env_production: {
-                NODE_ENV: 'production',
-                PORT: 3000
-            }
-        },
-        {
             name: 'mediamtx',
             script: './mediamtx',
             cwd: path.join(ROOT_DIR, 'mediamtx'),
@@ -25,7 +12,24 @@ module.exports = {
             interpreter: 'none',
             instances: 1,
             autorestart: true,
-            watch: false
+            watch: false,
+            max_restarts: 10,
+            restart_delay: 3000,
+        },
+        {
+            name: 'rafnet-cctv-backend',
+            script: 'server.js',
+            cwd: path.join(ROOT_DIR, 'backend'),
+            instances: 1,
+            autorestart: true,
+            watch: false,
+            max_memory_restart: '1G',
+            wait_ready: true,
+            listen_timeout: 10000,
+            env_production: {
+                NODE_ENV: 'production',
+                PORT: 3000
+            }
         }
     ]
 };

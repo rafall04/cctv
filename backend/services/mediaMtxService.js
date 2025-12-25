@@ -105,9 +105,23 @@ class MediaMtxService {
     /**
      * Synchronizes the camera configurations between the database and MediaMTX.
      * This includes adding/updating active cameras and removing orphaned paths.
+     * @param {number} retries - Number of retries if MediaMTX is not ready
      */
-    async syncCameras() {
+    async syncCameras(retries = 5) {
         console.log('[MediaMTX Service] Starting camera synchronization...');
+
+        // Check if MediaMTX is ready
+        const status = await this.getStatus();
+        if (!status.online) {
+            if (retries > 0) {
+                console.log(`[MediaMTX Service] MediaMTX not ready, retrying in 3 seconds... (${retries} retries left)`);
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                return this.syncCameras(retries - 1);
+            } else {
+                console.error('[MediaMTX Service] MediaMTX is not available after multiple retries. Sync aborted.');
+                return;
+            }
+        }
 
         const mediaMtxPaths = await this.getMediaMtxPaths();
         const dbCameras = this.getDatabaseCameras();
