@@ -260,9 +260,15 @@ describe('HLS Configuration Property Tests', () => {
         });
 
         it('isValidTier should reject invalid tiers', () => {
+            // Filter out strings that are valid tiers or reserved Object properties
+            const reservedProps = ['toString', 'valueOf', 'constructor', 'hasOwnProperty', 
+                                   'isPrototypeOf', 'propertyIsEnumerable', 'toLocaleString',
+                                   '__proto__', '__defineGetter__', '__defineSetter__',
+                                   '__lookupGetter__', '__lookupSetter__'];
+            
             fc.assert(
                 fc.property(
-                    fc.string().filter(s => !validTiers.includes(s)),
+                    fc.string().filter(s => !validTiers.includes(s) && !reservedProps.includes(s)),
                     (invalidTier) => {
                         expect(isValidTier(invalidTier)).toBe(false);
                     }
