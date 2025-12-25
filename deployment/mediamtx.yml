@@ -1,5 +1,9 @@
 # MediaMTX Configuration for RAF NET CCTV Production
 
+# Logging - set to 'error' to minimize output
+logLevel: error
+logDestinations: [stdout]
+
 # API settings
 api: yes
 apiAddress: 127.0.0.1:9997

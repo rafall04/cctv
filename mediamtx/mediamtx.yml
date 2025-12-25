@@ -1,6 +1,7 @@
 # MediaMTX Configuration - Minimal & Stable
 
-logLevel: info
+# Set to 'error' to only show errors, 'warn' for warnings+errors
+logLevel: error
 logDestinations: [stdout]
 
 # API for backend management
