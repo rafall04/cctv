@@ -397,25 +397,50 @@ function VideoPopup({ camera, onClose }) {
         if (!url || !videoRef.current) return;
         const video = videoRef.current;
         let hls = null;
+        let retryCount = 0;
+        const maxRetries = 3;
+
+        const handlePlaying = () => setStatus('live');
+        const handleWaiting = () => setStatus(prev => prev === 'live' ? 'connecting' : prev);
+        const handleError = () => setStatus('error');
+
+        video.addEventListener('playing', handlePlaying);
+        video.addEventListener('waiting', handleWaiting);
+        video.addEventListener('error', handleError);
+
         if (Hls.isSupported()) {
             hls = new Hls(HLS_CONFIG);
             hlsRef.current = hls;
             hls.loadSource(url);
             hls.attachMedia(video);
-            hls.on(Hls.Events.MANIFEST_PARSED, () => { video.play().catch(() => {}); setStatus('live'); });
+            
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                video.play().catch(() => {});
+            });
+            
             hls.on(Hls.Events.ERROR, (_, d) => {
                 if (d.fatal) {
-                    if (d.type === Hls.ErrorTypes.NETWORK_ERROR) setTimeout(() => hls?.startLoad(), 2000);
-                    else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) hls?.recoverMediaError();
-                    else setStatus('error');
+                    if (d.type === Hls.ErrorTypes.NETWORK_ERROR && retryCount < maxRetries) {
+                        retryCount++;
+                        setTimeout(() => hls?.startLoad(), 2000);
+                    } else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                        hls?.recoverMediaError();
+                    } else {
+                        setStatus('error');
+                    }
                 }
             });
         } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
             video.src = url;
-            video.addEventListener('loadedmetadata', () => { video.play().catch(() => {}); setStatus('live'); });
-            video.addEventListener('error', () => setStatus('error'));
+            video.addEventListener('loadedmetadata', () => video.play().catch(() => {}));
         }
-        return () => { if (hls) { hls.destroy(); hlsRef.current = null; } };
+
+        return () => {
+            video.removeEventListener('playing', handlePlaying);
+            video.removeEventListener('waiting', handleWaiting);
+            video.removeEventListener('error', handleError);
+            if (hls) { hls.destroy(); hlsRef.current = null; }
+        };
     }, [url]);
 
     const toggleFS = async () => {
@@ -505,25 +530,50 @@ function MultiViewVideoItem({ camera, onRemove }) {
         if (!url || !videoRef.current) return;
         const video = videoRef.current;
         let hls = null;
+        let retryCount = 0;
+        const maxRetries = 3;
+
+        const handlePlaying = () => setStatus('live');
+        const handleWaiting = () => setStatus(prev => prev === 'live' ? 'connecting' : prev);
+        const handleError = () => setStatus('error');
+
+        video.addEventListener('playing', handlePlaying);
+        video.addEventListener('waiting', handleWaiting);
+        video.addEventListener('error', handleError);
+
         if (Hls.isSupported()) {
             hls = new Hls(HLS_CONFIG);
             hlsRef.current = hls;
             hls.loadSource(url);
             hls.attachMedia(video);
-            hls.on(Hls.Events.MANIFEST_PARSED, () => { video.play().catch(() => {}); setStatus('live'); });
+            
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                video.play().catch(() => {});
+            });
+            
             hls.on(Hls.Events.ERROR, (_, d) => {
                 if (d.fatal) {
-                    if (d.type === Hls.ErrorTypes.NETWORK_ERROR) setTimeout(() => hls?.startLoad(), 2000);
-                    else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) hls?.recoverMediaError();
-                    else setStatus('error');
+                    if (d.type === Hls.ErrorTypes.NETWORK_ERROR && retryCount < maxRetries) {
+                        retryCount++;
+                        setTimeout(() => hls?.startLoad(), 2000);
+                    } else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                        hls?.recoverMediaError();
+                    } else {
+                        setStatus('error');
+                    }
                 }
             });
         } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
             video.src = url;
-            video.addEventListener('loadedmetadata', () => { video.play().catch(() => {}); setStatus('live'); });
-            video.addEventListener('error', () => setStatus('error'));
+            video.addEventListener('loadedmetadata', () => video.play().catch(() => {}));
         }
-        return () => { if (hls) { hls.destroy(); hlsRef.current = null; } };
+
+        return () => {
+            video.removeEventListener('playing', handlePlaying);
+            video.removeEventListener('waiting', handleWaiting);
+            video.removeEventListener('error', handleError);
+            if (hls) { hls.destroy(); hlsRef.current = null; }
+        };
     }, [url]);
 
     const toggleFS = async () => {
