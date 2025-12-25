@@ -1,34 +1,72 @@
 # MediaMTX Configuration for RAF NET CCTV Production
+# Optimized for Tunnel/Remote Cameras with unstable connections
 
-# Logging - set to 'error' to minimize output
+# Logging - only show errors
 logLevel: error
 logDestinations: [stdout]
 
-# API settings
+# API for backend management
 api: yes
 apiAddress: 127.0.0.1:9997
 
-# HLS settings
-hls: yes
-hlsAddress: :8888
-hlsAlwaysRemux: yes
-
-# WebRTC settings
-webrtc: yes
-webrtcAddress: :8889
-webrtcLocalUDPAddress: :8189
-
-# RTMP settings (for camera input)
-rtmp: yes
-rtmpAddress: :1935
-
-# RTSP settings
+# ============================================
+# RTSP Settings - Optimized for unstable connections
+# ============================================
 rtsp: yes
 rtspAddress: :8554
 
-# Path defaults
+# Increase timeouts for tunnel/remote cameras
+rtspTransport: tcp
+readTimeout: 30s
+writeTimeout: 30s
+readBufferCount: 2048
+
+# ============================================
+# HLS Settings - For web streaming
+# ============================================
+hls: yes
+hlsAddress: :8888
+hlsAlwaysRemux: yes
+hlsSegmentCount: 5
+hlsSegmentDuration: 1s
+hlsPartDuration: 200ms
+hlsSegmentMaxSize: 50M
+hlsAllowOrigin: '*'
+
+# ============================================
+# WebRTC Settings - Low latency streaming
+# ============================================
+webrtc: yes
+webrtcAddress: :8889
+webrtcLocalUDPAddress: :8189
+webrtcAllowOrigin: '*'
+webrtcICEServers2: []
+
+# ============================================
+# RTMP Settings
+# ============================================
+rtmp: yes
+rtmpAddress: :1935
+
+# ============================================
+# Path Defaults - Applied to all paths
+# ============================================
 pathDefaults:
+  # Source settings for unstable connections
+  sourceOnDemand: yes
+  sourceOnDemandStartTimeout: 30s
+  sourceOnDemandCloseAfter: 30s
+  
+  # Retry settings for tunnel cameras
+  readTimeout: 30s
+  writeTimeout: 30s
+  
+  # Buffer for unstable connections
+  readBufferCount: 2048
+  
+  # Recording (optional)
   recordDeleteAfter: 24h
 
+# Path configurations managed by backend
 paths:
   all_others: {}

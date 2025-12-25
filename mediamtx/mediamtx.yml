@@ -1,6 +1,6 @@
-# MediaMTX Configuration - Minimal & Stable
+# MediaMTX Configuration - Optimized for Tunnel/Remote Cameras
 
-# Set to 'error' to only show errors, 'warn' for warnings+errors
+# Logging - only show errors
 logLevel: error
 logDestinations: [stdout]
 
@@ -8,16 +8,63 @@ logDestinations: [stdout]
 api: yes
 apiAddress: :9997
 
-# Listeners for streaming protocols
-hls: yes
-hlsAddress: :8888
-webrtc: yes
-webrtcAddress: :8889
-rtmp: yes
-rtmpAddress: :1935
+# ============================================
+# RTSP Settings - Optimized for unstable connections
+# ============================================
 rtsp: yes
 rtspAddress: :8554
 
-# Path defaults are minimal. The backend service will manage path configurations.
+# Increase timeouts for tunnel/remote cameras
+rtspTransport: tcp
+readTimeout: 30s
+writeTimeout: 30s
+readBufferCount: 2048
+
+# ============================================
+# HLS Settings - For web streaming
+# ============================================
+hls: yes
+hlsAddress: :8888
+hlsAlwaysRemux: no
+hlsSegmentCount: 5
+hlsSegmentDuration: 1s
+hlsPartDuration: 200ms
+hlsSegmentMaxSize: 50M
+hlsAllowOrigin: '*'
+
+# ============================================
+# WebRTC Settings - Low latency streaming
+# ============================================
+webrtc: yes
+webrtcAddress: :8889
+webrtcAllowOrigin: '*'
+webrtcICEServers2: []
+
+# ============================================
+# RTMP Settings
+# ============================================
+rtmp: yes
+rtmpAddress: :1935
+
+# ============================================
+# Path Defaults - Applied to all paths
+# ============================================
+pathDefaults:
+  # Source settings for unstable connections
+  sourceOnDemand: yes
+  sourceOnDemandStartTimeout: 30s
+  sourceOnDemandCloseAfter: 30s
+  
+  # Retry settings for tunnel cameras
+  readTimeout: 30s
+  writeTimeout: 30s
+  
+  # Buffer for unstable connections
+  readBufferCount: 2048
+  
+  # Don't fail immediately on source errors
+  maxReaders: 0
+
+# Path configurations managed by backend
 paths:
   all_others: {}
