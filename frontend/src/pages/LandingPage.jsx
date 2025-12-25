@@ -60,6 +60,51 @@ const CameraSkeleton = () => (
 );
 
 // ============================================
+// TOAST NOTIFICATION COMPONENT
+// ============================================
+function Toast({ message, type = 'info', onClose }) {
+    useEffect(() => {
+        const timer = setTimeout(onClose, 4000);
+        return () => clearTimeout(timer);
+    }, [onClose]);
+
+    const bgColor = {
+        info: 'bg-sky-500',
+        success: 'bg-emerald-500',
+        warning: 'bg-amber-500',
+        error: 'bg-red-500',
+    }[type];
+
+    const icon = {
+        info: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+        success: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+        warning: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+        error: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+    }[type];
+
+    return (
+        <div className={`fixed top-20 left-1/2 -translate-x-1/2 z-[100] ${bgColor} text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-slide-down`}>
+            {icon}
+            <span className="font-medium text-sm">{message}</span>
+            <button onClick={onClose} className="ml-2 p-1 hover:bg-white/20 rounded-lg transition-colors">
+                <Icons.X />
+            </button>
+        </div>
+    );
+}
+
+// Toast container for multiple toasts
+function ToastContainer({ toasts, removeToast }) {
+    return (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2">
+            {toasts.map(toast => (
+                <Toast key={toast.id} {...toast} onClose={() => removeToast(toast.id)} />
+            ))}
+        </div>
+    );
+}
+
+// ============================================
 // CAMERA CARD - Enhanced with detailed location info
 // ============================================
 const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMulti }) {
@@ -880,19 +925,77 @@ function Footer() {
 }
 
 // ============================================
-// MULTI-VIEW FLOATING BUTTON
+// MULTI-VIEW FLOATING BUTTON - Enhanced with tooltip
 // ============================================
-function MultiViewButton({ count, onClick }) {
-    if (count === 0) return null;
+function MultiViewButton({ count, onClick, maxReached }) {
     return (
-        <button
-            onClick={onClick}
-            className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-sky-500 to-blue-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-105 transition-all"
-        >
-            <Icons.Layout />
-            <span className="font-bold">Multi-View</span>
-            <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-sm font-bold">{count}</span>
-        </button>
+        <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2">
+            {/* Info tooltip when max reached */}
+            {maxReached && (
+                <div className="bg-amber-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg shadow-lg animate-bounce">
+                    Maximum 3 cameras reached!
+                </div>
+            )}
+            
+            {count > 0 && (
+                <button
+                    onClick={onClick}
+                    className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-sky-500 to-blue-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-105 transition-all"
+                >
+                    <Icons.Layout />
+                    <span className="font-bold">Multi-View</span>
+                    <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-sm font-bold">{count}</span>
+                </button>
+            )}
+            
+            {/* Help text */}
+            {count === 0 && (
+                <div className="bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs px-3 py-2 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 max-w-[200px] text-center">
+                    <p className="font-medium mb-1">💡 Multi-View Mode</p>
+                    <p className="text-gray-500 dark:text-gray-400">Click the + button on cameras to view up to 3 streams simultaneously</p>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ============================================
+// STATS BAR - Show camera statistics
+// ============================================
+function StatsBar({ cameras, areas }) {
+    const totalCameras = cameras.length;
+    const totalAreas = areas.length;
+    const kecamatans = [...new Set(cameras.map(c => c.kecamatan).filter(Boolean))].length;
+    
+    if (totalCameras === 0) return null;
+    
+    return (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-4 mb-4">
+            <div className="flex flex-wrap justify-center gap-4 sm:gap-8">
+                <div className="flex items-center gap-2 text-sm">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center">
+                        <span className="text-emerald-600 dark:text-emerald-400 font-bold">{totalCameras}</span>
+                    </div>
+                    <span className="text-gray-600 dark:text-gray-400">Active Cameras</span>
+                </div>
+                {totalAreas > 0 && (
+                    <div className="flex items-center gap-2 text-sm">
+                        <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center">
+                            <span className="text-purple-600 dark:text-purple-400 font-bold">{totalAreas}</span>
+                        </div>
+                        <span className="text-gray-600 dark:text-gray-400">Monitoring Areas</span>
+                    </div>
+                )}
+                {kecamatans > 0 && (
+                    <div className="flex items-center gap-2 text-sm">
+                        <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center">
+                            <span className="text-blue-600 dark:text-blue-400 font-bold">{kecamatans}</span>
+                        </div>
+                        <span className="text-gray-600 dark:text-gray-400">Kecamatan Coverage</span>
+                    </div>
+                )}
+            </div>
+        </div>
     );
 }
 
@@ -906,6 +1009,18 @@ export default function LandingPage() {
     const [popup, setPopup] = useState(null);
     const [multiCameras, setMultiCameras] = useState([]);
     const [showMulti, setShowMulti] = useState(false);
+    const [toasts, setToasts] = useState([]);
+    const [maxReached, setMaxReached] = useState(false);
+
+    // Toast helper functions
+    const addToast = useCallback((message, type = 'info') => {
+        const id = Date.now();
+        setToasts(prev => [...prev, { id, message, type }]);
+    }, []);
+
+    const removeToast = useCallback((id) => {
+        setToasts(prev => prev.filter(t => t.id !== id));
+    }, []);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -919,48 +1034,108 @@ export default function LandingPage() {
                 setCameras(camsRes.data || []);
                 setAreas(areasRes.data || []);
                 
-                console.log('Loaded cameras:', camsRes.data?.length || 0);
-                console.log('Loaded areas:', areasRes.data?.length || 0);
+                // Show welcome toast if cameras loaded
+                if (camsRes.data?.length > 0) {
+                    addToast(`${camsRes.data.length} live cameras ready to view`, 'success');
+                }
             } catch (err) {
                 console.error('Failed to fetch data:', err);
+                addToast('Failed to load cameras. Please refresh the page.', 'error');
             } finally {
                 setLoading(false);
             }
         };
         fetchData();
-    }, []);
+    }, [addToast]);
 
     const handleAddMulti = useCallback((camera) => {
         setMultiCameras(prev => {
             const exists = prev.some(c => c.id === camera.id);
-            if (exists) return prev.filter(c => c.id !== camera.id);
-            if (prev.length >= 3) return prev;
+            
+            // If already in multi-view, remove it
+            if (exists) {
+                addToast(`"${camera.name}" removed from Multi-View`, 'info');
+                setMaxReached(false);
+                return prev.filter(c => c.id !== camera.id);
+            }
+            
+            // Check if max reached
+            if (prev.length >= 3) {
+                addToast('Maximum 3 cameras allowed in Multi-View mode', 'warning');
+                setMaxReached(true);
+                setTimeout(() => setMaxReached(false), 3000);
+                return prev;
+            }
+            
+            // Add to multi-view
+            addToast(`"${camera.name}" added to Multi-View (${prev.length + 1}/3)`, 'success');
             return [...prev, camera];
         });
-    }, []);
+    }, [addToast]);
 
     const handleRemoveMulti = useCallback((id) => {
         setMultiCameras(prev => {
+            const camera = prev.find(c => c.id === id);
+            if (camera) {
+                addToast(`"${camera.name}" removed from Multi-View`, 'info');
+            }
             const next = prev.filter(c => c.id !== id);
             if (next.length === 0) setShowMulti(false);
+            setMaxReached(false);
             return next;
         });
-    }, []);
+    }, [addToast]);
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
             <Navbar />
             
+            {/* Hero Section - Enhanced */}
             <div className="bg-gradient-to-br from-sky-500/10 via-transparent to-purple-500/10 dark:from-sky-500/5 dark:to-purple-500/5">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 text-center">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold mb-4">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        LIVE STREAMING
+                    </div>
                     <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-3">
                         Live CCTV Monitoring
                     </h1>
-                    <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-                        Real-time surveillance system with secure streaming
+                    <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mb-6">
+                        Real-time surveillance system with secure streaming. Monitor multiple locations simultaneously with our advanced multi-view feature.
                     </p>
+                    
+                    {/* Quick Features */}
+                    <div className="flex flex-wrap justify-center gap-4 text-sm">
+                        <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                            <svg className="w-4 h-4 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            <span>HD Streaming</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                            <svg className="w-4 h-4 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                            </svg>
+                            <span>Multi-View (up to 3)</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                            <svg className="w-4 h-4 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                            </svg>
+                            <span>Zoom & Pan</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                            <svg className="w-4 h-4 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span>Snapshot</span>
+                        </div>
+                    </div>
                 </div>
             </div>
+
+            {/* Stats Bar */}
+            <StatsBar cameras={cameras} areas={areas} />
 
             <CamerasSection
                 cameras={cameras}
@@ -974,7 +1149,14 @@ export default function LandingPage() {
             <div className="flex-1" />
             <Footer />
 
-            <MultiViewButton count={multiCameras.length} onClick={() => setShowMulti(true)} />
+            <MultiViewButton 
+                count={multiCameras.length} 
+                onClick={() => setShowMulti(true)} 
+                maxReached={maxReached}
+            />
+
+            {/* Toast Notifications */}
+            <ToastContainer toasts={toasts} removeToast={removeToast} />
 
             {popup && <VideoPopup camera={popup} onClose={() => setPopup(null)} />}
             {showMulti && multiCameras.length > 0 && (
