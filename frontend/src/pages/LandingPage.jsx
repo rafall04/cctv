@@ -25,7 +25,6 @@ const Icons = {
     ZoomOut: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M8 11h6"/></svg>,
 };
 
-// Skeleton
 const Skeleton = ({ className }) => <div className={`animate-pulse bg-gray-300 dark:bg-gray-700 rounded-xl ${className}`} />;
 const CameraSkeleton = () => (
     <div className="rounded-2xl overflow-hidden bg-white dark:bg-gray-900 shadow-lg">
@@ -73,136 +72,119 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
 });
 
 // ============================================
-// OPTIMIZED ZOOM/PAN HOOK - No lag during drag
-// Uses refs for real-time updates, state only for UI sync
+// ZOOMABLE VIDEO COMPONENT - Ultra smooth pan/zoom
+// Transform on wrapper div, not video. Pure DOM manipulation.
 // ============================================
-function useZoomPan(videoRef, maxZoom = 4) {
-    const [zoom, setZoom] = useState(1);
-    const [displayPan, setDisplayPan] = useState({ x: 0, y: 0 });
-    const [isDragging, setIsDragging] = useState(false);
-    
-    // Use refs for real-time tracking (no re-renders during drag)
-    const panRef = useRef({ x: 0, y: 0 });
-    const zoomRef = useRef(1);
-    const dragStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
-    const rafRef = useRef(null);
+const ZoomableVideo = memo(function ZoomableVideo({ videoRef, status, maxZoom = 4, onZoomChange }) {
+    const wrapperRef = useRef(null);
+    const stateRef = useRef({ zoom: 1, panX: 0, panY: 0, dragging: false, startX: 0, startY: 0, startPanX: 0, startPanY: 0 });
 
-    const getMaxPan = useCallback((z) => {
-        if (z <= 1) return 0;
-        return ((z - 1) / (2 * z)) * 100;
-    }, []);
+    const getMaxPan = (z) => z <= 1 ? 0 : ((z - 1) / (2 * z)) * 100;
+    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
-    const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
+    const applyTransform = useCallback((animate = false) => {
+        if (!wrapperRef.current) return;
+        const { zoom, panX, panY } = stateRef.current;
+        wrapperRef.current.style.transition = animate ? 'transform 0.2s ease-out' : 'none';
+        wrapperRef.current.style.transform = `scale(${zoom}) translate(${panX}%, ${panY}%)`;
+        onZoomChange?.(zoom);
+    }, [onZoomChange]);
 
-    // Direct DOM update - bypasses React for smooth performance
-    const updateTransform = useCallback((z, px, py, animate = false) => {
-        if (!videoRef.current) return;
-        const style = videoRef.current.style;
-        style.transform = `scale(${z}) translate(${px}%, ${py}%)`;
-        style.transition = animate ? 'transform 0.2s ease-out' : 'none';
-    }, [videoRef]);
+    const handleZoom = useCallback((delta, animate = true) => {
+        const s = stateRef.current;
+        s.zoom = clamp(s.zoom + delta, 1, maxZoom);
+        if (s.zoom <= 1) { s.panX = 0; s.panY = 0; }
+        else {
+            const max = getMaxPan(s.zoom);
+            s.panX = clamp(s.panX, -max, max);
+            s.panY = clamp(s.panY, -max, max);
+        }
+        applyTransform(animate);
+    }, [maxZoom, applyTransform]);
 
-    // Zoom with animation (button click)
-    const handleZoom = useCallback((delta) => {
-        const newZoom = clamp(zoomRef.current + delta, 1, maxZoom);
-        const maxP = getMaxPan(newZoom);
-        const newPanX = newZoom <= 1 ? 0 : clamp(panRef.current.x, -maxP, maxP);
-        const newPanY = newZoom <= 1 ? 0 : clamp(panRef.current.y, -maxP, maxP);
-        
-        zoomRef.current = newZoom;
-        panRef.current = { x: newPanX, y: newPanY };
-        
-        updateTransform(newZoom, newPanX, newPanY, true);
-        setZoom(newZoom);
-        setDisplayPan({ x: newPanX, y: newPanY });
-    }, [maxZoom, getMaxPan, updateTransform]);
-
-    // Wheel zoom (no animation)
     const handleWheel = useCallback((e) => {
         e.preventDefault();
-        const delta = e.deltaY > 0 ? -0.5 : 0.5;
-        const newZoom = clamp(zoomRef.current + delta, 1, maxZoom);
-        const maxP = getMaxPan(newZoom);
-        const newPanX = newZoom <= 1 ? 0 : clamp(panRef.current.x, -maxP, maxP);
-        const newPanY = newZoom <= 1 ? 0 : clamp(panRef.current.y, -maxP, maxP);
-        
-        zoomRef.current = newZoom;
-        panRef.current = { x: newPanX, y: newPanY };
-        
-        updateTransform(newZoom, newPanX, newPanY, false);
-        setZoom(newZoom);
-        setDisplayPan({ x: newPanX, y: newPanY });
-    }, [maxZoom, getMaxPan, updateTransform]);
+        e.stopPropagation();
+        handleZoom(e.deltaY > 0 ? -0.5 : 0.5, false);
+    }, [handleZoom]);
 
     const handlePointerDown = useCallback((e) => {
-        if (zoomRef.current <= 1) return;
-        setIsDragging(true);
-        dragStartRef.current = { 
-            x: e.clientX, 
-            y: e.clientY, 
-            panX: panRef.current.x, 
-            panY: panRef.current.y 
-        };
+        const s = stateRef.current;
+        if (s.zoom <= 1) return;
+        s.dragging = true;
+        s.startX = e.clientX;
+        s.startY = e.clientY;
+        s.startPanX = s.panX;
+        s.startPanY = s.panY;
+        wrapperRef.current.style.cursor = 'grabbing';
         e.currentTarget.setPointerCapture(e.pointerId);
-        if (videoRef.current) videoRef.current.style.cursor = 'grabbing';
-    }, [videoRef]);
-
-    const handlePointerMove = useCallback((e) => {
-        if (!isDragging || zoomRef.current <= 1) return;
-        
-        // Cancel any pending RAF
-        if (rafRef.current) cancelAnimationFrame(rafRef.current);
-        
-        // Use RAF for smooth 60fps updates
-        rafRef.current = requestAnimationFrame(() => {
-            const dx = e.clientX - dragStartRef.current.x;
-            const dy = e.clientY - dragStartRef.current.y;
-            const maxP = getMaxPan(zoomRef.current);
-            
-            // Direct calculation - no sensitivity divisor for 1:1 feel
-            const newPanX = clamp(dragStartRef.current.panX + (dx / 5), -maxP, maxP);
-            const newPanY = clamp(dragStartRef.current.panY + (dy / 5), -maxP, maxP);
-            
-            panRef.current = { x: newPanX, y: newPanY };
-            updateTransform(zoomRef.current, newPanX, newPanY, false);
-        });
-    }, [isDragging, getMaxPan, updateTransform]);
-
-    const handlePointerUp = useCallback((e) => {
-        if (rafRef.current) cancelAnimationFrame(rafRef.current);
-        setIsDragging(false);
-        setDisplayPan({ ...panRef.current });
-        if (videoRef.current) videoRef.current.style.cursor = zoomRef.current > 1 ? 'grab' : 'default';
-        try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
-    }, [videoRef]);
-
-    const reset = useCallback(() => {
-        zoomRef.current = 1;
-        panRef.current = { x: 0, y: 0 };
-        updateTransform(1, 0, 0, true);
-        setZoom(1);
-        setDisplayPan({ x: 0, y: 0 });
-    }, [updateTransform]);
-
-    // Cleanup RAF on unmount
-    useEffect(() => {
-        return () => {
-            if (rafRef.current) cancelAnimationFrame(rafRef.current);
-        };
     }, []);
 
-    return {
-        zoom,
-        pan: displayPan,
-        isDragging,
-        handleZoom,
-        handleWheel,
-        handlePointerDown,
-        handlePointerMove,
-        handlePointerUp,
-        reset
-    };
-}
+    const handlePointerMove = useCallback((e) => {
+        const s = stateRef.current;
+        if (!s.dragging) return;
+        
+        const dx = e.clientX - s.startX;
+        const dy = e.clientY - s.startY;
+        const max = getMaxPan(s.zoom);
+        
+        // Direct 1:1 mapping with container size factor
+        const factor = 0.15; // Adjust for natural feel
+        s.panX = clamp(s.startPanX + dx * factor, -max, max);
+        s.panY = clamp(s.startPanY + dy * factor, -max, max);
+        
+        // Direct DOM update - no React, no RAF needed for simple transform
+        wrapperRef.current.style.transform = `scale(${s.zoom}) translate(${s.panX}%, ${s.panY}%)`;
+    }, []);
+
+    const handlePointerUp = useCallback((e) => {
+        const s = stateRef.current;
+        s.dragging = false;
+        if (wrapperRef.current) wrapperRef.current.style.cursor = s.zoom > 1 ? 'grab' : 'default';
+        try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
+    }, []);
+
+    const reset = useCallback(() => {
+        const s = stateRef.current;
+        s.zoom = 1; s.panX = 0; s.panY = 0;
+        applyTransform(true);
+    }, [applyTransform]);
+
+    // Expose methods via ref
+    useEffect(() => {
+        if (wrapperRef.current) {
+            wrapperRef.current._zoomIn = () => handleZoom(0.5);
+            wrapperRef.current._zoomOut = () => handleZoom(-0.5);
+            wrapperRef.current._reset = reset;
+            wrapperRef.current._getZoom = () => stateRef.current.zoom;
+        }
+    }, [handleZoom, reset]);
+
+    return (
+        <div 
+            ref={wrapperRef}
+            onWheel={handleWheel}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            onPointerLeave={handlePointerUp}
+            className="w-full h-full"
+            style={{ 
+                transformOrigin: 'center center', 
+                cursor: 'default',
+                touchAction: 'none', // Critical for mobile smoothness
+                willChange: 'transform'
+            }}
+        >
+            <video 
+                ref={videoRef}
+                className="w-full h-full object-contain pointer-events-none"
+                muted playsInline autoPlay 
+            />
+        </div>
+    );
+});
 
 
 // ============================================
@@ -210,10 +192,11 @@ function useZoomPan(videoRef, maxZoom = 4) {
 // ============================================
 function VideoPopup({ camera, onClose }) {
     const videoRef = useRef(null);
+    const wrapperRef = useRef(null);
     const modalRef = useRef(null);
     const hlsRef = useRef(null);
     const [status, setStatus] = useState('connecting');
-    const zp = useZoomPan(videoRef, 4);
+    const [zoom, setZoom] = useState(1);
     const url = camera.streams?.hls;
 
     useEffect(() => {
@@ -267,6 +250,9 @@ function VideoPopup({ camera, onClose }) {
         link.click();
     };
 
+    // Get wrapper ref for zoom controls
+    const getWrapper = () => wrapperRef.current?.querySelector('[style*="transform-origin"]');
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-2 sm:p-4" onClick={onClose}>
             <div ref={modalRef} className="relative w-full max-w-5xl bg-gray-900 rounded-2xl overflow-hidden shadow-2xl flex flex-col" style={{ maxHeight: 'calc(100vh - 16px)' }} onClick={(e) => e.stopPropagation()}>
@@ -290,20 +276,10 @@ function VideoPopup({ camera, onClose }) {
                 </div>
 
                 {/* Video */}
-                <div className="relative flex-1 min-h-0 bg-black overflow-hidden" onWheel={zp.handleWheel} onDoubleClick={toggleFS}>
-                    <video 
-                        ref={videoRef}
-                        onPointerDown={zp.handlePointerDown}
-                        onPointerMove={zp.handlePointerMove}
-                        onPointerUp={zp.handlePointerUp}
-                        onPointerCancel={zp.handlePointerUp}
-                        onPointerLeave={zp.handlePointerUp}
-                        className="w-full h-full object-contain"
-                        style={{ transformOrigin: 'center center', cursor: zp.zoom > 1 ? 'grab' : 'default', willChange: 'transform' }}
-                        muted playsInline autoPlay 
-                    />
-                    {status === 'connecting' && <div className="absolute inset-0 flex items-center justify-center bg-black/60"><div className="w-10 h-10 border-2 border-white/20 border-t-sky-500 rounded-full animate-spin" /></div>}
-                    {status === 'error' && <div className="absolute inset-0 flex items-center justify-center bg-black/80"><p className="text-red-400">Stream Unavailable</p></div>}
+                <div ref={wrapperRef} className="relative flex-1 min-h-0 bg-black overflow-hidden" onDoubleClick={toggleFS}>
+                    <ZoomableVideo videoRef={videoRef} status={status} maxZoom={4} onZoomChange={setZoom} />
+                    {status === 'connecting' && <div className="absolute inset-0 flex items-center justify-center bg-black/60 pointer-events-none"><div className="w-10 h-10 border-2 border-white/20 border-t-sky-500 rounded-full animate-spin" /></div>}
+                    {status === 'error' && <div className="absolute inset-0 flex items-center justify-center bg-black/80 pointer-events-none"><p className="text-red-400">Stream Unavailable</p></div>}
                 </div>
 
                 {/* Footer */}
@@ -314,10 +290,10 @@ function VideoPopup({ camera, onClose }) {
                             {camera.area_name && <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400">{camera.area_name}</span>}
                         </div>
                         <div className="flex items-center gap-1 bg-white/5 rounded-xl p-1">
-                            <button onClick={() => zp.handleZoom(-0.5)} disabled={zp.zoom <= 1} className="p-2 hover:bg-white/10 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomOut /></button>
-                            <span className="text-white text-xs font-medium w-12 text-center">{Math.round(zp.zoom * 100)}%</span>
-                            <button onClick={() => zp.handleZoom(0.5)} disabled={zp.zoom >= 4} className="p-2 hover:bg-white/10 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomIn /></button>
-                            {zp.zoom > 1 && <button onClick={zp.reset} className="p-2 hover:bg-white/10 rounded-lg text-white ml-1"><Icons.Reset /></button>}
+                            <button onClick={() => getWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-2 hover:bg-white/10 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomOut /></button>
+                            <span className="text-white text-xs font-medium w-12 text-center">{Math.round(zoom * 100)}%</span>
+                            <button onClick={() => getWrapper()?._zoomIn?.()} disabled={zoom >= 4} className="p-2 hover:bg-white/10 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomIn /></button>
+                            {zoom > 1 && <button onClick={() => getWrapper()?._reset?.()} className="p-2 hover:bg-white/10 rounded-lg text-white ml-1"><Icons.Reset /></button>}
                         </div>
                     </div>
                 </div>
@@ -331,10 +307,11 @@ function VideoPopup({ camera, onClose }) {
 // ============================================
 function MultiViewVideoItem({ camera, onRemove }) {
     const videoRef = useRef(null);
+    const wrapperRef = useRef(null);
     const containerRef = useRef(null);
     const hlsRef = useRef(null);
     const [status, setStatus] = useState('connecting');
-    const zp = useZoomPan(videoRef, 3);
+    const [zoom, setZoom] = useState(1);
     const url = camera.streams?.hls;
 
     useEffect(() => {
@@ -381,22 +358,14 @@ function MultiViewVideoItem({ camera, onRemove }) {
         link.click();
     };
 
-    const handleWheel = (e) => { e.stopPropagation(); zp.handleWheel(e); };
+    const getWrapper = () => wrapperRef.current?.querySelector('[style*="transform-origin"]');
 
     return (
-        <div ref={containerRef} className="relative w-full h-full bg-black rounded-xl overflow-hidden group" onWheel={handleWheel}>
-            <video 
-                ref={videoRef}
-                onPointerDown={zp.handlePointerDown}
-                onPointerMove={zp.handlePointerMove}
-                onPointerUp={zp.handlePointerUp}
-                onPointerCancel={zp.handlePointerUp}
-                onPointerLeave={zp.handlePointerUp}
-                className="w-full h-full object-contain"
-                style={{ transformOrigin: 'center center', cursor: zp.zoom > 1 ? 'grab' : 'default', willChange: 'transform' }}
-                muted playsInline autoPlay 
-            />
-            <div className="absolute top-2 left-2 z-10">
+        <div ref={containerRef} className="relative w-full h-full bg-black rounded-xl overflow-hidden group">
+            <div ref={wrapperRef} className="w-full h-full">
+                <ZoomableVideo videoRef={videoRef} status={status} maxZoom={3} onZoomChange={setZoom} />
+            </div>
+            <div className="absolute top-2 left-2 z-10 pointer-events-none">
                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold text-white shadow ${status === 'live' ? 'bg-emerald-500' : status === 'connecting' ? 'bg-amber-500' : 'bg-red-500'}`}>
                     <span className={`w-1 h-1 rounded-full bg-white ${status === 'live' ? 'animate-pulse' : ''}`} />
                     {status === 'live' ? 'LIVE' : status === 'connecting' ? '...' : 'OFF'}
@@ -407,18 +376,18 @@ function MultiViewVideoItem({ camera, onRemove }) {
                 <div className="flex items-center justify-between gap-2">
                     <p className="text-white text-xs font-medium truncate flex-1">{camera.name}</p>
                     <div className="flex items-center gap-1">
-                        <button onClick={() => zp.handleZoom(-0.5)} disabled={zp.zoom <= 1} className="p-1 bg-white/10 hover:bg-white/20 disabled:opacity-30 rounded text-white"><Icons.ZoomOut /></button>
-                        <span className="text-white/70 text-[10px] w-8 text-center">{Math.round(zp.zoom * 100)}%</span>
-                        <button onClick={() => zp.handleZoom(0.5)} disabled={zp.zoom >= 3} className="p-1 bg-white/10 hover:bg-white/20 disabled:opacity-30 rounded text-white"><Icons.ZoomIn /></button>
-                        {zp.zoom > 1 && <button onClick={zp.reset} className="p-1 bg-white/10 hover:bg-white/20 rounded text-white"><Icons.Reset /></button>}
+                        <button onClick={() => getWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-1 bg-white/10 hover:bg-white/20 disabled:opacity-30 rounded text-white"><Icons.ZoomOut /></button>
+                        <span className="text-white/70 text-[10px] w-8 text-center">{Math.round(zoom * 100)}%</span>
+                        <button onClick={() => getWrapper()?._zoomIn?.()} disabled={zoom >= 3} className="p-1 bg-white/10 hover:bg-white/20 disabled:opacity-30 rounded text-white"><Icons.ZoomIn /></button>
+                        {zoom > 1 && <button onClick={() => getWrapper()?._reset?.()} className="p-1 bg-white/10 hover:bg-white/20 rounded text-white"><Icons.Reset /></button>}
                         <div className="w-px h-4 bg-white/20 mx-1" />
                         {status === 'live' && <button onClick={takeSnapshot} className="p-1 bg-white/10 hover:bg-white/20 rounded text-white"><Icons.Image /></button>}
                         <button onClick={toggleFS} className="p-1 bg-white/10 hover:bg-white/20 rounded text-white"><Icons.Fullscreen /></button>
                     </div>
                 </div>
             </div>
-            {status === 'connecting' && <div className="absolute inset-0 flex items-center justify-center bg-black/50"><div className="w-6 h-6 border-2 border-white/20 border-t-sky-500 rounded-full animate-spin" /></div>}
-            {status === 'error' && <div className="absolute inset-0 flex items-center justify-center bg-black/70"><p className="text-red-400 text-xs">Offline</p></div>}
+            {status === 'connecting' && <div className="absolute inset-0 flex items-center justify-center bg-black/50 pointer-events-none"><div className="w-6 h-6 border-2 border-white/20 border-t-sky-500 rounded-full animate-spin" /></div>}
+            {status === 'error' && <div className="absolute inset-0 flex items-center justify-center bg-black/70 pointer-events-none"><p className="text-red-400 text-xs">Offline</p></div>}
         </div>
     );
 }
@@ -553,7 +522,7 @@ function FilterDropdown({ areas, selected, onChange }) {
 }
 
 // ============================================
-// CAMERAS SECTION (Layout switcher removed)
+// CAMERAS SECTION
 // ============================================
 function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, multiCameras }) {
     const [filter, setFilter] = useState(null);
@@ -562,7 +531,6 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
     return (
         <section className="py-8 sm:py-12">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
                     <div>
                         <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Live Cameras</h2>
@@ -571,7 +539,6 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                     {areas.length > 0 && <FilterDropdown areas={areas} selected={filter} onChange={setFilter} />}
                 </div>
 
-                {/* Grid - Fixed 3 columns responsive */}
                 {loading ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                         {[1, 2, 3, 4, 5, 6].map(i => <CameraSkeleton key={i} />)}
@@ -684,7 +651,6 @@ export default function LandingPage() {
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
             <Navbar />
             
-            {/* Hero */}
             <div className="bg-gradient-to-br from-sky-500/10 via-transparent to-purple-500/10 dark:from-sky-500/5 dark:to-purple-500/5">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 text-center">
                     <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-3">
