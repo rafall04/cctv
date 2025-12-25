@@ -1,5 +1,6 @@
-# MediaMTX Configuration - Optimized for FAST HLS startup
+# MediaMTX Configuration - Minimal & Stable
 
+# Set to 'error' to only show errors, 'warn' for warnings+errors
 logLevel: error
 logDestinations: [stdout]
 
@@ -7,27 +8,19 @@ logDestinations: [stdout]
 api: yes
 apiAddress: :9997
 
-# HLS - Optimized for fast startup
+# Listeners for streaming protocols
 hls: yes
 hlsAddress: :8888
 hlsAllowOrigin: '*'
 hlsAlwaysRemux: yes
-hlsSegmentCount: 3
-hlsSegmentDuration: 1s
-hlsPartDuration: 200ms
-hlsSegmentMaxSize: 50M
-hlsVariant: lowLatency
 
-# WebRTC
 webrtc: yes
 webrtcAddress: :8889
 webrtcAllowOrigin: '*'
 
-# RTMP
 rtmp: yes
 rtmpAddress: :1935
 
-# RTSP
 rtsp: yes
 rtspAddress: :8554
 

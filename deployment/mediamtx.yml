@@ -1,5 +1,6 @@
-# MediaMTX Configuration - Optimized for FAST HLS startup (Production)
+# MediaMTX Configuration for RAF NET CCTV Production
 
+# Logging - only show errors
 logLevel: error
 logDestinations: [stdout]
 
@@ -7,28 +8,23 @@ logDestinations: [stdout]
 api: yes
 apiAddress: 127.0.0.1:9997
 
-# HLS - Optimized for fast startup
+# HLS settings
 hls: yes
 hlsAddress: :8888
-hlsAllowOrigin: '*'
 hlsAlwaysRemux: yes
-hlsSegmentCount: 3
-hlsSegmentDuration: 1s
-hlsPartDuration: 200ms
-hlsSegmentMaxSize: 50M
-hlsVariant: lowLatency
+hlsAllowOrigin: '*'
 
-# WebRTC
+# WebRTC settings
 webrtc: yes
 webrtcAddress: :8889
 webrtcLocalUDPAddress: :8189
 webrtcAllowOrigin: '*'
 
-# RTMP
+# RTMP settings
 rtmp: yes
 rtmpAddress: :1935
 
-# RTSP
+# RTSP settings
 rtsp: yes
 rtspAddress: :8554
 
