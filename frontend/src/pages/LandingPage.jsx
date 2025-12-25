@@ -65,6 +65,55 @@ const CameraSkeleton = () => (
 );
 
 // ============================================
+// VIDEO SKELETON - Animated loading placeholder for video player
+// ============================================
+const VideoSkeleton = memo(function VideoSkeleton({ size = 'large' }) {
+    const isSmall = size === 'small';
+    
+    return (
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-800 via-gray-900 to-gray-800 flex flex-col items-center justify-center pointer-events-none overflow-hidden">
+            {/* Animated shimmer background */}
+            <div className="absolute inset-0 overflow-hidden">
+                <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/5 to-transparent" />
+            </div>
+            
+            {/* Video player skeleton UI */}
+            <div className="relative z-10 flex flex-col items-center gap-3">
+                {/* Play button skeleton */}
+                <div className={`${isSmall ? 'w-10 h-10' : 'w-16 h-16'} rounded-full bg-white/10 flex items-center justify-center animate-pulse`}>
+                    <div className={`${isSmall ? 'w-4 h-4' : 'w-6 h-6'} border-2 border-white/30 border-t-sky-500 rounded-full animate-spin`} />
+                </div>
+                
+                {/* Loading text */}
+                <div className="flex flex-col items-center gap-1.5">
+                    <div className={`${isSmall ? 'h-2 w-16' : 'h-3 w-24'} bg-white/10 rounded-full animate-pulse`} />
+                    <div className={`${isSmall ? 'h-1.5 w-12' : 'h-2 w-20'} bg-white/5 rounded-full animate-pulse`} />
+                </div>
+            </div>
+            
+            {/* Bottom progress bar skeleton */}
+            <div className="absolute bottom-0 left-0 right-0 p-3">
+                <div className="flex items-center gap-2">
+                    <div className={`${isSmall ? 'w-4 h-4' : 'w-6 h-6'} rounded bg-white/10 animate-pulse`} />
+                    <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
+                        <div className="h-full w-1/3 bg-white/20 rounded-full animate-pulse" />
+                    </div>
+                    <div className={`${isSmall ? 'w-8' : 'w-12'} h-3 bg-white/10 rounded animate-pulse`} />
+                </div>
+            </div>
+            
+            {/* Corner decorations */}
+            <div className="absolute top-3 left-3 flex items-center gap-2">
+                <div className={`${isSmall ? 'w-8 h-4' : 'w-12 h-5'} bg-white/10 rounded-full animate-pulse`} />
+            </div>
+            <div className="absolute top-3 right-3">
+                <div className={`${isSmall ? 'w-4 h-4' : 'w-6 h-6'} bg-white/10 rounded animate-pulse`} />
+            </div>
+        </div>
+    );
+});
+
+// ============================================
 // TOAST NOTIFICATION COMPONENT - Enhanced modern design
 // ============================================
 function Toast({ message, type = 'info', onClose }) {
@@ -416,7 +465,7 @@ function VideoPopup({ camera, onClose }) {
                 {/* Video */}
                 <div ref={wrapperRef} className="relative flex-1 min-h-0 bg-black overflow-hidden" onDoubleClick={toggleFS}>
                     <ZoomableVideo videoRef={videoRef} maxZoom={4} onZoomChange={setZoom} />
-                    {status === 'connecting' && <div className="absolute inset-0 flex items-center justify-center bg-black/60 pointer-events-none"><div className="w-10 h-10 border-2 border-white/20 border-t-sky-500 rounded-full animate-spin" /></div>}
+                    {status === 'connecting' && <VideoSkeleton size="large" />}
                     {status === 'error' && <div className="absolute inset-0 flex items-center justify-center bg-black/80 pointer-events-none"><p className="text-red-400">Stream Unavailable</p></div>}
                 </div>
 
@@ -524,7 +573,7 @@ function MultiViewVideoItem({ camera, onRemove }) {
                     </div>
                 </div>
             </div>
-            {status === 'connecting' && <div className="absolute inset-0 flex items-center justify-center bg-black/50 pointer-events-none"><div className="w-6 h-6 border-2 border-white/20 border-t-sky-500 rounded-full animate-spin" /></div>}
+            {status === 'connecting' && <VideoSkeleton size="small" />}
             {status === 'error' && <div className="absolute inset-0 flex items-center justify-center bg-black/70 pointer-events-none"><p className="text-red-400 text-xs">Offline</p></div>}
         </div>
     );

@@ -31,6 +31,7 @@ export default {
                 'slide-down': 'slideDown 0.3s ease-out',
                 'slide-up': 'slideUp 0.3s ease-out',
                 'fade-in': 'fadeIn 0.2s ease-out',
+                'shimmer': 'shimmer 2s infinite',
             },
             keyframes: {
                 slideDown: {
@@ -44,6 +45,10 @@ export default {
                 fadeIn: {
                     '0%': { opacity: '0' },
                     '100%': { opacity: '1' },
+                },
+                shimmer: {
+                    '0%': { transform: 'translateX(-100%)' },
+                    '100%': { transform: 'translateX(100%)' },
                 },
             },
         },
