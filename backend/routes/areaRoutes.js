@@ -8,6 +8,11 @@ import {
 import { authMiddleware } from '../middleware/authMiddleware.js';
 
 export default async function areaRoutes(fastify, options) {
+    // Public endpoint - for landing page filter
+    fastify.get('/public', {
+        handler: getAllAreas,
+    });
+
     // Admin endpoints (protected)
     fastify.get('/', {
         onRequest: [authMiddleware],
