@@ -65,7 +65,7 @@ const CameraSkeleton = () => (
 );
 
 // ============================================
-// TOAST NOTIFICATION COMPONENT
+// TOAST NOTIFICATION COMPONENT - Enhanced modern design
 // ============================================
 function Toast({ message, type = 'info', onClose }) {
     useEffect(() => {
@@ -73,25 +73,34 @@ function Toast({ message, type = 'info', onClose }) {
         return () => clearTimeout(timer);
     }, [onClose]);
 
-    const bgColor = {
-        info: 'bg-sky-500',
-        success: 'bg-emerald-500',
-        warning: 'bg-amber-500',
-        error: 'bg-red-500',
-    }[type];
-
-    const icon = {
-        info: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-        success: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-        warning: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
-        error: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+    const styles = {
+        info: {
+            bg: 'bg-gradient-to-r from-sky-500 to-blue-600',
+            icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+        },
+        success: {
+            bg: 'bg-gradient-to-r from-emerald-500 to-teal-600',
+            icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+        },
+        warning: {
+            bg: 'bg-gradient-to-r from-amber-500 to-orange-600',
+            icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+        },
+        error: {
+            bg: 'bg-gradient-to-r from-red-500 to-rose-600',
+            icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+        },
     }[type];
 
     return (
-        <div className={`fixed top-20 left-1/2 -translate-x-1/2 z-[100] ${bgColor} text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-slide-down`}>
-            {icon}
-            <span className="font-medium text-sm">{message}</span>
-            <button onClick={onClose} className="ml-2 p-1 hover:bg-white/20 rounded-lg transition-colors">
+        <div className={`${styles.bg} text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 animate-slide-down backdrop-blur-sm`}>
+            <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                {styles.icon}
+            </div>
+            <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm">{message}</p>
+            </div>
+            <button onClick={onClose} className="p-1.5 hover:bg-white/20 rounded-xl transition-colors shrink-0">
                 <Icons.X />
             </button>
         </div>
@@ -100,8 +109,9 @@ function Toast({ message, type = 'info', onClose }) {
 
 // Toast container for multiple toasts
 function ToastContainer({ toasts, removeToast }) {
+    if (toasts.length === 0) return null;
     return (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2">
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-3 w-full max-w-sm px-4">
             {toasts.map(toast => (
                 <Toast key={toast.id} {...toast} onClose={() => removeToast(toast.id)} />
             ))}
@@ -1037,7 +1047,7 @@ function MultiViewButton({ count, onClick, maxReached }) {
 }
 
 // ============================================
-// STATS BAR - Show camera statistics
+// STATS BAR - Integrated into Hero section
 // ============================================
 function StatsBar({ cameras, areas }) {
     const totalCameras = cameras.length;
@@ -1047,31 +1057,38 @@ function StatsBar({ cameras, areas }) {
     if (totalCameras === 0) return null;
     
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-4 mb-4">
-            <div className="flex flex-wrap justify-center gap-4 sm:gap-8">
-                <div className="flex items-center gap-2 text-sm">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center">
-                        <span className="text-emerald-600 dark:text-emerald-400 font-bold">{totalCameras}</span>
-                    </div>
-                    <span className="text-gray-600 dark:text-gray-400">Active Cameras</span>
+        <div className="flex flex-wrap justify-center gap-3 sm:gap-6 mt-8 pt-6 border-t border-gray-200/50 dark:border-gray-700/50">
+            <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm shadow-sm">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                    <span className="text-white font-bold text-lg">{totalCameras}</span>
                 </div>
-                {totalAreas > 0 && (
-                    <div className="flex items-center gap-2 text-sm">
-                        <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center">
-                            <span className="text-purple-600 dark:text-purple-400 font-bold">{totalAreas}</span>
-                        </div>
-                        <span className="text-gray-600 dark:text-gray-400">Monitoring Areas</span>
-                    </div>
-                )}
-                {kecamatans > 0 && (
-                    <div className="flex items-center gap-2 text-sm">
-                        <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center">
-                            <span className="text-blue-600 dark:text-blue-400 font-bold">{kecamatans}</span>
-                        </div>
-                        <span className="text-gray-600 dark:text-gray-400">Kecamatan Coverage</span>
-                    </div>
-                )}
+                <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Active</p>
+                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">Cameras</p>
+                </div>
             </div>
+            {totalAreas > 0 && (
+                <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm shadow-sm">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
+                        <span className="text-white font-bold text-lg">{totalAreas}</span>
+                    </div>
+                    <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Monitoring</p>
+                        <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">Areas</p>
+                    </div>
+                </div>
+            )}
+            {kecamatans > 0 && (
+                <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm shadow-sm">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                        <span className="text-white font-bold text-lg">{kecamatans}</span>
+                    </div>
+                    <div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Coverage</p>
+                        <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">Kecamatan</p>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -1167,7 +1184,7 @@ export default function LandingPage() {
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
             <Navbar cameraCount={cameras.length} />
             
-            {/* Hero Section - Enhanced */}
+            {/* Hero Section - Enhanced with integrated stats */}
             <div className="relative overflow-hidden bg-gradient-to-br from-sky-500/10 via-transparent to-purple-500/10 dark:from-sky-500/5 dark:to-purple-500/5">
                 {/* Decorative elements */}
                 <div className="absolute top-0 left-1/4 w-64 h-64 bg-sky-500/10 rounded-full blur-3xl pointer-events-none"></div>
@@ -1191,35 +1208,35 @@ export default function LandingPage() {
                     {/* Quick Features - Enhanced */}
                     <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
                         <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
-                            <div className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-500/20 flex items-center justify-center">
+                            <div className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-500/20 flex items-center justify-center text-sky-600 dark:text-sky-400">
                                 <Icons.Eye />
                             </div>
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">HD Streaming</span>
                         </div>
                         <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
-                            <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center">
+                            <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center text-purple-600 dark:text-purple-400">
                                 <Icons.Grid />
                             </div>
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Multi-View</span>
                         </div>
                         <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
-                            <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center">
+                            <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
                                 <Icons.Shield />
                             </div>
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Secure</span>
                         </div>
                         <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
-                            <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center">
+                            <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400">
                                 <Icons.Clock />
                             </div>
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">24/7 Live</span>
                         </div>
                     </div>
+                    
+                    {/* Stats Bar - Integrated into Hero */}
+                    <StatsBar cameras={cameras} areas={areas} />
                 </div>
             </div>
-
-            {/* Stats Bar */}
-            <StatsBar cameras={cameras} areas={areas} />
 
             <CamerasSection
                 cameras={cameras}
