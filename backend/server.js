@@ -123,12 +123,24 @@ const start = async () => {
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         console.log('');
 
-        // Initial sync with MediaMTX
+        // Initial sync with MediaMTX and start auto-sync
         await mediaMtxService.syncCameras();
+        mediaMtxService.startAutoSync();
     } catch (err) {
         fastify.log.error(err);
         process.exit(1);
     }
 };
+
+// Graceful shutdown
+const shutdown = async () => {
+    console.log('\n[Server] Shutting down gracefully...');
+    mediaMtxService.stopAutoSync();
+    await fastify.close();
+    process.exit(0);
+};
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
 
 start();

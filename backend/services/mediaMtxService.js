@@ -14,22 +14,100 @@ const dbPath = config.database.path.startsWith('/')
 const mediaMtxApiBaseUrl = 'http://localhost:9997/v3';
 
 class MediaMtxService {
+    constructor() {
+        this.isOnline = false;
+        this.lastSyncTime = 0;
+        this.syncInterval = null;
+        this.healthCheckInterval = null;
+        this.consecutiveFailures = 0;
+        this.maxConsecutiveFailures = 3;
+    }
+
+    /**
+     * Start the auto-sync and health check mechanism
+     */
+    startAutoSync() {
+        // Health check every 30 seconds
+        this.healthCheckInterval = setInterval(async () => {
+            await this.healthCheck();
+        }, 30000);
+
+        // Initial health check after 5 seconds
+        setTimeout(() => this.healthCheck(), 5000);
+        
+        console.log('[MediaMTX] Auto-sync enabled (health check every 30s)');
+    }
+
+    /**
+     * Stop the auto-sync mechanism
+     */
+    stopAutoSync() {
+        if (this.healthCheckInterval) {
+            clearInterval(this.healthCheckInterval);
+            this.healthCheckInterval = null;
+        }
+    }
+
+    /**
+     * Health check - verify MediaMTX is online and paths are synced
+     */
+    async healthCheck() {
+        try {
+            const status = await this.getStatus();
+            
+            if (!status.online) {
+                // MediaMTX is offline
+                if (this.isOnline) {
+                    console.log('[MediaMTX] Connection lost - waiting for reconnect...');
+                }
+                this.isOnline = false;
+                this.consecutiveFailures++;
+                return;
+            }
+
+            // MediaMTX is online
+            const wasOffline = !this.isOnline;
+            this.isOnline = true;
+            this.consecutiveFailures = 0;
+
+            if (wasOffline) {
+                console.log('[MediaMTX] Connection restored - syncing cameras...');
+                await this.syncCameras(1);
+                return;
+            }
+
+            // Check if paths need re-sync (paths might be cleared after MediaMTX restart)
+            const paths = await this.getMediaMtxPaths();
+            const dbCameras = this.getDatabaseCameras();
+            const cameraPaths = paths.filter(p => p.startsWith('camera'));
+            
+            // If we have cameras in DB but no camera paths in MediaMTX, re-sync
+            if (dbCameras.length > 0 && cameraPaths.length === 0) {
+                console.log('[MediaMTX] Paths missing - re-syncing cameras...');
+                await this.syncCameras(1);
+            }
+        } catch (error) {
+            this.consecutiveFailures++;
+            if (this.consecutiveFailures <= this.maxConsecutiveFailures) {
+                console.error('[MediaMTX] Health check error:', error.message);
+            }
+        }
+    }
+
     /**
      * Fetches all active paths from the MediaMTX API.
      * @returns {Promise<string[]>} A list of path names.
      */
     async getMediaMtxPaths() {
         try {
-            const response = await axios.get(`${mediaMtxApiBaseUrl}/paths/list`);
+            const response = await axios.get(`${mediaMtxApiBaseUrl}/paths/list`, { timeout: 5000 });
             if (response.data && response.data.items) {
-                // items is an array of path objects with 'name' property
                 return response.data.items.map(item => item.name);
             }
             return [];
         } catch (error) {
-            // Don't throw if MediaMTX is not ready, just log it.
-            if (error.code !== 'ECONNREFUSED') {
-                console.error('[MediaMTX Service] Error fetching paths from MediaMTX:', error.message);
+            if (error.code !== 'ECONNREFUSED' && error.code !== 'ETIMEDOUT') {
+                console.error('[MediaMTX Service] Error fetching paths:', error.message);
             }
             return [];
         }
@@ -68,7 +146,7 @@ class MediaMtxService {
      */
     async pathExists(pathName) {
         try {
-            await axios.get(`${mediaMtxApiBaseUrl}/config/paths/get/${pathName}`);
+            await axios.get(`${mediaMtxApiBaseUrl}/config/paths/get/${pathName}`, { timeout: 5000 });
             return true;
         } catch {
             return false;
@@ -87,11 +165,11 @@ class MediaMtxService {
             
             if (exists) {
                 // Path exists, update it
-                await axios.patch(`${mediaMtxApiBaseUrl}/config/paths/patch/${pathName}`, pathConfig);
+                await axios.patch(`${mediaMtxApiBaseUrl}/config/paths/patch/${pathName}`, pathConfig, { timeout: 5000 });
                 return { success: true, action: 'updated' };
             } else {
                 // Path doesn't exist, add it
-                await axios.post(`${mediaMtxApiBaseUrl}/config/paths/add/${pathName}`, pathConfig);
+                await axios.post(`${mediaMtxApiBaseUrl}/config/paths/add/${pathName}`, pathConfig, { timeout: 5000 });
                 return { success: true, action: 'added' };
             }
         } catch (error) {
@@ -106,7 +184,7 @@ class MediaMtxService {
      */
     async removePath(pathName) {
         try {
-            await axios.delete(`${mediaMtxApiBaseUrl}/config/paths/delete/${pathName}`);
+            await axios.delete(`${mediaMtxApiBaseUrl}/config/paths/delete/${pathName}`, { timeout: 5000 });
             return { success: true };
         } catch (error) {
             console.error(`[MediaMTX Service] Error removing path ${pathName}:`, error.message);
@@ -172,8 +250,8 @@ class MediaMtxService {
     async getStats() {
         try {
             const [pathsRes, configRes] = await Promise.all([
-                axios.get(`${mediaMtxApiBaseUrl}/paths/list`),
-                axios.get(`${mediaMtxApiBaseUrl}/config/global/get`),
+                axios.get(`${mediaMtxApiBaseUrl}/paths/list`, { timeout: 5000 }),
+                axios.get(`${mediaMtxApiBaseUrl}/config/global/get`, { timeout: 5000 }),
             ]);
             
             // Get sessions/readers count from paths data
@@ -200,8 +278,8 @@ class MediaMtxService {
                 error: false
             };
         } catch (error) {
-            if (error.code !== 'ECONNREFUSED') {
-                console.error('[MediaMTX Service] Error fetching stats from MediaMTX:', error.message);
+            if (error.code !== 'ECONNREFUSED' && error.code !== 'ETIMEDOUT') {
+                console.error('[MediaMTX Service] Error fetching stats:', error.message);
             }
             return {
                 paths: [],
@@ -219,7 +297,7 @@ class MediaMtxService {
      */
     async getStatus() {
         try {
-            const response = await axios.get(`${mediaMtxApiBaseUrl}/config/global/get`);
+            const response = await axios.get(`${mediaMtxApiBaseUrl}/config/global/get`, { timeout: 5000 });
             return {
                 online: true,
                 config: response.data
