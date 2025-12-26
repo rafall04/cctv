@@ -26,17 +26,19 @@ import userRoutes from './routes/userRoutes.js';
 import mediaMtxService from './services/mediaMtxService.js';
 
 const fastify = Fastify({
-    logger: config.server.env === 'production' ? true : {
-        level: 'debug',
-        transport: {
-            target: 'pino-pretty',
-            options: {
-                translateTime: 'HH:mm:ss Z',
-                ignore: 'pid,hostname,reqId,res,responseTime',
-                messageFormat: '{req.method} {req.url} - {res.statusCode}'
+    logger: config.server.env === 'production' 
+        ? { level: 'info' }  // Simple JSON logging in production
+        : {
+            level: 'debug',
+            transport: {
+                target: 'pino-pretty',
+                options: {
+                    translateTime: 'HH:mm:ss Z',
+                    ignore: 'pid,hostname,reqId,res,responseTime',
+                    messageFormat: '{req.method} {req.url} - {res.statusCode}'
+                }
             }
-        }
-    },
+        },
 });
 
 // ============================================
