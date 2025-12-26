@@ -4,6 +4,14 @@ import jwt from '@fastify/jwt';
 import cookie from '@fastify/cookie';
 import { config } from './config/config.js';
 
+// Import middleware
+import { securityHeadersMiddleware } from './middleware/securityHeaders.js';
+import { rateLimiterMiddleware } from './middleware/rateLimiter.js';
+import { csrfMiddleware } from './middleware/csrfProtection.js';
+
+// Import services
+import { startDailyCleanup, stopDailyCleanup } from './services/securityAuditLogger.js';
+
 // Import routes
 import authRoutes from './routes/authRoutes.js';
 import cameraRoutes from './routes/cameraRoutes.js';
@@ -58,6 +66,15 @@ await fastify.register(cookie, {
     parseOptions: {},
 });
 
+// Register Security Headers Middleware (before other middleware)
+await fastify.register(securityHeadersMiddleware);
+
+// Register Rate Limiter Middleware (after security headers)
+await fastify.register(rateLimiterMiddleware);
+
+// Register CSRF Protection Middleware (after rate limiter)
+await fastify.register(csrfMiddleware);
+
 // Register JWT
 await fastify.register(jwt, {
     secret: config.jwt.secret,
@@ -107,6 +124,7 @@ const start = async () => {
         console.log('');
         console.log('API Endpoints:');
         console.log('  Public:');
+        console.log('    GET    /api/auth/csrf');
         console.log('    POST   /api/auth/login');
         console.log('    GET    /api/cameras/active');
         console.log('    GET    /api/stream');
@@ -126,6 +144,10 @@ const start = async () => {
         // Initial sync with MediaMTX and start auto-sync
         await mediaMtxService.syncCameras();
         mediaMtxService.startAutoSync();
+        
+        // Start security audit log cleanup scheduler
+        startDailyCleanup();
+        console.log('[Security] Daily audit log cleanup scheduled');
     } catch (err) {
         fastify.log.error(err);
         process.exit(1);
@@ -136,6 +158,7 @@ const start = async () => {
 const shutdown = async () => {
     console.log('\n[Server] Shutting down gracefully...');
     mediaMtxService.stopAutoSync();
+    stopDailyCleanup();
     await fastify.close();
     process.exit(0);
 };

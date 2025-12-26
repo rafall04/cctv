@@ -1,5 +1,10 @@
 import { query, queryOne, execute } from '../database/database.js';
 import mediaMtxService from '../services/mediaMtxService.js';
+import { 
+    logCameraCreated, 
+    logCameraUpdated, 
+    logCameraDeleted 
+} from '../services/securityAuditLogger.js';
 
 // Get all cameras (admin only - includes disabled cameras)
 export async function getAllCameras(request, reply) {
@@ -113,6 +118,14 @@ export async function createCamera(request, reply) {
             [request.user.id, 'CREATE_CAMERA', `Created camera: ${name}`, request.ip]
         );
 
+        // Log to security audit
+        logCameraCreated({
+            cameraId: result.lastInsertRowid,
+            cameraName: name,
+            createdByUserId: request.user.id,
+            createdByUsername: request.user.username
+        }, request);
+
         // Add path to MediaMTX if camera is enabled
         if (isEnabled) {
             mediaMtxService.updateCameraPath(result.lastInsertRowid, private_rtsp_url).catch(err => {
@@ -208,6 +221,15 @@ export async function updateCamera(request, reply) {
             [request.user.id, 'UPDATE_CAMERA', `Updated camera ID: ${id}`, request.ip]
         );
 
+        // Log to security audit
+        logCameraUpdated({
+            cameraId: parseInt(id),
+            cameraName: existingCamera.name,
+            updatedByUserId: request.user.id,
+            updatedByUsername: request.user.username,
+            changes: { name, description, location, group_name, area_id, enabled }
+        }, request);
+
         // Handle MediaMTX path updates
         const newEnabled = enabled !== undefined ? enabled : existingCamera.enabled;
         const newRtspUrl = private_rtsp_url !== undefined ? private_rtsp_url : existingCamera.private_rtsp_url;
@@ -262,6 +284,14 @@ export async function deleteCamera(request, reply) {
             'INSERT INTO audit_logs (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)',
             [request.user.id, 'DELETE_CAMERA', `Deleted camera: ${camera.name} (ID: ${id})`, request.ip]
         );
+
+        // Log to security audit
+        logCameraDeleted({
+            cameraId: parseInt(id),
+            cameraName: camera.name,
+            deletedByUserId: request.user.id,
+            deletedByUsername: request.user.username
+        }, request);
 
         // Remove specific path from MediaMTX (don't await, run in background)
         mediaMtxService.removeCameraPath(id).catch(err => {
