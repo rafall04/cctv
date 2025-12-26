@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { SecurityProvider } from './contexts/SecurityContext';
+import { NotificationProvider } from './contexts/NotificationContext';
+import { ToastContainer } from './components/ui/ToastContainer';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import CameraManagement from './pages/CameraManagement';
@@ -14,7 +16,9 @@ function App() {
     return (
         <ThemeProvider>
         <SecurityProvider>
+        <NotificationProvider>
         <BrowserRouter>
+            <ToastContainer />
             <Routes>
                 {/* Public routes */}
                 <Route path="/" element={<LandingPage />} />
@@ -69,6 +73,7 @@ function App() {
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         </BrowserRouter>
+        </NotificationProvider>
         </SecurityProvider>
         </ThemeProvider>
     );

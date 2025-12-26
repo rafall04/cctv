@@ -30,7 +30,9 @@ export default {
             animation: {
                 'slide-down': 'slideDown 0.3s ease-out',
                 'slide-up': 'slideUp 0.3s ease-out',
+                'slide-in-right': 'slideInRight 0.3s ease-out',
                 'fade-in': 'fadeIn 0.2s ease-out',
+                'fade-out': 'fadeOut 0.2s ease-out forwards',
                 'shimmer': 'shimmer 2s infinite',
             },
             keyframes: {
@@ -42,9 +44,17 @@ export default {
                     '0%': { transform: 'translateY(100%)', opacity: '0' },
                     '100%': { transform: 'translateY(0)', opacity: '1' },
                 },
+                slideInRight: {
+                    '0%': { transform: 'translateX(100%)', opacity: '0' },
+                    '100%': { transform: 'translateX(0)', opacity: '1' },
+                },
                 fadeIn: {
                     '0%': { opacity: '0' },
                     '100%': { opacity: '1' },
+                },
+                fadeOut: {
+                    '0%': { opacity: '1' },
+                    '100%': { opacity: '0' },
                 },
                 shimmer: {
                     '0%': { transform: 'translateX(-100%)' },
