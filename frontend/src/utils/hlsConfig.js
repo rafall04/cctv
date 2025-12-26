@@ -106,6 +106,7 @@ const HLS_CONFIGS = {
 /**
  * Mobile-specific configuration overrides
  * Applied on top of tier-based config for mobile devices
+ * **Validates: Requirements 7.1, 7.2**
  */
 const MOBILE_OVERRIDES = {
     // Smaller initial buffer for faster start on mobile
@@ -116,28 +117,90 @@ const MOBILE_OVERRIDES = {
 };
 
 /**
+ * Mobile-specific HLS configuration for phones
+ * Uses smaller segments and more conservative settings
+ * **Validates: Requirements 7.1, 7.2**
+ */
+const MOBILE_PHONE_CONFIG = {
+    // Smaller buffer for faster initial load
+    maxBufferLength: 15,
+    maxMaxBufferLength: 30,
+    // Smaller buffer size for memory constraints
+    maxBufferSize: 25 * 1000 * 1000, // 25MB
+    // Start with lowest quality for faster initial load
+    startLevel: 0,
+    // More conservative bandwidth estimation
+    abrEwmaDefaultEstimate: 250000, // 250kbps
+    abrBandWidthFactor: 0.6,
+    abrBandWidthUpFactor: 0.4,
+    // Longer timeouts for mobile networks
+    fragLoadingTimeOut: 35000,
+    fragLoadingRetryDelay: 2500,
+};
+
+/**
+ * Mobile-specific HLS configuration for tablets
+ * Balanced between phone and desktop settings
+ */
+const MOBILE_TABLET_CONFIG = {
+    maxBufferLength: 20,
+    maxMaxBufferLength: 40,
+    maxBufferSize: 35 * 1000 * 1000, // 35MB
+    startLevel: -1, // Auto for tablets
+    abrEwmaDefaultEstimate: 400000, // 400kbps
+    abrBandWidthFactor: 0.7,
+    abrBandWidthUpFactor: 0.5,
+    fragLoadingTimeOut: 30000,
+    fragLoadingRetryDelay: 2000,
+};
+
+/**
  * Get HLS configuration for a specific device tier
  * @param {'low' | 'medium' | 'high'} tier - Device tier
  * @param {Object} options - Additional options
  * @param {boolean} options.isMobile - Whether device is mobile
+ * @param {'phone' | 'tablet' | 'desktop'} options.mobileDeviceType - Mobile device type
  * @param {Object} options.overrides - Custom configuration overrides
  * @returns {Object} HLS.js configuration object
  */
 export const getHLSConfig = (tier, options = {}) => {
-    const { isMobile = false, overrides = {} } = options;
+    const { isMobile = false, mobileDeviceType = 'desktop', overrides = {} } = options;
     
     // Get base config for tier (default to medium if invalid tier)
     const baseConfig = { ...(HLS_CONFIGS[tier] || HLS_CONFIGS.medium) };
     
-    // Apply mobile overrides if on mobile device
+    // Apply mobile-specific configurations
+    // **Validates: Requirements 7.1, 7.2**
     if (isMobile) {
-        baseConfig.maxBufferLength = MOBILE_OVERRIDES.maxBufferLength(baseConfig.maxBufferLength);
-        baseConfig.abrBandWidthFactor = MOBILE_OVERRIDES.abrBandWidthFactor(baseConfig.abrBandWidthFactor);
-        baseConfig.abrBandWidthUpFactor = MOBILE_OVERRIDES.abrBandWidthUpFactor(baseConfig.abrBandWidthUpFactor);
+        // Apply device-type specific mobile config
+        if (mobileDeviceType === 'phone') {
+            Object.assign(baseConfig, MOBILE_PHONE_CONFIG);
+        } else if (mobileDeviceType === 'tablet') {
+            Object.assign(baseConfig, MOBILE_TABLET_CONFIG);
+        } else {
+            // Generic mobile overrides
+            baseConfig.maxBufferLength = MOBILE_OVERRIDES.maxBufferLength(baseConfig.maxBufferLength);
+            baseConfig.abrBandWidthFactor = MOBILE_OVERRIDES.abrBandWidthFactor(baseConfig.abrBandWidthFactor);
+            baseConfig.abrBandWidthUpFactor = MOBILE_OVERRIDES.abrBandWidthUpFactor(baseConfig.abrBandWidthUpFactor);
+        }
     }
     
     // Apply custom overrides
     return { ...baseConfig, ...overrides };
+};
+
+/**
+ * Get mobile-optimized HLS configuration
+ * Convenience function for mobile devices
+ * @param {'phone' | 'tablet'} deviceType - Mobile device type
+ * @param {'low' | 'medium' | 'high'} tier - Device tier
+ * @returns {Object} Mobile-optimized HLS.js configuration
+ */
+export const getMobileHLSConfig = (deviceType, tier = 'medium') => {
+    return getHLSConfig(tier, {
+        isMobile: true,
+        mobileDeviceType: deviceType,
+    });
 };
 
 /**
@@ -189,10 +252,16 @@ export const isValidTier = (tier) => {
 
 export default {
     getHLSConfig,
+    getMobileHLSConfig,
     getConfigValue,
     shouldEnableWorker,
     getMaxBufferLength,
     getAvailableTiers,
     isValidTier,
     HLS_CONFIGS,
+    MOBILE_PHONE_CONFIG,
+    MOBILE_TABLET_CONFIG,
 };
+
+// Named exports for direct imports
+export { HLS_CONFIGS, MOBILE_PHONE_CONFIG, MOBILE_TABLET_CONFIG };

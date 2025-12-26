@@ -462,3 +462,372 @@ fastify.addHook('onResponse', async (request, reply) => {
 ```
 
 These best practices ensure maintainable, secure, and performant code across the entire CCTV system.
+
+
+## Video Player Optimization Best Practices
+
+This section documents the device-adaptive video player optimization approach implemented for RAF NET CCTV Hub. The goal is to ensure smooth video playback across all device types, from low-end mobile phones ("HP kentang") to high-end desktops.
+
+### Core Principles
+
+1. **Device-Adaptive Configuration** - Automatically detect device capabilities and apply appropriate settings
+2. **Intelligent Resource Management** - Efficient memory and buffer management
+3. **Graceful Degradation** - Maintain functionality even on limited hardware
+4. **Progressive Enhancement** - Enable advanced features only on capable devices
+
+### Device-Adaptive HLS Configuration
+
+```javascript
+// ✅ Good - Device-adaptive HLS configuration
+import { detectDeviceTier } from '../utils/deviceDetector';
+import { getHLSConfig } from '../utils/hlsConfig';
+
+function VideoPlayer({ streamUrl }) {
+    const videoRef = useRef(null);
+    const hlsRef = useRef(null);
+
+    useEffect(() => {
+        if (!streamUrl || !videoRef.current) return;
+
+        // Detect device capabilities and get appropriate config
+        const tier = detectDeviceTier();
+        const hlsConfig = getHLSConfig(tier);
+
+        if (Hls.isSupported()) {
+            hlsRef.current = new Hls(hlsConfig);
+            hlsRef.current.loadSource(streamUrl);
+            hlsRef.current.attachMedia(videoRef.current);
+        }
+
+        return () => {
+            if (hlsRef.current) {
+                hlsRef.current.destroy();
+                hlsRef.current = null;
+            }
+        };
+    }, [streamUrl]);
+}
+
+// ❌ Bad - One-size-fits-all configuration
+function VideoPlayer({ streamUrl }) {
+    useEffect(() => {
+        const hls = new Hls({
+            enableWorker: true,  // May crash low-end devices
+            maxBufferLength: 60, // Too much memory for low-end
+        });
+    }, [streamUrl]);
+}
+```
+
+### Device Tier Classification
+
+The system classifies devices into three tiers based on hardware capabilities:
+
+| Tier | RAM | CPU Cores | Mobile RAM | Use Case |
+|------|-----|-----------|------------|----------|
+| Low | ≤ 2GB | ≤ 2 | ≤ 3GB | Budget phones, old devices |
+| Medium | 2-4GB | 2-4 | 3-4GB | Mid-range devices |
+| High | > 4GB | > 4 | > 4GB | Modern phones, desktops |
+
+```javascript
+// ✅ Good - Proper device detection
+const detectDeviceTier = () => {
+    const ram = navigator.deviceMemory || 4;
+    const cores = navigator.hardwareConcurrency || 4;
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    
+    // Low-end: RAM ≤ 2GB OR cores ≤ 2 OR mobile with RAM ≤ 3GB
+    if (ram <= 2 || cores <= 2 || (isMobile && ram <= 3)) {
+        return 'low';
+    }
+    // High-end: RAM > 4GB AND cores > 4
+    if (ram > 4 && cores > 4) {
+        return 'high';
+    }
+    return 'medium';
+};
+```
+
+### HLS Configuration by Device Tier
+
+```javascript
+// ✅ Good - Tier-specific configurations
+const HLS_CONFIGS = {
+    low: {
+        enableWorker: false,        // Disable worker for CPU savings
+        lowLatencyMode: false,      // Stability over latency
+        backBufferLength: 10,       // Minimal back buffer
+        maxBufferLength: 15,        // Small forward buffer
+        maxMaxBufferLength: 30,
+        maxBufferSize: 30 * 1000 * 1000, // 30MB max
+        startLevel: 0,              // Start with lowest quality
+        abrBandWidthFactor: 0.7,    // Conservative bandwidth usage
+        fragLoadingMaxRetry: 4,
+        fragLoadingRetryDelay: 2000,
+    },
+    medium: {
+        enableWorker: true,
+        lowLatencyMode: false,
+        backBufferLength: 20,
+        maxBufferLength: 25,
+        maxMaxBufferLength: 45,
+        maxBufferSize: 45 * 1000 * 1000, // 45MB max
+        startLevel: -1,             // Auto quality
+        abrBandWidthFactor: 0.8,
+        fragLoadingMaxRetry: 5,
+        fragLoadingRetryDelay: 1500,
+    },
+    high: {
+        enableWorker: true,
+        lowLatencyMode: false,
+        backBufferLength: 30,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
+        maxBufferSize: 60 * 1000 * 1000, // 60MB max
+        startLevel: -1,             // Auto quality
+        abrBandWidthFactor: 0.9,
+        fragLoadingMaxRetry: 6,
+        fragLoadingRetryDelay: 1000,
+    }
+};
+```
+
+### Error Recovery with Exponential Backoff
+
+```javascript
+// ✅ Good - Exponential backoff for error recovery
+const getBackoffDelay = (retryCount) => {
+    return Math.min(1000 * Math.pow(2, retryCount), 8000); // 1s, 2s, 4s, 8s max
+};
+
+hls.on(Hls.Events.ERROR, (event, data) => {
+    if (data.fatal) {
+        switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+                if (retryCount < maxRetries) {
+                    const delay = getBackoffDelay(retryCount);
+                    setTimeout(() => {
+                        hls.startLoad();
+                        retryCount++;
+                    }, delay);
+                }
+                break;
+            case Hls.ErrorTypes.MEDIA_ERROR:
+                hls.recoverMediaError(); // Try recovery first
+                break;
+            default:
+                setStatus('error');
+                break;
+        }
+    }
+});
+
+// ❌ Bad - Fixed retry delay
+hls.on(Hls.Events.ERROR, (event, data) => {
+    if (data.fatal) {
+        setTimeout(() => hls.startLoad(), 1000); // Always 1s, no limit
+    }
+});
+```
+
+### Visibility-Based Stream Control
+
+```javascript
+// ✅ Good - Pause streams when not visible
+const useVisibilityObserver = (videoRef, hlsRef) => {
+    const pauseTimeoutRef = useRef(null);
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting) {
+                    // Resume when visible
+                    clearTimeout(pauseTimeoutRef.current);
+                    videoRef.current?.play();
+                } else {
+                    // Pause after 5s when not visible
+                    pauseTimeoutRef.current = setTimeout(() => {
+                        videoRef.current?.pause();
+                    }, 5000);
+                }
+            },
+            { threshold: 0.1 }
+        );
+
+        if (videoRef.current) {
+            observer.observe(videoRef.current);
+        }
+
+        return () => {
+            observer.disconnect();
+            clearTimeout(pauseTimeoutRef.current);
+        };
+    }, []);
+};
+
+// ❌ Bad - Always streaming even when not visible
+// (wastes bandwidth and device resources)
+```
+
+### Multi-View Stream Management
+
+```javascript
+// ✅ Good - Staggered initialization and limits
+import { createMultiViewManager, staggeredInitialize } from '../utils/multiViewManager';
+
+const initializeMultiView = async (cameras, deviceTier) => {
+    const manager = createMultiViewManager();
+    const maxStreams = manager.getMaxStreams(); // 2 for low, 3 for medium/high
+    const camerasToInit = cameras.slice(0, maxStreams);
+    
+    // Stagger initialization to prevent CPU spike (100ms delay)
+    await staggeredInitialize(camerasToInit, initStream, {
+        delayMs: 100,
+        onError: (camera, error) => {
+            // Error isolation - one failure doesn't affect others
+            console.error(`Stream ${camera.id} failed:`, error);
+        }
+    });
+};
+
+// ❌ Bad - Initialize all at once
+const initializeMultiView = (cameras) => {
+    cameras.forEach(camera => initializeStream(camera)); // CPU spike!
+};
+```
+
+### Zoom/Pan Performance with RAF Throttling
+
+```javascript
+// ✅ Good - Use CSS transforms with RAF throttling
+import { createRAFThrottle, createTransformThrottle } from '../utils/rafThrottle';
+
+// Option 1: Generic RAF throttle
+const { throttled: handleZoom, cancel } = createRAFThrottle((delta) => {
+    const newZoom = Math.min(Math.max(1, zoom + delta), maxZoom);
+    wrapperRef.current.style.transform = `scale(${newZoom})`;
+});
+
+// Option 2: Specialized transform throttle
+const transformer = createTransformThrottle(wrapperRef.current);
+transformer.update(scale, panX, panY); // Max 60fps updates
+
+// ❌ Bad - Direct state updates causing re-renders
+const handleZoom = (delta) => {
+    setZoom(prev => prev + delta); // Causes full re-render
+};
+```
+
+### Resource Cleanup
+
+```javascript
+// ✅ Good - Complete cleanup on unmount
+useEffect(() => {
+    return () => {
+        // Destroy HLS instance
+        if (hlsRef.current) {
+            hlsRef.current.destroy();
+            hlsRef.current = null;
+        }
+        
+        // Clear video source
+        if (videoRef.current) {
+            videoRef.current.pause();
+            videoRef.current.src = '';
+            videoRef.current.load();
+        }
+        
+        // Clear any pending timeouts
+        clearTimeout(retryTimeoutRef.current);
+        clearTimeout(pauseTimeoutRef.current);
+    };
+}, []);
+
+// ❌ Bad - Incomplete cleanup (memory leak)
+useEffect(() => {
+    return () => {
+        hlsRef.current?.destroy(); // Missing video cleanup
+    };
+}, []);
+```
+
+### Brief Buffer Handling
+
+```javascript
+// ✅ Good - Don't show spinner for brief buffers
+const [showSpinner, setShowSpinner] = useState(false);
+const bufferTimeoutRef = useRef(null);
+
+const handleWaiting = () => {
+    // Only show spinner after 2 seconds of buffering
+    bufferTimeoutRef.current = setTimeout(() => {
+        setShowSpinner(true);
+    }, 2000);
+};
+
+const handlePlaying = () => {
+    clearTimeout(bufferTimeoutRef.current);
+    setShowSpinner(false);
+};
+
+// ❌ Bad - Immediate spinner (annoying UX)
+const handleWaiting = () => {
+    setShowSpinner(true); // Shows spinner for every tiny buffer
+};
+```
+
+### Adaptive Quality Management
+
+```javascript
+// ✅ Good - Bandwidth-based quality adaptation
+import { createAdaptiveQuality } from '../utils/adaptiveQuality';
+
+const aq = createAdaptiveQuality(hls, {
+    lowBandwidthThreshold: 500000,  // 500kbps
+    highBandwidthThreshold: 2000000, // 2Mbps
+    onQualityChange: (level, bandwidth) => {
+        console.log(`Quality changed to level ${level} at ${bandwidth}bps`);
+    }
+});
+
+aq.start();
+// On cleanup: aq.stop();
+```
+
+### Mobile-Specific Optimizations
+
+```javascript
+// ✅ Good - Handle orientation changes without stream reload
+import { createOrientationObserver } from '../utils/orientationObserver';
+
+const orientationObserver = createOrientationObserver({
+    onOrientationChange: ({ orientation, isPortrait }) => {
+        // Adapt layout without reloading stream
+        updateLayout(isPortrait ? 'portrait' : 'landscape');
+    }
+});
+
+orientationObserver.start();
+// On cleanup: orientationObserver.stop();
+
+// ✅ Good - Use passive event listeners for touch
+element.addEventListener('touchmove', handleTouch, { passive: true });
+```
+
+### Performance Checklist
+
+When implementing video player features, ensure:
+
+- [ ] Device tier is detected on component mount
+- [ ] HLS config matches device capabilities
+- [ ] Web workers disabled on low-end devices
+- [ ] Buffer sizes appropriate for device tier
+- [ ] Visibility observer pauses off-screen streams
+- [ ] Error recovery uses exponential backoff
+- [ ] Multi-view respects stream limits (2 low, 3 medium/high)
+- [ ] Zoom/pan uses RAF throttling (max 60fps)
+- [ ] Complete cleanup on unmount (HLS, video src, timeouts)
+- [ ] Brief buffers (<2s) don't show spinner
+- [ ] Orientation changes don't reload streams
+
+These video player best practices ensure smooth playback across all device types, from low-end mobile phones to high-end desktops.

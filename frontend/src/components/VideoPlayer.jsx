@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, memo, useCallback } from 'react';
 import Hls from 'hls.js';
-import { detectDeviceTier, getDeviceCapabilities } from '../utils/deviceDetector';
+import { detectDeviceTier, getDeviceCapabilities, getMobileDeviceType } from '../utils/deviceDetector';
 import { getHLSConfig } from '../utils/hlsConfig';
 import { createErrorRecoveryHandler, getBackoffDelay } from '../utils/errorRecovery';
 import { createVisibilityObserver } from '../utils/visibilityObserver';
+import { createOrientationObserver, getCurrentOrientation } from '../utils/orientationObserver';
 
 /**
  * Optimized VideoPlayer Component
@@ -16,6 +17,7 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
     const hlsRef = useRef(null);
     const containerRef = useRef(null);
     const visibilityObserverRef = useRef(null);
+    const orientationObserverRef = useRef(null);
     const errorRecoveryRef = useRef(null);
     const pauseTimeoutRef = useRef(null);
     const bufferSpinnerTimeoutRef = useRef(null);
@@ -38,6 +40,9 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
     // Fullscreen state
     const [isFullScreen, setIsFullScreen] = useState(false);
 
+    // Orientation state - **Validates: Requirements 7.4**
+    const [orientation, setOrientation] = useState(() => getCurrentOrientation());
+
     // Zoom & Pan State
     const [zoom, setZoom] = useState(1);
     const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -50,6 +55,36 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
         setDeviceCapabilities(capabilities);
         setDeviceTier(capabilities.tier);
     }, []);
+
+    // Setup orientation observer - **Validates: Requirements 7.4**
+    // Handles orientation changes without triggering stream reload
+    useEffect(() => {
+        if (!deviceCapabilities?.isMobile) return;
+
+        orientationObserverRef.current = createOrientationObserver({
+            onOrientationChange: ({ orientation: newOrientation }) => {
+                // Update orientation state without reloading stream
+                setOrientation(newOrientation);
+                
+                // Reset zoom/pan on orientation change for better UX
+                if (zoom !== 1) {
+                    setZoom(1);
+                    setPan({ x: 0, y: 0 });
+                }
+            },
+            debounceResize: true,
+            debounceDelay: 150,
+        });
+
+        orientationObserverRef.current.start();
+
+        return () => {
+            if (orientationObserverRef.current) {
+                orientationObserverRef.current.stop();
+                orientationObserverRef.current = null;
+            }
+        };
+    }, [deviceCapabilities?.isMobile, zoom]);
 
     // Initialize error recovery handler
     useEffect(() => {
@@ -146,8 +181,10 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
 
             // Get device-adaptive HLS configuration
             // **Property 2: Device-based HLS Configuration**
+            // **Property 14: Mobile HLS Configuration**
             const hlsConfig = getHLSConfig(deviceTier, {
                 isMobile: deviceCapabilities.isMobile,
+                mobileDeviceType: deviceCapabilities.mobileDeviceType,
             });
 
             // Try HLS first
@@ -374,7 +411,8 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
         setIsDragging(false);
     }, []);
 
-    // Touch Handlers for Mobile
+    // Touch Handlers for Mobile - **Validates: Requirements 7.5**
+    // Optimized with passive event listeners where appropriate
     const handleTouchStart = useCallback((e) => {
         if (!enableZoom || zoom <= 1) return;
         setIsDragging(true);
@@ -387,8 +425,10 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
 
     const handleTouchMove = useCallback((e) => {
         if (!isDragging || !enableZoom || zoom <= 1) return;
-        // Prevent scrolling while panning
-        if (e.cancelable) e.preventDefault();
+        // Prevent scrolling while panning - only when zoomed in
+        if (e.cancelable && zoom > 1) {
+            e.preventDefault();
+        }
 
         requestAnimationFrame(() => {
             const touch = e.touches[0];
@@ -406,6 +446,29 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
     const handleTouchEnd = useCallback(() => {
         setIsDragging(false);
     }, []);
+
+    // Attach touch event listeners with passive option for better scroll performance
+    // **Validates: Requirements 7.5**
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container || !deviceCapabilities?.isMobile) return;
+
+        // Use passive: true for touchstart and touchend to improve scroll performance
+        // touchmove needs passive: false when we need to prevent default (when zoomed)
+        const touchStartOptions = { passive: true };
+        const touchMoveOptions = { passive: zoom <= 1 }; // passive when not zoomed
+        const touchEndOptions = { passive: true };
+
+        container.addEventListener('touchstart', handleTouchStart, touchStartOptions);
+        container.addEventListener('touchmove', handleTouchMove, touchMoveOptions);
+        container.addEventListener('touchend', handleTouchEnd, touchEndOptions);
+
+        return () => {
+            container.removeEventListener('touchstart', handleTouchStart);
+            container.removeEventListener('touchmove', handleTouchMove);
+            container.removeEventListener('touchend', handleTouchEnd);
+        };
+    }, [deviceCapabilities?.isMobile, zoom, handleTouchStart, handleTouchMove, handleTouchEnd]);
 
     // Zoom button handlers
     const handleZoomIn = useCallback((e) => {
@@ -434,9 +497,6 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
             onWheel={handleWheel}
         >
             <video

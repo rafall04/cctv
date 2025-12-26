@@ -3,29 +3,24 @@ import { streamService } from '../services/streamService';
 import { areaService } from '../services/areaService';
 import { useTheme } from '../contexts/ThemeContext';
 import { createTransformThrottle } from '../utils/rafThrottle';
+import { detectDeviceTier, getMaxConcurrentStreams, isMobileDevice, getMobileDeviceType } from '../utils/deviceDetector';
+import { getHLSConfig } from '../utils/hlsConfig';
+import { DEFAULT_STAGGER_DELAY } from '../utils/multiViewManager';
 
 // ============================================
-// HLS CONFIG - Stable for all devices including low-end
+// DEVICE-ADAPTIVE HLS CONFIG
+// Uses hlsConfig module for tier-specific settings
+// **Validates: Requirements 1.1, 1.2, 1.3, 1.4, 1.5, 7.1, 7.2**
 // ============================================
-const HLS_CONFIG = {
-    enableWorker: false,              // Disable worker - better for low-end devices
-    lowLatencyMode: false,            // Disable LL-HLS - more stable
-    backBufferLength: 30,             // Keep 30s back buffer for stability
-    maxBufferLength: 30,              // 30s buffer - stable playback
-    maxMaxBufferLength: 60,           // Max 60s buffer
-    maxBufferSize: 60 * 1000 * 1000,  // 60MB max buffer
-    maxBufferHole: 0.5,               // Tolerate small gaps
-    startLevel: -1,                   // Auto quality selection
-    abrEwmaDefaultEstimate: 500000,   // Conservative 500kbps estimate
-    abrBandWidthFactor: 0.8,          // Conservative bandwidth usage
-    abrBandWidthUpFactor: 0.7,        // Gradual quality upgrade
-    fragLoadingTimeOut: 20000,        // 20s timeout
-    fragLoadingMaxRetry: 6,           // More retries for stability
-    fragLoadingRetryDelay: 1000,      // 1s between retries
-    manifestLoadingTimeOut: 15000,    // 15s manifest timeout
-    manifestLoadingMaxRetry: 4,       // More retries
-    levelLoadingTimeOut: 15000,       // 15s level timeout
-    levelLoadingMaxRetry: 4,          // More retries
+const getDeviceAdaptiveHLSConfig = () => {
+    const tier = detectDeviceTier();
+    const mobile = isMobileDevice();
+    const mobileType = getMobileDeviceType();
+    
+    return getHLSConfig(tier, {
+        isMobile: mobile,
+        mobileDeviceType: mobileType,
+    });
 };
 
 // Lazy load HLS.js - only when needed
@@ -412,7 +407,7 @@ const ZoomableVideo = memo(function ZoomableVideo({ videoRef, maxZoom = 4, onZoo
 
 
 // ============================================
-// VIDEO POPUP
+// VIDEO POPUP - Optimized with fullscreen detection
 // ============================================
 function VideoPopup({ camera, onClose }) {
     const videoRef = useRef(null);
@@ -422,7 +417,17 @@ function VideoPopup({ camera, onClose }) {
     const [status, setStatus] = useState('connecting');
     const [zoom, setZoom] = useState(1);
     const [retryKey, setRetryKey] = useState(0);
+    const [isFullscreen, setIsFullscreen] = useState(false);
     const url = camera.streams?.hls;
+
+    // Track fullscreen state to disable animations
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            setIsFullscreen(!!document.fullscreenElement);
+        };
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    }, []);
 
     useEffect(() => {
         const onKey = (e) => e.key === 'Escape' && onClose();
@@ -448,12 +453,15 @@ function VideoPopup({ camera, onClose }) {
         video.addEventListener('playing', handlePlaying);
         video.addEventListener('error', handleError);
 
-        // Lazy load HLS.js
+        // Lazy load HLS.js using cached loader
+        // **Validates: Requirements 4.4**
         loadHls().then(Hls => {
             if (cancelled) return;
             
             if (Hls.isSupported()) {
-                hls = new Hls(HLS_CONFIG);
+                // Use device-adaptive HLS configuration
+                const hlsConfig = getDeviceAdaptiveHLSConfig();
+                hls = new Hls(hlsConfig);
                 hlsRef.current = hls;
                 hls.loadSource(url);
                 hls.attachMedia(video);
@@ -527,7 +535,7 @@ function VideoPopup({ camera, onClose }) {
                         <div className="flex items-center gap-2 flex-wrap">
                             <h2 className="text-white font-bold text-sm sm:text-lg truncate">{camera.name}</h2>
                             <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${status === 'live' ? 'bg-emerald-500/20 text-emerald-400' : status === 'connecting' ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400'}`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${status === 'live' ? 'bg-emerald-400 animate-pulse' : status === 'connecting' ? 'bg-amber-400' : 'bg-red-400'}`} />
+                                <span className={`w-1.5 h-1.5 rounded-full ${status === 'live' ? `bg-emerald-400 ${!isFullscreen ? 'animate-pulse' : ''}` : status === 'connecting' ? 'bg-amber-400' : 'bg-red-400'}`} />
                                 {status === 'live' ? 'LIVE' : status === 'connecting' ? 'CONNECTING' : 'OFFLINE'}
                             </span>
                         </div>
@@ -587,9 +595,10 @@ function VideoPopup({ camera, onClose }) {
 }
 
 // ============================================
-// MULTI-VIEW VIDEO ITEM
+// MULTI-VIEW VIDEO ITEM - Optimized with fullscreen detection and error isolation
+// Each stream is isolated - errors in one don't affect others
 // ============================================
-function MultiViewVideoItem({ camera, onRemove }) {
+function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDelay = 0 }) {
     const videoRef = useRef(null);
     const wrapperRef = useRef(null);
     const containerRef = useRef(null);
@@ -597,7 +606,22 @@ function MultiViewVideoItem({ camera, onRemove }) {
     const [status, setStatus] = useState('connecting');
     const [zoom, setZoom] = useState(1);
     const [retryKey, setRetryKey] = useState(0);
+    const [isFullscreen, setIsFullscreen] = useState(false);
     const url = camera.streams?.hls;
+
+    // Track fullscreen state to disable animations
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            setIsFullscreen(!!document.fullscreenElement);
+        };
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    }, []);
+
+    // Notify parent of status changes
+    useEffect(() => {
+        onStatusChange?.(camera.id, status);
+    }, [status, camera.id, onStatusChange]);
 
     useEffect(() => {
         if (!url || !videoRef.current) return;
@@ -606,22 +630,41 @@ function MultiViewVideoItem({ camera, onRemove }) {
         let retryCount = 0;
         const maxRetries = 3;
         let cancelled = false;
+        let initTimeout = null;
 
         setStatus('connecting');
 
         // Only change to 'live' once video starts playing - don't revert on buffering
         const handlePlaying = () => setStatus('live');
-        const handleError = () => setStatus('error');
+        const handleError = () => {
+            setStatus('error');
+            // Notify parent of error for isolation tracking
+            onError?.(camera.id, new Error('Video playback error'));
+        };
 
         video.addEventListener('playing', handlePlaying);
         video.addEventListener('error', handleError);
 
-        // Lazy load HLS.js
-        loadHls().then(Hls => {
+        // Staggered initialization - wait for initDelay before starting
+        const initStream = async () => {
+            if (initDelay > 0) {
+                await new Promise(resolve => {
+                    initTimeout = setTimeout(resolve, initDelay);
+                });
+            }
+
+            if (cancelled) return;
+
+            // Lazy load HLS.js using cached loader
+            // **Validates: Requirements 4.4**
+            const Hls = await loadHls();
+            
             if (cancelled) return;
             
             if (Hls.isSupported()) {
-                hls = new Hls(HLS_CONFIG);
+                // Use device-adaptive HLS configuration
+                const hlsConfig = getDeviceAdaptiveHLSConfig();
+                hls = new Hls(hlsConfig);
                 hlsRef.current = hls;
                 hls.loadSource(url);
                 hls.attachMedia(video);
@@ -639,6 +682,8 @@ function MultiViewVideoItem({ camera, onRemove }) {
                             hls?.recoverMediaError();
                         } else {
                             setStatus('error');
+                            // Error isolation: notify parent but don't propagate
+                            onError?.(camera.id, new Error(`HLS fatal error: ${d.type}`));
                         }
                     }
                 });
@@ -646,15 +691,26 @@ function MultiViewVideoItem({ camera, onRemove }) {
                 video.src = url;
                 video.addEventListener('loadedmetadata', () => video.play().catch(() => {}));
             }
-        });
+        };
 
+        initStream();
+
+        // Cleanup function - ensures proper resource release
         return () => {
             cancelled = true;
+            if (initTimeout) clearTimeout(initTimeout);
             video.removeEventListener('playing', handlePlaying);
             video.removeEventListener('error', handleError);
-            if (hls) { hls.destroy(); hlsRef.current = null; }
+            if (hls) { 
+                hls.destroy(); 
+                hlsRef.current = null; 
+            }
+            // Clear video source to release resources
+            video.pause();
+            video.src = '';
+            video.load();
         };
-    }, [url, retryKey]);
+    }, [url, retryKey, initDelay, camera.id, onError]);
 
     const handleRetry = () => {
         if (hlsRef.current) {
@@ -690,14 +746,16 @@ function MultiViewVideoItem({ camera, onRemove }) {
             <div ref={wrapperRef} className="w-full h-full">
                 <ZoomableVideo videoRef={videoRef} status={status} maxZoom={3} onZoomChange={setZoom} />
             </div>
+            {/* Status badge - disable pulse animation in fullscreen */}
             <div className="absolute top-2 left-2 z-10 pointer-events-none">
                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold text-white shadow ${status === 'live' ? 'bg-emerald-500' : status === 'connecting' ? 'bg-amber-500' : 'bg-red-500'}`}>
-                    <span className={`w-1 h-1 rounded-full bg-white ${status === 'live' ? 'animate-pulse' : ''}`} />
+                    <span className={`w-1 h-1 rounded-full bg-white ${status === 'live' && !isFullscreen ? 'animate-pulse' : ''}`} />
                     {status === 'live' ? 'LIVE' : status === 'connecting' ? '...' : 'OFF'}
                 </span>
             </div>
             <button onClick={onRemove} className="absolute top-2 right-2 z-10 p-1.5 bg-red-500/80 hover:bg-red-500 rounded-lg text-white shadow"><Icons.X /></button>
-            <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity z-10">
+            {/* Overlay controls - render only on hover, no transition in fullscreen */}
+            <div className={`absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 z-10 ${isFullscreen ? '' : 'transition-opacity'}`}>
                 <div className="flex items-center justify-between gap-2">
                     <p className="text-white text-xs font-medium truncate flex-1">{camera.name}</p>
                     <div className="flex items-center gap-1">
@@ -737,18 +795,30 @@ function MultiViewVideoItem({ camera, onRemove }) {
 }
 
 // ============================================
-// MULTI-VIEW LAYOUT
+// MULTI-VIEW LAYOUT - Optimized with staggered initialization and proper cleanup
 // ============================================
 function MultiViewLayout({ cameras, onRemove, onClose }) {
     const containerRef = useRef(null);
+    const streamErrorsRef = useRef(new Map()); // Track errors per stream for isolation
     const count = cameras.length;
 
     useEffect(() => {
         const onKey = (e) => e.key === 'Escape' && onClose();
         document.addEventListener('keydown', onKey);
         document.body.style.overflow = 'hidden';
-        return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
+        return () => { 
+            document.removeEventListener('keydown', onKey); 
+            document.body.style.overflow = ''; 
+        };
     }, [onClose]);
+
+    // Cleanup all streams on unmount
+    useEffect(() => {
+        return () => {
+            // Clear error tracking
+            streamErrorsRef.current.clear();
+        };
+    }, []);
 
     const toggleFS = async () => {
         try {
@@ -756,6 +826,24 @@ function MultiViewLayout({ cameras, onRemove, onClose }) {
             else await document.exitFullscreen?.();
         } catch {}
     };
+
+    // Handle stream errors with isolation - one error doesn't affect others
+    const handleStreamError = useCallback((cameraId, error) => {
+        streamErrorsRef.current.set(cameraId, error);
+        // Error is isolated to this stream only
+        console.warn(`Stream ${cameraId} error (isolated):`, error.message);
+    }, []);
+
+    // Handle stream status changes
+    const handleStatusChange = useCallback((cameraId, status) => {
+        if (status === 'live') {
+            // Clear any previous error for this stream
+            streamErrorsRef.current.delete(cameraId);
+        }
+    }, []);
+
+    // Calculate stagger delay for each camera based on index
+    const getInitDelay = (index) => index * DEFAULT_STAGGER_DELAY;
 
     return (
         <div className="fixed inset-0 z-50 bg-gray-950 flex flex-col">
@@ -773,12 +861,54 @@ function MultiViewLayout({ cameras, onRemove, onClose }) {
                 </div>
             </div>
             <div ref={containerRef} className="flex-1 p-2 sm:p-3 min-h-0 overflow-hidden">
-                {count === 1 && <div className="h-full"><MultiViewVideoItem camera={cameras[0]} onRemove={() => onRemove(cameras[0].id)} /></div>}
-                {count === 2 && <div className="h-full grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">{cameras.map(c => <MultiViewVideoItem key={c.id} camera={c} onRemove={() => onRemove(c.id)} />)}</div>}
+                {count === 1 && (
+                    <div className="h-full">
+                        <MultiViewVideoItem 
+                            camera={cameras[0]} 
+                            onRemove={() => onRemove(cameras[0].id)}
+                            onError={handleStreamError}
+                            onStatusChange={handleStatusChange}
+                            initDelay={getInitDelay(0)}
+                        />
+                    </div>
+                )}
+                {count === 2 && (
+                    <div className="h-full grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                        {cameras.map((c, index) => (
+                            <MultiViewVideoItem 
+                                key={c.id} 
+                                camera={c} 
+                                onRemove={() => onRemove(c.id)}
+                                onError={handleStreamError}
+                                onStatusChange={handleStatusChange}
+                                initDelay={getInitDelay(index)}
+                            />
+                        ))}
+                    </div>
+                )}
                 {count === 3 && (
                     <div className="h-full flex flex-col gap-2 sm:gap-3">
-                        <div style={{ flex: '1.2 1 0%' }} className="min-h-0"><MultiViewVideoItem camera={cameras[0]} onRemove={() => onRemove(cameras[0].id)} /></div>
-                        <div style={{ flex: '0.8 1 0%' }} className="min-h-0 grid grid-cols-2 gap-2 sm:gap-3">{cameras.slice(1).map(c => <MultiViewVideoItem key={c.id} camera={c} onRemove={() => onRemove(c.id)} />)}</div>
+                        <div style={{ flex: '1.2 1 0%' }} className="min-h-0">
+                            <MultiViewVideoItem 
+                                camera={cameras[0]} 
+                                onRemove={() => onRemove(cameras[0].id)}
+                                onError={handleStreamError}
+                                onStatusChange={handleStatusChange}
+                                initDelay={getInitDelay(0)}
+                            />
+                        </div>
+                        <div style={{ flex: '0.8 1 0%' }} className="min-h-0 grid grid-cols-2 gap-2 sm:gap-3">
+                            {cameras.slice(1).map((c, index) => (
+                                <MultiViewVideoItem 
+                                    key={c.id} 
+                                    camera={c} 
+                                    onRemove={() => onRemove(c.id)}
+                                    onError={handleStreamError}
+                                    onStatusChange={handleStatusChange}
+                                    initDelay={getInitDelay(index + 1)}
+                                />
+                            ))}
+                        </div>
                     </div>
                 )}
             </div>
@@ -1218,15 +1348,15 @@ function Footer({ cameraCount, areaCount }) {
 }
 
 // ============================================
-// MULTI-VIEW FLOATING BUTTON - Enhanced with tooltip
+// MULTI-VIEW FLOATING BUTTON - Enhanced with tooltip and device-based limit
 // ============================================
-function MultiViewButton({ count, onClick, maxReached }) {
+function MultiViewButton({ count, onClick, maxReached, maxStreams = 3 }) {
     return (
         <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2">
             {/* Info tooltip when max reached */}
             {maxReached && (
                 <div className="bg-amber-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg shadow-lg animate-bounce">
-                    Maximum 3 cameras reached!
+                    Maximum {maxStreams} cameras reached!
                 </div>
             )}
             
@@ -1245,7 +1375,7 @@ function MultiViewButton({ count, onClick, maxReached }) {
             {count === 0 && (
                 <div className="bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs px-3 py-2 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 max-w-[200px] text-center">
                     <p className="font-medium mb-1">💡 Multi-View Mode</p>
-                    <p className="text-gray-500 dark:text-gray-400">Click the + button on cameras to view up to 3 streams simultaneously</p>
+                    <p className="text-gray-500 dark:text-gray-400">Click the + button on cameras to view up to {maxStreams} streams simultaneously</p>
                 </div>
             )}
         </div>
@@ -1311,6 +1441,10 @@ export default function LandingPage() {
     const [showMulti, setShowMulti] = useState(false);
     const [toasts, setToasts] = useState([]);
     const [maxReached, setMaxReached] = useState(false);
+    
+    // Device-based stream limit
+    const [deviceTier] = useState(() => detectDeviceTier());
+    const maxStreams = getMaxConcurrentStreams(deviceTier);
 
     // Toast helper functions
     const addToast = useCallback((message, type = 'info') => {
@@ -1359,19 +1493,19 @@ export default function LandingPage() {
                 return prev.filter(c => c.id !== camera.id);
             }
             
-            // Check if max reached
-            if (prev.length >= 3) {
-                addToast('Maximum 3 cameras allowed in Multi-View mode', 'warning');
+            // Check if max reached (device-based limit)
+            if (prev.length >= maxStreams) {
+                addToast(`Maximum ${maxStreams} cameras allowed in Multi-View mode (${deviceTier}-end device)`, 'warning');
                 setMaxReached(true);
                 setTimeout(() => setMaxReached(false), 3000);
                 return prev;
             }
             
             // Add to multi-view
-            addToast(`"${camera.name}" added to Multi-View (${prev.length + 1}/3)`, 'success');
+            addToast(`"${camera.name}" added to Multi-View (${prev.length + 1}/${maxStreams})`, 'success');
             return [...prev, camera];
         });
-    }, [addToast]);
+    }, [addToast, maxStreams, deviceTier]);
 
     const handleRemoveMulti = useCallback((id) => {
         setMultiCameras(prev => {
@@ -1460,6 +1594,7 @@ export default function LandingPage() {
                 count={multiCameras.length} 
                 onClick={() => setShowMulti(true)} 
                 maxReached={maxReached}
+                maxStreams={maxStreams}
             />
 
             {/* Toast Notifications */}

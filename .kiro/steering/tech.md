@@ -113,3 +113,241 @@ VITE_API_URL=http://localhost:3000
 3. **Database**: Ensure SQLite file exists and is initialized
 4. **MediaMTX**: Configure with production camera URLs
 5. **Reverse Proxy**: Nginx to serve frontend and proxy API calls
+
+
+## Video Player Utility Modules
+
+The video player optimization system consists of several utility modules that work together to provide device-adaptive, performant video streaming.
+
+### Device Detection (`frontend/src/utils/deviceDetector.js`)
+Detects device capabilities for adaptive configuration.
+
+```javascript
+// Usage
+import { detectDeviceTier, getDeviceCapabilities, getMaxConcurrentStreams } from '../utils/deviceDetector';
+
+const tier = detectDeviceTier(); // 'low' | 'medium' | 'high'
+const caps = getDeviceCapabilities(); // Full capability object
+const maxStreams = getMaxConcurrentStreams(tier); // 2 for low, 3 for medium/high
+```
+
+**Device Tiers:**
+- **Low**: RAM ≤ 2GB OR CPU cores ≤ 2 OR mobile with RAM ≤ 3GB
+- **Medium**: Default tier for most devices
+- **High**: RAM > 4GB AND CPU cores > 4
+
+### HLS Configuration (`frontend/src/utils/hlsConfig.js`)
+Provides device-adaptive HLS.js configurations.
+
+```javascript
+// Usage
+import { getHLSConfig, getMobileHLSConfig } from '../utils/hlsConfig';
+
+const config = getHLSConfig('low'); // Returns low-end optimized config
+const mobileConfig = getMobileHLSConfig('medium'); // Mobile-specific config
+```
+
+**Configuration Differences by Tier:**
+| Setting | Low | Medium | High |
+|---------|-----|--------|------|
+| enableWorker | false | true | true |
+| maxBufferLength | 15s | 25s | 30s |
+| backBufferLength | 10s | 20s | 30s |
+| maxBufferSize | 30MB | 45MB | 60MB |
+| startLevel | 0 (lowest) | -1 (auto) | -1 (auto) |
+
+### Stream Controller (`frontend/src/utils/streamController.js`)
+Manages video stream lifecycle with visibility awareness.
+
+```javascript
+// Usage
+import { createStreamController } from '../utils/streamController';
+
+const controller = createStreamController(videoElement, streamUrl, {
+    onStatusChange: (status) => console.log(status),
+    deviceTier: 'medium',
+    pauseDelay: 5000 // 5s delay before pausing invisible streams
+});
+
+controller.pause();
+controller.resume();
+controller.destroy();
+```
+
+### Error Recovery (`frontend/src/utils/errorRecovery.js`)
+Handles HLS errors with exponential backoff.
+
+```javascript
+// Usage
+import { createErrorRecovery, getBackoffDelay } from '../utils/errorRecovery';
+
+const delay = getBackoffDelay(retryCount); // 1s, 2s, 4s, 8s max
+
+const recovery = createErrorRecovery(hls, {
+    maxRetries: 3,
+    onRecoveryAttempt: (attempt) => console.log(`Retry ${attempt}`),
+    onRecoveryFailed: () => setStatus('error')
+});
+
+recovery.handleError(errorData);
+recovery.reset();
+```
+
+### Visibility Observer (`frontend/src/utils/visibilityObserver.js`)
+Intersection Observer wrapper for lazy loading and visibility-based stream control.
+
+```javascript
+// Usage
+import { createVisibilityObserver } from '../utils/visibilityObserver';
+
+const observer = createVisibilityObserver({ threshold: 0.1 });
+observer.observe(element, (isVisible) => {
+    if (isVisible) playVideo();
+    else pauseVideo();
+});
+observer.unobserve(element);
+observer.disconnect();
+```
+
+### Adaptive Quality (`frontend/src/utils/adaptiveQuality.js`)
+Monitors bandwidth and adjusts video quality dynamically.
+
+```javascript
+// Usage
+import { createAdaptiveQuality } from '../utils/adaptiveQuality';
+
+const aq = createAdaptiveQuality(hls, {
+    lowBandwidthThreshold: 500000,  // 500kbps
+    highBandwidthThreshold: 2000000, // 2Mbps
+    onQualityChange: (level, bandwidth) => console.log('Quality:', level)
+});
+aq.start();
+aq.stop();
+```
+
+### Multi-View Manager (`frontend/src/utils/multiViewManager.js`)
+Manages multiple video streams with optimized performance.
+
+```javascript
+// Usage
+import { createMultiViewManager, staggeredInitialize } from '../utils/multiViewManager';
+
+// Create manager instance
+const manager = createMultiViewManager({
+    maxStreams: 3,      // Override device-based limit
+    staggerDelay: 100   // 100ms between stream inits
+});
+
+// Add streams (respects device limits)
+manager.addStream(camera1);
+manager.addStream(camera2);
+
+// Initialize all with staggered timing
+await manager.initializeAll(initStreamFn);
+
+// Check capacity
+console.log(manager.getMaxStreams());    // 2 for low, 3 for medium/high
+console.log(manager.isAtCapacity());     // true/false
+console.log(manager.getStreamCount());   // Current stream count
+
+// Cleanup all streams
+manager.cleanup();
+```
+
+**Stream Limits by Device Tier:**
+| Tier | Max Concurrent Streams |
+|------|----------------------|
+| Low | 2 |
+| Medium | 3 |
+| High | 3 |
+
+### RAF Throttle (`frontend/src/utils/rafThrottle.js`)
+RequestAnimationFrame-based throttling for high-frequency events (zoom/pan).
+
+```javascript
+// Usage - Generic throttle
+import { createRAFThrottle, createTransformThrottle } from '../utils/rafThrottle';
+
+// Option 1: Generic RAF throttle for any callback
+const { throttled, cancel } = createRAFThrottle((x, y) => {
+    element.style.transform = `translate(${x}px, ${y}px)`;
+});
+element.addEventListener('mousemove', (e) => throttled(e.clientX, e.clientY));
+// On cleanup: cancel();
+
+// Option 2: Specialized transform throttle
+const transformer = createTransformThrottle(wrapperElement);
+transformer.update(scale, panX, panY); // scale=2, panX=10%, panY=-5%
+// On cleanup: transformer.cancel();
+
+// Measure update rate (for testing)
+import { createUpdateRateMeter } from '../utils/rafThrottle';
+const meter = createUpdateRateMeter();
+meter.record(); // Call on each update
+console.log(meter.getRate()); // Updates per second (should be ≤60)
+```
+
+**Throttle Configuration:**
+- Minimum interval: 16.67ms (~60fps)
+- Uses `requestAnimationFrame` for smooth updates
+- Automatically coalesces rapid updates
+
+### Orientation Observer (`frontend/src/utils/orientationObserver.js`)
+Handles device orientation changes without triggering stream reloads.
+
+```javascript
+// Usage
+import { createOrientationObserver, getCurrentOrientation } from '../utils/orientationObserver';
+
+// Get current orientation
+const orientation = getCurrentOrientation(); // 'portrait' | 'landscape'
+
+// Create observer
+const observer = createOrientationObserver({
+    onOrientationChange: ({ orientation, previousOrientation, isPortrait, isLandscape }) => {
+        // Adapt layout without reloading stream
+        updateLayout(isPortrait ? 'portrait' : 'landscape');
+    },
+    debounceResize: true,
+    debounceDelay: 100
+});
+
+observer.start();
+console.log(observer.getOrientation()); // Current orientation
+console.log(observer.isActive());       // true/false
+observer.stop();
+```
+
+## Testing Libraries
+
+### Property-Based Testing
+- **Library**: fast-check
+- **Location**: `frontend/src/__tests__/`
+- **Config**: Minimum 100 iterations per property test
+
+```bash
+# Install
+cd frontend
+npm install --save-dev fast-check
+
+# Run tests
+npm test
+```
+
+### Test File Naming
+- Unit tests: `*.test.js`
+- Property tests: `*.property.test.js`
+- Integration tests: `*.integration.test.js`
+
+### Property Test Files
+| Test File | Module Tested | Properties Validated |
+|-----------|---------------|---------------------|
+| `deviceDetector.property.test.js` | deviceDetector | Device tier consistency |
+| `hlsConfig.property.test.js` | hlsConfig | Config correctness by tier |
+| `errorRecovery.property.test.js` | errorRecovery | Exponential backoff |
+| `streamController.property.test.js` | streamController | Visibility-based control |
+| `resourceCleanup.property.test.js` | VideoPlayer | Resource cleanup |
+| `rafThrottle.property.test.js` | rafThrottle | Event throttling (≤60fps) |
+| `adaptiveQuality.property.test.js` | adaptiveQuality | Bandwidth-based quality |
+| `mobileConfig.property.test.js` | hlsConfig | Mobile configuration |
+| `multiViewManager.property.test.js` | multiViewManager | Stream limits, cleanup |

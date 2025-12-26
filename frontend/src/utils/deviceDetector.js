@@ -6,6 +6,13 @@
  * - low: RAM ≤ 2GB OR CPU cores ≤ 2 OR mobile with RAM ≤ 3GB
  * - medium: Default tier for most devices
  * - high: RAM > 4GB AND CPU cores > 4
+ * 
+ * Mobile-Specific Detection:
+ * - Detects mobile device type (phone, tablet)
+ * - Detects touch capability
+ * - Provides mobile-optimized configuration recommendations
+ * 
+ * **Validates: Requirements 7.1, 7.2**
  */
 
 /**
@@ -39,6 +46,89 @@ export const isMobileDevice = () => {
     return /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(
         navigator.userAgent
     );
+};
+
+/**
+ * Get mobile device type
+ * @returns {'phone' | 'tablet' | 'desktop'} Device type
+ */
+export const getMobileDeviceType = () => {
+    if (typeof navigator === 'undefined') return 'desktop';
+    
+    const ua = navigator.userAgent;
+    
+    // Check for tablets first (iPad, Android tablets)
+    if (/iPad/i.test(ua) || (/Android/i.test(ua) && !/Mobile/i.test(ua))) {
+        return 'tablet';
+    }
+    
+    // Check for phones
+    if (/iPhone|iPod|Android.*Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua)) {
+        return 'phone';
+    }
+    
+    return 'desktop';
+};
+
+/**
+ * Check if device has touch capability
+ * @returns {boolean} True if device supports touch
+ */
+export const hasTouchSupport = () => {
+    if (typeof window === 'undefined') return false;
+    
+    return (
+        'ontouchstart' in window ||
+        (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0) ||
+        (typeof navigator !== 'undefined' && navigator.msMaxTouchPoints > 0)
+    );
+};
+
+/**
+ * Get screen orientation
+ * @returns {'portrait' | 'landscape'} Current screen orientation
+ */
+export const getScreenOrientation = () => {
+    if (typeof window === 'undefined') return 'landscape';
+    
+    // Use Screen Orientation API if available
+    if (typeof screen !== 'undefined' && screen.orientation) {
+        return screen.orientation.type.includes('portrait') ? 'portrait' : 'landscape';
+    }
+    
+    // Fallback to window dimensions
+    return window.innerHeight > window.innerWidth ? 'portrait' : 'landscape';
+};
+
+/**
+ * Get screen dimensions
+ * @returns {{ width: number, height: number }} Screen dimensions
+ */
+export const getScreenDimensions = () => {
+    if (typeof window === 'undefined') {
+        return { width: 1920, height: 1080 };
+    }
+    
+    return {
+        width: window.innerWidth || document.documentElement.clientWidth || 1920,
+        height: window.innerHeight || document.documentElement.clientHeight || 1080,
+    };
+};
+
+/**
+ * Check if device is a low-end mobile device
+ * @param {Object} options - Optional overrides for testing
+ * @returns {boolean} True if low-end mobile
+ */
+export const isLowEndMobile = (options = {}) => {
+    const ram = options.ram ?? getDeviceRAM();
+    const cores = options.cores ?? getCPUCores();
+    const mobile = options.isMobile ?? isMobileDevice();
+    
+    if (!mobile) return false;
+    
+    // Low-end mobile: RAM ≤ 3GB OR cores ≤ 2
+    return ram <= 3 || cores <= 2;
 };
 
 /**
@@ -135,6 +225,11 @@ export const getDeviceCapabilities = (options = {}) => {
         ram,
         cpuCores: cores,
         isMobile: mobile,
+        mobileDeviceType: getMobileDeviceType(),
+        hasTouch: hasTouchSupport(),
+        screenOrientation: getScreenOrientation(),
+        screenDimensions: getScreenDimensions(),
+        isLowEndMobile: isLowEndMobile({ ram, cores, isMobile: mobile }),
         hasWebWorker: hasWebWorkerSupport(),
         connectionType: getConnectionType(),
         maxConcurrentStreams: getMaxConcurrentStreams(tier),
@@ -177,6 +272,11 @@ export default {
     getDeviceRAM,
     getCPUCores,
     isMobileDevice,
+    getMobileDeviceType,
+    hasTouchSupport,
+    getScreenOrientation,
+    getScreenDimensions,
+    isLowEndMobile,
     hasWebWorkerSupport,
     getConnectionType,
     getMaxConcurrentStreams,
