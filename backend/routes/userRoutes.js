@@ -11,6 +11,14 @@ import {
     getPasswordPolicyRequirements,
 } from '../controllers/userController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
+import {
+    createUserSchema,
+    updateUserSchema,
+    changePasswordSchema,
+    changeOwnPasswordSchema,
+    updateProfileSchema,
+    userIdParamSchema,
+} from '../middleware/schemaValidators.js';
 
 export default async function userRoutes(fastify, options) {
     // Public route - password requirements (no auth needed)
@@ -22,15 +30,43 @@ export default async function userRoutes(fastify, options) {
 
         // Profile routes (for current user)
         fastify.get('/profile', getProfile);
-        fastify.put('/profile', updateProfile);
-        fastify.put('/profile/password', changeOwnPassword);
+        
+        fastify.put('/profile', {
+            schema: updateProfileSchema,
+            handler: updateProfile,
+        });
+        
+        fastify.put('/profile/password', {
+            schema: changeOwnPasswordSchema,
+            handler: changeOwnPassword,
+        });
 
         // User management routes (admin)
         fastify.get('/', getAllUsers);
-        fastify.get('/:id', getUserById);
-        fastify.post('/', createUser);
-        fastify.put('/:id', updateUser);
-        fastify.put('/:id/password', changePassword);
-        fastify.delete('/:id', deleteUser);
+        
+        fastify.get('/:id', {
+            schema: userIdParamSchema,
+            handler: getUserById,
+        });
+        
+        fastify.post('/', {
+            schema: createUserSchema,
+            handler: createUser,
+        });
+        
+        fastify.put('/:id', {
+            schema: updateUserSchema,
+            handler: updateUser,
+        });
+        
+        fastify.put('/:id/password', {
+            schema: changePasswordSchema,
+            handler: changePassword,
+        });
+        
+        fastify.delete('/:id', {
+            schema: userIdParamSchema,
+            handler: deleteUser,
+        });
     });
 }

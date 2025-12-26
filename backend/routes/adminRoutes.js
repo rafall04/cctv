@@ -1,6 +1,7 @@
 import { getDashboardStats } from '../controllers/adminController.js';
 import { generateApiKey, listApiKeys, deleteApiKey } from '../controllers/apiKeyController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
+import { createApiKeySchema, apiKeyIdParamSchema } from '../middleware/schemaValidators.js';
 
 export default async function adminRoutes(fastify, options) {
     // Dashboard stats
@@ -12,6 +13,7 @@ export default async function adminRoutes(fastify, options) {
     // API Key Management Endpoints
     // POST /api/admin/api-keys - Generate new API key
     fastify.post('/api-keys', {
+        schema: createApiKeySchema,
         onRequest: [authMiddleware],
         handler: generateApiKey,
     });
@@ -24,6 +26,7 @@ export default async function adminRoutes(fastify, options) {
 
     // DELETE /api/admin/api-keys/:id - Revoke API key
     fastify.delete('/api-keys/:id', {
+        schema: apiKeyIdParamSchema,
         onRequest: [authMiddleware],
         handler: deleteApiKey,
     });

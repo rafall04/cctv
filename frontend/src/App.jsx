@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { SecurityProvider } from './contexts/SecurityContext';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import CameraManagement from './pages/CameraManagement';
@@ -12,6 +13,7 @@ import AdminLayout from './components/AdminLayout';
 function App() {
     return (
         <ThemeProvider>
+        <SecurityProvider>
         <BrowserRouter>
             <Routes>
                 {/* Public routes */}
@@ -67,6 +69,7 @@ function App() {
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         </BrowserRouter>
+        </SecurityProvider>
         </ThemeProvider>
     );
 }

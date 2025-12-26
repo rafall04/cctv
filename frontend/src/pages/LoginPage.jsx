@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { useTheme } from '../contexts/ThemeContext';
@@ -41,6 +41,16 @@ const Icons = {
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
         </svg>
     ),
+    Warning: () => (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+        </svg>
+    ),
+    Clock: () => (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+    ),
     Sun: () => (
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
@@ -59,6 +69,23 @@ const Icons = {
     ),
 };
 
+/**
+ * Format seconds into human-readable time
+ * @param {number} seconds - Time in seconds
+ * @returns {string} Formatted time string
+ */
+function formatTime(seconds) {
+    if (seconds < 60) {
+        return `${seconds} second${seconds !== 1 ? 's' : ''}`;
+    }
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    if (remainingSeconds === 0) {
+        return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+    }
+    return `${minutes}m ${remainingSeconds}s`;
+}
+
 export default function LoginPage() {
     const navigate = useNavigate();
     const { isDark, toggleTheme } = useTheme();
@@ -66,28 +93,94 @@ export default function LoginPage() {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [warning, setWarning] = useState('');
+    
+    // Rate limiting / lockout state
+    const [isRateLimited, setIsRateLimited] = useState(false);
+    const [retryCountdown, setRetryCountdown] = useState(0);
+    const [attemptsRemaining, setAttemptsRemaining] = useState(null);
+
+    // Countdown timer for rate limiting
+    useEffect(() => {
+        if (retryCountdown > 0) {
+            const timer = setTimeout(() => {
+                setRetryCountdown(prev => prev - 1);
+            }, 1000);
+            return () => clearTimeout(timer);
+        } else if (retryCountdown === 0 && isRateLimited) {
+            setIsRateLimited(false);
+            setError('');
+        }
+    }, [retryCountdown, isRateLimited]);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
         setError('');
+        setWarning('');
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        // Don't allow submission if rate limited
+        if (isRateLimited && retryCountdown > 0) {
+            return;
+        }
+        
         if (!formData.username || !formData.password) {
             setError('Please enter username and password');
             return;
         }
+        
         setLoading(true);
         setError('');
+        setWarning('');
+        
         const result = await authService.login(formData.username, formData.password);
+        
         if (result.success) {
+            // Check for password expiry warning
+            if (result.passwordExpiryWarning) {
+                // Store warning to show on dashboard
+                sessionStorage.setItem('passwordExpiryWarning', result.passwordExpiryWarning);
+            }
             navigate('/admin/dashboard');
         } else {
-            setError(result.message || 'Login failed');
+            // Handle rate limiting
+            if (result.isRateLimited) {
+                setIsRateLimited(true);
+                setRetryCountdown(result.retryAfter || 60);
+                setError(`Too many attempts. Please wait ${formatTime(result.retryAfter || 60)}.`);
+            } 
+            // Handle account lockout
+            else if (result.isLocked) {
+                const lockoutTime = result.lockoutRemaining 
+                    ? formatTime(Math.ceil(result.lockoutRemaining / 1000))
+                    : '30 minutes';
+                setError(`Account temporarily locked. Try again in ${lockoutTime}.`);
+            }
+            // Handle progressive delay warning
+            else if (result.attemptsRemaining !== null && result.attemptsRemaining <= 2) {
+                setWarning(`Warning: ${result.attemptsRemaining} attempt${result.attemptsRemaining !== 1 ? 's' : ''} remaining before lockout.`);
+                setError(result.message || 'Invalid credentials');
+                setAttemptsRemaining(result.attemptsRemaining);
+            }
+            // Handle security errors
+            else if (result.isSecurityError) {
+                setError(result.message);
+                // Suggest page refresh
+                setWarning('If this persists, please refresh the page.');
+            }
+            // Standard error
+            else {
+                setError(result.message || 'Login failed');
+            }
+            
             setLoading(false);
         }
     };
+
+    const isSubmitDisabled = loading || (isRateLimited && retryCountdown > 0);
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-4 py-8 transition-colors">
@@ -125,8 +218,25 @@ export default function LoginPage() {
                         {/* Error Alert */}
                         {error && (
                             <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-xl">
-                                <div className="text-red-500"><Icons.Alert /></div>
-                                <p className="text-red-600 dark:text-red-400 text-sm font-medium">{error}</p>
+                                <div className="text-red-500 flex-shrink-0">
+                                    {isRateLimited ? <Icons.Clock /> : <Icons.Alert />}
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-red-600 dark:text-red-400 text-sm font-medium">{error}</p>
+                                    {isRateLimited && retryCountdown > 0 && (
+                                        <p className="text-red-500 dark:text-red-300 text-xs mt-1">
+                                            Retry in: {formatTime(retryCountdown)}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Warning Alert */}
+                        {warning && (
+                            <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl">
+                                <div className="text-amber-500 flex-shrink-0"><Icons.Warning /></div>
+                                <p className="text-amber-600 dark:text-amber-400 text-sm font-medium">{warning}</p>
                             </div>
                         )}
 
@@ -144,9 +254,9 @@ export default function LoginPage() {
                                     name="username"
                                     value={formData.username}
                                     onChange={handleChange}
-                                    className="w-full pl-12 pr-4 py-3.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
+                                    className="w-full pl-12 pr-4 py-3.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                     placeholder="Enter your username"
-                                    disabled={loading}
+                                    disabled={isSubmitDisabled}
                                     autoComplete="username"
                                 />
                             </div>
@@ -166,15 +276,16 @@ export default function LoginPage() {
                                     name="password"
                                     value={formData.password}
                                     onChange={handleChange}
-                                    className="w-full pl-12 pr-12 py-3.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
+                                    className="w-full pl-12 pr-12 py-3.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                     placeholder="Enter your password"
-                                    disabled={loading}
+                                    disabled={isSubmitDisabled}
                                     autoComplete="current-password"
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors disabled:opacity-50"
+                                    disabled={isSubmitDisabled}
                                 >
                                     {showPassword ? <Icons.EyeOff /> : <Icons.Eye />}
                                 </button>
@@ -184,13 +295,18 @@ export default function LoginPage() {
                         {/* Submit Button */}
                         <button
                             type="submit"
-                            disabled={loading}
-                            className="w-full flex items-center justify-center gap-2 py-4 px-4 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-sky-500/30 hover:shadow-xl hover:shadow-sky-500/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                            disabled={isSubmitDisabled}
+                            className="w-full flex items-center justify-center gap-2 py-4 px-4 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-sky-500/30 hover:shadow-xl hover:shadow-sky-500/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-sky-500 disabled:hover:to-blue-600 transition-all"
                         >
                             {loading ? (
                                 <>
                                     <Icons.Loader />
                                     <span>Signing in...</span>
+                                </>
+                            ) : isRateLimited && retryCountdown > 0 ? (
+                                <>
+                                    <Icons.Clock />
+                                    <span>Wait {formatTime(retryCountdown)}</span>
                                 </>
                             ) : (
                                 <span>Sign In</span>
