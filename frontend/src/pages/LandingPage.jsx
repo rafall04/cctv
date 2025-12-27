@@ -1966,28 +1966,22 @@ export default function LandingPage() {
                 // In production (HTTPS), always use HTTPS. In development, use env var or localhost.
                 let mediaMtxUrl;
                 
-                // DEBUG: Log protocol and hostname
-                console.log('[DEBUG] Protocol:', window.location.protocol);
-                console.log('[DEBUG] Hostname:', window.location.hostname);
-                
                 if (window.location.protocol === 'https:') {
                     // Production: Use HTTPS with the API domain
-                    // The /hls path is proxied by nginx to MediaMTX
+                    // The /hls/ path is proxied by nginx to MediaMTX
+                    // IMPORTANT: Use trailing slash to avoid nginx redirect to HTTP
                     const hostname = window.location.hostname;
                     if (hostname === 'cctv.raf.my.id') {
-                        mediaMtxUrl = 'https://api-cctv.raf.my.id/hls';
+                        mediaMtxUrl = 'https://api-cctv.raf.my.id/hls/';
                     } else {
                         // Fallback: construct from current origin
-                        mediaMtxUrl = `${window.location.protocol}//${hostname.replace('cctv.', 'api-cctv.')}/hls`;
+                        mediaMtxUrl = `${window.location.protocol}//${hostname.replace('cctv.', 'api-cctv.')}/hls/`;
                     }
                 } else {
                     // Development: Use env var or localhost
                     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-                    mediaMtxUrl = `${apiUrl.replace(/\/$/, '')}/hls`;
+                    mediaMtxUrl = `${apiUrl.replace(/\/$/, '')}/hls/`;
                 }
-                
-                // DEBUG: Log the final URL
-                console.log('[DEBUG] MediaMTX URL:', mediaMtxUrl);
                 
                 const result = await testMediaMTXConnection(mediaMtxUrl);
                 

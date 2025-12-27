@@ -3,6 +3,7 @@ import apiClient from './apiClient';
 const getStreamBaseUrl = () => {
     // In production (HTTPS), always use HTTPS with the API domain
     // In development, use env var or localhost
+    // IMPORTANT: Use trailing slash to avoid nginx redirect to HTTP
     if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
         const hostname = window.location.hostname;
         if (hostname === 'cctv.raf.my.id') {
