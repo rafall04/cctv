@@ -1959,31 +1959,28 @@ export default function LandingPage() {
     }, []);
 
     // Check MediaMTX server connectivity - **Validates: Requirements 3.1, 3.2, 3.5**
+    // Note: We test the API endpoint instead of /hls/ because /hls/ returns 404 (no index file)
     useEffect(() => {
         const checkServerConnectivity = async () => {
             try {
-                // Determine the correct base URL for MediaMTX HLS endpoint
-                // In production (HTTPS), always use HTTPS. In development, use env var or localhost.
-                let mediaMtxUrl;
+                // Test the API health endpoint instead of HLS base path
+                // The /hls/ path returns 404 because there's no index file
+                // But if the API is reachable, MediaMTX should be too (same server)
+                let apiUrl;
                 
                 if (window.location.protocol === 'https:') {
-                    // Production: Use HTTPS with the API domain
-                    // The /hls/ path is proxied by nginx to MediaMTX
-                    // IMPORTANT: Use trailing slash to avoid nginx redirect to HTTP
                     const hostname = window.location.hostname;
                     if (hostname === 'cctv.raf.my.id') {
-                        mediaMtxUrl = 'https://api-cctv.raf.my.id/hls/';
+                        apiUrl = 'https://api-cctv.raf.my.id/health';
                     } else {
-                        // Fallback: construct from current origin
-                        mediaMtxUrl = `${window.location.protocol}//${hostname.replace('cctv.', 'api-cctv.')}/hls/`;
+                        apiUrl = `${window.location.protocol}//${hostname.replace('cctv.', 'api-cctv.')}/health`;
                     }
                 } else {
-                    // Development: Use env var or localhost
-                    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-                    mediaMtxUrl = `${apiUrl.replace(/\/$/, '')}/hls/`;
+                    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+                    apiUrl = `${baseUrl.replace(/\/$/, '')}/health`;
                 }
                 
-                const result = await testMediaMTXConnection(mediaMtxUrl);
+                const result = await testMediaMTXConnection(apiUrl);
                 
                 if (result.reachable) {
                     setServerStatus('online');
