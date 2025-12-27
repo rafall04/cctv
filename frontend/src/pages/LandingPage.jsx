@@ -1966,6 +1966,10 @@ export default function LandingPage() {
                 // In production (HTTPS), always use HTTPS. In development, use env var or localhost.
                 let mediaMtxUrl;
                 
+                // DEBUG: Log protocol and hostname
+                console.log('[DEBUG] Protocol:', window.location.protocol);
+                console.log('[DEBUG] Hostname:', window.location.hostname);
+                
                 if (window.location.protocol === 'https:') {
                     // Production: Use HTTPS with the API domain
                     // The /hls path is proxied by nginx to MediaMTX
@@ -1981,6 +1985,9 @@ export default function LandingPage() {
                     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
                     mediaMtxUrl = `${apiUrl.replace(/\/$/, '')}/hls`;
                 }
+                
+                // DEBUG: Log the final URL
+                console.log('[DEBUG] MediaMTX URL:', mediaMtxUrl);
                 
                 const result = await testMediaMTXConnection(mediaMtxUrl);
                 
