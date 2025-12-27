@@ -1,28 +1,36 @@
-# MediaMTX Configuration - Minimal & Stable
+# MediaMTX Configuration for RAF NET CCTV Production
 
-# Set to 'error' to only show errors, 'warn' for warnings+errors
+# Logging - only show errors
 logLevel: error
 logDestinations: [stdout]
 
 # API for backend management
 api: yes
-apiAddress: :9997
+apiAddress: 127.0.0.1:9997
 
-# Listeners for streaming protocols
+# HLS settings
 hls: yes
 hlsAddress: :8888
-hlsAllowOrigin: '*'
 hlsAlwaysRemux: yes
+hlsAllowOrigin: '*'
 
+# WebRTC settings
 webrtc: yes
 webrtcAddress: :8889
+webrtcLocalUDPAddress: :8189
 webrtcAllowOrigin: '*'
 
+# RTMP settings
 rtmp: yes
 rtmpAddress: :1935
 
+# RTSP settings
 rtsp: yes
 rtspAddress: :8554
+
+# UDP/RTP settings - use different ports to avoid conflicts
+rtpAddress: :8100
+rtcpAddress: :8101
 
 # Path configurations managed by backend
 paths:
