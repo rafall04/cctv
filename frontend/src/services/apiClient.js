@@ -201,7 +201,8 @@ apiClient.interceptors.response.use(
         
         // Handle 401 Unauthorized - Redirect to login
         // Requirements: 10.4
-        if (error.response?.status === 401) {
+        // Skip redirect for login endpoint - it handles its own 401 errors (invalid credentials)
+        if (error.response?.status === 401 && !originalRequest.url?.includes('/api/auth/login')) {
             // Check if this is a token refresh failure
             if (originalRequest.url?.includes('/api/auth/refresh')) {
                 // Refresh failed, clear auth and redirect
