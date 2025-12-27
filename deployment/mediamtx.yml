@@ -28,6 +28,10 @@ rtmpAddress: :1935
 rtsp: yes
 rtspAddress: :8554
 
+# UDP/RTP settings - use different ports to avoid conflicts
+rtpAddress: :8100
+rtcpAddress: :8101
+
 # Path configurations managed by backend
 paths:
   all_others: {}
