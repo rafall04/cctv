@@ -3,6 +3,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { SecurityProvider } from './contexts/SecurityContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { ToastContainer } from './components/ui/ToastContainer';
+import { ApiClientInitializer } from './components/ApiClientInitializer';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import CameraManagement from './pages/CameraManagement';
@@ -17,6 +18,7 @@ function App() {
         <ThemeProvider>
         <SecurityProvider>
         <NotificationProvider>
+        <ApiClientInitializer>
         <BrowserRouter>
             <ToastContainer />
             <Routes>
@@ -73,6 +75,7 @@ function App() {
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         </BrowserRouter>
+        </ApiClientInitializer>
         </NotificationProvider>
         </SecurityProvider>
         </ThemeProvider>

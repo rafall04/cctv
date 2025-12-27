@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { useTheme } from '../contexts/ThemeContext';
+import { useNotification } from '../contexts/NotificationContext';
+import { NetworkStatusBanner } from './ui/NetworkStatusBanner';
 
 // Icons
 const Icons = {
@@ -22,12 +24,36 @@ export default function AdminLayout({ children }) {
     const location = useLocation();
     const navigate = useNavigate();
     const { isDark, toggleTheme } = useTheme();
+    const { success: showSuccess } = useNotification();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [user, setUser] = useState(null);
+    const [isOffline, setIsOffline] = useState(false);
 
     useEffect(() => {
         const currentUser = authService.getCurrentUser();
         setUser(currentUser);
+    }, []);
+
+    /**
+     * Handle network coming back online
+     * Auto-refresh data when connection is restored
+     * Requirements: 10.1, 10.2
+     */
+    const handleOnline = useCallback(() => {
+        setIsOffline(false);
+        showSuccess('Connection Restored', 'You are back online. Data will refresh automatically.');
+        
+        // Trigger a page refresh to reload data
+        // This ensures all components get fresh data after reconnection
+        window.dispatchEvent(new CustomEvent('network-reconnected'));
+    }, [showSuccess]);
+
+    /**
+     * Handle network going offline
+     * Requirements: 10.1
+     */
+    const handleOffline = useCallback(() => {
+        setIsOffline(true);
     }, []);
 
     const handleLogout = async () => {
@@ -46,8 +72,15 @@ export default function AdminLayout({ children }) {
 
     return (
         <div className="min-h-screen bg-gray-100 dark:bg-gray-950 transition-colors">
+            {/* Network Status Banner - Shows offline/online status */}
+            <NetworkStatusBanner
+                onOnline={handleOnline}
+                onOffline={handleOffline}
+                showSuccessOnReconnect={false} // We handle success notification ourselves
+            />
+            
             {/* Mobile Header */}
-            <header className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800">
+            <header className={`lg:hidden fixed left-0 right-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800 transition-all ${isOffline ? 'top-12' : 'top-0'}`}>
                 <div className="flex items-center justify-between px-4 h-16">
                     <Link to="/" className="flex items-center gap-3">
                         <div className="w-9 h-9 bg-gradient-to-br from-sky-500 to-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-sky-500/30">
@@ -181,7 +214,7 @@ export default function AdminLayout({ children }) {
 
             {/* Main Content */}
             <main className="lg:ml-72 min-h-screen">
-                <div className="pt-20 lg:pt-8 pb-8 px-4 lg:px-8">
+                <div className={`pb-8 px-4 lg:px-8 transition-all ${isOffline ? 'pt-32 lg:pt-20' : 'pt-20 lg:pt-8'}`}>
                     <div className="max-w-7xl mx-auto">
                         {children}
                     </div>

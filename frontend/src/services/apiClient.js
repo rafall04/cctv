@@ -9,10 +9,15 @@ import {
     retryWithBackoff,
     isRetryableError,
     RETRY_CONFIG,
+    ERROR_MESSAGES,
 } from '../hooks/useApiError';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api-cctv.raf.my.id';
 const API_KEY = import.meta.env.VITE_API_KEY || '';
+
+// Default timeout configuration (30 seconds)
+// Requirements: 10.3
+const DEFAULT_TIMEOUT = 30000;
 
 // CSRF token storage
 let csrfToken = null;
@@ -21,6 +26,9 @@ let csrfTokenExpiry = null;
 // Notification callback (set by NotificationContext integration)
 let notificationCallback = null;
 
+// Retry callback for timeout errors (allows UI to offer retry option)
+let timeoutRetryCallback = null;
+
 /**
  * Set the notification callback for error handling
  * This should be called from the app initialization with the notification context
@@ -28,6 +36,15 @@ let notificationCallback = null;
  */
 export function setNotificationCallback(callback) {
     notificationCallback = callback;
+}
+
+/**
+ * Set the timeout retry callback
+ * This allows the UI to offer a retry option when timeout errors occur
+ * @param {Function} callback - Function to handle timeout retry (receives retryFn)
+ */
+export function setTimeoutRetryCallback(callback) {
+    timeoutRetryCallback = callback;
 }
 
 /**
@@ -41,12 +58,24 @@ function showErrorNotification(title, message) {
     }
 }
 
+/**
+ * Show warning notification if callback is set
+ * @param {string} title - Notification title
+ * @param {string} message - Notification message
+ */
+function showWarningNotification(title, message) {
+    if (notificationCallback) {
+        notificationCallback('warning', title, message);
+    }
+}
+
 const apiClient = axios.create({
     baseURL: API_URL,
     headers: {
         'Content-Type': 'application/json',
     },
     withCredentials: true, // Required for CSRF cookie
+    timeout: DEFAULT_TIMEOUT, // Default timeout for all requests
 });
 
 /**
@@ -145,6 +174,30 @@ apiClient.interceptors.response.use(
         
         // Parse the error for structured handling
         const parsedError = parseApiError(error);
+        
+        // Handle timeout errors
+        // Requirements: 10.3
+        if (isTimeoutError(error)) {
+            showErrorNotification('Request Timeout', ERROR_MESSAGES.TIMEOUT_ERROR);
+            
+            // Offer retry option if callback is set
+            if (timeoutRetryCallback && originalRequest && !originalRequest._timeoutRetry) {
+                originalRequest._timeoutRetry = true;
+                const retryFn = () => apiClient(originalRequest);
+                timeoutRetryCallback(retryFn, originalRequest);
+            }
+            
+            // Attach parsed error info
+            error.parsedError = parsedError;
+            return Promise.reject(error);
+        }
+        
+        // Handle network errors (not timeout)
+        if (isNetworkError(error) && !isTimeoutError(error)) {
+            showErrorNotification('Connection Error', ERROR_MESSAGES.NETWORK_ERROR);
+            error.parsedError = parsedError;
+            return Promise.reject(error);
+        }
         
         // Handle 401 Unauthorized - Redirect to login
         // Requirements: 10.4
