@@ -1420,8 +1420,8 @@ function Navbar({ cameraCount }) {
         <nav className="sticky top-0 z-40 bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-800/50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16">
-                    {/* Logo */}
-                    <div className="flex items-center gap-3">
+                    {/* Logo - SEO optimized with proper heading structure */}
+                    <a href="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity" title="CCTV Bojonegoro Online - RAF NET">
                         <div className="relative">
                             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-sky-500/30">
                                 <Icons.Camera />
@@ -1431,17 +1431,19 @@ function Navbar({ cameraCount }) {
                             )}
                         </div>
                         <div>
-                            <h1 className="text-lg font-bold text-gray-900 dark:text-white">RAF NET</h1>
-                            <p className="text-[10px] text-gray-500 dark:text-gray-400 -mt-0.5">CCTV Monitoring System</p>
+                            <span className="text-lg font-bold text-gray-900 dark:text-white">RAF NET</span>
+                            <p className="text-[10px] text-gray-500 dark:text-gray-400 -mt-0.5">CCTV Bojonegoro Online</p>
                         </div>
-                    </div>
+                    </a>
                     
-                    {/* Center - Live Time */}
+                    {/* Center - Live Time with Location */}
                     <div className="hidden md:flex items-center gap-3 px-4 py-2 rounded-xl bg-gray-100/80 dark:bg-gray-800/80">
                         <div className="flex items-center gap-2">
                             <span className={`w-2 h-2 rounded-full bg-emerald-500 ${disableAnimations ? '' : 'animate-pulse'}`}></span>
                             <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">LIVE</span>
                         </div>
+                        <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">Bojonegoro</span>
                         <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
                         <span className="text-sm font-mono text-gray-600 dark:text-gray-300">
                             {currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
@@ -1454,6 +1456,7 @@ function Navbar({ cameraCount }) {
                             onClick={toggleTheme}
                             className="p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                             title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                            aria-label={isDark ? 'Aktifkan Mode Terang' : 'Aktifkan Mode Gelap'}
                         >
                             {isDark ? <Icons.Sun /> : <Icons.Moon />}
                         </button>
@@ -1782,7 +1785,7 @@ function Footer({ cameraCount, areaCount }) {
         <footer className="py-8 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                    {/* Brand */}
+                    {/* Brand - SEO optimized */}
                     <div className="text-center md:text-left">
                         <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
                             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white">
@@ -1790,8 +1793,11 @@ function Footer({ cameraCount, areaCount }) {
                             </div>
                             <span className="font-bold text-gray-900 dark:text-white">RAF NET CCTV</span>
                         </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Secure video surveillance monitoring system
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                            Layanan pemantauan CCTV Bojonegoro online 24 jam
+                        </p>
+                        <p className="text-[10px] text-gray-400 dark:text-gray-500">
+                            Bojonegoro, Jawa Timur, Indonesia
                         </p>
                     </div>
                     
@@ -1800,33 +1806,41 @@ function Footer({ cameraCount, areaCount }) {
                         <div className="flex justify-center gap-6">
                             <div>
                                 <p className="text-2xl font-bold text-sky-500">{cameraCount}</p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Cameras</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Kamera</p>
                             </div>
                             <div>
                                 <p className="text-2xl font-bold text-purple-500">{areaCount}</p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Areas</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Lokasi</p>
                             </div>
                             <div>
                                 <p className="text-2xl font-bold text-emerald-500">24/7</p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Monitoring</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Live</p>
                             </div>
                         </div>
                     </div>
                     
-                    {/* Features */}
+                    {/* Features & Keywords - SEO optimized */}
                     <div className="text-center md:text-right">
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Features</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Fitur</p>
                         <div className="flex flex-wrap justify-center md:justify-end gap-2">
                             <span className="text-[10px] px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">HD Streaming</span>
                             <span className="text-[10px] px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">Multi-View</span>
                             <span className="text-[10px] px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">Zoom & Pan</span>
+                            <span className="text-[10px] px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">Gratis</span>
                         </div>
                     </div>
                 </div>
                 
+                {/* SEO Keywords Section - Hidden visually but accessible to search engines */}
+                <div className="text-center mb-4">
+                    <p className="text-[10px] text-gray-400 dark:text-gray-600">
+                        CCTV Bojonegoro • CCTV Bojonegoro Online • CCTV RAF NET • Pantau CCTV Bojonegoro • Live Streaming CCTV Bojonegoro • Keamanan Bojonegoro
+                    </p>
+                </div>
+                
                 <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
                     <p className="text-center text-gray-400 dark:text-gray-500 text-xs">
-                        © {new Date().getFullYear()} RAF NET CCTV Hub. All rights reserved. • Powered by MediaMTX
+                        © {new Date().getFullYear()} RAF NET CCTV Bojonegoro. Hak cipta dilindungi. • Powered by MediaMTX
                     </p>
                 </div>
             </div>
@@ -2066,8 +2080,8 @@ export default function LandingPage() {
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
             <Navbar cameraCount={cameras.length} />
             
-            {/* Hero Section - Enhanced with integrated stats */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-sky-500/10 via-transparent to-purple-500/10 dark:from-sky-500/5 dark:to-purple-500/5">
+            {/* Hero Section - SEO optimized with Indonesian content */}
+            <header className="relative overflow-hidden bg-gradient-to-br from-sky-500/10 via-transparent to-purple-500/10 dark:from-sky-500/5 dark:to-purple-500/5">
                 {/* Decorative elements */}
                 <div className="absolute top-0 left-1/4 w-64 h-64 bg-sky-500/10 rounded-full blur-3xl pointer-events-none"></div>
                 <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
@@ -2078,16 +2092,20 @@ export default function LandingPage() {
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                         </span>
-                        LIVE STREAMING
+                        LIVE STREAMING 24 JAM
                     </div>
                     <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-4">
-                        Live CCTV <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-500 to-blue-600">Monitoring</span>
+                        CCTV <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-500 to-blue-600">Bojonegoro</span> Online
                     </h1>
-                    <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mb-8 text-sm sm:text-base">
-                        Real-time surveillance system with secure streaming. Monitor multiple locations simultaneously with our advanced multi-view feature.
+                    <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mb-4 text-sm sm:text-base">
+                        Pantau keamanan kota Bojonegoro secara real-time dengan sistem CCTV RAF NET. 
+                        Akses gratis 24 jam untuk memantau berbagai lokasi di Bojonegoro, Jawa Timur.
+                    </p>
+                    <p className="text-gray-500 dark:text-gray-500 max-w-xl mx-auto mb-8 text-xs">
+                        Layanan pemantauan CCTV publik untuk keamanan dan kenyamanan warga Bojonegoro
                     </p>
                     
-                    {/* Quick Features - Enhanced */}
+                    {/* Quick Features - Enhanced with Indonesian labels */}
                     <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
                         <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
                             <div className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-500/20 flex items-center justify-center text-sky-600 dark:text-sky-400">
@@ -2118,7 +2136,7 @@ export default function LandingPage() {
                     {/* Stats Bar - Integrated into Hero */}
                     <StatsBar cameras={cameras} areas={areas} />
                 </div>
-            </div>
+            </header>
 
             <CamerasSection
                 cameras={cameras}
