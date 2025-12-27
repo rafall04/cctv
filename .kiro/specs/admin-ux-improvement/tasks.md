@@ -110,152 +110,154 @@ This implementation plan covers the development of a comprehensive notification 
 - [x] 5. Checkpoint - Core Components Complete
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 6. Create Network Status Handler
-  - [ ] 6.1 Implement useNetworkStatus hook
+- [x] 6. Create Network Status Handler
+  - [x] 6.1 Implement useNetworkStatus hook
     - Detect online/offline status
     - Trigger callbacks on status change
     - _Requirements: 10.1, 10.2_
 
-  - [ ] 6.2 Write property tests for network status
+  - [x] 6.2 Write property tests for network status
     - **Property 13: Network Status Detection**
     - **Validates: Requirements 10.1, 10.2**
 
-  - [ ] 6.3 Create NetworkStatusBanner component
+  - [x] 6.3 Create NetworkStatusBanner component
     - Show persistent banner when offline
     - Show brief success when back online
     - _Requirements: 10.1, 10.2_
 
-- [ ] 7. Enhance Login Page
-  - [ ] 7.1 Integrate NotificationContext
+- [x] 7. Enhance Login Page
+  - [x] 7.1 Integrate NotificationContext
     - Add success toast on login
     - _Requirements: 2.10_
 
-  - [ ] 7.2 Enhance error messages
+  - [x] 7.2 Enhance error messages
     - Specific messages for empty fields
     - Clear message for invalid credentials
     - Network error handling
     - Server error handling
     - _Requirements: 2.1, 2.2, 2.3, 2.6, 2.7_
 
-  - [ ] 7.3 Add field-level validation highlighting
+  - [x] 7.3 Add field-level validation highlighting
     - Red border on error fields
     - Clear error on input change
     - _Requirements: 2.9_
 
-  - [ ] 7.4 Enhance lockout and rate limit display
+  - [x] 7.4 Enhance lockout and rate limit display
     - Show countdown timer
     - Clear messaging
     - _Requirements: 2.4, 2.5_
 
-  - [ ] 7.5 Add password expiry warning
+  - [x] 7.5 Add password expiry warning
     - Display days remaining
     - _Requirements: 2.8_
 
-- [ ] 8. Enhance Dashboard Page
-  - [ ] 8.1 Add skeleton loading states
+- [x] 8. Enhance Dashboard Page
+  - [x] 8.1 Add skeleton loading states
     - Replace spinner with skeleton cards
     - Skeleton for stats grid
     - Skeleton for streams table
     - _Requirements: 3.4_
 
-  - [ ] 8.2 Enhance error display
+  - [x] 8.2 Enhance error display
     - Error state with retry button
     - MediaMTX offline warning banner
     - Connection status indicator
     - _Requirements: 3.1, 3.2, 3.3, 3.6_
 
-  - [ ] 8.3 Add empty states
+  - [x] 8.3 Add empty states
     - No streams empty state
     - No activity logs empty state
     - _Requirements: 3.5_
 
-  - [ ] 8.4 Handle auto-refresh failures
+  - [x] 8.4 Handle auto-refresh failures
     - Subtle warning without disruption
     - Show last successful update time
     - _Requirements: 3.7_
 
-- [ ] 9. Enhance Camera Management Page
-  - [ ] 9.1 Integrate notification system
+- [x] 9. Enhance Camera Management Page
+  - [x] 9.1 Integrate notification system
     - Success toast on create/update/delete
     - Error toast on failures
     - _Requirements: 4.1, 4.5, 4.7, 4.8_
 
-  - [ ] 9.2 Add form validation
+  - [x] 9.2 Add form validation
     - RTSP URL format validation
     - Required field validation
     - Duplicate name handling
     - _Requirements: 4.2, 4.3, 4.4_
 
-  - [ ] 9.3 Add loading states
+  - [x] 9.3 Add loading states
     - Skeleton cards while loading
     - Loading state on delete button
     - _Requirements: 4.6, 4.11_
 
-  - [ ] 9.4 Implement optimistic toggle with rollback
+  - [x] 9.4 Implement optimistic toggle with rollback
     - Toggle status optimistically
     - Revert on API failure
     - Show error toast
     - _Requirements: 4.9_
 
-  - [ ] 9.5 Write property tests for optimistic update
+  - [x] 9.5 Write property tests for optimistic update
     - **Property 11: Optimistic Update Rollback**
     - **Validates: Requirements 4.9**
 
-  - [ ] 9.6 Add empty state
+  - [x] 9.6 Add empty state
     - Helpful message with quick-add button
     - _Requirements: 4.10_
 
-- [ ] 10. Checkpoint - Camera Management Complete
+- [x] 10. Checkpoint - Camera Management Complete
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 11. Enhance Area Management Page
-  - [ ] 11.1 Integrate notification system
+- [x] 11. Enhance Area Management Page
+  - [x] 11.1 Integrate notification system
     - Success toast on create/update/delete
     - Error toast on failures
     - _Requirements: 5.1, 5.4, 5.5_
 
-  - [ ] 11.2 Add form validation
+  - [x] 11.2 Add form validation
     - Required field validation
     - Duplicate name handling
     - _Requirements: 5.2_
 
-  - [ ] 11.3 Add deletion warning for areas with cameras
+  - [x] 11.3 Add deletion warning for areas with cameras
     - Show affected camera count
     - Require confirmation
     - _Requirements: 5.3_
 
-  - [ ] 11.4 Add loading and empty states
+  - [x] 11.4 Add loading and empty states
     - Skeleton cards while loading
     - Empty state with area purpose explanation
     - _Requirements: 5.6, 5.7_
 
-- [ ] 12. Enhance User Management Page
-  - [ ] 12.1 Integrate notification system
+- [x] 12. Enhance User Management Page
+  - [x] 12.1 Integrate notification system
     - Success toast on create/update/delete
     - Success toast on password change
     - Error toast on failures
     - _Requirements: 6.1, 6.4, 6.6, 6.7_
 
-  - [ ] 12.2 Add form validation
+  - [x] 12.2 Add form validation
     - Username validation
     - Password requirements display
     - Duplicate username handling
     - _Requirements: 6.2, 6.3_
 
-  - [ ] 12.3 Write property tests for password validation
+  - [x] 12.3 Write property tests for password validation
     - **Property 6.3: Password Requirements Validation**
     - **Validates: Requirements 6.3**
+    - **PBT Status: PASSED** (8/8 tests passed)
 
-  - [ ] 12.4 Implement self-deletion prevention
+  - [x] 12.4 Implement self-deletion prevention
     - Check if deleting own account
     - Show warning and prevent action
     - _Requirements: 6.5_
 
-  - [ ] 12.5 Write property tests for self-deletion prevention
+  - [x] 12.5 Write property tests for self-deletion prevention
     - **Property 10: Self-Deletion Prevention**
     - **Validates: Requirements 6.5**
+    - **PBT Status: PASSED** (6/6 tests passed)
 
-  - [ ] 12.6 Add loading and empty states
+  - [x] 12.6 Add loading and empty states
     - Skeleton table while loading
     - Error state with retry
     - _Requirements: 6.8, 6.9_

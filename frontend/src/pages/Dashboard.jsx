@@ -1,41 +1,233 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { adminService } from '../services/adminService';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { Skeleton } from '../components/ui/Skeleton';
+import { EmptyState, NoStreamsEmptyState, NoActivityEmptyState } from '../components/ui/EmptyState';
+import { Alert } from '../components/ui/Alert';
+import { useNotification } from '../contexts/NotificationContext';
+
+/**
+ * Dashboard Skeleton Components
+ * Requirements: 3.4, 8.1, 8.2, 8.3, 8.4, 8.5
+ */
+
+// Skeleton for stats grid
+function DashboardStatsSkeleton() {
+    return (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+            {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <Skeleton variant="rectangular" className="w-12 h-12 rounded-xl" />
+                        <Skeleton variant="text" className="h-3 w-16" />
+                    </div>
+                    <Skeleton variant="text" className="h-9 w-16 mb-2" />
+                    <Skeleton variant="text" className="h-4 w-24" />
+                </div>
+            ))}
+        </div>
+    );
+}
+
+// Skeleton for streams table
+function DashboardStreamsSkeleton() {
+    return (
+        <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl overflow-hidden">
+            <div className="overflow-x-auto">
+                <table className="w-full">
+                    <thead>
+                        <tr className="border-b border-gray-200 dark:border-gray-700/50 bg-gray-50 dark:bg-gray-800/50">
+                            <th className="px-6 py-4 text-left"><Skeleton variant="text" className="h-3 w-16" /></th>
+                            <th className="px-6 py-4 text-left"><Skeleton variant="text" className="h-3 w-12" /></th>
+                            <th className="px-6 py-4 text-center"><Skeleton variant="text" className="h-3 w-14 mx-auto" /></th>
+                            <th className="px-6 py-4 text-right"><Skeleton variant="text" className="h-3 w-16 ml-auto" /></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700/50">
+                        {[1, 2, 3, 4].map((i) => (
+                            <tr key={i}>
+                                <td className="px-6 py-4">
+                                    <div className="flex items-center gap-3">
+                                        <Skeleton variant="rectangular" className="w-10 h-10 rounded-xl" />
+                                        <div>
+                                            <Skeleton variant="text" className="h-4 w-24 mb-1" />
+                                            <Skeleton variant="text" className="h-3 w-16" />
+                                        </div>
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4"><Skeleton variant="text" className="h-6 w-14 rounded-lg" /></td>
+                                <td className="px-6 py-4 text-center"><Skeleton variant="text" className="h-6 w-10 rounded-lg mx-auto" /></td>
+                                <td className="px-6 py-4 text-right">
+                                    <Skeleton variant="text" className="h-4 w-16 ml-auto mb-1" />
+                                    <Skeleton variant="text" className="h-3 w-14 ml-auto" />
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+}
+
+// Skeleton for activity log
+function DashboardActivitySkeleton() {
+    return (
+        <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6">
+            <div className="space-y-6">
+                {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="flex gap-4">
+                        <Skeleton variant="circular" className="w-[18px] h-[18px] mt-0.5" />
+                        <div className="flex-1">
+                            <Skeleton variant="text" className="h-4 w-full mb-2" />
+                            <div className="flex items-center gap-2">
+                                <Skeleton variant="text" className="h-3 w-16" />
+                                <Skeleton variant="text" className="h-3 w-24" />
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+// Skeleton for header
+function DashboardHeaderSkeleton() {
+    return (
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div>
+                <Skeleton variant="text" className="h-4 w-24 mb-2" />
+                <Skeleton variant="text" className="h-8 w-32 mb-2" />
+                <Skeleton variant="text" className="h-4 w-48" />
+            </div>
+            <div className="flex items-center gap-3">
+                <Skeleton variant="rectangular" className="h-14 w-24 rounded-xl" />
+                <Skeleton variant="rectangular" className="h-14 w-36 rounded-xl" />
+            </div>
+        </div>
+    );
+}
 
 export default function Dashboard() {
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [lastSuccessfulUpdate, setLastSuccessfulUpdate] = useState(null);
+    const [refreshError, setRefreshError] = useState(false);
+    const [isRetrying, setIsRetrying] = useState(false);
+    const intervalRef = useRef(null);
+    const navigate = useNavigate();
+    const { warning } = useNotification();
 
-    useEffect(() => {
-        loadStats();
-        const interval = setInterval(loadStats, 10000);
-        return () => clearInterval(interval);
-    }, []);
-
-    const loadStats = async () => {
+    const loadStats = useCallback(async (isAutoRefresh = false) => {
         try {
+            if (!isAutoRefresh) {
+                setIsRetrying(true);
+            }
             const response = await adminService.getStats();
             if (response.success) {
                 setStats(response.data);
+                setError(null);
+                setRefreshError(false);
+                setLastSuccessfulUpdate(new Date());
             } else {
-                setError(response.message);
+                if (isAutoRefresh && stats) {
+                    // Auto-refresh failed but we have existing data
+                    setRefreshError(true);
+                } else {
+                    setError(response.message || 'Failed to load dashboard data');
+                }
             }
         } catch (err) {
-            setError('Failed to connect to server');
+            if (isAutoRefresh && stats) {
+                // Auto-refresh failed but we have existing data
+                setRefreshError(true);
+            } else {
+                setError('Failed to connect to server. Please check your connection.');
+            }
         } finally {
             setLoading(false);
+            setIsRetrying(false);
         }
+    }, [stats]);
+
+    useEffect(() => {
+        loadStats(false);
+        intervalRef.current = setInterval(() => loadStats(true), 10000);
+        return () => {
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+            }
+        };
+    }, []);
+
+    const handleRetry = () => {
+        setError(null);
+        setLoading(true);
+        loadStats(false);
     };
 
+    const handleAddCamera = () => {
+        navigate('/admin/cameras');
+    };
+
+    // Show skeleton loading state on initial load
     if (loading && !stats) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh]">
-                <div className="relative w-16 h-16">
-                    <div className="absolute inset-0 border-4 border-sky-500/20 rounded-full"></div>
-                    <div className="absolute inset-0 border-4 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="space-y-8">
+                <DashboardHeaderSkeleton />
+                <DashboardStatsSkeleton />
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                    <div className="xl:col-span-2 space-y-4">
+                        <div className="flex items-center justify-between">
+                            <Skeleton variant="text" className="h-6 w-28" />
+                            <Skeleton variant="text" className="h-4 w-20" />
+                        </div>
+                        <DashboardStreamsSkeleton />
+                    </div>
+                    <div className="space-y-4">
+                        <Skeleton variant="text" className="h-6 w-24" />
+                        <DashboardActivitySkeleton />
+                    </div>
                 </div>
-                <p className="mt-6 text-gray-500 dark:text-gray-400 font-medium animate-pulse">Loading dashboard...</p>
+            </div>
+        );
+    }
+
+    // Show error state with retry button
+    if (error && !stats) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh]">
+                <div className="w-16 h-16 bg-red-100 dark:bg-red-500/10 rounded-2xl flex items-center justify-center text-red-500 mb-4">
+                    <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                </div>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Failed to Load Dashboard</h2>
+                <p className="text-gray-500 dark:text-gray-400 mb-6 text-center max-w-md">{error}</p>
+                <button
+                    onClick={handleRetry}
+                    disabled={isRetrying}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-400 text-white font-medium rounded-lg transition-colors"
+                >
+                    {isRetrying ? (
+                        <>
+                            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Retrying...
+                        </>
+                    ) : (
+                        <>
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Retry
+                        </>
+                    )}
+                </button>
             </div>
         );
     }
@@ -55,13 +247,55 @@ export default function Dashboard() {
         return `${d}d ${h}h ${m}m`;
     };
 
+    const formatLastUpdate = (date) => {
+        if (!date) return 'Never';
+        const now = new Date();
+        const diff = Math.floor((now - date) / 1000);
+        if (diff < 60) return 'Just now';
+        if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+        return date.toLocaleTimeString();
+    };
+
     const cpuLoad = stats?.system?.cpuLoad ?? 0;
     const memUsed = stats?.system?.totalMem - stats?.system?.freeMem;
     const memPercent = Math.round((memUsed / stats?.system?.totalMem) * 100);
 
     return (
         <div className="space-y-8">
-            {/* Header */}
+            {/* Auto-refresh failure warning - Requirements: 3.7 */}
+            {refreshError && (
+                <Alert
+                    type="warning"
+                    title="Auto-refresh failed"
+                    message={`Unable to fetch latest data. Last successful update: ${formatLastUpdate(lastSuccessfulUpdate)}`}
+                    dismissible
+                    onDismiss={() => setRefreshError(false)}
+                    className="mb-4"
+                />
+            )}
+
+            {/* MediaMTX Offline Warning Banner - Requirements: 3.2 */}
+            {stats && !stats.mtxConnected && (
+                <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-10 h-10 bg-red-100 dark:bg-red-500/20 rounded-lg flex items-center justify-center text-red-500">
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="text-sm font-semibold text-red-800 dark:text-red-400">MediaMTX Server Offline</h3>
+                            <p className="text-sm text-red-600 dark:text-red-300 mt-1">
+                                The media streaming server is not responding. Live streams will be unavailable until the connection is restored.
+                            </p>
+                            <p className="text-xs text-red-500 dark:text-red-400 mt-2">
+                                Tip: Check if MediaMTX is running on port 9997 and restart if necessary.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Header - Requirements: 3.6 */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
                     <p className="text-sm font-semibold text-sky-500 mb-1">System Overview</p>
@@ -71,10 +305,18 @@ export default function Dashboard() {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
+                    {/* Last Update Time */}
+                    {lastSuccessfulUpdate && (
+                        <div className="px-4 py-2.5 bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700/50 rounded-xl shadow-sm">
+                            <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase">Last Update</p>
+                            <p className="text-sm font-bold text-gray-900 dark:text-white">{formatLastUpdate(lastSuccessfulUpdate)}</p>
+                        </div>
+                    )}
                     <div className="px-4 py-2.5 bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700/50 rounded-xl shadow-sm">
                         <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase">Uptime</p>
                         <p className="text-sm font-bold text-gray-900 dark:text-white">{formatUptime(stats?.system.uptime)}</p>
                     </div>
+                    {/* Connection Status Indicator - Requirements: 3.6 */}
                     <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border shadow-sm ${
                         stats?.mtxConnected 
                             ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400' 
@@ -203,13 +445,23 @@ export default function Dashboard() {
                                                     </div>
                                                     <p className="font-semibold text-gray-900 dark:text-white">Media Server Offline</p>
                                                     <p className="text-sm text-gray-500 dark:text-gray-400">Unable to fetch stream statistics</p>
+                                                    <button
+                                                        onClick={handleRetry}
+                                                        className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300 transition-colors"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                        </svg>
+                                                        Retry Connection
+                                                    </button>
                                                 </div>
                                             </td>
                                         </tr>
                                     ) : stats?.streams.length === 0 ? (
                                         <tr>
-                                            <td colSpan="4" className="px-6 py-16 text-center text-gray-500 dark:text-gray-400">
-                                                No active streams detected
+                                            <td colSpan="4" className="px-6 py-8">
+                                                {/* No streams empty state - Requirements: 3.5 */}
+                                                <NoStreamsEmptyState onAddCamera={handleAddCamera} />
                                             </td>
                                         </tr>
                                     ) : (
@@ -262,7 +514,8 @@ export default function Dashboard() {
                     <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6">
                         <div className="space-y-6">
                             {stats?.recentLogs.length === 0 ? (
-                                <p className="text-center text-gray-500 dark:text-gray-400 py-8">No recent activity</p>
+                                /* No activity logs empty state - Requirements: 3.5 */
+                                <NoActivityEmptyState />
                             ) : (
                                 stats?.recentLogs.map((log, idx) => (
                                     <div key={log.id} className="relative flex gap-4">

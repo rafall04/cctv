@@ -1,12 +1,151 @@
 import { useEffect, useState } from 'react';
 import { userService } from '../services/userService';
 import { authService } from '../services/authService';
+import { useNotification } from '../contexts/NotificationContext';
+import { SkeletonTable } from '../components/ui/Skeleton';
+import { EmptyState } from '../components/ui/EmptyState';
+import { Alert } from '../components/ui/Alert';
+
+/**
+ * Password validation requirements
+ * Requirements: 6.3
+ */
+export const PASSWORD_REQUIREMENTS = {
+    minLength: 8,
+    requireUppercase: true,
+    requireLowercase: true,
+    requireNumber: true,
+    requireSpecial: false,
+};
+
+/**
+ * Validate password against requirements
+ * @param {string} password - Password to validate
+ * @returns {{ isValid: boolean, errors: string[], requirements: Object }}
+ */
+export function validatePassword(password) {
+    const errors = [];
+    const requirements = {
+        minLength: false,
+        hasUppercase: false,
+        hasLowercase: false,
+        hasNumber: false,
+        hasSpecial: false,
+    };
+
+    if (!password) {
+        return { isValid: false, errors: ['Password is required'], requirements };
+    }
+
+    // Check minimum length
+    if (password.length >= PASSWORD_REQUIREMENTS.minLength) {
+        requirements.minLength = true;
+    } else {
+        errors.push(`Password must be at least ${PASSWORD_REQUIREMENTS.minLength} characters`);
+    }
+
+    // Check uppercase
+    if (PASSWORD_REQUIREMENTS.requireUppercase) {
+        if (/[A-Z]/.test(password)) {
+            requirements.hasUppercase = true;
+        } else {
+            errors.push('Password must contain at least one uppercase letter');
+        }
+    }
+
+    // Check lowercase
+    if (PASSWORD_REQUIREMENTS.requireLowercase) {
+        if (/[a-z]/.test(password)) {
+            requirements.hasLowercase = true;
+        } else {
+            errors.push('Password must contain at least one lowercase letter');
+        }
+    }
+
+    // Check number
+    if (PASSWORD_REQUIREMENTS.requireNumber) {
+        if (/[0-9]/.test(password)) {
+            requirements.hasNumber = true;
+        } else {
+            errors.push('Password must contain at least one number');
+        }
+    }
+
+    // Check special character
+    if (PASSWORD_REQUIREMENTS.requireSpecial) {
+        if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+            requirements.hasSpecial = true;
+        } else {
+            errors.push('Password must contain at least one special character');
+        }
+    }
+
+    return {
+        isValid: errors.length === 0,
+        errors,
+        requirements,
+    };
+}
+
+/**
+ * Check if attempting to delete own account
+ * @param {number} userId - User ID to delete
+ * @param {number} currentUserId - Current logged-in user ID
+ * @returns {boolean} True if attempting self-deletion
+ */
+export function isSelfDeletion(userId, currentUserId) {
+    return userId === currentUserId;
+}
+
+/**
+ * Password Requirements Display Component
+ */
+function PasswordRequirementsDisplay({ password }) {
+    const { requirements } = validatePassword(password || '');
+    
+    const items = [
+        { key: 'minLength', label: `At least ${PASSWORD_REQUIREMENTS.minLength} characters`, met: requirements.minLength },
+        { key: 'hasUppercase', label: 'One uppercase letter', met: requirements.hasUppercase },
+        { key: 'hasLowercase', label: 'One lowercase letter', met: requirements.hasLowercase },
+        { key: 'hasNumber', label: 'One number', met: requirements.hasNumber },
+    ];
+
+    if (PASSWORD_REQUIREMENTS.requireSpecial) {
+        items.push({ key: 'hasSpecial', label: 'One special character', met: requirements.hasSpecial });
+    }
+
+    return (
+        <div className="mt-2 space-y-1">
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Password requirements:</p>
+            <ul className="space-y-1">
+                {items.map(item => (
+                    <li key={item.key} className="flex items-center gap-2 text-xs">
+                        {item.met ? (
+                            <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                        ) : (
+                            <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        )}
+                        <span className={item.met ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-400'}>
+                            {item.label}
+                        </span>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+}
 
 export default function UserManagement() {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(null);
     const [showModal, setShowModal] = useState(false);
     const [showPasswordModal, setShowPasswordModal] = useState(false);
+    const [showSelfDeleteWarning, setShowSelfDeleteWarning] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
     const [passwordUser, setPasswordUser] = useState(null);
     const [formData, setFormData] = useState({ username: '', password: '', role: 'admin' });
@@ -14,7 +153,9 @@ export default function UserManagement() {
     const [error, setError] = useState('');
     const [passwordError, setPasswordError] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const [fieldErrors, setFieldErrors] = useState({});
     const currentUser = authService.getCurrentUser();
+    const { success, error: showError } = useNotification();
 
     useEffect(() => {
         loadUsers();
@@ -23,10 +164,12 @@ export default function UserManagement() {
     const loadUsers = async () => {
         try {
             setLoading(true);
+            setLoadError(null);
             const response = await userService.getAllUsers();
             if (response.success) setUsers(response.data);
         } catch (err) {
             console.error('Load users error:', err);
+            setLoadError('Failed to load users. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -36,6 +179,7 @@ export default function UserManagement() {
         setEditingUser(null);
         setFormData({ username: '', password: '', role: 'admin' });
         setError('');
+        setFieldErrors({});
         setShowModal(true);
     };
 
@@ -43,6 +187,7 @@ export default function UserManagement() {
         setEditingUser(user);
         setFormData({ username: user.username, password: '', role: user.role });
         setError('');
+        setFieldErrors({});
         setShowModal(true);
     };
 
@@ -53,33 +198,98 @@ export default function UserManagement() {
         setShowPasswordModal(true);
     };
 
-    const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-    const handlePasswordChange = (e) => setPasswordData({ ...passwordData, [e.target.name]: e.target.value });
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData({ ...formData, [name]: value });
+        // Clear field error when user starts typing
+        if (fieldErrors[name]) {
+            setFieldErrors({ ...fieldErrors, [name]: '' });
+        }
+    };
+
+    const handlePasswordChange = (e) => {
+        const { name, value } = e.target;
+        setPasswordData({ ...passwordData, [name]: value });
+        // Clear error when user starts typing
+        if (passwordError) setPasswordError('');
+    };
+
+    const validateForm = () => {
+        const errors = {};
+        
+        // Username validation
+        if (!formData.username || formData.username.trim() === '') {
+            errors.username = 'Username is required';
+        } else if (formData.username.length < 3) {
+            errors.username = 'Username must be at least 3 characters';
+        } else if (!/^[a-zA-Z0-9_]+$/.test(formData.username)) {
+            errors.username = 'Username can only contain letters, numbers, and underscores';
+        }
+
+        // Password validation (only for new users)
+        if (!editingUser) {
+            const passwordValidation = validatePassword(formData.password);
+            if (!passwordValidation.isValid) {
+                errors.password = passwordValidation.errors[0];
+            }
+        }
+
+        setFieldErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
+        
+        if (!validateForm()) return;
+        
         setSubmitting(true);
         try {
             let result;
             if (editingUser) {
-                result = await userService.updateUser(editingUser.id, { username: formData.username, role: formData.role });
-            } else {
-                if (!formData.password) {
-                    setError('Password is required');
-                    setSubmitting(false);
-                    return;
+                result = await userService.updateUser(editingUser.id, { 
+                    username: formData.username, 
+                    role: formData.role 
+                });
+                if (result.success) {
+                    success('User Updated', `${formData.username} has been updated successfully`);
+                    setShowModal(false);
+                    loadUsers();
+                } else {
+                    // Handle duplicate username
+                    if (result.message?.toLowerCase().includes('username')) {
+                        setFieldErrors({ ...fieldErrors, username: 'Username already taken' });
+                    } else {
+                        setError(result.message);
+                    }
+                    showError('Update Failed', result.message || 'Failed to update user');
                 }
-                result = await userService.createUser(formData);
-            }
-            if (result.success) {
-                setShowModal(false);
-                loadUsers();
             } else {
-                setError(result.message);
+                result = await userService.createUser(formData);
+                if (result.success) {
+                    success('User Created', `${formData.username} has been created successfully`);
+                    setShowModal(false);
+                    loadUsers();
+                } else {
+                    // Handle duplicate username
+                    if (result.message?.toLowerCase().includes('username')) {
+                        setFieldErrors({ ...fieldErrors, username: 'Username already taken' });
+                    } else {
+                        setError(result.message);
+                    }
+                    showError('Creation Failed', result.message || 'Failed to create user');
+                }
             }
         } catch (err) {
-            setError(err.response?.data?.message || 'Something went wrong');
+            const errorMsg = err.response?.data?.message || 'Something went wrong';
+            // Handle duplicate username from API error
+            if (errorMsg.toLowerCase().includes('username')) {
+                setFieldErrors({ ...fieldErrors, username: 'Username already taken' });
+            } else {
+                setError(errorMsg);
+            }
+            showError('Error', errorMsg);
         } finally {
             setSubmitting(false);
         }
@@ -88,42 +298,61 @@ export default function UserManagement() {
     const handlePasswordSubmit = async (e) => {
         e.preventDefault();
         setPasswordError('');
+        
+        // Validate password match
         if (passwordData.password !== passwordData.confirmPassword) {
             setPasswordError('Passwords do not match');
             return;
         }
-        if (passwordData.password.length < 6) {
-            setPasswordError('Password must be at least 6 characters');
+        
+        // Validate password requirements
+        const passwordValidation = validatePassword(passwordData.password);
+        if (!passwordValidation.isValid) {
+            setPasswordError(passwordValidation.errors[0]);
             return;
         }
+        
         setSubmitting(true);
         try {
             const result = await userService.changeUserPassword(passwordUser.id, passwordData.password);
             if (result.success) {
+                success('Password Changed', `Password for ${passwordUser.username} has been updated`);
                 setShowPasswordModal(false);
-                alert('Password changed successfully');
             } else {
                 setPasswordError(result.message);
+                showError('Password Change Failed', result.message || 'Failed to change password');
             }
         } catch (err) {
-            setPasswordError(err.response?.data?.message || 'Failed to change password');
+            const errorMsg = err.response?.data?.message || 'Failed to change password';
+            setPasswordError(errorMsg);
+            showError('Error', errorMsg);
         } finally {
             setSubmitting(false);
         }
     };
 
-    const handleDelete = async (user) => {
-        if (user.id === currentUser?.id) {
-            alert('Cannot delete your own account');
+    const handleDeleteAttempt = (user) => {
+        // Check for self-deletion - Requirements: 6.5
+        if (isSelfDeletion(user.id, currentUser?.id)) {
+            setShowSelfDeleteWarning(true);
             return;
         }
-        if (!window.confirm(`Delete user "${user.username}"?`)) return;
+        handleDelete(user);
+    };
+
+    const handleDelete = async (user) => {
+        if (!window.confirm(`Delete user "${user.username}"? This action cannot be undone.`)) return;
         try {
             const result = await userService.deleteUser(user.id);
-            if (result.success) loadUsers();
-            else alert(result.message);
+            if (result.success) {
+                success('User Deleted', `${user.username} has been removed`);
+                loadUsers();
+            } else {
+                showError('Delete Failed', result.message || 'Failed to delete user');
+            }
         } catch (err) {
-            alert(err.response?.data?.message || 'Failed to delete');
+            const errorMsg = err.response?.data?.message || 'Failed to delete user';
+            showError('Error', errorMsg);
         }
     };
 
@@ -137,6 +366,14 @@ export default function UserManagement() {
             minute: '2-digit',
         }).format(new Date(dateString + ' UTC'));
     };
+
+    // Users icon for empty state
+    const UsersIcon = () => (
+        <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+    );
 
     return (
         <div className="space-y-8">
@@ -160,18 +397,36 @@ export default function UserManagement() {
 
             {/* Content */}
             {loading ? (
-                <div className="flex items-center justify-center min-h-[400px]">
-                    <div className="w-12 h-12 border-4 border-sky-500/20 border-t-sky-500 rounded-full animate-spin"></div>
+                <SkeletonTable rows={5} columns={4} />
+            ) : loadError ? (
+                <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-8">
+                    <Alert 
+                        type="error" 
+                        title="Failed to Load Users" 
+                        message={loadError}
+                        className="mb-4"
+                    />
+                    <button
+                        onClick={loadUsers}
+                        className="flex items-center gap-2 px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white font-medium rounded-lg transition-colors"
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Retry
+                    </button>
                 </div>
             ) : users.length === 0 ? (
-                <div className="text-center py-20 bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl">
-                    <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700/50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-gray-400 dark:text-gray-500">
-                        <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                        </svg>
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Users</h3>
-                    <p className="text-gray-500 dark:text-gray-400">Add your first administrator</p>
+                <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl">
+                    <EmptyState
+                        icon={<UsersIcon />}
+                        title="No Users Found"
+                        description="There are no user accounts in the system. This shouldn't normally happen."
+                        action={{
+                            label: 'Add User',
+                            onClick: openAddModal,
+                        }}
+                    />
                 </div>
             ) : (
                 <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl overflow-hidden">
@@ -228,19 +483,55 @@ export default function UserManagement() {
                                                         <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                                                     </svg>
                                                 </button>
-                                                {user.id !== currentUser?.id && (
-                                                    <button onClick={() => handleDelete(user)} className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all" title="Delete">
-                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                        </svg>
-                                                    </button>
-                                                )}
+                                                <button 
+                                                    onClick={() => handleDeleteAttempt(user)} 
+                                                    className={`p-2 rounded-lg transition-all ${
+                                                        user.id === currentUser?.id 
+                                                            ? 'bg-gray-100 dark:bg-gray-700/50 text-gray-300 dark:text-gray-600 cursor-not-allowed'
+                                                            : 'bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10'
+                                                    }`} 
+                                                    title={user.id === currentUser?.id ? "Cannot delete your own account" : "Delete"}
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    </svg>
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            )}
+
+            {/* Self-Deletion Warning Modal - Requirements: 6.5 */}
+            {showSelfDeleteWarning && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700/50">
+                        <div className="p-6">
+                            <div className="flex items-center gap-4 mb-4">
+                                <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-500/20 flex items-center justify-center">
+                                    <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">Cannot Delete Own Account</h3>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">This action is not allowed</p>
+                                </div>
+                            </div>
+                            <p className="text-gray-600 dark:text-gray-300 mb-6">
+                                You cannot delete your own account while logged in. If you need to remove this account, please ask another administrator to do so.
+                            </p>
+                            <button
+                                onClick={() => setShowSelfDeleteWarning(false)}
+                                className="w-full px-4 py-2.5 bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                            >
+                                I Understand
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -263,23 +554,51 @@ export default function UserManagement() {
 
                         <form onSubmit={handleSubmit} className="p-6 space-y-5">
                             {error && (
-                                <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-xl">
-                                    <svg className="w-5 h-5 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
-                                </div>
+                                <Alert type="error" message={error} dismissible onDismiss={() => setError('')} />
                             )}
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Username</label>
-                                <input type="text" name="username" value={formData.username} onChange={handleChange} className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500" placeholder="Enter username" required minLength={3} />
+                                <input 
+                                    type="text" 
+                                    name="username" 
+                                    value={formData.username} 
+                                    onChange={handleChange} 
+                                    className={`w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 ${
+                                        fieldErrors.username 
+                                            ? 'border-red-500 dark:border-red-500' 
+                                            : 'border-gray-200 dark:border-gray-700/50'
+                                    }`} 
+                                    placeholder="Enter username" 
+                                    required 
+                                    minLength={3} 
+                                />
+                                {fieldErrors.username && (
+                                    <p className="mt-1 text-sm text-red-500">{fieldErrors.username}</p>
+                                )}
+                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Letters, numbers, and underscores only</p>
                             </div>
 
                             {!editingUser && (
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Password</label>
-                                    <input type="password" name="password" value={formData.password} onChange={handleChange} className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500" placeholder="Min 6 characters" required minLength={6} />
+                                    <input 
+                                        type="password" 
+                                        name="password" 
+                                        value={formData.password} 
+                                        onChange={handleChange} 
+                                        className={`w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 ${
+                                            fieldErrors.password 
+                                                ? 'border-red-500 dark:border-red-500' 
+                                                : 'border-gray-200 dark:border-gray-700/50'
+                                        }`} 
+                                        placeholder="Enter password" 
+                                        required 
+                                    />
+                                    {fieldErrors.password && (
+                                        <p className="mt-1 text-sm text-red-500">{fieldErrors.password}</p>
+                                    )}
+                                    <PasswordRequirementsDisplay password={formData.password} />
                                 </div>
                             )}
 
@@ -320,22 +639,41 @@ export default function UserManagement() {
 
                         <form onSubmit={handlePasswordSubmit} className="p-6 space-y-5">
                             {passwordError && (
-                                <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-xl">
-                                    <svg className="w-5 h-5 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    <p className="text-red-600 dark:text-red-400 text-sm">{passwordError}</p>
-                                </div>
+                                <Alert type="error" message={passwordError} dismissible onDismiss={() => setPasswordError('')} />
                             )}
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">New Password</label>
-                                <input type="password" name="password" value={passwordData.password} onChange={handlePasswordChange} className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500" placeholder="Min 6 characters" required minLength={6} />
+                                <input 
+                                    type="password" 
+                                    name="password" 
+                                    value={passwordData.password} 
+                                    onChange={handlePasswordChange} 
+                                    className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500" 
+                                    placeholder="Enter new password" 
+                                    required 
+                                />
+                                <PasswordRequirementsDisplay password={passwordData.password} />
                             </div>
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Confirm Password</label>
-                                <input type="password" name="confirmPassword" value={passwordData.confirmPassword} onChange={handlePasswordChange} className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500" placeholder="Confirm password" required minLength={6} />
+                                <input 
+                                    type="password" 
+                                    name="confirmPassword" 
+                                    value={passwordData.confirmPassword} 
+                                    onChange={handlePasswordChange} 
+                                    className={`w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 ${
+                                        passwordData.confirmPassword && passwordData.password !== passwordData.confirmPassword
+                                            ? 'border-red-500 dark:border-red-500'
+                                            : 'border-gray-200 dark:border-gray-700/50'
+                                    }`} 
+                                    placeholder="Confirm password" 
+                                    required 
+                                />
+                                {passwordData.confirmPassword && passwordData.password !== passwordData.confirmPassword && (
+                                    <p className="mt-1 text-sm text-red-500">Passwords do not match</p>
+                                )}
                             </div>
 
                             <div className="flex gap-3 pt-2">

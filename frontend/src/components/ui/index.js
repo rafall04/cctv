@@ -24,3 +24,7 @@ export {
     getCharacterCount, 
     isOverCharacterLimit 
 } from './FormField';
+export { 
+    NetworkStatusBanner, 
+    getBannerConfig 
+} from './NetworkStatusBanner';

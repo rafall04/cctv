@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { useTheme } from '../contexts/ThemeContext';
+import { useNotification } from '../contexts/NotificationContext';
 
 // Icons
 const Icons = {
@@ -89,16 +90,27 @@ function formatTime(seconds) {
 export default function LoginPage() {
     const navigate = useNavigate();
     const { isDark, toggleTheme } = useTheme();
+    const { success: showSuccess } = useNotification();
     const [formData, setFormData] = useState({ username: '', password: '' });
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [warning, setWarning] = useState('');
     
+    // Field-level validation errors (Requirements: 2.1, 2.2, 2.9)
+    const [fieldErrors, setFieldErrors] = useState({ username: '', password: '' });
+    
+    // Password expiry warning (Requirements: 2.8)
+    const [passwordExpiryDays, setPasswordExpiryDays] = useState(null);
+    
     // Rate limiting / lockout state
     const [isRateLimited, setIsRateLimited] = useState(false);
     const [retryCountdown, setRetryCountdown] = useState(0);
     const [attemptsRemaining, setAttemptsRemaining] = useState(null);
+    
+    // Lockout state (Requirements: 2.4)
+    const [isLocked, setIsLocked] = useState(false);
+    const [lockoutCountdown, setLockoutCountdown] = useState(0);
 
     // Countdown timer for rate limiting
     useEffect(() => {
@@ -113,74 +125,180 @@ export default function LoginPage() {
         }
     }, [retryCountdown, isRateLimited]);
 
+    // Countdown timer for account lockout (Requirements: 2.4)
+    useEffect(() => {
+        if (lockoutCountdown > 0) {
+            const timer = setTimeout(() => {
+                setLockoutCountdown(prev => prev - 1);
+            }, 1000);
+            return () => clearTimeout(timer);
+        } else if (lockoutCountdown === 0 && isLocked) {
+            setIsLocked(false);
+            setError('');
+        }
+    }, [lockoutCountdown, isLocked]);
+
+    // Clear field error when user starts typing (Requirements: 2.9)
     const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+        setFormData({ ...formData, [name]: value });
+        
+        // Clear field-specific error when user types
+        if (fieldErrors[name]) {
+            setFieldErrors(prev => ({ ...prev, [name]: '' }));
+        }
+        
         setError('');
         setWarning('');
+    };
+
+    // Validate individual field (Requirements: 2.1, 2.2)
+    const validateField = (name, value) => {
+        if (name === 'username' && !value.trim()) {
+            return 'Username is required';
+        }
+        if (name === 'password' && !value) {
+            return 'Password is required';
+        }
+        return '';
+    };
+
+    // Handle field blur for validation highlighting (Requirements: 2.9)
+    const handleBlur = (e) => {
+        const { name, value } = e.target;
+        const error = validateField(name, value);
+        setFieldErrors(prev => ({ ...prev, [name]: error }));
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         
-        // Don't allow submission if rate limited
-        if (isRateLimited && retryCountdown > 0) {
+        // Don't allow submission if rate limited or locked
+        if ((isRateLimited && retryCountdown > 0) || (isLocked && lockoutCountdown > 0)) {
             return;
         }
         
-        if (!formData.username || !formData.password) {
-            setError('Please enter username and password');
+        // Field-level validation (Requirements: 2.1, 2.2)
+        const usernameError = validateField('username', formData.username);
+        const passwordError = validateField('password', formData.password);
+        
+        if (usernameError || passwordError) {
+            setFieldErrors({
+                username: usernameError,
+                password: passwordError
+            });
             return;
         }
         
         setLoading(true);
         setError('');
         setWarning('');
+        setFieldErrors({ username: '', password: '' });
         
-        const result = await authService.login(formData.username, formData.password);
-        
-        if (result.success) {
-            // Check for password expiry warning
-            if (result.passwordExpiryWarning) {
-                // Store warning to show on dashboard
-                sessionStorage.setItem('passwordExpiryWarning', result.passwordExpiryWarning);
-            }
-            navigate('/admin/dashboard');
-        } else {
-            // Handle rate limiting
-            if (result.isRateLimited) {
-                setIsRateLimited(true);
-                setRetryCountdown(result.retryAfter || 60);
-                setError(`Too many attempts. Please wait ${formatTime(result.retryAfter || 60)}.`);
-            } 
-            // Handle account lockout
-            else if (result.isLocked) {
-                const lockoutTime = result.lockoutRemaining 
-                    ? formatTime(Math.ceil(result.lockoutRemaining / 1000))
-                    : '30 minutes';
-                setError(`Account temporarily locked. Try again in ${lockoutTime}.`);
-            }
-            // Handle progressive delay warning
-            else if (result.attemptsRemaining !== null && result.attemptsRemaining <= 2) {
-                setWarning(`Warning: ${result.attemptsRemaining} attempt${result.attemptsRemaining !== 1 ? 's' : ''} remaining before lockout.`);
-                setError(result.message || 'Invalid credentials');
-                setAttemptsRemaining(result.attemptsRemaining);
-            }
-            // Handle security errors
-            else if (result.isSecurityError) {
-                setError(result.message);
-                // Suggest page refresh
-                setWarning('If this persists, please refresh the page.');
-            }
-            // Standard error
-            else {
-                setError(result.message || 'Login failed');
-            }
+        try {
+            const result = await authService.login(formData.username, formData.password);
             
+            if (result.success) {
+                // Check for password expiry warning (Requirements: 2.8)
+                if (result.passwordExpiryWarning) {
+                    sessionStorage.setItem('passwordExpiryWarning', result.passwordExpiryWarning);
+                    // Extract days from warning message if available
+                    const daysMatch = result.passwordExpiryWarning.match(/(\d+)\s*day/i);
+                    if (daysMatch) {
+                        setPasswordExpiryDays(parseInt(daysMatch[1], 10));
+                    }
+                }
+                
+                // Show success toast (Requirements: 2.10)
+                showSuccess('Login Successful', 'Welcome back! Redirecting to dashboard...');
+                
+                // Small delay to show the toast before redirect
+                setTimeout(() => {
+                    navigate('/admin/dashboard');
+                }, 500);
+            } else {
+                handleLoginError(result);
+                setLoading(false);
+            }
+        } catch (err) {
+            // Network error handling (Requirements: 2.6)
+            if (!navigator.onLine || err.message === 'Network Error') {
+                setError('Unable to connect to server. Please check your connection.');
+            } else {
+                // Server error handling (Requirements: 2.7)
+                setError('Server error occurred. Please try again later.');
+            }
             setLoading(false);
         }
     };
 
-    const isSubmitDisabled = loading || (isRateLimited && retryCountdown > 0);
+    // Handle different login error types (Requirements: 2.3, 2.4, 2.5, 2.6, 2.7)
+    const handleLoginError = (result) => {
+        // Handle rate limiting (Requirements: 2.5)
+        if (result.isRateLimited) {
+            setIsRateLimited(true);
+            const retryTime = result.retryAfter || 60;
+            setRetryCountdown(retryTime);
+            setError(`Too many attempts. Please wait ${formatTime(retryTime)}.`);
+            return;
+        }
+        
+        // Handle account lockout (Requirements: 2.4)
+        if (result.isLocked) {
+            setIsLocked(true);
+            const lockoutSeconds = result.lockoutRemaining 
+                ? Math.ceil(result.lockoutRemaining / 1000)
+                : 1800; // Default 30 minutes
+            setLockoutCountdown(lockoutSeconds);
+            setError(`Account temporarily locked due to too many failed attempts.`);
+            return;
+        }
+        
+        // Handle progressive delay warning
+        if (result.attemptsRemaining !== null && result.attemptsRemaining <= 2) {
+            setWarning(`Warning: ${result.attemptsRemaining} attempt${result.attemptsRemaining !== 1 ? 's' : ''} remaining before lockout.`);
+            setAttemptsRemaining(result.attemptsRemaining);
+        }
+        
+        // Handle security errors (CSRF, API key issues)
+        if (result.isSecurityError) {
+            setError(result.message || 'Security validation failed. Please refresh the page.');
+            setWarning('If this persists, please refresh the page.');
+            return;
+        }
+        
+        // Handle invalid credentials (Requirements: 2.3)
+        if (result.message?.toLowerCase().includes('invalid') || 
+            result.message?.toLowerCase().includes('credentials')) {
+            setError('Invalid username or password. Please check your credentials.');
+            return;
+        }
+        
+        // Default error message
+        setError(result.message || 'Login failed. Please try again.');
+    };
+
+    const isSubmitDisabled = loading || (isRateLimited && retryCountdown > 0) || (isLocked && lockoutCountdown > 0);
+
+    // Get field error class for styling (Requirements: 2.9)
+    const getFieldClass = (fieldName) => {
+        const baseClass = "w-full pl-12 pr-4 py-3.5 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed";
+        
+        if (fieldErrors[fieldName]) {
+            return `${baseClass} border-red-500 dark:border-red-500 focus:ring-red-500`;
+        }
+        return `${baseClass} border-gray-200 dark:border-gray-700/50 focus:ring-sky-500`;
+    };
+
+    // Password field needs different padding for the eye button
+    const getPasswordFieldClass = () => {
+        const baseClass = "w-full pl-12 pr-12 py-3.5 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed";
+        
+        if (fieldErrors.password) {
+            return `${baseClass} border-red-500 dark:border-red-500 focus:ring-red-500`;
+        }
+        return `${baseClass} border-gray-200 dark:border-gray-700/50 focus:ring-sky-500`;
+    };
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-4 py-8 transition-colors">
@@ -219,13 +337,20 @@ export default function LoginPage() {
                         {error && (
                             <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-xl">
                                 <div className="text-red-500 flex-shrink-0">
-                                    {isRateLimited ? <Icons.Clock /> : <Icons.Alert />}
+                                    {(isRateLimited || isLocked) ? <Icons.Clock /> : <Icons.Alert />}
                                 </div>
                                 <div className="flex-1">
                                     <p className="text-red-600 dark:text-red-400 text-sm font-medium">{error}</p>
+                                    {/* Rate limit countdown (Requirements: 2.5) */}
                                     {isRateLimited && retryCountdown > 0 && (
                                         <p className="text-red-500 dark:text-red-300 text-xs mt-1">
-                                            Retry in: {formatTime(retryCountdown)}
+                                            Retry in: <span className="font-mono font-semibold">{formatTime(retryCountdown)}</span>
+                                        </p>
+                                    )}
+                                    {/* Lockout countdown (Requirements: 2.4) */}
+                                    {isLocked && lockoutCountdown > 0 && (
+                                        <p className="text-red-500 dark:text-red-300 text-xs mt-1">
+                                            Try again in: <span className="font-mono font-semibold">{formatTime(lockoutCountdown)}</span>
                                         </p>
                                     )}
                                 </div>
@@ -236,7 +361,30 @@ export default function LoginPage() {
                         {warning && (
                             <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl">
                                 <div className="text-amber-500 flex-shrink-0"><Icons.Warning /></div>
-                                <p className="text-amber-600 dark:text-amber-400 text-sm font-medium">{warning}</p>
+                                <div className="flex-1">
+                                    <p className="text-amber-600 dark:text-amber-400 text-sm font-medium">{warning}</p>
+                                    {attemptsRemaining !== null && attemptsRemaining <= 2 && (
+                                        <p className="text-amber-500 dark:text-amber-300 text-xs mt-1">
+                                            Attempts remaining: <span className="font-semibold">{attemptsRemaining}</span>
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Password Expiry Warning (Requirements: 2.8) */}
+                        {passwordExpiryDays !== null && passwordExpiryDays <= 7 && (
+                            <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl">
+                                <div className="text-amber-500 flex-shrink-0"><Icons.Warning /></div>
+                                <div className="flex-1">
+                                    <p className="text-amber-600 dark:text-amber-400 text-sm font-medium">
+                                        Password Expiring Soon
+                                    </p>
+                                    <p className="text-amber-500 dark:text-amber-300 text-xs mt-1">
+                                        Your password will expire in {passwordExpiryDays} day{passwordExpiryDays !== 1 ? 's' : ''}. 
+                                        Please change it after logging in.
+                                    </p>
+                                </div>
                             </div>
                         )}
 
@@ -254,12 +402,20 @@ export default function LoginPage() {
                                     name="username"
                                     value={formData.username}
                                     onChange={handleChange}
-                                    className="w-full pl-12 pr-4 py-3.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                    onBlur={handleBlur}
+                                    className={getFieldClass('username')}
                                     placeholder="Enter your username"
                                     disabled={isSubmitDisabled}
                                     autoComplete="username"
                                 />
                             </div>
+                            {/* Field-level error (Requirements: 2.1, 2.9) */}
+                            {fieldErrors.username && (
+                                <p className="mt-1.5 text-sm text-red-500 dark:text-red-400 flex items-center gap-1">
+                                    <Icons.Alert />
+                                    {fieldErrors.username}
+                                </p>
+                            )}
                         </div>
 
                         {/* Password Field */}
@@ -276,7 +432,8 @@ export default function LoginPage() {
                                     name="password"
                                     value={formData.password}
                                     onChange={handleChange}
-                                    className="w-full pl-12 pr-12 py-3.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                    onBlur={handleBlur}
+                                    className={getPasswordFieldClass()}
                                     placeholder="Enter your password"
                                     disabled={isSubmitDisabled}
                                     autoComplete="current-password"
@@ -290,6 +447,13 @@ export default function LoginPage() {
                                     {showPassword ? <Icons.EyeOff /> : <Icons.Eye />}
                                 </button>
                             </div>
+                            {/* Field-level error (Requirements: 2.2, 2.9) */}
+                            {fieldErrors.password && (
+                                <p className="mt-1.5 text-sm text-red-500 dark:text-red-400 flex items-center gap-1">
+                                    <Icons.Alert />
+                                    {fieldErrors.password}
+                                </p>
+                            )}
                         </div>
 
                         {/* Submit Button */}
@@ -302,6 +466,11 @@ export default function LoginPage() {
                                 <>
                                     <Icons.Loader />
                                     <span>Signing in...</span>
+                                </>
+                            ) : isLocked && lockoutCountdown > 0 ? (
+                                <>
+                                    <Icons.Clock />
+                                    <span>Locked - {formatTime(lockoutCountdown)}</span>
                                 </>
                             ) : isRateLimited && retryCountdown > 0 ? (
                                 <>
