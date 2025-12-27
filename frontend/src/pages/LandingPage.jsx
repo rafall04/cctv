@@ -1962,16 +1962,26 @@ export default function LandingPage() {
     useEffect(() => {
         const checkServerConnectivity = async () => {
             try {
-                // Use API URL with /hls path - nginx proxies to MediaMTX internally
-                // VITE_API_URL should be set in .env (e.g., https://api-cctv.raf.my.id)
-                let apiUrl = import.meta.env.VITE_API_URL || 'https://api-cctv.raf.my.id';
+                // Determine the correct base URL for MediaMTX HLS endpoint
+                // In production (HTTPS), always use HTTPS. In development, use env var or localhost.
+                let mediaMtxUrl;
                 
-                // Force HTTPS if page is loaded over HTTPS (production)
                 if (window.location.protocol === 'https:') {
-                    apiUrl = apiUrl.replace(/^http:\/\//i, 'https://');
+                    // Production: Use HTTPS with the API domain
+                    // The /hls path is proxied by nginx to MediaMTX
+                    const hostname = window.location.hostname;
+                    if (hostname === 'cctv.raf.my.id') {
+                        mediaMtxUrl = 'https://api-cctv.raf.my.id/hls';
+                    } else {
+                        // Fallback: construct from current origin
+                        mediaMtxUrl = `${window.location.protocol}//${hostname.replace('cctv.', 'api-cctv.')}/hls`;
+                    }
+                } else {
+                    // Development: Use env var or localhost
+                    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+                    mediaMtxUrl = `${apiUrl.replace(/\/$/, '')}/hls`;
                 }
                 
-                const mediaMtxUrl = `${apiUrl.replace(/\/$/, '')}/hls`;
                 const result = await testMediaMTXConnection(mediaMtxUrl);
                 
                 if (result.reachable) {

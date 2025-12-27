@@ -12,7 +12,21 @@ import {
     ERROR_MESSAGES,
 } from '../hooks/useApiError';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://api-cctv.raf.my.id';
+// Determine API URL based on environment
+const getApiUrl = () => {
+    // In production (HTTPS), always use HTTPS with the API domain
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+        const hostname = window.location.hostname;
+        if (hostname === 'cctv.raf.my.id') {
+            return 'https://api-cctv.raf.my.id';
+        }
+        // Fallback: construct from current hostname
+        return `https://${hostname.replace('cctv.', 'api-cctv.')}`;
+    }
+    return import.meta.env.VITE_API_URL || 'http://localhost:3000';
+};
+
+const API_URL = getApiUrl();
 const API_KEY = import.meta.env.VITE_API_KEY || '';
 
 // Default timeout configuration (30 seconds)

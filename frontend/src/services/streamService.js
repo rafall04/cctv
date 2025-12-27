@@ -1,7 +1,17 @@
 import apiClient from './apiClient';
 
 const getStreamBaseUrl = () => {
-    return import.meta.env.VITE_API_URL || 'https://api-cctv.raf.my.id';
+    // In production (HTTPS), always use HTTPS with the API domain
+    // In development, use env var or localhost
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+        const hostname = window.location.hostname;
+        if (hostname === 'cctv.raf.my.id') {
+            return 'https://api-cctv.raf.my.id';
+        }
+        // Fallback: construct from current hostname
+        return `https://${hostname.replace('cctv.', 'api-cctv.')}`;
+    }
+    return import.meta.env.VITE_API_URL || 'http://localhost:3000';
 };
 
 const makeStreamUrlsAbsolute = (streams) => {
