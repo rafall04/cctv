@@ -38,21 +38,35 @@ export const testConnection = async (url, timeout = DEFAULT_TIMEOUT) => {
     
     try {
         // Use HEAD request for lightweight check (Requirement 3.3)
-        await fetch(url, {
+        // Note: mode 'no-cors' returns opaque response, so we can't check status
+        // A successful fetch (even 404) means the server is reachable
+        const response = await fetch(url, {
             method: 'HEAD',
             signal: controller.signal,
-            mode: 'no-cors', // Allow cross-origin requests to MediaMTX
+            mode: 'cors', // Use cors mode to get actual response status
         });
         
         clearTimeout(timeoutId);
         const latency = performance.now() - startTime;
         
+        // Server is reachable if we got any response (even 404 on base path is OK)
+        // 404 on /hls/ is expected - there's no index file, but server is up
         return {
             reachable: true,
             latency,
         };
     } catch (error) {
         clearTimeout(timeoutId);
+        const latency = performance.now() - startTime;
+        
+        // If it's a CORS error, the server is still reachable
+        // CORS errors happen when server responds but blocks cross-origin
+        if (error.name === 'TypeError' && error.message.includes('CORS')) {
+            return {
+                reachable: true,
+                latency,
+            };
+        }
         
         // Determine error message based on error type
         let errorMessage;
