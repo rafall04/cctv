@@ -1,12 +1,12 @@
 # MediaMTX Configuration for RAF NET CCTV Production
 
-# Logging - only show errors
+# Logging
 logLevel: error
 logDestinations: [stdout]
 
 # API for backend management
 api: yes
-apiAddress: 127.0.0.1:9997
+apiAddress: :9997
 
 # HLS settings
 hls: yes
@@ -17,7 +17,6 @@ hlsAllowOrigin: '*'
 # WebRTC settings
 webrtc: yes
 webrtcAddress: :8889
-webrtcLocalUDPAddress: :8189
 webrtcAllowOrigin: '*'
 
 # RTMP settings
@@ -27,10 +26,6 @@ rtmpAddress: :1935
 # RTSP settings
 rtsp: yes
 rtspAddress: :8554
-
-# UDP/RTP settings - use different ports to avoid conflicts
-rtpAddress: :8100
-rtcpAddress: :8101
 
 # Path configurations managed by backend
 paths:
