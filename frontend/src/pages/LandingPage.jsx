@@ -1964,7 +1964,13 @@ export default function LandingPage() {
             try {
                 // Use API URL with /hls path - nginx proxies to MediaMTX internally
                 // VITE_API_URL should be set in .env (e.g., https://api-cctv.raf.my.id)
-                const apiUrl = import.meta.env.VITE_API_URL || 'https://api-cctv.raf.my.id';
+                let apiUrl = import.meta.env.VITE_API_URL || 'https://api-cctv.raf.my.id';
+                
+                // Force HTTPS if page is loaded over HTTPS (production)
+                if (window.location.protocol === 'https:') {
+                    apiUrl = apiUrl.replace(/^http:\/\//i, 'https://');
+                }
+                
                 const mediaMtxUrl = `${apiUrl.replace(/\/$/, '')}/hls`;
                 const result = await testMediaMTXConnection(mediaMtxUrl);
                 

@@ -11,9 +11,17 @@ const makeStreamUrlsAbsolute = (streams) => {
     
     const makeAbsolute = (url) => {
         if (!url) return url;
+        
+        // If URL is already absolute, ensure it uses HTTPS in production
         if (url.startsWith('http://') || url.startsWith('https://')) {
+            // Force HTTPS if the page is loaded over HTTPS (production)
+            if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+                return url.replace(/^http:\/\//i, 'https://');
+            }
             return url;
         }
+        
+        // Relative URL - prepend base URL
         const cleanBase = baseUrl.replace(/\/$/, '');
         const cleanPath = url.startsWith('/') ? url : `/${url}`;
         return `${cleanBase}${cleanPath}`;
