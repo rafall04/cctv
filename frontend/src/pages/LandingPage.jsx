@@ -65,8 +65,6 @@ const Icons = {
     Eye: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>,
     Signal: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>,
     Grid: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>,
-    VolumeOn: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>,
-    VolumeOff: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/><path d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/></svg>,
 };
 
 // Skeleton component with low-end device optimization - **Validates: Requirements 5.2**
@@ -289,26 +287,14 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
 // ============================================
 // ZOOMABLE VIDEO COMPONENT - Ultra smooth pan/zoom with RAF throttling
 // Transform on wrapper div, not video. Uses RAF-based throttling for 60fps max.
-// Now supports audio control for CCTV streams with sound
 // ============================================
-const ZoomableVideo = memo(function ZoomableVideo({ videoRef, maxZoom = 4, onZoomChange, isMuted = true }) {
+const ZoomableVideo = memo(function ZoomableVideo({ videoRef, maxZoom = 4, onZoomChange }) {
     const wrapperRef = useRef(null);
     const transformThrottleRef = useRef(null);
     const stateRef = useRef({ zoom: 1, panX: 0, panY: 0, dragging: false, startX: 0, startY: 0, startPanX: 0, startPanY: 0 });
 
     const getMaxPan = (z) => z <= 1 ? 0 : ((z - 1) / (2 * z)) * 100;
     const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-
-    // Sync muted state with video element when isMuted prop changes
-    useEffect(() => {
-        if (videoRef.current) {
-            videoRef.current.muted = isMuted;
-            // Set volume to 100% when unmuting
-            if (!isMuted) {
-                videoRef.current.volume = 1.0;
-            }
-        }
-    }, [isMuted, videoRef]);
 
     // Initialize RAF throttle on mount
     useEffect(() => {
@@ -434,7 +420,7 @@ const ZoomableVideo = memo(function ZoomableVideo({ videoRef, maxZoom = 4, onZoo
             <video 
                 ref={videoRef}
                 className="w-full h-full object-contain pointer-events-none"
-                muted={isMuted}
+                muted
                 playsInline 
                 autoPlay 
             />
@@ -465,8 +451,6 @@ function VideoPopup({ camera, onClose }) {
     const [isAutoRetrying, setIsAutoRetrying] = useState(false);
     const [consecutiveFailures, setConsecutiveFailures] = useState(0);
     const [showTroubleshooting, setShowTroubleshooting] = useState(false);
-    // Audio state for CCTV streams with sound
-    const [isMuted, setIsMuted] = useState(true);
     
     const url = camera.streams?.hls;
     const deviceTier = detectDeviceTier();
@@ -733,19 +717,6 @@ function VideoPopup({ camera, onClose }) {
         link.click();
     };
 
-    // Toggle audio mute/unmute
-    const toggleMute = useCallback(() => {
-        if (videoRef.current) {
-            const newMuted = !isMuted;
-            videoRef.current.muted = newMuted;
-            // Set volume to 100% when unmuting
-            if (!newMuted) {
-                videoRef.current.volume = 1.0;
-            }
-            setIsMuted(newMuted);
-        }
-    }, [isMuted]);
-
     // Get wrapper ref for zoom controls
     const getWrapper = () => wrapperRef.current?.querySelector('[style*="transform-origin"]');
 
@@ -782,14 +753,6 @@ function VideoPopup({ camera, onClose }) {
                         {camera.location && <p className="text-gray-400 text-xs sm:text-sm flex items-center gap-1.5 mt-1 truncate"><Icons.MapPin /> {camera.location}</p>}
                     </div>
                     <div className="flex items-center gap-1 sm:gap-2">
-                        {/* Audio Control Button */}
-                        <button 
-                            onClick={toggleMute} 
-                            className={`p-2 hover:bg-white/10 rounded-xl transition-colors ${!isMuted ? 'text-sky-400' : 'text-white'}`}
-                            title={isMuted ? 'Aktifkan Suara' : 'Matikan Suara'}
-                        >
-                            {isMuted ? <Icons.VolumeOff /> : <Icons.VolumeOn />}
-                        </button>
                         {status === 'live' && <button onClick={takeSnapshot} className="p-2 hover:bg-white/10 rounded-xl text-white"><Icons.Image /></button>}
                         <button onClick={toggleFS} className="p-2 hover:bg-white/10 rounded-xl text-white"><Icons.Fullscreen /></button>
                         <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl text-white"><Icons.X /></button>
@@ -798,7 +761,7 @@ function VideoPopup({ camera, onClose }) {
 
                 {/* Video */}
                 <div ref={wrapperRef} className="relative flex-1 min-h-0 bg-black overflow-hidden" onDoubleClick={toggleFS}>
-                    <ZoomableVideo videoRef={videoRef} maxZoom={4} onZoomChange={setZoom} isMuted={isMuted} />
+                    <ZoomableVideo videoRef={videoRef} maxZoom={4} onZoomChange={setZoom} />
                     
                     {/* Progressive Loading Overlay - **Validates: Requirements 4.1, 4.2, 4.3, 4.4, 4.5, 5.2** */}
                     {status === 'connecting' && (
@@ -905,8 +868,6 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [autoRetryCount, setAutoRetryCount] = useState(0);
     const [isAutoRetrying, setIsAutoRetrying] = useState(false);
-    // Audio state for CCTV streams with sound
-    const [isMuted, setIsMuted] = useState(true);
     
     const url = camera.streams?.hls;
     const deviceTier = detectDeviceTier();
@@ -1215,19 +1176,6 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         link.click();
     };
 
-    // Toggle audio mute/unmute
-    const toggleMute = useCallback(() => {
-        if (videoRef.current) {
-            const newMuted = !isMuted;
-            videoRef.current.muted = newMuted;
-            // Set volume to 100% when unmuting
-            if (!newMuted) {
-                videoRef.current.volume = 1.0;
-            }
-            setIsMuted(newMuted);
-        }
-    }, [isMuted]);
-
     const getWrapper = () => wrapperRef.current?.querySelector('[style*="transform-origin"]');
 
     // Get status display info for multi-view - **Validates: Requirements 4.1, 4.2, 4.3, 4.4**
@@ -1247,7 +1195,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
     return (
         <div ref={containerRef} className="relative w-full h-full bg-black rounded-xl overflow-hidden group">
             <div ref={wrapperRef} className="w-full h-full">
-                <ZoomableVideo videoRef={videoRef} status={status} maxZoom={3} onZoomChange={setZoom} isMuted={isMuted} />
+                <ZoomableVideo videoRef={videoRef} status={status} maxZoom={3} onZoomChange={setZoom} />
             </div>
             {/* Status badge - disable pulse animation in fullscreen and on low-end devices */}
             <div className="absolute top-2 left-2 z-10 pointer-events-none">
@@ -1265,15 +1213,6 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 <div className="flex items-center justify-between gap-2">
                     <p className="text-white text-xs font-medium truncate flex-1">{camera.name}</p>
                     <div className="flex items-center gap-1">
-                        {/* Audio Control */}
-                        <button 
-                            onClick={toggleMute} 
-                            className={`p-1 hover:bg-white/20 rounded transition-colors ${!isMuted ? 'bg-sky-500/30 text-sky-400' : 'bg-white/10 text-white'}`}
-                            title={isMuted ? 'Aktifkan Suara' : 'Matikan Suara'}
-                        >
-                            {isMuted ? <Icons.VolumeOff /> : <Icons.VolumeOn />}
-                        </button>
-                        <div className="w-px h-4 bg-white/20 mx-1" />
                         <button onClick={() => getWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-1 bg-white/10 hover:bg-white/20 disabled:opacity-30 rounded text-white"><Icons.ZoomOut /></button>
                         <span className="text-white/70 text-[10px] w-8 text-center">{Math.round(zoom * 100)}%</span>
                         <button onClick={() => getWrapper()?._zoomIn?.()} disabled={zoom >= 3} className="p-1 bg-white/10 hover:bg-white/20 disabled:opacity-30 rounded text-white"><Icons.ZoomIn /></button>

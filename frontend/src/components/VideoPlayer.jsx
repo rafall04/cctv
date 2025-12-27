@@ -59,9 +59,6 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
     // Fullscreen state
     const [isFullScreen, setIsFullScreen] = useState(false);
 
-    // Audio state - for CCTV audio playback
-    const [isMuted, setIsMuted] = useState(true);
-
     // Orientation state - **Validates: Requirements 7.4**
     const [orientation, setOrientation] = useState(() => getCurrentOrientation());
 
@@ -77,17 +74,6 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
         setDeviceCapabilities(capabilities);
         setDeviceTier(capabilities.tier);
     }, []);
-
-    // Sync muted state with video element when isMuted changes
-    useEffect(() => {
-        if (videoRef.current) {
-            videoRef.current.muted = isMuted;
-            // Set volume to 100% when unmuting
-            if (!isMuted) {
-                videoRef.current.volume = 1.0;
-            }
-        }
-    }, [isMuted]);
 
     // Setup orientation observer - **Validates: Requirements 7.4**
     // Handles orientation changes without triggering stream reload
@@ -656,20 +642,6 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
         }
     };
 
-    // Toggle audio mute/unmute
-    const toggleMute = useCallback((e) => {
-        if (e) e.stopPropagation();
-        if (videoRef.current) {
-            const newMuted = !isMuted;
-            videoRef.current.muted = newMuted;
-            // Set volume to 100% when unmuting
-            if (!newMuted) {
-                videoRef.current.volume = 1.0;
-            }
-            setIsMuted(newMuted);
-        }
-    }, [isMuted]);
-
     // Zoom Logic - optimized with requestAnimationFrame
     const handleWheel = useCallback((e) => {
         if (!enableZoom) return;
@@ -824,7 +796,7 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                     cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'inherit',
                     objectFit: isExpanded || isFullScreen ? 'contain' : 'cover'
                 }}
-                muted={isMuted}
+                muted
                 playsInline
                 controls={false}
             />
@@ -879,24 +851,6 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
 
                 {/* Controls - Bottom Bar */}
                 <div className="absolute bottom-0 left-0 right-0 p-4 flex justify-end items-center gap-2 bg-gradient-to-t from-black/80 to-transparent">
-
-                    {/* Audio Control */}
-                    <button
-                        onClick={toggleMute}
-                        className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all duration-200 border border-white/10 shadow-lg"
-                        title={isMuted ? "Unmute Audio" : "Mute Audio"}
-                    >
-                        {isMuted ? (
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
-                            </svg>
-                        ) : (
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                            </svg>
-                        )}
-                    </button>
 
                     {/* Zoom Controls */}
                     {enableZoom && isExpanded && (

@@ -11,19 +11,6 @@
  */
 
 /**
- * Common audio configuration for all tiers
- * Ensures audio track is properly handled
- */
-const AUDIO_CONFIG = {
-    // Enable audio track switching
-    audioCodecs: ['mp4a.40.2', 'mp4a.40.5', 'mp4a.40.29', 'opus'],
-    // Don't skip audio-only segments
-    testBandwidth: true,
-    // Enable audio track selection
-    enableSoftwareAES: true,
-};
-
-/**
  * HLS configuration presets for each device tier
  */
 const HLS_CONFIGS = {
@@ -57,8 +44,6 @@ const HLS_CONFIGS = {
         levelLoadingTimeOut: 15000,
         levelLoadingMaxRetry: 3,
         levelLoadingRetryDelay: 2000,
-        // Audio settings
-        ...AUDIO_CONFIG,
     },
     medium: {
         // Worker enabled for better performance
@@ -86,8 +71,6 @@ const HLS_CONFIGS = {
         levelLoadingTimeOut: 12000,
         levelLoadingMaxRetry: 4,
         levelLoadingRetryDelay: 1500,
-        // Audio settings
-        ...AUDIO_CONFIG,
     },
     high: {
         // Worker enabled for optimal performance
@@ -117,8 +100,6 @@ const HLS_CONFIGS = {
         levelLoadingTimeOut: 10000,
         levelLoadingMaxRetry: 5,
         levelLoadingRetryDelay: 1000,
-        // Audio settings
-        ...AUDIO_CONFIG,
     },
 };
 

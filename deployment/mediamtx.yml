@@ -8,15 +8,11 @@ logDestinations: [stdout]
 api: yes
 apiAddress: :9997
 
-# HLS settings - audio is automatically included from RTSP source
+# HLS settings
 hls: yes
 hlsAddress: :8888
 hlsAlwaysRemux: yes
 hlsAllowOrigin: '*'
-hlsSegmentCount: 7
-hlsSegmentDuration: 1s
-hlsPartDuration: 200ms
-hlsSegmentMaxSize: 50M
 
 # WebRTC settings
 webrtc: yes
@@ -32,6 +28,5 @@ rtsp: yes
 rtspAddress: :8554
 
 # Path configurations managed by backend
-# Audio passthrough is automatic when RTSP source contains audio
 paths:
   all_others: {}
