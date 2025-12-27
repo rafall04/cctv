@@ -1,4 +1,15 @@
 import axios from 'axios';
+import {
+    parseApiError,
+    getErrorMessage,
+    isNetworkError,
+    isAuthError,
+    isServerError,
+    isTimeoutError,
+    retryWithBackoff,
+    isRetryableError,
+    RETRY_CONFIG,
+} from '../hooks/useApiError';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api-cctv.raf.my.id';
 const API_KEY = import.meta.env.VITE_API_KEY || '';
@@ -6,6 +17,29 @@ const API_KEY = import.meta.env.VITE_API_KEY || '';
 // CSRF token storage
 let csrfToken = null;
 let csrfTokenExpiry = null;
+
+// Notification callback (set by NotificationContext integration)
+let notificationCallback = null;
+
+/**
+ * Set the notification callback for error handling
+ * This should be called from the app initialization with the notification context
+ * @param {Function} callback - Function to show notifications (type, title, message)
+ */
+export function setNotificationCallback(callback) {
+    notificationCallback = callback;
+}
+
+/**
+ * Show error notification if callback is set
+ * @param {string} title - Notification title
+ * @param {string} message - Notification message
+ */
+function showErrorNotification(title, message) {
+    if (notificationCallback) {
+        notificationCallback('error', title, message);
+    }
+}
 
 const apiClient = axios.create({
     baseURL: API_URL,
@@ -101,7 +135,7 @@ apiClient.interceptors.request.use(
     }
 );
 
-// Response interceptor - Handle auth errors
+// Response interceptor - Handle auth errors and enhanced error handling
 apiClient.interceptors.response.use(
     (response) => {
         return response;
@@ -109,7 +143,11 @@ apiClient.interceptors.response.use(
     async (error) => {
         const originalRequest = error.config;
         
-        // Handle 401 Unauthorized
+        // Parse the error for structured handling
+        const parsedError = parseApiError(error);
+        
+        // Handle 401 Unauthorized - Redirect to login
+        // Requirements: 10.4
         if (error.response?.status === 401) {
             // Check if this is a token refresh failure
             if (originalRequest.url?.includes('/api/auth/refresh')) {
@@ -119,8 +157,11 @@ apiClient.interceptors.response.use(
                 localStorage.removeItem('user');
                 clearCsrfToken();
                 
+                // Show session expired notification
+                showErrorNotification('Session Expired', 'Your session has expired. Please log in again.');
+                
                 if (window.location.pathname.startsWith('/admin')) {
-                    window.location.href = '/admin/login';
+                    window.location.href = '/admin/login?expired=true';
                 }
                 return Promise.reject(error);
             }
@@ -151,8 +192,11 @@ apiClient.interceptors.response.use(
                     localStorage.removeItem('user');
                     clearCsrfToken();
                     
+                    // Show session expired notification
+                    showErrorNotification('Session Expired', 'Your session has expired. Please log in again.');
+                    
                     if (window.location.pathname.startsWith('/admin')) {
-                        window.location.href = '/admin/login';
+                        window.location.href = '/admin/login?expired=true';
                     }
                     return Promise.reject(refreshError);
                 }
@@ -164,8 +208,11 @@ apiClient.interceptors.response.use(
             localStorage.removeItem('user');
             clearCsrfToken();
             
+            // Show session expired notification
+            showErrorNotification('Session Expired', 'Your session has expired. Please log in again.');
+            
             if (window.location.pathname.startsWith('/admin')) {
-                window.location.href = '/admin/login';
+                window.location.href = '/admin/login?expired=true';
             }
         }
         
@@ -187,8 +234,96 @@ apiClient.interceptors.response.use(
             }
         }
         
+        // Attach parsed error info to the error object for consumers
+        error.parsedError = parsedError;
+        
         return Promise.reject(error);
     }
 );
+
+/**
+ * Make an API request with automatic retry for retryable errors
+ * Uses exponential backoff: 1s, 2s, 4s (max 3 retries)
+ * 
+ * Requirements: 10.7
+ * 
+ * @param {Object} config - Axios request config
+ * @param {Object} options - Retry options
+ * @param {boolean} options.enableRetry - Enable retry logic (default: true)
+ * @param {number} options.maxRetries - Max retry attempts (default: 3)
+ * @param {Function} options.onRetry - Callback before each retry
+ * @returns {Promise<any>} Response data
+ */
+export async function apiRequest(config, options = {}) {
+    const {
+        enableRetry = true,
+        maxRetries = RETRY_CONFIG.MAX_RETRIES,
+        onRetry = null,
+    } = options;
+
+    if (!enableRetry) {
+        return apiClient(config);
+    }
+
+    return retryWithBackoff(
+        () => apiClient(config),
+        {
+            maxRetries,
+            shouldRetry: isRetryableError,
+            onRetry: (attempt, delay, error) => {
+                console.log(`API request retry ${attempt + 1}/${maxRetries} after ${delay}ms`);
+                if (onRetry) {
+                    onRetry(attempt, delay, error);
+                }
+            },
+        }
+    );
+}
+
+/**
+ * GET request with retry support
+ * @param {string} url - Request URL
+ * @param {Object} config - Axios config
+ * @param {Object} retryOptions - Retry options
+ * @returns {Promise<any>}
+ */
+export function apiGet(url, config = {}, retryOptions = {}) {
+    return apiRequest({ ...config, method: 'get', url }, retryOptions);
+}
+
+/**
+ * POST request with retry support
+ * @param {string} url - Request URL
+ * @param {any} data - Request body
+ * @param {Object} config - Axios config
+ * @param {Object} retryOptions - Retry options
+ * @returns {Promise<any>}
+ */
+export function apiPost(url, data, config = {}, retryOptions = {}) {
+    return apiRequest({ ...config, method: 'post', url, data }, retryOptions);
+}
+
+/**
+ * PUT request with retry support
+ * @param {string} url - Request URL
+ * @param {any} data - Request body
+ * @param {Object} config - Axios config
+ * @param {Object} retryOptions - Retry options
+ * @returns {Promise<any>}
+ */
+export function apiPut(url, data, config = {}, retryOptions = {}) {
+    return apiRequest({ ...config, method: 'put', url, data }, retryOptions);
+}
+
+/**
+ * DELETE request with retry support
+ * @param {string} url - Request URL
+ * @param {Object} config - Axios config
+ * @param {Object} retryOptions - Retry options
+ * @returns {Promise<any>}
+ */
+export function apiDelete(url, config = {}, retryOptions = {}) {
+    return apiRequest({ ...config, method: 'delete', url }, retryOptions);
+}
 
 export default apiClient;

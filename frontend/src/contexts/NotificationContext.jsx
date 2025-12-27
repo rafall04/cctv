@@ -49,7 +49,12 @@ const generateId = () => `notif_${Date.now()}_${Math.random().toString(36).subst
  * @returns {Object} Configuration object with duration, colorClass, iconColor
  */
 export const getNotificationConfig = (type) => {
-    return NOTIFICATION_CONFIG[type] || NOTIFICATION_CONFIG.info;
+    // Use Object.hasOwn to check for own properties only, avoiding prototype properties
+    // like 'constructor', 'valueOf', 'toString', etc.
+    if (Object.hasOwn(NOTIFICATION_CONFIG, type)) {
+        return NOTIFICATION_CONFIG[type];
+    }
+    return NOTIFICATION_CONFIG.info;
 };
 
 export function NotificationProvider({ children }) {
