@@ -1962,8 +1962,10 @@ export default function LandingPage() {
     useEffect(() => {
         const checkServerConnectivity = async () => {
             try {
-                // Get MediaMTX HLS URL from environment or use default
-                const mediaMtxUrl = import.meta.env.VITE_MEDIAMTX_HLS_URL || 'http://localhost:8888';
+                // Use API URL with /hls path for production (nginx proxies to MediaMTX)
+                // In development, VITE_MEDIAMTX_HLS_URL can point directly to localhost:8888
+                const apiUrl = import.meta.env.VITE_API_URL || '';
+                const mediaMtxUrl = import.meta.env.VITE_MEDIAMTX_HLS_URL || (apiUrl ? `${apiUrl}/hls` : 'http://localhost:8888');
                 const result = await testMediaMTXConnection(mediaMtxUrl);
                 
                 if (result.reachable) {
