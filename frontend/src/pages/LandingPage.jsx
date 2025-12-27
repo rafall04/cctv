@@ -299,6 +299,17 @@ const ZoomableVideo = memo(function ZoomableVideo({ videoRef, maxZoom = 4, onZoo
     const getMaxPan = (z) => z <= 1 ? 0 : ((z - 1) / (2 * z)) * 100;
     const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
+    // Sync muted state with video element when isMuted prop changes
+    useEffect(() => {
+        if (videoRef.current) {
+            videoRef.current.muted = isMuted;
+            // Set volume to 100% when unmuting
+            if (!isMuted) {
+                videoRef.current.volume = 1.0;
+            }
+        }
+    }, [isMuted, videoRef]);
+
     // Initialize RAF throttle on mount
     useEffect(() => {
         if (wrapperRef.current) {
@@ -727,6 +738,10 @@ function VideoPopup({ camera, onClose }) {
         if (videoRef.current) {
             const newMuted = !isMuted;
             videoRef.current.muted = newMuted;
+            // Set volume to 100% when unmuting
+            if (!newMuted) {
+                videoRef.current.volume = 1.0;
+            }
             setIsMuted(newMuted);
         }
     }, [isMuted]);
@@ -1205,6 +1220,10 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         if (videoRef.current) {
             const newMuted = !isMuted;
             videoRef.current.muted = newMuted;
+            // Set volume to 100% when unmuting
+            if (!newMuted) {
+                videoRef.current.volume = 1.0;
+            }
             setIsMuted(newMuted);
         }
     }, [isMuted]);

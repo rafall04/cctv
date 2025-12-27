@@ -78,6 +78,17 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
         setDeviceTier(capabilities.tier);
     }, []);
 
+    // Sync muted state with video element when isMuted changes
+    useEffect(() => {
+        if (videoRef.current) {
+            videoRef.current.muted = isMuted;
+            // Set volume to 100% when unmuting
+            if (!isMuted) {
+                videoRef.current.volume = 1.0;
+            }
+        }
+    }, [isMuted]);
+
     // Setup orientation observer - **Validates: Requirements 7.4**
     // Handles orientation changes without triggering stream reload
     useEffect(() => {
@@ -651,6 +662,10 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
         if (videoRef.current) {
             const newMuted = !isMuted;
             videoRef.current.muted = newMuted;
+            // Set volume to 100% when unmuting
+            if (!newMuted) {
+                videoRef.current.volume = 1.0;
+            }
             setIsMuted(newMuted);
         }
     }, [isMuted]);

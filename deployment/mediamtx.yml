@@ -13,6 +13,11 @@ hls: yes
 hlsAddress: :8888
 hlsAlwaysRemux: yes
 hlsAllowOrigin: '*'
+# HLS segment settings for audio support
+hlsSegmentCount: 7
+hlsSegmentDuration: 1s
+hlsPartDuration: 200ms
+hlsSegmentMaxSize: 50M
 
 # WebRTC settings
 webrtc: yes
@@ -28,5 +33,10 @@ rtsp: yes
 rtspAddress: :8554
 
 # Path configurations managed by backend
+# Audio is automatically included when RTSP source has audio track
 paths:
-  all_others: {}
+  all_others:
+    # Enable audio passthrough from RTSP sources
+    audioCodecs: [opus, aac, g711a, g711u, g722, lpcm]
+    # Enable video codecs
+    videoCodecs: [h264, h265, vp8, vp9, av1]
