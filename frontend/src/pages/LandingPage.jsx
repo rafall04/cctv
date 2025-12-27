@@ -507,9 +507,8 @@ function VideoPopup({ camera, onClose }) {
                 setAutoRetryCount(totalAttempts);
             },
             onNetworkRestore: () => {
-                if (status === 'error' || status === 'timeout') {
-                    handleRetry();
-                }
+                // Note: We don't auto-retry on network restore in popup
+                // User can manually retry if needed
             },
             onManualRetryRequired: () => {
                 setIsAutoRetrying(false);
@@ -522,7 +521,7 @@ function VideoPopup({ camera, onClose }) {
                 fallbackHandlerRef.current = null;
             }
         };
-    }, [status]);
+    }, []);
 
     // Cleanup resources function - **Validates: Requirements 7.1, 7.2, 7.3**
     const cleanupResources = useCallback(() => {
@@ -679,7 +678,7 @@ function VideoPopup({ camera, onClose }) {
             cleanupResources();
             if (hls) { hls.destroy(); hlsRef.current = null; }
         };
-    }, [url, retryKey, deviceTier, cleanupResources, loadingStage, autoRetryCount]);
+    }, [url, retryKey, deviceTier, cleanupResources]);
 
     const handleRetry = useCallback(() => {
         cleanupResources();
@@ -922,9 +921,8 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 setAutoRetryCount(totalAttempts);
             },
             onNetworkRestore: () => {
-                if (status === 'error' || status === 'timeout') {
-                    handleRetry();
-                }
+                // Note: We don't auto-retry on network restore in multi-view
+                // User can manually retry if needed
             },
             onManualRetryRequired: () => {
                 setIsAutoRetrying(false);
@@ -937,7 +935,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 fallbackHandlerRef.current = null;
             }
         };
-    }, [status]);
+    }, []);
 
     // Cleanup resources function - **Validates: Requirements 7.1, 7.2, 7.3**
     const cleanupResources = useCallback(() => {
@@ -1140,7 +1138,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 hlsRef.current = null; 
             }
         };
-    }, [url, retryKey, initDelay, camera.id, onError, deviceTier, cleanupResources, loadingStage, autoRetryCount]);
+    }, [url, retryKey, initDelay, camera.id, onError, deviceTier, cleanupResources]);
 
     const handleRetry = useCallback(() => {
         cleanupResources();
