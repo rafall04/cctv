@@ -24,7 +24,8 @@ export const formatErrorType = (errorType) => {
         media: 'Media Error',
         unknown: 'Unknown Error',
     };
-    return typeMap[errorType] || 'Unknown Error';
+    // Use Object.hasOwn to avoid returning inherited properties like valueOf, toString
+    return Object.hasOwn(typeMap, errorType) ? typeMap[errorType] : 'Unknown Error';
 };
 
 /**
@@ -38,7 +39,8 @@ export const formatDeviceTier = (deviceTier) => {
         medium: 'Medium',
         high: 'High-End',
     };
-    return tierMap[deviceTier] || 'Unknown';
+    // Use Object.hasOwn to avoid returning inherited properties like valueOf, toString
+    return Object.hasOwn(tierMap, deviceTier) ? tierMap[deviceTier] : 'Unknown';
 };
 
 /**
