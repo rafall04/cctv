@@ -6,6 +6,16 @@ import { createTransformThrottle } from '../utils/rafThrottle';
 import { detectDeviceTier, getMaxConcurrentStreams, isMobileDevice, getMobileDeviceType } from '../utils/deviceDetector';
 import { getHLSConfig } from '../utils/hlsConfig';
 import { DEFAULT_STAGGER_DELAY } from '../utils/multiViewManager';
+// Stream loading fix imports - **Validates: Requirements 2.1, 2.3, 3.1, 3.2, 5.5**
+import { preloadHls, getPreloadedHls, isPreloaded, getPreloadStatus } from '../utils/preloadManager';
+import { testMediaMTXConnection, isServerReachable } from '../utils/connectionTester';
+import { createLoadingTimeoutHandler, getTimeoutDuration } from '../utils/loadingTimeoutHandler';
+import { LoadingStage, LOADING_STAGE_MESSAGES, getStageMessage, createStreamError } from '../utils/streamLoaderTypes';
+import { createFallbackHandler, getRetryDelay } from '../utils/fallbackHandler';
+// Animation control for low-end device optimization - **Validates: Requirements 5.2**
+import { shouldDisableAnimations, getAnimationClass, createAnimationConfig } from '../utils/animationControl';
+// Stream initialization queue for low-end devices - **Validates: Requirements 5.4**
+import { getGlobalStreamInitQueue, shouldUseQueuedInit, getMaxConcurrentInits } from '../utils/streamInitQueue';
 
 // ============================================
 // DEVICE-ADAPTIVE HLS CONFIG
@@ -23,14 +33,10 @@ const getDeviceAdaptiveHLSConfig = () => {
     });
 };
 
-// Lazy load HLS.js - only when needed
-let HlsModule = null;
+// Lazy load HLS.js - uses PreloadManager for caching
+// **Validates: Requirements 2.2, 2.3**
 const loadHls = async () => {
-    if (!HlsModule) {
-        const module = await import('hls.js');
-        HlsModule = module.default;
-    }
-    return HlsModule;
+    return preloadHls();
 };
 
 
@@ -61,7 +67,13 @@ const Icons = {
     Grid: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>,
 };
 
-const Skeleton = ({ className }) => <div className={`animate-pulse bg-gray-300 dark:bg-gray-700 rounded-xl ${className}`} />;
+// Skeleton component with low-end device optimization - **Validates: Requirements 5.2**
+const Skeleton = ({ className }) => {
+    const disableAnimations = shouldDisableAnimations();
+    return (
+        <div className={`${disableAnimations ? 'opacity-75' : 'animate-pulse'} bg-gray-300 dark:bg-gray-700 rounded-xl ${className}`} />
+    );
+};
 const CameraSkeleton = () => (
     <div className="rounded-2xl overflow-hidden bg-white dark:bg-gray-900 shadow-lg">
         <Skeleton className="aspect-video" />
@@ -71,48 +83,57 @@ const CameraSkeleton = () => (
 
 // ============================================
 // VIDEO SKELETON - Animated loading placeholder for video player
+// Disables animations on low-end devices - **Validates: Requirements 5.2**
 // ============================================
 const VideoSkeleton = memo(function VideoSkeleton({ size = 'large' }) {
     const isSmall = size === 'small';
+    const disableAnimations = shouldDisableAnimations();
+    
+    // Get animation classes based on device tier
+    const pulseClass = disableAnimations ? 'opacity-75' : 'animate-pulse';
+    const spinClass = disableAnimations ? '' : 'animate-spin';
+    const shimmerClass = disableAnimations ? '' : 'animate-[shimmer_2s_infinite]';
     
     return (
         <div className="absolute inset-0 bg-gradient-to-br from-gray-800 via-gray-900 to-gray-800 flex flex-col items-center justify-center pointer-events-none overflow-hidden">
-            {/* Animated shimmer background */}
-            <div className="absolute inset-0 overflow-hidden">
-                <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/5 to-transparent" />
-            </div>
+            {/* Animated shimmer background - disabled on low-end */}
+            {!disableAnimations && (
+                <div className="absolute inset-0 overflow-hidden">
+                    <div className={`absolute inset-0 -translate-x-full ${shimmerClass} bg-gradient-to-r from-transparent via-white/5 to-transparent`} />
+                </div>
+            )}
             
             {/* Video player skeleton UI */}
             <div className="relative z-10 flex flex-col items-center gap-3">
                 {/* Play button skeleton */}
-                <div className={`${isSmall ? 'w-10 h-10' : 'w-16 h-16'} rounded-full bg-white/10 flex items-center justify-center animate-pulse`}>
-                    <div className={`${isSmall ? 'w-4 h-4' : 'w-6 h-6'} border-2 border-white/30 border-t-sky-500 rounded-full animate-spin`} />
+                <div className={`${isSmall ? 'w-10 h-10' : 'w-16 h-16'} rounded-full bg-white/10 flex items-center justify-center ${pulseClass}`}>
+                    <div className={`${isSmall ? 'w-4 h-4' : 'w-6 h-6'} border-2 border-white/30 border-t-sky-500 rounded-full ${spinClass}`} />
                 </div>
                 
                 {/* Loading text */}
                 <div className="flex flex-col items-center gap-1.5">
-                    <div className={`${isSmall ? 'h-2 w-16' : 'h-3 w-24'} bg-white/10 rounded-full animate-pulse`} />
-                    <div className={`${isSmall ? 'h-1.5 w-12' : 'h-2 w-20'} bg-white/5 rounded-full animate-pulse`} />
+                    <div className={`${isSmall ? 'h-2 w-16' : 'h-3 w-24'} bg-white/10 rounded-full ${pulseClass}`} />
+                    <div className={`${isSmall ? 'h-1.5 w-12' : 'h-2 w-20'} bg-white/5 rounded-full ${pulseClass}`} />
                 </div>
             </div>
             
             {/* Bottom progress bar skeleton */}
             <div className="absolute bottom-0 left-0 right-0 p-3">
                 <div className="flex items-center gap-2">
-                    <div className={`${isSmall ? 'w-4 h-4' : 'w-6 h-6'} rounded bg-white/10 animate-pulse`} />
+                    <div className={`${isSmall ? 'w-4 h-4' : 'w-6 h-6'} rounded bg-white/10 ${pulseClass}`} />
                     <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
-                        <div className="h-full w-1/3 bg-white/20 rounded-full animate-pulse" />
+                        <div className={`h-full w-1/3 bg-white/20 rounded-full ${pulseClass}`} />
                     </div>
-                    <div className={`${isSmall ? 'w-8' : 'w-12'} h-3 bg-white/10 rounded animate-pulse`} />
+                    <div className={`${isSmall ? 'w-8' : 'w-12'} h-3 bg-white/10 rounded ${pulseClass}`} />
                 </div>
             </div>
             
             {/* Corner decorations */}
             <div className="absolute top-3 left-3 flex items-center gap-2">
-                <div className={`${isSmall ? 'w-8 h-4' : 'w-12 h-5'} bg-white/10 rounded-full animate-pulse`} />
+                <div className={`${isSmall ? 'w-8 h-4' : 'w-12 h-5'} bg-white/10 rounded-full ${pulseClass}`} />
             </div>
             <div className="absolute top-3 right-3">
-                <div className={`${isSmall ? 'w-4 h-4' : 'w-6 h-6'} bg-white/10 rounded animate-pulse`} />
+                <div className={`${isSmall ? 'w-4 h-4' : 'w-6 h-6'} bg-white/10 rounded ${pulseClass}`} />
             </div>
         </div>
     );
@@ -407,18 +428,30 @@ const ZoomableVideo = memo(function ZoomableVideo({ videoRef, maxZoom = 4, onZoo
 
 
 // ============================================
-// VIDEO POPUP - Optimized with fullscreen detection
+// VIDEO POPUP - Optimized with fullscreen detection, timeout handler, progressive stages, and auto-retry
+// **Validates: Requirements 1.1, 1.2, 1.3, 1.4, 2.3, 3.1, 3.2, 4.1, 4.2, 4.3, 4.4, 6.1, 6.2, 6.3, 6.4, 7.1, 7.2, 7.3**
 // ============================================
 function VideoPopup({ camera, onClose }) {
     const videoRef = useRef(null);
     const wrapperRef = useRef(null);
     const modalRef = useRef(null);
     const hlsRef = useRef(null);
+    const loadingTimeoutHandlerRef = useRef(null);
+    const fallbackHandlerRef = useRef(null);
+    const abortControllerRef = useRef(null);
+    
     const [status, setStatus] = useState('connecting');
+    const [loadingStage, setLoadingStage] = useState(LoadingStage.CONNECTING);
     const [zoom, setZoom] = useState(1);
     const [retryKey, setRetryKey] = useState(0);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [autoRetryCount, setAutoRetryCount] = useState(0);
+    const [isAutoRetrying, setIsAutoRetrying] = useState(false);
+    const [consecutiveFailures, setConsecutiveFailures] = useState(0);
+    const [showTroubleshooting, setShowTroubleshooting] = useState(false);
+    
     const url = camera.streams?.hls;
+    const deviceTier = detectDeviceTier();
 
     // Track fullscreen state to disable animations
     useEffect(() => {
@@ -436,27 +469,131 @@ function VideoPopup({ camera, onClose }) {
         return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
     }, [onClose]);
 
+    // Initialize LoadingTimeoutHandler - **Validates: Requirements 1.1, 1.2, 1.3, 1.4**
+    useEffect(() => {
+        loadingTimeoutHandlerRef.current = createLoadingTimeoutHandler({
+            deviceTier,
+            onTimeout: (stage) => {
+                cleanupResources();
+                setStatus('timeout');
+                setLoadingStage(LoadingStage.TIMEOUT);
+                const failures = loadingTimeoutHandlerRef.current?.getConsecutiveFailures() || 0;
+                setConsecutiveFailures(failures);
+            },
+            onMaxFailures: (failures) => {
+                setShowTroubleshooting(true);
+                setConsecutiveFailures(failures);
+            },
+        });
+
+        return () => {
+            if (loadingTimeoutHandlerRef.current) {
+                loadingTimeoutHandlerRef.current.destroy();
+                loadingTimeoutHandlerRef.current = null;
+            }
+        };
+    }, [deviceTier]);
+
+    // Initialize FallbackHandler for auto-retry - **Validates: Requirements 6.1, 6.2, 6.3, 6.4**
+    useEffect(() => {
+        fallbackHandlerRef.current = createFallbackHandler({
+            maxAutoRetries: 3,
+            onAutoRetry: ({ attempt, maxAttempts, delay }) => {
+                setIsAutoRetrying(true);
+                setAutoRetryCount(attempt);
+            },
+            onAutoRetryExhausted: ({ totalAttempts }) => {
+                setIsAutoRetrying(false);
+                setAutoRetryCount(totalAttempts);
+            },
+            onNetworkRestore: () => {
+                if (status === 'error' || status === 'timeout') {
+                    handleRetry();
+                }
+            },
+            onManualRetryRequired: () => {
+                setIsAutoRetrying(false);
+            },
+        });
+
+        return () => {
+            if (fallbackHandlerRef.current) {
+                fallbackHandlerRef.current.destroy();
+                fallbackHandlerRef.current = null;
+            }
+        };
+    }, [status]);
+
+    // Cleanup resources function - **Validates: Requirements 7.1, 7.2, 7.3**
+    const cleanupResources = useCallback(() => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+        if (hlsRef.current) {
+            hlsRef.current.destroy();
+            hlsRef.current = null;
+        }
+        if (videoRef.current) {
+            videoRef.current.pause();
+            videoRef.current.src = '';
+            videoRef.current.load();
+        }
+        if (loadingTimeoutHandlerRef.current) {
+            loadingTimeoutHandlerRef.current.clearTimeout();
+        }
+        if (fallbackHandlerRef.current) {
+            fallbackHandlerRef.current.clearPendingRetry();
+        }
+    }, []);
+
     useEffect(() => {
         if (!url || !videoRef.current) return;
         const video = videoRef.current;
         let hls = null;
-        let retryCount = 0;
-        const maxRetries = 3;
         let cancelled = false;
 
+        abortControllerRef.current = new AbortController();
         setStatus('connecting');
+        setLoadingStage(LoadingStage.CONNECTING);
+
+        // Start loading timeout - **Validates: Requirements 1.1**
+        if (loadingTimeoutHandlerRef.current) {
+            loadingTimeoutHandlerRef.current.startTimeout(LoadingStage.CONNECTING);
+        }
 
         // Only change to 'live' once video starts playing - don't revert on buffering
-        const handlePlaying = () => setStatus('live');
-        const handleError = () => setStatus('error');
+        const handlePlaying = () => {
+            setStatus('live');
+            setLoadingStage(LoadingStage.PLAYING);
+            // Clear timeout on success
+            if (loadingTimeoutHandlerRef.current) {
+                loadingTimeoutHandlerRef.current.clearTimeout();
+                loadingTimeoutHandlerRef.current.resetFailures();
+            }
+            if (fallbackHandlerRef.current) {
+                fallbackHandlerRef.current.reset();
+            }
+            setAutoRetryCount(0);
+            setConsecutiveFailures(0);
+        };
+        const handleError = () => {
+            setStatus('error');
+            setLoadingStage(LoadingStage.ERROR);
+        };
 
         video.addEventListener('playing', handlePlaying);
         video.addEventListener('error', handleError);
 
-        // Lazy load HLS.js using cached loader
-        // **Validates: Requirements 4.4**
+        // Lazy load HLS.js using PreloadManager - **Validates: Requirements 2.3**
         loadHls().then(Hls => {
             if (cancelled) return;
+            
+            // Update loading stage - **Validates: Requirements 4.2**
+            setLoadingStage(LoadingStage.LOADING);
+            if (loadingTimeoutHandlerRef.current) {
+                loadingTimeoutHandlerRef.current.updateStage(LoadingStage.LOADING);
+            }
             
             if (Hls.isSupported()) {
                 // Use device-adaptive HLS configuration
@@ -467,18 +604,65 @@ function VideoPopup({ camera, onClose }) {
                 hls.attachMedia(video);
                 
                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    if (cancelled) return;
+                    // Update to buffering stage - **Validates: Requirements 4.3**
+                    setLoadingStage(LoadingStage.BUFFERING);
+                    if (loadingTimeoutHandlerRef.current) {
+                        loadingTimeoutHandlerRef.current.updateStage(LoadingStage.BUFFERING);
+                    }
                     video.play().catch(() => {});
+                });
+
+                hls.on(Hls.Events.FRAG_BUFFERED, () => {
+                    if (cancelled) return;
+                    // Update to starting stage - **Validates: Requirements 4.4**
+                    if (loadingStage === LoadingStage.BUFFERING) {
+                        setLoadingStage(LoadingStage.STARTING);
+                        if (loadingTimeoutHandlerRef.current) {
+                            loadingTimeoutHandlerRef.current.updateStage(LoadingStage.STARTING);
+                        }
+                    }
                 });
                 
                 hls.on(Hls.Events.ERROR, (_, d) => {
+                    if (cancelled) return;
                     if (d.fatal) {
-                        if (d.type === Hls.ErrorTypes.NETWORK_ERROR && retryCount < maxRetries) {
-                            retryCount++;
-                            setTimeout(() => hls?.startLoad(), 2000);
-                        } else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                            hls?.recoverMediaError();
+                        // Clear loading timeout
+                        if (loadingTimeoutHandlerRef.current) {
+                            loadingTimeoutHandlerRef.current.clearTimeout();
+                        }
+
+                        const errorType = d.type === Hls.ErrorTypes.NETWORK_ERROR ? 'network' :
+                                          d.type === Hls.ErrorTypes.MEDIA_ERROR ? 'media' : 'unknown';
+
+                        // Try auto-retry with FallbackHandler - **Validates: Requirements 6.1, 6.2, 6.3, 6.4**
+                        if (fallbackHandlerRef.current) {
+                            const streamError = createStreamError({
+                                type: errorType,
+                                message: d.details || 'Stream error',
+                                stage: loadingStage,
+                                deviceTier,
+                                retryCount: autoRetryCount,
+                            });
+
+                            const result = fallbackHandlerRef.current.handleError(streamError, () => {
+                                if (!cancelled && hls) {
+                                    setLoadingStage(LoadingStage.CONNECTING);
+                                    if (d.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                                        hls.startLoad();
+                                    } else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                                        hls.recoverMediaError();
+                                    }
+                                }
+                            });
+
+                            if (result.action === 'manual-retry-required') {
+                                setStatus('error');
+                                setLoadingStage(LoadingStage.ERROR);
+                            }
                         } else {
                             setStatus('error');
+                            setLoadingStage(LoadingStage.ERROR);
                         }
                     }
                 });
@@ -492,17 +676,26 @@ function VideoPopup({ camera, onClose }) {
             cancelled = true;
             video.removeEventListener('playing', handlePlaying);
             video.removeEventListener('error', handleError);
+            cleanupResources();
             if (hls) { hls.destroy(); hlsRef.current = null; }
         };
-    }, [url, retryKey]);
+    }, [url, retryKey, deviceTier, cleanupResources, loadingStage, autoRetryCount]);
 
-    const handleRetry = () => {
-        if (hlsRef.current) {
-            hlsRef.current.destroy();
-            hlsRef.current = null;
+    const handleRetry = useCallback(() => {
+        cleanupResources();
+        setStatus('connecting');
+        setLoadingStage(LoadingStage.CONNECTING);
+        setAutoRetryCount(0);
+        setIsAutoRetrying(false);
+        setShowTroubleshooting(false);
+        if (loadingTimeoutHandlerRef.current) {
+            loadingTimeoutHandlerRef.current.resetFailures();
+        }
+        if (fallbackHandlerRef.current) {
+            fallbackHandlerRef.current.reset();
         }
         setRetryKey(k => k + 1);
-    };
+    }, [cleanupResources]);
 
     const toggleFS = async () => {
         try {
@@ -526,6 +719,20 @@ function VideoPopup({ camera, onClose }) {
     // Get wrapper ref for zoom controls
     const getWrapper = () => wrapperRef.current?.querySelector('[style*="transform-origin"]');
 
+    // Get status display info - **Validates: Requirements 4.1, 4.2, 4.3, 4.4**
+    const getStatusDisplay = () => {
+        if (status === 'live') return { label: 'LIVE', color: 'bg-emerald-500/20 text-emerald-400', dotColor: 'bg-emerald-400' };
+        if (status === 'timeout') return { label: 'TIMEOUT', color: 'bg-amber-500/20 text-amber-400', dotColor: 'bg-amber-400' };
+        if (status === 'error') return { label: 'OFFLINE', color: 'bg-red-500/20 text-red-400', dotColor: 'bg-red-400' };
+        // Connecting states with progressive messages
+        return { label: getStageMessage(loadingStage), color: 'bg-amber-500/20 text-amber-400', dotColor: 'bg-amber-400' };
+    };
+
+    const statusDisplay = getStatusDisplay();
+    
+    // Check if animations should be disabled on low-end devices - **Validates: Requirements 5.2**
+    const disableAnimations = shouldDisableAnimations();
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-2 sm:p-4" onClick={onClose}>
             <div ref={modalRef} className="relative w-full max-w-5xl bg-gray-900 rounded-2xl overflow-hidden shadow-2xl flex flex-col" style={{ maxHeight: 'calc(100vh - 16px)' }} onClick={(e) => e.stopPropagation()}>
@@ -534,10 +741,13 @@ function VideoPopup({ camera, onClose }) {
                     <div className="flex-1 min-w-0 pr-4">
                         <div className="flex items-center gap-2 flex-wrap">
                             <h2 className="text-white font-bold text-sm sm:text-lg truncate">{camera.name}</h2>
-                            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${status === 'live' ? 'bg-emerald-500/20 text-emerald-400' : status === 'connecting' ? 'bg-amber-500/20 text-amber-400' : 'bg-red-500/20 text-red-400'}`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${status === 'live' ? `bg-emerald-400 ${!isFullscreen ? 'animate-pulse' : ''}` : status === 'connecting' ? 'bg-amber-400' : 'bg-red-400'}`} />
-                                {status === 'live' ? 'LIVE' : status === 'connecting' ? 'CONNECTING' : 'OFFLINE'}
+                            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${statusDisplay.color}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${statusDisplay.dotColor} ${status === 'live' && !isFullscreen && !disableAnimations ? 'animate-pulse' : ''}`} />
+                                {statusDisplay.label}
                             </span>
+                            {isAutoRetrying && (
+                                <span className="text-[10px] text-amber-400">Auto-retry {autoRetryCount}/3...</span>
+                            )}
                         </div>
                         {camera.location && <p className="text-gray-400 text-xs sm:text-sm flex items-center gap-1.5 mt-1 truncate"><Icons.MapPin /> {camera.location}</p>}
                     </div>
@@ -551,7 +761,49 @@ function VideoPopup({ camera, onClose }) {
                 {/* Video */}
                 <div ref={wrapperRef} className="relative flex-1 min-h-0 bg-black overflow-hidden" onDoubleClick={toggleFS}>
                     <ZoomableVideo videoRef={videoRef} maxZoom={4} onZoomChange={setZoom} />
-                    {status === 'connecting' && <VideoSkeleton size="large" />}
+                    
+                    {/* Progressive Loading Overlay - **Validates: Requirements 4.1, 4.2, 4.3, 4.4, 4.5, 5.2** */}
+                    {status === 'connecting' && (
+                        <div className="absolute inset-0 bg-gradient-to-br from-gray-800 via-gray-900 to-gray-800 flex flex-col items-center justify-center">
+                            <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mb-4">
+                                <div className={`w-8 h-8 border-2 border-white/30 border-t-sky-500 rounded-full ${disableAnimations ? '' : 'animate-spin'}`} />
+                            </div>
+                            <p className="text-white font-medium mb-1">{getStageMessage(loadingStage)}</p>
+                            <p className="text-gray-400 text-sm">Please wait...</p>
+                        </div>
+                    )}
+                    
+                    {/* Timeout Error Overlay - **Validates: Requirements 1.2, 1.4** */}
+                    {status === 'timeout' && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90">
+                            <div className="text-center p-6">
+                                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-500/20 flex items-center justify-center">
+                                    <Icons.Clock />
+                                </div>
+                                <h3 className="text-white font-semibold text-lg mb-2">Loading Timeout</h3>
+                                <p className="text-gray-400 text-sm mb-2">Stream took too long to load</p>
+                                {consecutiveFailures >= 3 && showTroubleshooting && (
+                                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mb-4 text-left max-w-sm mx-auto">
+                                        <p className="text-amber-400 text-xs font-medium mb-1">Troubleshooting Tips:</p>
+                                        <ul className="text-gray-400 text-xs list-disc list-inside space-y-1">
+                                            <li>Check your internet connection</li>
+                                            <li>Camera may be offline</li>
+                                            <li>Try refreshing the page</li>
+                                        </ul>
+                                    </div>
+                                )}
+                                <button
+                                    onClick={handleRetry}
+                                    className="inline-flex items-center gap-2 px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg font-medium transition-colors"
+                                >
+                                    <Icons.Reset />
+                                    Coba Lagi
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* Error Overlay */}
                     {status === 'error' && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90">
                             <div className="text-center p-6">
@@ -595,19 +847,29 @@ function VideoPopup({ camera, onClose }) {
 }
 
 // ============================================
-// MULTI-VIEW VIDEO ITEM - Optimized with fullscreen detection and error isolation
+// MULTI-VIEW VIDEO ITEM - Optimized with fullscreen detection, error isolation, timeout handler, and auto-retry
 // Each stream is isolated - errors in one don't affect others
+// **Validates: Requirements 1.1, 1.2, 1.3, 2.3, 4.1, 4.2, 4.3, 4.4, 6.1, 6.2, 6.3, 6.4, 7.1, 7.2, 7.3**
 // ============================================
 function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDelay = 0 }) {
     const videoRef = useRef(null);
     const wrapperRef = useRef(null);
     const containerRef = useRef(null);
     const hlsRef = useRef(null);
+    const loadingTimeoutHandlerRef = useRef(null);
+    const fallbackHandlerRef = useRef(null);
+    const abortControllerRef = useRef(null);
+    
     const [status, setStatus] = useState('connecting');
+    const [loadingStage, setLoadingStage] = useState(LoadingStage.CONNECTING);
     const [zoom, setZoom] = useState(1);
     const [retryKey, setRetryKey] = useState(0);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [autoRetryCount, setAutoRetryCount] = useState(0);
+    const [isAutoRetrying, setIsAutoRetrying] = useState(false);
+    
     const url = camera.streams?.hls;
+    const deviceTier = detectDeviceTier();
 
     // Track fullscreen state to disable animations
     useEffect(() => {
@@ -623,21 +885,111 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         onStatusChange?.(camera.id, status);
     }, [status, camera.id, onStatusChange]);
 
+    // Initialize LoadingTimeoutHandler - **Validates: Requirements 1.1, 1.2, 1.3**
+    useEffect(() => {
+        loadingTimeoutHandlerRef.current = createLoadingTimeoutHandler({
+            deviceTier,
+            onTimeout: (stage) => {
+                cleanupResources();
+                setStatus('timeout');
+                setLoadingStage(LoadingStage.TIMEOUT);
+                onError?.(camera.id, new Error(`Loading timeout at ${stage} stage`));
+            },
+            onMaxFailures: () => {
+                // In multi-view, just notify parent
+                onError?.(camera.id, new Error('Max consecutive failures reached'));
+            },
+        });
+
+        return () => {
+            if (loadingTimeoutHandlerRef.current) {
+                loadingTimeoutHandlerRef.current.destroy();
+                loadingTimeoutHandlerRef.current = null;
+            }
+        };
+    }, [deviceTier, camera.id, onError]);
+
+    // Initialize FallbackHandler for auto-retry - **Validates: Requirements 6.1, 6.2, 6.3, 6.4**
+    useEffect(() => {
+        fallbackHandlerRef.current = createFallbackHandler({
+            maxAutoRetries: 3,
+            onAutoRetry: ({ attempt }) => {
+                setIsAutoRetrying(true);
+                setAutoRetryCount(attempt);
+            },
+            onAutoRetryExhausted: ({ totalAttempts }) => {
+                setIsAutoRetrying(false);
+                setAutoRetryCount(totalAttempts);
+            },
+            onNetworkRestore: () => {
+                if (status === 'error' || status === 'timeout') {
+                    handleRetry();
+                }
+            },
+            onManualRetryRequired: () => {
+                setIsAutoRetrying(false);
+            },
+        });
+
+        return () => {
+            if (fallbackHandlerRef.current) {
+                fallbackHandlerRef.current.destroy();
+                fallbackHandlerRef.current = null;
+            }
+        };
+    }, [status]);
+
+    // Cleanup resources function - **Validates: Requirements 7.1, 7.2, 7.3**
+    const cleanupResources = useCallback(() => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+        if (hlsRef.current) {
+            hlsRef.current.destroy();
+            hlsRef.current = null;
+        }
+        if (videoRef.current) {
+            videoRef.current.pause();
+            videoRef.current.src = '';
+            videoRef.current.load();
+        }
+        if (loadingTimeoutHandlerRef.current) {
+            loadingTimeoutHandlerRef.current.clearTimeout();
+        }
+        if (fallbackHandlerRef.current) {
+            fallbackHandlerRef.current.clearPendingRetry();
+        }
+    }, []);
+
     useEffect(() => {
         if (!url || !videoRef.current) return;
         const video = videoRef.current;
         let hls = null;
-        let retryCount = 0;
-        const maxRetries = 3;
         let cancelled = false;
         let initTimeout = null;
 
+        abortControllerRef.current = new AbortController();
         setStatus('connecting');
+        setLoadingStage(LoadingStage.CONNECTING);
 
         // Only change to 'live' once video starts playing - don't revert on buffering
-        const handlePlaying = () => setStatus('live');
+        const handlePlaying = () => {
+            setStatus('live');
+            setLoadingStage(LoadingStage.PLAYING);
+            // Clear timeout on success
+            if (loadingTimeoutHandlerRef.current) {
+                loadingTimeoutHandlerRef.current.clearTimeout();
+                loadingTimeoutHandlerRef.current.resetFailures();
+            }
+            if (fallbackHandlerRef.current) {
+                fallbackHandlerRef.current.reset();
+            }
+            setAutoRetryCount(0);
+        };
         const handleError = () => {
             setStatus('error');
+            setLoadingStage(LoadingStage.ERROR);
             // Notify parent of error for isolation tracking
             onError?.(camera.id, new Error('Video playback error'));
         };
@@ -645,21 +997,25 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         video.addEventListener('playing', handlePlaying);
         video.addEventListener('error', handleError);
 
-        // Staggered initialization - wait for initDelay before starting
-        const initStream = async () => {
-            if (initDelay > 0) {
-                await new Promise(resolve => {
-                    initTimeout = setTimeout(resolve, initDelay);
-                });
-            }
-
+        // Core initialization logic
+        const performInit = async () => {
             if (cancelled) return;
 
-            // Lazy load HLS.js using cached loader
-            // **Validates: Requirements 4.4**
+            // Start loading timeout - **Validates: Requirements 1.1**
+            if (loadingTimeoutHandlerRef.current) {
+                loadingTimeoutHandlerRef.current.startTimeout(LoadingStage.CONNECTING);
+            }
+
+            // Lazy load HLS.js using PreloadManager - **Validates: Requirements 2.3**
             const Hls = await loadHls();
             
             if (cancelled) return;
+
+            // Update loading stage - **Validates: Requirements 4.2**
+            setLoadingStage(LoadingStage.LOADING);
+            if (loadingTimeoutHandlerRef.current) {
+                loadingTimeoutHandlerRef.current.updateStage(LoadingStage.LOADING);
+            }
             
             if (Hls.isSupported()) {
                 // Use device-adaptive HLS configuration
@@ -670,19 +1026,67 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 hls.attachMedia(video);
                 
                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    if (cancelled) return;
+                    // Update to buffering stage - **Validates: Requirements 4.3**
+                    setLoadingStage(LoadingStage.BUFFERING);
+                    if (loadingTimeoutHandlerRef.current) {
+                        loadingTimeoutHandlerRef.current.updateStage(LoadingStage.BUFFERING);
+                    }
                     video.play().catch(() => {});
+                });
+
+                hls.on(Hls.Events.FRAG_BUFFERED, () => {
+                    if (cancelled) return;
+                    // Update to starting stage - **Validates: Requirements 4.4**
+                    if (loadingStage === LoadingStage.BUFFERING) {
+                        setLoadingStage(LoadingStage.STARTING);
+                        if (loadingTimeoutHandlerRef.current) {
+                            loadingTimeoutHandlerRef.current.updateStage(LoadingStage.STARTING);
+                        }
+                    }
                 });
                 
                 hls.on(Hls.Events.ERROR, (_, d) => {
+                    if (cancelled) return;
                     if (d.fatal) {
-                        if (d.type === Hls.ErrorTypes.NETWORK_ERROR && retryCount < maxRetries) {
-                            retryCount++;
-                            setTimeout(() => hls?.startLoad(), 2000);
-                        } else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                            hls?.recoverMediaError();
+                        // Clear loading timeout
+                        if (loadingTimeoutHandlerRef.current) {
+                            loadingTimeoutHandlerRef.current.clearTimeout();
+                        }
+
+                        const errorType = d.type === Hls.ErrorTypes.NETWORK_ERROR ? 'network' :
+                                          d.type === Hls.ErrorTypes.MEDIA_ERROR ? 'media' : 'unknown';
+
+                        // Try auto-retry with FallbackHandler - **Validates: Requirements 6.1, 6.2, 6.3, 6.4**
+                        if (fallbackHandlerRef.current) {
+                            const streamError = createStreamError({
+                                type: errorType,
+                                message: d.details || 'Stream error',
+                                stage: loadingStage,
+                                deviceTier,
+                                retryCount: autoRetryCount,
+                            });
+
+                            const result = fallbackHandlerRef.current.handleError(streamError, () => {
+                                if (!cancelled && hls) {
+                                    setLoadingStage(LoadingStage.CONNECTING);
+                                    if (d.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                                        hls.startLoad();
+                                    } else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                                        hls.recoverMediaError();
+                                    }
+                                }
+                            });
+
+                            if (result.action === 'manual-retry-required') {
+                                setStatus('error');
+                                setLoadingStage(LoadingStage.ERROR);
+                                // Error isolation: notify parent but don't propagate
+                                onError?.(camera.id, new Error(`HLS fatal error: ${d.type}`));
+                            }
                         } else {
                             setStatus('error');
-                            // Error isolation: notify parent but don't propagate
+                            setLoadingStage(LoadingStage.ERROR);
                             onError?.(camera.id, new Error(`HLS fatal error: ${d.type}`));
                         }
                     }
@@ -690,6 +1094,35 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 video.src = url;
                 video.addEventListener('loadedmetadata', () => video.play().catch(() => {}));
+            }
+        };
+
+        // Staggered initialization with queue support for low-end devices
+        // **Validates: Requirements 5.4**
+        const initStream = async () => {
+            // Wait for initDelay first (staggered initialization)
+            if (initDelay > 0) {
+                await new Promise(resolve => {
+                    initTimeout = setTimeout(resolve, initDelay);
+                });
+            }
+
+            if (cancelled) return;
+
+            // On low-end devices, use queue to limit concurrent initializations
+            // **Validates: Requirements 5.4**
+            if (shouldUseQueuedInit()) {
+                const queue = getGlobalStreamInitQueue();
+                try {
+                    await queue.enqueue(performInit, camera.id);
+                } catch (error) {
+                    if (!cancelled) {
+                        console.warn(`Stream ${camera.id} init cancelled:`, error.message);
+                    }
+                }
+            } else {
+                // Medium/High devices: initialize directly
+                await performInit();
             }
         };
 
@@ -701,24 +1134,28 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             if (initTimeout) clearTimeout(initTimeout);
             video.removeEventListener('playing', handlePlaying);
             video.removeEventListener('error', handleError);
+            cleanupResources();
             if (hls) { 
                 hls.destroy(); 
                 hlsRef.current = null; 
             }
-            // Clear video source to release resources
-            video.pause();
-            video.src = '';
-            video.load();
         };
-    }, [url, retryKey, initDelay, camera.id, onError]);
+    }, [url, retryKey, initDelay, camera.id, onError, deviceTier, cleanupResources, loadingStage, autoRetryCount]);
 
-    const handleRetry = () => {
-        if (hlsRef.current) {
-            hlsRef.current.destroy();
-            hlsRef.current = null;
+    const handleRetry = useCallback(() => {
+        cleanupResources();
+        setStatus('connecting');
+        setLoadingStage(LoadingStage.CONNECTING);
+        setAutoRetryCount(0);
+        setIsAutoRetrying(false);
+        if (loadingTimeoutHandlerRef.current) {
+            loadingTimeoutHandlerRef.current.resetFailures();
+        }
+        if (fallbackHandlerRef.current) {
+            fallbackHandlerRef.current.reset();
         }
         setRetryKey(k => k + 1);
-    };
+    }, [cleanupResources]);
 
     const toggleFS = async () => {
         try {
@@ -741,17 +1178,34 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
 
     const getWrapper = () => wrapperRef.current?.querySelector('[style*="transform-origin"]');
 
+    // Get status display info for multi-view - **Validates: Requirements 4.1, 4.2, 4.3, 4.4**
+    const getStatusBadge = () => {
+        if (status === 'live') return { label: 'LIVE', color: 'bg-emerald-500' };
+        if (status === 'timeout') return { label: 'TIMEOUT', color: 'bg-amber-500' };
+        if (status === 'error') return { label: 'OFF', color: 'bg-red-500' };
+        // Connecting - show abbreviated stage
+        return { label: '...', color: 'bg-amber-500' };
+    };
+
+    const statusBadge = getStatusBadge();
+    
+    // Check if animations should be disabled on low-end devices - **Validates: Requirements 5.2**
+    const disableAnimations = shouldDisableAnimations();
+
     return (
         <div ref={containerRef} className="relative w-full h-full bg-black rounded-xl overflow-hidden group">
             <div ref={wrapperRef} className="w-full h-full">
                 <ZoomableVideo videoRef={videoRef} status={status} maxZoom={3} onZoomChange={setZoom} />
             </div>
-            {/* Status badge - disable pulse animation in fullscreen */}
+            {/* Status badge - disable pulse animation in fullscreen and on low-end devices */}
             <div className="absolute top-2 left-2 z-10 pointer-events-none">
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold text-white shadow ${status === 'live' ? 'bg-emerald-500' : status === 'connecting' ? 'bg-amber-500' : 'bg-red-500'}`}>
-                    <span className={`w-1 h-1 rounded-full bg-white ${status === 'live' && !isFullscreen ? 'animate-pulse' : ''}`} />
-                    {status === 'live' ? 'LIVE' : status === 'connecting' ? '...' : 'OFF'}
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold text-white shadow ${statusBadge.color}`}>
+                    <span className={`w-1 h-1 rounded-full bg-white ${status === 'live' && !isFullscreen && !disableAnimations ? 'animate-pulse' : ''}`} />
+                    {statusBadge.label}
                 </span>
+                {isAutoRetrying && (
+                    <span className="ml-1 text-[8px] text-amber-400">retry {autoRetryCount}/3</span>
+                )}
             </div>
             <button onClick={onRemove} className="absolute top-2 right-2 z-10 p-1.5 bg-red-500/80 hover:bg-red-500 rounded-lg text-white shadow"><Icons.X /></button>
             {/* Overlay controls - render only on hover, no transition in fullscreen */}
@@ -769,7 +1223,38 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                     </div>
                 </div>
             </div>
-            {status === 'connecting' && <VideoSkeleton size="small" />}
+            
+            {/* Progressive Loading Overlay - **Validates: Requirements 4.1, 4.2, 4.3, 4.4, 5.2** */}
+            {status === 'connecting' && (
+                <div className="absolute inset-0 bg-gradient-to-br from-gray-800 via-gray-900 to-gray-800 flex flex-col items-center justify-center">
+                    <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center mb-2">
+                        <div className={`w-5 h-5 border-2 border-white/30 border-t-sky-500 rounded-full ${disableAnimations ? '' : 'animate-spin'}`} />
+                    </div>
+                    <p className="text-white text-xs font-medium">{getStageMessage(loadingStage)}</p>
+                </div>
+            )}
+            
+            {/* Timeout Overlay */}
+            {status === 'timeout' && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90">
+                    <div className="text-center p-4">
+                        <div className="w-10 h-10 mx-auto mb-2 rounded-full bg-amber-500/20 flex items-center justify-center">
+                            <Icons.Clock />
+                        </div>
+                        <p className="text-white text-xs font-medium mb-1">Timeout</p>
+                        <p className="text-gray-400 text-[10px] mb-3">Loading terlalu lama</p>
+                        <button
+                            onClick={handleRetry}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-xs font-medium transition-colors"
+                        >
+                            <Icons.Reset />
+                            Coba Lagi
+                        </button>
+                    </div>
+                </div>
+            )}
+            
+            {/* Error Overlay */}
             {status === 'error' && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90">
                     <div className="text-center p-4">
@@ -919,10 +1404,12 @@ function MultiViewLayout({ cameras, onRemove, onClose }) {
 
 // ============================================
 // NAVBAR - Enhanced with live indicator
+// Disables animations on low-end devices - **Validates: Requirements 5.2**
 // ============================================
 function Navbar({ cameraCount }) {
     const { isDark, toggleTheme } = useTheme();
     const [currentTime, setCurrentTime] = useState(new Date());
+    const disableAnimations = shouldDisableAnimations();
     
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -940,7 +1427,7 @@ function Navbar({ cameraCount }) {
                                 <Icons.Camera />
                             </div>
                             {cameraCount > 0 && (
-                                <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white dark:border-gray-900 animate-pulse"></span>
+                                <span className={`absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white dark:border-gray-900 ${disableAnimations ? '' : 'animate-pulse'}`}></span>
                             )}
                         </div>
                         <div>
@@ -952,7 +1439,7 @@ function Navbar({ cameraCount }) {
                     {/* Center - Live Time */}
                     <div className="hidden md:flex items-center gap-3 px-4 py-2 rounded-xl bg-gray-100/80 dark:bg-gray-800/80">
                         <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span className={`w-2 h-2 rounded-full bg-emerald-500 ${disableAnimations ? '' : 'animate-pulse'}`}></span>
                             <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">LIVE</span>
                         </div>
                         <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
@@ -1349,13 +1836,16 @@ function Footer({ cameraCount, areaCount }) {
 
 // ============================================
 // MULTI-VIEW FLOATING BUTTON - Enhanced with tooltip and device-based limit
+// Disables animations on low-end devices - **Validates: Requirements 5.2**
 // ============================================
 function MultiViewButton({ count, onClick, maxReached, maxStreams = 3 }) {
+    const disableAnimations = shouldDisableAnimations();
+    
     return (
         <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2">
             {/* Info tooltip when max reached */}
             {maxReached && (
-                <div className="bg-amber-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg shadow-lg animate-bounce">
+                <div className={`bg-amber-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg shadow-lg ${disableAnimations ? '' : 'animate-bounce'}`}>
                     Maximum {maxStreams} cameras reached!
                 </div>
             )}
@@ -1446,6 +1936,10 @@ export default function LandingPage() {
     const [deviceTier] = useState(() => detectDeviceTier());
     const maxStreams = getMaxConcurrentStreams(deviceTier);
 
+    // Server connectivity state - **Validates: Requirements 3.1, 3.2, 3.5**
+    const [serverStatus, setServerStatus] = useState('checking'); // 'checking', 'online', 'offline'
+    const [serverLatency, setServerLatency] = useState(-1);
+
     // Toast helper functions
     const addToast = useCallback((message, type = 'info') => {
         const id = Date.now();
@@ -1454,6 +1948,38 @@ export default function LandingPage() {
 
     const removeToast = useCallback((id) => {
         setToasts(prev => prev.filter(t => t.id !== id));
+    }, []);
+
+    // Preload HLS.js immediately on mount - **Validates: Requirements 2.1, 5.5**
+    useEffect(() => {
+        // Start preloading HLS.js in background immediately
+        preloadHls().catch((err) => {
+            console.warn('HLS.js preload failed:', err);
+        });
+    }, []);
+
+    // Check MediaMTX server connectivity - **Validates: Requirements 3.1, 3.2, 3.5**
+    useEffect(() => {
+        const checkServerConnectivity = async () => {
+            try {
+                // Get MediaMTX HLS URL from environment or use default
+                const mediaMtxUrl = import.meta.env.VITE_MEDIAMTX_HLS_URL || 'http://localhost:8888';
+                const result = await testMediaMTXConnection(mediaMtxUrl);
+                
+                if (result.reachable) {
+                    setServerStatus('online');
+                    setServerLatency(result.latency);
+                } else {
+                    setServerStatus('offline');
+                    console.warn('MediaMTX server unreachable:', result.error);
+                }
+            } catch (err) {
+                setServerStatus('offline');
+                console.error('Server connectivity check failed:', err);
+            }
+        };
+
+        checkServerConnectivity();
     }, []);
 
     useEffect(() => {

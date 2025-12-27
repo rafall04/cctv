@@ -1,16 +1,21 @@
 import { useEffect, useRef, useState, memo, useCallback } from 'react';
-import Hls from 'hls.js';
 import { detectDeviceTier, getDeviceCapabilities, getMobileDeviceType } from '../utils/deviceDetector';
 import { getHLSConfig } from '../utils/hlsConfig';
 import { createErrorRecoveryHandler, getBackoffDelay } from '../utils/errorRecovery';
 import { createVisibilityObserver } from '../utils/visibilityObserver';
 import { createOrientationObserver, getCurrentOrientation } from '../utils/orientationObserver';
+// New imports for stream loading fix
+import { preloadHls, getPreloadedHls, isPreloaded, getPreloadStatus } from '../utils/preloadManager';
+import { createLoadingTimeoutHandler, getTimeoutDuration } from '../utils/loadingTimeoutHandler';
+import { LoadingStage, LOADING_STAGE_MESSAGES, getStageMessage, createStreamError } from '../utils/streamLoaderTypes';
+import { createFallbackHandler, getRetryDelay } from '../utils/fallbackHandler';
 
 /**
  * Optimized VideoPlayer Component
- * Integrates device-adaptive HLS configuration, error recovery, and visibility-based stream control
+ * Integrates device-adaptive HLS configuration, error recovery, visibility-based stream control,
+ * loading timeout detection, progressive loading stages, and auto-retry functionality.
  * 
- * **Validates: Requirements 1.1, 1.2, 1.3, 1.4, 1.5, 2.4, 2.5, 3.1, 3.2, 3.3, 3.4, 3.5, 4.2, 4.3**
+ * **Validates: Requirements 1.1, 1.2, 1.3, 1.4, 1.5, 2.1, 2.2, 2.3, 2.4, 2.5, 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 4.2, 4.3, 4.4, 4.5, 5.2, 5.3, 6.1, 6.2, 6.3, 6.4, 7.1, 7.2, 7.3, 7.4, 7.5**
  */
 const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = false }) => {
     const videoRef = useRef(null);
@@ -21,17 +26,31 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
     const errorRecoveryRef = useRef(null);
     const pauseTimeoutRef = useRef(null);
     const bufferSpinnerTimeoutRef = useRef(null);
+    // New refs for stream loading fix
+    const loadingTimeoutHandlerRef = useRef(null);
+    const fallbackHandlerRef = useRef(null);
+    const abortControllerRef = useRef(null);
     
     // Device capabilities - detected once on mount
     const [deviceTier, setDeviceTier] = useState('medium');
     const [deviceCapabilities, setDeviceCapabilities] = useState(null);
     
-    // Stream status
-    const [status, setStatus] = useState('loading'); // loading, playing, paused, error
+    // Stream status - now using LoadingStage for progressive feedback
+    const [status, setStatus] = useState('loading'); // loading, playing, paused, error, timeout
+    const [loadingStage, setLoadingStage] = useState(LoadingStage.CONNECTING);
     const [error, setError] = useState(null);
     const [retryCount, setRetryCount] = useState(0);
     const [showSpinner, setShowSpinner] = useState(true);
     const maxRetries = 4;
+
+    // Auto-retry state
+    const [autoRetryCount, setAutoRetryCount] = useState(0);
+    const [isAutoRetrying, setIsAutoRetrying] = useState(false);
+    const [retryDelay, setRetryDelay] = useState(0);
+
+    // Consecutive failure tracking
+    const [consecutiveFailures, setConsecutiveFailures] = useState(0);
+    const [showTroubleshooting, setShowTroubleshooting] = useState(false);
 
     // Visibility state
     const [isVisible, setIsVisible] = useState(true);
@@ -98,10 +117,12 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                 if (type === 'network' || type === 'media') {
                     setError(null);
                     setStatus('playing');
+                    setLoadingStage(LoadingStage.PLAYING);
                 }
             },
             onFailed: (type, result) => {
                 setStatus('error');
+                setLoadingStage(LoadingStage.ERROR);
                 setError(result.message || 'Recovery failed');
             },
         });
@@ -111,6 +132,121 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                 errorRecoveryRef.current.reset();
             }
         };
+    }, []);
+
+    // Initialize LoadingTimeoutHandler - **Validates: Requirements 1.1, 1.2, 1.3, 1.4, 5.3**
+    useEffect(() => {
+        if (!deviceCapabilities) return;
+
+        loadingTimeoutHandlerRef.current = createLoadingTimeoutHandler({
+            deviceTier: deviceCapabilities.tier,
+            onTimeout: (stage) => {
+                // Handle timeout - cleanup and show error
+                // **Validates: Requirements 1.2, 1.3, 7.1, 7.2, 7.3**
+                cleanupResources();
+                setStatus('timeout');
+                setLoadingStage(LoadingStage.TIMEOUT);
+                setError(`Loading timeout at ${stage} stage`);
+                setShowSpinner(false);
+                
+                // Track consecutive failures
+                const failures = loadingTimeoutHandlerRef.current?.getConsecutiveFailures() || 0;
+                setConsecutiveFailures(failures);
+            },
+            onMaxFailures: (failures) => {
+                // Show troubleshooting after 3 consecutive failures
+                // **Validates: Requirements 1.4**
+                setShowTroubleshooting(true);
+                setConsecutiveFailures(failures);
+            },
+        });
+
+        return () => {
+            if (loadingTimeoutHandlerRef.current) {
+                loadingTimeoutHandlerRef.current.destroy();
+                loadingTimeoutHandlerRef.current = null;
+            }
+        };
+    }, [deviceCapabilities]);
+
+    // Initialize FallbackHandler for auto-retry - **Validates: Requirements 6.1, 6.2, 6.3, 6.4, 6.5**
+    useEffect(() => {
+        fallbackHandlerRef.current = createFallbackHandler({
+            maxAutoRetries: 3,
+            onAutoRetry: ({ attempt, maxAttempts, delay, errorType }) => {
+                setIsAutoRetrying(true);
+                setAutoRetryCount(attempt);
+                setRetryDelay(delay);
+                setError(`Auto-retry ${attempt}/${maxAttempts} in ${delay / 1000}s...`);
+            },
+            onAutoRetryExhausted: ({ totalAttempts }) => {
+                setIsAutoRetrying(false);
+                setAutoRetryCount(totalAttempts);
+            },
+            onNetworkRestore: () => {
+                // Auto-reconnect when network is restored
+                // **Validates: Requirements 6.5**
+                if (status === 'error' || status === 'timeout') {
+                    handleRetry();
+                }
+            },
+            onManualRetryRequired: ({ errorType, message }) => {
+                setIsAutoRetrying(false);
+                setError(message);
+            },
+        });
+
+        return () => {
+            if (fallbackHandlerRef.current) {
+                fallbackHandlerRef.current.destroy();
+                fallbackHandlerRef.current = null;
+            }
+        };
+    }, [status]);
+
+    /**
+     * Cleanup all resources - **Validates: Requirements 1.3, 7.1, 7.2, 7.3, 7.4, 7.5**
+     * **Property 8: Resource Cleanup on Timeout**
+     */
+    const cleanupResources = useCallback(() => {
+        // Cancel pending network requests
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+
+        // Destroy HLS instance - **Validates: Requirements 7.1**
+        if (hlsRef.current) {
+            hlsRef.current.destroy();
+            hlsRef.current = null;
+        }
+
+        // Clear video element source - **Validates: Requirements 7.2**
+        if (videoRef.current) {
+            videoRef.current.pause();
+            videoRef.current.src = '';
+            videoRef.current.load();
+        }
+
+        // Clear loading timeout
+        if (loadingTimeoutHandlerRef.current) {
+            loadingTimeoutHandlerRef.current.clearTimeout();
+        }
+
+        // Clear fallback handler pending retry
+        if (fallbackHandlerRef.current) {
+            fallbackHandlerRef.current.clearPendingRetry();
+        }
+
+        // Clear all timeouts
+        if (pauseTimeoutRef.current) {
+            clearTimeout(pauseTimeoutRef.current);
+            pauseTimeoutRef.current = null;
+        }
+        if (bufferSpinnerTimeoutRef.current) {
+            clearTimeout(bufferSpinnerTimeoutRef.current);
+            bufferSpinnerTimeoutRef.current = null;
+        }
     }, []);
 
     // Setup visibility observer for pause/resume based on visibility
@@ -138,6 +274,7 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                     videoRef.current.play().catch(() => {});
                     setIsPausedByVisibility(false);
                     setStatus('playing');
+                    setLoadingStage(LoadingStage.PLAYING);
                 }
             } else {
                 // Schedule pause after 5 seconds when not visible
@@ -167,116 +304,260 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
         };
     }, [status, isPausedByVisibility]);
 
-    // Main HLS initialization effect
+    /**
+     * Handle retry - fresh connection with cleared cache
+     * **Validates: Requirements 1.5**
+     */
+    const handleRetry = useCallback(() => {
+        // Reset states
+        setRetryCount(0);
+        setAutoRetryCount(0);
+        setIsAutoRetrying(false);
+        setError(null);
+        setStatus('loading');
+        setLoadingStage(LoadingStage.CONNECTING);
+        setShowSpinner(true);
+        setShowTroubleshooting(false);
+
+        // Reset handlers
+        if (errorRecoveryRef.current) {
+            errorRecoveryRef.current.reset();
+        }
+        if (fallbackHandlerRef.current) {
+            fallbackHandlerRef.current.reset();
+        }
+        if (loadingTimeoutHandlerRef.current) {
+            loadingTimeoutHandlerRef.current.resetFailures();
+        }
+
+        // Cleanup and reinitialize
+        cleanupResources();
+        
+        // Force re-render to trigger initPlayer
+        setDeviceCapabilities(prev => ({ ...prev }));
+    }, [cleanupResources]);
+
+    // Main HLS initialization effect - now using PreloadManager
+    // **Validates: Requirements 2.1, 2.2, 2.3**
     useEffect(() => {
         if (!streams || !videoRef.current || !deviceCapabilities) return;
 
         const video = videoRef.current;
         let hls = null;
+        let isDestroyed = false;
 
-        const initPlayer = () => {
+        // Create abort controller for cancelling requests
+        abortControllerRef.current = new AbortController();
+
+        const initPlayer = async () => {
             setStatus('loading');
+            setLoadingStage(LoadingStage.CONNECTING);
             setError(null);
             setShowSpinner(true);
 
-            // Get device-adaptive HLS configuration
-            // **Property 2: Device-based HLS Configuration**
-            // **Property 14: Mobile HLS Configuration**
-            const hlsConfig = getHLSConfig(deviceTier, {
-                isMobile: deviceCapabilities.isMobile,
-                mobileDeviceType: deviceCapabilities.mobileDeviceType,
-            });
+            // Start loading timeout - **Validates: Requirements 1.1, 5.3**
+            if (loadingTimeoutHandlerRef.current) {
+                loadingTimeoutHandlerRef.current.startTimeout(LoadingStage.CONNECTING);
+            }
 
-            // Try HLS first
-            if (Hls.isSupported() && streams.hls) {
-                hls = new Hls(hlsConfig);
-                hlsRef.current = hls;
+            try {
+                // Use preloaded HLS.js instead of direct import
+                // **Validates: Requirements 2.3**
+                const Hls = await preloadHls();
+                
+                if (isDestroyed) return;
 
-                hls.loadSource(streams.hls);
-                hls.attachMedia(video);
+                // Update loading stage - **Validates: Requirements 4.1**
+                setLoadingStage(LoadingStage.LOADING);
+                if (loadingTimeoutHandlerRef.current) {
+                    loadingTimeoutHandlerRef.current.updateStage(LoadingStage.LOADING);
+                }
 
-                hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                    video.play().then(() => {
-                        setStatus('playing');
-                        setRetryCount(0);
-                        setShowSpinner(false);
-                        if (errorRecoveryRef.current) {
-                            errorRecoveryRef.current.reset();
-                        }
-                    }).catch((err) => {
-                        console.error('Play error:', err);
-                        setStatus('error');
-                        setError('Failed to play video');
-                        setShowSpinner(false);
-                    });
+                // Get device-adaptive HLS configuration
+                // **Property 2: Device-based HLS Configuration**
+                const hlsConfig = getHLSConfig(deviceTier, {
+                    isMobile: deviceCapabilities.isMobile,
+                    mobileDeviceType: deviceCapabilities.mobileDeviceType,
                 });
 
-                // Handle HLS errors with ErrorRecovery module
-                // **Property 6: Exponential Backoff Recovery**
-                hls.on(Hls.Events.ERROR, async (event, data) => {
-                    console.error('HLS error:', data);
+                // Try HLS first
+                if (Hls.isSupported() && streams.hls) {
+                    hls = new Hls(hlsConfig);
+                    hlsRef.current = hls;
 
-                    if (data.fatal) {
-                        const errorData = {
-                            fatal: true,
-                            type: data.type === Hls.ErrorTypes.NETWORK_ERROR ? 'networkError' :
-                                  data.type === Hls.ErrorTypes.MEDIA_ERROR ? 'mediaError' : 'fatalError',
-                        };
+                    hls.loadSource(streams.hls);
+                    hls.attachMedia(video);
 
-                        if (errorRecoveryRef.current) {
-                            await errorRecoveryRef.current.handleError(hls, errorData);
-                        } else {
-                            // Fallback error handling
-                            switch (data.type) {
-                                case Hls.ErrorTypes.NETWORK_ERROR:
-                                    if (retryCount < maxRetries) {
-                                        const delay = getBackoffDelay(retryCount);
-                                        setError(`Network error - retrying in ${delay / 1000}s...`);
-                                        setTimeout(() => {
+                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                        if (isDestroyed) return;
+                        
+                        // Update to buffering stage - **Validates: Requirements 4.3**
+                        setLoadingStage(LoadingStage.BUFFERING);
+                        if (loadingTimeoutHandlerRef.current) {
+                            loadingTimeoutHandlerRef.current.updateStage(LoadingStage.BUFFERING);
+                        }
+                    });
+
+                    hls.on(Hls.Events.FRAG_BUFFERED, () => {
+                        if (isDestroyed) return;
+                        
+                        // Update to starting stage - **Validates: Requirements 4.4**
+                        if (loadingStage === LoadingStage.BUFFERING) {
+                            setLoadingStage(LoadingStage.STARTING);
+                            if (loadingTimeoutHandlerRef.current) {
+                                loadingTimeoutHandlerRef.current.updateStage(LoadingStage.STARTING);
+                            }
+                            
+                            // Attempt playback
+                            video.play().then(() => {
+                                if (isDestroyed) return;
+                                
+                                setStatus('playing');
+                                setLoadingStage(LoadingStage.PLAYING);
+                                setRetryCount(0);
+                                setAutoRetryCount(0);
+                                setShowSpinner(false);
+                                setConsecutiveFailures(0);
+                                
+                                // Clear timeout on success
+                                if (loadingTimeoutHandlerRef.current) {
+                                    loadingTimeoutHandlerRef.current.clearTimeout();
+                                    loadingTimeoutHandlerRef.current.resetFailures();
+                                }
+                                
+                                // Reset fallback handler on success
+                                if (fallbackHandlerRef.current) {
+                                    fallbackHandlerRef.current.reset();
+                                }
+                                
+                                if (errorRecoveryRef.current) {
+                                    errorRecoveryRef.current.reset();
+                                }
+                            }).catch((err) => {
+                                if (isDestroyed) return;
+                                console.error('Play error:', err);
+                                setStatus('error');
+                                setLoadingStage(LoadingStage.ERROR);
+                                setError('Failed to play video');
+                                setShowSpinner(false);
+                            });
+                        }
+                    });
+
+                    // Handle HLS errors with ErrorRecovery and FallbackHandler
+                    // **Property 6: Exponential Backoff Recovery**
+                    // **Validates: Requirements 6.1, 6.2, 6.3, 6.4**
+                    hls.on(Hls.Events.ERROR, async (event, data) => {
+                        if (isDestroyed) return;
+                        console.error('HLS error:', data);
+
+                        if (data.fatal) {
+                            // Clear loading timeout
+                            if (loadingTimeoutHandlerRef.current) {
+                                loadingTimeoutHandlerRef.current.clearTimeout();
+                            }
+
+                            const errorType = data.type === Hls.ErrorTypes.NETWORK_ERROR ? 'network' :
+                                              data.type === Hls.ErrorTypes.MEDIA_ERROR ? 'media' : 'unknown';
+
+                            // Create stream error for diagnostic
+                            const streamError = createStreamError({
+                                type: errorType,
+                                message: data.details || 'Stream error',
+                                stage: loadingStage,
+                                deviceTier: deviceTier,
+                                retryCount: autoRetryCount,
+                            });
+
+                            // Try auto-retry with FallbackHandler
+                            if (fallbackHandlerRef.current) {
+                                const result = fallbackHandlerRef.current.handleError(streamError, () => {
+                                    // Retry function
+                                    if (!isDestroyed && hls) {
+                                        setLoadingStage(LoadingStage.CONNECTING);
+                                        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
                                             hls.startLoad();
-                                            setRetryCount(prev => prev + 1);
-                                        }, delay);
-                                    } else {
-                                        setStatus('error');
-                                        setError('Network error - max retries reached');
+                                        } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                                            hls.recoverMediaError();
+                                        }
                                     }
-                                    break;
-                                case Hls.ErrorTypes.MEDIA_ERROR:
-                                    setError('Media error - recovering...');
-                                    hls.recoverMediaError();
-                                    break;
-                                default:
+                                });
+
+                                if (result.action === 'manual-retry-required') {
                                     setStatus('error');
+                                    setLoadingStage(LoadingStage.ERROR);
+                                    setShowSpinner(false);
+                                }
+                            } else {
+                                // Fallback error handling if handler not available
+                                if (errorRecoveryRef.current) {
+                                    await errorRecoveryRef.current.handleError(hls, {
+                                        fatal: true,
+                                        type: data.type === Hls.ErrorTypes.NETWORK_ERROR ? 'networkError' :
+                                              data.type === Hls.ErrorTypes.MEDIA_ERROR ? 'mediaError' : 'fatalError',
+                                    });
+                                } else {
+                                    setStatus('error');
+                                    setLoadingStage(LoadingStage.ERROR);
                                     setError('Fatal error occurred');
+                                    setShowSpinner(false);
                                     hls.destroy();
-                                    break;
+                                }
                             }
                         }
-                    }
-                });
-            } else if (video.canPlayType('application/vnd.apple.mpegurl') && streams.hls) {
-                // Native HLS support (Safari)
-                video.src = streams.hls;
-                video.addEventListener('loadedmetadata', () => {
-                    video.play().then(() => {
-                        setStatus('playing');
-                        setShowSpinner(false);
-                    }).catch((err) => {
-                        console.error('Play error:', err);
+                    });
+                } else if (video.canPlayType('application/vnd.apple.mpegurl') && streams.hls) {
+                    // Native HLS support (Safari)
+                    video.src = streams.hls;
+                    
+                    video.addEventListener('loadedmetadata', () => {
+                        if (isDestroyed) return;
+                        setLoadingStage(LoadingStage.BUFFERING);
+                    });
+
+                    video.addEventListener('canplay', () => {
+                        if (isDestroyed) return;
+                        setLoadingStage(LoadingStage.STARTING);
+                        
+                        video.play().then(() => {
+                            if (isDestroyed) return;
+                            setStatus('playing');
+                            setLoadingStage(LoadingStage.PLAYING);
+                            setShowSpinner(false);
+                            
+                            if (loadingTimeoutHandlerRef.current) {
+                                loadingTimeoutHandlerRef.current.clearTimeout();
+                                loadingTimeoutHandlerRef.current.resetFailures();
+                            }
+                        }).catch((err) => {
+                            if (isDestroyed) return;
+                            console.error('Play error:', err);
+                            setStatus('error');
+                            setLoadingStage(LoadingStage.ERROR);
+                            setError('Failed to play video');
+                            setShowSpinner(false);
+                        });
+                    });
+
+                    video.addEventListener('error', () => {
+                        if (isDestroyed) return;
                         setStatus('error');
-                        setError('Failed to play video');
+                        setLoadingStage(LoadingStage.ERROR);
+                        setError('Video playback error');
                         setShowSpinner(false);
                     });
-                });
-
-                video.addEventListener('error', () => {
+                } else {
                     setStatus('error');
-                    setError('Video playback error');
+                    setLoadingStage(LoadingStage.ERROR);
+                    setError('HLS not supported in this browser');
                     setShowSpinner(false);
-                });
-            } else {
+                }
+            } catch (err) {
+                if (isDestroyed) return;
+                console.error('Failed to load HLS.js:', err);
                 setStatus('error');
-                setError('HLS not supported in this browser');
+                setLoadingStage(LoadingStage.ERROR);
+                setError('Failed to load video player');
                 setShowSpinner(false);
             }
         };
@@ -284,18 +565,16 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
         initPlayer();
 
         // Cleanup - **Property 5: Resource Cleanup Completeness**
+        // **Validates: Requirements 7.4, 7.5**
         return () => {
+            isDestroyed = true;
+            cleanupResources();
             if (hls) {
                 hls.destroy();
                 hlsRef.current = null;
             }
-            if (video) {
-                video.pause();
-                video.src = '';
-                video.load();
-            }
         };
-    }, [streams, deviceCapabilities, deviceTier]);
+    }, [streams, deviceCapabilities, deviceTier, cleanupResources, loadingStage]);
 
     // Handle buffering events - **Property 8: Brief Buffer No Spinner**
     // Don't show spinner for brief buffers (< 2 seconds)
@@ -489,6 +768,14 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
         setPan({ x: 0, y: 0 });
     }, []);
 
+    // Get loading stage message for progressive feedback
+    // **Validates: Requirements 4.1, 4.2, 4.3, 4.4, 4.5**
+    const loadingMessage = getStageMessage(loadingStage);
+
+    // Determine if animations should be disabled on low-end devices
+    // **Validates: Requirements 5.2**
+    const disableAnimations = deviceTier === 'low';
+
     return (
         <div
             ref={containerRef}
@@ -544,16 +831,20 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                             ? 'bg-yellow-500/20 border-yellow-500/30 text-yellow-400'
                             : status === 'paused'
                                 ? 'bg-blue-500/20 border-blue-500/30 text-blue-400'
-                                : 'bg-red-500/20 border-red-500/30 text-red-400'
+                                : status === 'timeout'
+                                    ? 'bg-orange-500/20 border-orange-500/30 text-orange-400'
+                                    : 'bg-red-500/20 border-red-500/30 text-red-400'
                         }`}>
-                        <div className={`w-1.5 h-1.5 rounded-full ${status === 'playing' ? 'bg-green-500 animate-pulse' :
-                            status === 'loading' ? 'bg-yellow-500 animate-bounce' :
-                            status === 'paused' ? 'bg-blue-500' : 'bg-red-500'
+                        <div className={`w-1.5 h-1.5 rounded-full ${status === 'playing' ? `bg-green-500 ${!disableAnimations ? 'animate-pulse' : ''}` :
+                            status === 'loading' ? `bg-yellow-500 ${!disableAnimations ? 'animate-bounce' : ''}` :
+                            status === 'paused' ? 'bg-blue-500' : 
+                            status === 'timeout' ? 'bg-orange-500' : 'bg-red-500'
                             }`} />
                         <span className="text-[10px] font-bold tracking-wider uppercase">
                             {status === 'playing' ? 'LIVE' : 
                              status === 'loading' ? 'CONNECTING' : 
-                             status === 'paused' ? 'PAUSED' : 'OFFLINE'}
+                             status === 'paused' ? 'PAUSED' : 
+                             status === 'timeout' ? 'TIMEOUT' : 'OFFLINE'}
                         </span>
                     </div>
                 </div>
@@ -614,15 +905,21 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                 </div>
             </div>
 
-            {/* Loading state - Only show spinner after 2s of buffering */}
+            {/* Loading state with progressive feedback - **Validates: Requirements 4.1, 4.2, 4.3, 4.4, 4.5** */}
             {status === 'loading' && showSpinner && (
                 <div className="absolute inset-0 flex items-center justify-center bg-dark-950/60 z-10">
                     <div className="text-center">
                         <div className="relative w-10 h-10 mb-3 mx-auto">
                             <div className="absolute inset-0 border-2 border-white/10 rounded-full"></div>
-                            <div className="absolute inset-0 border-2 border-t-primary-500 rounded-full animate-spin"></div>
+                            {/* Disable animation on low-end devices - **Validates: Requirements 5.2** */}
+                            <div className={`absolute inset-0 border-2 border-t-primary-500 rounded-full ${!disableAnimations ? 'animate-spin' : ''}`}></div>
                         </div>
-                        <p className="text-dark-300 font-bold text-[10px] uppercase tracking-widest">Loading...</p>
+                        <p className="text-dark-300 font-bold text-[10px] uppercase tracking-widest">{loadingMessage}</p>
+                        {isAutoRetrying && (
+                            <p className="text-yellow-400 text-[9px] mt-1">
+                                Retry {autoRetryCount}/3 in {Math.ceil(retryDelay / 1000)}s
+                            </p>
+                        )}
                     </div>
                 </div>
             )}
@@ -633,7 +930,7 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                     <div className="text-center">
                         <div className="relative w-8 h-8 mb-2 mx-auto">
                             <div className="absolute inset-0 border-2 border-white/10 rounded-full"></div>
-                            <div className="absolute inset-0 border-2 border-t-primary-500 rounded-full animate-spin"></div>
+                            <div className={`absolute inset-0 border-2 border-t-primary-500 rounded-full ${!disableAnimations ? 'animate-spin' : ''}`}></div>
                         </div>
                         <p className="text-dark-300 font-bold text-[10px] uppercase tracking-widest">Buffering...</p>
                     </div>
@@ -655,6 +952,46 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                 </div>
             )}
 
+            {/* Timeout state - **Validates: Requirements 1.2, 1.4** */}
+            {status === 'timeout' && (
+                <div className="absolute inset-0 flex items-center justify-center bg-dark-950/90 backdrop-blur-sm z-10">
+                    <div className="text-center px-6 py-8 w-full max-w-[280px]">
+                        <div className="w-12 h-12 bg-orange-500/10 rounded-full flex items-center justify-center mx-auto mb-4 ring-1 ring-orange-500/20">
+                            <svg className="w-6 h-6 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <p className="text-orange-400 font-bold text-sm mb-1">Loading Timeout</p>
+                        <p className="text-dark-400 text-xs mb-4 line-clamp-2">{error}</p>
+                        
+                        {/* Troubleshooting suggestion after 3 failures - **Validates: Requirements 1.4** */}
+                        {showTroubleshooting && (
+                            <div className="bg-dark-800/50 rounded-lg p-3 mb-4 text-left">
+                                <p className="text-dark-300 text-[10px] font-medium mb-2">Troubleshooting:</p>
+                                <ul className="text-dark-400 text-[9px] space-y-1">
+                                    <li>• Check your network connection</li>
+                                    <li>• Verify the camera is online</li>
+                                    <li>• Try refreshing the page</li>
+                                </ul>
+                            </div>
+                        )}
+                        
+                        {/* Diagnostic info - **Validates: Requirements 8.1, 8.2, 8.3** */}
+                        <div className="text-dark-500 text-[9px] mb-3">
+                            Device: {deviceTier} | Failures: {consecutiveFailures}
+                        </div>
+                        
+                        <button
+                            onClick={handleRetry}
+                            className="w-full py-2 px-4 bg-orange-600 hover:bg-orange-700 text-white text-xs font-medium rounded-lg transition-colors"
+                        >
+                            Retry Connection
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Error state */}
             {status === 'error' && (
                 <div className="absolute inset-0 flex items-center justify-center bg-dark-950/90 backdrop-blur-sm z-10">
@@ -667,16 +1004,22 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                         </div>
                         <p className="text-red-400 font-bold text-sm mb-1">Signal Lost</p>
                         <p className="text-dark-400 text-xs mb-4 line-clamp-2">{error}</p>
-                        {retryCount < maxRetries && (
+                        
+                        {/* Auto-retry status */}
+                        {isAutoRetrying && (
+                            <p className="text-yellow-400 text-[10px] mb-3">
+                                Auto-retry {autoRetryCount}/3 in {Math.ceil(retryDelay / 1000)}s...
+                            </p>
+                        )}
+                        
+                        {/* Diagnostic info - **Validates: Requirements 8.1, 8.2, 8.3** */}
+                        <div className="text-dark-500 text-[9px] mb-3">
+                            Stage: {loadingStage} | Device: {deviceTier}
+                        </div>
+                        
+                        {!isAutoRetrying && (
                             <button
-                                onClick={() => {
-                                    setRetryCount(0);
-                                    setError(null);
-                                    setStatus('loading');
-                                    if (errorRecoveryRef.current) {
-                                        errorRecoveryRef.current.reset();
-                                    }
-                                }}
+                                onClick={handleRetry}
                                 className="w-full py-2 px-4 bg-dark-800 hover:bg-dark-700 text-white text-xs font-medium rounded-lg transition-colors border border-white/5"
                             >
                                 Reconnect
