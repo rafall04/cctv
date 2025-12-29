@@ -5,7 +5,7 @@ import {
     deleteFeedback,
     getFeedbackStats 
 } from '../controllers/feedbackController.js';
-import { fingerprintAuthMiddleware } from '../middleware/authMiddleware.js';
+import authMiddleware from '../middleware/authMiddleware.js';
 
 export default async function feedbackRoutes(fastify) {
     // Public endpoint - submit feedback
@@ -24,8 +24,8 @@ export default async function feedbackRoutes(fastify) {
     }, createFeedback);
 
     // Admin endpoints
-    fastify.get('/', { preHandler: [fingerprintAuthMiddleware] }, getAllFeedbacks);
-    fastify.get('/stats', { preHandler: [fingerprintAuthMiddleware] }, getFeedbackStats);
-    fastify.patch('/:id/status', { preHandler: [fingerprintAuthMiddleware] }, updateFeedbackStatus);
-    fastify.delete('/:id', { preHandler: [fingerprintAuthMiddleware] }, deleteFeedback);
+    fastify.get('/', { preHandler: [authMiddleware] }, getAllFeedbacks);
+    fastify.get('/stats', { preHandler: [authMiddleware] }, getFeedbackStats);
+    fastify.patch('/:id/status', { preHandler: [authMiddleware] }, updateFeedbackStatus);
+    fastify.delete('/:id', { preHandler: [authMiddleware] }, deleteFeedback);
 }
