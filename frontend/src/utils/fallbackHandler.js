@@ -20,10 +20,11 @@ import { ErrorType } from './streamLoaderTypes.js';
  */
 export const FALLBACK_CONFIG = {
     MAX_AUTO_RETRIES: 3,           // Maximum automatic retry attempts
-    NETWORK_RETRY_DELAY: 5000,     // 5 seconds for network errors (increased from 3s)
-    SERVER_RETRY_DELAY: 8000,      // 8 seconds for server errors (increased from 5s)
-    TIMEOUT_RETRY_DELAY: 5000,     // 5 seconds for timeout errors (increased from 3s)
-    DEFAULT_RETRY_DELAY: 5000,     // Default delay for unknown errors (increased from 3s)
+    NETWORK_RETRY_DELAY: 5000,     // 5 seconds for network errors
+    SERVER_RETRY_DELAY: 8000,      // 8 seconds for server errors
+    TIMEOUT_RETRY_DELAY: 5000,     // 5 seconds for timeout errors
+    DEFAULT_RETRY_DELAY: 5000,     // Default delay for unknown errors
+    INITIAL_RETRY_DELAY: 3000,     // Minimum 3 seconds before first retry (new)
 };
 
 /**
@@ -194,7 +195,12 @@ export const createFallbackHandler = (options = {}) => {
 
         // Check if we should auto-retry
         if (shouldAutoRetry()) {
-            const delay = getRetryDelay(errorType);
+            // Use longer delay for first retry to give server time to respond
+            const baseDelay = getRetryDelay(errorType);
+            const delay = autoRetryCount === 0 
+                ? Math.max(baseDelay, FALLBACK_CONFIG.INITIAL_RETRY_DELAY) 
+                : baseDelay;
+            
             autoRetryCount++;
             isWaitingForRetry = true;
 

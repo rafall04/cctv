@@ -643,6 +643,13 @@ function VideoPopup({ camera, onClose }) {
                         const errorType = d.type === Hls.ErrorTypes.NETWORK_ERROR ? 'network' :
                                           d.type === Hls.ErrorTypes.MEDIA_ERROR ? 'media' : 'unknown';
 
+                        // For media errors, try recovery first before auto-retry
+                        if (d.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                            console.log('HLS media error, attempting recovery...');
+                            hls.recoverMediaError();
+                            return;
+                        }
+
                         // Try auto-retry with FallbackHandler - **Validates: Requirements 6.1, 6.2, 6.3, 6.4**
                         if (fallbackHandlerRef.current) {
                             const streamError = createStreamError({
@@ -656,11 +663,27 @@ function VideoPopup({ camera, onClose }) {
                             const result = fallbackHandlerRef.current.handleError(streamError, () => {
                                 if (!cancelled && hls) {
                                     setLoadingStage(LoadingStage.CONNECTING);
-                                    if (d.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                                        hls.startLoad();
-                                    } else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                                        hls.recoverMediaError();
-                                    }
+                                    // Destroy and recreate HLS instance for clean retry
+                                    hls.destroy();
+                                    const newHls = new Hls(getDeviceAdaptiveHLSConfig());
+                                    hlsRef.current = newHls;
+                                    newHls.loadSource(url);
+                                    newHls.attachMedia(video);
+                                    
+                                    // Re-attach event handlers
+                                    newHls.on(Hls.Events.MANIFEST_PARSED, () => {
+                                        if (cancelled) return;
+                                        setLoadingStage(LoadingStage.BUFFERING);
+                                        video.play().catch(() => {});
+                                    });
+                                    
+                                    newHls.on(Hls.Events.ERROR, (_, d2) => {
+                                        if (cancelled) return;
+                                        if (d2.fatal) {
+                                            setStatus('error');
+                                            setLoadingStage(LoadingStage.ERROR);
+                                        }
+                                    });
                                 }
                             });
 
