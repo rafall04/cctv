@@ -1892,12 +1892,13 @@ function Footer({ cameraCount, areaCount }) {
 // ============================================
 // MULTI-VIEW FLOATING BUTTON - Enhanced with tooltip and device-based limit
 // Disables animations on low-end devices - **Validates: Requirements 5.2**
+// Position: bottom-left to avoid collision with FeedbackWidget (bottom-right)
 // ============================================
 function MultiViewButton({ count, onClick, maxReached, maxStreams = 3 }) {
     const disableAnimations = shouldDisableAnimations();
     
     return (
-        <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2">
+        <div className="fixed bottom-6 left-6 z-40 flex flex-col items-start gap-2">
             {/* Info tooltip when max reached */}
             {maxReached && (
                 <div className={`bg-amber-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg shadow-lg ${disableAnimations ? '' : 'animate-bounce'}`}>
@@ -1918,7 +1919,7 @@ function MultiViewButton({ count, onClick, maxReached, maxStreams = 3 }) {
             
             {/* Help text */}
             {count === 0 && (
-                <div className="bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs px-3 py-2 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 max-w-[200px] text-center">
+                <div className="bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs px-3 py-2 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 max-w-[200px] text-left">
                     <p className="font-medium mb-1">💡 Multi-View Mode</p>
                     <p className="text-gray-500 dark:text-gray-400">Click the + button on cameras to view up to {maxStreams} streams simultaneously</p>
                 </div>
