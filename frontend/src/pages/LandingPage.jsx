@@ -683,7 +683,6 @@ function VideoPopup({ camera, onClose }) {
                         video.play().catch(() => {});
                     }
                 });
-                });
                 
                 hls.on(Hls.Events.ERROR, (_, d) => {
                     if (cancelled) return;
