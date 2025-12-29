@@ -73,6 +73,7 @@ export default function CameraManagement() {
             group_name: '',
             area_id: '',
             enabled: true,
+            is_tunnel: false,
         },
         getValidationRules()
     );
@@ -128,6 +129,7 @@ export default function CameraManagement() {
             group_name: '',
             area_id: '',
             enabled: true,
+            is_tunnel: false,
         });
         setModalError('');
         setShowModal(true);
@@ -143,6 +145,7 @@ export default function CameraManagement() {
             group_name: camera.group_name || '',
             area_id: camera.area_id || '',
             enabled: camera.enabled === 1,
+            is_tunnel: camera.is_tunnel === 1,
         });
         setModalError('');
         setShowModal(true);
@@ -168,7 +171,7 @@ export default function CameraManagement() {
         
         setSubmitting(true);
         try {
-            const data = { ...formData, enabled: formData.enabled ? 1 : 0 };
+            const data = { ...formData, enabled: formData.enabled ? 1 : 0, is_tunnel: formData.is_tunnel ? 1 : 0 };
             const result = editingCamera 
                 ? await cameraService.updateCamera(editingCamera.id, data)
                 : await cameraService.createCamera(data);
@@ -372,7 +375,12 @@ export default function CameraManagement() {
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                     </svg>
                                 </div>
-                                <div className="absolute top-3 right-3">
+                                <div className="absolute top-3 right-3 flex gap-2">
+                                    {camera.is_tunnel === 1 && (
+                                        <span className="px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm bg-amber-500/90 text-white" title="Koneksi Tunnel - Kurang Stabil">
+                                            ⚠️ Tunnel
+                                        </span>
+                                    )}
                                     <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm ${
                                         camera.enabled
                                             ? 'bg-emerald-500/90 text-white'
@@ -585,6 +593,29 @@ export default function CameraManagement() {
                                     className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none disabled:opacity-50" 
                                     placeholder="Optional notes..." 
                                 />
+                            </div>
+
+                            {/* Tunnel Connection Toggle */}
+                            <div className="flex items-center justify-between p-4 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400">
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-gray-900 dark:text-white">Koneksi Tunnel</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Aktifkan jika kamera menggunakan koneksi tunnel (kurang stabil)</p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => handleFormChange({ target: { name: 'is_tunnel', value: !formData.is_tunnel, type: 'checkbox', checked: !formData.is_tunnel } })}
+                                    disabled={isSubmitting}
+                                    className={`relative w-12 h-6 rounded-full transition-colors disabled:opacity-50 ${formData.is_tunnel ? 'bg-amber-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+                                >
+                                    <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${formData.is_tunnel ? 'left-6' : 'left-0.5'}`}></div>
+                                </button>
                             </div>
 
                             {/* Action buttons */}
