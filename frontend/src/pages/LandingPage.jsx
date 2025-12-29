@@ -1881,7 +1881,7 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
 // ============================================
 function Footer({ cameraCount, areaCount }) {
     const whatsappNumber = '6289685645956'; // Format internasional tanpa +
-    const whatsappLink = `https://wa.me/${whatsappNumber}?text=Halo%20Admin%20RAF%20NET%20CCTV`;
+    const whatsappLink = `https://wa.me/${whatsappNumber}?text=Halo%20Admin%20RAF%20NET`;
     
     return (
         <footer className="py-10 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
@@ -1895,11 +1895,11 @@ function Footer({ cameraCount, areaCount }) {
                         <span className="font-bold text-sky-600 dark:text-sky-400">RAF NET</span>
                     </div>
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
-                        Penyedia Layanan CCTV Online Bojonegoro
+                        Penyedia Internet & Jasa Pasang CCTV Bojonegoro
                     </h3>
                     <p className="text-sm text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mb-4">
-                        RAF NET adalah penyedia layanan internet dan CCTV online di Bojonegoro, Jawa Timur. 
-                        Kami menyediakan akses publik gratis untuk memantau keamanan wilayah melalui sistem CCTV yang terintegrasi.
+                        RAF NET melayani pemasangan WiFi dan CCTV di wilayah Bojonegoro. 
+                        Pantau CCTV publik secara gratis melalui website ini.
                     </p>
                     <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20">
                         <svg className="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1907,7 +1907,7 @@ function Footer({ cameraCount, areaCount }) {
                             <circle cx="12" cy="11" r="3"/>
                         </svg>
                         <span className="text-sm text-emerald-700 dark:text-emerald-400">
-                            Saat ini area coverage kami: <strong>Dander</strong> & <strong>Tanjungharjo</strong>
+                            Area layanan: <strong>Dander</strong> & <strong>Tanjungharjo</strong>
                         </span>
                     </div>
                 </div>
@@ -1915,13 +1915,12 @@ function Footer({ cameraCount, areaCount }) {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
                     {/* Brand */}
                     <div className="text-center md:text-left">
-                        <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Tentang RAF NET</h4>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                            Layanan pemantauan CCTV Bojonegoro online 24 jam untuk keamanan dan kenyamanan warga.
-                        </p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500">
-                            📍 Bojonegoro, Jawa Timur, Indonesia
-                        </p>
+                        <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Layanan Kami</h4>
+                        <ul className="text-sm text-gray-500 dark:text-gray-400 space-y-1.5">
+                            <li>• Pemasangan WiFi rumah & kantor</li>
+                            <li>• Instalasi CCTV</li>
+                            <li>• Monitoring CCTV online 24 jam</li>
+                        </ul>
                     </div>
                     
                     {/* Stats */}
@@ -1938,16 +1937,16 @@ function Footer({ cameraCount, areaCount }) {
                             </div>
                             <div>
                                 <p className="text-2xl font-bold text-emerald-500">24/7</p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Live</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Online</p>
                             </div>
                         </div>
                     </div>
                     
                     {/* Contact */}
                     <div className="text-center md:text-right">
-                        <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Hubungi Admin</h4>
+                        <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Hubungi Kami</h4>
                         <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                            Minat pasang WiFi / CCTV?
+                            Butuh WiFi atau CCTV?
                         </p>
                         <a
                             href={whatsappLink}
@@ -1965,23 +1964,23 @@ function Footer({ cameraCount, areaCount }) {
 
                 {/* Features */}
                 <div className="flex flex-wrap justify-center gap-2 mb-6">
+                    <span className="text-xs px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">WiFi Rumah</span>
+                    <span className="text-xs px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">Pasang CCTV</span>
                     <span className="text-xs px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">HD Streaming</span>
                     <span className="text-xs px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">Multi-View</span>
-                    <span className="text-xs px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">Zoom & Pan</span>
-                    <span className="text-xs px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">Gratis</span>
-                    <span className="text-xs px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">Tanpa Login</span>
+                    <span className="text-xs px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">Gratis Akses</span>
                 </div>
                 
                 {/* SEO Keywords Section */}
                 <div className="text-center mb-4">
                     <p className="text-[10px] text-gray-400 dark:text-gray-600">
-                        CCTV Bojonegoro • CCTV Bojonegoro Online • CCTV RAF NET • Pantau CCTV Bojonegoro • Live Streaming CCTV Bojonegoro • Keamanan Bojonegoro • CCTV Dander • CCTV Tanjungharjo
+                        Pasang WiFi Bojonegoro • Jasa CCTV Bojonegoro • Internet Dander • Internet Tanjungharjo • CCTV Online Bojonegoro • RAF NET
                     </p>
                 </div>
                 
                 <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
                     <p className="text-center text-gray-400 dark:text-gray-500 text-xs">
-                        © {new Date().getFullYear()} RAF NET CCTV Bojonegoro. Hak cipta dilindungi. • Powered by MediaMTX
+                        © {new Date().getFullYear()} RAF NET • Penyedia Internet & CCTV Bojonegoro
                     </p>
                 </div>
             </div>
