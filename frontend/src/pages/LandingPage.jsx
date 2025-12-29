@@ -677,17 +677,9 @@ function VideoPopup({ camera, onClose }) {
 
                 hls.on(Hls.Events.FRAG_BUFFERED, () => {
                     if (cancelled) return;
-                    // Update to starting stage
-                    setLoadingStage(prev => {
-                        if (prev === LoadingStage.BUFFERING || prev === LoadingStage.LOADING || prev === LoadingStage.CONNECTING) {
-                            if (loadingTimeoutHandlerRef.current) {
-                                loadingTimeoutHandlerRef.current.updateStage(LoadingStage.STARTING);
-                            }
-                            return LoadingStage.STARTING;
-                        }
-                        return prev;
-                    });
-                    // Force play attempt after fragment buffered
+                    // Langsung set PLAYING setelah buffered - skip STARTING stage
+                    setLoadingStage(LoadingStage.PLAYING);
+                    // Force play
                     if (video.paused) {
                         video.play().catch(() => {});
                     }
@@ -696,59 +688,34 @@ function VideoPopup({ camera, onClose }) {
                 hls.on(Hls.Events.ERROR, (_, d) => {
                     if (cancelled) return;
                     
-                    // Detailed error logging for debugging
-                    console.log('=== HLS ERROR DETAILS ===');
-                    console.log('Fatal:', d.fatal);
-                    console.log('Type:', d.type);
-                    console.log('Details:', d.details);
-                    console.log('Error:', d.error);
-                    console.log('URL:', d.url);
-                    console.log('Response:', d.response);
-                    console.log('Video readyState:', video.readyState);
-                    console.log('Video networkState:', video.networkState);
-                    console.log('Video error:', video.error);
-                    console.log('Buffered length:', video.buffered.length);
-                    if (video.buffered.length > 0) {
-                        console.log('Buffered range:', video.buffered.start(0), '-', video.buffered.end(0));
-                    }
-                    console.log('=========================');
-                    
-                    // For non-fatal errors, just log and continue
-                    if (!d.fatal) {
-                        return;
-                    }
+                    // For non-fatal errors, just continue
+                    if (!d.fatal) return;
                     
                     // Clear loading timeout
                     if (loadingTimeoutHandlerRef.current) {
                         loadingTimeoutHandlerRef.current.clearTimeout();
                     }
                     
-                    // Check for codec incompatibility - this is NOT recoverable
+                    // Check for codec incompatibility - NOT recoverable
                     if (d.details === 'manifestIncompatibleCodecsError') {
-                        console.error('CODEC ERROR: Browser tidak support codec H.265/HEVC. Butuh transcoding ke H.264.');
+                        console.error('Browser tidak support codec H.265/HEVC. Ubah setting kamera ke H.264.');
                         setStatus('error');
                         setLoadingStage(LoadingStage.ERROR);
-                        // Don't try recovery - codec issue won't be fixed by retry
                         return;
                     }
 
                     const errorType = d.type === Hls.ErrorTypes.NETWORK_ERROR ? 'network' :
                                       d.type === Hls.ErrorTypes.MEDIA_ERROR ? 'media' : 'unknown';
 
-                    // For media errors (except codec), try recovery (max 2 times)
+                    // For media errors, try recovery (max 2 times)
                     if (d.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                        if (!hls._mediaErrorRecoveryCount) {
-                            hls._mediaErrorRecoveryCount = 0;
-                        }
+                        if (!hls._mediaErrorRecoveryCount) hls._mediaErrorRecoveryCount = 0;
                         hls._mediaErrorRecoveryCount++;
                         
                         if (hls._mediaErrorRecoveryCount <= 2) {
-                            console.log(`HLS media error, recovery attempt ${hls._mediaErrorRecoveryCount}/2`);
-                            console.log('Calling hls.recoverMediaError()...');
                             hls.recoverMediaError();
                             return;
                         }
-                        console.log('HLS media error recovery failed, giving up');
                     }
 
                     // Try auto-retry with FallbackHandler
@@ -1212,15 +1179,8 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
 
                 hls.on(Hls.Events.FRAG_BUFFERED, () => {
                     if (cancelled) return;
-                    setLoadingStage(prev => {
-                        if (prev === LoadingStage.BUFFERING || prev === LoadingStage.LOADING || prev === LoadingStage.CONNECTING) {
-                            if (loadingTimeoutHandlerRef.current) {
-                                loadingTimeoutHandlerRef.current.updateStage(LoadingStage.STARTING);
-                            }
-                            return LoadingStage.STARTING;
-                        }
-                        return prev;
-                    });
+                    // Langsung set PLAYING setelah buffered - skip STARTING stage
+                    setLoadingStage(LoadingStage.PLAYING);
                     if (video.paused) {
                         video.play().catch(() => {});
                     }
@@ -1229,22 +1189,8 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 hls.on(Hls.Events.ERROR, (_, d) => {
                     if (cancelled) return;
                     
-                    // Detailed error logging for debugging
-                    console.log('=== HLS ERROR (MultiView) ===');
-                    console.log('Camera:', camera.name);
-                    console.log('Fatal:', d.fatal);
-                    console.log('Type:', d.type);
-                    console.log('Details:', d.details);
-                    console.log('Error:', d.error);
-                    console.log('Video readyState:', video.readyState);
-                    console.log('Video networkState:', video.networkState);
-                    console.log('Buffered length:', video.buffered.length);
-                    console.log('=============================');
-                    
-                    // For non-fatal errors, just log and continue
-                    if (!d.fatal) {
-                        return;
-                    }
+                    // For non-fatal errors, just continue
+                    if (!d.fatal) return;
                     
                     // Clear loading timeout
                     if (loadingTimeoutHandlerRef.current) {
@@ -1253,7 +1199,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                     
                     // Check for codec incompatibility - NOT recoverable
                     if (d.details === 'manifestIncompatibleCodecsError') {
-                        console.error('CODEC ERROR: Browser tidak support codec H.265/HEVC');
+                        console.error('Browser tidak support codec H.265/HEVC. Ubah setting kamera ke H.264.');
                         setStatus('error');
                         setLoadingStage(LoadingStage.ERROR);
                         onError?.(camera.id, new Error('Codec tidak didukung browser'));
@@ -1263,15 +1209,12 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                     const errorType = d.type === Hls.ErrorTypes.NETWORK_ERROR ? 'network' :
                                       d.type === Hls.ErrorTypes.MEDIA_ERROR ? 'media' : 'unknown';
 
-                    // For media errors (except codec), try recovery (max 2 times)
+                    // For media errors, try recovery (max 2 times)
                     if (d.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                        if (!hls._mediaErrorRecoveryCount) {
-                            hls._mediaErrorRecoveryCount = 0;
-                        }
+                        if (!hls._mediaErrorRecoveryCount) hls._mediaErrorRecoveryCount = 0;
                         hls._mediaErrorRecoveryCount++;
                         
                         if (hls._mediaErrorRecoveryCount <= 2) {
-                            console.log(`HLS media error, recovery attempt ${hls._mediaErrorRecoveryCount}/2`);
                             hls.recoverMediaError();
                             return;
                         }
