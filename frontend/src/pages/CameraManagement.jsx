@@ -453,9 +453,9 @@ export default function CameraManagement() {
 
             {/* Modal */}
             {showModal && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700/50">
-                        <div className="p-6 border-b border-gray-200 dark:border-gray-700/50 flex justify-between items-center">
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+                    <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700/50 my-auto max-h-[90vh] flex flex-col">
+                        <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700/50 flex justify-between items-center shrink-0">
                             <div>
                                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                                     {editingCamera ? 'Edit Camera' : 'Add Camera'}
@@ -473,7 +473,7 @@ export default function CameraManagement() {
                             </button>
                         </div>
 
-                        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+                        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
                             {/* Modal error alert */}
                             {modalError && (
                                 <Alert 
@@ -484,10 +484,10 @@ export default function CameraManagement() {
                                 />
                             )}
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                                 {/* Name field */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                         Name <span className="text-red-500">*</span>
                                     </label>
                                     <input 
@@ -497,7 +497,7 @@ export default function CameraManagement() {
                                         onChange={handleFormChange}
                                         onBlur={handleBlur}
                                         disabled={isSubmitting}
-                                        className={`w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50 ${
+                                        className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50 text-sm ${
                                             getFieldError('name') 
                                                 ? 'border-red-500 focus:ring-red-500' 
                                                 : 'border-gray-200 dark:border-gray-700/50'
@@ -511,13 +511,13 @@ export default function CameraManagement() {
                                 
                                 {/* Area field */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Area</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Area</label>
                                     <select 
                                         name="area_id" 
                                         value={formData.area_id} 
                                         onChange={handleFormChange}
                                         disabled={isSubmitting}
-                                        className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50"
+                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50 text-sm"
                                     >
                                         <option value="">Select Area</option>
                                         {areas.map(area => <option key={area.id} value={area.id}>{area.name}</option>)}
@@ -527,7 +527,7 @@ export default function CameraManagement() {
 
                             {/* RTSP URL field with validation */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                     RTSP URL <span className="text-red-500">*</span>
                                 </label>
                                 <input 
@@ -537,7 +537,7 @@ export default function CameraManagement() {
                                     onChange={handleFormChange}
                                     onBlur={handleBlur}
                                     disabled={isSubmitting}
-                                    className={`w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white font-mono text-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50 ${
+                                    className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white font-mono text-xs placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50 ${
                                         getFieldError('private_rtsp_url') 
                                             ? 'border-red-500 focus:ring-red-500' 
                                             : 'border-gray-200 dark:border-gray-700/50'
@@ -551,31 +551,31 @@ export default function CameraManagement() {
                                 )}
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                                 {/* Location field */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Location</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Location</label>
                                     <input 
                                         type="text" 
                                         name="location" 
                                         value={formData.location} 
                                         onChange={handleFormChange}
                                         disabled={isSubmitting}
-                                        className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50" 
+                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50 text-sm" 
                                         placeholder="Building A" 
                                     />
                                 </div>
                                 
                                 {/* Group field */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Group</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Group</label>
                                     <input 
                                         type="text" 
                                         name="group_name" 
                                         value={formData.group_name} 
                                         onChange={handleFormChange}
                                         disabled={isSubmitting}
-                                        className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50" 
+                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50 text-sm" 
                                         placeholder="Security" 
                                     />
                                 </div>
@@ -583,54 +583,54 @@ export default function CameraManagement() {
 
                             {/* Description field */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Description</label>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
                                 <textarea 
                                     name="description" 
                                     value={formData.description} 
                                     onChange={handleFormChange}
                                     disabled={isSubmitting}
                                     rows="2" 
-                                    className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none disabled:opacity-50" 
+                                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none disabled:opacity-50 text-sm" 
                                     placeholder="Optional notes..." 
                                 />
                             </div>
 
-                            {/* Tunnel Connection Toggle */}
-                            <div className="flex items-center justify-between p-4 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400">
-                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            {/* Tunnel Connection Toggle - Compact */}
+                            <div className="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                         </svg>
                                     </div>
                                     <div>
                                         <p className="text-sm font-medium text-gray-900 dark:text-white">Koneksi Tunnel</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">Aktifkan jika kamera menggunakan koneksi tunnel (kurang stabil)</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">Kurang stabil</p>
                                     </div>
                                 </div>
                                 <button
                                     type="button"
                                     onClick={() => handleFormChange({ target: { name: 'is_tunnel', value: !formData.is_tunnel, type: 'checkbox', checked: !formData.is_tunnel } })}
                                     disabled={isSubmitting}
-                                    className={`relative w-12 h-6 rounded-full transition-colors disabled:opacity-50 ${formData.is_tunnel ? 'bg-amber-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+                                    className={`relative w-11 h-6 rounded-full transition-colors disabled:opacity-50 shrink-0 ${formData.is_tunnel ? 'bg-amber-500' : 'bg-gray-300 dark:bg-gray-600'}`}
                                 >
-                                    <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${formData.is_tunnel ? 'left-6' : 'left-0.5'}`}></div>
+                                    <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${formData.is_tunnel ? 'left-5' : 'left-0.5'}`}></div>
                                 </button>
                             </div>
 
-                            {/* Action buttons */}
-                            <div className="flex gap-3 pt-2">
+                            {/* Action buttons - Sticky at bottom */}
+                            <div className="flex gap-3 pt-2 sticky bottom-0 bg-white dark:bg-gray-800 pb-1">
                                 <button 
                                     type="button" 
                                     onClick={() => setShowModal(false)} 
-                                    className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50" 
+                                    className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 text-sm" 
                                     disabled={isSubmitting}
                                 >
                                     Cancel
                                 </button>
                                 <button 
                                     type="submit" 
-                                    className="flex-[2] px-4 py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 text-white font-medium rounded-xl shadow-lg shadow-sky-500/30 hover:from-sky-600 hover:to-blue-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2" 
+                                    className="flex-[2] px-4 py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 text-white font-medium rounded-xl shadow-lg shadow-sky-500/30 hover:from-sky-600 hover:to-blue-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2 text-sm" 
                                     disabled={isSubmitting}
                                 >
                                     {isSubmitting && (
