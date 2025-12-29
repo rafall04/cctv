@@ -696,6 +696,23 @@ function VideoPopup({ camera, onClose }) {
                 hls.on(Hls.Events.ERROR, (_, d) => {
                     if (cancelled) return;
                     
+                    // Detailed error logging for debugging
+                    console.log('=== HLS ERROR DETAILS ===');
+                    console.log('Fatal:', d.fatal);
+                    console.log('Type:', d.type);
+                    console.log('Details:', d.details);
+                    console.log('Error:', d.error);
+                    console.log('URL:', d.url);
+                    console.log('Response:', d.response);
+                    console.log('Video readyState:', video.readyState);
+                    console.log('Video networkState:', video.networkState);
+                    console.log('Video error:', video.error);
+                    console.log('Buffered length:', video.buffered.length);
+                    if (video.buffered.length > 0) {
+                        console.log('Buffered range:', video.buffered.start(0), '-', video.buffered.end(0));
+                    }
+                    console.log('=========================');
+                    
                     // For non-fatal errors, just log and continue
                     if (!d.fatal) {
                         return;
@@ -718,6 +735,7 @@ function VideoPopup({ camera, onClose }) {
                         
                         if (hls._mediaErrorRecoveryCount <= 2) {
                             console.log(`HLS media error, recovery attempt ${hls._mediaErrorRecoveryCount}/2`);
+                            console.log('Calling hls.recoverMediaError()...');
                             hls.recoverMediaError();
                             return;
                         }
@@ -1201,6 +1219,18 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 
                 hls.on(Hls.Events.ERROR, (_, d) => {
                     if (cancelled) return;
+                    
+                    // Detailed error logging for debugging
+                    console.log('=== HLS ERROR (MultiView) ===');
+                    console.log('Camera:', camera.name);
+                    console.log('Fatal:', d.fatal);
+                    console.log('Type:', d.type);
+                    console.log('Details:', d.details);
+                    console.log('Error:', d.error);
+                    console.log('Video readyState:', video.readyState);
+                    console.log('Video networkState:', video.networkState);
+                    console.log('Buffered length:', video.buffered.length);
+                    console.log('=============================');
                     
                     // For non-fatal errors, just log and continue
                     if (!d.fatal) {
