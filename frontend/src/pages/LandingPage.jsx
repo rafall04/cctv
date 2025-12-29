@@ -572,6 +572,7 @@ function VideoPopup({ camera, onClose }) {
 
         // Only change to 'live' once video starts playing - don't revert on buffering
         const handlePlaying = () => {
+            if (cancelled) return;
             setStatus('live');
             setLoadingStage(LoadingStage.PLAYING);
             // Clear timeout on success
@@ -585,12 +586,36 @@ function VideoPopup({ camera, onClose }) {
             setAutoRetryCount(0);
             setConsecutiveFailures(0);
         };
+        
+        // Also handle canplay event as backup
+        const handleCanPlay = () => {
+            if (cancelled) return;
+            // If video can play, try to play it
+            if (video.paused) {
+                video.play().catch(() => {});
+            }
+        };
+        
+        // Handle timeupdate to detect if video is actually playing
+        let hasTriggeredPlaying = false;
+        const handleTimeUpdate = () => {
+            if (cancelled || hasTriggeredPlaying) return;
+            // If we're getting timeupdate events with currentTime > 0, video is playing
+            if (video.currentTime > 0) {
+                hasTriggeredPlaying = true;
+                handlePlaying();
+            }
+        };
+        
         const handleError = () => {
+            if (cancelled) return;
             setStatus('error');
             setLoadingStage(LoadingStage.ERROR);
         };
 
         video.addEventListener('playing', handlePlaying);
+        video.addEventListener('canplay', handleCanPlay);
+        video.addEventListener('timeupdate', handleTimeUpdate);
         video.addEventListener('error', handleError);
 
         // Lazy load HLS.js using PreloadManager - **Validates: Requirements 2.3**
@@ -624,12 +649,15 @@ function VideoPopup({ camera, onClose }) {
                 hls.on(Hls.Events.FRAG_BUFFERED, () => {
                     if (cancelled) return;
                     // Update to starting stage - **Validates: Requirements 4.4**
-                    if (loadingStage === LoadingStage.BUFFERING) {
-                        setLoadingStage(LoadingStage.STARTING);
-                        if (loadingTimeoutHandlerRef.current) {
-                            loadingTimeoutHandlerRef.current.updateStage(LoadingStage.STARTING);
+                    setLoadingStage(prev => {
+                        if (prev === LoadingStage.BUFFERING) {
+                            if (loadingTimeoutHandlerRef.current) {
+                                loadingTimeoutHandlerRef.current.updateStage(LoadingStage.STARTING);
+                            }
+                            return LoadingStage.STARTING;
                         }
-                    }
+                        return prev;
+                    });
                 });
                 
                 hls.on(Hls.Events.ERROR, (_, d) => {
@@ -706,6 +734,8 @@ function VideoPopup({ camera, onClose }) {
         return () => {
             cancelled = true;
             video.removeEventListener('playing', handlePlaying);
+            video.removeEventListener('canplay', handleCanPlay);
+            video.removeEventListener('timeupdate', handleTimeUpdate);
             video.removeEventListener('error', handleError);
             cleanupResources();
             if (hls) { hls.destroy(); hlsRef.current = null; }
