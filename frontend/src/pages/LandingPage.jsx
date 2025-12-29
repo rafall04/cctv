@@ -722,11 +722,20 @@ function VideoPopup({ camera, onClose }) {
                     if (loadingTimeoutHandlerRef.current) {
                         loadingTimeoutHandlerRef.current.clearTimeout();
                     }
+                    
+                    // Check for codec incompatibility - this is NOT recoverable
+                    if (d.details === 'manifestIncompatibleCodecsError') {
+                        console.error('CODEC ERROR: Browser tidak support codec H.265/HEVC. Butuh transcoding ke H.264.');
+                        setStatus('error');
+                        setLoadingStage(LoadingStage.ERROR);
+                        // Don't try recovery - codec issue won't be fixed by retry
+                        return;
+                    }
 
                     const errorType = d.type === Hls.ErrorTypes.NETWORK_ERROR ? 'network' :
                                       d.type === Hls.ErrorTypes.MEDIA_ERROR ? 'media' : 'unknown';
 
-                    // For media errors, try recovery (max 2 times)
+                    // For media errors (except codec), try recovery (max 2 times)
                     if (d.type === Hls.ErrorTypes.MEDIA_ERROR) {
                         if (!hls._mediaErrorRecoveryCount) {
                             hls._mediaErrorRecoveryCount = 0;
@@ -1241,11 +1250,20 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                     if (loadingTimeoutHandlerRef.current) {
                         loadingTimeoutHandlerRef.current.clearTimeout();
                     }
+                    
+                    // Check for codec incompatibility - NOT recoverable
+                    if (d.details === 'manifestIncompatibleCodecsError') {
+                        console.error('CODEC ERROR: Browser tidak support codec H.265/HEVC');
+                        setStatus('error');
+                        setLoadingStage(LoadingStage.ERROR);
+                        onError?.(camera.id, new Error('Codec tidak didukung browser'));
+                        return;
+                    }
 
                     const errorType = d.type === Hls.ErrorTypes.NETWORK_ERROR ? 'network' :
                                       d.type === Hls.ErrorTypes.MEDIA_ERROR ? 'media' : 'unknown';
 
-                    // For media errors, try recovery (max 2 times)
+                    // For media errors (except codec), try recovery (max 2 times)
                     if (d.type === Hls.ErrorTypes.MEDIA_ERROR) {
                         if (!hls._mediaErrorRecoveryCount) {
                             hls._mediaErrorRecoveryCount = 0;
