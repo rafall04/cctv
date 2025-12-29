@@ -587,10 +587,19 @@ function VideoPopup({ camera, onClose }) {
             setConsecutiveFailures(0);
         };
         
-        // Also handle canplay event as backup
+        // Also handle canplay event as backup - try to play video
         const handleCanPlay = () => {
             if (cancelled) return;
             // If video can play, try to play it
+            if (video.paused) {
+                video.play().catch(() => {});
+            }
+        };
+        
+        // Handle loadeddata - video has enough data to play
+        const handleLoadedData = () => {
+            if (cancelled) return;
+            // Try to play when data is loaded
             if (video.paused) {
                 video.play().catch(() => {});
             }
@@ -607,6 +616,15 @@ function VideoPopup({ camera, onClose }) {
             }
         };
         
+        // Handle progress event - data is being downloaded
+        const handleProgress = () => {
+            if (cancelled || hasTriggeredPlaying) return;
+            // If buffered data exists and video is not playing, try to play
+            if (video.buffered.length > 0 && video.paused) {
+                video.play().catch(() => {});
+            }
+        };
+        
         const handleError = () => {
             if (cancelled) return;
             setStatus('error');
@@ -615,7 +633,9 @@ function VideoPopup({ camera, onClose }) {
 
         video.addEventListener('playing', handlePlaying);
         video.addEventListener('canplay', handleCanPlay);
+        video.addEventListener('loadeddata', handleLoadedData);
         video.addEventListener('timeupdate', handleTimeUpdate);
+        video.addEventListener('progress', handleProgress);
         video.addEventListener('error', handleError);
 
         // Lazy load HLS.js using PreloadManager - **Validates: Requirements 2.3**
@@ -658,6 +678,11 @@ function VideoPopup({ camera, onClose }) {
                         }
                         return prev;
                     });
+                    // Force play attempt after fragment buffered - helps on stubborn browsers
+                    if (video.paused) {
+                        video.play().catch(() => {});
+                    }
+                });
                 });
                 
                 hls.on(Hls.Events.ERROR, (_, d) => {
@@ -735,7 +760,9 @@ function VideoPopup({ camera, onClose }) {
             cancelled = true;
             video.removeEventListener('playing', handlePlaying);
             video.removeEventListener('canplay', handleCanPlay);
+            video.removeEventListener('loadeddata', handleLoadedData);
             video.removeEventListener('timeupdate', handleTimeUpdate);
+            video.removeEventListener('progress', handleProgress);
             video.removeEventListener('error', handleError);
             cleanupResources();
             if (hls) { hls.destroy(); hlsRef.current = null; }
@@ -1035,6 +1062,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
 
         // Only change to 'live' once video starts playing - don't revert on buffering
         const handlePlaying = () => {
+            if (cancelled) return;
             setStatus('live');
             setLoadingStage(LoadingStage.PLAYING);
             // Clear timeout on success
@@ -1047,7 +1075,43 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             }
             setAutoRetryCount(0);
         };
+        
+        // Also handle canplay event as backup - try to play video
+        const handleCanPlay = () => {
+            if (cancelled) return;
+            if (video.paused) {
+                video.play().catch(() => {});
+            }
+        };
+        
+        // Handle loadeddata - video has enough data to play
+        const handleLoadedData = () => {
+            if (cancelled) return;
+            if (video.paused) {
+                video.play().catch(() => {});
+            }
+        };
+        
+        // Handle timeupdate to detect if video is actually playing
+        let hasTriggeredPlaying = false;
+        const handleTimeUpdate = () => {
+            if (cancelled || hasTriggeredPlaying) return;
+            if (video.currentTime > 0) {
+                hasTriggeredPlaying = true;
+                handlePlaying();
+            }
+        };
+        
+        // Handle progress event - data is being downloaded
+        const handleProgress = () => {
+            if (cancelled || hasTriggeredPlaying) return;
+            if (video.buffered.length > 0 && video.paused) {
+                video.play().catch(() => {});
+            }
+        };
+        
         const handleError = () => {
+            if (cancelled) return;
             setStatus('error');
             setLoadingStage(LoadingStage.ERROR);
             // Notify parent of error for isolation tracking
@@ -1055,6 +1119,10 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         };
 
         video.addEventListener('playing', handlePlaying);
+        video.addEventListener('canplay', handleCanPlay);
+        video.addEventListener('loadeddata', handleLoadedData);
+        video.addEventListener('timeupdate', handleTimeUpdate);
+        video.addEventListener('progress', handleProgress);
         video.addEventListener('error', handleError);
 
         // Core initialization logic
@@ -1103,6 +1171,10 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                         if (loadingTimeoutHandlerRef.current) {
                             loadingTimeoutHandlerRef.current.updateStage(LoadingStage.STARTING);
                         }
+                    }
+                    // Force play attempt after fragment buffered - helps on stubborn browsers
+                    if (video.paused) {
+                        video.play().catch(() => {});
                     }
                 });
                 
@@ -1193,6 +1265,10 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             cancelled = true;
             if (initTimeout) clearTimeout(initTimeout);
             video.removeEventListener('playing', handlePlaying);
+            video.removeEventListener('canplay', handleCanPlay);
+            video.removeEventListener('loadeddata', handleLoadedData);
+            video.removeEventListener('timeupdate', handleTimeUpdate);
+            video.removeEventListener('progress', handleProgress);
             video.removeEventListener('error', handleError);
             cleanupResources();
             if (hls) { 
