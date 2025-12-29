@@ -621,7 +621,7 @@ function VideoPopup({ camera, onClose }) {
         video.addEventListener('error', handleError);
 
         // Lazy load HLS.js using PreloadManager - **Validates: Requirements 2.3**
-        loadHls().then(Hls => {
+        loadHls().then(async Hls => {
             if (cancelled) return;
             
             // Update loading stage - **Validates: Requirements 4.2**
@@ -635,7 +635,12 @@ function VideoPopup({ camera, onClose }) {
                 const hlsConfig = getDeviceAdaptiveHLSConfig();
                 hls = new Hls(hlsConfig);
                 hlsRef.current = hls;
+                
+                // Load source first, then attach media with small delay
+                // This helps prevent media errors on some browsers
                 hls.loadSource(url);
+                await new Promise(r => setTimeout(r, 50));
+                if (cancelled) return;
                 hls.attachMedia(video);
                 
                 // Start playback check early - don't wait for events that may not fire
@@ -690,67 +695,77 @@ function VideoPopup({ camera, onClose }) {
                 
                 hls.on(Hls.Events.ERROR, (_, d) => {
                     if (cancelled) return;
-                    if (d.fatal) {
-                        // Clear loading timeout
-                        if (loadingTimeoutHandlerRef.current) {
-                            loadingTimeoutHandlerRef.current.clearTimeout();
+                    
+                    // For non-fatal errors, just log and continue
+                    if (!d.fatal) {
+                        return;
+                    }
+                    
+                    // Clear loading timeout
+                    if (loadingTimeoutHandlerRef.current) {
+                        loadingTimeoutHandlerRef.current.clearTimeout();
+                    }
+
+                    const errorType = d.type === Hls.ErrorTypes.NETWORK_ERROR ? 'network' :
+                                      d.type === Hls.ErrorTypes.MEDIA_ERROR ? 'media' : 'unknown';
+
+                    // For media errors, try recovery (max 2 times)
+                    if (d.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                        if (!hls._mediaErrorRecoveryCount) {
+                            hls._mediaErrorRecoveryCount = 0;
                         }
-
-                        const errorType = d.type === Hls.ErrorTypes.NETWORK_ERROR ? 'network' :
-                                          d.type === Hls.ErrorTypes.MEDIA_ERROR ? 'media' : 'unknown';
-
-                        // For media errors, try recovery first before auto-retry
-                        if (d.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                            console.log('HLS media error, attempting recovery...');
+                        hls._mediaErrorRecoveryCount++;
+                        
+                        if (hls._mediaErrorRecoveryCount <= 2) {
+                            console.log(`HLS media error, recovery attempt ${hls._mediaErrorRecoveryCount}/2`);
                             hls.recoverMediaError();
                             return;
                         }
+                        console.log('HLS media error recovery failed, giving up');
+                    }
 
-                        // Try auto-retry with FallbackHandler - **Validates: Requirements 6.1, 6.2, 6.3, 6.4**
-                        if (fallbackHandlerRef.current) {
-                            const streamError = createStreamError({
-                                type: errorType,
-                                message: d.details || 'Stream error',
-                                stage: loadingStage,
-                                deviceTier,
-                                retryCount: autoRetryCount,
-                            });
+                    // Try auto-retry with FallbackHandler
+                    if (fallbackHandlerRef.current) {
+                        const streamError = createStreamError({
+                            type: errorType,
+                            message: d.details || 'Stream error',
+                            stage: loadingStage,
+                            deviceTier,
+                            retryCount: autoRetryCount,
+                        });
 
-                            const result = fallbackHandlerRef.current.handleError(streamError, () => {
-                                if (!cancelled && hls) {
-                                    setLoadingStage(LoadingStage.CONNECTING);
-                                    // Destroy and recreate HLS instance for clean retry
-                                    hls.destroy();
-                                    const newHls = new Hls(getDeviceAdaptiveHLSConfig());
-                                    hlsRef.current = newHls;
-                                    newHls.loadSource(url);
-                                    newHls.attachMedia(video);
-                                    
-                                    // Re-attach event handlers
-                                    newHls.on(Hls.Events.MANIFEST_PARSED, () => {
-                                        if (cancelled) return;
-                                        setLoadingStage(LoadingStage.BUFFERING);
-                                        video.play().catch(() => {});
-                                    });
-                                    
-                                    newHls.on(Hls.Events.ERROR, (_, d2) => {
-                                        if (cancelled) return;
-                                        if (d2.fatal) {
-                                            setStatus('error');
-                                            setLoadingStage(LoadingStage.ERROR);
-                                        }
-                                    });
-                                }
-                            });
-
-                            if (result.action === 'manual-retry-required') {
-                                setStatus('error');
-                                setLoadingStage(LoadingStage.ERROR);
+                        const result = fallbackHandlerRef.current.handleError(streamError, () => {
+                            if (!cancelled && hls) {
+                                setLoadingStage(LoadingStage.CONNECTING);
+                                hls.destroy();
+                                const newHls = new Hls(getDeviceAdaptiveHLSConfig());
+                                hlsRef.current = newHls;
+                                newHls.loadSource(url);
+                                newHls.attachMedia(video);
+                                
+                                newHls.on(Hls.Events.MANIFEST_PARSED, () => {
+                                    if (cancelled) return;
+                                    setLoadingStage(LoadingStage.BUFFERING);
+                                    video.play().catch(() => {});
+                                });
+                                
+                                newHls.on(Hls.Events.ERROR, (_, d2) => {
+                                    if (cancelled) return;
+                                    if (d2.fatal) {
+                                        setStatus('error');
+                                        setLoadingStage(LoadingStage.ERROR);
+                                    }
+                                });
                             }
-                        } else {
+                        });
+
+                        if (result.action === 'manual-retry-required') {
                             setStatus('error');
                             setLoadingStage(LoadingStage.ERROR);
                         }
+                    } else {
+                        setStatus('error');
+                        setLoadingStage(LoadingStage.ERROR);
                     }
                 });
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
@@ -1132,7 +1147,11 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 const hlsConfig = getDeviceAdaptiveHLSConfig();
                 hls = new Hls(hlsConfig);
                 hlsRef.current = hls;
+                
+                // Load source first, then attach media with small delay
                 hls.loadSource(url);
+                await new Promise(r => setTimeout(r, 50));
+                if (cancelled) return;
                 hls.attachMedia(video);
                 
                 // Start playback check early - don't wait for events that may not fire
@@ -1182,47 +1201,64 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 
                 hls.on(Hls.Events.ERROR, (_, d) => {
                     if (cancelled) return;
-                    if (d.fatal) {
-                        // Clear loading timeout
-                        if (loadingTimeoutHandlerRef.current) {
-                            loadingTimeoutHandlerRef.current.clearTimeout();
+                    
+                    // For non-fatal errors, just log and continue
+                    if (!d.fatal) {
+                        return;
+                    }
+                    
+                    // Clear loading timeout
+                    if (loadingTimeoutHandlerRef.current) {
+                        loadingTimeoutHandlerRef.current.clearTimeout();
+                    }
+
+                    const errorType = d.type === Hls.ErrorTypes.NETWORK_ERROR ? 'network' :
+                                      d.type === Hls.ErrorTypes.MEDIA_ERROR ? 'media' : 'unknown';
+
+                    // For media errors, try recovery (max 2 times)
+                    if (d.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                        if (!hls._mediaErrorRecoveryCount) {
+                            hls._mediaErrorRecoveryCount = 0;
                         }
+                        hls._mediaErrorRecoveryCount++;
+                        
+                        if (hls._mediaErrorRecoveryCount <= 2) {
+                            console.log(`HLS media error, recovery attempt ${hls._mediaErrorRecoveryCount}/2`);
+                            hls.recoverMediaError();
+                            return;
+                        }
+                    }
 
-                        const errorType = d.type === Hls.ErrorTypes.NETWORK_ERROR ? 'network' :
-                                          d.type === Hls.ErrorTypes.MEDIA_ERROR ? 'media' : 'unknown';
+                    // Try auto-retry with FallbackHandler
+                    if (fallbackHandlerRef.current) {
+                        const streamError = createStreamError({
+                            type: errorType,
+                            message: d.details || 'Stream error',
+                            stage: loadingStage,
+                            deviceTier,
+                            retryCount: autoRetryCount,
+                        });
 
-                        // Try auto-retry with FallbackHandler - **Validates: Requirements 6.1, 6.2, 6.3, 6.4**
-                        if (fallbackHandlerRef.current) {
-                            const streamError = createStreamError({
-                                type: errorType,
-                                message: d.details || 'Stream error',
-                                stage: loadingStage,
-                                deviceTier,
-                                retryCount: autoRetryCount,
-                            });
-
-                            const result = fallbackHandlerRef.current.handleError(streamError, () => {
-                                if (!cancelled && hls) {
-                                    setLoadingStage(LoadingStage.CONNECTING);
-                                    if (d.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                                        hls.startLoad();
-                                    } else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                                        hls.recoverMediaError();
-                                    }
+                        const result = fallbackHandlerRef.current.handleError(streamError, () => {
+                            if (!cancelled && hls) {
+                                setLoadingStage(LoadingStage.CONNECTING);
+                                if (d.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                                    hls.startLoad();
+                                } else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                                    hls.recoverMediaError();
                                 }
-                            });
-
-                            if (result.action === 'manual-retry-required') {
-                                setStatus('error');
-                                setLoadingStage(LoadingStage.ERROR);
-                                // Error isolation: notify parent but don't propagate
-                                onError?.(camera.id, new Error(`HLS fatal error: ${d.type}`));
                             }
-                        } else {
+                        });
+
+                        if (result.action === 'manual-retry-required') {
                             setStatus('error');
                             setLoadingStage(LoadingStage.ERROR);
                             onError?.(camera.id, new Error(`HLS fatal error: ${d.type}`));
                         }
+                    } else {
+                        setStatus('error');
+                        setLoadingStage(LoadingStage.ERROR);
+                        onError?.(camera.id, new Error(`HLS fatal error: ${d.type}`));
                     }
                 });
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
