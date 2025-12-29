@@ -2,16 +2,15 @@
  * HLS Configuration Module
  * Provides device-adaptive HLS.js configurations based on device tier
  * 
- * Configuration differences by tier:
- * - Low: enableWorker=false, maxBufferLength=15s, conservative settings
- * - Medium: enableWorker=true, maxBufferLength=25s, balanced settings
- * - High: enableWorker=true, maxBufferLength=30s, optimal settings
+ * SIMPLIFIED CONFIG - Previous complex ABR settings caused playback issues
+ * on certain devices. Now using minimal, proven settings.
  * 
  * **Validates: Requirements 1.2, 1.3, 1.4, 1.5**
  */
 
 /**
  * HLS configuration presets for each device tier
+ * SIMPLIFIED: Removed complex ABR settings that caused issues
  */
 const HLS_CONFIGS = {
     low: {
@@ -21,153 +20,99 @@ const HLS_CONFIGS = {
         lowLatencyMode: false,
         // Minimal back buffer to save memory
         backBufferLength: 10,
-        // Small forward buffer (15s max)
+        // Small forward buffer
         maxBufferLength: 15,
         maxMaxBufferLength: 30,
         // 30MB max buffer size
         maxBufferSize: 30 * 1000 * 1000,
         maxBufferHole: 0.5,
-        // Start with lowest quality for faster initial load
-        startLevel: 0,
-        // Conservative bandwidth estimation (300kbps)
-        abrEwmaDefaultEstimate: 300000,
-        // Conservative bandwidth usage
-        abrBandWidthFactor: 0.7,
-        abrBandWidthUpFactor: 0.5,
-        // Longer timeout for slow connections (increased)
-        fragLoadingTimeOut: 45000,
-        // Fewer retries to fail faster
-        fragLoadingMaxRetry: 4,
-        // Longer delay between retries
-        fragLoadingRetryDelay: 3000,
-        // Level/manifest loading settings (increased for slow connections)
-        levelLoadingTimeOut: 30000,
-        levelLoadingMaxRetry: 4,
-        levelLoadingRetryDelay: 3000,
-        // Manifest loading timeout (new)
-        manifestLoadingTimeOut: 30000,
-        manifestLoadingMaxRetry: 4,
-        manifestLoadingRetryDelay: 3000,
-    },
-    medium: {
-        // Worker enabled for better performance
-        enableWorker: true,
-        lowLatencyMode: false,
-        // Moderate back buffer
-        backBufferLength: 20,
-        // Medium forward buffer (25s)
-        maxBufferLength: 25,
-        maxMaxBufferLength: 45,
-        // 45MB max buffer size
-        maxBufferSize: 45 * 1000 * 1000,
-        maxBufferHole: 0.5,
-        // Auto quality selection
+        // AUTO quality - let HLS.js decide (startLevel: 0 caused issues)
         startLevel: -1,
-        // Moderate bandwidth estimation (500kbps)
-        abrEwmaDefaultEstimate: 500000,
-        // Balanced bandwidth usage
-        abrBandWidthFactor: 0.8,
-        abrBandWidthUpFactor: 0.6,
-        // Standard timeout (increased)
-        fragLoadingTimeOut: 35000,
-        fragLoadingMaxRetry: 5,
+        // Longer timeout for slow connections
+        fragLoadingTimeOut: 30000,
+        fragLoadingMaxRetry: 3,
         fragLoadingRetryDelay: 2000,
-        levelLoadingTimeOut: 25000,
-        levelLoadingMaxRetry: 4,
+        levelLoadingTimeOut: 20000,
+        levelLoadingMaxRetry: 3,
         levelLoadingRetryDelay: 2000,
-        // Manifest loading timeout
-        manifestLoadingTimeOut: 25000,
-        manifestLoadingMaxRetry: 4,
+        manifestLoadingTimeOut: 20000,
+        manifestLoadingMaxRetry: 3,
         manifestLoadingRetryDelay: 2000,
     },
-    high: {
-        // Worker enabled for optimal performance
+    medium: {
         enableWorker: true,
         lowLatencyMode: false,
-        // Large back buffer for smooth seeking
+        backBufferLength: 20,
+        maxBufferLength: 25,
+        maxMaxBufferLength: 45,
+        maxBufferSize: 45 * 1000 * 1000,
+        maxBufferHole: 0.5,
+        startLevel: -1,
+        fragLoadingTimeOut: 25000,
+        fragLoadingMaxRetry: 4,
+        fragLoadingRetryDelay: 1500,
+        levelLoadingTimeOut: 15000,
+        levelLoadingMaxRetry: 3,
+        levelLoadingRetryDelay: 1500,
+        manifestLoadingTimeOut: 15000,
+        manifestLoadingMaxRetry: 3,
+        manifestLoadingRetryDelay: 1500,
+    },
+    high: {
+        enableWorker: true,
+        lowLatencyMode: false,
         backBufferLength: 30,
-        // Large forward buffer (30s)
         maxBufferLength: 30,
         maxMaxBufferLength: 60,
-        // 60MB max buffer size
         maxBufferSize: 60 * 1000 * 1000,
         maxBufferHole: 0.5,
-        // Auto quality selection
         startLevel: -1,
-        // Higher bandwidth estimation (1Mbps)
-        abrEwmaDefaultEstimate: 1000000,
-        // Aggressive bandwidth usage
-        abrBandWidthFactor: 0.9,
-        abrBandWidthUpFactor: 0.7,
-        // Shorter timeout for faster failure detection
-        fragLoadingTimeOut: 25000,
-        // More retries for reliability
-        fragLoadingMaxRetry: 6,
-        // Shorter delay between retries
-        fragLoadingRetryDelay: 1500,
-        levelLoadingTimeOut: 20000,
-        levelLoadingMaxRetry: 5,
-        levelLoadingRetryDelay: 1500,
-        // Manifest loading timeout
-        manifestLoadingTimeOut: 20000,
-        manifestLoadingMaxRetry: 5,
-        manifestLoadingRetryDelay: 1500,
+        fragLoadingTimeOut: 20000,
+        fragLoadingMaxRetry: 4,
+        fragLoadingRetryDelay: 1000,
+        levelLoadingTimeOut: 10000,
+        levelLoadingMaxRetry: 3,
+        levelLoadingRetryDelay: 1000,
+        manifestLoadingTimeOut: 10000,
+        manifestLoadingMaxRetry: 3,
+        manifestLoadingRetryDelay: 1000,
     },
 };
 
 /**
  * Mobile-specific configuration overrides
- * Applied on top of tier-based config for mobile devices
- * **Validates: Requirements 7.1, 7.2**
+ * SIMPLIFIED: Only adjust buffer sizes for mobile
  */
 const MOBILE_OVERRIDES = {
-    // Smaller initial buffer for faster start on mobile
     maxBufferLength: (tierValue) => Math.min(tierValue, 20),
-    // More conservative ABR on mobile networks
-    abrBandWidthFactor: (tierValue) => Math.min(tierValue, 0.7),
-    abrBandWidthUpFactor: (tierValue) => Math.min(tierValue, 0.5),
 };
 
 /**
- * Mobile-specific HLS configuration for phones
- * Uses smaller segments and more conservative settings
- * **Validates: Requirements 7.1, 7.2**
+ * Mobile phone config - simplified
  */
 const MOBILE_PHONE_CONFIG = {
-    // Smaller buffer for faster initial load
     maxBufferLength: 15,
     maxMaxBufferLength: 30,
-    // Smaller buffer size for memory constraints
-    maxBufferSize: 25 * 1000 * 1000, // 25MB
-    // Start with lowest quality for faster initial load
-    startLevel: 0,
-    // More conservative bandwidth estimation
-    abrEwmaDefaultEstimate: 250000, // 250kbps
-    abrBandWidthFactor: 0.6,
-    abrBandWidthUpFactor: 0.4,
-    // Longer timeouts for mobile networks (increased)
-    fragLoadingTimeOut: 45000,
-    fragLoadingRetryDelay: 3000,
-    levelLoadingTimeOut: 30000,
-    manifestLoadingTimeOut: 30000,
+    maxBufferSize: 25 * 1000 * 1000,
+    startLevel: -1,
+    fragLoadingTimeOut: 30000,
+    fragLoadingRetryDelay: 2000,
+    levelLoadingTimeOut: 20000,
+    manifestLoadingTimeOut: 20000,
 };
 
 /**
- * Mobile-specific HLS configuration for tablets
- * Balanced between phone and desktop settings
+ * Mobile tablet config - simplified
  */
 const MOBILE_TABLET_CONFIG = {
     maxBufferLength: 20,
     maxMaxBufferLength: 40,
-    maxBufferSize: 35 * 1000 * 1000, // 35MB
-    startLevel: -1, // Auto for tablets
-    abrEwmaDefaultEstimate: 400000, // 400kbps
-    abrBandWidthFactor: 0.7,
-    abrBandWidthUpFactor: 0.5,
-    fragLoadingTimeOut: 40000,
-    fragLoadingRetryDelay: 2500,
-    levelLoadingTimeOut: 25000,
-    manifestLoadingTimeOut: 25000,
+    maxBufferSize: 35 * 1000 * 1000,
+    startLevel: -1,
+    fragLoadingTimeOut: 25000,
+    fragLoadingRetryDelay: 1500,
+    levelLoadingTimeOut: 15000,
+    manifestLoadingTimeOut: 15000,
 };
 
 /**
@@ -185,19 +130,14 @@ export const getHLSConfig = (tier, options = {}) => {
     // Get base config for tier (default to medium if invalid tier)
     const baseConfig = { ...(HLS_CONFIGS[tier] || HLS_CONFIGS.medium) };
     
-    // Apply mobile-specific configurations
-    // **Validates: Requirements 7.1, 7.2**
+    // Apply mobile-specific configurations (simplified)
     if (isMobile) {
-        // Apply device-type specific mobile config
         if (mobileDeviceType === 'phone') {
             Object.assign(baseConfig, MOBILE_PHONE_CONFIG);
         } else if (mobileDeviceType === 'tablet') {
             Object.assign(baseConfig, MOBILE_TABLET_CONFIG);
         } else {
-            // Generic mobile overrides
             baseConfig.maxBufferLength = MOBILE_OVERRIDES.maxBufferLength(baseConfig.maxBufferLength);
-            baseConfig.abrBandWidthFactor = MOBILE_OVERRIDES.abrBandWidthFactor(baseConfig.abrBandWidthFactor);
-            baseConfig.abrBandWidthUpFactor = MOBILE_OVERRIDES.abrBandWidthUpFactor(baseConfig.abrBandWidthUpFactor);
         }
     }
     
