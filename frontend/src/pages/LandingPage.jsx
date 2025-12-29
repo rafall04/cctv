@@ -638,21 +638,43 @@ function VideoPopup({ camera, onClose }) {
                 hls.loadSource(url);
                 hls.attachMedia(video);
                 
+                // Start playback check early - don't wait for events that may not fire
+                startPlaybackCheck();
+                
                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
                     if (cancelled) return;
-                    // Update to buffering stage - **Validates: Requirements 4.3**
+                    // Update to buffering stage
                     setLoadingStage(LoadingStage.BUFFERING);
                     if (loadingTimeoutHandlerRef.current) {
                         loadingTimeoutHandlerRef.current.updateStage(LoadingStage.BUFFERING);
                     }
                     video.play().catch(() => {});
                 });
+                
+                // FRAG_LOADED fires when first fragment is loaded - more reliable than MANIFEST_PARSED
+                hls.on(Hls.Events.FRAG_LOADED, () => {
+                    if (cancelled) return;
+                    // If still in LOADING stage, move to BUFFERING
+                    setLoadingStage(prev => {
+                        if (prev === LoadingStage.LOADING || prev === LoadingStage.CONNECTING) {
+                            if (loadingTimeoutHandlerRef.current) {
+                                loadingTimeoutHandlerRef.current.updateStage(LoadingStage.BUFFERING);
+                            }
+                            return LoadingStage.BUFFERING;
+                        }
+                        return prev;
+                    });
+                    // Try to play
+                    if (video.paused) {
+                        video.play().catch(() => {});
+                    }
+                });
 
                 hls.on(Hls.Events.FRAG_BUFFERED, () => {
                     if (cancelled) return;
-                    // Update to starting stage - **Validates: Requirements 4.4**
+                    // Update to starting stage
                     setLoadingStage(prev => {
-                        if (prev === LoadingStage.BUFFERING) {
+                        if (prev === LoadingStage.BUFFERING || prev === LoadingStage.LOADING || prev === LoadingStage.CONNECTING) {
                             if (loadingTimeoutHandlerRef.current) {
                                 loadingTimeoutHandlerRef.current.updateStage(LoadingStage.STARTING);
                             }
@@ -660,8 +682,6 @@ function VideoPopup({ camera, onClose }) {
                         }
                         return prev;
                     });
-                    // Start playback check interval as fallback
-                    startPlaybackCheck();
                     // Force play attempt after fragment buffered
                     if (video.paused) {
                         video.play().catch(() => {});
@@ -1115,28 +1135,46 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 hls.loadSource(url);
                 hls.attachMedia(video);
                 
+                // Start playback check early - don't wait for events that may not fire
+                startPlaybackCheck();
+                
                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
                     if (cancelled) return;
-                    // Update to buffering stage - **Validates: Requirements 4.3**
                     setLoadingStage(LoadingStage.BUFFERING);
                     if (loadingTimeoutHandlerRef.current) {
                         loadingTimeoutHandlerRef.current.updateStage(LoadingStage.BUFFERING);
                     }
                     video.play().catch(() => {});
                 });
+                
+                // FRAG_LOADED fires when first fragment is loaded
+                hls.on(Hls.Events.FRAG_LOADED, () => {
+                    if (cancelled) return;
+                    setLoadingStage(prev => {
+                        if (prev === LoadingStage.LOADING || prev === LoadingStage.CONNECTING) {
+                            if (loadingTimeoutHandlerRef.current) {
+                                loadingTimeoutHandlerRef.current.updateStage(LoadingStage.BUFFERING);
+                            }
+                            return LoadingStage.BUFFERING;
+                        }
+                        return prev;
+                    });
+                    if (video.paused) {
+                        video.play().catch(() => {});
+                    }
+                });
 
                 hls.on(Hls.Events.FRAG_BUFFERED, () => {
                     if (cancelled) return;
-                    // Update to starting stage - **Validates: Requirements 4.4**
-                    if (loadingStage === LoadingStage.BUFFERING) {
-                        setLoadingStage(LoadingStage.STARTING);
-                        if (loadingTimeoutHandlerRef.current) {
-                            loadingTimeoutHandlerRef.current.updateStage(LoadingStage.STARTING);
+                    setLoadingStage(prev => {
+                        if (prev === LoadingStage.BUFFERING || prev === LoadingStage.LOADING || prev === LoadingStage.CONNECTING) {
+                            if (loadingTimeoutHandlerRef.current) {
+                                loadingTimeoutHandlerRef.current.updateStage(LoadingStage.STARTING);
+                            }
+                            return LoadingStage.STARTING;
                         }
-                    }
-                    // Start playback check interval as fallback
-                    startPlaybackCheck();
-                    // Force play attempt after fragment buffered
+                        return prev;
+                    });
                     if (video.paused) {
                         video.play().catch(() => {});
                     }
