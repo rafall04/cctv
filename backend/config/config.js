@@ -110,6 +110,13 @@ export const config = {
     // Allowed Origins
     allowedOrigins: parseAllowedOrigins(),
   },
+
+  // Telegram Bot Configuration
+  telegram: {
+    botToken: process.env.TELEGRAM_BOT_TOKEN || '',
+    chatId: process.env.TELEGRAM_CHAT_ID || '',
+    enabled: !!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID),
+  },
 };
 
 export default config;

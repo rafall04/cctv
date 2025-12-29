@@ -9,6 +9,7 @@ import LoginPage from './pages/LoginPage';
 import CameraManagement from './pages/CameraManagement';
 import AreaManagement from './pages/AreaManagement';
 import UserManagement from './pages/UserManagement';
+import FeedbackManagement from './pages/FeedbackManagement';
 import Dashboard from './pages/Dashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminLayout from './components/AdminLayout';
@@ -63,6 +64,16 @@ function App() {
                         <ProtectedRoute>
                             <AdminLayout>
                                 <UserManagement />
+                            </AdminLayout>
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/admin/feedback"
+                    element={
+                        <ProtectedRoute>
+                            <AdminLayout>
+                                <FeedbackManagement />
                             </AdminLayout>
                         </ProtectedRoute>
                     }

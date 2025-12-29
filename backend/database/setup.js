@@ -92,6 +92,20 @@ db.exec(`
 `);
 console.log('✓ Created audit_logs table');
 
+// Create feedbacks table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS feedbacks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT,
+    email TEXT,
+    message TEXT NOT NULL,
+    status TEXT DEFAULT 'unread',
+    ip_address TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+console.log('✓ Created feedbacks table');
+
 // Create default admin user if not exists
 const existingAdmin = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
 

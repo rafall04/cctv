@@ -23,6 +23,7 @@ import areaRoutes from './routes/areaRoutes.js';
 import streamRoutes from './routes/streamRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import userRoutes from './routes/userRoutes.js';
+import feedbackRoutes from './routes/feedbackRoutes.js';
 import mediaMtxService from './services/mediaMtxService.js';
 
 const fastify = Fastify({
@@ -197,6 +198,7 @@ await fastify.register(areaRoutes, { prefix: '/api/areas' });
 await fastify.register(streamRoutes, { prefix: '/api/stream' });
 await fastify.register(adminRoutes, { prefix: '/api/admin' });
 await fastify.register(userRoutes, { prefix: '/api/users' });
+await fastify.register(feedbackRoutes, { prefix: '/api/feedback' });
 
 // ============================================
 // GLOBAL ERROR HANDLER
