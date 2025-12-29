@@ -677,8 +677,9 @@ function VideoPopup({ camera, onClose }) {
 
                 hls.on(Hls.Events.FRAG_BUFFERED, () => {
                     if (cancelled) return;
-                    // Langsung set PLAYING setelah buffered - skip STARTING stage
+                    // Langsung set PLAYING dan status live setelah buffered
                     setLoadingStage(LoadingStage.PLAYING);
+                    setStatus('live'); // Hilangkan overlay segera
                     // Force play
                     if (video.paused) {
                         video.play().catch(() => {});
@@ -1179,8 +1180,9 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
 
                 hls.on(Hls.Events.FRAG_BUFFERED, () => {
                     if (cancelled) return;
-                    // Langsung set PLAYING setelah buffered - skip STARTING stage
+                    // Langsung set PLAYING dan status live setelah buffered
                     setLoadingStage(LoadingStage.PLAYING);
+                    setStatus('live'); // Hilangkan overlay segera
                     if (video.paused) {
                         video.play().catch(() => {});
                     }

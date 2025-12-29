@@ -1,25 +1,6 @@
-# RAF NET CCTV Bojonegoro - robots.txt
-# https://cctv.raf.my.id
-
 User-agent: *
 Allow: /
 Disallow: /admin/
 Disallow: /api/
 
-# Sitemap location
 Sitemap: https://cctv.raf.my.id/sitemap.xml
-
-# Crawl-delay for polite crawling
-Crawl-delay: 10
-
-# Google specific
-User-agent: Googlebot
-Allow: /
-Disallow: /admin/
-Disallow: /api/
-
-# Bing specific
-User-agent: Bingbot
-Allow: /
-Disallow: /admin/
-Disallow: /api/
