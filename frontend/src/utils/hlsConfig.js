@@ -34,16 +34,20 @@ const HLS_CONFIGS = {
         // Conservative bandwidth usage
         abrBandWidthFactor: 0.7,
         abrBandWidthUpFactor: 0.5,
-        // Longer timeout for slow connections
-        fragLoadingTimeOut: 30000,
+        // Longer timeout for slow connections (increased)
+        fragLoadingTimeOut: 45000,
         // Fewer retries to fail faster
         fragLoadingMaxRetry: 4,
         // Longer delay between retries
-        fragLoadingRetryDelay: 2000,
-        // Level loading settings
-        levelLoadingTimeOut: 15000,
-        levelLoadingMaxRetry: 3,
-        levelLoadingRetryDelay: 2000,
+        fragLoadingRetryDelay: 3000,
+        // Level/manifest loading settings (increased for slow connections)
+        levelLoadingTimeOut: 30000,
+        levelLoadingMaxRetry: 4,
+        levelLoadingRetryDelay: 3000,
+        // Manifest loading timeout (new)
+        manifestLoadingTimeOut: 30000,
+        manifestLoadingMaxRetry: 4,
+        manifestLoadingRetryDelay: 3000,
     },
     medium: {
         // Worker enabled for better performance
@@ -64,13 +68,17 @@ const HLS_CONFIGS = {
         // Balanced bandwidth usage
         abrBandWidthFactor: 0.8,
         abrBandWidthUpFactor: 0.6,
-        // Standard timeout
-        fragLoadingTimeOut: 25000,
+        // Standard timeout (increased)
+        fragLoadingTimeOut: 35000,
         fragLoadingMaxRetry: 5,
-        fragLoadingRetryDelay: 1500,
-        levelLoadingTimeOut: 12000,
+        fragLoadingRetryDelay: 2000,
+        levelLoadingTimeOut: 25000,
         levelLoadingMaxRetry: 4,
-        levelLoadingRetryDelay: 1500,
+        levelLoadingRetryDelay: 2000,
+        // Manifest loading timeout
+        manifestLoadingTimeOut: 25000,
+        manifestLoadingMaxRetry: 4,
+        manifestLoadingRetryDelay: 2000,
     },
     high: {
         // Worker enabled for optimal performance
@@ -92,14 +100,18 @@ const HLS_CONFIGS = {
         abrBandWidthFactor: 0.9,
         abrBandWidthUpFactor: 0.7,
         // Shorter timeout for faster failure detection
-        fragLoadingTimeOut: 20000,
+        fragLoadingTimeOut: 25000,
         // More retries for reliability
         fragLoadingMaxRetry: 6,
         // Shorter delay between retries
-        fragLoadingRetryDelay: 1000,
-        levelLoadingTimeOut: 10000,
+        fragLoadingRetryDelay: 1500,
+        levelLoadingTimeOut: 20000,
         levelLoadingMaxRetry: 5,
-        levelLoadingRetryDelay: 1000,
+        levelLoadingRetryDelay: 1500,
+        // Manifest loading timeout
+        manifestLoadingTimeOut: 20000,
+        manifestLoadingMaxRetry: 5,
+        manifestLoadingRetryDelay: 1500,
     },
 };
 
@@ -133,9 +145,11 @@ const MOBILE_PHONE_CONFIG = {
     abrEwmaDefaultEstimate: 250000, // 250kbps
     abrBandWidthFactor: 0.6,
     abrBandWidthUpFactor: 0.4,
-    // Longer timeouts for mobile networks
-    fragLoadingTimeOut: 35000,
-    fragLoadingRetryDelay: 2500,
+    // Longer timeouts for mobile networks (increased)
+    fragLoadingTimeOut: 45000,
+    fragLoadingRetryDelay: 3000,
+    levelLoadingTimeOut: 30000,
+    manifestLoadingTimeOut: 30000,
 };
 
 /**
@@ -150,8 +164,10 @@ const MOBILE_TABLET_CONFIG = {
     abrEwmaDefaultEstimate: 400000, // 400kbps
     abrBandWidthFactor: 0.7,
     abrBandWidthUpFactor: 0.5,
-    fragLoadingTimeOut: 30000,
-    fragLoadingRetryDelay: 2000,
+    fragLoadingTimeOut: 40000,
+    fragLoadingRetryDelay: 2500,
+    levelLoadingTimeOut: 25000,
+    manifestLoadingTimeOut: 25000,
 };
 
 /**

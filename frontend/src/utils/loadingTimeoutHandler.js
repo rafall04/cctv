@@ -27,8 +27,8 @@
  * Timeout configuration constants
  */
 export const TIMEOUT_CONFIG = {
-    LOW_END_TIMEOUT: 15000,    // 15 seconds for low-end devices
-    HIGH_END_TIMEOUT: 10000,   // 10 seconds for medium/high-end devices
+    LOW_END_TIMEOUT: 30000,    // 30 seconds for low-end devices (increased from 15s)
+    HIGH_END_TIMEOUT: 20000,   // 20 seconds for medium/high-end devices (increased from 10s)
     MAX_CONSECUTIVE_FAILURES: 3, // Suggest troubleshooting after 3 failures
 };
 

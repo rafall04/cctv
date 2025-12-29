@@ -20,10 +20,10 @@ import { ErrorType } from './streamLoaderTypes.js';
  */
 export const FALLBACK_CONFIG = {
     MAX_AUTO_RETRIES: 3,           // Maximum automatic retry attempts
-    NETWORK_RETRY_DELAY: 3000,     // 3 seconds for network errors
-    SERVER_RETRY_DELAY: 5000,      // 5 seconds for server errors
-    TIMEOUT_RETRY_DELAY: 3000,     // 3 seconds for timeout errors
-    DEFAULT_RETRY_DELAY: 3000,     // Default delay for unknown errors
+    NETWORK_RETRY_DELAY: 5000,     // 5 seconds for network errors (increased from 3s)
+    SERVER_RETRY_DELAY: 8000,      // 8 seconds for server errors (increased from 5s)
+    TIMEOUT_RETRY_DELAY: 5000,     // 5 seconds for timeout errors (increased from 3s)
+    DEFAULT_RETRY_DELAY: 5000,     // Default delay for unknown errors (increased from 3s)
 };
 
 /**
