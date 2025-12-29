@@ -84,6 +84,10 @@ export const createCameraSchema = {
             enabled: {
                 type: ['boolean', 'integer'],
                 enum: [true, false, 0, 1]
+            },
+            is_tunnel: {
+                type: ['boolean', 'integer'],
+                enum: [true, false, 0, 1]
             }
         },
         additionalProperties: false
@@ -121,6 +125,10 @@ export const updateCameraSchema = {
                 type: ['integer', 'string', 'null']
             },
             enabled: {
+                type: ['boolean', 'integer'],
+                enum: [true, false, 0, 1]
+            },
+            is_tunnel: {
                 type: ['boolean', 'integer'],
                 enum: [true, false, 0, 1]
             }
