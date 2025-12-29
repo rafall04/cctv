@@ -93,6 +93,6 @@ pm2 list
 echo ""
 echo "⚠️  Next Steps:"
 echo "1. Run 'sudo certbot --nginx' to enable SSL for both domains."
-echo "2. Ensure ports 80, 443, 1935 (RTMP), 8888 (HLS), 8889 (WebRTC) are open in your firewall."
+echo "2. Ensure ports 800, 443, 1935 (RTMP), 8888 (HLS), 8889 (WebRTC) are open in your firewall."
 echo "3. Update your DNS A records to point to 172.17.11.12."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

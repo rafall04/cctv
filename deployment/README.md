@@ -30,7 +30,7 @@ This folder contains all the necessary files to deploy the RAF NET CCTV applicat
 
 5. **Firewall Setup**:
    Ensure the following ports are open:
-   - `80` (HTTP)
+   - `800` (HTTP - custom port, 80 used by aaPanel)
    - `443` (HTTPS)
    - `1935` (RTMP - for camera input)
    - `8888` (HLS - for streaming)
