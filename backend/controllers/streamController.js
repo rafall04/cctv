@@ -17,7 +17,7 @@ export async function getStreamUrls(request, reply) {
         const { cameraId } = request.params;
 
         const camera = queryOne(
-            `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, 
+            `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel,
                     a.name as area_name, a.rt, a.rw, a.kelurahan, a.kecamatan
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 
@@ -43,6 +43,7 @@ export async function getStreamUrls(request, reply) {
                     group_name: camera.group_name,
                     area_id: camera.area_id,
                     area_name: camera.area_name,
+                    is_tunnel: camera.is_tunnel,
                     rt: camera.rt,
                     rw: camera.rw,
                     kelurahan: camera.kelurahan,
@@ -63,12 +64,12 @@ export async function getStreamUrls(request, reply) {
 export async function getAllActiveStreams(request, reply) {
     try {
         const cameras = query(
-            `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, 
+            `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel,
                     a.name as area_name, a.rt, a.rw, a.kelurahan, a.kecamatan
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 
              WHERE c.enabled = 1 
-             ORDER BY c.id ASC`
+             ORDER BY c.is_tunnel ASC, c.id ASC`
         );
 
         const camerasWithStreams = cameras.map(camera => ({
