@@ -1681,7 +1681,7 @@ function FilterDropdown({ areas, selected, onChange, cameras, kecamatans = [], k
 // ============================================
 function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, multiCameras }) {
     const [filter, setFilter] = useState(null);
-    const [connectionTab, setConnectionTab] = useState('all'); // 'all', 'stable', 'tunnel'
+    const [connectionTab, setConnectionTab] = useState('stable'); // 'all', 'stable', 'tunnel' - default to stable
     
     // Get unique kecamatan and kelurahan from cameras directly (in case areas table is empty)
     const kecamatansFromCameras = [...new Set(cameras.map(c => c.kecamatan).filter(Boolean))].sort();
