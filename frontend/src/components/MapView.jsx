@@ -120,15 +120,23 @@ const applyMarkerOffset = (cameras) => {
     });
 };
 
-// Video Modal - dengan error handling codec dan status maintenance
+// Video Modal - dengan error handling codec, status maintenance, dan zoom controls
 const VideoModal = memo(({ camera, onClose }) => {
     const videoRef = useRef(null);
+    const videoWrapperRef = useRef(null);
     const hlsRef = useRef(null);
     const [status, setStatus] = useState('loading');
     const [errorType, setErrorType] = useState(null); // 'codec', 'network', 'timeout', 'unknown'
+    const [zoom, setZoom] = useState(1);
+    const [pan, setPan] = useState({ x: 0, y: 0 });
+    const [isDragging, setIsDragging] = useState(false);
+    const dragStart = useRef({ x: 0, y: 0 });
 
     const isMaintenance = camera.status === 'maintenance';
     const isTunnel = camera.is_tunnel === 1 || camera.is_tunnel === true;
+
+    const MIN_ZOOM = 1;
+    const MAX_ZOOM = 4;
 
     useEffect(() => {
         document.body.style.overflow = 'hidden';
@@ -140,6 +148,80 @@ const VideoModal = memo(({ camera, onClose }) => {
         window.addEventListener('keydown', handleEsc);
         return () => window.removeEventListener('keydown', handleEsc);
     }, [onClose]);
+
+    // Zoom handlers
+    const handleZoomIn = () => {
+        setZoom(prev => Math.min(prev + 0.5, MAX_ZOOM));
+    };
+
+    const handleZoomOut = () => {
+        setZoom(prev => {
+            const newZoom = Math.max(prev - 0.5, MIN_ZOOM);
+            if (newZoom === 1) setPan({ x: 0, y: 0 }); // Reset pan when zoom is 1
+            return newZoom;
+        });
+    };
+
+    const handleResetZoom = () => {
+        setZoom(1);
+        setPan({ x: 0, y: 0 });
+    };
+
+    // Mouse wheel zoom
+    const handleWheel = (e) => {
+        e.preventDefault();
+        if (e.deltaY < 0) {
+            setZoom(prev => Math.min(prev + 0.25, MAX_ZOOM));
+        } else {
+            setZoom(prev => {
+                const newZoom = Math.max(prev - 0.25, MIN_ZOOM);
+                if (newZoom === 1) setPan({ x: 0, y: 0 });
+                return newZoom;
+            });
+        }
+    };
+
+    // Pan handlers (drag to move when zoomed)
+    const handleMouseDown = (e) => {
+        if (zoom > 1) {
+            setIsDragging(true);
+            dragStart.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+        }
+    };
+
+    const handleMouseMove = (e) => {
+        if (isDragging && zoom > 1) {
+            const maxPan = (zoom - 1) * 50; // Limit pan based on zoom level
+            const newX = Math.max(-maxPan, Math.min(maxPan, e.clientX - dragStart.current.x));
+            const newY = Math.max(-maxPan, Math.min(maxPan, e.clientY - dragStart.current.y));
+            setPan({ x: newX, y: newY });
+        }
+    };
+
+    const handleMouseUp = () => {
+        setIsDragging(false);
+    };
+
+    // Touch handlers for mobile
+    const handleTouchStart = (e) => {
+        if (zoom > 1 && e.touches.length === 1) {
+            setIsDragging(true);
+            dragStart.current = { x: e.touches[0].clientX - pan.x, y: e.touches[0].clientY - pan.y };
+        }
+    };
+
+    const handleTouchMove = (e) => {
+        if (isDragging && zoom > 1 && e.touches.length === 1) {
+            const maxPan = (zoom - 1) * 50;
+            const newX = Math.max(-maxPan, Math.min(maxPan, e.touches[0].clientX - dragStart.current.x));
+            const newY = Math.max(-maxPan, Math.min(maxPan, e.touches[0].clientY - dragStart.current.y));
+            setPan({ x: newX, y: newY });
+        }
+    };
+
+    const handleTouchEnd = () => {
+        setIsDragging(false);
+    };
 
     useEffect(() => {
         // Jika maintenance, tidak perlu load stream
@@ -290,16 +372,27 @@ const VideoModal = memo(({ camera, onClose }) => {
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Video Container */}
-                <div className="relative bg-black aspect-video">
+                <div 
+                    className="relative bg-black aspect-video overflow-hidden"
+                    onWheel={handleWheel}
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={handleMouseUp}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                    style={{ cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
+                >
                     {status === 'loading' && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10">
                             <div className="w-10 h-10 border-2 border-gray-700 border-t-sky-500 rounded-full animate-spin"/>
                             <span className="text-gray-400 text-sm">Menghubungkan...</span>
                         </div>
                     )}
                     
                     {status === 'maintenance' && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-red-950/50">
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-red-950/50 z-10">
                             <svg className="w-16 h-16 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                                 <path d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"/>
                             </svg>
@@ -311,7 +404,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                     )}
                     
                     {status === 'error' && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4">
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 z-10">
                             {errorInfo.icon}
                             <div className="text-center">
                                 <h4 className="text-gray-200 font-semibold">{errorInfo.title}</h4>
@@ -320,50 +413,99 @@ const VideoModal = memo(({ camera, onClose }) => {
                         </div>
                     )}
                     
+                    {/* Video with zoom/pan transform */}
                     {!isMaintenance && (
-                        <video ref={videoRef} className="w-full h-full object-contain" muted playsInline controls />
+                        <div 
+                            ref={videoWrapperRef}
+                            className="w-full h-full transition-transform duration-100"
+                            style={{ 
+                                transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+                                transformOrigin: 'center center'
+                            }}
+                        >
+                            <video ref={videoRef} className="w-full h-full object-contain" muted playsInline controls />
+                        </div>
                     )}
-                    
-                    {/* Top badges */}
-                    <div className="absolute top-2 left-2 flex items-center gap-2">
-                        {isMaintenance ? (
-                            <span className="px-2.5 py-1 rounded-full bg-red-500 text-white text-xs font-bold flex items-center gap-1.5">
-                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
-                                </svg>
-                                PERBAIKAN
-                            </span>
-                        ) : (
-                            <>
-                                <span className="px-2.5 py-1 rounded-full bg-red-500 text-white text-xs font-bold flex items-center gap-1.5">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-white"/>
-                                    LIVE
-                                </span>
-                                <span className={`px-2.5 py-1 rounded-full text-white text-xs font-bold ${isTunnel ? 'bg-orange-500' : 'bg-emerald-500'}`}>
-                                    {isTunnel ? 'Tunnel' : 'Stabil'}
-                                </span>
-                            </>
-                        )}
-                    </div>
 
-                    {/* Close button */}
+                    {/* Close button - top right */}
                     <button 
                         onClick={onClose} 
-                        className="absolute top-2 right-2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-lg"
+                        className="absolute top-2 right-2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-lg z-20"
                     >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path d="M6 18L18 6M6 6l12 12"/>
                         </svg>
                     </button>
+
+                    {/* Zoom Controls - bottom right */}
+                    {!isMaintenance && status !== 'error' && (
+                        <div className="absolute bottom-2 right-2 flex items-center gap-1 z-20">
+                            <button
+                                onClick={handleZoomOut}
+                                disabled={zoom <= MIN_ZOOM}
+                                className="p-2 bg-black/60 hover:bg-black/80 text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                                title="Zoom Out"
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"/>
+                                </svg>
+                            </button>
+                            <button
+                                onClick={handleResetZoom}
+                                className="px-2 py-1 bg-black/60 hover:bg-black/80 text-white rounded-lg text-xs font-medium min-w-[40px] transition-all"
+                                title="Reset Zoom"
+                            >
+                                {Math.round(zoom * 100)}%
+                            </button>
+                            <button
+                                onClick={handleZoomIn}
+                                disabled={zoom >= MAX_ZOOM}
+                                className="p-2 bg-black/60 hover:bg-black/80 text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                                title="Zoom In"
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"/>
+                                </svg>
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Zoom hint - show when zoomed */}
+                    {zoom > 1 && (
+                        <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-xs rounded-lg z-20">
+                            Drag untuk geser • Scroll untuk zoom
+                        </div>
+                    )}
                 </div>
 
-                {/* Info Panel */}
+                {/* Info Panel - dengan badges dipindah ke sini */}
                 <div className="p-4 border-t border-gray-800">
                     <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
-                            <h3 className="text-white font-bold text-base sm:text-lg truncate">{camera.name}</h3>
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                                <h3 className="text-white font-bold text-base sm:text-lg truncate">{camera.name}</h3>
+                                {/* Status badges - dipindah ke sini */}
+                                {isMaintenance ? (
+                                    <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center gap-1 shrink-0">
+                                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                                        </svg>
+                                        Perbaikan
+                                    </span>
+                                ) : (
+                                    <>
+                                        <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center gap-1 shrink-0">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-white"/>
+                                            LIVE
+                                        </span>
+                                        <span className={`px-2 py-0.5 rounded-full text-white text-xs font-bold shrink-0 ${isTunnel ? 'bg-orange-500' : 'bg-emerald-500'}`}>
+                                            {isTunnel ? 'Tunnel' : 'Stabil'}
+                                        </span>
+                                    </>
+                                )}
+                            </div>
                             {camera.location && (
-                                <p className="text-gray-400 text-sm mt-0.5 flex items-center gap-1.5 truncate">
+                                <p className="text-gray-400 text-sm flex items-center gap-1.5 truncate">
                                     <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                         <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/>
                                         <circle cx="12" cy="11" r="3"/>
