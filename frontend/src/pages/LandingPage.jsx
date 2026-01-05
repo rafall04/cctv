@@ -227,21 +227,17 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
                         <Icons.Play />
                     </div>
                 </div>
-                <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/90 backdrop-blur-sm text-white text-[10px] font-bold shadow-lg">
+                {/* Live badge */}
+                <div className="absolute top-3 left-3">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/90 backdrop-blur-sm text-white text-[10px] font-bold shadow-lg">
                         <span className="relative flex h-1.5 w-1.5">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
                             <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
                         </span>
                         LIVE
                     </span>
-                    {camera.is_tunnel === 1 && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/90 backdrop-blur-sm text-white text-[10px] font-bold shadow-lg" title="Koneksi Tunnel - Kurang Stabil">
-                            ⚠️ Tunnel
-                        </span>
-                    )}
                 </div>
-                {/* Area badge on video */}
+                {/* Area badge */}
                 {camera.area_name && (
                     <div className="absolute bottom-3 left-3">
                         <span className="px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-sm text-white text-[10px] font-medium">
@@ -253,42 +249,13 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
             <div className="p-4 cursor-pointer" onClick={onClick}>
                 <h3 className="font-bold text-gray-900 dark:text-white truncate mb-1 group-hover/card:text-sky-500 transition-colors">{camera.name}</h3>
                 
-                {/* Description */}
-                {camera.description && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mb-2">{camera.description}</p>
-                )}
-                
                 {/* Location */}
                 {camera.location && (
-                    <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1.5 mb-2">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
                         <Icons.MapPin />
                         <span className="truncate">{camera.location}</span>
                     </p>
                 )}
-                
-                {/* Area Details Tags */}
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                    {camera.kecamatan && (
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400">
-                            {camera.kecamatan}
-                        </span>
-                    )}
-                    {camera.kelurahan && (
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400">
-                            {camera.kelurahan}
-                        </span>
-                    )}
-                    {camera.rw && (
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400">
-                            RW {camera.rw}
-                        </span>
-                    )}
-                    {camera.rt && (
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400">
-                            RT {camera.rt}
-                        </span>
-                    )}
-                </div>
             </div>
         </div>
     );
@@ -1837,184 +1804,49 @@ function FilterDropdown({ areas, selected, onChange, cameras, kecamatans = [], k
 }
 
 // ============================================
-// CAMERAS SECTION
+// CAMERAS SECTION - Simplified
 // ============================================
 function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, multiCameras }) {
-    const [filter, setFilter] = useState(null);
-    const [connectionTab, setConnectionTab] = useState('stable'); // 'all', 'stable', 'tunnel' - default to stable
     const [viewMode, setViewMode] = useState('map'); // 'grid' or 'map' - default to map view
-    
-    // Get unique kecamatan and kelurahan from cameras directly (in case areas table is empty)
-    const kecamatansFromCameras = [...new Set(cameras.map(c => c.kecamatan).filter(Boolean))].sort();
-    const kelurahansFromCameras = [...new Set(cameras.map(c => c.kelurahan).filter(Boolean))].sort();
-    
-    // Merge with areas data
-    const kecamatansFromAreas = [...new Set(areas.map(a => a.kecamatan).filter(Boolean))];
-    const kelurahansFromAreas = [...new Set(areas.map(a => a.kelurahan).filter(Boolean))];
-    
-    const allKecamatans = [...new Set([...kecamatansFromCameras, ...kecamatansFromAreas])].sort();
-    const allKelurahans = [...new Set([...kelurahansFromCameras, ...kelurahansFromAreas])].sort();
-    
-    // Check if we have any filter data
-    const hasFilterData = areas.length > 0 || allKecamatans.length > 0 || allKelurahans.length > 0;
-    
-    // Count cameras by connection type
-    const tunnelCameras = cameras.filter(c => c.is_tunnel === 1);
-    const stableCameras = cameras.filter(c => c.is_tunnel !== 1);
-    const hasTunnelCameras = tunnelCameras.length > 0;
-    
-    // Filter cameras based on selected filter and connection tab
-    const filtered = (() => {
-        let result = cameras;
-        
-        // First filter by connection type
-        if (connectionTab === 'stable') {
-            result = result.filter(c => c.is_tunnel !== 1);
-        } else if (connectionTab === 'tunnel') {
-            result = result.filter(c => c.is_tunnel === 1);
-        }
-        
-        // Then filter by area/location
-        if (!filter) return result;
-        if (filter.type === 'area') return result.filter(c => c.area_id === filter.value);
-        if (filter.type === 'kecamatan') return result.filter(c => c.kecamatan === filter.value);
-        if (filter.type === 'kelurahan') return result.filter(c => c.kelurahan === filter.value);
-        return result;
-    })();
-
-    const getTitle = () => {
-        if (connectionTab === 'tunnel') return 'Kamera Tunnel';
-        if (connectionTab === 'stable') return 'Kamera Stabil';
-        if (!filter) return 'Live Cameras';
-        if (filter.type === 'area') {
-            const area = areas.find(a => a.id === filter.value);
-            return area?.name || 'Cameras';
-        }
-        return filter.value;
-    };
-
-    const getSubtitle = () => {
-        if (connectionTab === 'tunnel') {
-            return `${filtered.length} kamera dengan koneksi tunnel`;
-        }
-        if (connectionTab === 'stable') {
-            return `${filtered.length} kamera dengan koneksi stabil`;
-        }
-        if (!filter) return `${filtered.length} camera${filtered.length !== 1 ? 's' : ''} available`;
-        const typeLabel = filter.type === 'area' ? '' : filter.type === 'kecamatan' ? 'Kecamatan ' : 'Kelurahan ';
-        return `${filtered.length} camera${filtered.length !== 1 ? 's' : ''} in ${typeLabel}${filter.type === 'area' ? 'this area' : filter.value}`;
-    };
 
     return (
-        <section className="py-8 sm:py-12">
+        <section className="py-6 sm:py-10">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                {/* Connection Type Tabs - Only show if there are tunnel cameras */}
-                {hasTunnelCameras && (
-                    <div className="mb-6">
-                        <div className="flex flex-wrap gap-2 p-1.5 bg-gray-100 dark:bg-gray-800 rounded-xl w-fit">
-                            <button
-                                onClick={() => setConnectionTab('all')}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                                    connectionTab === 'all'
-                                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                                }`}
-                            >
-                                Semua ({cameras.length})
-                            </button>
-                            <button
-                                onClick={() => setConnectionTab('stable')}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                                    connectionTab === 'stable'
-                                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                                }`}
-                            >
-                                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                Stabil ({stableCameras.length})
-                            </button>
-                            <button
-                                onClick={() => setConnectionTab('tunnel')}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                                    connectionTab === 'tunnel'
-                                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                                }`}
-                            >
-                                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                                Tunnel ({tunnelCameras.length})
-                            </button>
-                        </div>
-                        
-                        {/* Tunnel Warning Info */}
-                        {connectionTab === 'tunnel' && (
-                            <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl">
-                                <div className="flex items-start gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
-                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                        </svg>
-                                    </div>
-                                    <div>
-                                        <h4 className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-1">
-                                            ⚠️ Koneksi Tunnel - Kurang Stabil
-                                        </h4>
-                                        <p className="text-sm text-amber-700 dark:text-amber-400">
-                                            Kamera-kamera ini menggunakan koneksi tunnel yang mungkin kurang stabil. 
-                                            Jika stream tidak muncul atau terputus, silakan coba refresh atau tunggu beberapa saat.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                     <div>
                         <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-                            {getTitle()}
+                            CCTV Publik
                         </h2>
                         <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-                            {getSubtitle()}
+                            {cameras.length} kamera tersedia • Streaming langsung 24/7
                         </p>
                     </div>
-                    <div className="flex items-center gap-3">
-                        {/* View Mode Toggle */}
-                        <div className="flex items-center p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
-                            <button
-                                onClick={() => setViewMode('grid')}
-                                className={`p-2 rounded-lg transition-all ${
-                                    viewMode === 'grid'
-                                        ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-sky-400 shadow-sm'
-                                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                                }`}
-                                title="Grid View"
-                            >
-                                <Icons.Grid />
-                            </button>
-                            <button
-                                onClick={() => setViewMode('map')}
-                                className={`p-2 rounded-lg transition-all ${
-                                    viewMode === 'map'
-                                        ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-sky-400 shadow-sm'
-                                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                                }`}
-                                title="Map View"
-                            >
-                                <Icons.Map />
-                            </button>
-                        </div>
-                        {hasFilterData && (
-                            <FilterDropdown 
-                                areas={areas} 
-                                selected={filter} 
-                                onChange={setFilter}
-                                cameras={cameras}
-                                kecamatans={allKecamatans}
-                                kelurahans={allKelurahans}
-                            />
-                        )}
+                    
+                    {/* View Mode Toggle */}
+                    <div className="flex items-center p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
+                        <button
+                            onClick={() => setViewMode('grid')}
+                            className={`p-2.5 rounded-lg transition-all ${
+                                viewMode === 'grid'
+                                    ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-sky-400 shadow-sm'
+                                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                            }`}
+                            title="Grid View"
+                        >
+                            <Icons.Grid />
+                        </button>
+                        <button
+                            onClick={() => setViewMode('map')}
+                            className={`p-2.5 rounded-lg transition-all ${
+                                viewMode === 'map'
+                                    ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-sky-400 shadow-sm'
+                                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                            }`}
+                            title="Map View"
+                        >
+                            <Icons.Map />
+                        </button>
                     </div>
                 </div>
 
@@ -2022,49 +1854,31 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                         {[1, 2, 3, 4, 5, 6].map(i => <CameraSkeleton key={i} />)}
                     </div>
-                ) : filtered.length === 0 ? (
+                ) : cameras.length === 0 ? (
                     <div className="text-center py-16">
                         <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400">
                             <Icons.Camera />
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Cameras Found</h3>
-                        <p className="text-gray-500 dark:text-gray-400 mb-4">
-                            {connectionTab === 'tunnel' 
-                                ? 'Tidak ada kamera dengan koneksi tunnel.' 
-                                : connectionTab === 'stable'
-                                    ? 'Tidak ada kamera dengan koneksi stabil.'
-                                    : filter 
-                                        ? 'No cameras available in this location.' 
-                                        : 'No cameras available.'}
-                        </p>
-                        {(filter || connectionTab !== 'all') && (
-                            <button 
-                                onClick={() => { setFilter(null); setConnectionTab('all'); }}
-                                className="text-sky-500 font-medium hover:text-sky-600 transition-colors"
-                            >
-                                View All Cameras →
-                            </button>
-                        )}
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Belum Ada Kamera</h3>
+                        <p className="text-gray-500 dark:text-gray-400">Kamera akan segera tersedia.</p>
                     </div>
                 ) : viewMode === 'map' ? (
                     <Suspense fallback={
-                        <div className="h-[500px] bg-gray-100 dark:bg-gray-800 rounded-xl animate-pulse flex items-center justify-center">
-                            <div className="text-gray-400">Loading map...</div>
+                        <div className="h-[500px] bg-gray-100 dark:bg-gray-800 rounded-2xl animate-pulse flex items-center justify-center">
+                            <div className="text-center">
+                                <div className="w-8 h-8 border-2 border-gray-300 border-t-sky-500 rounded-full animate-spin mx-auto mb-2"/>
+                                <span className="text-gray-400 text-sm">Memuat peta...</span>
+                            </div>
                         </div>
                     }>
                         <MapView
-                            cameras={filtered}
-                            onCameraSelect={(camera, openStream) => {
-                                if (openStream) {
-                                    onCameraClick(camera);
-                                }
-                            }}
+                            cameras={cameras}
                             className="h-[500px] sm:h-[600px]"
                         />
                     </Suspense>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                        {filtered.map(camera => (
+                        {cameras.map(camera => (
                             <CameraCard
                                 key={camera.id}
                                 camera={camera}
