@@ -10,7 +10,8 @@ import { config } from '../config/config.js';
 class StreamWarmer {
     constructor() {
         this.warmStreams = new Map(); // pathName -> { intervalId, failCount }
-        this.hlsBaseUrl = config.mediamtx?.hlsUrl || 'http://localhost:8888';
+        // Use INTERNAL URL for server-side requests
+        this.hlsBaseUrl = config.mediamtx?.hlsUrlInternal || 'http://localhost:8888';
         this.mediamtxApiUrl = config.mediamtx?.apiUrl || 'http://localhost:9997';
         this.maxFailures = 3; // Stop warming after 3 consecutive failures
     }

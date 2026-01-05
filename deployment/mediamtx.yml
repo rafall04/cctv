@@ -8,17 +8,17 @@ logDestinations: [stdout]
 api: yes
 apiAddress: :9997
 
-# HLS settings - optimized for faster startup
+# HLS settings
 hls: yes
 hlsAddress: :8888
 hlsAlwaysRemux: yes
 hlsAllowOrigin: '*'
-hlsSegmentCount: 3
+hlsVariant: lowLatency
+hlsSegmentCount: 5
 hlsSegmentDuration: 1s
 hlsPartDuration: 200ms
-hlsSegmentMaxSize: 50M
 
-# WebRTC settings - lower latency
+# WebRTC settings
 webrtc: yes
 webrtcAddress: :8889
 webrtcAllowOrigin: '*'
