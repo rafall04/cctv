@@ -437,39 +437,6 @@ const VideoModal = memo(({ camera, onClose }) => {
                         </svg>
                     </button>
 
-                    {/* Zoom Controls - bottom right */}
-                    {!isMaintenance && status !== 'error' && (
-                        <div className="absolute bottom-2 right-2 flex items-center gap-1 z-20">
-                            <button
-                                onClick={handleZoomOut}
-                                disabled={zoom <= MIN_ZOOM}
-                                className="p-2 bg-black/60 hover:bg-black/80 text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                                title="Zoom Out"
-                            >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"/>
-                                </svg>
-                            </button>
-                            <button
-                                onClick={handleResetZoom}
-                                className="px-2 py-1 bg-black/60 hover:bg-black/80 text-white rounded-lg text-xs font-medium min-w-[40px] transition-all"
-                                title="Reset Zoom"
-                            >
-                                {Math.round(zoom * 100)}%
-                            </button>
-                            <button
-                                onClick={handleZoomIn}
-                                disabled={zoom >= MAX_ZOOM}
-                                className="p-2 bg-black/60 hover:bg-black/80 text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                                title="Zoom In"
-                            >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"/>
-                                </svg>
-                            </button>
-                        </div>
-                    )}
-
                     {/* Zoom hint - show when zoomed */}
                     {zoom > 1 && (
                         <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-xs rounded-lg z-20">
@@ -478,13 +445,13 @@ const VideoModal = memo(({ camera, onClose }) => {
                     )}
                 </div>
 
-                {/* Info Panel - dengan badges dipindah ke sini */}
+                {/* Info Panel - dengan badges dan zoom controls */}
                 <div className="p-4 border-t border-gray-800">
                     <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 flex-wrap mb-1">
                                 <h3 className="text-white font-bold text-base sm:text-lg truncate">{camera.name}</h3>
-                                {/* Status badges - dipindah ke sini */}
+                                {/* Status badges */}
                                 {isMaintenance ? (
                                     <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center gap-1 shrink-0">
                                         <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -514,12 +481,60 @@ const VideoModal = memo(({ camera, onClose }) => {
                                 </p>
                             )}
                         </div>
-                        {camera.area_name && (
-                            <span className="shrink-0 px-2.5 py-1 bg-sky-500/20 text-sky-400 rounded-lg text-xs font-semibold">
-                                {camera.area_name}
-                            </span>
+                        
+                        {/* Zoom Controls - di info panel */}
+                        {!isMaintenance && status !== 'error' && (
+                            <div className="flex items-center gap-1 bg-gray-800 rounded-xl p-1 shrink-0">
+                                <button
+                                    onClick={handleZoomOut}
+                                    disabled={zoom <= MIN_ZOOM}
+                                    className="p-2 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg text-white transition-colors"
+                                    title="Zoom Out"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"/>
+                                    </svg>
+                                </button>
+                                <button
+                                    onClick={handleResetZoom}
+                                    className="px-2 py-1 hover:bg-gray-700 text-white rounded-lg text-xs font-medium min-w-[48px] text-center transition-colors"
+                                    title="Reset Zoom"
+                                >
+                                    {Math.round(zoom * 100)}%
+                                </button>
+                                <button
+                                    onClick={handleZoomIn}
+                                    disabled={zoom >= MAX_ZOOM}
+                                    className="p-2 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg text-white transition-colors"
+                                    title="Zoom In"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"/>
+                                    </svg>
+                                </button>
+                                {zoom > 1 && (
+                                    <button
+                                        onClick={handleResetZoom}
+                                        className="p-2 hover:bg-gray-700 rounded-lg text-white transition-colors ml-1"
+                                        title="Reset"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/>
+                                        </svg>
+                                    </button>
+                                )}
+                            </div>
                         )}
                     </div>
+                    
+                    {/* Area badge - row terpisah jika ada */}
+                    {camera.area_name && (
+                        <div className="mt-2 pt-2 border-t border-gray-800">
+                            <span className="px-2.5 py-1 bg-sky-500/20 text-sky-400 rounded-lg text-xs font-semibold">
+                                {camera.area_name}
+                            </span>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
