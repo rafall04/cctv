@@ -104,16 +104,22 @@ export async function createCamera(request, reply) {
         const areaIdValue = area_id === '' || area_id === null || area_id === undefined 
             ? null 
             : parseInt(area_id, 10);
+        const finalAreaId = Number.isNaN(areaIdValue) ? null : areaIdValue;
 
-        const isEnabled = enabled !== undefined ? enabled : 1;
-        const isTunnel = is_tunnel !== undefined ? is_tunnel : 0;
-        const lat = latitude !== undefined && latitude !== '' ? parseFloat(latitude) : null;
-        const lng = longitude !== undefined && longitude !== '' ? parseFloat(longitude) : null;
+        // Convert boolean to integer for SQLite
+        const isEnabled = enabled === true || enabled === 1 ? 1 : (enabled === false || enabled === 0 ? 0 : 1);
+        const isTunnel = is_tunnel === true || is_tunnel === 1 ? 1 : 0;
+        
+        // Parse coordinates
+        const latValue = latitude !== undefined && latitude !== '' && latitude !== null ? parseFloat(latitude) : null;
+        const lngValue = longitude !== undefined && longitude !== '' && longitude !== null ? parseFloat(longitude) : null;
+        const lat = Number.isNaN(latValue) ? null : latValue;
+        const lng = Number.isNaN(lngValue) ? null : lngValue;
 
         // Insert camera
         const result = execute(
             'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [name, private_rtsp_url, description || null, location || null, group_name || null, areaIdValue, isEnabled, isTunnel, lat, lng]
+            [name, private_rtsp_url, description || null, location || null, group_name || null, finalAreaId, isEnabled, isTunnel, lat, lng]
         );
 
         // Log action
@@ -197,23 +203,28 @@ export async function updateCamera(request, reply) {
         if (area_id !== undefined) {
             updates.push('area_id = ?');
             // Convert empty string to null for foreign key
-            values.push(area_id === '' || area_id === null ? null : parseInt(area_id, 10));
+            const areaIdValue = area_id === '' || area_id === null ? null : parseInt(area_id, 10);
+            values.push(Number.isNaN(areaIdValue) ? null : areaIdValue);
         }
         if (enabled !== undefined) {
             updates.push('enabled = ?');
-            values.push(enabled);
+            // Convert boolean to integer for SQLite
+            values.push(enabled === true || enabled === 1 ? 1 : 0);
         }
         if (is_tunnel !== undefined) {
             updates.push('is_tunnel = ?');
-            values.push(is_tunnel);
+            // Convert boolean to integer for SQLite
+            values.push(is_tunnel === true || is_tunnel === 1 ? 1 : 0);
         }
         if (latitude !== undefined) {
             updates.push('latitude = ?');
-            values.push(latitude === '' || latitude === null ? null : parseFloat(latitude));
+            const latValue = latitude === '' || latitude === null ? null : parseFloat(latitude);
+            values.push(Number.isNaN(latValue) ? null : latValue);
         }
         if (longitude !== undefined) {
             updates.push('longitude = ?');
-            values.push(longitude === '' || longitude === null ? null : parseFloat(longitude));
+            const lngValue = longitude === '' || longitude === null ? null : parseFloat(longitude);
+            values.push(Number.isNaN(lngValue) ? null : lngValue);
         }
 
         if (updates.length === 0) {
