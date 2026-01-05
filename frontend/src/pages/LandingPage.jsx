@@ -1957,19 +1957,8 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                         </p>
                     </div>
                     
-                    {/* View Mode Toggle */}
+                    {/* View Mode Toggle - Maps diutamakan di depan */}
                     <div className="flex items-center p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
-                        <button
-                            onClick={() => setViewMode('grid')}
-                            className={`p-2.5 rounded-lg transition-colors ${
-                                viewMode === 'grid'
-                                    ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-sky-400 shadow-sm'
-                                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                            }`}
-                            title="Grid View"
-                        >
-                            <Icons.Grid />
-                        </button>
                         <button
                             onClick={() => setViewMode('map')}
                             className={`p-2.5 rounded-lg transition-colors ${
@@ -1980,6 +1969,17 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                             title="Map View"
                         >
                             <Icons.Map />
+                        </button>
+                        <button
+                            onClick={() => setViewMode('grid')}
+                            className={`p-2.5 rounded-lg transition-colors ${
+                                viewMode === 'grid'
+                                    ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-sky-400 shadow-sm'
+                                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                            }`}
+                            title="Grid View (Multi-View)"
+                        >
+                            <Icons.Grid />
                         </button>
                     </div>
                 </div>
@@ -2227,11 +2227,11 @@ function MultiViewButton({ count, onClick, maxReached, maxStreams = 3 }) {
                 </button>
             )}
             
-            {/* Help text */}
+            {/* Help text - hanya tampil di Grid view */}
             {count === 0 && (
-                <div className="bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs px-3 py-2 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 max-w-[200px] text-left">
+                <div className="bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs px-3 py-2 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 max-w-[220px] text-left">
                     <p className="font-medium mb-1">💡 Multi-View Mode</p>
-                    <p className="text-gray-500 dark:text-gray-400">Click the + button on cameras to view up to {maxStreams} streams simultaneously</p>
+                    <p className="text-gray-500 dark:text-gray-400">Klik tombol + pada kamera di <strong>Grid View</strong> untuk menonton hingga {maxStreams} stream bersamaan</p>
                 </div>
             )}
         </div>
