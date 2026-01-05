@@ -1,7 +1,7 @@
 # MediaMTX Configuration for RAF NET CCTV Production
 
 # Logging
-logLevel: error
+logLevel: info
 logDestinations: [stdout]
 
 # API for backend management
@@ -13,10 +13,6 @@ hls: yes
 hlsAddress: :8888
 hlsAlwaysRemux: yes
 hlsAllowOrigin: '*'
-hlsVariant: lowLatency
-hlsSegmentCount: 5
-hlsSegmentDuration: 1s
-hlsPartDuration: 200ms
 
 # WebRTC settings
 webrtc: yes
