@@ -365,7 +365,7 @@ const VideoModal = memo(({ camera, onClose }) => {
             case 'codec':
                 return {
                     title: 'Codec Tidak Didukung',
-                    desc: 'Browser tidak mendukung codec H.265/HEVC. Gunakan browser Chrome/Firefox terbaru atau hubungi admin.',
+                    desc: 'Browser Anda tidak mendukung codec H.265/HEVC yang digunakan kamera ini. Coba gunakan browser lain atau perangkat yang mendukung H.265.',
                     icon: (
                         <svg className="w-10 h-10 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
@@ -487,85 +487,48 @@ const VideoModal = memo(({ camera, onClose }) => {
                     {/* Zoom hint - show when zoomed */}
                     {zoom > 1 && (
                         <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-xs rounded-lg z-20">
-                            Drag untuk geser • Scroll untuk zoom
+                            Geser untuk pan
                         </div>
                     )}
                 </div>
 
-                {/* Info Panel - dengan badges dan zoom controls */}
-                <div className="p-4 border-t border-gray-800">
-                    <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap mb-1">
-                                <h3 className="text-white font-bold text-base sm:text-lg truncate">{camera.name}</h3>
-                                {/* Status badges */}
-                                {isMaintenance ? (
-                                    <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center gap-1 shrink-0">
-                                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
-                                        </svg>
-                                        Perbaikan
-                                    </span>
-                                ) : (
-                                    <>
-                                        <span className="px-2 py-0.5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center gap-1 shrink-0">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-white"/>
-                                            LIVE
-                                        </span>
-                                        <span className={`px-2 py-0.5 rounded-full text-white text-xs font-bold shrink-0 ${isTunnel ? 'bg-orange-500' : 'bg-emerald-500'}`}>
-                                            {isTunnel ? 'Tunnel' : 'Stabil'}
-                                        </span>
-                                    </>
-                                )}
-                            </div>
-                            {camera.location && (
-                                <p className="text-gray-400 text-sm flex items-center gap-1.5 truncate">
-                                    <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/>
-                                        <circle cx="12" cy="11" r="3"/>
-                                    </svg>
-                                    {camera.location}
-                                </p>
-                            )}
-                        </div>
+                {/* Info Panel - compact dengan badges di bawah */}
+                <div className="p-3 border-t border-gray-800">
+                    {/* Row 1: Nama + Zoom Controls */}
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                        <h3 className="text-white font-bold text-sm sm:text-base truncate flex-1">{camera.name}</h3>
                         
-                        {/* Zoom Controls - di info panel */}
+                        {/* Zoom Controls */}
                         {!isMaintenance && status !== 'error' && (
-                            <div className="flex items-center gap-1 bg-gray-800 rounded-xl p-1 shrink-0">
+                            <div className="flex items-center gap-0.5 bg-gray-800 rounded-lg p-0.5 shrink-0">
                                 <button
                                     onClick={handleZoomOut}
                                     disabled={zoom <= MIN_ZOOM}
-                                    className="p-2 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg text-white transition-colors"
+                                    className="p-1.5 hover:bg-gray-700 disabled:opacity-30 rounded text-white transition-colors"
                                     title="Zoom Out"
                                 >
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                         <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"/>
                                     </svg>
                                 </button>
-                                <button
-                                    onClick={handleResetZoom}
-                                    className="px-2 py-1 hover:bg-gray-700 text-white rounded-lg text-xs font-medium min-w-[48px] text-center transition-colors"
-                                    title="Reset Zoom"
-                                >
-                                    {Math.round(zoom * 100)}%
-                                </button>
+                                <span className="text-white text-[10px] font-medium w-8 text-center">{Math.round(zoom * 100)}%</span>
                                 <button
                                     onClick={handleZoomIn}
                                     disabled={zoom >= MAX_ZOOM}
-                                    className="p-2 hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg text-white transition-colors"
+                                    className="p-1.5 hover:bg-gray-700 disabled:opacity-30 rounded text-white transition-colors"
                                     title="Zoom In"
                                 >
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                         <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"/>
                                     </svg>
                                 </button>
                                 {zoom > 1 && (
                                     <button
                                         onClick={handleResetZoom}
-                                        className="p-2 hover:bg-gray-700 rounded-lg text-white transition-colors ml-1"
+                                        className="p-1.5 hover:bg-gray-700 rounded text-white transition-colors"
                                         title="Reset"
                                     >
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                             <path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/>
                                         </svg>
                                     </button>
@@ -574,14 +537,44 @@ const VideoModal = memo(({ camera, onClose }) => {
                         )}
                     </div>
                     
-                    {/* Area badge - row terpisah jika ada */}
-                    {camera.area_name && (
-                        <div className="mt-2 pt-2 border-t border-gray-800">
-                            <span className="px-2.5 py-1 bg-sky-500/20 text-sky-400 rounded-lg text-xs font-semibold">
-                                {camera.area_name}
-                            </span>
+                    {/* Row 2: Location + Area + Status badges */}
+                    <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                            {camera.location && (
+                                <span className="text-gray-400 text-xs flex items-center gap-1 truncate">
+                                    <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/>
+                                        <circle cx="12" cy="11" r="3"/>
+                                    </svg>
+                                    <span className="truncate">{camera.location}</span>
+                                </span>
+                            )}
+                            {camera.area_name && (
+                                <span className="px-1.5 py-0.5 bg-sky-500/20 text-sky-400 rounded text-[10px] font-medium shrink-0">
+                                    {camera.area_name}
+                                </span>
+                            )}
                         </div>
-                    )}
+                        
+                        {/* Status badges - pojok kanan bawah */}
+                        <div className="flex items-center gap-1 shrink-0">
+                            {isMaintenance ? (
+                                <span className="px-1.5 py-0.5 rounded bg-red-500 text-white text-[10px] font-bold flex items-center gap-1">
+                                    <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                                    </svg>
+                                    Perbaikan
+                                </span>
+                            ) : (
+                                <>
+                                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"/>
+                                    <span className={`px-1.5 py-0.5 rounded text-white text-[10px] font-bold ${isTunnel ? 'bg-orange-500' : 'bg-emerald-500'}`}>
+                                        {isTunnel ? 'Tunnel' : 'Stabil'}
+                                    </span>
+                                </>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
