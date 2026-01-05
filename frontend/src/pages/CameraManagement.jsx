@@ -606,21 +606,18 @@ export default function CameraManagement() {
 
                             {/* Location Picker Map */}
                             <div className="p-3 bg-sky-50 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/20 rounded-xl">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <div className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-500/20 flex items-center justify-center text-sky-600 dark:text-sky-400 shrink-0">
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <div className="w-7 h-7 rounded-lg bg-sky-100 dark:bg-sky-500/20 flex items-center justify-center text-sky-600 dark:text-sky-400 shrink-0">
+                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                             <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/>
                                             <circle cx="12" cy="11" r="3"/>
                                         </svg>
                                     </div>
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-900 dark:text-white">Lokasi Kamera</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">Klik peta atau cari lokasi</p>
-                                    </div>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white">Lokasi Kamera</p>
                                 </div>
                                 <Suspense fallback={
-                                    <div className="h-[250px] bg-gray-100 dark:bg-gray-800 rounded-xl animate-pulse flex items-center justify-center">
-                                        <span className="text-gray-400 text-sm">Loading map...</span>
+                                    <div className="h-10 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
+                                        <span className="text-gray-400 text-xs">Loading...</span>
                                     </div>
                                 }>
                                     <LocationPicker
