@@ -25,6 +25,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import feedbackRoutes from './routes/feedbackRoutes.js';
 import mediaMtxService from './services/mediaMtxService.js';
+import streamWarmer from './services/streamWarmer.js';
 
 const fastify = Fastify({
     logger: config.server.env === 'production' 
@@ -280,6 +281,14 @@ const start = async () => {
         await mediaMtxService.syncCameras();
         mediaMtxService.startAutoSync();
         
+        // Pre-warm camera streams for faster initial load
+        const cameras = mediaMtxService.getDatabaseCameras();
+        if (cameras.length > 0) {
+            console.log(`[StreamWarmer] Pre-warming ${cameras.length} camera streams...`);
+            await streamWarmer.warmAllCameras(cameras);
+            console.log('[StreamWarmer] Streams pre-warmed for instant playback');
+        }
+        
         // Start security audit log cleanup scheduler
         startDailyCleanup();
         console.log('[Security] Daily audit log cleanup scheduled (90-day retention)');
@@ -295,6 +304,7 @@ const start = async () => {
 const shutdown = async () => {
     console.log('\n[Server] Shutting down gracefully...');
     mediaMtxService.stopAutoSync();
+    streamWarmer.stopAll();
     stopDailyCleanup();
     await fastify.close();
     process.exit(0);
