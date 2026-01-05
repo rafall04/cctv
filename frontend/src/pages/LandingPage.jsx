@@ -452,6 +452,7 @@ function VideoPopup({ camera, onClose }) {
     
     const [status, setStatus] = useState('connecting');
     const [loadingStage, setLoadingStage] = useState(LoadingStage.CONNECTING);
+    const [errorType, setErrorType] = useState(null); // 'codec', 'network', 'timeout', 'media', 'unknown'
     const [zoom, setZoom] = useState(1);
     const [retryKey, setRetryKey] = useState(0);
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -462,6 +463,75 @@ function VideoPopup({ camera, onClose }) {
     
     const url = camera.streams?.hls;
     const deviceTier = detectDeviceTier();
+
+    // Error messages berdasarkan tipe - sama seperti MapView
+    const getErrorInfo = () => {
+        switch (errorType) {
+            case 'codec':
+                return {
+                    title: 'Codec Tidak Didukung',
+                    desc: 'Browser tidak mendukung codec H.265/HEVC. Gunakan browser Chrome/Firefox terbaru atau hubungi admin untuk mengubah setting kamera ke H.264.',
+                    color: 'yellow',
+                    icon: (
+                        <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        </svg>
+                    )
+                };
+            case 'network':
+                return {
+                    title: 'Koneksi Gagal',
+                    desc: 'Tidak dapat terhubung ke server stream. Periksa koneksi internet Anda atau coba lagi nanti.',
+                    color: 'orange',
+                    icon: (
+                        <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
+                        </svg>
+                    )
+                };
+            case 'timeout':
+                return {
+                    title: 'Waktu Habis',
+                    desc: 'Stream terlalu lama merespons. Kamera mungkin sedang offline atau jaringan lambat.',
+                    color: 'gray',
+                    icon: (
+                        <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    )
+                };
+            case 'media':
+                return {
+                    title: 'Error Media',
+                    desc: 'Terjadi kesalahan saat memutar video. Format stream mungkin tidak kompatibel dengan browser.',
+                    color: 'purple',
+                    icon: (
+                        <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                        </svg>
+                    )
+                };
+            default:
+                return {
+                    title: 'CCTV Tidak Terkoneksi',
+                    desc: 'Kamera sedang offline atau terjadi kesalahan. Coba lagi nanti.',
+                    color: 'red',
+                    icon: (
+                        <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    )
+                };
+        }
+    };
+
+    const errorColorClasses = {
+        yellow: 'bg-yellow-500/20 text-yellow-400',
+        orange: 'bg-orange-500/20 text-orange-400',
+        gray: 'bg-gray-500/20 text-gray-400',
+        purple: 'bg-purple-500/20 text-purple-400',
+        red: 'bg-red-500/20 text-red-400',
+    };
 
     // Track fullscreen state to disable animations
     useEffect(() => {
@@ -486,6 +556,7 @@ function VideoPopup({ camera, onClose }) {
             onTimeout: (stage) => {
                 cleanupResources();
                 setStatus('timeout');
+                setErrorType('timeout');
                 setLoadingStage(LoadingStage.TIMEOUT);
                 const failures = loadingTimeoutHandlerRef.current?.getConsecutiveFailures() || 0;
                 setConsecutiveFailures(failures);
@@ -699,14 +770,20 @@ function VideoPopup({ camera, onClose }) {
                     }
                     
                     // Check for codec incompatibility - NOT recoverable
-                    if (d.details === 'manifestIncompatibleCodecsError') {
+                    if (d.details === 'manifestIncompatibleCodecsError' ||
+                        d.details === 'fragParsingError' ||
+                        d.details === 'bufferAppendError' ||
+                        d.reason?.includes('codec') ||
+                        d.reason?.includes('HEVC') ||
+                        d.reason?.includes('h265')) {
                         console.error('Browser tidak support codec H.265/HEVC. Ubah setting kamera ke H.264.');
                         setStatus('error');
+                        setErrorType('codec');
                         setLoadingStage(LoadingStage.ERROR);
                         return;
                     }
 
-                    const errorType = d.type === Hls.ErrorTypes.NETWORK_ERROR ? 'network' :
+                    const detectedErrorType = d.type === Hls.ErrorTypes.NETWORK_ERROR ? 'network' :
                                       d.type === Hls.ErrorTypes.MEDIA_ERROR ? 'media' : 'unknown';
 
                     // For media errors, try recovery (max 2 times)
@@ -723,7 +800,7 @@ function VideoPopup({ camera, onClose }) {
                     // Try auto-retry with FallbackHandler
                     if (fallbackHandlerRef.current) {
                         const streamError = createStreamError({
-                            type: errorType,
+                            type: detectedErrorType,
                             message: d.details || 'Stream error',
                             stage: loadingStage,
                             deviceTier,
@@ -749,6 +826,7 @@ function VideoPopup({ camera, onClose }) {
                                     if (cancelled) return;
                                     if (d2.fatal) {
                                         setStatus('error');
+                                        setErrorType(detectedErrorType);
                                         setLoadingStage(LoadingStage.ERROR);
                                     }
                                 });
@@ -757,10 +835,12 @@ function VideoPopup({ camera, onClose }) {
 
                         if (result.action === 'manual-retry-required') {
                             setStatus('error');
+                            setErrorType(detectedErrorType);
                             setLoadingStage(LoadingStage.ERROR);
                         }
                     } else {
                         setStatus('error');
+                        setErrorType(detectedErrorType);
                         setLoadingStage(LoadingStage.ERROR);
                     }
                 });
@@ -783,6 +863,7 @@ function VideoPopup({ camera, onClose }) {
     const handleRetry = useCallback(() => {
         cleanupResources();
         setStatus('connecting');
+        setErrorType(null);
         setLoadingStage(LoadingStage.CONNECTING);
         setAutoRetryCount(0);
         setIsAutoRetrying(false);
@@ -906,13 +987,19 @@ function VideoPopup({ camera, onClose }) {
                     {status === 'error' && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90">
                             <div className="text-center p-6">
-                                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/20 flex items-center justify-center">
-                                    <svg className="w-8 h-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                    </svg>
-                                </div>
-                                <h3 className="text-white font-semibold text-lg mb-2">CCTV Tidak Terkoneksi</h3>
-                                <p className="text-gray-400 text-sm mb-4">Kamera sedang offline atau koneksi terputus</p>
+                                {(() => {
+                                    const info = getErrorInfo();
+                                    const colorClass = errorColorClasses[info.color] || errorColorClasses.red;
+                                    return (
+                                        <>
+                                            <div className={`w-16 h-16 mx-auto mb-4 rounded-full ${colorClass} flex items-center justify-center`}>
+                                                {info.icon}
+                                            </div>
+                                            <h3 className="text-white font-semibold text-lg mb-2">{info.title}</h3>
+                                            <p className="text-gray-400 text-sm mb-4 max-w-md">{info.desc}</p>
+                                        </>
+                                    );
+                                })()}
                                 <button
                                     onClick={handleRetry}
                                     className="inline-flex items-center gap-2 px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg font-medium transition-colors"
