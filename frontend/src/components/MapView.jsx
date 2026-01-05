@@ -26,15 +26,25 @@ const isLowEnd = deviceTier === 'low';
 // Cache icon untuk menghindari pembuatan ulang
 const iconCache = new Map();
 
-// CCTV Marker - Sederhana tapi tetap keren, tanpa animasi berat
-const createCameraIcon = (isTunnel = false) => {
-    const cacheKey = isTunnel ? 'tunnel' : 'stable';
+// CCTV Marker - dengan support status (active, maintenance, tunnel)
+const createCameraIcon = (status = 'active', isTunnel = false) => {
+    // Status: 'active' = hijau, 'maintenance' = merah, 'tunnel' = orange
+    let cacheKey = status === 'maintenance' ? 'maintenance' : (isTunnel ? 'tunnel' : 'stable');
     if (iconCache.has(cacheKey)) {
         return iconCache.get(cacheKey);
     }
 
-    const color = isTunnel ? '#f97316' : '#10b981';
-    const darkColor = isTunnel ? '#ea580c' : '#059669';
+    let color, darkColor;
+    if (status === 'maintenance') {
+        color = '#ef4444'; // merah
+        darkColor = '#dc2626';
+    } else if (isTunnel) {
+        color = '#f97316'; // orange
+        darkColor = '#ea580c';
+    } else {
+        color = '#10b981'; // hijau
+        darkColor = '#059669';
+    }
     
     const icon = L.divIcon({
         className: 'cctv-marker',
@@ -58,7 +68,10 @@ const createCameraIcon = (isTunnel = false) => {
                     justify-content: center;
                 ">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="white" style="transform: rotate(45deg);">
-                        <path d="M18 10.48V6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-4.48l4 3.98v-11l-4 3.98z"/>
+                        ${status === 'maintenance' 
+                            ? '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>' // wrench icon simplified
+                            : '<path d="M18 10.48V6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-4.48l4 3.98v-11l-4 3.98z"/>'
+                        }
                     </svg>
                 </div>
             </div>
@@ -107,11 +120,15 @@ const applyMarkerOffset = (cameras) => {
     });
 };
 
-// Video Modal - Optimasi untuk low-end (tanpa backdrop-blur)
+// Video Modal - dengan error handling codec dan status maintenance
 const VideoModal = memo(({ camera, onClose }) => {
     const videoRef = useRef(null);
     const hlsRef = useRef(null);
     const [status, setStatus] = useState('loading');
+    const [errorType, setErrorType] = useState(null); // 'codec', 'network', 'timeout', 'unknown'
+
+    const isMaintenance = camera.status === 'maintenance';
+    const isTunnel = camera.is_tunnel === 1 || camera.is_tunnel === true;
 
     useEffect(() => {
         document.body.style.overflow = 'hidden';
@@ -125,6 +142,12 @@ const VideoModal = memo(({ camera, onClose }) => {
     }, [onClose]);
 
     useEffect(() => {
+        // Jika maintenance, tidak perlu load stream
+        if (isMaintenance) {
+            setStatus('maintenance');
+            return;
+        }
+
         if (!camera?.streams?.hls || !videoRef.current) return;
 
         // Config HLS berdasarkan device tier
@@ -141,34 +164,121 @@ const VideoModal = memo(({ camera, onClose }) => {
             maxBufferLength: 15,
         };
 
+        // Timeout untuk loading
+        const loadTimeout = setTimeout(() => {
+            if (status === 'loading') {
+                setStatus('error');
+                setErrorType('timeout');
+            }
+        }, 15000); // 15 detik timeout
+
         if (Hls.isSupported()) {
             hlsRef.current = new Hls(hlsConfig);
+            
             hlsRef.current.on(Hls.Events.MANIFEST_PARSED, () => {
+                clearTimeout(loadTimeout);
                 setStatus('playing');
                 videoRef.current?.play().catch(() => {});
             });
+            
             hlsRef.current.on(Hls.Events.ERROR, (_, data) => {
-                if (data.fatal) setStatus('error');
+                console.log('HLS Error:', data);
+                if (data.fatal) {
+                    clearTimeout(loadTimeout);
+                    setStatus('error');
+                    
+                    // Deteksi jenis error
+                    if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                        setErrorType('network');
+                    } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                        // Cek apakah error codec (H.265/HEVC tidak didukung)
+                        if (data.details === 'fragParsingError' || 
+                            data.details === 'bufferAppendError' ||
+                            data.reason?.includes('codec') ||
+                            data.reason?.includes('HEVC') ||
+                            data.reason?.includes('h265')) {
+                            setErrorType('codec');
+                        } else {
+                            setErrorType('media');
+                        }
+                    } else {
+                        setErrorType('unknown');
+                    }
+                }
             });
+            
             hlsRef.current.loadSource(camera.streams.hls);
             hlsRef.current.attachMedia(videoRef.current);
         } else if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
             videoRef.current.src = camera.streams.hls;
             videoRef.current.addEventListener('loadedmetadata', () => {
+                clearTimeout(loadTimeout);
                 setStatus('playing');
                 videoRef.current?.play().catch(() => {});
+            });
+            videoRef.current.addEventListener('error', () => {
+                clearTimeout(loadTimeout);
+                setStatus('error');
+                setErrorType('media');
             });
         }
 
         return () => {
+            clearTimeout(loadTimeout);
             if (hlsRef.current) {
                 hlsRef.current.destroy();
                 hlsRef.current = null;
             }
         };
-    }, [camera]);
+    }, [camera, isMaintenance]);
 
-    const isTunnel = camera.is_tunnel === 1 || camera.is_tunnel === true;
+    // Error messages berdasarkan tipe
+    const getErrorMessage = () => {
+        switch (errorType) {
+            case 'codec':
+                return {
+                    title: 'Codec Tidak Didukung',
+                    desc: 'Browser tidak mendukung codec H.265/HEVC. Gunakan browser Chrome/Firefox terbaru atau hubungi admin.',
+                    icon: (
+                        <svg className="w-10 h-10 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        </svg>
+                    )
+                };
+            case 'network':
+                return {
+                    title: 'Koneksi Gagal',
+                    desc: 'Tidak dapat terhubung ke server stream. Periksa koneksi internet Anda.',
+                    icon: (
+                        <svg className="w-10 h-10 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
+                        </svg>
+                    )
+                };
+            case 'timeout':
+                return {
+                    title: 'Waktu Habis',
+                    desc: 'Stream terlalu lama merespons. Kamera mungkin sedang offline atau jaringan lambat.',
+                    icon: (
+                        <svg className="w-10 h-10 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    )
+                };
+            default:
+                return {
+                    title: 'Stream Tidak Tersedia',
+                    desc: 'Terjadi kesalahan saat memuat stream. Coba lagi nanti.',
+                    icon: (
+                        <svg className="w-10 h-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                    )
+                };
+        }
+    };
+
+    const errorInfo = getErrorMessage();
 
     return (
         <div 
@@ -187,25 +297,53 @@ const VideoModal = memo(({ camera, onClose }) => {
                             <span className="text-gray-400 text-sm">Menghubungkan...</span>
                         </div>
                     )}
-                    {status === 'error' && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-                            <svg className="w-10 h-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    
+                    {status === 'maintenance' && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-red-950/50">
+                            <svg className="w-16 h-16 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                <path d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"/>
                             </svg>
-                            <span className="text-gray-400 text-sm">Stream tidak tersedia</span>
+                            <div className="text-center px-4">
+                                <h4 className="text-red-400 font-bold text-lg">Dalam Perbaikan</h4>
+                                <p className="text-gray-400 text-sm mt-1">Kamera ini sedang dalam masa perbaikan/maintenance</p>
+                            </div>
                         </div>
                     )}
-                    <video ref={videoRef} className="w-full h-full object-contain" muted playsInline controls />
                     
-                    {/* Top badges - tanpa gradient overlay untuk performa */}
+                    {status === 'error' && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4">
+                            {errorInfo.icon}
+                            <div className="text-center">
+                                <h4 className="text-gray-200 font-semibold">{errorInfo.title}</h4>
+                                <p className="text-gray-400 text-sm mt-1 max-w-md">{errorInfo.desc}</p>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {!isMaintenance && (
+                        <video ref={videoRef} className="w-full h-full object-contain" muted playsInline controls />
+                    )}
+                    
+                    {/* Top badges */}
                     <div className="absolute top-2 left-2 flex items-center gap-2">
-                        <span className="px-2.5 py-1 rounded-full bg-red-500 text-white text-xs font-bold flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-white"/>
-                            LIVE
-                        </span>
-                        <span className={`px-2.5 py-1 rounded-full text-white text-xs font-bold ${isTunnel ? 'bg-orange-500' : 'bg-emerald-500'}`}>
-                            {isTunnel ? 'Tunnel' : 'Stabil'}
-                        </span>
+                        {isMaintenance ? (
+                            <span className="px-2.5 py-1 rounded-full bg-red-500 text-white text-xs font-bold flex items-center gap-1.5">
+                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                                </svg>
+                                PERBAIKAN
+                            </span>
+                        ) : (
+                            <>
+                                <span className="px-2.5 py-1 rounded-full bg-red-500 text-white text-xs font-bold flex items-center gap-1.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-white"/>
+                                    LIVE
+                                </span>
+                                <span className={`px-2.5 py-1 rounded-full text-white text-xs font-bold ${isTunnel ? 'bg-orange-500' : 'bg-emerald-500'}`}>
+                                    {isTunnel ? 'Tunnel' : 'Stabil'}
+                                </span>
+                            </>
+                        )}
                     </div>
 
                     {/* Close button */}
@@ -262,18 +400,19 @@ function MapController({ center, zoom, bounds }) {
     return null;
 }
 
-// Camera Marker - dengan support untuk grouped markers
+// Camera Marker - dengan support untuk grouped markers dan status
 const CameraMarker = memo(({ camera, onClick }) => {
     if (!hasValidCoords(camera)) return null;
     // Gunakan display coordinates jika ada (untuk offset)
     const lat = camera._displayLat ?? parseFloat(camera.latitude);
     const lng = camera._displayLng ?? parseFloat(camera.longitude);
     const isTunnel = camera.is_tunnel === 1 || camera.is_tunnel === true;
+    const status = camera.status || 'active';
     
     return (
         <Marker 
             position={[lat, lng]} 
-            icon={createCameraIcon(isTunnel)}
+            icon={createCameraIcon(status, isTunnel)}
             eventHandlers={{ click: () => onClick(camera) }}
         />
     );
@@ -327,9 +466,10 @@ const MapView = memo(({
     }, [camerasWithCoords, selectedArea]);
 
     const stats = useMemo(() => {
-        const stabil = filtered.filter(c => !c.is_tunnel).length;
-        const tunnel = filtered.filter(c => c.is_tunnel === 1 || c.is_tunnel === true).length;
-        return { stabil, tunnel, total: filtered.length };
+        const maintenance = filtered.filter(c => c.status === 'maintenance').length;
+        const stabil = filtered.filter(c => c.status !== 'maintenance' && !c.is_tunnel).length;
+        const tunnel = filtered.filter(c => c.status !== 'maintenance' && (c.is_tunnel === 1 || c.is_tunnel === true)).length;
+        return { stabil, tunnel, maintenance, total: filtered.length };
     }, [filtered]);
 
     const { center, zoom, bounds } = useMemo(() => {
@@ -442,6 +582,15 @@ const MapView = memo(({
                         <span className="w-2.5 h-2.5 rounded-full bg-orange-500"/>
                         <span className="font-medium text-gray-700 dark:text-gray-200">{stats.tunnel}</span>
                     </span>
+                    {stats.maintenance > 0 && (
+                        <>
+                            <span className="text-gray-300 dark:text-gray-600">|</span>
+                            <span className="flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-full bg-red-500"/>
+                                <span className="font-medium text-gray-700 dark:text-gray-200">{stats.maintenance}</span>
+                            </span>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -456,6 +605,10 @@ const MapView = memo(({
                         <span className="flex items-center gap-1.5">
                             <span className="w-3 h-3 rounded-full bg-orange-500"/>
                             <span className="text-gray-600 dark:text-gray-300">Tunnel</span>
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                            <span className="w-3 h-3 rounded-full bg-red-500"/>
+                            <span className="text-gray-600 dark:text-gray-300">Perbaikan</span>
                         </span>
                     </div>
                 </div>

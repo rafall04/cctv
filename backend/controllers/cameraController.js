@@ -34,7 +34,7 @@ export async function getActiveCameras(request, reply) {
     try {
         const cameras = query(
             `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel, 
-                    c.latitude, c.longitude, a.name as area_name 
+                    c.latitude, c.longitude, c.status, a.name as area_name 
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 
              WHERE c.enabled = 1 
@@ -90,7 +90,7 @@ export async function getCameraById(request, reply) {
 // Create new camera (admin only)
 export async function createCamera(request, reply) {
     try {
-        const { name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude } = request.body;
+        const { name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status } = request.body;
 
         // Validate required fields
         if (!name || !private_rtsp_url) {
@@ -116,10 +116,13 @@ export async function createCamera(request, reply) {
         const lat = Number.isNaN(latValue) ? null : latValue;
         const lng = Number.isNaN(lngValue) ? null : lngValue;
 
+        // Status: active, maintenance, offline
+        const cameraStatus = status || 'active';
+
         // Insert camera
         const result = execute(
-            'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [name, private_rtsp_url, description || null, location || null, group_name || null, finalAreaId, isEnabled, isTunnel, lat, lng]
+            'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [name, private_rtsp_url, description || null, location || null, group_name || null, finalAreaId, isEnabled, isTunnel, lat, lng, cameraStatus]
         );
 
         // Log action
@@ -164,7 +167,7 @@ export async function createCamera(request, reply) {
 export async function updateCamera(request, reply) {
     try {
         const { id } = request.params;
-        const { name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude } = request.body;
+        const { name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status } = request.body;
 
         // Check if camera exists
         const existingCamera = queryOne('SELECT id, name, private_rtsp_url, enabled FROM cameras WHERE id = ?', [id]);
@@ -225,6 +228,10 @@ export async function updateCamera(request, reply) {
             updates.push('longitude = ?');
             const lngValue = longitude === '' || longitude === null ? null : parseFloat(longitude);
             values.push(Number.isNaN(lngValue) ? null : lngValue);
+        }
+        if (status !== undefined) {
+            updates.push('status = ?');
+            values.push(status || 'active');
         }
 
         if (updates.length === 0) {
