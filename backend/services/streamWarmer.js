@@ -1,7 +1,7 @@
 /**
  * Stream Warmer Service
- * Keeps frequently viewed camera streams pre-loaded in MediaMTX
- * Only warms streams that are actually reachable
+ * Keeps camera streams pre-loaded in MediaMTX for instant playback
+ * by periodically requesting HLS playlists to keep RTSP connections alive
  */
 
 import axios from 'axios';
@@ -9,129 +9,85 @@ import { config } from '../config/config.js';
 
 class StreamWarmer {
     constructor() {
-        this.warmStreams = new Map(); // pathName -> { intervalId, failCount }
-        // Use INTERNAL URL for server-side requests
+        this.warmStreams = new Map(); // pathName -> intervalId
         this.hlsBaseUrl = config.mediamtx?.hlsUrlInternal || 'http://localhost:8888';
         this.mediamtxApiUrl = config.mediamtx?.apiUrl || 'http://localhost:9997';
-        this.maxFailures = 3; // Stop warming after 3 consecutive failures
     }
 
     /**
-     * Check if a stream is actually ready/online in MediaMTX
-     */
-    async isStreamReady(pathName) {
-        try {
-            const response = await axios.get(
-                `${this.mediamtxApiUrl}/v3/paths/get/${pathName}`,
-                { timeout: 3000 }
-            );
-            // Stream is ready if it has a source and is not in error state
-            return response.data?.ready === true || response.data?.source !== null;
-        } catch {
-            return false;
-        }
-    }
-
-    /**
-     * Start warming a specific stream - only if it's reachable
+     * Start warming a stream - keeps fetching playlist to maintain RTSP connection
      */
     async warmStream(pathName) {
         if (this.warmStreams.has(pathName)) {
             return; // Already warming
         }
 
-        // First check if stream is reachable
-        const isReady = await this.isStreamReady(pathName);
-        if (!isReady) {
-            // Try one fetch to trigger connection
-            const success = await this.fetchPlaylist(pathName);
-            if (!success) {
-                console.log(`[StreamWarmer] ${pathName} not reachable, skipping`);
-                return;
-            }
-        }
+        console.log(`[StreamWarmer] Starting warm for ${pathName}`);
 
-        console.log(`[StreamWarmer] Warming ${pathName}`);
-        
-        const streamInfo = { failCount: 0, intervalId: null };
-        this.warmStreams.set(pathName, streamInfo);
+        // Initial fetch to trigger RTSP connection
+        await this.fetchPlaylist(pathName);
 
-        // Keep stream alive by fetching playlist every 8 seconds
-        streamInfo.intervalId = setInterval(async () => {
-            const info = this.warmStreams.get(pathName);
-            if (!info) return;
+        // Keep stream alive by fetching playlist every 5 seconds
+        // This prevents sourceOnDemandCloseAfter from closing the connection
+        const intervalId = setInterval(async () => {
+            await this.fetchPlaylist(pathName);
+        }, 5000);
 
-            const success = await this.fetchPlaylist(pathName);
-            
-            if (!success) {
-                info.failCount++;
-                if (info.failCount >= this.maxFailures) {
-                    console.log(`[StreamWarmer] ${pathName} offline, pausing warm`);
-                    this.stopWarming(pathName);
-                }
-            } else {
-                info.failCount = 0; // Reset on success
-            }
-        }, 8000);
+        this.warmStreams.set(pathName, intervalId);
     }
 
     /**
      * Stop warming a specific stream
      */
     stopWarming(pathName) {
-        const info = this.warmStreams.get(pathName);
-        if (info) {
-            if (info.intervalId) {
-                clearInterval(info.intervalId);
-            }
+        const intervalId = this.warmStreams.get(pathName);
+        if (intervalId) {
+            clearInterval(intervalId);
             this.warmStreams.delete(pathName);
+            console.log(`[StreamWarmer] Stopped warming ${pathName}`);
         }
     }
 
     /**
-     * Fetch HLS playlist to keep stream active
-     * Returns true if successful, false otherwise
+     * Fetch HLS playlist to trigger/maintain RTSP connection
      */
     async fetchPlaylist(pathName) {
         try {
-            const response = await axios.get(`${this.hlsBaseUrl}/${pathName}/index.m3u8`, {
-                timeout: 5000,
-                validateStatus: (status) => status < 500
+            await axios.get(`${this.hlsBaseUrl}/${pathName}/index.m3u8`, {
+                timeout: 15000 // 15s timeout for initial connection
             });
-            return response.status === 200;
-        } catch {
-            return false;
+        } catch (error) {
+            // Silent - stream might not be ready yet or camera offline
         }
     }
 
     /**
-     * Warm all enabled cameras - only those that are reachable
+     * Warm all enabled cameras with staggered start
      */
     async warmAllCameras(cameras) {
-        let warmedCount = 0;
+        console.log(`[StreamWarmer] Pre-warming ${cameras.length} camera streams...`);
         
         for (const camera of cameras) {
             const pathName = `camera${camera.id}`;
-            await this.warmStream(pathName);
             
-            if (this.warmStreams.has(pathName)) {
-                warmedCount++;
-            }
+            // Start warming without waiting for result
+            this.warmStream(pathName);
             
-            // Stagger to avoid overwhelming network
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Stagger by 2 seconds to avoid overwhelming cameras
+            await new Promise(resolve => setTimeout(resolve, 2000));
         }
         
-        console.log(`[StreamWarmer] ${warmedCount}/${cameras.length} streams warmed`);
+        console.log(`[StreamWarmer] All streams warming started`);
     }
 
     /**
      * Stop all warming
      */
     stopAll() {
-        for (const pathName of this.warmStreams.keys()) {
-            this.stopWarming(pathName);
+        for (const [pathName, intervalId] of this.warmStreams) {
+            clearInterval(intervalId);
         }
+        this.warmStreams.clear();
         console.log('[StreamWarmer] All streams stopped');
     }
 
@@ -140,6 +96,13 @@ class StreamWarmer {
      */
     getWarmedStreams() {
         return Array.from(this.warmStreams.keys());
+    }
+
+    /**
+     * Check if a stream is being warmed
+     */
+    isWarming(pathName) {
+        return this.warmStreams.has(pathName);
     }
 }
 

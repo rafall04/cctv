@@ -276,7 +276,7 @@ class MediaMtxService {
                 sourceProtocol: 'tcp',
                 sourceOnDemand: true,
                 sourceOnDemandStartTimeout: '10s',
-                sourceOnDemandCloseAfter: '10s',
+                sourceOnDemandCloseAfter: '30s',
             };
 
             try {
@@ -305,7 +305,7 @@ class MediaMtxService {
             sourceProtocol: 'tcp',
             sourceOnDemand: true,
             sourceOnDemandStartTimeout: '10s',
-            sourceOnDemandCloseAfter: '10s',
+            sourceOnDemandCloseAfter: '30s',
         };
 
         try {
