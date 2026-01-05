@@ -185,6 +185,8 @@ export default function CameraManagement() {
         setSubmitting(true);
         try {
             const data = { ...formData, enabled: formData.enabled ? 1 : 0, is_tunnel: formData.is_tunnel ? 1 : 0, status: formData.status };
+            console.log('Submitting data:', data);
+            console.log('formData.status:', formData.status);
             const result = editingCamera 
                 ? await cameraService.updateCamera(editingCamera.id, data)
                 : await cameraService.createCamera(data);
@@ -678,7 +680,11 @@ export default function CameraManagement() {
                                 </div>
                                 <button
                                     type="button"
-                                    onClick={() => handleFormChange({ target: { name: 'status', value: formData.status === 'maintenance' ? 'active' : 'maintenance', type: 'text' } })}
+                                    onClick={() => {
+                                        const newStatus = formData.status === 'maintenance' ? 'active' : 'maintenance';
+                                        setFieldValue('status', newStatus);
+                                        if (modalError) setModalError('');
+                                    }}
                                     disabled={isSubmitting}
                                     className={`relative w-11 h-6 rounded-full transition-colors disabled:opacity-50 shrink-0 ${formData.status === 'maintenance' ? 'bg-red-500' : 'bg-gray-300 dark:bg-gray-600'}`}
                                 >
