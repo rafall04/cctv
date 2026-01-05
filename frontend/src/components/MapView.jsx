@@ -128,15 +128,19 @@ const VideoModal = memo(({ camera, onClose }) => {
     const [status, setStatus] = useState('loading');
     const [errorType, setErrorType] = useState(null); // 'codec', 'network', 'timeout', 'unknown'
     const [zoom, setZoom] = useState(1);
-    const [pan, setPan] = useState({ x: 0, y: 0 });
+    const [pan, setPan] = useState({ x: 0, y: 0 }); // dalam persentase
     const [isDragging, setIsDragging] = useState(false);
-    const dragStart = useRef({ x: 0, y: 0 });
+    const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
 
     const isMaintenance = camera.status === 'maintenance';
     const isTunnel = camera.is_tunnel === 1 || camera.is_tunnel === true;
 
     const MIN_ZOOM = 1;
     const MAX_ZOOM = 4;
+
+    // Helper functions - sama seperti di LandingPage
+    const getMaxPan = (z) => z <= 1 ? 0 : ((z - 1) / (2 * z)) * 100;
+    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
     useEffect(() => {
         document.body.style.overflow = 'hidden';
@@ -151,13 +155,30 @@ const VideoModal = memo(({ camera, onClose }) => {
 
     // Zoom handlers
     const handleZoomIn = () => {
-        setZoom(prev => Math.min(prev + 0.5, MAX_ZOOM));
+        setZoom(prev => {
+            const newZoom = Math.min(prev + 0.5, MAX_ZOOM);
+            // Clamp pan saat zoom berubah
+            const max = getMaxPan(newZoom);
+            setPan(p => ({ 
+                x: clamp(p.x, -max, max), 
+                y: clamp(p.y, -max, max) 
+            }));
+            return newZoom;
+        });
     };
 
     const handleZoomOut = () => {
         setZoom(prev => {
             const newZoom = Math.max(prev - 0.5, MIN_ZOOM);
-            if (newZoom === 1) setPan({ x: 0, y: 0 }); // Reset pan when zoom is 1
+            if (newZoom <= 1) {
+                setPan({ x: 0, y: 0 }); // Reset pan when zoom is 1
+            } else {
+                const max = getMaxPan(newZoom);
+                setPan(p => ({ 
+                    x: clamp(p.x, -max, max), 
+                    y: clamp(p.y, -max, max) 
+                }));
+            }
             return newZoom;
         });
     };
@@ -170,30 +191,45 @@ const VideoModal = memo(({ camera, onClose }) => {
     // Mouse wheel zoom
     const handleWheel = (e) => {
         e.preventDefault();
-        if (e.deltaY < 0) {
-            setZoom(prev => Math.min(prev + 0.25, MAX_ZOOM));
-        } else {
-            setZoom(prev => {
-                const newZoom = Math.max(prev - 0.25, MIN_ZOOM);
-                if (newZoom === 1) setPan({ x: 0, y: 0 });
-                return newZoom;
-            });
-        }
+        const delta = e.deltaY < 0 ? 0.25 : -0.25;
+        setZoom(prev => {
+            const newZoom = clamp(prev + delta, MIN_ZOOM, MAX_ZOOM);
+            if (newZoom <= 1) {
+                setPan({ x: 0, y: 0 });
+            } else {
+                const max = getMaxPan(newZoom);
+                setPan(p => ({ 
+                    x: clamp(p.x, -max, max), 
+                    y: clamp(p.y, -max, max) 
+                }));
+            }
+            return newZoom;
+        });
     };
 
-    // Pan handlers (drag to move when zoomed)
+    // Pan handlers (drag to move when zoomed) - menggunakan persentase seperti LandingPage
     const handleMouseDown = (e) => {
         if (zoom > 1) {
             setIsDragging(true);
-            dragStart.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+            dragStart.current = { 
+                x: e.clientX, 
+                y: e.clientY, 
+                panX: pan.x, 
+                panY: pan.y 
+            };
         }
     };
 
     const handleMouseMove = (e) => {
         if (isDragging && zoom > 1) {
-            const maxPan = (zoom - 1) * 50; // Limit pan based on zoom level
-            const newX = Math.max(-maxPan, Math.min(maxPan, e.clientX - dragStart.current.x));
-            const newY = Math.max(-maxPan, Math.min(maxPan, e.clientY - dragStart.current.y));
+            const dx = e.clientX - dragStart.current.x;
+            const dy = e.clientY - dragStart.current.y;
+            const max = getMaxPan(zoom);
+            
+            // Factor untuk konversi pixel ke persentase (sesuaikan dengan container)
+            const factor = 0.15;
+            const newX = clamp(dragStart.current.panX + dx * factor, -max, max);
+            const newY = clamp(dragStart.current.panY + dy * factor, -max, max);
             setPan({ x: newX, y: newY });
         }
     };
@@ -202,19 +238,28 @@ const VideoModal = memo(({ camera, onClose }) => {
         setIsDragging(false);
     };
 
-    // Touch handlers for mobile
+    // Touch handlers for mobile - menggunakan persentase
     const handleTouchStart = (e) => {
         if (zoom > 1 && e.touches.length === 1) {
             setIsDragging(true);
-            dragStart.current = { x: e.touches[0].clientX - pan.x, y: e.touches[0].clientY - pan.y };
+            dragStart.current = { 
+                x: e.touches[0].clientX, 
+                y: e.touches[0].clientY, 
+                panX: pan.x, 
+                panY: pan.y 
+            };
         }
     };
 
     const handleTouchMove = (e) => {
         if (isDragging && zoom > 1 && e.touches.length === 1) {
-            const maxPan = (zoom - 1) * 50;
-            const newX = Math.max(-maxPan, Math.min(maxPan, e.touches[0].clientX - dragStart.current.x));
-            const newY = Math.max(-maxPan, Math.min(maxPan, e.touches[0].clientY - dragStart.current.y));
+            const dx = e.touches[0].clientX - dragStart.current.x;
+            const dy = e.touches[0].clientY - dragStart.current.y;
+            const max = getMaxPan(zoom);
+            
+            const factor = 0.15;
+            const newX = clamp(dragStart.current.panX + dx * factor, -max, max);
+            const newY = clamp(dragStart.current.panY + dy * factor, -max, max);
             setPan({ x: newX, y: newY });
         }
     };
@@ -419,7 +464,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                             ref={videoWrapperRef}
                             className="w-full h-full transition-transform duration-100"
                             style={{ 
-                                transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+                                transform: `scale(${zoom}) translate(${pan.x}%, ${pan.y}%)`,
                                 transformOrigin: 'center center'
                             }}
                         >
