@@ -1,6 +1,8 @@
 /**
  * MapView Component - Modern CCTV Map
  * Klik marker → langsung modal besar
+ * Filter area di dalam map
+ * Warna marker: hijau = stabil, orange = tunnel
  */
 
 import { useEffect, useRef, useState, memo, useCallback, useMemo } from 'react';
@@ -17,9 +19,9 @@ L.Icon.Default.mergeOptions({
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
 
-// Camera marker icon - simple colored dot
-const createCameraIcon = (isActive = true) => {
-    const color = isActive ? '#10b981' : '#6b7280';
+// Camera marker icon - warna berbeda untuk tunnel vs stabil
+const createCameraIcon = (isTunnel = false) => {
+    const color = isTunnel ? '#f97316' : '#10b981'; // orange untuk tunnel, hijau untuk stabil
     return L.divIcon({
         className: 'camera-marker',
         html: `<div style="
@@ -109,6 +111,8 @@ const VideoModal = memo(({ camera, onClose }) => {
         }
     };
 
+    const isTunnel = camera.is_tunnel === 1 || camera.is_tunnel === true;
+
     return (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
             <div 
@@ -137,12 +141,17 @@ const VideoModal = memo(({ camera, onClose }) => {
                     )}
                     <video ref={videoRef} className="w-full h-full object-contain" muted playsInline />
                     
-                    {/* Live Badge */}
-                    <div className="absolute top-3 left-3">
+                    {/* Badges */}
+                    <div className="absolute top-3 left-3 flex items-center gap-2">
                         <span className="flex items-center gap-1.5 px-2.5 py-1 bg-red-500 rounded-lg text-white text-xs font-semibold shadow-lg">
                             <span className="w-2 h-2 bg-white rounded-full animate-pulse"/>
                             LIVE
                         </span>
+                        {isTunnel && (
+                            <span className="flex items-center gap-1.5 px-2.5 py-1 bg-orange-500 rounded-lg text-white text-xs font-semibold shadow-lg">
+                                ⚠️ Tunnel
+                            </span>
+                        )}
                     </div>
 
                     {/* Close Button */}
@@ -221,11 +230,12 @@ const CameraMarker = memo(({ camera, onClick }) => {
     
     const lat = parseFloat(camera.latitude);
     const lng = parseFloat(camera.longitude);
+    const isTunnel = camera.is_tunnel === 1 || camera.is_tunnel === true;
     
     return (
         <Marker 
             position={[lat, lng]} 
-            icon={createCameraIcon(true)}
+            icon={createCameraIcon(isTunnel)}
             eventHandlers={{
                 click: () => onClick(camera)
             }}
@@ -241,25 +251,43 @@ const MapView = memo(({
     defaultZoom = 13,
     className = '',
 }) => {
+    const [selectedArea, setSelectedArea] = useState('all');
     const [modalCamera, setModalCamera] = useState(null);
     const mapRef = useRef(null);
 
     // Cameras with valid coordinates
     const camerasWithCoords = useMemo(() => cameras.filter(hasValidCoords), [cameras]);
 
+    // Unique areas
+    const areas = useMemo(() => {
+        const set = new Set();
+        cameras.forEach(c => c.area_name && set.add(c.area_name));
+        return Array.from(set).sort();
+    }, [cameras]);
+
+    // Filtered cameras by area
+    const filtered = useMemo(() => {
+        if (selectedArea === 'all') return camerasWithCoords;
+        return camerasWithCoords.filter(c => c.area_name === selectedArea);
+    }, [camerasWithCoords, selectedArea]);
+
+    // Count tunnel vs stabil
+    const tunnelCount = filtered.filter(c => c.is_tunnel === 1 || c.is_tunnel === true).length;
+    const stableCount = filtered.length - tunnelCount;
+
     // Bounds
     const bounds = useMemo(() => {
-        if (camerasWithCoords.length === 0) return null;
-        return L.latLngBounds(camerasWithCoords.map(c => [parseFloat(c.latitude), parseFloat(c.longitude)]));
-    }, [camerasWithCoords]);
+        if (filtered.length === 0) return null;
+        return L.latLngBounds(filtered.map(c => [parseFloat(c.latitude), parseFloat(c.longitude)]));
+    }, [filtered]);
 
     // Map center
     const center = useMemo(() => {
-        if (camerasWithCoords.length === 0) return defaultCenter;
-        const avgLat = camerasWithCoords.reduce((s, c) => s + parseFloat(c.latitude), 0) / camerasWithCoords.length;
-        const avgLng = camerasWithCoords.reduce((s, c) => s + parseFloat(c.longitude), 0) / camerasWithCoords.length;
+        if (filtered.length === 0) return defaultCenter;
+        const avgLat = filtered.reduce((s, c) => s + parseFloat(c.latitude), 0) / filtered.length;
+        const avgLng = filtered.reduce((s, c) => s + parseFloat(c.longitude), 0) / filtered.length;
         return [avgLat, avgLng];
-    }, [camerasWithCoords, defaultCenter]);
+    }, [filtered, defaultCenter]);
 
     const openModal = useCallback((camera) => {
         setModalCamera(camera);
@@ -317,7 +345,7 @@ const MapView = memo(({
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
                 <MapController bounds={bounds} />
-                {camerasWithCoords.map(camera => (
+                {filtered.map(camera => (
                     <CameraMarker
                         key={camera.id}
                         camera={camera}
@@ -326,13 +354,45 @@ const MapView = memo(({
                 ))}
             </MapContainer>
 
-            {/* Camera Count Badge */}
-            <div className="absolute top-3 left-3 z-[1000]">
+            {/* Top Left - Area Filter */}
+            {areas.length > 0 && (
+                <div className="absolute top-3 left-3 z-[1000]">
+                    <select
+                        value={selectedArea}
+                        onChange={(e) => setSelectedArea(e.target.value)}
+                        className="px-3 py-2 bg-white/95 dark:bg-gray-800/95 backdrop-blur rounded-xl shadow-lg text-sm text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-sky-500 min-w-[150px] cursor-pointer"
+                    >
+                        <option value="all">Semua Area ({camerasWithCoords.length})</option>
+                        {areas.map(area => (
+                            <option key={area} value={area}>
+                                {area} ({camerasWithCoords.filter(c => c.area_name === area).length})
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            )}
+
+            {/* Top Right - Camera Stats */}
+            <div className="absolute top-3 right-3 z-[1000] flex flex-col gap-2">
+                {/* Total count */}
                 <div className="flex items-center gap-2 px-3 py-2 bg-white/95 dark:bg-gray-800/95 backdrop-blur rounded-xl shadow-lg">
-                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"/>
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                        {camerasWithCoords.length} Kamera Aktif
+                        {filtered.length} Kamera
                     </span>
+                </div>
+                
+                {/* Legend */}
+                <div className="flex flex-col gap-1.5 px-3 py-2 bg-white/95 dark:bg-gray-800/95 backdrop-blur rounded-xl shadow-lg text-xs">
+                    <div className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full bg-emerald-500"/>
+                        <span className="text-gray-600 dark:text-gray-300">Stabil ({stableCount})</span>
+                    </div>
+                    {tunnelCount > 0 && (
+                        <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 rounded-full bg-orange-500"/>
+                            <span className="text-gray-600 dark:text-gray-300">Tunnel ({tunnelCount})</span>
+                        </div>
+                    )}
                 </div>
             </div>
 
