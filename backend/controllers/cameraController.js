@@ -169,6 +169,10 @@ export async function updateCamera(request, reply) {
         const { id } = request.params;
         const { name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status } = request.body;
 
+        // Debug log
+        console.log('Update camera request body:', JSON.stringify(request.body, null, 2));
+        console.log('Status value received:', status, 'Type:', typeof status);
+
         // Check if camera exists
         const existingCamera = queryOne('SELECT id, name, private_rtsp_url, enabled FROM cameras WHERE id = ?', [id]);
 
@@ -232,6 +236,7 @@ export async function updateCamera(request, reply) {
         if (status !== undefined) {
             updates.push('status = ?');
             values.push(status || 'active');
+            console.log('Status will be updated to:', status || 'active');
         }
 
         if (updates.length === 0) {
@@ -243,6 +248,9 @@ export async function updateCamera(request, reply) {
 
         updates.push('updated_at = CURRENT_TIMESTAMP');
         values.push(id);
+
+        console.log('Final UPDATE query:', `UPDATE cameras SET ${updates.join(', ')} WHERE id = ?`);
+        console.log('Final values:', values);
 
         execute(
             `UPDATE cameras SET ${updates.join(', ')} WHERE id = ?`,
