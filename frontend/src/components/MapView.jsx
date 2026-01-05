@@ -1,8 +1,9 @@
 /**
  * MapView Component - Modern CCTV Map
  * Klik marker → langsung modal besar
- * Filter area di dalam map
+ * Filter area di dalam map (UI bagus)
  * Warna marker: hijau = stabil, orange = tunnel
+ * Nama CCTV di bawah video agar zoom tidak terganggu
  */
 
 import { useEffect, useRef, useState, memo, useCallback, useMemo } from 'react';
@@ -21,7 +22,7 @@ L.Icon.Default.mergeOptions({
 
 // Camera marker icon - warna berbeda untuk tunnel vs stabil
 const createCameraIcon = (isTunnel = false) => {
-    const color = isTunnel ? '#f97316' : '#10b981'; // orange untuk tunnel, hijau untuk stabil
+    const color = isTunnel ? '#f97316' : '#10b981';
     return L.divIcon({
         className: 'camera-marker',
         html: `<div style="
@@ -53,7 +54,7 @@ const hasValidCoords = (c) => {
     return !isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0);
 };
 
-// Video Modal - Full featured
+// Video Modal - Nama CCTV di bawah video
 const VideoModal = memo(({ camera, onClose }) => {
     const videoRef = useRef(null);
     const hlsRef = useRef(null);
@@ -119,7 +120,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                 className="bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Video Container */}
+                {/* Video Container - Clean, no overlay text */}
                 <div className="relative bg-black aspect-video">
                     {status === 'loading' && (
                         <div className="absolute inset-0 flex items-center justify-center">
@@ -139,9 +140,9 @@ const VideoModal = memo(({ camera, onClose }) => {
                             </div>
                         </div>
                     )}
-                    <video ref={videoRef} className="w-full h-full object-contain" muted playsInline />
+                    <video ref={videoRef} className="w-full h-full object-contain" muted playsInline controls />
                     
-                    {/* Badges */}
+                    {/* Only badges on video - minimal */}
                     <div className="absolute top-3 left-3 flex items-center gap-2">
                         <span className="flex items-center gap-1.5 px-2.5 py-1 bg-red-500 rounded-lg text-white text-xs font-semibold shadow-lg">
                             <span className="w-2 h-2 bg-white rounded-full animate-pulse"/>
@@ -154,56 +155,49 @@ const VideoModal = memo(({ camera, onClose }) => {
                         )}
                     </div>
 
-                    {/* Close Button */}
-                    <button
-                        onClick={onClose}
-                        className="absolute top-3 right-3 p-2 bg-black/50 hover:bg-black/70 text-white rounded-lg transition-colors"
-                    >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                    
-                    {/* Bottom Controls */}
-                    <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
-                        <div className="flex items-center justify-between">
-                            <div className="flex-1 min-w-0 mr-3">
-                                <h3 className="text-white font-semibold text-sm sm:text-base truncate">{camera.name}</h3>
-                                {camera.location && (
-                                    <p className="text-white/60 text-xs truncate flex items-center gap-1 mt-0.5">
-                                        <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeWidth={2} d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/>
-                                        </svg>
-                                        {camera.location}
-                                    </p>
-                                )}
-                            </div>
-                            <button
-                                onClick={toggleFullscreen}
-                                className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-                                title="Fullscreen"
-                            >
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
-                                </svg>
-                            </button>
-                        </div>
+                    {/* Close & Fullscreen buttons */}
+                    <div className="absolute top-3 right-3 flex items-center gap-2">
+                        <button
+                            onClick={toggleFullscreen}
+                            className="p-2 bg-black/50 hover:bg-black/70 text-white rounded-lg transition-colors"
+                            title="Fullscreen"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+                            </svg>
+                        </button>
+                        <button
+                            onClick={onClose}
+                            className="p-2 bg-black/50 hover:bg-red-500 text-white rounded-lg transition-colors"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
                     </div>
                 </div>
 
-                {/* Camera Info */}
-                <div className="p-4 border-t border-gray-800">
-                    <div className="flex flex-wrap items-center gap-2">
+                {/* Camera Info - Di bawah video */}
+                <div className="p-4 bg-gray-900">
+                    <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                            <h3 className="text-white font-bold text-lg truncate">{camera.name}</h3>
+                            {camera.location && (
+                                <p className="text-gray-400 text-sm flex items-center gap-1.5 mt-1">
+                                    <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeWidth={2} d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/>
+                                    </svg>
+                                    <span className="truncate">{camera.location}</span>
+                                </p>
+                            )}
+                            {camera.description && (
+                                <p className="text-gray-500 text-sm mt-2">{camera.description}</p>
+                            )}
+                        </div>
                         {camera.area_name && (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-sky-500/20 text-sky-400 rounded-lg text-xs font-medium">
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-                                </svg>
+                            <span className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-500/20 text-sky-400 rounded-lg text-sm font-medium">
                                 {camera.area_name}
                             </span>
-                        )}
-                        {camera.description && (
-                            <span className="text-gray-400 text-xs">{camera.description}</span>
                         )}
                     </div>
                 </div>
@@ -224,7 +218,7 @@ function MapController({ bounds }) {
     return null;
 }
 
-// Camera Marker - click langsung buka modal
+// Camera Marker
 const CameraMarker = memo(({ camera, onClick }) => {
     if (!hasValidCoords(camera)) return null;
     
@@ -252,8 +246,21 @@ const MapView = memo(({
     className = '',
 }) => {
     const [selectedArea, setSelectedArea] = useState('all');
+    const [showAreaDropdown, setShowAreaDropdown] = useState(false);
     const [modalCamera, setModalCamera] = useState(null);
     const mapRef = useRef(null);
+    const dropdownRef = useRef(null);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+                setShowAreaDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     // Cameras with valid coordinates
     const camerasWithCoords = useMemo(() => cameras.filter(hasValidCoords), [cameras]);
@@ -270,10 +277,6 @@ const MapView = memo(({
         if (selectedArea === 'all') return camerasWithCoords;
         return camerasWithCoords.filter(c => c.area_name === selectedArea);
     }, [camerasWithCoords, selectedArea]);
-
-    // Count tunnel vs stabil
-    const tunnelCount = filtered.filter(c => c.is_tunnel === 1 || c.is_tunnel === true).length;
-    const stableCount = filtered.length - tunnelCount;
 
     // Bounds
     const bounds = useMemo(() => {
@@ -296,6 +299,16 @@ const MapView = memo(({
     const closeModal = useCallback(() => {
         setModalCamera(null);
     }, []);
+
+    const selectArea = (area) => {
+        setSelectedArea(area);
+        setShowAreaDropdown(false);
+    };
+
+    const getSelectedAreaName = () => {
+        if (selectedArea === 'all') return 'Semua Area';
+        return selectedArea;
+    };
 
     // No cameras
     if (cameras.length === 0) {
@@ -354,45 +367,90 @@ const MapView = memo(({
                 ))}
             </MapContainer>
 
-            {/* Top Left - Area Filter */}
+            {/* Top Left - Area Filter (Beautiful UI) */}
             {areas.length > 0 && (
-                <div className="absolute top-3 left-3 z-[1000]">
-                    <select
-                        value={selectedArea}
-                        onChange={(e) => setSelectedArea(e.target.value)}
-                        className="px-3 py-2 bg-white/95 dark:bg-gray-800/95 backdrop-blur rounded-xl shadow-lg text-sm text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-sky-500 min-w-[150px] cursor-pointer"
+                <div className="absolute top-3 left-3 z-[1000]" ref={dropdownRef}>
+                    <button
+                        onClick={() => setShowAreaDropdown(!showAreaDropdown)}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 hover:border-sky-500 dark:hover:border-sky-500 transition-colors"
                     >
-                        <option value="all">Semua Area ({camerasWithCoords.length})</option>
-                        {areas.map(area => (
-                            <option key={area} value={area}>
-                                {area} ({camerasWithCoords.filter(c => c.area_name === area).length})
-                            </option>
-                        ))}
-                    </select>
+                        <svg className="w-4 h-4 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/>
+                            <circle cx="12" cy="11" r="3"/>
+                        </svg>
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                            {getSelectedAreaName()}
+                        </span>
+                        <span className="text-xs text-gray-400 dark:text-gray-500">
+                            ({filtered.length})
+                        </span>
+                        <svg className={`w-4 h-4 text-gray-400 transition-transform ${showAreaDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+
+                    {/* Dropdown Menu */}
+                    {showAreaDropdown && (
+                        <div className="absolute top-full left-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                            <div className="p-2">
+                                <button
+                                    onClick={() => selectArea('all')}
+                                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-colors ${
+                                        selectedArea === 'all'
+                                            ? 'bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400'
+                                            : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-200'
+                                    }`}
+                                >
+                                    <span className="flex items-center gap-2">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                        </svg>
+                                        <span className="text-sm font-medium">Semua Area</span>
+                                    </span>
+                                    <span className="text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-full">
+                                        {camerasWithCoords.length}
+                                    </span>
+                                </button>
+                                
+                                <div className="my-2 border-t border-gray-100 dark:border-gray-700"/>
+                                
+                                {areas.map(area => {
+                                    const count = camerasWithCoords.filter(c => c.area_name === area).length;
+                                    return (
+                                        <button
+                                            key={area}
+                                            onClick={() => selectArea(area)}
+                                            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-colors ${
+                                                selectedArea === area
+                                                    ? 'bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400'
+                                                    : 'hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-200'
+                                            }`}
+                                        >
+                                            <span className="flex items-center gap-2">
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                    <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                                                </svg>
+                                                <span className="text-sm font-medium">{area}</span>
+                                            </span>
+                                            <span className="text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-full">
+                                                {count}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
-            {/* Top Right - Camera Stats */}
-            <div className="absolute top-3 right-3 z-[1000] flex flex-col gap-2">
-                {/* Total count */}
+            {/* Top Right - Camera Count */}
+            <div className="absolute top-3 right-3 z-[1000]">
                 <div className="flex items-center gap-2 px-3 py-2 bg-white/95 dark:bg-gray-800/95 backdrop-blur rounded-xl shadow-lg">
+                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"/>
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
                         {filtered.length} Kamera
                     </span>
-                </div>
-                
-                {/* Legend */}
-                <div className="flex flex-col gap-1.5 px-3 py-2 bg-white/95 dark:bg-gray-800/95 backdrop-blur rounded-xl shadow-lg text-xs">
-                    <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full bg-emerald-500"/>
-                        <span className="text-gray-600 dark:text-gray-300">Stabil ({stableCount})</span>
-                    </div>
-                    {tunnelCount > 0 && (
-                        <div className="flex items-center gap-2">
-                            <span className="w-3 h-3 rounded-full bg-orange-500"/>
-                            <span className="text-gray-600 dark:text-gray-300">Tunnel ({tunnelCount})</span>
-                        </div>
-                    )}
                 </div>
             </div>
 
@@ -414,8 +472,15 @@ const MapView = memo(({
                     from { transform: scale(0.95); opacity: 0; }
                     to { transform: scale(1); opacity: 1; }
                 }
+                @keyframes slide-in-from-top-2 {
+                    from { transform: translateY(-8px); opacity: 0; }
+                    to { transform: translateY(0); opacity: 1; }
+                }
                 .animate-in {
                     animation: fade-in 0.2s ease-out, zoom-in-95 0.2s ease-out;
+                }
+                .slide-in-from-top-2 {
+                    animation: slide-in-from-top-2 0.2s ease-out;
                 }
             `}</style>
         </div>

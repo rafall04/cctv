@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, memo, lazy, Suspense } from 'react';
+import { useEffect, useState, useCallback, useRef, memo, lazy, Suspense, useMemo } from 'react';
 import { streamService } from '../services/streamService';
 import { areaService } from '../services/areaService';
 import { useTheme } from '../contexts/ThemeContext';
@@ -1804,22 +1804,97 @@ function FilterDropdown({ areas, selected, onChange, cameras, kecamatans = [], k
 }
 
 // ============================================
-// CAMERAS SECTION - Simplified
+// CAMERAS SECTION - With Connection Tabs
 // ============================================
 function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, multiCameras }) {
-    const [viewMode, setViewMode] = useState('map'); // 'grid' or 'map' - default to map view
+    const [connectionTab, setConnectionTab] = useState('all'); // 'all', 'stable', 'tunnel'
+    const [viewMode, setViewMode] = useState('map'); // 'grid' or 'map'
+
+    // Count cameras by connection type
+    const tunnelCameras = cameras.filter(c => c.is_tunnel === 1);
+    const stableCameras = cameras.filter(c => c.is_tunnel !== 1);
+    const hasTunnelCameras = tunnelCameras.length > 0;
+
+    // Filter cameras by connection type
+    const filtered = useMemo(() => {
+        if (connectionTab === 'stable') return stableCameras;
+        if (connectionTab === 'tunnel') return tunnelCameras;
+        return cameras;
+    }, [cameras, connectionTab, stableCameras, tunnelCameras]);
 
     return (
         <section className="py-6 sm:py-10">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                {/* Connection Type Tabs - Only show if there are tunnel cameras */}
+                {hasTunnelCameras && (
+                    <div className="mb-6">
+                        <div className="flex flex-wrap gap-2 p-1.5 bg-gray-100 dark:bg-gray-800 rounded-xl w-fit">
+                            <button
+                                onClick={() => setConnectionTab('all')}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                                    connectionTab === 'all'
+                                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                                }`}
+                            >
+                                Semua ({cameras.length})
+                            </button>
+                            <button
+                                onClick={() => setConnectionTab('stable')}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                                    connectionTab === 'stable'
+                                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                                }`}
+                            >
+                                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                Stabil ({stableCameras.length})
+                            </button>
+                            <button
+                                onClick={() => setConnectionTab('tunnel')}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                                    connectionTab === 'tunnel'
+                                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                                }`}
+                            >
+                                <span className="w-2 h-2 rounded-full bg-orange-500"></span>
+                                Tunnel ({tunnelCameras.length})
+                            </button>
+                        </div>
+                        
+                        {/* Tunnel Warning Info */}
+                        {connectionTab === 'tunnel' && (
+                            <div className="mt-4 p-4 bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20 rounded-xl">
+                                <div className="flex items-start gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-orange-100 dark:bg-orange-500/20 flex items-center justify-center text-orange-600 dark:text-orange-400 shrink-0">
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-sm font-semibold text-orange-800 dark:text-orange-300 mb-1">
+                                            Koneksi Tunnel
+                                        </h4>
+                                        <p className="text-sm text-orange-700 dark:text-orange-400">
+                                            Kamera ini menggunakan koneksi tunnel yang mungkin kurang stabil. 
+                                            Jika stream tidak muncul, silakan refresh atau tunggu beberapa saat.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                     <div>
                         <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-                            CCTV Publik
+                            {connectionTab === 'tunnel' ? 'Kamera Tunnel' : connectionTab === 'stable' ? 'Kamera Stabil' : 'CCTV Publik'}
                         </h2>
                         <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-                            {cameras.length} kamera tersedia • Streaming langsung 24/7
+                            {filtered.length} kamera tersedia • Streaming langsung 24/7
                         </p>
                     </div>
                     
@@ -1854,13 +1929,27 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                         {[1, 2, 3, 4, 5, 6].map(i => <CameraSkeleton key={i} />)}
                     </div>
-                ) : cameras.length === 0 ? (
+                ) : filtered.length === 0 ? (
                     <div className="text-center py-16">
                         <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400">
                             <Icons.Camera />
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Belum Ada Kamera</h3>
-                        <p className="text-gray-500 dark:text-gray-400">Kamera akan segera tersedia.</p>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Tidak Ada Kamera</h3>
+                        <p className="text-gray-500 dark:text-gray-400 mb-4">
+                            {connectionTab === 'tunnel' 
+                                ? 'Tidak ada kamera dengan koneksi tunnel.' 
+                                : connectionTab === 'stable'
+                                    ? 'Tidak ada kamera dengan koneksi stabil.'
+                                    : 'Kamera akan segera tersedia.'}
+                        </p>
+                        {connectionTab !== 'all' && (
+                            <button 
+                                onClick={() => setConnectionTab('all')}
+                                className="text-sky-500 font-medium hover:text-sky-600 transition-colors"
+                            >
+                                Lihat Semua Kamera →
+                            </button>
+                        )}
                     </div>
                 ) : viewMode === 'map' ? (
                     <Suspense fallback={
@@ -1872,13 +1961,13 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                         </div>
                     }>
                         <MapView
-                            cameras={cameras}
+                            cameras={filtered}
                             className="h-[500px] sm:h-[600px]"
                         />
                     </Suspense>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                        {cameras.map(camera => (
+                        {filtered.map(camera => (
                             <CameraCard
                                 key={camera.id}
                                 camera={camera}
