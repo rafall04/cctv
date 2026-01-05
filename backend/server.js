@@ -24,6 +24,7 @@ import streamRoutes from './routes/streamRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import feedbackRoutes from './routes/feedbackRoutes.js';
+import settingsRoutes from './routes/settingsRoutes.js';
 import mediaMtxService from './services/mediaMtxService.js';
 import streamWarmer from './services/streamWarmer.js';
 
@@ -200,6 +201,7 @@ await fastify.register(streamRoutes, { prefix: '/api/stream' });
 await fastify.register(adminRoutes, { prefix: '/api/admin' });
 await fastify.register(userRoutes, { prefix: '/api/users' });
 await fastify.register(feedbackRoutes, { prefix: '/api/feedback' });
+await fastify.register(settingsRoutes);
 
 // ============================================
 // GLOBAL ERROR HANDLER

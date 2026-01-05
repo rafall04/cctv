@@ -72,7 +72,7 @@ export async function getAreaById(request, reply) {
 
 export async function createArea(request, reply) {
     try {
-        const { name, description, rt, rw, kelurahan, kecamatan } = request.body;
+        const { name, description, rt, rw, kelurahan, kecamatan, latitude, longitude } = request.body;
 
         if (!name) {
             return reply.code(400).send({
@@ -82,8 +82,8 @@ export async function createArea(request, reply) {
         }
 
         const result = execute(
-            'INSERT INTO areas (name, description, rt, rw, kelurahan, kecamatan) VALUES (?, ?, ?, ?, ?, ?)',
-            [name, description || null, rt || null, rw || null, kelurahan || null, kecamatan || null]
+            'INSERT INTO areas (name, description, rt, rw, kelurahan, kecamatan, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [name, description || null, rt || null, rw || null, kelurahan || null, kecamatan || null, latitude || null, longitude || null]
         );
 
         const newArea = queryOne('SELECT * FROM areas WHERE id = ?', [result.lastInsertRowid]);
@@ -111,7 +111,7 @@ export async function createArea(request, reply) {
 export async function updateArea(request, reply) {
     try {
         const { id } = request.params;
-        const { name, description, rt, rw, kelurahan, kecamatan } = request.body;
+        const { name, description, rt, rw, kelurahan, kecamatan, latitude, longitude } = request.body;
 
         const area = queryOne('SELECT * FROM areas WHERE id = ?', [id]);
         if (!area) {
@@ -122,7 +122,7 @@ export async function updateArea(request, reply) {
         }
 
         execute(
-            'UPDATE areas SET name = ?, description = ?, rt = ?, rw = ?, kelurahan = ?, kecamatan = ? WHERE id = ?',
+            'UPDATE areas SET name = ?, description = ?, rt = ?, rw = ?, kelurahan = ?, kecamatan = ?, latitude = ?, longitude = ? WHERE id = ?',
             [
                 name || area.name, 
                 description !== undefined ? description : area.description,
@@ -130,6 +130,8 @@ export async function updateArea(request, reply) {
                 rw !== undefined ? (rw || null) : area.rw,
                 kelurahan !== undefined ? (kelurahan || null) : area.kelurahan,
                 kecamatan !== undefined ? (kecamatan || null) : area.kecamatan,
+                latitude !== undefined ? (latitude || null) : area.latitude,
+                longitude !== undefined ? (longitude || null) : area.longitude,
                 id
             ]
         );
