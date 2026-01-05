@@ -68,7 +68,7 @@ export async function getAllActiveStreams(request, reply) {
     try {
         const cameras = query(
             `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel,
-                    c.latitude, c.longitude,
+                    c.latitude, c.longitude, c.status,
                     a.name as area_name, a.rt, a.rw, a.kelurahan, a.kecamatan
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 
