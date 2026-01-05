@@ -77,6 +77,36 @@ const hasValidCoords = (c) => {
     return !isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0);
 };
 
+// Fungsi untuk mendeteksi dan memberikan offset pada marker yang bertumpuk
+const applyMarkerOffset = (cameras) => {
+    const coordMap = new Map();
+    const OFFSET = 0.0003; // ~30 meter offset
+    
+    return cameras.map(camera => {
+        const lat = parseFloat(camera.latitude);
+        const lng = parseFloat(camera.longitude);
+        const key = `${lat.toFixed(4)},${lng.toFixed(4)}`; // Group by ~11m precision
+        
+        if (!coordMap.has(key)) {
+            coordMap.set(key, []);
+        }
+        
+        const group = coordMap.get(key);
+        const index = group.length;
+        group.push(camera.id);
+        
+        // Jika ada lebih dari 1 kamera di lokasi yang sama, beri offset melingkar
+        if (index > 0) {
+            const angle = (index * 60) * (Math.PI / 180); // 60 derajat per kamera
+            const offsetLat = lat + (OFFSET * Math.cos(angle));
+            const offsetLng = lng + (OFFSET * Math.sin(angle));
+            return { ...camera, _displayLat: offsetLat, _displayLng: offsetLng, _isGrouped: true, _groupIndex: index };
+        }
+        
+        return { ...camera, _displayLat: lat, _displayLng: lng, _isGrouped: false, _groupIndex: 0 };
+    });
+};
+
 // Video Modal - Optimasi untuk low-end (tanpa backdrop-blur)
 const VideoModal = memo(({ camera, onClose }) => {
     const videoRef = useRef(null);
@@ -232,11 +262,12 @@ function MapController({ center, zoom, bounds }) {
     return null;
 }
 
-// Camera Marker
+// Camera Marker - dengan support untuk grouped markers
 const CameraMarker = memo(({ camera, onClick }) => {
     if (!hasValidCoords(camera)) return null;
-    const lat = parseFloat(camera.latitude);
-    const lng = parseFloat(camera.longitude);
+    // Gunakan display coordinates jika ada (untuk offset)
+    const lat = camera._displayLat ?? parseFloat(camera.latitude);
+    const lng = camera._displayLng ?? parseFloat(camera.longitude);
     const isTunnel = camera.is_tunnel === 1 || camera.is_tunnel === true;
     
     return (
@@ -254,7 +285,7 @@ const MapView = memo(({
     cameras = [], 
     areas = [],
     defaultCenter = [-7.1507, 111.8815],
-    defaultZoom = 13,
+    defaultZoom = 11, // Zoom level untuk skala kabupaten
     className = '',
 }) => {
     const [selectedArea, setSelectedArea] = useState('all');
@@ -285,8 +316,14 @@ const MapView = memo(({
     }, [cameras]);
 
     const filtered = useMemo(() => {
-        if (selectedArea === 'all') return camerasWithCoords;
-        return camerasWithCoords.filter(c => c.area_name === selectedArea);
+        let result;
+        if (selectedArea === 'all') {
+            result = camerasWithCoords;
+        } else {
+            result = camerasWithCoords.filter(c => c.area_name === selectedArea);
+        }
+        // Terapkan offset untuk marker yang bertumpuk
+        return applyMarkerOffset(result);
     }, [camerasWithCoords, selectedArea]);
 
     const stats = useMemo(() => {
