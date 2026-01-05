@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, lazy, Suspense } from 'react';
 import { cameraService } from '../services/cameraService';
 import { areaService } from '../services/areaService';
 import { useNotification } from '../contexts/NotificationContext';
@@ -7,6 +7,9 @@ import { validateRtspUrl, getRtspFormatHint } from '../utils/validators';
 import { SkeletonCard, Skeleton } from '../components/ui/Skeleton';
 import { NoCamerasEmptyState } from '../components/ui/EmptyState';
 import { Alert } from '../components/ui/Alert';
+
+// Lazy load LocationPicker for better performance
+const LocationPicker = lazy(() => import('../components/LocationPicker'));
 
 /**
  * Camera Management Page
@@ -601,7 +604,7 @@ export default function CameraManagement() {
                                 />
                             </div>
 
-                            {/* Coordinates for Map View */}
+                            {/* Location Picker Map */}
                             <div className="p-3 bg-sky-50 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/20 rounded-xl">
                                 <div className="flex items-center gap-2 mb-3">
                                     <div className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-500/20 flex items-center justify-center text-sky-600 dark:text-sky-400 shrink-0">
@@ -611,36 +614,24 @@ export default function CameraManagement() {
                                         </svg>
                                     </div>
                                     <div>
-                                        <p className="text-sm font-medium text-gray-900 dark:text-white">Koordinat Peta</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">Untuk tampilan map view</p>
+                                        <p className="text-sm font-medium text-gray-900 dark:text-white">Lokasi Kamera</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Klik peta atau cari lokasi</p>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Latitude</label>
-                                        <input 
-                                            type="text" 
-                                            name="latitude" 
-                                            value={formData.latitude} 
-                                            onChange={handleFormChange}
-                                            disabled={isSubmitting}
-                                            className="w-full px-3 py-2 bg-white dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50 text-sm" 
-                                            placeholder="-7.7956" 
-                                        />
+                                <Suspense fallback={
+                                    <div className="h-[250px] bg-gray-100 dark:bg-gray-800 rounded-xl animate-pulse flex items-center justify-center">
+                                        <span className="text-gray-400 text-sm">Loading map...</span>
                                     </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Longitude</label>
-                                        <input 
-                                            type="text" 
-                                            name="longitude" 
-                                            value={formData.longitude} 
-                                            onChange={handleFormChange}
-                                            disabled={isSubmitting}
-                                            className="w-full px-3 py-2 bg-white dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50 text-sm" 
-                                            placeholder="110.3695" 
-                                        />
-                                    </div>
-                                </div>
+                                }>
+                                    <LocationPicker
+                                        latitude={formData.latitude}
+                                        longitude={formData.longitude}
+                                        onLocationChange={(lat, lng) => {
+                                            handleFormChange({ target: { name: 'latitude', value: lat } });
+                                            handleFormChange({ target: { name: 'longitude', value: lng } });
+                                        }}
+                                    />
+                                </Suspense>
                             </div>
 
                             {/* Tunnel Connection Toggle - Compact */}
