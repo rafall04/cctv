@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, memo } from 'react';
+import { useEffect, useState, useCallback, useRef, memo, lazy, Suspense } from 'react';
 import { streamService } from '../services/streamService';
 import { areaService } from '../services/areaService';
 import { useTheme } from '../contexts/ThemeContext';
@@ -18,6 +18,8 @@ import { shouldDisableAnimations, getAnimationClass, createAnimationConfig } fro
 import { getGlobalStreamInitQueue, shouldUseQueuedInit, getMaxConcurrentInits } from '../utils/streamInitQueue';
 // Feedback widget
 import FeedbackWidget from '../components/FeedbackWidget';
+// Map view - lazy loaded for performance
+const MapView = lazy(() => import('../components/MapView'));
 
 // ============================================
 // DEVICE-ADAPTIVE HLS CONFIG
@@ -67,6 +69,7 @@ const Icons = {
     Eye: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>,
     Signal: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>,
     Grid: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>,
+    Map: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l5.447 2.724A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>,
 };
 
 // Skeleton component with low-end device optimization - **Validates: Requirements 5.2**
@@ -1839,6 +1842,7 @@ function FilterDropdown({ areas, selected, onChange, cameras, kecamatans = [], k
 function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, multiCameras }) {
     const [filter, setFilter] = useState(null);
     const [connectionTab, setConnectionTab] = useState('stable'); // 'all', 'stable', 'tunnel' - default to stable
+    const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'map'
     
     // Get unique kecamatan and kelurahan from cameras directly (in case areas table is empty)
     const kecamatansFromCameras = [...new Set(cameras.map(c => c.kecamatan).filter(Boolean))].sort();
@@ -1975,16 +1979,43 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                             {getSubtitle()}
                         </p>
                     </div>
-                    {hasFilterData && (
-                        <FilterDropdown 
-                            areas={areas} 
-                            selected={filter} 
-                            onChange={setFilter}
-                            cameras={cameras}
-                            kecamatans={allKecamatans}
-                            kelurahans={allKelurahans}
-                        />
-                    )}
+                    <div className="flex items-center gap-3">
+                        {/* View Mode Toggle */}
+                        <div className="flex items-center p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
+                            <button
+                                onClick={() => setViewMode('grid')}
+                                className={`p-2 rounded-lg transition-all ${
+                                    viewMode === 'grid'
+                                        ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-sky-400 shadow-sm'
+                                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                                }`}
+                                title="Grid View"
+                            >
+                                <Icons.Grid />
+                            </button>
+                            <button
+                                onClick={() => setViewMode('map')}
+                                className={`p-2 rounded-lg transition-all ${
+                                    viewMode === 'map'
+                                        ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-sky-400 shadow-sm'
+                                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                                }`}
+                                title="Map View"
+                            >
+                                <Icons.Map />
+                            </button>
+                        </div>
+                        {hasFilterData && (
+                            <FilterDropdown 
+                                areas={areas} 
+                                selected={filter} 
+                                onChange={setFilter}
+                                cameras={cameras}
+                                kecamatans={allKecamatans}
+                                kelurahans={allKelurahans}
+                            />
+                        )}
+                    </div>
                 </div>
 
                 {loading ? (
@@ -2015,6 +2046,22 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                             </button>
                         )}
                     </div>
+                ) : viewMode === 'map' ? (
+                    <Suspense fallback={
+                        <div className="h-[500px] bg-gray-100 dark:bg-gray-800 rounded-xl animate-pulse flex items-center justify-center">
+                            <div className="text-gray-400">Loading map...</div>
+                        </div>
+                    }>
+                        <MapView
+                            cameras={filtered}
+                            onCameraSelect={(camera, openStream) => {
+                                if (openStream) {
+                                    onCameraClick(camera);
+                                }
+                            }}
+                            className="h-[500px] sm:h-[600px]"
+                        />
+                    </Suspense>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                         {filtered.map(camera => (

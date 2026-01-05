@@ -4,6 +4,29 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Leaflet Map Styles */
+.leaflet-container {
+    font-family: inherit;
+}
+
+.leaflet-popup-content-wrapper {
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.leaflet-popup-content {
+    margin: 8px 12px;
+}
+
+.custom-camera-marker {
+    background: transparent !important;
+    border: none !important;
+}
+
+.custom-camera-marker:hover > div {
+    transform: scale(1.1);
+}
+
 @layer base {
     html {
         scroll-behavior: smooth;

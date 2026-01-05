@@ -74,6 +74,8 @@ export default function CameraManagement() {
             area_id: '',
             enabled: true,
             is_tunnel: false,
+            latitude: '',
+            longitude: '',
         },
         getValidationRules()
     );
@@ -130,6 +132,8 @@ export default function CameraManagement() {
             area_id: '',
             enabled: true,
             is_tunnel: false,
+            latitude: '',
+            longitude: '',
         });
         setModalError('');
         setShowModal(true);
@@ -146,6 +150,8 @@ export default function CameraManagement() {
             area_id: camera.area_id || '',
             enabled: camera.enabled === 1,
             is_tunnel: camera.is_tunnel === 1,
+            latitude: camera.latitude || '',
+            longitude: camera.longitude || '',
         });
         setModalError('');
         setShowModal(true);
@@ -593,6 +599,48 @@ export default function CameraManagement() {
                                     className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none disabled:opacity-50 text-sm" 
                                     placeholder="Optional notes..." 
                                 />
+                            </div>
+
+                            {/* Coordinates for Map View */}
+                            <div className="p-3 bg-sky-50 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/20 rounded-xl">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <div className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-500/20 flex items-center justify-center text-sky-600 dark:text-sky-400 shrink-0">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/>
+                                            <circle cx="12" cy="11" r="3"/>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-gray-900 dark:text-white">Koordinat Peta</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Untuk tampilan map view</p>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Latitude</label>
+                                        <input 
+                                            type="text" 
+                                            name="latitude" 
+                                            value={formData.latitude} 
+                                            onChange={handleFormChange}
+                                            disabled={isSubmitting}
+                                            className="w-full px-3 py-2 bg-white dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50 text-sm" 
+                                            placeholder="-7.7956" 
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Longitude</label>
+                                        <input 
+                                            type="text" 
+                                            name="longitude" 
+                                            value={formData.longitude} 
+                                            onChange={handleFormChange}
+                                            disabled={isSubmitting}
+                                            className="w-full px-3 py-2 bg-white dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50 text-sm" 
+                                            placeholder="110.3695" 
+                                        />
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Tunnel Connection Toggle - Compact */}
