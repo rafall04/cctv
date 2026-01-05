@@ -9,6 +9,7 @@ import L from 'leaflet';
 import Hls from 'hls.js';
 import 'leaflet/dist/leaflet.css';
 import { detectDeviceTier } from '../utils/deviceDetector';
+import { settingsService } from '../services/settingsService';
 
 // Fix Leaflet icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -259,6 +260,21 @@ const MapView = memo(({
     const [selectedArea, setSelectedArea] = useState('all');
     const [modalCamera, setModalCamera] = useState(null);
     const [mapKey, setMapKey] = useState(0);
+    const [mapSettings, setMapSettings] = useState({ 
+        latitude: defaultCenter[0], 
+        longitude: defaultCenter[1], 
+        zoom: defaultZoom, 
+        name: 'Semua Lokasi' 
+    });
+
+    // Load map settings from backend
+    useEffect(() => {
+        settingsService.getMapCenter().then(res => {
+            if (res.success && res.data) {
+                setMapSettings(res.data);
+            }
+        }).catch(() => {});
+    }, []);
 
     const camerasWithCoords = useMemo(() => cameras.filter(hasValidCoords), [cameras]);
 
@@ -290,13 +306,21 @@ const MapView = memo(({
             }
         }
         
+        // Use settings for "Semua Lokasi"
+        if (selectedArea === 'all' && mapSettings.latitude && mapSettings.longitude) {
+            return {
+                center: [mapSettings.latitude, mapSettings.longitude],
+                bounds: null
+            };
+        }
+        
         if (filtered.length === 0) {
-            return { center: defaultCenter, bounds: null };
+            return { center: [mapSettings.latitude || defaultCenter[0], mapSettings.longitude || defaultCenter[1]], bounds: null };
         }
         
         const cameraBounds = L.latLngBounds(filtered.map(c => [parseFloat(c.latitude), parseFloat(c.longitude)]));
         return { center: null, bounds: cameraBounds };
-    }, [filtered, selectedArea, areas, defaultCenter]);
+    }, [filtered, selectedArea, areas, defaultCenter, mapSettings]);
 
     const openModal = useCallback((camera) => setModalCamera(camera), []);
     const closeModal = useCallback(() => setModalCamera(null), []);
@@ -351,7 +375,7 @@ const MapView = memo(({
                     onChange={handleAreaChange}
                     className="px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg shadow-lg text-sm font-medium border-0 focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer"
                 >
-                    <option value="all">Semua Lokasi ({camerasWithCoords.length})</option>
+                    <option value="all">{mapSettings.name || 'Semua Lokasi'} ({camerasWithCoords.length})</option>
                     {areaNames.map(area => (
                         <option key={area} value={area}>
                             {area} ({camerasWithCoords.filter(c => c.area_name === area).length})
