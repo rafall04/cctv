@@ -427,7 +427,6 @@ const VideoModal = memo(({ camera, onClose }) => {
                     onTouchStart={handleTouchStart}
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}
-                    style={{ cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
                 >
                     {status === 'loading' && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10">
@@ -465,10 +464,13 @@ const VideoModal = memo(({ camera, onClose }) => {
                             className="w-full h-full transition-transform duration-100"
                             style={{ 
                                 transform: `scale(${zoom}) translate(${pan.x}%, ${pan.y}%)`,
-                                transformOrigin: 'center center'
+                                transformOrigin: 'center center',
+                                touchAction: 'none',
+                                willChange: 'transform',
+                                cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default'
                             }}
                         >
-                            <video ref={videoRef} className="w-full h-full object-contain" muted playsInline controls />
+                            <video ref={videoRef} className="w-full h-full object-contain pointer-events-none" muted playsInline autoPlay />
                         </div>
                     )}
 
