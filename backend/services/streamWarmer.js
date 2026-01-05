@@ -1,7 +1,7 @@
 /**
  * Stream Warmer Service
  * Keeps frequently viewed camera streams pre-loaded in MediaMTX
- * to eliminate initial loading delay
+ * Only warms streams that are actually reachable
  */
 
 import axios from 'axios';
@@ -9,80 +9,119 @@ import { config } from '../config/config.js';
 
 class StreamWarmer {
     constructor() {
-        this.warmStreams = new Map(); // pathName -> AbortController
+        this.warmStreams = new Map(); // pathName -> { intervalId, failCount }
         this.hlsBaseUrl = config.mediamtx?.hlsUrl || 'http://localhost:8888';
-        this.checkInterval = null;
+        this.mediamtxApiUrl = config.mediamtx?.apiUrl || 'http://localhost:9997';
+        this.maxFailures = 3; // Stop warming after 3 consecutive failures
     }
 
     /**
-     * Start warming a specific stream by periodically fetching HLS playlist
-     * This keeps MediaMTX connected to the camera
+     * Check if a stream is actually ready/online in MediaMTX
+     */
+    async isStreamReady(pathName) {
+        try {
+            const response = await axios.get(
+                `${this.mediamtxApiUrl}/v3/paths/get/${pathName}`,
+                { timeout: 3000 }
+            );
+            // Stream is ready if it has a source and is not in error state
+            return response.data?.ready === true || response.data?.source !== null;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Start warming a specific stream - only if it's reachable
      */
     async warmStream(pathName) {
         if (this.warmStreams.has(pathName)) {
             return; // Already warming
         }
 
-        const controller = new AbortController();
-        this.warmStreams.set(pathName, controller);
-
-        console.log(`[StreamWarmer] Starting warm for ${pathName}`);
-
-        // Initial fetch to trigger stream connection
-        await this.fetchPlaylist(pathName);
-
-        // Keep stream alive by fetching playlist every 5 seconds
-        const intervalId = setInterval(async () => {
-            if (!this.warmStreams.has(pathName)) {
-                clearInterval(intervalId);
+        // First check if stream is reachable
+        const isReady = await this.isStreamReady(pathName);
+        if (!isReady) {
+            // Try one fetch to trigger connection
+            const success = await this.fetchPlaylist(pathName);
+            if (!success) {
+                console.log(`[StreamWarmer] ${pathName} not reachable, skipping`);
                 return;
             }
-            await this.fetchPlaylist(pathName);
-        }, 5000);
+        }
 
-        // Store interval ID for cleanup
-        controller.intervalId = intervalId;
+        console.log(`[StreamWarmer] Warming ${pathName}`);
+        
+        const streamInfo = { failCount: 0, intervalId: null };
+        this.warmStreams.set(pathName, streamInfo);
+
+        // Keep stream alive by fetching playlist every 8 seconds
+        streamInfo.intervalId = setInterval(async () => {
+            const info = this.warmStreams.get(pathName);
+            if (!info) return;
+
+            const success = await this.fetchPlaylist(pathName);
+            
+            if (!success) {
+                info.failCount++;
+                if (info.failCount >= this.maxFailures) {
+                    console.log(`[StreamWarmer] ${pathName} offline, pausing warm`);
+                    this.stopWarming(pathName);
+                }
+            } else {
+                info.failCount = 0; // Reset on success
+            }
+        }, 8000);
     }
 
     /**
      * Stop warming a specific stream
      */
     stopWarming(pathName) {
-        const controller = this.warmStreams.get(pathName);
-        if (controller) {
-            if (controller.intervalId) {
-                clearInterval(controller.intervalId);
+        const info = this.warmStreams.get(pathName);
+        if (info) {
+            if (info.intervalId) {
+                clearInterval(info.intervalId);
             }
-            controller.abort();
             this.warmStreams.delete(pathName);
-            console.log(`[StreamWarmer] Stopped warming ${pathName}`);
         }
     }
 
     /**
      * Fetch HLS playlist to keep stream active
+     * Returns true if successful, false otherwise
      */
     async fetchPlaylist(pathName) {
         try {
-            await axios.get(`${this.hlsBaseUrl}/${pathName}/index.m3u8`, {
-                timeout: 8000,
-                validateStatus: () => true // Don't throw on any status
+            const response = await axios.get(`${this.hlsBaseUrl}/${pathName}/index.m3u8`, {
+                timeout: 5000,
+                validateStatus: (status) => status < 500
             });
-        } catch (error) {
-            // Silent fail - stream might not be ready yet
+            return response.status === 200;
+        } catch {
+            return false;
         }
     }
 
     /**
-     * Warm all enabled cameras
+     * Warm all enabled cameras - only those that are reachable
      */
     async warmAllCameras(cameras) {
+        let warmedCount = 0;
+        
         for (const camera of cameras) {
             const pathName = `camera${camera.id}`;
             await this.warmStream(pathName);
-            // Stagger initialization to avoid overwhelming the system
-            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            if (this.warmStreams.has(pathName)) {
+                warmedCount++;
+            }
+            
+            // Stagger to avoid overwhelming network
+            await new Promise(resolve => setTimeout(resolve, 1000));
         }
+        
+        console.log(`[StreamWarmer] ${warmedCount}/${cameras.length} streams warmed`);
     }
 
     /**
@@ -91,9 +130,6 @@ class StreamWarmer {
     stopAll() {
         for (const pathName of this.warmStreams.keys()) {
             this.stopWarming(pathName);
-        }
-        if (this.checkInterval) {
-            clearInterval(this.checkInterval);
         }
         console.log('[StreamWarmer] All streams stopped');
     }
