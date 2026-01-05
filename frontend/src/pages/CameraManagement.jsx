@@ -64,6 +64,7 @@ export default function CameraManagement() {
         handleBlur,
         validateForm,
         resetWith,
+        setFieldValue,
         setFieldError,
         isSubmitting,
         setSubmitting,
@@ -624,8 +625,8 @@ export default function CameraManagement() {
                                         latitude={formData.latitude}
                                         longitude={formData.longitude}
                                         onLocationChange={(lat, lng) => {
-                                            handleFormChange({ target: { name: 'latitude', value: lat } });
-                                            handleFormChange({ target: { name: 'longitude', value: lng } });
+                                            setFieldValue('latitude', lat);
+                                            setFieldValue('longitude', lng);
                                         }}
                                     />
                                 </Suspense>
