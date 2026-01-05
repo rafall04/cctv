@@ -73,12 +73,14 @@ pm2 restart rafnet-cctv-backend
 2. Menggunakan path relatif yang salah di migration file
 3. Lupa menambahkan field di SELECT query
 4. Lupa menambahkan field di frontend form state
+5. **Lupa menambahkan field di schemaValidators.js** (field akan di-strip karena `additionalProperties: false`)
 
 ### ✅ SELALU:
 1. Test migration di local dulu
 2. Gunakan `__dirname` untuk path yang reliable
 3. Check apakah kolom sudah ada sebelum ALTER TABLE
 4. Update SEMUA tempat yang menggunakan data tersebut
+5. **Update schema validators di `backend/middleware/schemaValidators.js`**
 
 ## Field Addition Checklist
 
@@ -86,6 +88,7 @@ Saat menambahkan field baru, pastikan update di:
 
 ### Backend:
 - [ ] `backend/database/migrations/add_[field].js` - Migration file
+- [ ] `backend/middleware/schemaValidators.js` - **WAJIB** tambahkan field di schema (createSchema & updateSchema)
 - [ ] `backend/controllers/[entity]Controller.js` - getAll query
 - [ ] `backend/controllers/[entity]Controller.js` - getById query  
 - [ ] `backend/controllers/[entity]Controller.js` - create function

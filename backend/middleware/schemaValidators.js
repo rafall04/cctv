@@ -89,6 +89,10 @@ export const createCameraSchema = {
             },
             longitude: {
                 anyOf: [{ type: 'number' }, { type: 'string' }, { type: 'null' }]
+            },
+            status: {
+                type: 'string',
+                enum: ['active', 'maintenance', 'offline']
             }
         },
         additionalProperties: false
@@ -133,6 +137,10 @@ export const updateCameraSchema = {
             },
             longitude: {
                 anyOf: [{ type: 'number' }, { type: 'string' }, { type: 'null' }]
+            },
+            status: {
+                type: 'string',
+                enum: ['active', 'maintenance', 'offline']
             }
         },
         additionalProperties: false
