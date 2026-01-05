@@ -20,62 +20,72 @@ const HLS_CONFIGS = {
         lowLatencyMode: false,
         // Minimal back buffer to save memory
         backBufferLength: 10,
-        // Small forward buffer
-        maxBufferLength: 15,
-        maxMaxBufferLength: 30,
+        // Small forward buffer - reduced for faster start
+        maxBufferLength: 10,
+        maxMaxBufferLength: 20,
         // 30MB max buffer size
         maxBufferSize: 30 * 1000 * 1000,
         maxBufferHole: 0.5,
-        // AUTO quality - let HLS.js decide (startLevel: 0 caused issues)
+        // AUTO quality - let HLS.js decide
         startLevel: -1,
-        // Longer timeout for slow connections
-        fragLoadingTimeOut: 30000,
-        fragLoadingMaxRetry: 3,
-        fragLoadingRetryDelay: 2000,
-        levelLoadingTimeOut: 20000,
-        levelLoadingMaxRetry: 3,
-        levelLoadingRetryDelay: 2000,
-        manifestLoadingTimeOut: 20000,
-        manifestLoadingMaxRetry: 3,
-        manifestLoadingRetryDelay: 2000,
+        // FASTER STARTUP: Start playing with less buffer
+        liveSyncDurationCount: 2,
+        liveMaxLatencyDurationCount: 4,
+        // Shorter timeout for faster failure detection
+        fragLoadingTimeOut: 15000,
+        fragLoadingMaxRetry: 2,
+        fragLoadingRetryDelay: 1000,
+        levelLoadingTimeOut: 10000,
+        levelLoadingMaxRetry: 2,
+        levelLoadingRetryDelay: 1000,
+        manifestLoadingTimeOut: 10000,
+        manifestLoadingMaxRetry: 2,
+        manifestLoadingRetryDelay: 1000,
     },
     medium: {
         enableWorker: true,
         lowLatencyMode: false,
-        backBufferLength: 20,
-        maxBufferLength: 25,
-        maxMaxBufferLength: 45,
+        backBufferLength: 15,
+        // Reduced for faster start
+        maxBufferLength: 15,
+        maxMaxBufferLength: 30,
         maxBufferSize: 45 * 1000 * 1000,
         maxBufferHole: 0.5,
         startLevel: -1,
-        fragLoadingTimeOut: 25000,
-        fragLoadingMaxRetry: 4,
-        fragLoadingRetryDelay: 1500,
-        levelLoadingTimeOut: 15000,
-        levelLoadingMaxRetry: 3,
-        levelLoadingRetryDelay: 1500,
-        manifestLoadingTimeOut: 15000,
-        manifestLoadingMaxRetry: 3,
-        manifestLoadingRetryDelay: 1500,
+        // FASTER STARTUP
+        liveSyncDurationCount: 2,
+        liveMaxLatencyDurationCount: 4,
+        fragLoadingTimeOut: 12000,
+        fragLoadingMaxRetry: 3,
+        fragLoadingRetryDelay: 1000,
+        levelLoadingTimeOut: 8000,
+        levelLoadingMaxRetry: 2,
+        levelLoadingRetryDelay: 1000,
+        manifestLoadingTimeOut: 8000,
+        manifestLoadingMaxRetry: 2,
+        manifestLoadingRetryDelay: 1000,
     },
     high: {
         enableWorker: true,
         lowLatencyMode: false,
-        backBufferLength: 30,
-        maxBufferLength: 30,
-        maxMaxBufferLength: 60,
+        backBufferLength: 20,
+        maxBufferLength: 20,
+        maxMaxBufferLength: 45,
         maxBufferSize: 60 * 1000 * 1000,
         maxBufferHole: 0.5,
         startLevel: -1,
-        fragLoadingTimeOut: 20000,
-        fragLoadingMaxRetry: 4,
-        fragLoadingRetryDelay: 1000,
-        levelLoadingTimeOut: 10000,
-        levelLoadingMaxRetry: 3,
-        levelLoadingRetryDelay: 1000,
-        manifestLoadingTimeOut: 10000,
-        manifestLoadingMaxRetry: 3,
-        manifestLoadingRetryDelay: 1000,
+        // FASTER STARTUP
+        liveSyncDurationCount: 2,
+        liveMaxLatencyDurationCount: 4,
+        fragLoadingTimeOut: 10000,
+        fragLoadingMaxRetry: 3,
+        fragLoadingRetryDelay: 800,
+        levelLoadingTimeOut: 6000,
+        levelLoadingMaxRetry: 2,
+        levelLoadingRetryDelay: 800,
+        manifestLoadingTimeOut: 6000,
+        manifestLoadingMaxRetry: 2,
+        manifestLoadingRetryDelay: 800,
     },
 };
 
@@ -88,31 +98,35 @@ const MOBILE_OVERRIDES = {
 };
 
 /**
- * Mobile phone config - simplified
+ * Mobile phone config - optimized for fast startup
  */
 const MOBILE_PHONE_CONFIG = {
-    maxBufferLength: 15,
-    maxMaxBufferLength: 30,
+    maxBufferLength: 10,
+    maxMaxBufferLength: 20,
     maxBufferSize: 25 * 1000 * 1000,
     startLevel: -1,
-    fragLoadingTimeOut: 30000,
-    fragLoadingRetryDelay: 2000,
-    levelLoadingTimeOut: 20000,
-    manifestLoadingTimeOut: 20000,
+    liveSyncDurationCount: 2,
+    liveMaxLatencyDurationCount: 4,
+    fragLoadingTimeOut: 15000,
+    fragLoadingRetryDelay: 1000,
+    levelLoadingTimeOut: 10000,
+    manifestLoadingTimeOut: 10000,
 };
 
 /**
- * Mobile tablet config - simplified
+ * Mobile tablet config - optimized for fast startup
  */
 const MOBILE_TABLET_CONFIG = {
-    maxBufferLength: 20,
-    maxMaxBufferLength: 40,
+    maxBufferLength: 12,
+    maxMaxBufferLength: 25,
     maxBufferSize: 35 * 1000 * 1000,
     startLevel: -1,
-    fragLoadingTimeOut: 25000,
-    fragLoadingRetryDelay: 1500,
-    levelLoadingTimeOut: 15000,
-    manifestLoadingTimeOut: 15000,
+    liveSyncDurationCount: 2,
+    liveMaxLatencyDurationCount: 4,
+    fragLoadingTimeOut: 12000,
+    fragLoadingRetryDelay: 1000,
+    levelLoadingTimeOut: 8000,
+    manifestLoadingTimeOut: 8000,
 };
 
 /**
