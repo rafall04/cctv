@@ -295,32 +295,43 @@ const MapView = memo(({
         return { stabil, tunnel, total: filtered.length };
     }, [filtered]);
 
-    const { center, bounds } = useMemo(() => {
+    const { center, zoom, bounds } = useMemo(() => {
+        // Jika area spesifik dipilih, gunakan koordinat area tersebut
         if (selectedArea !== 'all') {
             const areaData = areas.find(a => a.name === selectedArea);
             if (areaData?.latitude && areaData?.longitude) {
                 return {
                     center: [parseFloat(areaData.latitude), parseFloat(areaData.longitude)],
+                    zoom: 15, // Zoom level untuk desa
                     bounds: null
                 };
             }
+            // Area tidak punya koordinat, tapi tetap filter kamera
+            // Jika ada kamera di area ini, gunakan bounds kamera
+            const areaCameras = camerasWithCoords.filter(c => c.area_name === selectedArea);
+            if (areaCameras.length > 0) {
+                const cameraBounds = L.latLngBounds(areaCameras.map(c => [parseFloat(c.latitude), parseFloat(c.longitude)]));
+                return { center: null, zoom: null, bounds: cameraBounds };
+            }
+            // Area tidak punya koordinat dan tidak ada kamera, fallback ke default
         }
         
-        // Use settings for "Semua Lokasi"
+        // "Semua Lokasi" - gunakan settings dengan zoom dari settings
         if (selectedArea === 'all' && mapSettings.latitude && mapSettings.longitude) {
             return {
                 center: [mapSettings.latitude, mapSettings.longitude],
+                zoom: mapSettings.zoom || 13, // Gunakan zoom dari settings
                 bounds: null
             };
         }
         
-        if (filtered.length === 0) {
-            return { center: [mapSettings.latitude || defaultCenter[0], mapSettings.longitude || defaultCenter[1]], bounds: null };
-        }
-        
-        const cameraBounds = L.latLngBounds(filtered.map(c => [parseFloat(c.latitude), parseFloat(c.longitude)]));
-        return { center: null, bounds: cameraBounds };
-    }, [filtered, selectedArea, areas, defaultCenter, mapSettings]);
+        // Fallback
+        return { 
+            center: [mapSettings.latitude || defaultCenter[0], mapSettings.longitude || defaultCenter[1]], 
+            zoom: mapSettings.zoom || defaultZoom,
+            bounds: null 
+        };
+    }, [camerasWithCoords, selectedArea, areas, defaultCenter, defaultZoom, mapSettings]);
 
     const openModal = useCallback((camera) => setModalCamera(camera), []);
     const closeModal = useCallback(() => setModalCamera(null), []);
@@ -361,7 +372,7 @@ const MapView = memo(({
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
                 <ZoomControl position="bottomright" />
-                <MapController center={center} zoom={15} bounds={bounds} />
+                <MapController center={center} zoom={zoom} bounds={bounds} />
                 {filtered.map(camera => (
                     <CameraMarker key={camera.id} camera={camera} onClick={openModal} />
                 ))}
