@@ -67,27 +67,28 @@ export const createCameraSchema = {
                 pattern: '^rtsp://'
             },
             description: {
-                type: ['string', 'null'],
-                maxLength: 500
+                anyOf: [{ type: 'string', maxLength: 500 }, { type: 'null' }]
             },
             location: {
-                type: ['string', 'null'],
-                maxLength: 200
+                anyOf: [{ type: 'string', maxLength: 200 }, { type: 'null' }]
             },
             group_name: {
-                type: ['string', 'null'],
-                maxLength: 100
+                anyOf: [{ type: 'string', maxLength: 100 }, { type: 'null' }]
             },
             area_id: {
-                type: ['integer', 'string', 'null']
+                anyOf: [{ type: 'integer' }, { type: 'string' }, { type: 'null' }]
             },
             enabled: {
-                type: ['boolean', 'integer'],
-                enum: [true, false, 0, 1]
+                anyOf: [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }]
             },
             is_tunnel: {
-                type: ['boolean', 'integer'],
-                enum: [true, false, 0, 1]
+                anyOf: [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }]
+            },
+            latitude: {
+                anyOf: [{ type: 'number' }, { type: 'string' }, { type: 'null' }]
+            },
+            longitude: {
+                anyOf: [{ type: 'number' }, { type: 'string' }, { type: 'null' }]
             }
         },
         additionalProperties: false
@@ -110,27 +111,28 @@ export const updateCameraSchema = {
                 pattern: '^rtsp://'
             },
             description: {
-                type: ['string', 'null'],
-                maxLength: 500
+                anyOf: [{ type: 'string', maxLength: 500 }, { type: 'null' }]
             },
             location: {
-                type: ['string', 'null'],
-                maxLength: 200
+                anyOf: [{ type: 'string', maxLength: 200 }, { type: 'null' }]
             },
             group_name: {
-                type: ['string', 'null'],
-                maxLength: 100
+                anyOf: [{ type: 'string', maxLength: 100 }, { type: 'null' }]
             },
             area_id: {
-                type: ['integer', 'string', 'null']
+                anyOf: [{ type: 'integer' }, { type: 'string' }, { type: 'null' }]
             },
             enabled: {
-                type: ['boolean', 'integer'],
-                enum: [true, false, 0, 1]
+                anyOf: [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }]
             },
             is_tunnel: {
-                type: ['boolean', 'integer'],
-                enum: [true, false, 0, 1]
+                anyOf: [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }]
+            },
+            latitude: {
+                anyOf: [{ type: 'number' }, { type: 'string' }, { type: 'null' }]
+            },
+            longitude: {
+                anyOf: [{ type: 'number' }, { type: 'string' }, { type: 'null' }]
             }
         },
         additionalProperties: false
@@ -311,8 +313,7 @@ export const createAreaSchema = {
                 maxLength: 100
             },
             description: {
-                type: ['string', 'null'],
-                maxLength: 500
+                anyOf: [{ type: 'string', maxLength: 500 }, { type: 'null' }]
             }
         },
         additionalProperties: false
@@ -329,8 +330,7 @@ export const updateAreaSchema = {
                 maxLength: 100
             },
             description: {
-                type: ['string', 'null'],
-                maxLength: 500
+                anyOf: [{ type: 'string', maxLength: 500 }, { type: 'null' }]
             }
         },
         additionalProperties: false
@@ -375,12 +375,10 @@ export const createApiKeySchema = {
                 maxLength: 100
             },
             description: {
-                type: ['string', 'null'],
-                maxLength: 500
+                anyOf: [{ type: 'string', maxLength: 500 }, { type: 'null' }]
             },
             expires_at: {
-                type: ['string', 'null'],
-                format: 'date-time'
+                anyOf: [{ type: 'string', format: 'date-time' }, { type: 'null' }]
             }
         },
         additionalProperties: false
