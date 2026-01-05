@@ -2203,37 +2203,31 @@ function Footer({ cameraCount, areaCount }) {
 // MULTI-VIEW FLOATING BUTTON - Enhanced with tooltip and device-based limit
 // Disables animations on low-end devices - **Validates: Requirements 5.2**
 // Position: bottom-left to avoid collision with FeedbackWidget (bottom-right)
+// Tooltip dihapus agar tidak menimpa maps
 // ============================================
 function MultiViewButton({ count, onClick, maxReached, maxStreams = 3 }) {
     const disableAnimations = shouldDisableAnimations();
+    
+    // Hanya tampilkan button jika ada kamera yang dipilih
+    if (count === 0) return null;
     
     return (
         <div className="fixed bottom-6 left-6 z-40 flex flex-col items-start gap-2">
             {/* Info tooltip when max reached */}
             {maxReached && (
                 <div className={`bg-amber-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg shadow-lg ${disableAnimations ? '' : 'animate-bounce'}`}>
-                    Maximum {maxStreams} cameras reached!
+                    Maksimal {maxStreams} kamera!
                 </div>
             )}
             
-            {count > 0 && (
-                <button
-                    onClick={onClick}
-                    className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-sky-500 to-blue-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-105 transition-all"
-                >
-                    <Icons.Layout />
-                    <span className="font-bold">Multi-View</span>
-                    <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-sm font-bold">{count}</span>
-                </button>
-            )}
-            
-            {/* Help text - hanya tampil di Grid view */}
-            {count === 0 && (
-                <div className="bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs px-3 py-2 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 max-w-[220px] text-left">
-                    <p className="font-medium mb-1">💡 Multi-View Mode</p>
-                    <p className="text-gray-500 dark:text-gray-400">Klik tombol + pada kamera di <strong>Grid View</strong> untuk menonton hingga {maxStreams} stream bersamaan</p>
-                </div>
-            )}
+            <button
+                onClick={onClick}
+                className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-sky-500 to-blue-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-105 transition-all"
+            >
+                <Icons.Layout />
+                <span className="font-bold">Multi-View</span>
+                <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-sm font-bold">{count}</span>
+            </button>
         </div>
     );
 }
