@@ -16,7 +16,9 @@ export default function AreaManagement() {
         rt: '', 
         rw: '', 
         kelurahan: '', 
-        kecamatan: '' 
+        kecamatan: '',
+        latitude: '',
+        longitude: ''
     });
     const [formErrors, setFormErrors] = useState({});
     const [error, setError] = useState('');
@@ -71,7 +73,7 @@ export default function AreaManagement() {
 
     const openAddModal = () => {
         setEditingArea(null);
-        setFormData({ name: '', description: '', rt: '', rw: '', kelurahan: '', kecamatan: '' });
+        setFormData({ name: '', description: '', rt: '', rw: '', kelurahan: '', kecamatan: '', latitude: '', longitude: '' });
         setFormErrors({});
         setError('');
         setShowModal(true);
@@ -86,6 +88,8 @@ export default function AreaManagement() {
             rw: area.rw || '',
             kelurahan: area.kelurahan || '',
             kecamatan: area.kecamatan || '',
+            latitude: area.latitude || '',
+            longitude: area.longitude || '',
         });
         setFormErrors({});
         setError('');
@@ -467,6 +471,40 @@ export default function AreaManagement() {
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Description</label>
                                 <textarea name="description" value={formData.description} onChange={handleChange} rows="2" className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none" placeholder="Optional notes..." />
+                            </div>
+
+                            {/* Coordinates Section */}
+                            <div className="pt-2 border-t border-gray-200 dark:border-gray-700/50">
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                                    Koordinat Area (untuk Map View)
+                                </label>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Latitude</label>
+                                        <input 
+                                            type="text" 
+                                            name="latitude" 
+                                            value={formData.latitude} 
+                                            onChange={handleChange} 
+                                            className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500" 
+                                            placeholder="-7.1507" 
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Longitude</label>
+                                        <input 
+                                            type="text" 
+                                            name="longitude" 
+                                            value={formData.longitude} 
+                                            onChange={handleChange} 
+                                            className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500" 
+                                            placeholder="111.8815" 
+                                        />
+                                    </div>
+                                </div>
+                                <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                                    Koordinat digunakan untuk memindahkan peta saat filter area dipilih
+                                </p>
                             </div>
 
                             <div className="flex gap-3 pt-2">

@@ -1947,6 +1947,7 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                     }>
                         <MapView
                             cameras={cameras}
+                            areas={areas}
                             className="h-[450px] sm:h-[550px]"
                         />
                     </Suspense>
