@@ -203,8 +203,14 @@ function ToastContainer({ toasts, removeToast }) {
 // CAMERA CARD - Enhanced with detailed location info
 // ============================================
 const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMulti }) {
+    const isMaintenance = camera.status === 'maintenance';
+    
     return (
-        <div className="relative rounded-2xl overflow-hidden bg-white dark:bg-gray-900 shadow-lg hover:shadow-2xl transition-all duration-300 ring-1 ring-gray-200 dark:ring-gray-800 hover:ring-sky-500/50 hover:-translate-y-1 group/card">
+        <div className={`relative rounded-2xl overflow-hidden bg-white dark:bg-gray-900 shadow-lg hover:shadow-2xl transition-all duration-300 ring-1 hover:-translate-y-1 group/card ${
+            isMaintenance 
+                ? 'ring-red-500/50 hover:ring-red-500' 
+                : 'ring-gray-200 dark:ring-gray-800 hover:ring-sky-500/50'
+        }`}>
             <button
                 onClick={(e) => { e.stopPropagation(); onAddMulti(); }}
                 className={`absolute top-3 right-3 z-30 p-2.5 rounded-xl shadow-lg transition-all duration-200 ${
@@ -216,26 +222,47 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
             >
                 {inMulti ? <Icons.Check /> : <Icons.Plus />}
             </button>
-            <div onClick={onClick} className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 relative cursor-pointer">
-                <div className="absolute inset-0 flex items-center justify-center text-gray-300 dark:text-gray-700">
-                    <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={0.5}>
-                        <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-                    </svg>
+            <div onClick={onClick} className={`aspect-video relative cursor-pointer ${
+                isMaintenance 
+                    ? 'bg-gradient-to-br from-red-100 to-red-200 dark:from-red-900/30 dark:to-red-800/30' 
+                    : 'bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900'
+            }`}>
+                <div className={`absolute inset-0 flex items-center justify-center ${isMaintenance ? 'text-red-300 dark:text-red-700' : 'text-gray-300 dark:text-gray-700'}`}>
+                    {isMaintenance ? (
+                        <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={0.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z" />
+                        </svg>
+                    ) : (
+                        <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={0.5}>
+                            <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                        </svg>
+                    )}
                 </div>
-                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/card:opacity-100 bg-black/40 transition-opacity duration-300">
-                    <div className="w-14 h-14 rounded-full bg-white/95 flex items-center justify-center text-sky-500 shadow-xl transform scale-90 group-hover/card:scale-100 transition-transform duration-300">
-                        <Icons.Play />
+                {!isMaintenance && (
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/card:opacity-100 bg-black/40 transition-opacity duration-300">
+                        <div className="w-14 h-14 rounded-full bg-white/95 flex items-center justify-center text-sky-500 shadow-xl transform scale-90 group-hover/card:scale-100 transition-transform duration-300">
+                            <Icons.Play />
+                        </div>
                     </div>
-                </div>
-                {/* Live badge */}
+                )}
+                {/* Status badge - Maintenance or Live */}
                 <div className="absolute top-3 left-3">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/90 backdrop-blur-sm text-white text-[10px] font-bold shadow-lg">
-                        <span className="relative flex h-1.5 w-1.5">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
+                    {isMaintenance ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-600/90 backdrop-blur-sm text-white text-[10px] font-bold shadow-lg">
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63" />
+                            </svg>
+                            PERBAIKAN
                         </span>
-                        LIVE
-                    </span>
+                    ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/90 backdrop-blur-sm text-white text-[10px] font-bold shadow-lg">
+                            <span className="relative flex h-1.5 w-1.5">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
+                            </span>
+                            LIVE
+                        </span>
+                    )}
                 </div>
                 {/* Area badge */}
                 {camera.area_name && (
@@ -247,7 +274,11 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
                 )}
             </div>
             <div className="p-4 cursor-pointer" onClick={onClick}>
-                <h3 className="font-bold text-gray-900 dark:text-white truncate mb-1 group-hover/card:text-sky-500 transition-colors">{camera.name}</h3>
+                <h3 className={`font-bold truncate mb-1 transition-colors ${
+                    isMaintenance 
+                        ? 'text-red-600 dark:text-red-400' 
+                        : 'text-gray-900 dark:text-white group-hover/card:text-sky-500'
+                }`}>{camera.name}</h3>
                 
                 {/* Location */}
                 {camera.location && (

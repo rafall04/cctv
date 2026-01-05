@@ -297,6 +297,38 @@ export default function CameraManagement() {
         }
     }, [showError]);
 
+    // Toggle maintenance status
+    const [togglingMaintenanceId, setTogglingMaintenanceId] = useState(null);
+    const toggleMaintenance = useCallback(async (camera) => {
+        const previousStatus = camera.status;
+        const newStatus = camera.status === 'maintenance' ? 'active' : 'maintenance';
+        
+        // Optimistic update
+        setCameras(prev => prev.map(c => 
+            c.id === camera.id ? { ...c, status: newStatus } : c
+        ));
+        setTogglingMaintenanceId(camera.id);
+        
+        try {
+            const result = await cameraService.updateCamera(camera.id, { status: newStatus });
+            if (!result.success) {
+                // Rollback on failure
+                setCameras(prev => prev.map(c => 
+                    c.id === camera.id ? { ...c, status: previousStatus } : c
+                ));
+                showError('Update Failed', result.message || 'Failed to update maintenance status');
+            }
+        } catch (err) {
+            // Rollback on error
+            setCameras(prev => prev.map(c => 
+                c.id === camera.id ? { ...c, status: previousStatus } : c
+            ));
+            showError('Update Failed', err.response?.data?.message || 'Failed to update maintenance status');
+        } finally {
+            setTogglingMaintenanceId(null);
+        }
+    }, [showError]);
+
     // Render loading skeleton
     const renderLoadingSkeleton = () => (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -463,6 +495,26 @@ export default function CameraManagement() {
                                             <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${camera.enabled ? 'left-5' : 'left-0.5'}`}></div>
                                         </button>
                                     </div>
+                                </div>
+                                
+                                {/* Maintenance Toggle */}
+                                <div className="flex items-center justify-between pt-3 mt-3 border-t border-gray-200 dark:border-gray-700/50">
+                                    <div className="flex items-center gap-1.5">
+                                        <svg className={`w-3.5 h-3.5 ${camera.status === 'maintenance' ? 'text-red-500' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63" />
+                                        </svg>
+                                        <span className={`text-xs ${camera.status === 'maintenance' ? 'text-red-500 font-medium' : 'text-gray-400 dark:text-gray-500'}`}>
+                                            {camera.status === 'maintenance' ? 'Perbaikan' : 'Normal'}
+                                        </span>
+                                    </div>
+                                    <button
+                                        onClick={() => toggleMaintenance(camera)}
+                                        disabled={togglingMaintenanceId === camera.id}
+                                        className={`relative w-10 h-5 rounded-full transition-colors disabled:opacity-50 ${camera.status === 'maintenance' ? 'bg-red-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+                                        title={camera.status === 'maintenance' ? 'Matikan mode perbaikan' : 'Aktifkan mode perbaikan'}
+                                    >
+                                        <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${camera.status === 'maintenance' ? 'left-5' : 'left-0.5'}`}></div>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -662,33 +714,6 @@ export default function CameraManagement() {
                                     className={`relative w-11 h-6 rounded-full transition-colors disabled:opacity-50 shrink-0 ${formData.is_tunnel ? 'bg-amber-500' : 'bg-gray-300 dark:bg-gray-600'}`}
                                 >
                                     <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${formData.is_tunnel ? 'left-5' : 'left-0.5'}`}></div>
-                                </button>
-                            </div>
-
-                            {/* Maintenance Status Toggle */}
-                            <div className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-500/20 flex items-center justify-center text-red-600 dark:text-red-400 shrink-0">
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z" />
-                                        </svg>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-900 dark:text-white">Dalam Perbaikan</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">Maintenance mode</p>
-                                    </div>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        const newStatus = formData.status === 'maintenance' ? 'active' : 'maintenance';
-                                        setFieldValue('status', newStatus);
-                                        if (modalError) setModalError('');
-                                    }}
-                                    disabled={isSubmitting}
-                                    className={`relative w-11 h-6 rounded-full transition-colors disabled:opacity-50 shrink-0 ${formData.status === 'maintenance' ? 'bg-red-500' : 'bg-gray-300 dark:bg-gray-600'}`}
-                                >
-                                    <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${formData.status === 'maintenance' ? 'left-5' : 'left-0.5'}`}></div>
                                 </button>
                             </div>
 
