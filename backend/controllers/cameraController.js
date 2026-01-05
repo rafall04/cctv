@@ -33,7 +33,8 @@ export async function getAllCameras(request, reply) {
 export async function getActiveCameras(request, reply) {
     try {
         const cameras = query(
-            `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel, a.name as area_name 
+            `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel, 
+                    c.latitude, c.longitude, a.name as area_name 
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 
              WHERE c.enabled = 1 
@@ -89,7 +90,7 @@ export async function getCameraById(request, reply) {
 // Create new camera (admin only)
 export async function createCamera(request, reply) {
     try {
-        const { name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel } = request.body;
+        const { name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude } = request.body;
 
         // Validate required fields
         if (!name || !private_rtsp_url) {
@@ -106,11 +107,13 @@ export async function createCamera(request, reply) {
 
         const isEnabled = enabled !== undefined ? enabled : 1;
         const isTunnel = is_tunnel !== undefined ? is_tunnel : 0;
+        const lat = latitude !== undefined && latitude !== '' ? parseFloat(latitude) : null;
+        const lng = longitude !== undefined && longitude !== '' ? parseFloat(longitude) : null;
 
         // Insert camera
         const result = execute(
-            'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [name, private_rtsp_url, description || null, location || null, group_name || null, areaIdValue, isEnabled, isTunnel]
+            'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [name, private_rtsp_url, description || null, location || null, group_name || null, areaIdValue, isEnabled, isTunnel, lat, lng]
         );
 
         // Log action
@@ -155,7 +158,7 @@ export async function createCamera(request, reply) {
 export async function updateCamera(request, reply) {
     try {
         const { id } = request.params;
-        const { name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel } = request.body;
+        const { name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude } = request.body;
 
         // Check if camera exists
         const existingCamera = queryOne('SELECT id, name, private_rtsp_url, enabled FROM cameras WHERE id = ?', [id]);
@@ -203,6 +206,14 @@ export async function updateCamera(request, reply) {
         if (is_tunnel !== undefined) {
             updates.push('is_tunnel = ?');
             values.push(is_tunnel);
+        }
+        if (latitude !== undefined) {
+            updates.push('latitude = ?');
+            values.push(latitude === '' || latitude === null ? null : parseFloat(latitude));
+        }
+        if (longitude !== undefined) {
+            updates.push('longitude = ?');
+            values.push(longitude === '' || longitude === null ? null : parseFloat(longitude));
         }
 
         if (updates.length === 0) {
