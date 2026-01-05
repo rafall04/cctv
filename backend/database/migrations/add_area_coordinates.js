@@ -1,12 +1,21 @@
 /**
  * Migration: Add latitude and longitude to areas table
- * Run: node backend/database/migrations/add_area_coordinates.js
+ * Run from backend folder: node database/migrations/add_area_coordinates.js
+ * Or from root: node backend/database/migrations/add_area_coordinates.js
  */
 
 import Database from 'better-sqlite3';
-import { config } from '../../config/config.js';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
-const db = new Database(config.database.path);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Path ke database relatif dari lokasi file ini
+const dbPath = join(__dirname, '..', '..', 'data', 'cctv.db');
+console.log('Database path:', dbPath);
+
+const db = new Database(dbPath);
 
 console.log('Adding coordinates columns to areas table...');
 
