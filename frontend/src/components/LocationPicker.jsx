@@ -165,7 +165,7 @@ const LocationPicker = ({
     latitude, 
     longitude, 
     onLocationChange,
-    defaultCenter = [-7.7956, 110.3695], // Default: Yogyakarta
+    defaultCenter = [-7.1507, 111.8815], // Default: Bojonegoro
     defaultZoom = 13,
 }) => {
     const [position, setPosition] = useState(
