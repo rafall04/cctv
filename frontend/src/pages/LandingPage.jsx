@@ -1929,7 +1929,10 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
     const [connectionTab, setConnectionTab] = useState('all'); // 'all', 'stable', 'tunnel'
     const [viewMode, setViewMode] = useState('map'); // 'grid' or 'map'
     const [searchQuery, setSearchQuery] = useState('');
+    const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+    const [focusedCameraId, setFocusedCameraId] = useState(null);
     const searchInputRef = useRef(null);
+    const searchContainerRef = useRef(null);
 
     // Count cameras by connection type
     const tunnelCameras = cameras.filter(c => c.is_tunnel === 1);
@@ -1966,7 +1969,26 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
     // Clear search
     const clearSearch = useCallback(() => {
         setSearchQuery('');
+        setShowSearchDropdown(false);
         searchInputRef.current?.focus();
+    }, []);
+
+    // Handle camera selection from dropdown
+    const handleCameraSelect = useCallback((camera) => {
+        // Switch to map view if not already
+        if (viewMode !== 'map') {
+            setViewMode('map');
+        }
+        // Set focused camera to navigate and play
+        setFocusedCameraId(camera.id);
+        // Clear search and close dropdown
+        setSearchQuery('');
+        setShowSearchDropdown(false);
+    }, [viewMode]);
+
+    // Handle focus handled callback from MapView
+    const handleFocusHandled = useCallback(() => {
+        setFocusedCameraId(null);
     }, []);
 
     // Handle keyboard shortcut (Ctrl+K or Cmd+K)
@@ -1986,6 +2008,27 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [searchQuery, clearSearch]);
 
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (searchContainerRef.current && !searchContainerRef.current.contains(e.target)) {
+                setShowSearchDropdown(false);
+            }
+        };
+        
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Show dropdown when typing
+    useEffect(() => {
+        if (searchQuery.trim()) {
+            setShowSearchDropdown(true);
+        } else {
+            setShowSearchDropdown(false);
+        }
+    }, [searchQuery]);
+
     return (
         <section className="py-6 sm:py-10">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1997,13 +2040,7 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                                 CCTV Publik
                             </h2>
                             <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-                                {searchQuery ? (
-                                    <>
-                                        <span className="text-sky-500 font-medium">{displayCameras.length}</span> dari {cameras.length} kamera
-                                    </>
-                                ) : (
-                                    <>{cameras.length} kamera tersedia • Streaming langsung 24/7</>
-                                )}
+                                {cameras.length} kamera tersedia • Streaming langsung 24/7
                             </p>
                         </div>
                         
@@ -2034,8 +2071,8 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                         </div>
                     </div>
 
-                    {/* Search Bar - Responsive */}
-                    <div className="relative">
+                    {/* Search Bar - Responsive with Dropdown */}
+                    <div className="relative" ref={searchContainerRef}>
                         <div className="relative flex items-center">
                             <div className="absolute left-3 text-gray-400 dark:text-gray-500 pointer-events-none">
                                 <Icons.Search />
@@ -2045,6 +2082,7 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                                 type="text"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
+                                onFocus={() => searchQuery.trim() && setShowSearchDropdown(true)}
                                 placeholder="Cari kamera berdasarkan nama, lokasi, atau area..."
                                 className="w-full pl-10 pr-20 sm:pr-24 py-2.5 sm:py-3 bg-gray-100 dark:bg-gray-800 border border-transparent focus:border-sky-500 dark:focus:border-sky-500 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm sm:text-base outline-none transition-colors"
                             />
@@ -2069,24 +2107,113 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                             </div>
                         </div>
                         
-                        {/* Search results info */}
-                        {searchQuery && (
-                            <div className="mt-2 flex items-center gap-2 text-sm">
-                                {displayCameras.length > 0 ? (
-                                    <span className="text-gray-500 dark:text-gray-400">
-                                        Menampilkan <span className="font-medium text-sky-500">{displayCameras.length}</span> hasil untuk "<span className="font-medium text-gray-700 dark:text-gray-300">{searchQuery}</span>"
+                        {/* Search Dropdown List */}
+                        {showSearchDropdown && searchFilteredCameras.length > 0 && (
+                            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50 max-h-[300px] sm:max-h-[400px] overflow-y-auto">
+                                <div className="px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                        {searchFilteredCameras.length} kamera ditemukan • Klik untuk lihat di peta
                                     </span>
-                                ) : (
-                                    <span className="text-gray-500 dark:text-gray-400">
-                                        Tidak ditemukan kamera untuk "<span className="font-medium text-gray-700 dark:text-gray-300">{searchQuery}</span>"
-                                    </span>
-                                )}
-                                <button
-                                    onClick={clearSearch}
-                                    className="text-sky-500 hover:text-sky-600 font-medium transition-colors"
-                                >
-                                    Reset
-                                </button>
+                                </div>
+                                {searchFilteredCameras.map((camera) => {
+                                    const isMaintenance = camera.status === 'maintenance';
+                                    const isTunnel = camera.is_tunnel === 1;
+                                    const hasCoords = camera.latitude && camera.longitude;
+                                    
+                                    return (
+                                        <button
+                                            key={camera.id}
+                                            onClick={() => handleCameraSelect(camera)}
+                                            disabled={!hasCoords}
+                                            className={`w-full px-4 py-3 flex items-center gap-3 text-left transition-colors border-b border-gray-100 dark:border-gray-700/50 last:border-b-0 ${
+                                                hasCoords 
+                                                    ? 'hover:bg-sky-50 dark:hover:bg-sky-500/10 cursor-pointer' 
+                                                    : 'opacity-50 cursor-not-allowed'
+                                            }`}
+                                        >
+                                            {/* Status indicator */}
+                                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                                                isMaintenance 
+                                                    ? 'bg-red-100 dark:bg-red-500/20 text-red-500' 
+                                                    : isTunnel 
+                                                        ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-500'
+                                                        : 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-500'
+                                            }`}>
+                                                {isMaintenance ? (
+                                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63" />
+                                                    </svg>
+                                                ) : (
+                                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                        <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                                    </svg>
+                                                )}
+                                            </div>
+                                            
+                                            {/* Camera info */}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`font-medium truncate ${
+                                                        isMaintenance 
+                                                            ? 'text-red-600 dark:text-red-400' 
+                                                            : 'text-gray-900 dark:text-white'
+                                                    }`}>
+                                                        {camera.name}
+                                                    </span>
+                                                    {isMaintenance && (
+                                                        <span className="px-1.5 py-0.5 text-[10px] font-medium bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 rounded">
+                                                            PERBAIKAN
+                                                        </span>
+                                                    )}
+                                                    {isTunnel && !isMaintenance && (
+                                                        <span className="px-1.5 py-0.5 text-[10px] font-medium bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded">
+                                                            TUNNEL
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                                    {camera.location && (
+                                                        <span className="flex items-center gap-1 truncate">
+                                                            <Icons.MapPin />
+                                                            {camera.location}
+                                                        </span>
+                                                    )}
+                                                    {camera.area_name && (
+                                                        <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-[10px]">
+                                                            {camera.area_name}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Arrow indicator */}
+                                            {hasCoords && (
+                                                <div className="text-gray-400 dark:text-gray-500 shrink-0">
+                                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                        <path d="M9 5l7 7-7 7"/>
+                                                    </svg>
+                                                </div>
+                                            )}
+                                            {!hasCoords && (
+                                                <span className="text-[10px] text-gray-400 dark:text-gray-500 shrink-0">
+                                                    Tanpa koordinat
+                                                </span>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                        
+                        {/* No results message */}
+                        {showSearchDropdown && searchQuery.trim() && searchFilteredCameras.length === 0 && (
+                            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50 p-6 text-center">
+                                <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-400">
+                                    <Icons.Search />
+                                </div>
+                                <p className="text-gray-500 dark:text-gray-400 text-sm">
+                                    Tidak ditemukan kamera untuk "<span className="font-medium text-gray-700 dark:text-gray-300">{searchQuery}</span>"
+                                </p>
                             </div>
                         )}
                     </div>
@@ -2183,9 +2310,11 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                         </div>
                     }>
                         <MapView
-                            cameras={searchFilteredCameras}
+                            cameras={cameras}
                             areas={areas}
                             className="h-[450px] sm:h-[550px]"
+                            focusedCameraId={focusedCameraId}
+                            onFocusHandled={handleFocusHandled}
                         />
                     </Suspense>
                 ) : (

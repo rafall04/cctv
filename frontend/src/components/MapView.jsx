@@ -588,6 +588,8 @@ const MapView = memo(({
     defaultCenter = [-7.1507, 111.8815],
     defaultZoom = 11, // Zoom level untuk skala kabupaten
     className = '',
+    focusedCameraId = null, // ID kamera yang akan difokuskan
+    onFocusHandled = null, // Callback setelah fokus ditangani
 }) => {
     const [selectedArea, setSelectedArea] = useState('all');
     const [modalCamera, setModalCamera] = useState(null);
@@ -607,6 +609,25 @@ const MapView = memo(({
             }
         }).catch(() => {});
     }, []);
+
+    // Handle focused camera from search
+    useEffect(() => {
+        if (focusedCameraId) {
+            const camera = cameras.find(c => c.id === focusedCameraId);
+            if (camera && hasValidCoords(camera)) {
+                // Set area filter to show the camera
+                if (camera.area_name && selectedArea !== camera.area_name && selectedArea !== 'all') {
+                    setSelectedArea('all');
+                }
+                // Open modal for the camera
+                setModalCamera(camera);
+                // Trigger map rerender to focus on camera
+                setMapKey(prev => prev + 1);
+                // Notify parent that focus has been handled
+                onFocusHandled?.();
+            }
+        }
+    }, [focusedCameraId, cameras, onFocusHandled, selectedArea]);
 
     const camerasWithCoords = useMemo(() => cameras.filter(hasValidCoords), [cameras]);
 
@@ -635,6 +656,18 @@ const MapView = memo(({
     }, [filtered]);
 
     const { center, zoom, bounds } = useMemo(() => {
+        // Jika ada focused camera, prioritaskan ke kamera tersebut
+        if (focusedCameraId) {
+            const focusedCamera = camerasWithCoords.find(c => c.id === focusedCameraId);
+            if (focusedCamera) {
+                return {
+                    center: [parseFloat(focusedCamera.latitude), parseFloat(focusedCamera.longitude)],
+                    zoom: 17, // Zoom dekat untuk fokus ke kamera
+                    bounds: null
+                };
+            }
+        }
+        
         // Jika area spesifik dipilih, gunakan koordinat area tersebut
         if (selectedArea !== 'all') {
             const areaData = areas.find(a => a.name === selectedArea);
@@ -670,7 +703,7 @@ const MapView = memo(({
             zoom: mapSettings.zoom || defaultZoom,
             bounds: null 
         };
-    }, [camerasWithCoords, selectedArea, areas, defaultCenter, defaultZoom, mapSettings]);
+    }, [camerasWithCoords, selectedArea, areas, defaultCenter, defaultZoom, mapSettings, focusedCameraId]);
 
     const openModal = useCallback((camera) => setModalCamera(camera), []);
     const closeModal = useCallback(() => setModalCamera(null), []);
@@ -707,7 +740,7 @@ const MapView = memo(({
                 zoomControl={false}
             >
                 <TileLayer
-                    attribution='&copy; <a href="https://raf.my.id" target="_blank">RAF NET</a>'
+                    attribution='&copy; <a href="https://rafnet.my.id" target="_blank">RAF NET</a>'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
                 <ZoomControl position="bottomright" />
