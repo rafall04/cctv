@@ -2110,8 +2110,8 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                         
                         {/* Search Dropdown List */}
                         {showSearchDropdown && searchFilteredCameras.length > 0 && (
-                            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50 max-h-[300px] sm:max-h-[400px] overflow-y-auto">
-                                <div className="px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
+                            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden z-[1100] max-h-[300px] sm:max-h-[400px] overflow-y-auto">
+                                <div className="px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700 sticky top-0">
                                     <span className="text-xs text-gray-500 dark:text-gray-400">
                                         {searchFilteredCameras.length} kamera ditemukan • Klik untuk {viewMode === 'map' ? 'lihat di peta' : 'putar video'}
                                     </span>
@@ -2210,7 +2210,7 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                         
                         {/* No results message */}
                         {showSearchDropdown && searchQuery.trim() && searchFilteredCameras.length === 0 && (
-                            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50 p-6 text-center">
+                            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden z-[1100] p-6 text-center">
                                 <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-400">
                                     <Icons.Search />
                                 </div>
