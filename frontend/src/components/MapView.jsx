@@ -11,6 +11,7 @@ import 'leaflet/dist/leaflet.css';
 import { detectDeviceTier } from '../utils/deviceDetector';
 import { settingsService } from '../services/settingsService';
 import { getHLSConfig } from '../utils/hlsConfig';
+import { viewerService } from '../services/viewerService';
 
 // Fix Leaflet icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -306,6 +307,34 @@ const VideoModal = memo(({ camera, onClose }) => {
         if (videoWrapperRef.current) videoWrapperRef.current.style.cursor = s.zoom > 1 ? 'grab' : 'default';
         try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
     }, []);
+
+    // Viewer session tracking - track when user starts/stops watching
+    useEffect(() => {
+        // Don't track if camera is offline or in maintenance
+        if (isMaintenance || isOffline) return;
+        
+        let sessionId = null;
+        
+        // Start viewer session
+        const startTracking = async () => {
+            try {
+                sessionId = await viewerService.startSession(camera.id);
+            } catch (error) {
+                console.error('[VideoModal] Failed to start viewer session:', error);
+            }
+        };
+        
+        startTracking();
+        
+        // Cleanup: stop session when modal closes
+        return () => {
+            if (sessionId) {
+                viewerService.stopSession(sessionId).catch(err => {
+                    console.error('[VideoModal] Failed to stop viewer session:', err);
+                });
+            }
+        };
+    }, [camera.id, isMaintenance, isOffline]);
 
     // HLS setup - simplified (stream sudah di-preload setiap 5 detik)
     useEffect(() => {

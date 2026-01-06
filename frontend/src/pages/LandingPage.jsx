@@ -1100,7 +1100,7 @@ function VideoPopup({ camera, onClose }) {
     const disableAnimations = shouldDisableAnimations();
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-2 sm:p-4" onClick={onClose}>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 p-2 sm:p-4" onClick={onClose}>
             <div ref={modalRef} className="relative w-full max-w-5xl bg-gray-900 rounded-2xl overflow-hidden shadow-2xl flex flex-col" style={{ maxHeight: 'calc(100vh - 16px)' }} onClick={(e) => e.stopPropagation()}>
                 {/* Header */}
                 <div className="shrink-0 flex items-center justify-between p-3 sm:p-4 bg-gray-900 border-b border-white/10">
