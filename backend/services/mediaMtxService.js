@@ -345,10 +345,19 @@ class MediaMtxService {
             const paths = pathsRes.data?.items || [];
             const sessions = [];
             
-            // Filter function to exclude internal preload readers
-            // Preload uses HLS from localhost, so filter out readers from localhost/127.0.0.1
+            // Filter function to exclude internal/preload readers
+            // Real viewers have remoteAddr populated, internal muxers don't
             const isRealViewer = (reader) => {
-                // Check remoteAddr if available
+                // hlsMuxer without remoteAddr is internal (from preload/warming service)
+                // Real HLS viewers have remoteAddr populated
+                if (reader.type === 'hlsMuxer' && !reader.remoteAddr) {
+                    if (debug) {
+                        console.log(`[MediaMTX] Filtered out internal hlsMuxer (no remoteAddr)`);
+                    }
+                    return false;
+                }
+                
+                // Check remoteAddr if available - filter localhost
                 if (reader.remoteAddr) {
                     const addr = reader.remoteAddr.toLowerCase();
                     // Exclude localhost readers (these are from preload/warming service)
