@@ -1975,16 +1975,17 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
 
     // Handle camera selection from dropdown
     const handleCameraSelect = useCallback((camera) => {
-        // Switch to map view if not already
-        if (viewMode !== 'map') {
-            setViewMode('map');
+        if (viewMode === 'map') {
+            // Map View: navigasi ke posisi kamera dan play
+            setFocusedCameraId(camera.id);
+        } else {
+            // Grid View: buka VideoPopup seperti biasa
+            onCameraClick(camera);
         }
-        // Set focused camera to navigate and play
-        setFocusedCameraId(camera.id);
         // Clear search and close dropdown
         setSearchQuery('');
         setShowSearchDropdown(false);
-    }, [viewMode]);
+    }, [viewMode, onCameraClick]);
 
     // Handle focus handled callback from MapView
     const handleFocusHandled = useCallback(() => {
@@ -2112,21 +2113,23 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                             <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50 max-h-[300px] sm:max-h-[400px] overflow-y-auto">
                                 <div className="px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
                                     <span className="text-xs text-gray-500 dark:text-gray-400">
-                                        {searchFilteredCameras.length} kamera ditemukan • Klik untuk lihat di peta
+                                        {searchFilteredCameras.length} kamera ditemukan • Klik untuk {viewMode === 'map' ? 'lihat di peta' : 'putar video'}
                                     </span>
                                 </div>
                                 {searchFilteredCameras.map((camera) => {
                                     const isMaintenance = camera.status === 'maintenance';
                                     const isTunnel = camera.is_tunnel === 1;
                                     const hasCoords = camera.latitude && camera.longitude;
+                                    // Di Map View perlu koordinat, di Grid View tidak perlu
+                                    const isDisabled = viewMode === 'map' && !hasCoords;
                                     
                                     return (
                                         <button
                                             key={camera.id}
                                             onClick={() => handleCameraSelect(camera)}
-                                            disabled={!hasCoords}
+                                            disabled={isDisabled}
                                             className={`w-full px-4 py-3 flex items-center gap-3 text-left transition-colors border-b border-gray-100 dark:border-gray-700/50 last:border-b-0 ${
-                                                hasCoords 
+                                                !isDisabled 
                                                     ? 'hover:bg-sky-50 dark:hover:bg-sky-500/10 cursor-pointer' 
                                                     : 'opacity-50 cursor-not-allowed'
                                             }`}
@@ -2186,15 +2189,15 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                                                 </div>
                                             </div>
                                             
-                                            {/* Arrow indicator */}
-                                            {hasCoords && (
+                                                            {/* Arrow indicator */}
+                                            {!isDisabled && (
                                                 <div className="text-gray-400 dark:text-gray-500 shrink-0">
                                                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                                         <path d="M9 5l7 7-7 7"/>
                                                     </svg>
                                                 </div>
                                             )}
-                                            {!hasCoords && (
+                                            {isDisabled && (
                                                 <span className="text-[10px] text-gray-400 dark:text-gray-500 shrink-0">
                                                     Tanpa koordinat
                                                 </span>
