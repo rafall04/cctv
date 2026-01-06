@@ -93,7 +93,8 @@ export async function originValidatorMiddleware(fastify, _options) {
     // Skip origin validation for certain paths
     const skipPaths = [
         '/health',
-        '/api/stream'  // Stream endpoints need to be accessible
+        '/api/stream',  // Stream endpoints need to be accessible
+        '/api/viewer'   // Viewer tracking endpoints
     ];
     
     fastify.addHook('onRequest', async (request, reply) => {

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef, memo, lazy, Suspense, useMemo } from 'react';
 import { streamService } from '../services/streamService';
 import { areaService } from '../services/areaService';
+import { viewerService } from '../services/viewerService';
 import { useTheme } from '../contexts/ThemeContext';
 import { createTransformThrottle } from '../utils/rafThrottle';
 import { detectDeviceTier, getMaxConcurrentStreams, isMobileDevice, getMobileDeviceType } from '../utils/deviceDetector';
@@ -695,6 +696,34 @@ function VideoPopup({ camera, onClose }) {
         return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
     }, []);
 
+    // Viewer session tracking - track when user starts/stops watching
+    useEffect(() => {
+        // Don't track if camera is offline or in maintenance
+        if (isMaintenance || isOffline) return;
+        
+        let sessionId = null;
+        
+        // Start viewer session
+        const startTracking = async () => {
+            try {
+                sessionId = await viewerService.startSession(camera.id);
+            } catch (error) {
+                console.error('[VideoPopup] Failed to start viewer session:', error);
+            }
+        };
+        
+        startTracking();
+        
+        // Cleanup: stop session when popup closes
+        return () => {
+            if (sessionId) {
+                viewerService.stopSession(sessionId).catch(err => {
+                    console.error('[VideoPopup] Failed to stop viewer session:', err);
+                });
+            }
+        };
+    }, [camera.id, isMaintenance, isOffline]);
+
     useEffect(() => {
         const onKey = (e) => e.key === 'Escape' && onClose();
         document.addEventListener('keydown', onKey);
@@ -1260,6 +1289,39 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         document.addEventListener('fullscreenchange', handleFullscreenChange);
         return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
     }, []);
+
+    // Viewer session tracking - track when user starts/stops watching this camera
+    useEffect(() => {
+        // Don't track if camera is offline or in maintenance
+        if (isMaintenance || isOffline) return;
+        
+        let sessionId = null;
+        
+        // Start viewer session with delay (staggered init)
+        const startTracking = async () => {
+            // Wait for init delay before starting session
+            if (initDelay > 0) {
+                await new Promise(resolve => setTimeout(resolve, initDelay));
+            }
+            
+            try {
+                sessionId = await viewerService.startSession(camera.id);
+            } catch (error) {
+                console.error('[MultiViewVideoItem] Failed to start viewer session:', error);
+            }
+        };
+        
+        startTracking();
+        
+        // Cleanup: stop session when component unmounts
+        return () => {
+            if (sessionId) {
+                viewerService.stopSession(sessionId).catch(err => {
+                    console.error('[MultiViewVideoItem] Failed to stop viewer session:', err);
+                });
+            }
+        };
+    }, [camera.id, isMaintenance, isOffline, initDelay]);
 
     // Notify parent of status changes
     useEffect(() => {

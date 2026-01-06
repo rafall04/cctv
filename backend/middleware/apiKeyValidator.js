@@ -22,7 +22,10 @@ export const API_KEY_VALIDATOR_CONFIG = {
         '/api/auth/login',
         '/api/cameras/active',
         '/api/stream',
-        '/api/areas/public'
+        '/api/areas/public',
+        '/api/viewer/start',
+        '/api/viewer/heartbeat',
+        '/api/viewer/stop'
     ],
     // Endpoint prefixes that don't require API key validation
     publicPrefixes: [
