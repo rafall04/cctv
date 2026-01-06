@@ -482,7 +482,18 @@ function VideoPopup({ camera, onClose }) {
     const fallbackHandlerRef = useRef(null);
     const abortControllerRef = useRef(null);
     
-    const [status, setStatus] = useState('connecting');
+    // Check camera status first
+    const isMaintenance = camera.status === 'maintenance';
+    const isOffline = camera.is_online === 0;
+    
+    // Set initial status based on camera state
+    const getInitialStatus = () => {
+        if (isMaintenance) return 'maintenance';
+        if (isOffline) return 'offline';
+        return 'connecting';
+    };
+    
+    const [status, setStatus] = useState(getInitialStatus);
     const [loadingStage, setLoadingStage] = useState(LoadingStage.CONNECTING);
     const [errorType, setErrorType] = useState(null); // 'codec', 'network', 'timeout', 'media', 'unknown'
     const [zoom, setZoom] = useState(1);
@@ -660,6 +671,8 @@ function VideoPopup({ camera, onClose }) {
     }, []);
 
     useEffect(() => {
+        // Skip HLS loading if camera is in maintenance or offline
+        if (isMaintenance || isOffline) return;
         if (!url || !videoRef.current) return;
         const video = videoRef.current;
         let hls = null;
@@ -934,8 +947,10 @@ function VideoPopup({ camera, onClose }) {
     // Get status display info - **Validates: Requirements 4.1, 4.2, 4.3, 4.4**
     const getStatusDisplay = () => {
         if (status === 'live') return { label: 'LIVE', color: 'bg-emerald-500/20 text-emerald-400', dotColor: 'bg-emerald-400' };
+        if (status === 'maintenance') return { label: 'PERBAIKAN', color: 'bg-red-500/20 text-red-400', dotColor: 'bg-red-400' };
+        if (status === 'offline') return { label: 'OFFLINE', color: 'bg-gray-500/20 text-gray-400', dotColor: 'bg-gray-400' };
         if (status === 'timeout') return { label: 'TIMEOUT', color: 'bg-amber-500/20 text-amber-400', dotColor: 'bg-amber-400' };
-        if (status === 'error') return { label: 'OFFLINE', color: 'bg-red-500/20 text-red-400', dotColor: 'bg-red-400' };
+        if (status === 'error') return { label: 'ERROR', color: 'bg-red-500/20 text-red-400', dotColor: 'bg-red-400' };
         // Connecting states with progressive messages
         return { label: getStageMessage(loadingStage), color: 'bg-amber-500/20 text-amber-400', dotColor: 'bg-amber-400' };
     };
@@ -973,6 +988,32 @@ function VideoPopup({ camera, onClose }) {
                 {/* Video */}
                 <div ref={wrapperRef} className="relative flex-1 min-h-0 bg-black overflow-hidden" onDoubleClick={toggleFS}>
                     <ZoomableVideo videoRef={videoRef} maxZoom={4} onZoomChange={setZoom} />
+                    
+                    {/* Maintenance Overlay */}
+                    {status === 'maintenance' && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-950/80">
+                            <div className="w-20 h-20 rounded-full bg-red-500/20 flex items-center justify-center mb-4">
+                                <svg className="w-10 h-10 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"/>
+                                </svg>
+                            </div>
+                            <h3 className="text-red-300 font-bold text-xl mb-2">Dalam Perbaikan</h3>
+                            <p className="text-gray-400 text-sm text-center max-w-md px-4">Kamera ini sedang dalam masa perbaikan/maintenance</p>
+                        </div>
+                    )}
+                    
+                    {/* Offline Overlay */}
+                    {status === 'offline' && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/90">
+                            <div className="w-20 h-20 rounded-full bg-gray-700 flex items-center justify-center mb-4">
+                                <svg className="w-10 h-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M6 18L18 6"/>
+                                </svg>
+                            </div>
+                            <h3 className="text-gray-300 font-bold text-xl mb-2">Kamera Offline</h3>
+                            <p className="text-gray-500 text-sm text-center max-w-md px-4">Kamera ini sedang tidak tersedia atau tidak dapat dijangkau</p>
+                        </div>
+                    )}
                     
                     {/* Progressive Loading Overlay - **Validates: Requirements 4.1, 4.2, 4.3, 4.4, 4.5, 5.2** */}
                     {status === 'connecting' && (

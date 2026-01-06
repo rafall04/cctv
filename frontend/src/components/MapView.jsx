@@ -60,13 +60,16 @@ const createCameraIcon = (status = 'active', isTunnel = false, isOnline = true) 
         darkColor = '#059669';
     }
     
-    // Icon SVG berdasarkan status
+    // Icon SVG berdasarkan status - gunakan icon sederhana agar jelas di ukuran kecil
     let iconSvg;
     if (status === 'maintenance') {
-        iconSvg = '<path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/>';
+        // Wrench icon - sederhana
+        iconSvg = '<path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" stroke-width="2" stroke="white" fill="none"/>';
     } else if (!isOnline) {
-        iconSvg = '<path d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3"/>';
+        // X icon - sangat jelas untuk offline
+        iconSvg = '<path d="M6 6l12 12M6 18L18 6" stroke="white" stroke-width="3" stroke-linecap="round" fill="none"/>';
     } else {
+        // Camera icon
         iconSvg = '<path d="M18 10.48V6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-4.48l4 3.98v-11l-4 3.98z"/>';
     }
     
@@ -163,6 +166,7 @@ const VideoModal = memo(({ camera, onClose }) => {
     });
 
     const isMaintenance = camera.status === 'maintenance';
+    const isOffline = camera.is_online === 0;
     const isTunnel = camera.is_tunnel === 1 || camera.is_tunnel === true;
 
     const MIN_ZOOM = 1;
@@ -306,6 +310,7 @@ const VideoModal = memo(({ camera, onClose }) => {
     // HLS setup - simplified (stream sudah di-preload setiap 5 detik)
     useEffect(() => {
         if (isMaintenance) { setStatus('maintenance'); return; }
+        if (isOffline) { setStatus('offline'); return; }
         if (!camera?.streams?.hls || !videoRef.current) return;
 
         const hlsConfig = getHLSConfig(deviceTier);
@@ -346,7 +351,7 @@ const VideoModal = memo(({ camera, onClose }) => {
         return () => {
             if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; }
         };
-    }, [camera, isMaintenance]);
+    }, [camera, isMaintenance, isOffline]);
 
     const getErrorMessage = useCallback(() => {
         const errors = {
@@ -396,6 +401,20 @@ const VideoModal = memo(({ camera, onClose }) => {
                             <div className="text-center px-4">
                                 <h4 className="text-red-400 font-bold text-lg">Dalam Perbaikan</h4>
                                 <p className="text-gray-400 text-sm mt-1">Kamera ini sedang dalam masa perbaikan/maintenance</p>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {status === 'offline' && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gray-900/80 z-10">
+                            <div className="w-20 h-20 rounded-full bg-gray-700 flex items-center justify-center">
+                                <svg className="w-10 h-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M6 18L18 6"/>
+                                </svg>
+                            </div>
+                            <div className="text-center px-4">
+                                <h4 className="text-gray-300 font-bold text-lg">Kamera Offline</h4>
+                                <p className="text-gray-500 text-sm mt-1">Kamera ini sedang tidak tersedia atau tidak dapat dijangkau</p>
                             </div>
                         </div>
                     )}
