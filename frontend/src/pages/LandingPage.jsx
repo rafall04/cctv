@@ -52,6 +52,7 @@ const Icons = {
     Moon: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>,
     Camera: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>,
     X: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M6 18L18 6M6 6l12 12"/></svg>,
+    Search: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>,
     Play: () => <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>,
     MapPin: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/><circle cx="12" cy="11" r="3"/></svg>,
     Plus: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M12 5v14m-7-7h14"/></svg>,
@@ -1927,60 +1928,167 @@ function FilterDropdown({ areas, selected, onChange, cameras, kecamatans = [], k
 function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, multiCameras }) {
     const [connectionTab, setConnectionTab] = useState('all'); // 'all', 'stable', 'tunnel'
     const [viewMode, setViewMode] = useState('map'); // 'grid' or 'map'
+    const [searchQuery, setSearchQuery] = useState('');
+    const searchInputRef = useRef(null);
 
     // Count cameras by connection type
     const tunnelCameras = cameras.filter(c => c.is_tunnel === 1);
     const stableCameras = cameras.filter(c => c.is_tunnel !== 1);
     const hasTunnelCameras = tunnelCameras.length > 0;
 
+    // Filter cameras by search query
+    const searchFilteredCameras = useMemo(() => {
+        if (!searchQuery.trim()) return cameras;
+        
+        const query = searchQuery.toLowerCase().trim();
+        return cameras.filter(camera => {
+            const name = (camera.name || '').toLowerCase();
+            const location = (camera.location || '').toLowerCase();
+            const areaName = (camera.area_name || '').toLowerCase();
+            
+            return name.includes(query) || 
+                   location.includes(query) || 
+                   areaName.includes(query);
+        });
+    }, [cameras, searchQuery]);
+
     // Filter cameras by connection type (only for grid view)
     const filteredForGrid = useMemo(() => {
-        if (connectionTab === 'stable') return stableCameras;
-        if (connectionTab === 'tunnel') return tunnelCameras;
-        return cameras;
-    }, [cameras, connectionTab, stableCameras, tunnelCameras]);
+        const baseList = searchFilteredCameras;
+        if (connectionTab === 'stable') return baseList.filter(c => c.is_tunnel !== 1);
+        if (connectionTab === 'tunnel') return baseList.filter(c => c.is_tunnel === 1);
+        return baseList;
+    }, [searchFilteredCameras, connectionTab]);
 
-    // For map view, always show all cameras (filter by area is inside MapView)
-    const displayCameras = viewMode === 'map' ? cameras : filteredForGrid;
+    // For map view, use search filtered cameras
+    const displayCameras = viewMode === 'map' ? searchFilteredCameras : filteredForGrid;
+
+    // Clear search
+    const clearSearch = useCallback(() => {
+        setSearchQuery('');
+        searchInputRef.current?.focus();
+    }, []);
+
+    // Handle keyboard shortcut (Ctrl+K or Cmd+K)
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                searchInputRef.current?.focus();
+            }
+            // Escape to clear search
+            if (e.key === 'Escape' && searchQuery) {
+                clearSearch();
+            }
+        };
+        
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [searchQuery, clearSearch]);
 
     return (
         <section className="py-6 sm:py-10">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-                    <div>
-                        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-                            CCTV Publik
-                        </h2>
-                        <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-                            {cameras.length} kamera tersedia • Streaming langsung 24/7
-                        </p>
+                <div className="flex flex-col gap-4 mb-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div>
+                            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
+                                CCTV Publik
+                            </h2>
+                            <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
+                                {searchQuery ? (
+                                    <>
+                                        <span className="text-sky-500 font-medium">{displayCameras.length}</span> dari {cameras.length} kamera
+                                    </>
+                                ) : (
+                                    <>{cameras.length} kamera tersedia • Streaming langsung 24/7</>
+                                )}
+                            </p>
+                        </div>
+                        
+                        {/* View Mode Toggle - Maps diutamakan di depan */}
+                        <div className="flex items-center p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
+                            <button
+                                onClick={() => setViewMode('map')}
+                                className={`p-2.5 rounded-lg transition-colors ${
+                                    viewMode === 'map'
+                                        ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-sky-400 shadow-sm'
+                                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                                }`}
+                                title="Map View"
+                            >
+                                <Icons.Map />
+                            </button>
+                            <button
+                                onClick={() => setViewMode('grid')}
+                                className={`p-2.5 rounded-lg transition-colors ${
+                                    viewMode === 'grid'
+                                        ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-sky-400 shadow-sm'
+                                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                                }`}
+                                title="Grid View (Multi-View)"
+                            >
+                                <Icons.Grid />
+                            </button>
+                        </div>
                     </div>
-                    
-                    {/* View Mode Toggle - Maps diutamakan di depan */}
-                    <div className="flex items-center p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
-                        <button
-                            onClick={() => setViewMode('map')}
-                            className={`p-2.5 rounded-lg transition-colors ${
-                                viewMode === 'map'
-                                    ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-sky-400 shadow-sm'
-                                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                            }`}
-                            title="Map View"
-                        >
-                            <Icons.Map />
-                        </button>
-                        <button
-                            onClick={() => setViewMode('grid')}
-                            className={`p-2.5 rounded-lg transition-colors ${
-                                viewMode === 'grid'
-                                    ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-sky-400 shadow-sm'
-                                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                            }`}
-                            title="Grid View (Multi-View)"
-                        >
-                            <Icons.Grid />
-                        </button>
+
+                    {/* Search Bar - Responsive */}
+                    <div className="relative">
+                        <div className="relative flex items-center">
+                            <div className="absolute left-3 text-gray-400 dark:text-gray-500 pointer-events-none">
+                                <Icons.Search />
+                            </div>
+                            <input
+                                ref={searchInputRef}
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Cari kamera berdasarkan nama, lokasi, atau area..."
+                                className="w-full pl-10 pr-20 sm:pr-24 py-2.5 sm:py-3 bg-gray-100 dark:bg-gray-800 border border-transparent focus:border-sky-500 dark:focus:border-sky-500 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm sm:text-base outline-none transition-colors"
+                            />
+                            {/* Clear button & Keyboard shortcut hint */}
+                            <div className="absolute right-2 flex items-center gap-1.5">
+                                {searchQuery && (
+                                    <button
+                                        onClick={clearSearch}
+                                        className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                                        title="Hapus pencarian (Esc)"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path d="M6 18L18 6M6 6l12 12"/>
+                                        </svg>
+                                    </button>
+                                )}
+                                {/* Keyboard shortcut - hidden on mobile */}
+                                <span className="hidden sm:flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] text-gray-400 dark:text-gray-500 bg-gray-200 dark:bg-gray-700 rounded">
+                                    <kbd className="font-sans">⌘</kbd>
+                                    <kbd className="font-sans">K</kbd>
+                                </span>
+                            </div>
+                        </div>
+                        
+                        {/* Search results info */}
+                        {searchQuery && (
+                            <div className="mt-2 flex items-center gap-2 text-sm">
+                                {displayCameras.length > 0 ? (
+                                    <span className="text-gray-500 dark:text-gray-400">
+                                        Menampilkan <span className="font-medium text-sky-500">{displayCameras.length}</span> hasil untuk "<span className="font-medium text-gray-700 dark:text-gray-300">{searchQuery}</span>"
+                                    </span>
+                                ) : (
+                                    <span className="text-gray-500 dark:text-gray-400">
+                                        Tidak ditemukan kamera untuk "<span className="font-medium text-gray-700 dark:text-gray-300">{searchQuery}</span>"
+                                    </span>
+                                )}
+                                <button
+                                    onClick={clearSearch}
+                                    className="text-sky-500 hover:text-sky-600 font-medium transition-colors"
+                                >
+                                    Reset
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -1996,7 +2104,7 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                                         : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                                 }`}
                             >
-                                Semua ({cameras.length})
+                                Semua ({searchFilteredCameras.length})
                             </button>
                             <button
                                 onClick={() => setConnectionTab('stable')}
@@ -2007,7 +2115,7 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                                 }`}
                             >
                                 <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                Stabil ({stableCameras.length})
+                                Stabil ({searchFilteredCameras.filter(c => c.is_tunnel !== 1).length})
                             </button>
                             <button
                                 onClick={() => setConnectionTab('tunnel')}
@@ -2018,7 +2126,7 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                                 }`}
                             >
                                 <span className="w-2 h-2 rounded-full bg-orange-500"></span>
-                                Tunnel ({tunnelCameras.length})
+                                Tunnel ({searchFilteredCameras.filter(c => c.is_tunnel === 1).length})
                             </button>
                         </div>
                         
@@ -2038,17 +2146,28 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                 ) : displayCameras.length === 0 ? (
                     <div className="text-center py-16">
                         <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400">
-                            <Icons.Camera />
+                            {searchQuery ? <Icons.Search /> : <Icons.Camera />}
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Tidak Ada Kamera</h3>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                            {searchQuery ? 'Tidak Ditemukan' : 'Tidak Ada Kamera'}
+                        </h3>
                         <p className="text-gray-500 dark:text-gray-400 mb-4">
-                            {connectionTab === 'tunnel' 
-                                ? 'Tidak ada kamera dengan koneksi tunnel.' 
-                                : connectionTab === 'stable'
-                                    ? 'Tidak ada kamera dengan koneksi stabil.'
-                                    : 'Kamera akan segera tersedia.'}
+                            {searchQuery 
+                                ? `Tidak ada kamera yang cocok dengan "${searchQuery}".`
+                                : connectionTab === 'tunnel' 
+                                    ? 'Tidak ada kamera dengan koneksi tunnel.' 
+                                    : connectionTab === 'stable'
+                                        ? 'Tidak ada kamera dengan koneksi stabil.'
+                                        : 'Kamera akan segera tersedia.'}
                         </p>
-                        {connectionTab !== 'all' && (
+                        {searchQuery ? (
+                            <button 
+                                onClick={clearSearch}
+                                className="text-sky-500 font-medium hover:text-sky-600 transition-colors"
+                            >
+                                Hapus Pencarian →
+                            </button>
+                        ) : connectionTab !== 'all' && (
                             <button 
                                 onClick={() => setConnectionTab('all')}
                                 className="text-sky-500 font-medium hover:text-sky-600 transition-colors"
@@ -2064,7 +2183,7 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                         </div>
                     }>
                         <MapView
-                            cameras={cameras}
+                            cameras={searchFilteredCameras}
                             areas={areas}
                             className="h-[450px] sm:h-[550px]"
                         />
