@@ -248,26 +248,21 @@ const VideoModal = memo(({ camera, onClose }) => {
         try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
     }, []);
 
-    // HLS setup - optimized config
+    // HLS setup - simplified (stream sudah di-preload setiap 5 detik)
     useEffect(() => {
         if (isMaintenance) { setStatus('maintenance'); return; }
         if (!camera?.streams?.hls || !videoRef.current) return;
 
         const hlsConfig = getHLSConfig(deviceTier);
-        const loadTimeout = setTimeout(() => {
-            if (status === 'loading') { setStatus('error'); setErrorType('timeout'); }
-        }, isLowEnd ? 20000 : 15000);
 
         if (Hls.isSupported()) {
             hlsRef.current = new Hls(hlsConfig);
             hlsRef.current.on(Hls.Events.MANIFEST_PARSED, () => {
-                clearTimeout(loadTimeout);
                 setStatus('playing');
                 videoRef.current?.play().catch(() => {});
             });
             hlsRef.current.on(Hls.Events.ERROR, (_, data) => {
                 if (data.fatal) {
-                    clearTimeout(loadTimeout);
                     setStatus('error');
                     if (data.type === Hls.ErrorTypes.NETWORK_ERROR) setErrorType('network');
                     else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
@@ -285,16 +280,15 @@ const VideoModal = memo(({ camera, onClose }) => {
         } else if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
             videoRef.current.src = camera.streams.hls;
             videoRef.current.addEventListener('loadedmetadata', () => {
-                clearTimeout(loadTimeout); setStatus('playing');
+                setStatus('playing');
                 videoRef.current?.play().catch(() => {});
             });
             videoRef.current.addEventListener('error', () => {
-                clearTimeout(loadTimeout); setStatus('error'); setErrorType('media');
+                setStatus('error'); setErrorType('media');
             });
         }
 
         return () => {
-            clearTimeout(loadTimeout);
             if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; }
         };
     }, [camera, isMaintenance]);
@@ -303,7 +297,6 @@ const VideoModal = memo(({ camera, onClose }) => {
         const errors = {
             codec: { title: 'Codec Tidak Didukung', desc: 'Browser Anda tidak mendukung codec H.265/HEVC. Coba browser lain.', color: 'yellow' },
             network: { title: 'Koneksi Gagal', desc: 'Tidak dapat terhubung ke server stream.', color: 'orange' },
-            timeout: { title: 'Waktu Habis', desc: 'Stream terlalu lama merespons.', color: 'gray' },
             default: { title: 'Stream Tidak Tersedia', desc: 'Terjadi kesalahan saat memuat stream.', color: 'red' }
         };
         return errors[errorType] || errors.default;
