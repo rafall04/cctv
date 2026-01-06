@@ -334,7 +334,7 @@ class MediaMtxService {
      * Filters out internal preload readers (from localhost) to show only real viewers.
      * @returns {Promise<any>}
      */
-    async getStats() {
+    async getStats(debug = false) {
         try {
             const [pathsRes, configRes] = await Promise.all([
                 axios.get(`${mediaMtxApiBaseUrl}/paths/list`, { timeout: 5000 }),
@@ -346,16 +346,43 @@ class MediaMtxService {
             const sessions = [];
             
             // Filter function to exclude internal preload readers
-            // Preload uses HLS from localhost, so filter out hlsMuxer readers from 127.0.0.1
+            // Preload uses HLS from localhost, so filter out readers from localhost/127.0.0.1
             const isRealViewer = (reader) => {
-                // If reader has remoteAddr, check if it's from localhost (preload)
+                // Check remoteAddr if available
                 if (reader.remoteAddr) {
                     const addr = reader.remoteAddr.toLowerCase();
-                    // Exclude localhost/127.0.0.1 readers (these are from preload service)
-                    if (addr.includes('127.0.0.1') || addr.includes('localhost') || addr.startsWith('[::1]')) {
+                    // Exclude localhost readers (these are from preload/warming service)
+                    // Handle various formats: 127.0.0.1, localhost, ::1, ::ffff:127.0.0.1
+                    if (
+                        addr.includes('127.0.0.1') || 
+                        addr.includes('localhost') || 
+                        addr.startsWith('[::1]') ||
+                        addr.includes('::1]') ||
+                        addr === '::1' ||
+                        addr.includes('::ffff:127.0.0.1')
+                    ) {
+                        if (debug) {
+                            console.log(`[MediaMTX] Filtered out localhost reader: ${addr}`);
+                        }
                         return false;
                     }
                 }
+                
+                // Also check id field which may contain IP info in some MediaMTX versions
+                if (reader.id) {
+                    const id = reader.id.toLowerCase();
+                    if (
+                        id.includes('127.0.0.1') || 
+                        id.includes('localhost') ||
+                        id.includes('::1')
+                    ) {
+                        if (debug) {
+                            console.log(`[MediaMTX] Filtered out localhost reader by id: ${id}`);
+                        }
+                        return false;
+                    }
+                }
+                
                 return true;
             };
             

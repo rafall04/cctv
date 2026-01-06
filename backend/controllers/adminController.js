@@ -65,13 +65,28 @@ export async function getDashboardStats(request, reply) {
         const activeStreams = (mtxStats.paths || []).map(p => {
             const cameraId = p.name.replace('camera', '');
             const cam = queryOne('SELECT name FROM cameras WHERE id = ?', [cameraId]);
+            
+            // Determine stream state
+            let state = 'idle';
+            if (p.sourceReady || p.ready) {
+                state = 'ready';
+            } else if (p.readers && p.readers.length > 0) {
+                state = 'buffering';
+            }
+            
             return {
                 id: cameraId,
                 name: cam ? cam.name : p.name,
                 ready: p.ready || false,
+                state: state,
                 viewers: (p.readers || []).length,
                 bytesReceived: p.bytesReceived || 0,
-                bytesSent: p.bytesSent || 0
+                bytesSent: p.bytesSent || 0,
+                // Debug info (can be removed in production)
+                _debug: {
+                    originalReaders: p._originalReaderCount || 0,
+                    filteredReaders: p._filteredReaderCount || 0
+                }
             };
         });
 
