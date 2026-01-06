@@ -25,9 +25,11 @@ import adminRoutes from './routes/adminRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import feedbackRoutes from './routes/feedbackRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
+import viewerRoutes from './routes/viewerRoutes.js';
 import mediaMtxService from './services/mediaMtxService.js';
 import streamWarmer from './services/streamWarmer.js';
 import cameraHealthService from './services/cameraHealthService.js';
+import viewerSessionService from './services/viewerSessionService.js';
 
 const fastify = Fastify({
     logger: config.server.env === 'production' 
@@ -203,6 +205,7 @@ await fastify.register(adminRoutes, { prefix: '/api/admin' });
 await fastify.register(userRoutes, { prefix: '/api/users' });
 await fastify.register(feedbackRoutes, { prefix: '/api/feedback' });
 await fastify.register(settingsRoutes);
+await fastify.register(viewerRoutes, { prefix: '/api/viewer' });
 
 // ============================================
 // GLOBAL ERROR HANDLER
@@ -263,6 +266,9 @@ const start = async () => {
         console.log('    GET    /api/cameras/active');
         console.log('    GET    /api/stream');
         console.log('    GET    /api/stream/:cameraId');
+        console.log('    POST   /api/viewer/start');
+        console.log('    POST   /api/viewer/heartbeat');
+        console.log('    POST   /api/viewer/stop');
         console.log('');
         console.log('  Admin (requires JWT + CSRF):');
         console.log('    POST   /api/auth/logout');
@@ -299,6 +305,10 @@ const start = async () => {
         // Start camera health check service (every 30 seconds)
         cameraHealthService.start(30000);
         console.log('[CameraHealth] Health check service started (30s interval)');
+        
+        // Start viewer session cleanup service
+        viewerSessionService.startCleanup();
+        console.log('[ViewerSession] Session cleanup service started (15s interval)');
     } catch (err) {
         fastify.log.error(err);
         process.exit(1);
@@ -313,6 +323,7 @@ const shutdown = async () => {
     mediaMtxService.stopAutoSync();
     streamWarmer.stopAll();
     cameraHealthService.stop();
+    viewerSessionService.stopCleanup();
     stopDailyCleanup();
     await fastify.close();
     process.exit(0);

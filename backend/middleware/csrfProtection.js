@@ -37,6 +37,9 @@ export const STATE_CHANGING_METHODS = ['POST', 'PUT', 'DELETE', 'PATCH'];
  */
 export const CSRF_SKIP_ENDPOINTS = [
     '/api/stream',                      // Stream endpoints use API key only
+    '/api/viewer/start',                // Viewer tracking - public endpoint
+    '/api/viewer/heartbeat',            // Viewer tracking - public endpoint
+    '/api/viewer/stop',                 // Viewer tracking - public endpoint
     '/health'                           // Health check endpoint
 ];
 

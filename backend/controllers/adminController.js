@@ -1,6 +1,7 @@
 import os from 'os';
 import { query, queryOne } from '../database/database.js';
 import mediaMtxService from '../services/mediaMtxService.js';
+import viewerSessionService from '../services/viewerSessionService.js';
 
 export async function getDashboardStats(request, reply) {
     try {
@@ -59,8 +60,13 @@ export async function getDashboardStats(request, reply) {
             loadAvg: os.loadavg(),
         };
 
-        const sessions = mtxStats.sessions || [];
-        const activeViewers = sessions.length;
+        // Get viewer data from viewerSessionService (frontend-based tracking)
+        const viewerStats = viewerSessionService.getViewerStats();
+        const activeViewers = viewerStats.activeViewers;
+        const viewersByCamera = {};
+        viewerStats.viewersByCamera.forEach(v => {
+            viewersByCamera[v.camera_id] = v.viewer_count;
+        });
 
         const activeStreams = (mtxStats.paths || []).map(p => {
             const cameraId = p.name.replace('camera', '');
@@ -74,19 +80,17 @@ export async function getDashboardStats(request, reply) {
                 state = 'buffering';
             }
             
+            // Get viewer count from viewerSessionService
+            const viewers = viewersByCamera[parseInt(cameraId)] || 0;
+            
             return {
                 id: cameraId,
                 name: cam ? cam.name : p.name,
                 ready: p.ready || false,
                 state: state,
-                viewers: (p.readers || []).length,
+                viewers: viewers,
                 bytesReceived: p.bytesReceived || 0,
-                bytesSent: p.bytesSent || 0,
-                // Debug info (can be removed in production)
-                _debug: {
-                    originalReaders: p._originalReaderCount || 0,
-                    filteredReaders: p._filteredReaderCount || 0
-                }
+                bytesSent: p.bytesSent || 0
             };
         });
 

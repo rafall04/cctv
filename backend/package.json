@@ -32,7 +32,8 @@
     "better-sqlite3": "^11.7.0",
     "dotenv": "^16.4.5",
     "fastify": "^4.28.1",
-    "nanoid": "^5.0.8"
+    "nanoid": "^5.0.8",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@types/node": "^20.14.10",

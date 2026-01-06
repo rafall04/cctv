@@ -37,7 +37,8 @@ export const RATE_LIMIT_CONFIG = {
     // Whitelisted endpoints (no rate limiting)
     whitelist: [
         '/health',
-        '/api/stream'
+        '/api/stream',
+        '/api/viewer/heartbeat'  // Viewer heartbeat needs frequent calls (every 10s)
     ],
     // Auth endpoint prefixes
     authPrefixes: [
