@@ -21,9 +21,28 @@ L.Icon.Default.mergeOptions({
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
 
-// Deteksi device tier sekali saja
+// Deteksi device tier sekali saja (module level untuk performa)
 const deviceTier = detectDeviceTier();
 const isLowEnd = deviceTier === 'low';
+
+// Loading stages untuk progressive feedback
+const LoadingStage = {
+    CONNECTING: 'connecting',
+    LOADING: 'loading',
+    BUFFERING: 'buffering',
+    PLAYING: 'playing',
+    ERROR: 'error'
+};
+
+// Pesan loading berdasarkan stage
+const getLoadingMessage = (stage) => {
+    switch (stage) {
+        case LoadingStage.CONNECTING: return 'Menghubungkan...';
+        case LoadingStage.LOADING: return 'Memuat stream...';
+        case LoadingStage.BUFFERING: return 'Buffering...';
+        default: return 'Memuat...';
+    }
+};
 
 // Cache icon untuk menghindari pembuatan ulang
 const iconCache = new Map();
@@ -153,7 +172,11 @@ const VideoModal = memo(({ camera, onClose }) => {
     const modalRef = useRef(null);
     const hlsRef = useRef(null);
     const rafRef = useRef(null);
-    const [status, setStatus] = useState('loading');
+    const playbackCheckRef = useRef(null);
+    
+    // Status: 'connecting' | 'loading' | 'buffering' | 'playing' | 'maintenance' | 'offline' | 'error'
+    const [status, setStatus] = useState('connecting');
+    const [loadingStage, setLoadingStage] = useState(LoadingStage.CONNECTING);
     const [errorType, setErrorType] = useState(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
     
@@ -232,6 +255,7 @@ const VideoModal = memo(({ camera, onClose }) => {
         return () => { 
             document.body.style.overflow = ''; 
             if (rafRef.current) cancelAnimationFrame(rafRef.current);
+            if (playbackCheckRef.current) clearInterval(playbackCheckRef.current);
         };
     }, []);
 
@@ -336,49 +360,146 @@ const VideoModal = memo(({ camera, onClose }) => {
         };
     }, [camera.id, isMaintenance, isOffline]);
 
-    // HLS setup - simplified (stream sudah di-preload setiap 5 detik)
+    // HLS setup - dengan progressive loading stages seperti grid view
     useEffect(() => {
         if (isMaintenance) { setStatus('maintenance'); return; }
         if (isOffline) { setStatus('offline'); return; }
         if (!camera?.streams?.hls || !videoRef.current) return;
 
+        const video = videoRef.current;
+        let cancelled = false;
+        
+        // Reset state
+        setStatus('connecting');
+        setLoadingStage(LoadingStage.CONNECTING);
+        setErrorType(null);
+
         const hlsConfig = getHLSConfig(deviceTier);
 
+        // Handler untuk video playing - hanya set sekali saat mulai play
+        const handlePlaying = () => {
+            if (cancelled) return;
+            if (playbackCheckRef.current) {
+                clearInterval(playbackCheckRef.current);
+                playbackCheckRef.current = null;
+            }
+            setStatus('playing');
+            setLoadingStage(LoadingStage.PLAYING);
+        };
+
+        // Fallback: Check video state periodically untuk browser yang tidak fire event
+        const startPlaybackCheck = () => {
+            playbackCheckRef.current = setInterval(() => {
+                if (cancelled) {
+                    clearInterval(playbackCheckRef.current);
+                    return;
+                }
+                if (video.readyState >= 3 && video.buffered.length > 0) {
+                    if (!video.paused || video.currentTime > 0) {
+                        handlePlaying();
+                    } else {
+                        video.play().catch(() => {});
+                    }
+                }
+            }, 500);
+        };
+
+        video.addEventListener('playing', handlePlaying);
+
         if (Hls.isSupported()) {
-            hlsRef.current = new Hls(hlsConfig);
-            hlsRef.current.on(Hls.Events.MANIFEST_PARSED, () => {
-                setStatus('playing');
-                videoRef.current?.play().catch(() => {});
+            const hls = new Hls(hlsConfig);
+            hlsRef.current = hls;
+            
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                if (cancelled) return;
+                setLoadingStage(LoadingStage.BUFFERING);
+                video.play().catch(() => {});
             });
-            hlsRef.current.on(Hls.Events.ERROR, (_, data) => {
-                if (data.fatal) {
-                    setStatus('error');
-                    if (data.type === Hls.ErrorTypes.NETWORK_ERROR) setErrorType('network');
-                    else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                        if (data.details === 'fragParsingError' || data.details === 'bufferAppendError' ||
-                            data.details === 'manifestIncompatibleCodecsError' ||
-                            data.reason?.toLowerCase().includes('codec') ||
-                            data.reason?.toLowerCase().includes('hevc')) {
-                            setErrorType('codec');
-                        } else setErrorType('media');
-                    } else setErrorType('unknown');
+            
+            // FRAG_LOADED - fragment pertama dimuat
+            hls.on(Hls.Events.FRAG_LOADED, () => {
+                if (cancelled) return;
+                setLoadingStage(prev => {
+                    if (prev === LoadingStage.CONNECTING || prev === LoadingStage.LOADING) {
+                        return LoadingStage.BUFFERING;
+                    }
+                    return prev;
+                });
+                if (video.paused) video.play().catch(() => {});
+            });
+            
+            // FRAG_BUFFERED - fragment sudah di-buffer, siap play
+            hls.on(Hls.Events.FRAG_BUFFERED, () => {
+                if (cancelled) return;
+                setStatus('playing');
+                setLoadingStage(LoadingStage.PLAYING);
+                if (video.paused) video.play().catch(() => {});
+            });
+            
+            hls.on(Hls.Events.ERROR, (_, data) => {
+                if (cancelled || !data.fatal) return;
+                
+                setStatus('error');
+                setLoadingStage(LoadingStage.ERROR);
+                
+                if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                    setErrorType('network');
+                } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                    if (data.details === 'fragParsingError' || data.details === 'bufferAppendError' ||
+                        data.details === 'manifestIncompatibleCodecsError' ||
+                        data.reason?.toLowerCase().includes('codec') ||
+                        data.reason?.toLowerCase().includes('hevc')) {
+                        setErrorType('codec');
+                    } else {
+                        setErrorType('media');
+                    }
+                } else {
+                    setErrorType('unknown');
                 }
             });
-            hlsRef.current.loadSource(camera.streams.hls);
-            hlsRef.current.attachMedia(videoRef.current);
-        } else if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
-            videoRef.current.src = camera.streams.hls;
-            videoRef.current.addEventListener('loadedmetadata', () => {
-                setStatus('playing');
-                videoRef.current?.play().catch(() => {});
+            
+            // Load source dan attach media
+            hls.loadSource(camera.streams.hls);
+            setLoadingStage(LoadingStage.LOADING);
+            
+            // Delay attach untuk stabilitas
+            setTimeout(() => {
+                if (!cancelled && hlsRef.current) {
+                    hls.attachMedia(video);
+                    startPlaybackCheck();
+                }
+            }, 50);
+            
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            // Safari native HLS
+            video.src = camera.streams.hls;
+            setLoadingStage(LoadingStage.LOADING);
+            
+            video.addEventListener('loadedmetadata', () => {
+                if (cancelled) return;
+                setLoadingStage(LoadingStage.BUFFERING);
+                video.play().catch(() => {});
             });
-            videoRef.current.addEventListener('error', () => {
-                setStatus('error'); setErrorType('media');
+            video.addEventListener('error', () => {
+                if (cancelled) return;
+                setStatus('error');
+                setErrorType('media');
             });
+            
+            startPlaybackCheck();
         }
 
         return () => {
-            if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; }
+            cancelled = true;
+            video.removeEventListener('playing', handlePlaying);
+            if (playbackCheckRef.current) {
+                clearInterval(playbackCheckRef.current);
+                playbackCheckRef.current = null;
+            }
+            if (hlsRef.current) { 
+                hlsRef.current.destroy(); 
+                hlsRef.current = null; 
+            }
         };
     }, [camera, isMaintenance, isOffline]);
 
@@ -414,13 +535,53 @@ const VideoModal = memo(({ camera, onClose }) => {
                     onPointerLeave={handlePointerUp}
                     style={{ touchAction: 'none' }}
                 >
-                    {status === 'loading' && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10">
-                            <div className={`w-10 h-10 border-2 border-gray-700 border-t-sky-500 rounded-full ${isLowEnd ? '' : 'animate-spin'}`}
-                                 style={isLowEnd ? { animation: 'spin 1.5s linear infinite' } : {}} />
-                            <span className="text-gray-400 text-sm">Menghubungkan...</span>
+                    {/* Progressive Loading Overlay - dengan animasi buffering */}
+                {(status === 'connecting' || status === 'loading' || status === 'buffering' || 
+                  (status !== 'playing' && status !== 'maintenance' && status !== 'offline' && status !== 'error')) && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10 bg-gradient-to-br from-gray-800 via-gray-900 to-gray-800">
+                        {/* Animated shimmer background - disabled on low-end */}
+                        {!isLowEnd && (
+                            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                                <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/5 to-transparent" />
+                            </div>
+                        )}
+                        
+                        {/* Loading spinner dengan progress indicator */}
+                        <div className="relative">
+                            <div className={`w-12 h-12 border-2 border-gray-700 rounded-full ${isLowEnd ? '' : 'animate-pulse'}`} />
+                            <div 
+                                className={`absolute inset-0 w-12 h-12 border-2 border-transparent border-t-sky-500 rounded-full ${isLowEnd ? '' : 'animate-spin'}`}
+                                style={isLowEnd ? { animation: 'spin 1.5s linear infinite' } : {}}
+                            />
+                            {/* Inner progress dot untuk buffering stage */}
+                            {loadingStage === LoadingStage.BUFFERING && (
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className={`w-2 h-2 bg-sky-500 rounded-full ${isLowEnd ? '' : 'animate-ping'}`} />
+                                </div>
+                            )}
                         </div>
-                    )}
+                        
+                        {/* Loading message */}
+                        <div className="text-center">
+                            <span className="text-white font-medium text-sm">{getLoadingMessage(loadingStage)}</span>
+                            {/* Progress dots untuk visual feedback */}
+                            <div className="flex items-center justify-center gap-1 mt-2">
+                                <span className={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${
+                                    loadingStage === LoadingStage.CONNECTING || loadingStage === LoadingStage.LOADING || loadingStage === LoadingStage.BUFFERING 
+                                        ? 'bg-sky-500' : 'bg-gray-600'
+                                }`} />
+                                <span className={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${
+                                    loadingStage === LoadingStage.LOADING || loadingStage === LoadingStage.BUFFERING 
+                                        ? 'bg-sky-500' : 'bg-gray-600'
+                                }`} />
+                                <span className={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${
+                                    loadingStage === LoadingStage.BUFFERING 
+                                        ? 'bg-sky-500' : 'bg-gray-600'
+                                }`} />
+                            </div>
+                        </div>
+                    </div>
+                )}
                     
                     {status === 'maintenance' && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-red-950/50 z-10">
@@ -600,7 +761,8 @@ const VideoModal = memo(({ camera, onClose }) => {
                                 </span>
                             ) : (
                                 <>
-                                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"/>
+                                    {/* Pulse indicator - disabled on low-end for performance */}
+                                    <span className={`w-1.5 h-1.5 rounded-full bg-red-500 ${isLowEnd ? '' : 'animate-pulse'}`}/>
                                     <span className={`px-1.5 py-0.5 rounded text-white text-[10px] font-bold ${isTunnel ? 'bg-orange-500' : 'bg-emerald-500'}`}>
                                         {isTunnel ? 'Tunnel' : 'Stabil'}
                                     </span>
