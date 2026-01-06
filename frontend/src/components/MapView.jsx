@@ -10,6 +10,7 @@ import Hls from 'hls.js';
 import 'leaflet/dist/leaflet.css';
 import { detectDeviceTier } from '../utils/deviceDetector';
 import { settingsService } from '../services/settingsService';
+import { getHLSConfig } from '../utils/hlsConfig';
 
 // Fix Leaflet icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -120,17 +121,24 @@ const applyMarkerOffset = (cameras) => {
     });
 };
 
-// Video Modal - dengan error handling codec, status maintenance, dan zoom controls
+// Video Modal - OPTIMIZED untuk low-end device
+// Menggunakan ref-based state untuk pan/zoom agar tidak trigger re-render
 const VideoModal = memo(({ camera, onClose }) => {
     const videoRef = useRef(null);
     const videoWrapperRef = useRef(null);
     const hlsRef = useRef(null);
+    const rafRef = useRef(null);
     const [status, setStatus] = useState('loading');
-    const [errorType, setErrorType] = useState(null); // 'codec', 'network', 'timeout', 'unknown'
-    const [zoom, setZoom] = useState(1);
-    const [pan, setPan] = useState({ x: 0, y: 0 }); // dalam persentase
-    const [isDragging, setIsDragging] = useState(false);
-    const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+    const [errorType, setErrorType] = useState(null);
+    
+    // Zoom state - hanya untuk UI display
+    const [zoomDisplay, setZoomDisplay] = useState(1);
+    
+    // Ref-based state untuk performa (tidak trigger re-render saat pan/zoom)
+    const stateRef = useRef({ 
+        zoom: 1, panX: 0, panY: 0, 
+        dragging: false, startX: 0, startY: 0, startPanX: 0, startPanY: 0 
+    });
 
     const isMaintenance = camera.status === 'maintenance';
     const isTunnel = camera.is_tunnel === 1 || camera.is_tunnel === true;
@@ -138,13 +146,33 @@ const VideoModal = memo(({ camera, onClose }) => {
     const MIN_ZOOM = 1;
     const MAX_ZOOM = 4;
 
-    // Helper functions - sama seperti di LandingPage
     const getMaxPan = (z) => z <= 1 ? 0 : ((z - 1) / (2 * z)) * 100;
     const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
+    // Apply transform langsung ke DOM (bypass React re-render)
+    const applyTransform = useCallback((animate = false) => {
+        if (!videoWrapperRef.current) return;
+        const { zoom, panX, panY } = stateRef.current;
+        videoWrapperRef.current.style.transition = animate ? 'transform 0.15s ease-out' : 'none';
+        videoWrapperRef.current.style.transform = `scale(${zoom}) translate(${panX}%, ${panY}%)`;
+        setZoomDisplay(zoom);
+    }, []);
+
+    // RAF-throttled transform
+    const scheduleTransform = useCallback(() => {
+        if (rafRef.current) return;
+        rafRef.current = requestAnimationFrame(() => {
+            applyTransform(false);
+            rafRef.current = null;
+        });
+    }, [applyTransform]);
+
     useEffect(() => {
         document.body.style.overflow = 'hidden';
-        return () => { document.body.style.overflow = ''; };
+        return () => { 
+            document.body.style.overflow = ''; 
+            if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        };
     }, []);
 
     useEffect(() => {
@@ -153,257 +181,133 @@ const VideoModal = memo(({ camera, onClose }) => {
         return () => window.removeEventListener('keydown', handleEsc);
     }, [onClose]);
 
-    // Zoom handlers
-    const handleZoomIn = () => {
-        setZoom(prev => {
-            const newZoom = Math.min(prev + 0.5, MAX_ZOOM);
-            // Clamp pan saat zoom berubah
-            const max = getMaxPan(newZoom);
-            setPan(p => ({ 
-                x: clamp(p.x, -max, max), 
-                y: clamp(p.y, -max, max) 
-            }));
-            return newZoom;
-        });
-    };
+    const handleZoomIn = useCallback(() => {
+        const s = stateRef.current;
+        s.zoom = Math.min(s.zoom + 0.5, MAX_ZOOM);
+        const max = getMaxPan(s.zoom);
+        s.panX = clamp(s.panX, -max, max);
+        s.panY = clamp(s.panY, -max, max);
+        applyTransform(true);
+    }, [applyTransform]);
 
-    const handleZoomOut = () => {
-        setZoom(prev => {
-            const newZoom = Math.max(prev - 0.5, MIN_ZOOM);
-            if (newZoom <= 1) {
-                setPan({ x: 0, y: 0 }); // Reset pan when zoom is 1
-            } else {
-                const max = getMaxPan(newZoom);
-                setPan(p => ({ 
-                    x: clamp(p.x, -max, max), 
-                    y: clamp(p.y, -max, max) 
-                }));
-            }
-            return newZoom;
-        });
-    };
+    const handleZoomOut = useCallback(() => {
+        const s = stateRef.current;
+        s.zoom = Math.max(s.zoom - 0.5, MIN_ZOOM);
+        if (s.zoom <= 1) { s.panX = 0; s.panY = 0; }
+        else {
+            const max = getMaxPan(s.zoom);
+            s.panX = clamp(s.panX, -max, max);
+            s.panY = clamp(s.panY, -max, max);
+        }
+        applyTransform(true);
+    }, [applyTransform]);
 
-    const handleResetZoom = () => {
-        setZoom(1);
-        setPan({ x: 0, y: 0 });
-    };
+    const handleResetZoom = useCallback(() => {
+        const s = stateRef.current;
+        s.zoom = 1; s.panX = 0; s.panY = 0;
+        applyTransform(true);
+    }, [applyTransform]);
 
-    // Mouse wheel zoom
-    const handleWheel = (e) => {
+    const handleWheel = useCallback((e) => {
         e.preventDefault();
-        const delta = e.deltaY < 0 ? 0.25 : -0.25;
-        setZoom(prev => {
-            const newZoom = clamp(prev + delta, MIN_ZOOM, MAX_ZOOM);
-            if (newZoom <= 1) {
-                setPan({ x: 0, y: 0 });
-            } else {
-                const max = getMaxPan(newZoom);
-                setPan(p => ({ 
-                    x: clamp(p.x, -max, max), 
-                    y: clamp(p.y, -max, max) 
-                }));
-            }
-            return newZoom;
-        });
-    };
-
-    // Pan handlers (drag to move when zoomed) - menggunakan persentase seperti LandingPage
-    const handleMouseDown = (e) => {
-        if (zoom > 1) {
-            setIsDragging(true);
-            dragStart.current = { 
-                x: e.clientX, 
-                y: e.clientY, 
-                panX: pan.x, 
-                panY: pan.y 
-            };
+        const s = stateRef.current;
+        s.zoom = clamp(s.zoom + (e.deltaY < 0 ? 0.25 : -0.25), MIN_ZOOM, MAX_ZOOM);
+        if (s.zoom <= 1) { s.panX = 0; s.panY = 0; }
+        else {
+            const max = getMaxPan(s.zoom);
+            s.panX = clamp(s.panX, -max, max);
+            s.panY = clamp(s.panY, -max, max);
         }
-    };
+        scheduleTransform();
+    }, [scheduleTransform]);
 
-    const handleMouseMove = (e) => {
-        if (isDragging && zoom > 1) {
-            const dx = e.clientX - dragStart.current.x;
-            const dy = e.clientY - dragStart.current.y;
-            const max = getMaxPan(zoom);
-            
-            // Factor untuk konversi pixel ke persentase (sesuaikan dengan container)
-            const factor = 0.15;
-            const newX = clamp(dragStart.current.panX + dx * factor, -max, max);
-            const newY = clamp(dragStart.current.panY + dy * factor, -max, max);
-            setPan({ x: newX, y: newY });
-        }
-    };
+    const handlePointerDown = useCallback((e) => {
+        const s = stateRef.current;
+        if (s.zoom <= 1) return;
+        s.dragging = true;
+        s.startX = e.clientX; s.startY = e.clientY;
+        s.startPanX = s.panX; s.startPanY = s.panY;
+        if (videoWrapperRef.current) videoWrapperRef.current.style.cursor = 'grabbing';
+        e.currentTarget.setPointerCapture(e.pointerId);
+    }, []);
 
-    const handleMouseUp = () => {
-        setIsDragging(false);
-    };
+    const handlePointerMove = useCallback((e) => {
+        const s = stateRef.current;
+        if (!s.dragging) return;
+        const max = getMaxPan(s.zoom);
+        const factor = 0.15;
+        s.panX = clamp(s.startPanX + (e.clientX - s.startX) * factor, -max, max);
+        s.panY = clamp(s.startPanY + (e.clientY - s.startY) * factor, -max, max);
+        scheduleTransform();
+    }, [scheduleTransform]);
 
-    // Touch handlers for mobile - menggunakan persentase
-    const handleTouchStart = (e) => {
-        if (zoom > 1 && e.touches.length === 1) {
-            setIsDragging(true);
-            dragStart.current = { 
-                x: e.touches[0].clientX, 
-                y: e.touches[0].clientY, 
-                panX: pan.x, 
-                panY: pan.y 
-            };
-        }
-    };
+    const handlePointerUp = useCallback((e) => {
+        const s = stateRef.current;
+        s.dragging = false;
+        if (videoWrapperRef.current) videoWrapperRef.current.style.cursor = s.zoom > 1 ? 'grab' : 'default';
+        try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
+    }, []);
 
-    const handleTouchMove = (e) => {
-        if (isDragging && zoom > 1 && e.touches.length === 1) {
-            const dx = e.touches[0].clientX - dragStart.current.x;
-            const dy = e.touches[0].clientY - dragStart.current.y;
-            const max = getMaxPan(zoom);
-            
-            const factor = 0.15;
-            const newX = clamp(dragStart.current.panX + dx * factor, -max, max);
-            const newY = clamp(dragStart.current.panY + dy * factor, -max, max);
-            setPan({ x: newX, y: newY });
-        }
-    };
-
-    const handleTouchEnd = () => {
-        setIsDragging(false);
-    };
-
+    // HLS setup - optimized config
     useEffect(() => {
-        // Jika maintenance, tidak perlu load stream
-        if (isMaintenance) {
-            setStatus('maintenance');
-            return;
-        }
-
+        if (isMaintenance) { setStatus('maintenance'); return; }
         if (!camera?.streams?.hls || !videoRef.current) return;
 
-        // Config HLS berdasarkan device tier
-        const hlsConfig = isLowEnd ? {
-            enableWorker: false,
-            lowLatencyMode: false,
-            backBufferLength: 5,
-            maxBufferLength: 10,
-            maxMaxBufferLength: 20,
-        } : {
-            enableWorker: false,
-            lowLatencyMode: false,
-            backBufferLength: 10,
-            maxBufferLength: 15,
-        };
-
-        // Timeout untuk loading
+        const hlsConfig = getHLSConfig(deviceTier);
         const loadTimeout = setTimeout(() => {
-            if (status === 'loading') {
-                setStatus('error');
-                setErrorType('timeout');
-            }
-        }, 15000); // 15 detik timeout
+            if (status === 'loading') { setStatus('error'); setErrorType('timeout'); }
+        }, isLowEnd ? 20000 : 15000);
 
         if (Hls.isSupported()) {
             hlsRef.current = new Hls(hlsConfig);
-            
             hlsRef.current.on(Hls.Events.MANIFEST_PARSED, () => {
                 clearTimeout(loadTimeout);
                 setStatus('playing');
                 videoRef.current?.play().catch(() => {});
             });
-            
             hlsRef.current.on(Hls.Events.ERROR, (_, data) => {
-                console.log('HLS Error:', data);
                 if (data.fatal) {
                     clearTimeout(loadTimeout);
                     setStatus('error');
-                    
-                    // Deteksi jenis error
-                    if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                        setErrorType('network');
-                    } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                        // Cek apakah error codec (H.265/HEVC tidak didukung)
-                        if (data.details === 'fragParsingError' || 
-                            data.details === 'bufferAppendError' ||
-                            data.reason?.includes('codec') ||
-                            data.reason?.includes('HEVC') ||
-                            data.reason?.includes('h265')) {
+                    if (data.type === Hls.ErrorTypes.NETWORK_ERROR) setErrorType('network');
+                    else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                        if (data.details === 'fragParsingError' || data.details === 'bufferAppendError' ||
+                            data.details === 'manifestIncompatibleCodecsError' ||
+                            data.reason?.toLowerCase().includes('codec') ||
+                            data.reason?.toLowerCase().includes('hevc')) {
                             setErrorType('codec');
-                        } else {
-                            setErrorType('media');
-                        }
-                    } else {
-                        setErrorType('unknown');
-                    }
+                        } else setErrorType('media');
+                    } else setErrorType('unknown');
                 }
             });
-            
             hlsRef.current.loadSource(camera.streams.hls);
             hlsRef.current.attachMedia(videoRef.current);
         } else if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
             videoRef.current.src = camera.streams.hls;
             videoRef.current.addEventListener('loadedmetadata', () => {
-                clearTimeout(loadTimeout);
-                setStatus('playing');
+                clearTimeout(loadTimeout); setStatus('playing');
                 videoRef.current?.play().catch(() => {});
             });
             videoRef.current.addEventListener('error', () => {
-                clearTimeout(loadTimeout);
-                setStatus('error');
-                setErrorType('media');
+                clearTimeout(loadTimeout); setStatus('error'); setErrorType('media');
             });
         }
 
         return () => {
             clearTimeout(loadTimeout);
-            if (hlsRef.current) {
-                hlsRef.current.destroy();
-                hlsRef.current = null;
-            }
+            if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null; }
         };
     }, [camera, isMaintenance]);
 
-    // Error messages berdasarkan tipe
-    const getErrorMessage = () => {
-        switch (errorType) {
-            case 'codec':
-                return {
-                    title: 'Codec Tidak Didukung',
-                    desc: 'Browser Anda tidak mendukung codec H.265/HEVC yang digunakan kamera ini. Coba gunakan browser lain atau perangkat yang mendukung H.265.',
-                    icon: (
-                        <svg className="w-10 h-10 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                        </svg>
-                    )
-                };
-            case 'network':
-                return {
-                    title: 'Koneksi Gagal',
-                    desc: 'Tidak dapat terhubung ke server stream. Periksa koneksi internet Anda.',
-                    icon: (
-                        <svg className="w-10 h-10 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
-                        </svg>
-                    )
-                };
-            case 'timeout':
-                return {
-                    title: 'Waktu Habis',
-                    desc: 'Stream terlalu lama merespons. Kamera mungkin sedang offline atau jaringan lambat.',
-                    icon: (
-                        <svg className="w-10 h-10 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        </svg>
-                    )
-                };
-            default:
-                return {
-                    title: 'Stream Tidak Tersedia',
-                    desc: 'Terjadi kesalahan saat memuat stream. Coba lagi nanti.',
-                    icon: (
-                        <svg className="w-10 h-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                        </svg>
-                    )
-                };
-        }
-    };
+    const getErrorMessage = useCallback(() => {
+        const errors = {
+            codec: { title: 'Codec Tidak Didukung', desc: 'Browser Anda tidak mendukung codec H.265/HEVC. Coba browser lain.', color: 'yellow' },
+            network: { title: 'Koneksi Gagal', desc: 'Tidak dapat terhubung ke server stream.', color: 'orange' },
+            timeout: { title: 'Waktu Habis', desc: 'Stream terlalu lama merespons.', color: 'gray' },
+            default: { title: 'Stream Tidak Tersedia', desc: 'Terjadi kesalahan saat memuat stream.', color: 'red' }
+        };
+        return errors[errorType] || errors.default;
+    }, [errorType]);
 
     const errorInfo = getErrorMessage();
 
@@ -416,21 +320,21 @@ const VideoModal = memo(({ camera, onClose }) => {
                 className="bg-gray-900 rounded-xl w-full max-w-4xl overflow-hidden shadow-2xl border border-gray-800" 
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Video Container */}
+                {/* Video Container - optimized dengan pointer events */}
                 <div 
                     className="relative bg-black aspect-video overflow-hidden"
                     onWheel={handleWheel}
-                    onMouseDown={handleMouseDown}
-                    onMouseMove={handleMouseMove}
-                    onMouseUp={handleMouseUp}
-                    onMouseLeave={handleMouseUp}
-                    onTouchStart={handleTouchStart}
-                    onTouchMove={handleTouchMove}
-                    onTouchEnd={handleTouchEnd}
+                    onPointerDown={handlePointerDown}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    onPointerCancel={handlePointerUp}
+                    onPointerLeave={handlePointerUp}
+                    style={{ touchAction: 'none' }}
                 >
                     {status === 'loading' && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10">
-                            <div className="w-10 h-10 border-2 border-gray-700 border-t-sky-500 rounded-full animate-spin"/>
+                            <div className={`w-10 h-10 border-2 border-gray-700 border-t-sky-500 rounded-full ${isLowEnd ? '' : 'animate-spin'}`}
+                                 style={isLowEnd ? { animation: 'spin 1.5s linear infinite' } : {}} />
                             <span className="text-gray-400 text-sm">Menghubungkan...</span>
                         </div>
                     )}
@@ -449,7 +353,9 @@ const VideoModal = memo(({ camera, onClose }) => {
                     
                     {status === 'error' && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 z-10">
-                            {errorInfo.icon}
+                            <svg className={`w-10 h-10 text-${errorInfo.color}-500`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                            </svg>
                             <div className="text-center">
                                 <h4 className="text-gray-200 font-semibold">{errorInfo.title}</h4>
                                 <p className="text-gray-400 text-sm mt-1 max-w-md">{errorInfo.desc}</p>
@@ -457,24 +363,22 @@ const VideoModal = memo(({ camera, onClose }) => {
                         </div>
                     )}
                     
-                    {/* Video with zoom/pan transform */}
+                    {/* Video with zoom/pan transform - optimized */}
                     {!isMaintenance && (
                         <div 
                             ref={videoWrapperRef}
-                            className="w-full h-full transition-transform duration-100"
+                            className="w-full h-full"
                             style={{ 
-                                transform: `scale(${zoom}) translate(${pan.x}%, ${pan.y}%)`,
                                 transformOrigin: 'center center',
-                                touchAction: 'none',
                                 willChange: 'transform',
-                                cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default'
+                                cursor: stateRef.current.zoom > 1 ? 'grab' : 'default'
                             }}
                         >
                             <video ref={videoRef} className="w-full h-full object-contain pointer-events-none" muted playsInline autoPlay />
                         </div>
                     )}
 
-                    {/* Close button - top right */}
+                    {/* Close button */}
                     <button 
                         onClick={onClose} 
                         className="absolute top-2 right-2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-lg z-20"
@@ -484,17 +388,16 @@ const VideoModal = memo(({ camera, onClose }) => {
                         </svg>
                     </button>
 
-                    {/* Zoom hint - show when zoomed */}
-                    {zoom > 1 && (
+                    {/* Zoom hint */}
+                    {zoomDisplay > 1 && (
                         <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-xs rounded-lg z-20">
                             Geser untuk pan
                         </div>
                     )}
                 </div>
 
-                {/* Info Panel - compact dengan badges di bawah */}
+                {/* Info Panel */}
                 <div className="p-3 border-t border-gray-800">
-                    {/* Row 1: Nama + Zoom Controls */}
                     <div className="flex items-center justify-between gap-2 mb-2">
                         <h3 className="text-white font-bold text-sm sm:text-base truncate flex-1">{camera.name}</h3>
                         
@@ -503,7 +406,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                             <div className="flex items-center gap-0.5 bg-gray-800 rounded-lg p-0.5 shrink-0">
                                 <button
                                     onClick={handleZoomOut}
-                                    disabled={zoom <= MIN_ZOOM}
+                                    disabled={zoomDisplay <= MIN_ZOOM}
                                     className="p-1.5 hover:bg-gray-700 disabled:opacity-30 rounded text-white transition-colors"
                                     title="Zoom Out"
                                 >
@@ -511,10 +414,10 @@ const VideoModal = memo(({ camera, onClose }) => {
                                         <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"/>
                                     </svg>
                                 </button>
-                                <span className="text-white text-[10px] font-medium w-8 text-center">{Math.round(zoom * 100)}%</span>
+                                <span className="text-white text-[10px] font-medium w-8 text-center">{Math.round(zoomDisplay * 100)}%</span>
                                 <button
                                     onClick={handleZoomIn}
-                                    disabled={zoom >= MAX_ZOOM}
+                                    disabled={zoomDisplay >= MAX_ZOOM}
                                     className="p-1.5 hover:bg-gray-700 disabled:opacity-30 rounded text-white transition-colors"
                                     title="Zoom In"
                                 >
@@ -522,7 +425,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                                         <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"/>
                                     </svg>
                                 </button>
-                                {zoom > 1 && (
+                                {zoomDisplay > 1 && (
                                     <button
                                         onClick={handleResetZoom}
                                         className="p-1.5 hover:bg-gray-700 rounded text-white transition-colors"
