@@ -201,6 +201,128 @@ function ToastContainer({ toasts, removeToast }) {
 }
 
 // ============================================
+// CAMERA STATUS BAR - Real-time statistics display
+// Shows online/offline/maintenance counts with responsive design
+// ============================================
+const CameraStatusBar = memo(function CameraStatusBar({ cameras }) {
+    const stats = useMemo(() => {
+        const online = cameras.filter(c => c.status !== 'maintenance' && c.is_online !== 0).length;
+        const offline = cameras.filter(c => c.status !== 'maintenance' && c.is_online === 0).length;
+        const maintenance = cameras.filter(c => c.status === 'maintenance').length;
+        return { online, offline, maintenance, total: cameras.length };
+    }, [cameras]);
+    
+    if (cameras.length === 0) return null;
+    
+    return (
+        <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Online */}
+            <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg bg-emerald-500/10 dark:bg-emerald-500/20">
+                <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-500"></span>
+                <span className="text-[10px] sm:text-xs font-semibold text-emerald-600 dark:text-emerald-400">{stats.online}</span>
+            </div>
+            
+            {/* Offline - only show if > 0 */}
+            {stats.offline > 0 && (
+                <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg bg-gray-500/10 dark:bg-gray-500/20">
+                    <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-gray-500"></span>
+                    <span className="text-[10px] sm:text-xs font-semibold text-gray-600 dark:text-gray-400">{stats.offline}</span>
+                </div>
+            )}
+            
+            {/* Maintenance - only show if > 0 */}
+            {stats.maintenance > 0 && (
+                <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg bg-red-500/10 dark:bg-red-500/20">
+                    <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-500"></span>
+                    <span className="text-[10px] sm:text-xs font-semibold text-red-600 dark:text-red-400">{stats.maintenance}</span>
+                </div>
+            )}
+        </div>
+    );
+});
+
+// ============================================
+// CAMERA STATUS TRACKER HOOK - Tracks camera status changes
+// Notifies when cameras go offline/online
+// ============================================
+function useCameraStatusTracker(cameras, addToast) {
+    const prevCamerasRef = useRef(null);
+    const isFirstLoadRef = useRef(true);
+    
+    useEffect(() => {
+        // Skip first load - don't notify on initial data fetch
+        if (isFirstLoadRef.current) {
+            if (cameras.length > 0) {
+                prevCamerasRef.current = new Map(cameras.map(c => [c.id, { 
+                    is_online: c.is_online, 
+                    status: c.status,
+                    name: c.name 
+                }]));
+                isFirstLoadRef.current = false;
+            }
+            return;
+        }
+        
+        if (!prevCamerasRef.current || cameras.length === 0) return;
+        
+        const prevMap = prevCamerasRef.current;
+        const changes = { wentOffline: [], wentOnline: [], wentMaintenance: [] };
+        
+        cameras.forEach(camera => {
+            const prev = prevMap.get(camera.id);
+            if (!prev) return; // New camera, skip
+            
+            const wasOnline = prev.is_online !== 0 && prev.status !== 'maintenance';
+            const isOnline = camera.is_online !== 0 && camera.status !== 'maintenance';
+            const wasMaintenance = prev.status === 'maintenance';
+            const isMaintenance = camera.status === 'maintenance';
+            
+            // Check for status changes
+            if (wasOnline && !isOnline && !isMaintenance) {
+                changes.wentOffline.push(camera.name);
+            } else if (!wasOnline && isOnline && !wasMaintenance) {
+                changes.wentOnline.push(camera.name);
+            } else if (!wasMaintenance && isMaintenance) {
+                changes.wentMaintenance.push(camera.name);
+            }
+        });
+        
+        // Show notifications for changes
+        if (changes.wentOffline.length > 0) {
+            if (changes.wentOffline.length === 1) {
+                addToast(`${changes.wentOffline[0]} sedang offline`, 'warning');
+            } else {
+                addToast(`${changes.wentOffline.length} kamera sedang offline`, 'warning');
+            }
+        }
+        
+        if (changes.wentOnline.length > 0) {
+            if (changes.wentOnline.length === 1) {
+                addToast(`${changes.wentOnline[0]} kembali online`, 'success');
+            } else {
+                addToast(`${changes.wentOnline.length} kamera kembali online`, 'success');
+            }
+        }
+        
+        if (changes.wentMaintenance.length > 0) {
+            if (changes.wentMaintenance.length === 1) {
+                addToast(`${changes.wentMaintenance[0]} dalam perbaikan`, 'info');
+            } else {
+                addToast(`${changes.wentMaintenance.length} kamera dalam perbaikan`, 'info');
+            }
+        }
+        
+        // Update previous state
+        prevCamerasRef.current = new Map(cameras.map(c => [c.id, { 
+            is_online: c.is_online, 
+            status: c.status,
+            name: c.name 
+        }]));
+        
+    }, [cameras, addToast]);
+}
+
+// ============================================
 // CAMERA CARD - Enhanced with detailed location info and online status
 // ============================================
 const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMulti }) {
@@ -1728,10 +1850,10 @@ function MultiViewLayout({ cameras, onRemove, onClose }) {
 
 
 // ============================================
-// NAVBAR - Enhanced with live indicator
+// NAVBAR - Enhanced with live indicator and camera status
 // Disables animations on low-end devices - **Validates: Requirements 5.2**
 // ============================================
-function Navbar({ cameraCount }) {
+function Navbar({ cameraCount, cameras = [] }) {
     const { isDark, toggleTheme } = useTheme();
     const [currentTime, setCurrentTime] = useState(new Date());
     const disableAnimations = shouldDisableAnimations();
@@ -1755,24 +1877,33 @@ function Navbar({ cameraCount }) {
                                 <span className={`absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white dark:border-gray-900 ${disableAnimations ? '' : 'animate-pulse'}`}></span>
                             )}
                         </div>
-                        <div>
+                        <div className="hidden sm:block">
                             <span className="text-lg font-bold text-gray-900 dark:text-white">RAF NET</span>
                             <p className="text-[10px] text-gray-500 dark:text-gray-400 -mt-0.5">CCTV Bojonegoro Online</p>
                         </div>
                     </a>
                     
-                    {/* Center - Live Time with Location */}
-                    <div className="hidden md:flex items-center gap-3 px-4 py-2 rounded-xl bg-gray-100/80 dark:bg-gray-800/80">
-                        <div className="flex items-center gap-2">
-                            <span className={`w-2 h-2 rounded-full bg-emerald-500 ${disableAnimations ? '' : 'animate-pulse'}`}></span>
-                            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">LIVE</span>
+                    {/* Center - Live Time with Location (desktop) / Camera Status (mobile) */}
+                    <div className="flex items-center gap-2 sm:gap-3">
+                        {/* Camera Status Bar - visible on all devices */}
+                        <CameraStatusBar cameras={cameras} />
+                        
+                        {/* Separator - desktop only */}
+                        <div className="hidden md:block w-px h-6 bg-gray-300 dark:bg-gray-600"></div>
+                        
+                        {/* Live indicator and time - desktop only */}
+                        <div className="hidden md:flex items-center gap-3 px-4 py-2 rounded-xl bg-gray-100/80 dark:bg-gray-800/80">
+                            <div className="flex items-center gap-2">
+                                <span className={`w-2 h-2 rounded-full bg-emerald-500 ${disableAnimations ? '' : 'animate-pulse'}`}></span>
+                                <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">LIVE</span>
+                            </div>
+                            <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">Bojonegoro</span>
+                            <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
+                            <span className="text-sm font-mono text-gray-600 dark:text-gray-300">
+                                {currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                            </span>
                         </div>
-                        <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">Bojonegoro</span>
-                        <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
-                        <span className="text-sm font-mono text-gray-600 dark:text-gray-300">
-                            {currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                        </span>
                     </div>
                     
                     {/* Right - Theme Toggle */}
@@ -2745,9 +2876,29 @@ export default function LandingPage() {
         });
     }, [addToast]);
 
+    // Track camera status changes and notify user
+    useCameraStatusTracker(cameras, addToast);
+    
+    // Auto-refresh cameras every 30 seconds to get updated online status
+    useEffect(() => {
+        const refreshInterval = setInterval(async () => {
+            try {
+                const camsRes = await streamService.getAllActiveStreams();
+                if (camsRes.data) {
+                    setCameras(camsRes.data);
+                }
+            } catch (err) {
+                // Silent fail - don't show error for background refresh
+                console.warn('Background refresh failed:', err);
+            }
+        }, 30000); // 30 seconds
+        
+        return () => clearInterval(refreshInterval);
+    }, []);
+
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
-            <Navbar cameraCount={cameras.length} />
+            <Navbar cameraCount={cameras.length} cameras={cameras} />
             
             {/* Hero Section - SEO optimized with Indonesian content */}
             <header className="relative overflow-hidden bg-gradient-to-br from-sky-500/10 via-transparent to-purple-500/10 dark:from-sky-500/5 dark:to-purple-500/5">
