@@ -552,10 +552,13 @@ function MapController({ center, zoom, bounds }) {
     const map = useMap();
     
     useEffect(() => {
+        // Jika semua null, jangan ubah view (preserve current position)
+        if (!center && !bounds) return;
+        
         if (bounds?.isValid()) {
             map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
         } else if (center) {
-            map.setView(center, zoom || 15);
+            map.setView(center, zoom || 15, { animate: true, duration: 0.5 });
         }
     }, [map, center, zoom, bounds]);
     
@@ -600,6 +603,10 @@ const MapView = memo(({
         zoom: defaultZoom, 
         name: 'Semua Lokasi' 
     });
+    // State untuk menyimpan posisi kamera yang akan difokuskan (untuk animasi)
+    const [pendingFocusCamera, setPendingFocusCamera] = useState(null);
+    // Flag untuk mencegah map reset saat close modal
+    const [preserveMapPosition, setPreserveMapPosition] = useState(false);
 
     // Load map settings from backend
     useEffect(() => {
@@ -610,17 +617,18 @@ const MapView = memo(({
         }).catch(() => {});
     }, []);
 
-    // Handle focused camera from search
+    // Handle focused camera from search - Step 1: Navigate map first
     useEffect(() => {
         if (focusedCameraId) {
             const camera = cameras.find(c => c.id === focusedCameraId);
             if (camera && hasValidCoords(camera)) {
-                // Set area filter to show the camera
+                // Set area filter to show the camera if needed
                 if (camera.area_name && selectedArea !== camera.area_name && selectedArea !== 'all') {
                     setSelectedArea('all');
                 }
-                // Open modal for the camera
-                setModalCamera(camera);
+                // Set pending focus camera - map will navigate first
+                setPendingFocusCamera(camera);
+                setPreserveMapPosition(true);
                 // Trigger map rerender to focus on camera
                 setMapKey(prev => prev + 1);
                 // Notify parent that focus has been handled
@@ -628,6 +636,18 @@ const MapView = memo(({
             }
         }
     }, [focusedCameraId, cameras, onFocusHandled, selectedArea]);
+
+    // Handle focused camera - Step 2: Open modal after map animation
+    useEffect(() => {
+        if (pendingFocusCamera) {
+            // Delay opening modal to let map animate to position first
+            const timer = setTimeout(() => {
+                setModalCamera(pendingFocusCamera);
+                setPendingFocusCamera(null);
+            }, 600); // 600ms delay for map animation
+            return () => clearTimeout(timer);
+        }
+    }, [pendingFocusCamera]);
 
     const camerasWithCoords = useMemo(() => cameras.filter(hasValidCoords), [cameras]);
 
@@ -656,16 +676,19 @@ const MapView = memo(({
     }, [filtered]);
 
     const { center, zoom, bounds } = useMemo(() => {
-        // Jika ada focused camera, prioritaskan ke kamera tersebut
-        if (focusedCameraId) {
-            const focusedCamera = camerasWithCoords.find(c => c.id === focusedCameraId);
-            if (focusedCamera) {
-                return {
-                    center: [parseFloat(focusedCamera.latitude), parseFloat(focusedCamera.longitude)],
-                    zoom: 17, // Zoom dekat untuk fokus ke kamera
-                    bounds: null
-                };
-            }
+        // Jika ada pending focus camera (dari search), navigasi ke kamera tersebut
+        if (pendingFocusCamera) {
+            return {
+                center: [parseFloat(pendingFocusCamera.latitude), parseFloat(pendingFocusCamera.longitude)],
+                zoom: 17, // Zoom dekat untuk fokus ke kamera
+                bounds: null
+            };
+        }
+        
+        // Jika preserveMapPosition aktif (setelah close modal), jangan ubah posisi
+        // Return null untuk semua agar MapController tidak mengubah view
+        if (preserveMapPosition) {
+            return { center: null, zoom: null, bounds: null };
         }
         
         // Jika area spesifik dipilih, gunakan koordinat area tersebut
@@ -703,13 +726,24 @@ const MapView = memo(({
             zoom: mapSettings.zoom || defaultZoom,
             bounds: null 
         };
-    }, [camerasWithCoords, selectedArea, areas, defaultCenter, defaultZoom, mapSettings, focusedCameraId]);
+    }, [camerasWithCoords, selectedArea, areas, defaultCenter, defaultZoom, mapSettings, pendingFocusCamera, preserveMapPosition]);
 
-    const openModal = useCallback((camera) => setModalCamera(camera), []);
-    const closeModal = useCallback(() => setModalCamera(null), []);
+    const openModal = useCallback((camera) => {
+        // Set preserve position saat buka modal dari klik marker
+        setPreserveMapPosition(true);
+        setModalCamera(camera);
+    }, []);
+    
+    const closeModal = useCallback(() => {
+        // Tetap preserve position saat close modal
+        setModalCamera(null);
+        // preserveMapPosition tetap true agar map tidak reset
+    }, []);
 
     const handleAreaChange = (e) => {
         setSelectedArea(e.target.value);
+        // Reset preserve position saat ganti area filter
+        setPreserveMapPosition(false);
         setMapKey(prev => prev + 1);
     };
 
