@@ -331,6 +331,7 @@ class MediaMtxService {
 
     /**
      * Fetches statistics from the MediaMTX API.
+     * Filters out internal preload readers (from localhost) to show only real viewers.
      * @returns {Promise<any>}
      */
     async getStats() {
@@ -344,8 +345,33 @@ class MediaMtxService {
             const paths = pathsRes.data?.items || [];
             const sessions = [];
             
-            // Extract readers from each path as sessions
-            paths.forEach(path => {
+            // Filter function to exclude internal preload readers
+            // Preload uses HLS from localhost, so filter out hlsMuxer readers from 127.0.0.1
+            const isRealViewer = (reader) => {
+                // If reader has remoteAddr, check if it's from localhost (preload)
+                if (reader.remoteAddr) {
+                    const addr = reader.remoteAddr.toLowerCase();
+                    // Exclude localhost/127.0.0.1 readers (these are from preload service)
+                    if (addr.includes('127.0.0.1') || addr.includes('localhost') || addr.startsWith('[::1]')) {
+                        return false;
+                    }
+                }
+                return true;
+            };
+            
+            // Process paths and filter readers
+            const processedPaths = paths.map(path => {
+                const realReaders = (path.readers || []).filter(isRealViewer);
+                return {
+                    ...path,
+                    readers: realReaders,
+                    _originalReaderCount: (path.readers || []).length,
+                    _filteredReaderCount: realReaders.length
+                };
+            });
+            
+            // Extract real readers from each path as sessions
+            processedPaths.forEach(path => {
                 if (path.readers && path.readers.length > 0) {
                     path.readers.forEach(reader => {
                         sessions.push({
@@ -358,7 +384,7 @@ class MediaMtxService {
             });
             
             return {
-                paths: paths,
+                paths: processedPaths,
                 sessions: sessions,
                 config: configRes.data || {},
                 error: false
