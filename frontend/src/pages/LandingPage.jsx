@@ -282,116 +282,145 @@ function useCameraStatusTracker(cameras, addToast) {
 }
 
 // ============================================
-// CAMERA CARD - Enhanced with detailed location info and online status
+// CAMERA CARD - Optimized for low-end devices with tunnel indicator
+// Reduced animations, simplified rendering, added tunnel badge next to LIVE
+// **Validates: Requirements 5.2, 7.1**
 // ============================================
 const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMulti }) {
     const isMaintenance = camera.status === 'maintenance';
     const isOffline = camera.is_online === 0;
+    const isTunnel = camera.is_tunnel === 1;
+    const disableAnimations = shouldDisableAnimations();
     
-    // Determine card style based on status priority: maintenance > offline > normal
-    const getCardStyle = () => {
-        if (isMaintenance) return 'ring-red-500/50 hover:ring-red-500';
-        if (isOffline) return 'ring-gray-400/50 hover:ring-gray-500';
-        return 'ring-gray-200 dark:ring-gray-800 hover:ring-sky-500/50';
-    };
+    // Pre-computed styles to avoid recalculation on each render
+    const cardStyle = isMaintenance 
+        ? 'ring-red-500/50 hover:ring-red-500' 
+        : isOffline 
+            ? 'ring-gray-400/50 hover:ring-gray-500' 
+            : 'ring-gray-200 dark:ring-gray-800 hover:ring-sky-500/50';
     
-    const getBackgroundStyle = () => {
-        if (isMaintenance) return 'bg-gradient-to-br from-red-100 to-red-200 dark:from-red-900/30 dark:to-red-800/30';
-        if (isOffline) return 'bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800';
-        return 'bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900';
-    };
+    const bgStyle = isMaintenance 
+        ? 'bg-red-100 dark:bg-red-900/30' 
+        : isOffline 
+            ? 'bg-gray-200 dark:bg-gray-700' 
+            : 'bg-gray-100 dark:bg-gray-800';
     
-    const getIconStyle = () => {
-        if (isMaintenance) return 'text-red-300 dark:text-red-700';
-        if (isOffline) return 'text-gray-400 dark:text-gray-600';
-        return 'text-gray-300 dark:text-gray-700';
-    };
+    const iconStyle = isMaintenance 
+        ? 'text-red-300 dark:text-red-700' 
+        : isOffline 
+            ? 'text-gray-400 dark:text-gray-600' 
+            : 'text-gray-300 dark:text-gray-700';
+    
+    // Simplified transition classes for low-end devices
+    const transitionClass = disableAnimations ? '' : 'transition-all duration-200';
+    const hoverTransform = disableAnimations ? '' : 'hover:-translate-y-1';
     
     return (
-        <div className={`relative rounded-2xl overflow-hidden bg-white dark:bg-gray-900 shadow-lg hover:shadow-2xl transition-all duration-300 ring-1 hover:-translate-y-1 group/card ${getCardStyle()}`}>
+        <div className={`relative rounded-2xl overflow-hidden bg-white dark:bg-gray-900 shadow-lg ring-1 ${transitionClass} ${hoverTransform} group/card ${cardStyle}`}>
+            {/* Multi-view button - simplified for low-end */}
             <button
                 onClick={(e) => { e.stopPropagation(); onAddMulti(); }}
-                className={`absolute top-3 right-3 z-30 p-2.5 rounded-xl shadow-lg transition-all duration-200 ${
+                className={`absolute top-3 right-3 z-30 p-2.5 rounded-xl shadow-lg ${
                     inMulti 
-                        ? 'bg-emerald-500 text-white scale-110' 
-                        : 'bg-white/90 dark:bg-gray-800/90 text-gray-600 dark:text-gray-300 hover:bg-sky-500 hover:text-white hover:scale-110'
-                }`}
-                title={inMulti ? 'Remove from Multi-View' : 'Add to Multi-View'}
+                        ? 'bg-emerald-500 text-white' 
+                        : 'bg-white/90 dark:bg-gray-800/90 text-gray-600 dark:text-gray-300'
+                } ${disableAnimations ? '' : 'transition-colors hover:bg-sky-500 hover:text-white'}`}
+                title={inMulti ? 'Hapus dari Multi-View' : 'Tambah ke Multi-View'}
             >
                 {inMulti ? <Icons.Check /> : <Icons.Plus />}
             </button>
-            <div onClick={onClick} className={`aspect-video relative cursor-pointer ${getBackgroundStyle()}`}>
-                <div className={`absolute inset-0 flex items-center justify-center ${getIconStyle()}`}>
-                    {isMaintenance ? (
-                        <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={0.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z" />
-                        </svg>
-                    ) : isOffline ? (
-                        <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={0.5}>
+            
+            {/* Video thumbnail area */}
+            <div onClick={onClick} className={`aspect-video relative cursor-pointer ${bgStyle}`}>
+                {/* Center icon - simplified SVG */}
+                <div className={`absolute inset-0 flex items-center justify-center ${iconStyle}`}>
+                    <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={0.5}>
+                        {isMaintenance ? (
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63" />
+                        ) : isOffline ? (
                             <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414"/>
-                        </svg>
-                    ) : (
-                        <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={0.5}>
+                        ) : (
                             <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-                        </svg>
-                    )}
+                        )}
+                    </svg>
                 </div>
-                {!isMaintenance && !isOffline && (
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/card:opacity-100 bg-black/40 transition-opacity duration-300">
-                        <div className="w-14 h-14 rounded-full bg-white/95 flex items-center justify-center text-sky-500 shadow-xl transform scale-90 group-hover/card:scale-100 transition-transform duration-300">
+                
+                {/* Play overlay - only for online cameras, disabled on low-end */}
+                {!isMaintenance && !isOffline && !disableAnimations && (
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/card:opacity-100 bg-black/40 transition-opacity">
+                        <div className="w-14 h-14 rounded-full bg-white/95 flex items-center justify-center text-sky-500 shadow-xl">
                             <Icons.Play />
                         </div>
                     </div>
                 )}
-                {/* Status badge - Maintenance, Offline, or Live */}
-                <div className="absolute top-3 left-3">
+                
+                {/* Status badges - LIVE with Tunnel indicator */}
+                <div className="absolute top-3 left-3 flex items-center gap-1.5">
                     {isMaintenance ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-600/90 backdrop-blur-sm text-white text-[10px] font-bold shadow-lg">
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-600/90 text-white text-[10px] font-bold shadow-lg">
                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63" />
                             </svg>
                             PERBAIKAN
                         </span>
                     ) : isOffline ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-600/90 backdrop-blur-sm text-white text-[10px] font-bold shadow-lg">
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gray-600/90 text-white text-[10px] font-bold shadow-lg">
                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072"/>
                             </svg>
                             OFFLINE
                         </span>
                     ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/90 backdrop-blur-sm text-white text-[10px] font-bold shadow-lg">
-                            <span className="relative flex h-1.5 w-1.5">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
+                        <>
+                            {/* LIVE badge */}
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-500/90 text-white text-[10px] font-bold shadow-lg">
+                                <span className="relative flex h-1.5 w-1.5">
+                                    {!disableAnimations && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>}
+                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
+                                </span>
+                                LIVE
                             </span>
-                            LIVE
-                        </span>
+                            {/* Tunnel badge - shown next to LIVE if tunnel connection */}
+                            {isTunnel && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-orange-500/90 text-white text-[10px] font-bold shadow-lg" title="Koneksi Tunnel - mungkin kurang stabil">
+                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0"/>
+                                    </svg>
+                                    TUNNEL
+                                </span>
+                            )}
+                        </>
                     )}
                 </div>
+                
                 {/* Offline indicator at bottom left */}
                 {isOffline && !isMaintenance && (
                     <div className="absolute bottom-3 left-3">
-                        <span className="px-2.5 py-1 rounded-lg bg-gray-800/80 backdrop-blur-sm text-gray-300 text-[10px] font-medium">
+                        <span className="px-2 py-1 rounded-lg bg-gray-800/80 text-gray-300 text-[10px] font-medium">
                             Tidak tersedia
                         </span>
                     </div>
                 )}
-                {/* Area badge - move to bottom right if offline indicator is shown */}
+                
+                {/* Area badge */}
                 {camera.area_name && (
                     <div className={`absolute bottom-3 ${isOffline && !isMaintenance ? 'right-3' : 'left-3'}`}>
-                        <span className="px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-sm text-white text-[10px] font-medium">
+                        <span className="px-2 py-1 rounded-lg bg-black/60 text-white text-[10px] font-medium">
                             {camera.area_name}
                         </span>
                     </div>
                 )}
             </div>
+            
+            {/* Camera info */}
             <div className="p-4 cursor-pointer" onClick={onClick}>
-                <h3 className={`font-bold truncate mb-1 transition-colors ${
+                <h3 className={`font-bold truncate mb-1 ${
                     isMaintenance 
                         ? 'text-red-600 dark:text-red-400' 
-                        : 'text-gray-900 dark:text-white group-hover/card:text-sky-500'
-                }`}>{camera.name}</h3>
+                        : 'text-gray-900 dark:text-white'
+                } ${!disableAnimations ? 'group-hover/card:text-sky-500 transition-colors' : ''}`}>
+                    {camera.name}
+                </h3>
                 
                 {/* Location */}
                 {camera.location && (
@@ -2424,7 +2453,8 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
 
                 {loading ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                        {[1, 2, 3, 4, 5, 6].map(i => <CameraSkeleton key={i} />)}
+                        {/* Reduced skeleton count for low-end devices: 3 instead of 6 */}
+                        {[1, 2, 3].map(i => <CameraSkeleton key={i} />)}
                     </div>
                 ) : displayCameras.length === 0 ? (
                     <div className="text-center py-16">
@@ -2692,32 +2722,50 @@ function StatsBar({ cameras, areas, onCameraClick }) {
         </button>
     );
     
-    // Modal Component
+    // Modal Component - Optimized for low-end devices
+    // Removed: backdrop-blur, complex SVGs, transitions on list items
+    // Fixed: Added missing getHeaderColor and getStatusIcon functions
     const ListModal = ({ title, items, type, onClose }) => {
-        const getStatusIcon = () => {
-            switch(type) {
-                case 'online': return <span className="w-2 h-2 rounded-full bg-emerald-500"></span>;
-                case 'offline': return <span className="w-2 h-2 rounded-full bg-gray-500"></span>;
-                case 'maintenance': return <span className="w-2 h-2 rounded-full bg-red-500"></span>;
-                default: return null;
-            }
-        };
-        
+        // Get header color based on type
         const getHeaderColor = () => {
-            switch(type) {
+            switch (type) {
                 case 'online': return 'from-emerald-500 to-emerald-600';
                 case 'offline': return 'from-gray-500 to-gray-600';
                 case 'maintenance': return 'from-red-500 to-red-600';
                 case 'areas': return 'from-purple-500 to-purple-600';
-                default: return 'from-sky-500 to-blue-600';
+                default: return 'from-sky-500 to-sky-600';
             }
         };
         
-        // Disable backdrop blur on low-end devices for better performance
-        const backdropClass = disableAnimations ? 'bg-black/70' : 'bg-black/60 backdrop-blur-sm';
+        // Get status icon based on type - simplified for low-end devices
+        const getStatusIcon = () => {
+            const iconClass = "w-5 h-5 text-white";
+            switch (type) {
+                case 'online':
+                    return <svg className={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M5 13l4 4L19 7"/></svg>;
+                case 'offline':
+                    return <svg className={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M6 18L18 6M6 6l12 12"/></svg>;
+                case 'maintenance':
+                    return <svg className={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877"/></svg>;
+                case 'areas':
+                    return <svg className={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/><circle cx="12" cy="11" r="3"/></svg>;
+                default:
+                    return <Icons.Camera />;
+            }
+        };
+        
+        // Get icon color for camera items
+        const getIconColor = () => {
+            switch (type) {
+                case 'online': return 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400';
+                case 'offline': return 'bg-gray-100 dark:bg-gray-500/20 text-gray-600 dark:text-gray-400';
+                case 'maintenance': return 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400';
+                default: return 'bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400';
+            }
+        };
         
         return (
-            <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${backdropClass}`} onClick={onClose}>
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={onClose}>
                 <div 
                     className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md max-h-[70vh] overflow-hidden"
                     onClick={e => e.stopPropagation()}
@@ -2755,57 +2803,64 @@ function StatsBar({ cameras, areas, onCameraClick }) {
                                 ))}
                             </div>
                         ) : (
-                            // Camera list - optimized for low-end devices
+                            // Camera list - optimized for low-end devices with tunnel indicator
                             <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                                {items.map(camera => (
-                                    <button
-                                        key={camera.id}
-                                        onClick={() => handleCameraItemClick(camera)}
-                                        className={`w-full px-4 py-3 text-left flex items-center gap-3 ${
-                                            disableAnimations 
-                                                ? 'hover:bg-gray-100 dark:hover:bg-gray-800' 
-                                                : 'hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors'
-                                        }`}
-                                    >
-                                        <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                                            type === 'online' ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' :
-                                            type === 'offline' ? 'bg-gray-100 dark:bg-gray-500/20 text-gray-600 dark:text-gray-400' :
-                                            'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400'
-                                        }`}>
-                                            <Icons.Camera />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="font-medium text-gray-900 dark:text-white truncate text-sm sm:text-base">{camera.name}</p>
-                                            {/* Location */}
-                                            {camera.location && (
-                                                <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 truncate flex items-center gap-1">
-                                                    <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                        <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/><circle cx="12" cy="11" r="3"/>
-                                                    </svg>
-                                                    <span className="truncate">{camera.location}</span>
-                                                </p>
-                                            )}
-                                            {/* Area */}
-                                            {camera.area_name && (
-                                                <p className="text-[11px] sm:text-xs text-gray-400 dark:text-gray-500 truncate flex items-center gap-1 mt-0.5">
-                                                    <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                        <path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l5.447 2.724A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
-                                                    </svg>
-                                                    <span className="truncate">{camera.area_name}</span>
-                                                </p>
-                                            )}
-                                            {/* Fallback if no location and no area */}
-                                            {!camera.location && !camera.area_name && (
-                                                <p className="text-[11px] sm:text-xs text-gray-400 dark:text-gray-500">Lokasi tidak tersedia</p>
-                                            )}
-                                        </div>
-                                        {type === 'online' && (
-                                            <div className="shrink-0 text-emerald-500 w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center">
-                                                <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                                {items.map(camera => {
+                                    const isTunnel = camera.is_tunnel === 1;
+                                    return (
+                                        <button
+                                            key={camera.id}
+                                            onClick={() => handleCameraItemClick(camera)}
+                                            className={`w-full px-4 py-3 text-left flex items-center gap-3 ${
+                                                disableAnimations 
+                                                    ? 'hover:bg-gray-100 dark:hover:bg-gray-800' 
+                                                    : 'hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors'
+                                            }`}
+                                        >
+                                            <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center shrink-0 ${getIconColor()}`}>
+                                                <Icons.Camera />
                                             </div>
-                                        )}
-                                    </button>
-                                ))}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-1.5">
+                                                    <p className="font-medium text-gray-900 dark:text-white truncate text-sm sm:text-base">{camera.name}</p>
+                                                    {/* Tunnel badge in list */}
+                                                    {isTunnel && type === 'online' && (
+                                                        <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-bold bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded">
+                                                            TUNNEL
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {/* Location */}
+                                                {camera.location && (
+                                                    <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 truncate flex items-center gap-1">
+                                                        <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                            <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/><circle cx="12" cy="11" r="3"/>
+                                                        </svg>
+                                                        <span className="truncate">{camera.location}</span>
+                                                    </p>
+                                                )}
+                                                {/* Area */}
+                                                {camera.area_name && (
+                                                    <p className="text-[11px] sm:text-xs text-gray-400 dark:text-gray-500 truncate flex items-center gap-1 mt-0.5">
+                                                        <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                            <path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l5.447 2.724A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+                                                        </svg>
+                                                        <span className="truncate">{camera.area_name}</span>
+                                                    </p>
+                                                )}
+                                                {/* Fallback if no location and no area */}
+                                                {!camera.location && !camera.area_name && (
+                                                    <p className="text-[11px] sm:text-xs text-gray-400 dark:text-gray-500">Lokasi tidak tersedia</p>
+                                                )}
+                                            </div>
+                                            {type === 'online' && (
+                                                <div className="shrink-0 text-emerald-500 w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center">
+                                                    <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                                                </div>
+                                            )}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
