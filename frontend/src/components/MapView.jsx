@@ -707,7 +707,7 @@ const MapView = memo(({
                 zoomControl={false}
             >
                 <TileLayer
-                    attribution='&copy; OSM'
+                    attribution='&copy; <a href="https://raf.my.id" target="_blank">RAF NET</a>'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
                 <ZoomControl position="bottomright" />
