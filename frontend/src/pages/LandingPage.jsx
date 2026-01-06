@@ -1218,6 +1218,7 @@ function VideoPopup({ camera, onClose }) {
 // ============================================
 // MULTI-VIEW VIDEO ITEM - Optimized with fullscreen detection, error isolation, timeout handler, and auto-retry
 // Each stream is isolated - errors in one don't affect others
+// Now handles offline/maintenance cameras properly
 // **Validates: Requirements 1.1, 1.2, 1.3, 2.3, 4.1, 4.2, 4.3, 4.4, 6.1, 6.2, 6.3, 6.4, 7.1, 7.2, 7.3**
 // ============================================
 function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDelay = 0 }) {
@@ -1229,7 +1230,18 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
     const fallbackHandlerRef = useRef(null);
     const abortControllerRef = useRef(null);
     
-    const [status, setStatus] = useState('connecting');
+    // Check camera status first - same as VideoPopup
+    const isMaintenance = camera.status === 'maintenance';
+    const isOffline = camera.is_online === 0;
+    
+    // Set initial status based on camera state
+    const getInitialStatus = () => {
+        if (isMaintenance) return 'maintenance';
+        if (isOffline) return 'offline';
+        return 'connecting';
+    };
+    
+    const [status, setStatus] = useState(getInitialStatus);
     const [loadingStage, setLoadingStage] = useState(LoadingStage.CONNECTING);
     const [zoom, setZoom] = useState(1);
     const [retryKey, setRetryKey] = useState(0);
@@ -1331,6 +1343,9 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
     }, []);
 
     useEffect(() => {
+        // Skip HLS loading if camera is in maintenance or offline
+        if (isMaintenance || isOffline) return;
+        
         if (!url || !videoRef.current) return;
         const video = videoRef.current;
         let hls = null;
@@ -1575,7 +1590,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 hlsRef.current = null; 
             }
         };
-    }, [url, retryKey, initDelay, camera.id, onError, deviceTier, cleanupResources]);
+    }, [url, retryKey, initDelay, camera.id, onError, deviceTier, cleanupResources, isMaintenance, isOffline]);
 
     const handleRetry = useCallback(() => {
         cleanupResources();
@@ -1616,6 +1631,8 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
     // Get status display info for multi-view - **Validates: Requirements 4.1, 4.2, 4.3, 4.4**
     const getStatusBadge = () => {
         if (status === 'live') return { label: 'LIVE', color: 'bg-emerald-500' };
+        if (status === 'maintenance') return { label: 'PERBAIKAN', color: 'bg-red-500' };
+        if (status === 'offline') return { label: 'OFFLINE', color: 'bg-gray-500' };
         if (status === 'timeout') return { label: 'TIMEOUT', color: 'bg-amber-500' };
         if (status === 'error') return { label: 'OFF', color: 'bg-red-500' };
         // Connecting - show abbreviated stage
@@ -1707,6 +1724,36 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                             <Icons.Reset />
                             Coba Lagi
                         </button>
+                    </div>
+                </div>
+            )}
+            
+            {/* Maintenance Overlay */}
+            {status === 'maintenance' && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-950/90">
+                    <div className="text-center p-4">
+                        <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-red-500/20 flex items-center justify-center">
+                            <svg className="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63"/>
+                            </svg>
+                        </div>
+                        <p className="text-red-300 text-sm font-bold mb-1">Dalam Perbaikan</p>
+                        <p className="text-gray-400 text-[10px]">Kamera sedang maintenance</p>
+                    </div>
+                </div>
+            )}
+            
+            {/* Offline Overlay */}
+            {status === 'offline' && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/95">
+                    <div className="text-center p-4">
+                        <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-700 flex items-center justify-center">
+                            <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829"/>
+                            </svg>
+                        </div>
+                        <p className="text-gray-300 text-sm font-bold mb-1">Kamera Offline</p>
+                        <p className="text-gray-500 text-[10px]">Tidak dapat dijangkau</p>
                     </div>
                 </div>
             )}
