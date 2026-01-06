@@ -201,47 +201,6 @@ function ToastContainer({ toasts, removeToast }) {
 }
 
 // ============================================
-// CAMERA STATUS BAR - Real-time statistics display
-// Shows online/offline/maintenance counts with responsive design
-// ============================================
-const CameraStatusBar = memo(function CameraStatusBar({ cameras }) {
-    const stats = useMemo(() => {
-        const online = cameras.filter(c => c.status !== 'maintenance' && c.is_online !== 0).length;
-        const offline = cameras.filter(c => c.status !== 'maintenance' && c.is_online === 0).length;
-        const maintenance = cameras.filter(c => c.status === 'maintenance').length;
-        return { online, offline, maintenance, total: cameras.length };
-    }, [cameras]);
-    
-    if (cameras.length === 0) return null;
-    
-    return (
-        <div className="flex items-center gap-1.5 sm:gap-2">
-            {/* Online */}
-            <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg bg-emerald-500/10 dark:bg-emerald-500/20">
-                <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-500"></span>
-                <span className="text-[10px] sm:text-xs font-semibold text-emerald-600 dark:text-emerald-400">{stats.online}</span>
-            </div>
-            
-            {/* Offline - only show if > 0 */}
-            {stats.offline > 0 && (
-                <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg bg-gray-500/10 dark:bg-gray-500/20">
-                    <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-gray-500"></span>
-                    <span className="text-[10px] sm:text-xs font-semibold text-gray-600 dark:text-gray-400">{stats.offline}</span>
-                </div>
-            )}
-            
-            {/* Maintenance - only show if > 0 */}
-            {stats.maintenance > 0 && (
-                <div className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg bg-red-500/10 dark:bg-red-500/20">
-                    <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-500"></span>
-                    <span className="text-[10px] sm:text-xs font-semibold text-red-600 dark:text-red-400">{stats.maintenance}</span>
-                </div>
-            )}
-        </div>
-    );
-});
-
-// ============================================
 // CAMERA STATUS TRACKER HOOK - Tracks camera status changes
 // Notifies when cameras go offline/online
 // ============================================
@@ -1850,10 +1809,10 @@ function MultiViewLayout({ cameras, onRemove, onClose }) {
 
 
 // ============================================
-// NAVBAR - Enhanced with live indicator and camera status
+// NAVBAR - Enhanced with live indicator
 // Disables animations on low-end devices - **Validates: Requirements 5.2**
 // ============================================
-function Navbar({ cameraCount, cameras = [] }) {
+function Navbar({ cameraCount }) {
     const { isDark, toggleTheme } = useTheme();
     const [currentTime, setCurrentTime] = useState(new Date());
     const disableAnimations = shouldDisableAnimations();
@@ -1877,33 +1836,24 @@ function Navbar({ cameraCount, cameras = [] }) {
                                 <span className={`absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white dark:border-gray-900 ${disableAnimations ? '' : 'animate-pulse'}`}></span>
                             )}
                         </div>
-                        <div className="hidden sm:block">
+                        <div>
                             <span className="text-lg font-bold text-gray-900 dark:text-white">RAF NET</span>
                             <p className="text-[10px] text-gray-500 dark:text-gray-400 -mt-0.5">CCTV Bojonegoro Online</p>
                         </div>
                     </a>
                     
-                    {/* Center - Live Time with Location (desktop) / Camera Status (mobile) */}
-                    <div className="flex items-center gap-2 sm:gap-3">
-                        {/* Camera Status Bar - visible on all devices */}
-                        <CameraStatusBar cameras={cameras} />
-                        
-                        {/* Separator - desktop only */}
-                        <div className="hidden md:block w-px h-6 bg-gray-300 dark:bg-gray-600"></div>
-                        
-                        {/* Live indicator and time - desktop only */}
-                        <div className="hidden md:flex items-center gap-3 px-4 py-2 rounded-xl bg-gray-100/80 dark:bg-gray-800/80">
-                            <div className="flex items-center gap-2">
-                                <span className={`w-2 h-2 rounded-full bg-emerald-500 ${disableAnimations ? '' : 'animate-pulse'}`}></span>
-                                <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">LIVE</span>
-                            </div>
-                            <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
-                            <span className="text-xs text-gray-500 dark:text-gray-400">Bojonegoro</span>
-                            <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
-                            <span className="text-sm font-mono text-gray-600 dark:text-gray-300">
-                                {currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                            </span>
+                    {/* Center - Live Time with Location */}
+                    <div className="hidden md:flex items-center gap-3 px-4 py-2 rounded-xl bg-gray-100/80 dark:bg-gray-800/80">
+                        <div className="flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full bg-emerald-500 ${disableAnimations ? '' : 'animate-pulse'}`}></span>
+                            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">LIVE</span>
                         </div>
+                        <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">Bojonegoro</span>
+                        <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
+                        <span className="text-sm font-mono text-gray-600 dark:text-gray-300">
+                            {currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </span>
                     </div>
                     
                     {/* Right - Theme Toggle */}
@@ -2687,45 +2637,68 @@ function MultiViewButton({ count, onClick, maxReached, maxStreams = 3 }) {
 }
 
 // ============================================
-// STATS BAR - Integrated into Hero section
+// STATS BAR - Camera status statistics with online/offline/maintenance breakdown
 // ============================================
 function StatsBar({ cameras, areas }) {
-    const totalCameras = cameras.length;
-    const totalAreas = areas.length;
-    const kecamatans = [...new Set(cameras.map(c => c.kecamatan).filter(Boolean))].length;
+    const stats = useMemo(() => {
+        const online = cameras.filter(c => c.status !== 'maintenance' && c.is_online !== 0).length;
+        const offline = cameras.filter(c => c.status !== 'maintenance' && c.is_online === 0).length;
+        const maintenance = cameras.filter(c => c.status === 'maintenance').length;
+        return { online, offline, maintenance, total: cameras.length };
+    }, [cameras]);
     
-    if (totalCameras === 0) return null;
+    const totalAreas = areas.length;
+    
+    if (cameras.length === 0) return null;
     
     return (
-        <div className="flex flex-wrap justify-center gap-3 sm:gap-6 mt-8 pt-6 border-t border-gray-200/50 dark:border-gray-700/50">
-            <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm shadow-sm">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
-                    <span className="text-white font-bold text-lg">{totalCameras}</span>
+        <div className="flex flex-wrap justify-center gap-2 sm:gap-4 mt-8 pt-6 border-t border-gray-200/50 dark:border-gray-700/50">
+            {/* Online Cameras */}
+            <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-xl bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm shadow-sm">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                    <span className="text-white font-bold text-sm sm:text-lg">{stats.online}</span>
                 </div>
                 <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Active</p>
-                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">Cameras</p>
+                    <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">Online</p>
+                    <p className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-200">Kamera</p>
                 </div>
             </div>
-            {totalAreas > 0 && (
-                <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm shadow-sm">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
-                        <span className="text-white font-bold text-lg">{totalAreas}</span>
+            
+            {/* Offline Cameras - only show if > 0 */}
+            {stats.offline > 0 && (
+                <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-xl bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm shadow-sm">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center shadow-lg shadow-gray-500/30">
+                        <span className="text-white font-bold text-sm sm:text-lg">{stats.offline}</span>
                     </div>
                     <div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Monitoring</p>
-                        <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">Areas</p>
+                        <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">Offline</p>
+                        <p className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-200">Kamera</p>
                     </div>
                 </div>
             )}
-            {kecamatans > 0 && (
-                <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm shadow-sm">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
-                        <span className="text-white font-bold text-lg">{kecamatans}</span>
+            
+            {/* Maintenance Cameras - only show if > 0 */}
+            {stats.maintenance > 0 && (
+                <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-xl bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm shadow-sm">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center shadow-lg shadow-red-500/30">
+                        <span className="text-white font-bold text-sm sm:text-lg">{stats.maintenance}</span>
                     </div>
                     <div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Coverage</p>
-                        <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">Kecamatan</p>
+                        <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">Perbaikan</p>
+                        <p className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-200">Kamera</p>
+                    </div>
+                </div>
+            )}
+            
+            {/* Areas */}
+            {totalAreas > 0 && (
+                <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-xl bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm shadow-sm">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
+                        <span className="text-white font-bold text-sm sm:text-lg">{totalAreas}</span>
+                    </div>
+                    <div>
+                        <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">Monitoring</p>
+                        <p className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-200">Area</p>
                     </div>
                 </div>
             )}
@@ -2898,7 +2871,7 @@ export default function LandingPage() {
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
-            <Navbar cameraCount={cameras.length} cameras={cameras} />
+            <Navbar cameraCount={cameras.length} />
             
             {/* Hero Section - SEO optimized with Indonesian content */}
             <header className="relative overflow-hidden bg-gradient-to-br from-sky-500/10 via-transparent to-purple-500/10 dark:from-sky-500/5 dark:to-purple-500/5">
