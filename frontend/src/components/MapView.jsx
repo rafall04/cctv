@@ -27,10 +27,20 @@ const isLowEnd = deviceTier === 'low';
 // Cache icon untuk menghindari pembuatan ulang
 const iconCache = new Map();
 
-// CCTV Marker - dengan support status (active, maintenance, tunnel)
-const createCameraIcon = (status = 'active', isTunnel = false) => {
-    // Status: 'active' = hijau, 'maintenance' = merah, 'tunnel' = orange
-    let cacheKey = status === 'maintenance' ? 'maintenance' : (isTunnel ? 'tunnel' : 'stable');
+// CCTV Marker - dengan support status (active, maintenance, tunnel, offline)
+const createCameraIcon = (status = 'active', isTunnel = false, isOnline = true) => {
+    // Status priority: maintenance > offline > tunnel > stable
+    let cacheKey;
+    if (status === 'maintenance') {
+        cacheKey = 'maintenance';
+    } else if (!isOnline) {
+        cacheKey = 'offline';
+    } else if (isTunnel) {
+        cacheKey = 'tunnel';
+    } else {
+        cacheKey = 'stable';
+    }
+    
     if (iconCache.has(cacheKey)) {
         return iconCache.get(cacheKey);
     }
@@ -39,12 +49,25 @@ const createCameraIcon = (status = 'active', isTunnel = false) => {
     if (status === 'maintenance') {
         color = '#ef4444'; // merah
         darkColor = '#dc2626';
+    } else if (!isOnline) {
+        color = '#6b7280'; // abu-abu (offline)
+        darkColor = '#4b5563';
     } else if (isTunnel) {
         color = '#f97316'; // orange
         darkColor = '#ea580c';
     } else {
         color = '#10b981'; // hijau
         darkColor = '#059669';
+    }
+    
+    // Icon SVG berdasarkan status
+    let iconSvg;
+    if (status === 'maintenance') {
+        iconSvg = '<path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/>';
+    } else if (!isOnline) {
+        iconSvg = '<path d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3"/>';
+    } else {
+        iconSvg = '<path d="M18 10.48V6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-4.48l4 3.98v-11l-4 3.98z"/>';
     }
     
     const icon = L.divIcon({
@@ -69,10 +92,7 @@ const createCameraIcon = (status = 'active', isTunnel = false) => {
                     justify-content: center;
                 ">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="white" style="transform: rotate(45deg);">
-                        ${status === 'maintenance' 
-                            ? '<path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/>'
-                            : '<path d="M18 10.48V6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-4.48l4 3.98v-11l-4 3.98z"/>'
-                        }
+                        ${iconSvg}
                     </svg>
                 </div>
             </div>
@@ -572,12 +592,13 @@ const CameraMarker = memo(({ camera, onClick }) => {
     const lat = camera._displayLat ?? parseFloat(camera.latitude);
     const lng = camera._displayLng ?? parseFloat(camera.longitude);
     const isTunnel = camera.is_tunnel === 1 || camera.is_tunnel === true;
+    const isOnline = camera.is_online !== 0; // Default to online if undefined
     const status = camera.status || 'active';
     
     return (
         <Marker 
             position={[lat, lng]} 
-            icon={createCameraIcon(status, isTunnel)}
+            icon={createCameraIcon(status, isTunnel, isOnline)}
             eventHandlers={{ click: () => onClick(camera) }}
         />
     );
@@ -670,9 +691,10 @@ const MapView = memo(({
 
     const stats = useMemo(() => {
         const maintenance = filtered.filter(c => c.status === 'maintenance').length;
-        const stabil = filtered.filter(c => c.status !== 'maintenance' && !c.is_tunnel).length;
-        const tunnel = filtered.filter(c => c.status !== 'maintenance' && (c.is_tunnel === 1 || c.is_tunnel === true)).length;
-        return { stabil, tunnel, maintenance, total: filtered.length };
+        const offline = filtered.filter(c => c.status !== 'maintenance' && c.is_online === 0).length;
+        const stabil = filtered.filter(c => c.status !== 'maintenance' && c.is_online !== 0 && !c.is_tunnel).length;
+        const tunnel = filtered.filter(c => c.status !== 'maintenance' && c.is_online !== 0 && (c.is_tunnel === 1 || c.is_tunnel === true)).length;
+        return { stabil, tunnel, maintenance, offline, total: filtered.length };
     }, [filtered]);
 
     const { center, zoom, bounds } = useMemo(() => {
@@ -811,6 +833,15 @@ const MapView = memo(({
                         <span className="w-2.5 h-2.5 rounded-full bg-orange-500"/>
                         <span className="font-medium text-gray-700 dark:text-gray-200">{stats.tunnel}</span>
                     </span>
+                    {stats.offline > 0 && (
+                        <>
+                            <span className="text-gray-300 dark:text-gray-600">|</span>
+                            <span className="flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-full bg-gray-500"/>
+                                <span className="font-medium text-gray-700 dark:text-gray-200">{stats.offline}</span>
+                            </span>
+                        </>
+                    )}
                     {stats.maintenance > 0 && (
                         <>
                             <span className="text-gray-300 dark:text-gray-600">|</span>
@@ -826,7 +857,7 @@ const MapView = memo(({
             {/* Legend - Bottom Left - posisi lebih ke pojok bawah */}
             <div className="absolute bottom-3 left-3 z-[1000]">
                 <div className="px-2.5 py-1.5 bg-white/95 dark:bg-gray-800/95 rounded-lg shadow-lg text-[10px]">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                         <span className="flex items-center gap-1">
                             <span className="w-2 h-2 rounded-full bg-emerald-500"/>
                             <span className="text-gray-600 dark:text-gray-300">Stabil</span>
@@ -834,6 +865,10 @@ const MapView = memo(({
                         <span className="flex items-center gap-1">
                             <span className="w-2 h-2 rounded-full bg-orange-500"/>
                             <span className="text-gray-600 dark:text-gray-300">Tunnel</span>
+                        </span>
+                        <span className="flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-gray-500"/>
+                            <span className="text-gray-600 dark:text-gray-300">Offline</span>
                         </span>
                         <span className="flex items-center gap-1">
                             <span className="w-2 h-2 rounded-full bg-red-500"/>

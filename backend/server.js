@@ -27,6 +27,7 @@ import feedbackRoutes from './routes/feedbackRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
 import mediaMtxService from './services/mediaMtxService.js';
 import streamWarmer from './services/streamWarmer.js';
+import cameraHealthService from './services/cameraHealthService.js';
 
 const fastify = Fastify({
     logger: config.server.env === 'production' 
@@ -294,6 +295,10 @@ const start = async () => {
         // Start security audit log cleanup scheduler
         startDailyCleanup();
         console.log('[Security] Daily audit log cleanup scheduled (90-day retention)');
+        
+        // Start camera health check service (every 30 seconds)
+        cameraHealthService.start(30000);
+        console.log('[CameraHealth] Health check service started (30s interval)');
     } catch (err) {
         fastify.log.error(err);
         process.exit(1);
@@ -307,6 +312,7 @@ const shutdown = async () => {
     console.log('\n[Server] Shutting down gracefully...');
     mediaMtxService.stopAutoSync();
     streamWarmer.stopAll();
+    cameraHealthService.stop();
     stopDailyCleanup();
     await fastify.close();
     process.exit(0);

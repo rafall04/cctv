@@ -201,17 +201,33 @@ function ToastContainer({ toasts, removeToast }) {
 }
 
 // ============================================
-// CAMERA CARD - Enhanced with detailed location info
+// CAMERA CARD - Enhanced with detailed location info and online status
 // ============================================
 const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMulti }) {
     const isMaintenance = camera.status === 'maintenance';
+    const isOffline = camera.is_online === 0;
+    
+    // Determine card style based on status priority: maintenance > offline > normal
+    const getCardStyle = () => {
+        if (isMaintenance) return 'ring-red-500/50 hover:ring-red-500';
+        if (isOffline) return 'ring-gray-400/50 hover:ring-gray-500';
+        return 'ring-gray-200 dark:ring-gray-800 hover:ring-sky-500/50';
+    };
+    
+    const getBackgroundStyle = () => {
+        if (isMaintenance) return 'bg-gradient-to-br from-red-100 to-red-200 dark:from-red-900/30 dark:to-red-800/30';
+        if (isOffline) return 'bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800';
+        return 'bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900';
+    };
+    
+    const getIconStyle = () => {
+        if (isMaintenance) return 'text-red-300 dark:text-red-700';
+        if (isOffline) return 'text-gray-400 dark:text-gray-600';
+        return 'text-gray-300 dark:text-gray-700';
+    };
     
     return (
-        <div className={`relative rounded-2xl overflow-hidden bg-white dark:bg-gray-900 shadow-lg hover:shadow-2xl transition-all duration-300 ring-1 hover:-translate-y-1 group/card ${
-            isMaintenance 
-                ? 'ring-red-500/50 hover:ring-red-500' 
-                : 'ring-gray-200 dark:ring-gray-800 hover:ring-sky-500/50'
-        }`}>
+        <div className={`relative rounded-2xl overflow-hidden bg-white dark:bg-gray-900 shadow-lg hover:shadow-2xl transition-all duration-300 ring-1 hover:-translate-y-1 group/card ${getCardStyle()}`}>
             <button
                 onClick={(e) => { e.stopPropagation(); onAddMulti(); }}
                 className={`absolute top-3 right-3 z-30 p-2.5 rounded-xl shadow-lg transition-all duration-200 ${
@@ -223,15 +239,15 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
             >
                 {inMulti ? <Icons.Check /> : <Icons.Plus />}
             </button>
-            <div onClick={onClick} className={`aspect-video relative cursor-pointer ${
-                isMaintenance 
-                    ? 'bg-gradient-to-br from-red-100 to-red-200 dark:from-red-900/30 dark:to-red-800/30' 
-                    : 'bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900'
-            }`}>
-                <div className={`absolute inset-0 flex items-center justify-center ${isMaintenance ? 'text-red-300 dark:text-red-700' : 'text-gray-300 dark:text-gray-700'}`}>
+            <div onClick={onClick} className={`aspect-video relative cursor-pointer ${getBackgroundStyle()}`}>
+                <div className={`absolute inset-0 flex items-center justify-center ${getIconStyle()}`}>
                     {isMaintenance ? (
                         <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={0.5}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z" />
+                        </svg>
+                    ) : isOffline ? (
+                        <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={0.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414"/>
                         </svg>
                     ) : (
                         <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={0.5}>
@@ -239,14 +255,14 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
                         </svg>
                     )}
                 </div>
-                {!isMaintenance && (
+                {!isMaintenance && !isOffline && (
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/card:opacity-100 bg-black/40 transition-opacity duration-300">
                         <div className="w-14 h-14 rounded-full bg-white/95 flex items-center justify-center text-sky-500 shadow-xl transform scale-90 group-hover/card:scale-100 transition-transform duration-300">
                             <Icons.Play />
                         </div>
                     </div>
                 )}
-                {/* Status badge - Maintenance or Live */}
+                {/* Status badge - Maintenance, Offline, or Live */}
                 <div className="absolute top-3 left-3">
                     {isMaintenance ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-600/90 backdrop-blur-sm text-white text-[10px] font-bold shadow-lg">
@@ -254,6 +270,13 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63" />
                             </svg>
                             PERBAIKAN
+                        </span>
+                    ) : isOffline ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-600/90 backdrop-blur-sm text-white text-[10px] font-bold shadow-lg">
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072"/>
+                            </svg>
+                            OFFLINE
                         </span>
                     ) : (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/90 backdrop-blur-sm text-white text-[10px] font-bold shadow-lg">
@@ -265,9 +288,17 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
                         </span>
                     )}
                 </div>
-                {/* Area badge */}
-                {camera.area_name && (
+                {/* Offline indicator at bottom left */}
+                {isOffline && !isMaintenance && (
                     <div className="absolute bottom-3 left-3">
+                        <span className="px-2.5 py-1 rounded-lg bg-gray-800/80 backdrop-blur-sm text-gray-300 text-[10px] font-medium">
+                            Tidak tersedia
+                        </span>
+                    </div>
+                )}
+                {/* Area badge - move to bottom right if offline indicator is shown */}
+                {camera.area_name && (
+                    <div className={`absolute bottom-3 ${isOffline && !isMaintenance ? 'right-3' : 'left-3'}`}>
                         <span className="px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-sm text-white text-[10px] font-medium">
                             {camera.area_name}
                         </span>
