@@ -2637,72 +2637,235 @@ function MultiViewButton({ count, onClick, maxReached, maxStreams = 3 }) {
 }
 
 // ============================================
-// STATS BAR - Camera status statistics with online/offline/maintenance breakdown
+// STATS BAR - Camera status statistics with clickable items
+// Shows modal with list when clicked
 // ============================================
-function StatsBar({ cameras, areas }) {
+function StatsBar({ cameras, areas, onCameraClick }) {
+    const [activeModal, setActiveModal] = useState(null); // 'online', 'offline', 'maintenance', 'areas'
+    
     const stats = useMemo(() => {
-        const online = cameras.filter(c => c.status !== 'maintenance' && c.is_online !== 0).length;
-        const offline = cameras.filter(c => c.status !== 'maintenance' && c.is_online === 0).length;
-        const maintenance = cameras.filter(c => c.status === 'maintenance').length;
-        return { online, offline, maintenance, total: cameras.length };
+        const onlineList = cameras.filter(c => c.status !== 'maintenance' && c.is_online !== 0);
+        const offlineList = cameras.filter(c => c.status !== 'maintenance' && c.is_online === 0);
+        const maintenanceList = cameras.filter(c => c.status === 'maintenance');
+        return { 
+            online: onlineList.length, 
+            offline: offlineList.length, 
+            maintenance: maintenanceList.length, 
+            total: cameras.length,
+            onlineList,
+            offlineList,
+            maintenanceList
+        };
     }, [cameras]);
     
     const totalAreas = areas.length;
     
     if (cameras.length === 0) return null;
     
-    return (
-        <div className="flex flex-wrap justify-center gap-2 sm:gap-4 mt-8 pt-6 border-t border-gray-200/50 dark:border-gray-700/50">
-            {/* Online Cameras */}
-            <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-xl bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm shadow-sm">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
-                    <span className="text-white font-bold text-sm sm:text-lg">{stats.online}</span>
-                </div>
-                <div>
-                    <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">Online</p>
-                    <p className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-200">Kamera</p>
+    const handleCameraItemClick = (camera) => {
+        setActiveModal(null);
+        onCameraClick?.(camera);
+    };
+    
+    // Stats Item Component
+    const StatsItem = ({ count, label, sublabel, gradient, shadow, onClick, disabled = false }) => (
+        <button
+            onClick={onClick}
+            disabled={disabled}
+            className={`flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-xl bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm shadow-sm transition-all ${
+                disabled ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 hover:shadow-md cursor-pointer'
+            }`}
+        >
+            <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center shadow-lg ${shadow}`}>
+                <span className="text-white font-bold text-sm sm:text-lg">{count}</span>
+            </div>
+            <div className="text-left">
+                <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">{label}</p>
+                <p className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-200">{sublabel}</p>
+            </div>
+        </button>
+    );
+    
+    // Modal Component
+    const ListModal = ({ title, items, type, onClose }) => {
+        const getStatusIcon = () => {
+            switch(type) {
+                case 'online': return <span className="w-2 h-2 rounded-full bg-emerald-500"></span>;
+                case 'offline': return <span className="w-2 h-2 rounded-full bg-gray-500"></span>;
+                case 'maintenance': return <span className="w-2 h-2 rounded-full bg-red-500"></span>;
+                default: return null;
+            }
+        };
+        
+        const getHeaderColor = () => {
+            switch(type) {
+                case 'online': return 'from-emerald-500 to-emerald-600';
+                case 'offline': return 'from-gray-500 to-gray-600';
+                case 'maintenance': return 'from-red-500 to-red-600';
+                case 'areas': return 'from-purple-500 to-purple-600';
+                default: return 'from-sky-500 to-blue-600';
+            }
+        };
+        
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+                <div 
+                    className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md max-h-[70vh] overflow-hidden"
+                    onClick={e => e.stopPropagation()}
+                >
+                    {/* Header */}
+                    <div className={`bg-gradient-to-r ${getHeaderColor()} px-5 py-4 flex items-center justify-between`}>
+                        <div className="flex items-center gap-3">
+                            {getStatusIcon()}
+                            <h3 className="text-white font-bold text-lg">{title}</h3>
+                            <span className="px-2 py-0.5 bg-white/20 rounded-full text-white text-sm font-medium">
+                                {items.length}
+                            </span>
+                        </div>
+                        <button onClick={onClose} className="p-1.5 hover:bg-white/20 rounded-lg transition-colors text-white">
+                            <Icons.X />
+                        </button>
+                    </div>
+                    
+                    {/* List */}
+                    <div className="overflow-y-auto max-h-[calc(70vh-80px)]">
+                        {items.length === 0 ? (
+                            <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+                                Tidak ada data
+                            </div>
+                        ) : type === 'areas' ? (
+                            // Area list
+                            <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                                {items.map(area => (
+                                    <div key={area.id} className="px-5 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                                        <p className="font-medium text-gray-900 dark:text-white">{area.name}</p>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                                            {[area.kelurahan, area.kecamatan].filter(Boolean).join(', ')}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            // Camera list
+                            <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                                {items.map(camera => (
+                                    <button
+                                        key={camera.id}
+                                        onClick={() => handleCameraItemClick(camera)}
+                                        className="w-full px-5 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 text-left flex items-center gap-3 transition-colors"
+                                    >
+                                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                                            type === 'online' ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' :
+                                            type === 'offline' ? 'bg-gray-100 dark:bg-gray-500/20 text-gray-600 dark:text-gray-400' :
+                                            'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400'
+                                        }`}>
+                                            <Icons.Camera />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-medium text-gray-900 dark:text-white truncate">{camera.name}</p>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                                                {camera.location || camera.area_name || 'Lokasi tidak tersedia'}
+                                            </p>
+                                        </div>
+                                        {type === 'online' && (
+                                            <div className="shrink-0 text-emerald-500">
+                                                <Icons.Play />
+                                            </div>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
+        );
+    };
+    
+    return (
+        <>
+            <div className="flex flex-wrap justify-center gap-2 sm:gap-4 mt-8 pt-6 border-t border-gray-200/50 dark:border-gray-700/50">
+                {/* Online Cameras */}
+                <StatsItem
+                    count={stats.online}
+                    label="Online"
+                    sublabel="Kamera"
+                    gradient="from-emerald-400 to-emerald-600"
+                    shadow="shadow-emerald-500/30"
+                    onClick={() => setActiveModal('online')}
+                />
+                
+                {/* Offline Cameras - only show if > 0 */}
+                {stats.offline > 0 && (
+                    <StatsItem
+                        count={stats.offline}
+                        label="Offline"
+                        sublabel="Kamera"
+                        gradient="from-gray-400 to-gray-600"
+                        shadow="shadow-gray-500/30"
+                        onClick={() => setActiveModal('offline')}
+                    />
+                )}
+                
+                {/* Maintenance Cameras - only show if > 0 */}
+                {stats.maintenance > 0 && (
+                    <StatsItem
+                        count={stats.maintenance}
+                        label="Perbaikan"
+                        sublabel="Kamera"
+                        gradient="from-red-400 to-red-600"
+                        shadow="shadow-red-500/30"
+                        onClick={() => setActiveModal('maintenance')}
+                    />
+                )}
+                
+                {/* Areas */}
+                {totalAreas > 0 && (
+                    <StatsItem
+                        count={totalAreas}
+                        label="Monitoring"
+                        sublabel="Area"
+                        gradient="from-purple-400 to-purple-600"
+                        shadow="shadow-purple-500/30"
+                        onClick={() => setActiveModal('areas')}
+                    />
+                )}
+            </div>
             
-            {/* Offline Cameras - only show if > 0 */}
-            {stats.offline > 0 && (
-                <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-xl bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm shadow-sm">
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center shadow-lg shadow-gray-500/30">
-                        <span className="text-white font-bold text-sm sm:text-lg">{stats.offline}</span>
-                    </div>
-                    <div>
-                        <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">Offline</p>
-                        <p className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-200">Kamera</p>
-                    </div>
-                </div>
+            {/* Modals */}
+            {activeModal === 'online' && (
+                <ListModal
+                    title="Kamera Online"
+                    items={stats.onlineList}
+                    type="online"
+                    onClose={() => setActiveModal(null)}
+                />
             )}
-            
-            {/* Maintenance Cameras - only show if > 0 */}
-            {stats.maintenance > 0 && (
-                <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-xl bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm shadow-sm">
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-red-400 to-red-600 flex items-center justify-center shadow-lg shadow-red-500/30">
-                        <span className="text-white font-bold text-sm sm:text-lg">{stats.maintenance}</span>
-                    </div>
-                    <div>
-                        <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">Perbaikan</p>
-                        <p className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-200">Kamera</p>
-                    </div>
-                </div>
+            {activeModal === 'offline' && (
+                <ListModal
+                    title="Kamera Offline"
+                    items={stats.offlineList}
+                    type="offline"
+                    onClose={() => setActiveModal(null)}
+                />
             )}
-            
-            {/* Areas */}
-            {totalAreas > 0 && (
-                <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-xl bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm shadow-sm">
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
-                        <span className="text-white font-bold text-sm sm:text-lg">{totalAreas}</span>
-                    </div>
-                    <div>
-                        <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">Monitoring</p>
-                        <p className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-200">Area</p>
-                    </div>
-                </div>
+            {activeModal === 'maintenance' && (
+                <ListModal
+                    title="Kamera Perbaikan"
+                    items={stats.maintenanceList}
+                    type="maintenance"
+                    onClose={() => setActiveModal(null)}
+                />
             )}
-        </div>
+            {activeModal === 'areas' && (
+                <ListModal
+                    title="Area Monitoring"
+                    items={areas}
+                    type="areas"
+                    onClose={() => setActiveModal(null)}
+                />
+            )}
+        </>
     );
 }
 
@@ -2944,7 +3107,7 @@ export default function LandingPage() {
                     </div>
                     
                     {/* Stats Bar - Integrated into Hero */}
-                    <StatsBar cameras={cameras} areas={areas} />
+                    <StatsBar cameras={cameras} areas={areas} onCameraClick={setPopup} />
                 </div>
             </header>
 
