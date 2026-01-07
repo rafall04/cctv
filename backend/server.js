@@ -296,19 +296,14 @@ const start = async () => {
         await mediaMtxService.syncCameras();
         mediaMtxService.startAutoSync();
         
-        // NOTE: StreamWarmer disabled to save bandwidth
-        // Streams will start on-demand when viewers connect
-        // This means first viewer may experience 2-3 second delay
-        // Uncomment below to enable pre-warming (uses bandwidth even without viewers)
-        /*
+        // Pre-warm camera streams for faster initial load
+        // This keeps RTSP connections ready so users don't wait
         const cameras = mediaMtxService.getDatabaseCameras();
         if (cameras.length > 0) {
             console.log(`[StreamWarmer] Pre-warming ${cameras.length} camera streams...`);
             await streamWarmer.warmAllCameras(cameras);
             console.log('[StreamWarmer] Streams pre-warmed for instant playback');
         }
-        */
-        console.log('[StreamWarmer] Disabled - streams will start on-demand to save bandwidth');
         
         // Start security audit log cleanup scheduler
         startDailyCleanup();

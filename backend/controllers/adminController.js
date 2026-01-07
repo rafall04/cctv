@@ -101,6 +101,10 @@ export async function getDashboardStats(request, reply) {
             const viewers = viewersByCamera[cameraIdInt] || 0;
             const sessions = sessionsByCamera[cameraIdInt] || [];
             
+            // Only show bandwidth when there are active viewers
+            // When no viewers, bandwidth should be 0 (stream is just being kept warm)
+            const hasActiveViewers = viewers > 0;
+            
             return {
                 id: cameraId,
                 name: cam ? cam.name : p.name,
@@ -108,8 +112,10 @@ export async function getDashboardStats(request, reply) {
                 state: state,
                 viewers: viewers,
                 sessions: sessions, // Include session details with IP
-                bytesReceived: p.bytesReceived || 0,
-                bytesSent: p.bytesSent || 0
+                // Show actual bandwidth only when viewers are watching
+                // Otherwise show 0 to indicate no active consumption
+                bytesReceived: hasActiveViewers ? (p.bytesReceived || 0) : 0,
+                bytesSent: hasActiveViewers ? (p.bytesSent || 0) : 0
             };
         });
 
