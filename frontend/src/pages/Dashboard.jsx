@@ -116,7 +116,7 @@ function ViewerSessionsModal({ title, sessions, onClose }) {
                                                 <span>⏱️ {formatDuration(session.durationSeconds)}</span>
                                                 {session.startedAt && (
                                                     <span>
-                                                        Mulai: {new Date(session.startedAt + 'Z').toLocaleTimeString('id-ID', { 
+                                                        Mulai: {new Date(session.startedAt).toLocaleTimeString('id-ID', { 
                                                             hour: '2-digit', 
                                                             minute: '2-digit' 
                                                         })}

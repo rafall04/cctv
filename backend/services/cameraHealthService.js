@@ -25,6 +25,22 @@ const dbPath = config.database.path.startsWith('/')
 
 const mediaMtxApiBaseUrl = 'http://localhost:9997/v3';
 
+/**
+ * Get current timestamp in WIB (Asia/Jakarta) format for SQLite
+ */
+function getWIBTimestamp() {
+    return new Date().toLocaleString('sv-SE', { 
+        timeZone: 'Asia/Jakarta',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    }).replace(' ', ' ');
+}
+
 class CameraHealthService {
     constructor() {
         this.checkInterval = null;
@@ -145,13 +161,14 @@ class CameraHealthService {
 
             const updateStmt = db.prepare(`
                 UPDATE cameras 
-                SET is_online = ?, last_online_check = datetime('now') 
+                SET is_online = ?, last_online_check = ? 
                 WHERE id = ?
             `);
 
             let onlineCount = 0;
             let offlineCount = 0;
             let changedCount = 0;
+            const wibTimestamp = getWIBTimestamp();
 
             for (const camera of cameras) {
                 // Use stream_key if available, fallback to legacy camera{id} format
@@ -169,7 +186,7 @@ class CameraHealthService {
                 
                 // Only update if status changed
                 if (camera.is_online !== isOnline) {
-                    updateStmt.run(isOnline, camera.id);
+                    updateStmt.run(isOnline, wibTimestamp, camera.id);
                     changedCount++;
                     
                     // Send Telegram notification on status change
@@ -293,12 +310,13 @@ class CameraHealthService {
             
             const isOnline = pathInfo?.isOnline ? 1 : 0;
             
-            // Update database
+            // Update database with WIB timestamp
+            const wibTimestamp = getWIBTimestamp();
             db.prepare(`
                 UPDATE cameras 
-                SET is_online = ?, last_online_check = datetime('now') 
+                SET is_online = ?, last_online_check = ? 
                 WHERE id = ?
-            `).run(isOnline, cameraId);
+            `).run(isOnline, wibTimestamp, cameraId);
             db.close();
 
             return isOnline === 1;

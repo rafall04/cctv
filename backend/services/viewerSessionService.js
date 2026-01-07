@@ -13,40 +13,71 @@
  * - Backend session timeout: 15 seconds (no heartbeat)
  * - Backend cleanup interval: every 5 seconds
  * - Max staleness: ~20 seconds (15s timeout + 5s cleanup)
+ * 
+ * Timezone: All timestamps stored in WIB (Asia/Jakarta, UTC+7)
  */
 
 import { query, queryOne, execute } from '../database/database.js';
 import { v4 as uuidv4 } from 'uuid';
 
+/**
+ * Get current timestamp in WIB (Asia/Jakarta) format for SQLite
+ * Format: YYYY-MM-DD HH:MM:SS
+ */
+function getWIBTimestamp() {
+    return new Date().toLocaleString('sv-SE', { 
+        timeZone: 'Asia/Jakarta',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    }).replace(' ', ' ');
+}
+
+/**
+ * Get current date in WIB for date comparisons
+ * Format: YYYY-MM-DD
+ */
+function getWIBDate() {
+    return new Date().toLocaleDateString('sv-SE', { 
+        timeZone: 'Asia/Jakarta'
+    });
+}
+
+/**
+ * Get WIB date with offset (e.g., -7 days)
+ * Format: YYYY-MM-DD
+ */
+function getWIBDateWithOffset(days) {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    return date.toLocaleDateString('sv-SE', { 
+        timeZone: 'Asia/Jakarta'
+    });
+}
+
 // Session timeout in seconds (if no heartbeat received)
-// Reduced from 30s to 15s for more realtime data
 const SESSION_TIMEOUT = 15;
 
 // Cleanup interval in milliseconds
-// Reduced from 15s to 5s for faster stale session detection
-const CLEANUP_INTERVAL = 5000; // 5 seconds
+const CLEANUP_INTERVAL = 5000;
 
 class ViewerSessionService {
     constructor() {
         this.cleanupInterval = null;
     }
 
-    /**
-     * Start the cleanup interval
-     */
     startCleanup() {
         if (this.cleanupInterval) return;
-        
         this.cleanupInterval = setInterval(() => {
             this.cleanupStaleSessions();
         }, CLEANUP_INTERVAL);
-        
         console.log('[ViewerSession] Cleanup service started');
     }
 
-    /**
-     * Stop the cleanup interval
-     */
     stopCleanup() {
         if (this.cleanupInterval) {
             clearInterval(this.cleanupInterval);
@@ -55,34 +86,21 @@ class ViewerSessionService {
         }
     }
 
-    /**
-     * Extract real IP from request (handles proxy headers)
-     */
     getRealIP(request) {
-        // Check various proxy headers
         const forwardedFor = request.headers['x-forwarded-for'];
         if (forwardedFor) {
-            // X-Forwarded-For can contain multiple IPs, first one is the client
             return forwardedFor.split(',')[0].trim();
         }
-        
         const realIP = request.headers['x-real-ip'];
         if (realIP) {
             return realIP.trim();
         }
-        
-        // Fallback to direct IP
         return request.ip || request.socket?.remoteAddress || 'unknown';
     }
 
-    /**
-     * Parse user agent to determine device type
-     */
     getDeviceType(userAgent) {
         if (!userAgent) return 'unknown';
-        
         const ua = userAgent.toLowerCase();
-        
         if (ua.includes('mobile') || ua.includes('android') || ua.includes('iphone')) {
             return 'mobile';
         }
@@ -92,23 +110,20 @@ class ViewerSessionService {
         return 'desktop';
     }
 
-    /**
-     * Start a new viewer session
-     * @returns {string} Session ID
-     */
     startSession(cameraId, request) {
         const sessionId = uuidv4();
         const ipAddress = this.getRealIP(request);
         const userAgent = request.headers['user-agent'] || '';
         const deviceType = this.getDeviceType(userAgent);
+        const wibTimestamp = getWIBTimestamp();
 
         try {
             execute(`
-                INSERT INTO viewer_sessions (session_id, camera_id, ip_address, user_agent, device_type)
-                VALUES (?, ?, ?, ?, ?)
-            `, [sessionId, cameraId, ipAddress, userAgent, deviceType]);
+                INSERT INTO viewer_sessions (session_id, camera_id, ip_address, user_agent, device_type, started_at, last_heartbeat)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            `, [sessionId, cameraId, ipAddress, userAgent, deviceType, wibTimestamp, wibTimestamp]);
 
-            console.log(`[ViewerSession] Started: ${sessionId} for camera ${cameraId} from ${ipAddress}`);
+            console.log(`[ViewerSession] Started: ${sessionId} for camera ${cameraId} from ${ipAddress} at ${wibTimestamp} WIB`);
             return sessionId;
         } catch (error) {
             console.error('[ViewerSession] Error starting session:', error);
@@ -116,17 +131,14 @@ class ViewerSessionService {
         }
     }
 
-    /**
-     * Update session heartbeat (keep-alive)
-     */
     heartbeat(sessionId) {
         try {
+            const wibTimestamp = getWIBTimestamp();
             const result = execute(`
                 UPDATE viewer_sessions 
-                SET last_heartbeat = CURRENT_TIMESTAMP
+                SET last_heartbeat = ?
                 WHERE session_id = ? AND is_active = 1
-            `, [sessionId]);
-
+            `, [wibTimestamp, sessionId]);
             return result.changes > 0;
         } catch (error) {
             console.error('[ViewerSession] Error updating heartbeat:', error);
@@ -134,42 +146,31 @@ class ViewerSessionService {
         }
     }
 
-    /**
-     * End a viewer session
-     */
     endSession(sessionId) {
         try {
-            // Get session info before ending
             const session = queryOne(`
                 SELECT * FROM viewer_sessions WHERE session_id = ? AND is_active = 1
             `, [sessionId]);
 
-            if (!session) {
-                return false;
-            }
+            if (!session) return false;
 
-            // Calculate duration
-            const startedAt = new Date(session.started_at + 'Z');
+            const startedAt = new Date(session.started_at);
             const endedAt = new Date();
             const durationSeconds = Math.floor((endedAt - startedAt) / 1000);
+            const wibTimestamp = getWIBTimestamp();
 
-            // Update session as ended
             execute(`
                 UPDATE viewer_sessions 
-                SET is_active = 0, 
-                    ended_at = CURRENT_TIMESTAMP,
-                    duration_seconds = ?
+                SET is_active = 0, ended_at = ?, duration_seconds = ?
                 WHERE session_id = ?
-            `, [durationSeconds, sessionId]);
+            `, [wibTimestamp, durationSeconds, sessionId]);
 
-            // Get camera name for history
             const camera = queryOne('SELECT name FROM cameras WHERE id = ?', [session.camera_id]);
 
-            // Store in history
             execute(`
                 INSERT INTO viewer_session_history 
                 (camera_id, camera_name, ip_address, user_agent, device_type, started_at, ended_at, duration_seconds)
-                VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             `, [
                 session.camera_id,
                 camera?.name || `Camera ${session.camera_id}`,
@@ -177,6 +178,7 @@ class ViewerSessionService {
                 session.user_agent,
                 session.device_type,
                 session.started_at,
+                wibTimestamp,
                 durationSeconds
             ]);
 
@@ -188,21 +190,17 @@ class ViewerSessionService {
         }
     }
 
-    /**
-     * Cleanup stale sessions (no heartbeat for SESSION_TIMEOUT seconds)
-     */
     cleanupStaleSessions() {
         try {
-            // Find stale sessions
+            const wibTimestamp = getWIBTimestamp();
             const staleSessions = query(`
                 SELECT session_id FROM viewer_sessions 
                 WHERE is_active = 1 
-                AND datetime(last_heartbeat) < datetime('now', '-${SESSION_TIMEOUT} seconds')
-            `);
+                AND datetime(last_heartbeat) < datetime(?, '-${SESSION_TIMEOUT} seconds')
+            `, [wibTimestamp]);
 
             for (const session of staleSessions) {
                 this.endSession(session.session_id);
-                console.log(`[ViewerSession] Cleaned up stale session: ${session.session_id}`);
             }
 
             if (staleSessions.length > 0) {
@@ -213,11 +211,9 @@ class ViewerSessionService {
         }
     }
 
-    /**
-     * Get all active sessions
-     */
     getActiveSessions() {
         try {
+            const wibTimestamp = getWIBTimestamp();
             return query(`
                 SELECT 
                     vs.session_id,
@@ -227,23 +223,21 @@ class ViewerSessionService {
                     vs.device_type,
                     vs.started_at,
                     vs.last_heartbeat,
-                    CAST((julianday('now') - julianday(vs.started_at)) * 86400 AS INTEGER) as duration_seconds
+                    CAST((julianday(?) - julianday(vs.started_at)) * 86400 AS INTEGER) as duration_seconds
                 FROM viewer_sessions vs
                 LEFT JOIN cameras c ON vs.camera_id = c.id
                 WHERE vs.is_active = 1
                 ORDER BY vs.started_at DESC
-            `);
+            `, [wibTimestamp]);
         } catch (error) {
             console.error('[ViewerSession] Error getting active sessions:', error);
             return [];
         }
     }
 
-    /**
-     * Get active sessions for a specific camera
-     */
     getActiveSessionsByCamera(cameraId) {
         try {
+            const wibTimestamp = getWIBTimestamp();
             return query(`
                 SELECT 
                     session_id,
@@ -251,26 +245,21 @@ class ViewerSessionService {
                     device_type,
                     started_at,
                     last_heartbeat,
-                    CAST((julianday('now') - julianday(started_at)) * 86400 AS INTEGER) as duration_seconds
+                    CAST((julianday(?) - julianday(started_at)) * 86400 AS INTEGER) as duration_seconds
                 FROM viewer_sessions
                 WHERE camera_id = ? AND is_active = 1
                 ORDER BY started_at DESC
-            `, [cameraId]);
+            `, [wibTimestamp, cameraId]);
         } catch (error) {
             console.error('[ViewerSession] Error getting camera sessions:', error);
             return [];
         }
     }
 
-    /**
-     * Get viewer count per camera
-     */
     getViewerCountByCamera() {
         try {
             return query(`
-                SELECT 
-                    camera_id,
-                    COUNT(*) as viewer_count
+                SELECT camera_id, COUNT(*) as viewer_count
                 FROM viewer_sessions
                 WHERE is_active = 1
                 GROUP BY camera_id
@@ -281,14 +270,9 @@ class ViewerSessionService {
         }
     }
 
-    /**
-     * Get total active viewer count
-     */
     getTotalActiveViewers() {
         try {
-            const result = queryOne(`
-                SELECT COUNT(*) as count FROM viewer_sessions WHERE is_active = 1
-            `);
+            const result = queryOne(`SELECT COUNT(*) as count FROM viewer_sessions WHERE is_active = 1`);
             return result?.count || 0;
         } catch (error) {
             console.error('[ViewerSession] Error getting total viewers:', error);
@@ -296,9 +280,6 @@ class ViewerSessionService {
         }
     }
 
-    /**
-     * Get session history with pagination
-     */
     getSessionHistory(limit = 50, offset = 0, cameraId = null) {
         try {
             let sql = `
@@ -307,7 +288,6 @@ class ViewerSessionService {
                 ORDER BY started_at DESC
                 LIMIT ? OFFSET ?
             `;
-            
             const params = cameraId ? [cameraId, limit, offset] : [limit, offset];
             return query(sql, params);
         } catch (error) {
@@ -316,24 +296,21 @@ class ViewerSessionService {
         }
     }
 
-    /**
-     * Get viewer statistics summary
-     */
     getViewerStats() {
         try {
             const activeViewers = this.getTotalActiveViewers();
             const activeSessions = this.getActiveSessions();
             const viewersByCamera = this.getViewerCountByCamera();
+            const todayDate = getWIBDate();
 
-            // Get today's total unique viewers
             const todayStats = queryOne(`
                 SELECT 
                     COUNT(DISTINCT ip_address) as unique_viewers,
                     COUNT(*) as total_sessions,
                     SUM(duration_seconds) as total_watch_time
                 FROM viewer_session_history
-                WHERE date(started_at) = date('now')
-            `);
+                WHERE date(started_at) = ?
+            `, [todayDate]);
 
             return {
                 activeViewers,
@@ -356,23 +333,27 @@ class ViewerSessionService {
         }
     }
 
+
     /**
      * Get comprehensive analytics data for dashboard
      * @param {string} period - 'today', '7days', '30days', 'all'
+     * Uses WIB timezone for date filtering
      */
     getAnalytics(period = '7days') {
         try {
-            // Determine date filter
+            // Determine date filter using WIB dates
             let dateFilter = '';
+            const todayDate = getWIBDate();
+            
             switch (period) {
                 case 'today':
-                    dateFilter = "AND date(started_at) = date('now')";
+                    dateFilter = `AND date(started_at) = '${todayDate}'`;
                     break;
                 case '7days':
-                    dateFilter = "AND date(started_at) >= date('now', '-7 days')";
+                    dateFilter = `AND date(started_at) >= '${getWIBDateWithOffset(-7)}'`;
                     break;
                 case '30days':
-                    dateFilter = "AND date(started_at) >= date('now', '-30 days')";
+                    dateFilter = `AND date(started_at) >= '${getWIBDateWithOffset(-30)}'`;
                     break;
                 default:
                     dateFilter = '';
@@ -403,7 +384,7 @@ class ViewerSessionService {
                 ORDER BY date ASC
             `);
 
-            // Sessions by hour (for heatmap)
+            // Sessions by hour (for heatmap) - now correctly shows WIB hours
             const sessionsByHour = query(`
                 SELECT 
                     strftime('%H', started_at) as hour,
@@ -474,7 +455,7 @@ class ViewerSessionService {
                 LIMIT 50
             `);
 
-            // Peak hours analysis
+            // Peak hours analysis - now correctly shows WIB hours
             const peakHours = query(`
                 SELECT 
                     strftime('%H', started_at) as hour,
@@ -551,8 +532,9 @@ class ViewerSessionService {
             const activeViewers = this.getTotalActiveViewers();
             const activeSessions = this.getActiveSessions();
             const viewersByCamera = this.getViewerCountByCamera();
+            const wibTimestamp = getWIBTimestamp();
 
-            // Get last 5 minutes activity
+            // Get last 5 minutes activity (using WIB time)
             const recentActivity = query(`
                 SELECT 
                     camera_name,
@@ -560,10 +542,10 @@ class ViewerSessionService {
                     device_type,
                     started_at
                 FROM viewer_session_history
-                WHERE datetime(started_at) >= datetime('now', '-5 minutes')
+                WHERE datetime(started_at) >= datetime(?, '-5 minutes')
                 ORDER BY started_at DESC
                 LIMIT 10
-            `);
+            `, [wibTimestamp]);
 
             return {
                 activeViewers,
@@ -581,7 +563,7 @@ class ViewerSessionService {
                     viewerCount: v.viewer_count
                 })),
                 recentActivity,
-                timestamp: new Date().toISOString(),
+                timestamp: wibTimestamp,
             };
         } catch (error) {
             console.error('[ViewerSession] Error getting real-time data:', error);
@@ -590,7 +572,7 @@ class ViewerSessionService {
                 activeSessions: [],
                 viewersByCamera: [],
                 recentActivity: [],
-                timestamp: new Date().toISOString(),
+                timestamp: getWIBTimestamp(),
             };
         }
     }

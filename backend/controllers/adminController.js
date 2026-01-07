@@ -135,16 +135,28 @@ export async function getDashboardStats(request, reply) {
             LEFT JOIN users u ON l.user_id = u.id
             ORDER BY l.created_at DESC
             LIMIT 10
-        `).map(log => ({
-            ...log,
-            created_at_wib: new Intl.DateTimeFormat('id-ID', {
-                timeZone: 'Asia/Jakarta',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false
-            }).format(new Date(log.created_at + ' Z'))
-        }));
+        `).map(log => {
+            // Parse the timestamp - if it's already in WIB format (no Z suffix), use directly
+            // Otherwise convert from UTC
+            let logDate;
+            if (log.created_at.includes('Z') || log.created_at.includes('+')) {
+                logDate = new Date(log.created_at);
+            } else {
+                // Assume stored in local/WIB format
+                logDate = new Date(log.created_at);
+            }
+            
+            return {
+                ...log,
+                created_at_wib: new Intl.DateTimeFormat('id-ID', {
+                    timeZone: 'Asia/Jakarta',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                }).format(logDate)
+            };
+        });
 
         return reply.send({
             success: true,
