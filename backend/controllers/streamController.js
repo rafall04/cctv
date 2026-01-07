@@ -1,14 +1,13 @@
 import { query, queryOne } from '../database/database.js';
 import { config } from '../config/config.js';
 
-const buildStreamUrls = (cameraId) => {
-    const streamPath = `camera${cameraId}`;
+const buildStreamUrls = (streamKey) => {
     const hlsBase = (config.mediamtx.hlsUrl || '/hls').replace(/\/$/, '');
     const webrtcBase = (config.mediamtx.webrtcUrl || '/webrtc').replace(/\/$/, '');
     
     return {
-        hls: `${hlsBase}/${streamPath}/index.m3u8`,
-        webrtc: `${webrtcBase}/${streamPath}`,
+        hls: `${hlsBase}/${streamKey}/index.m3u8`,
+        webrtc: `${webrtcBase}/${streamKey}`,
     };
 };
 
@@ -18,7 +17,7 @@ export async function getStreamUrls(request, reply) {
 
         const camera = queryOne(
             `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel,
-                    c.latitude, c.longitude,
+                    c.latitude, c.longitude, c.stream_key,
                     a.name as area_name, a.rt, a.rw, a.kelurahan, a.kecamatan
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 
@@ -32,6 +31,9 @@ export async function getStreamUrls(request, reply) {
                 message: 'Camera not found or disabled',
             });
         }
+
+        // Use stream_key for URL, fallback to camera{id} for legacy
+        const streamPath = camera.stream_key || `camera${camera.id}`;
 
         return reply.send({
             success: true,
@@ -52,7 +54,7 @@ export async function getStreamUrls(request, reply) {
                     kelurahan: camera.kelurahan,
                     kecamatan: camera.kecamatan,
                 },
-                streams: buildStreamUrls(camera.id),
+                streams: buildStreamUrls(streamPath),
             },
         });
     } catch (error) {
@@ -68,7 +70,7 @@ export async function getAllActiveStreams(request, reply) {
     try {
         const cameras = query(
             `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel,
-                    c.latitude, c.longitude, c.status, c.is_online, c.last_online_check,
+                    c.latitude, c.longitude, c.status, c.is_online, c.last_online_check, c.stream_key,
                     a.name as area_name, a.rt, a.rw, a.kelurahan, a.kecamatan
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 
@@ -76,10 +78,14 @@ export async function getAllActiveStreams(request, reply) {
              ORDER BY c.is_tunnel ASC, c.id ASC`
         );
 
-        const camerasWithStreams = cameras.map(camera => ({
-            ...camera,
-            streams: buildStreamUrls(camera.id),
-        }));
+        const camerasWithStreams = cameras.map(camera => {
+            // Use stream_key for URL, fallback to camera{id} for legacy
+            const streamPath = camera.stream_key || `camera${camera.id}`;
+            return {
+                ...camera,
+                streams: buildStreamUrls(streamPath),
+            };
+        });
 
         return reply.send({
             success: true,

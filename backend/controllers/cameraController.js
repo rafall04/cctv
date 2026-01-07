@@ -1,4 +1,5 @@
 import { query, queryOne, execute } from '../database/database.js';
+import { v4 as uuidv4 } from 'uuid';
 import mediaMtxService from '../services/mediaMtxService.js';
 import { 
     logCameraCreated, 
@@ -100,6 +101,9 @@ export async function createCamera(request, reply) {
             });
         }
 
+        // Generate unique stream key (UUID v4)
+        const streamKey = uuidv4();
+
         // Convert empty string area_id to null
         const areaIdValue = area_id === '' || area_id === null || area_id === undefined 
             ? null 
@@ -119,10 +123,10 @@ export async function createCamera(request, reply) {
         // Status: active, maintenance, offline
         const cameraStatus = status || 'active';
 
-        // Insert camera
+        // Insert camera with stream_key
         const result = execute(
-            'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [name, private_rtsp_url, description || null, location || null, group_name || null, finalAreaId, isEnabled, isTunnel, lat, lng, cameraStatus]
+            'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [name, private_rtsp_url, description || null, location || null, group_name || null, finalAreaId, isEnabled, isTunnel, lat, lng, cameraStatus, streamKey]
         );
 
         // Log action
@@ -139,10 +143,10 @@ export async function createCamera(request, reply) {
             createdByUsername: request.user.username
         }, request);
 
-        // Add path to MediaMTX if camera is enabled
+        // Add path to MediaMTX if camera is enabled (using stream_key as path)
         if (isEnabled) {
             try {
-                const mtxResult = await mediaMtxService.updateCameraPath(result.lastInsertRowid, private_rtsp_url);
+                const mtxResult = await mediaMtxService.updateCameraPath(streamKey, private_rtsp_url);
                 if (!mtxResult.success) {
                     console.error(`[Camera] Failed to add MediaMTX path for camera ${result.lastInsertRowid}:`, mtxResult.error);
                 }
@@ -157,6 +161,7 @@ export async function createCamera(request, reply) {
             data: {
                 id: result.lastInsertRowid,
                 name,
+                stream_key: streamKey,
             },
         });
     } catch (error) {
@@ -174,14 +179,22 @@ export async function updateCamera(request, reply) {
         const { id } = request.params;
         const { name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status } = request.body;
 
-        // Check if camera exists
-        const existingCamera = queryOne('SELECT id, name, private_rtsp_url, enabled FROM cameras WHERE id = ?', [id]);
+        // Check if camera exists (include stream_key)
+        const existingCamera = queryOne('SELECT id, name, private_rtsp_url, enabled, stream_key FROM cameras WHERE id = ?', [id]);
 
         if (!existingCamera) {
             return reply.code(404).send({
                 success: false,
                 message: 'Camera not found',
             });
+        }
+
+        // Generate stream_key if not exists (for legacy cameras)
+        let streamKey = existingCamera.stream_key;
+        if (!streamKey) {
+            streamKey = uuidv4();
+            execute('UPDATE cameras SET stream_key = ? WHERE id = ?', [streamKey, id]);
+            console.log(`[Camera] Generated stream_key for legacy camera ${id}: ${streamKey}`);
         }
 
         // Build update query dynamically
@@ -269,23 +282,31 @@ export async function updateCamera(request, reply) {
             changes: { name, description, location, group_name, area_id, enabled }
         }, request);
 
-        // Handle MediaMTX path updates
+        // Handle MediaMTX path updates (using stream_key as path)
         const newEnabled = enabled !== undefined ? enabled : existingCamera.enabled;
         const newRtspUrl = private_rtsp_url !== undefined ? private_rtsp_url : existingCamera.private_rtsp_url;
         const rtspChanged = private_rtsp_url !== undefined && private_rtsp_url !== existingCamera.private_rtsp_url;
         const enabledChanged = enabled !== undefined && enabled !== existingCamera.enabled;
 
+        // Also remove old camera{id} path if it exists (migration from old format)
+        const oldPathName = `camera${id}`;
+
         if (newEnabled === 0 || newEnabled === false) {
-            // Camera disabled - remove path
+            // Camera disabled - remove both old and new paths
             try {
-                await mediaMtxService.removeCameraPath(id);
+                await mediaMtxService.removeCameraPathByKey(streamKey);
+                await mediaMtxService.removePath(oldPathName); // Clean up old format
             } catch (err) {
                 console.error('MediaMTX remove path error:', err.message);
             }
         } else if (rtspChanged || (enabledChanged && newEnabled)) {
-            // RTSP URL changed or camera re-enabled - update/add path
+            // RTSP URL changed or camera re-enabled - update/add path using stream_key
             try {
-                const mtxResult = await mediaMtxService.updateCameraPath(id, newRtspUrl);
+                // Remove old format path if exists
+                await mediaMtxService.removePath(oldPathName);
+                
+                // Add/update with new stream_key format
+                const mtxResult = await mediaMtxService.updateCameraPath(streamKey, newRtspUrl);
                 if (!mtxResult.success) {
                     console.error(`[Camera] Failed to update MediaMTX path for camera ${id}:`, mtxResult.error);
                 }
@@ -312,8 +333,8 @@ export async function deleteCamera(request, reply) {
     try {
         const { id } = request.params;
 
-        // Check if camera exists
-        const camera = queryOne('SELECT id, name FROM cameras WHERE id = ?', [id]);
+        // Check if camera exists (include stream_key for cleanup)
+        const camera = queryOne('SELECT id, name, stream_key FROM cameras WHERE id = ?', [id]);
 
         if (!camera) {
             return reply.code(404).send({
@@ -339,10 +360,15 @@ export async function deleteCamera(request, reply) {
             deletedByUsername: request.user.username
         }, request);
 
-        // Remove specific path from MediaMTX (don't await, run in background)
-        mediaMtxService.removeCameraPath(id).catch(err => {
+        // Remove paths from MediaMTX (both old and new format)
+        try {
+            if (camera.stream_key) {
+                await mediaMtxService.removeCameraPathByKey(camera.stream_key);
+            }
+            await mediaMtxService.removePath(`camera${id}`); // Clean up old format
+        } catch (err) {
             console.error('MediaMTX remove path error:', err.message);
-        });
+        }
 
         return reply.send({
             success: true,
