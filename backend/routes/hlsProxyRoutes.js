@@ -152,14 +152,17 @@ export default async function hlsProxyRoutes(fastify, _options) {
     });
     
     /**
-     * Proxy HLS segment requests (.ts files)
+     * Proxy HLS segment requests (.ts, .m3u8, .mp4 files)
      * Updates session heartbeat
      */
     fastify.get('/:cameraPath/:segment', async (request, reply) => {
         const { cameraPath, segment } = request.params;
         
-        // Only process .ts and .m3u8 files
-        if (!segment.endsWith('.ts') && !segment.endsWith('.m3u8')) {
+        // Process .ts, .m3u8, and .mp4 files (fMP4/CMAF init segments)
+        const validExtensions = ['.ts', '.m3u8', '.mp4', '.m4s'];
+        const isValidFile = validExtensions.some(ext => segment.endsWith(ext));
+        
+        if (!isValidFile) {
             return reply.code(404).send({ error: 'Not found' });
         }
         
@@ -195,10 +198,15 @@ export default async function hlsProxyRoutes(fastify, _options) {
                 return reply.code(response.status).send({ error: 'Segment not available' });
             }
             
-            // Determine content type
-            const contentType = segment.endsWith('.ts') 
-                ? 'video/mp2t' 
-                : 'application/vnd.apple.mpegurl';
+            // Determine content type based on extension
+            let contentType = 'application/octet-stream';
+            if (segment.endsWith('.ts')) {
+                contentType = 'video/mp2t';
+            } else if (segment.endsWith('.m3u8')) {
+                contentType = 'application/vnd.apple.mpegurl';
+            } else if (segment.endsWith('.mp4') || segment.endsWith('.m4s')) {
+                contentType = 'video/mp4';
+            }
             
             reply.header('Content-Type', contentType);
             reply.header('Access-Control-Allow-Origin', '*');
