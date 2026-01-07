@@ -101,76 +101,47 @@ export default async function hlsProxyRoutes(fastify, _options) {
     const mediamtxHlsUrl = config.mediamtx?.hlsUrlInternal || 'http://localhost:8888';
     
     /**
-     * Proxy HLS playlist request (index.m3u8)
-     * This is the main entry point - creates/updates session
+     * Handle CORS preflight for all HLS routes
      */
-    fastify.get('/:cameraPath/index.m3u8', async (request, reply) => {
-        const { cameraPath } = request.params;
-        const cameraId = extractCameraId(cameraPath);
-        
-        if (!cameraId) {
-            return reply.code(400).send({ error: 'Invalid camera path' });
-        }
-        
-        const ip = getRealIP(request);
-        
-        // Create or update session (don't block on errors)
-        try {
-            getOrCreateSession(ip, cameraId, request);
-        } catch (e) {
-            console.error('[HLSProxy] Session error:', e.message);
-        }
-        
-        // Proxy request to MediaMTX
-        try {
-            const response = await axios.get(`${mediamtxHlsUrl}/${cameraPath}/index.m3u8`, {
-                headers: {
-                    'User-Agent': request.headers['user-agent'] || 'HLSProxy',
-                },
-                timeout: 10000,
-                responseType: 'text',
-                validateStatus: () => true // Don't throw on non-2xx
-            });
-            
-            if (response.status !== 200) {
-                return reply.code(response.status).send({ 
-                    error: 'Stream not available',
-                    status: response.status 
-                });
-            }
-            
-            // Set appropriate headers
-            reply.header('Content-Type', 'application/vnd.apple.mpegurl');
-            reply.header('Access-Control-Allow-Origin', '*');
-            reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
-            
-            return reply.send(response.data);
-        } catch (error) {
-            console.error(`[HLSProxy] Error proxying playlist for ${cameraPath}:`, error.message);
-            return reply.code(502).send({ error: 'Failed to fetch stream' });
-        }
+    fastify.options('/*', async (_request, reply) => {
+        reply.header('Access-Control-Allow-Origin', '*');
+        reply.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        reply.header('Access-Control-Allow-Headers', 'Content-Type');
+        return reply.code(204).send();
     });
     
     /**
-     * Proxy HLS segment requests (.ts, .m3u8, .mp4 files)
-     * Updates session heartbeat
+     * Proxy ALL HLS requests to MediaMTX
+     * Handles: index.m3u8, stream.m3u8, .ts, .mp4, .m4s files
      */
-    fastify.get('/:cameraPath/:segment', async (request, reply) => {
-        const { cameraPath, segment } = request.params;
+    fastify.get('/*', async (request, reply) => {
+        // Get the full path after /hls/
+        const fullPath = request.params['*'];
         
-        // Process .ts, .m3u8, and .mp4 files (fMP4/CMAF init segments)
-        const validExtensions = ['.ts', '.m3u8', '.mp4', '.m4s'];
-        const isValidFile = validExtensions.some(ext => segment.endsWith(ext));
-        
-        if (!isValidFile) {
-            return reply.code(404).send({ error: 'Not found' });
+        if (!fullPath) {
+            return reply.code(400).send({ error: 'Invalid path' });
         }
         
+        // Extract camera path (first segment)
+        const pathParts = fullPath.split('/');
+        const cameraPath = pathParts[0];
+        const fileName = pathParts[pathParts.length - 1];
+        
+        // Extract camera ID for session tracking
         const cameraId = extractCameraId(cameraPath);
         const ip = getRealIP(request);
         
-        // Update session heartbeat for segment requests (don't block)
-        if (cameraId) {
+        // Create/update session only for playlist requests (not segments)
+        if (fileName.endsWith('.m3u8') && cameraId) {
+            try {
+                getOrCreateSession(ip, cameraId, request);
+            } catch (e) {
+                console.error('[HLSProxy] Session error:', e.message);
+            }
+        }
+        
+        // Update heartbeat for segment requests
+        if (cameraId && !fileName.endsWith('.m3u8')) {
             try {
                 const cacheKey = `${ip}_${cameraId}`;
                 const cached = sessionCache.get(cacheKey);
@@ -185,26 +156,32 @@ export default async function hlsProxyRoutes(fastify, _options) {
         
         // Proxy request to MediaMTX
         try {
-            const response = await axios.get(`${mediamtxHlsUrl}/${cameraPath}/${segment}`, {
+            const targetUrl = `${mediamtxHlsUrl}/${fullPath}`;
+            const isTextFile = fileName.endsWith('.m3u8');
+            
+            const response = await axios.get(targetUrl, {
                 headers: {
                     'User-Agent': request.headers['user-agent'] || 'HLSProxy',
                 },
                 timeout: 10000,
-                responseType: 'arraybuffer',
+                responseType: isTextFile ? 'text' : 'arraybuffer',
                 validateStatus: () => true
             });
             
             if (response.status !== 200) {
-                return reply.code(response.status).send({ error: 'Segment not available' });
+                return reply.code(response.status).send({ 
+                    error: 'Resource not available',
+                    status: response.status 
+                });
             }
             
             // Determine content type based on extension
             let contentType = 'application/octet-stream';
-            if (segment.endsWith('.ts')) {
-                contentType = 'video/mp2t';
-            } else if (segment.endsWith('.m3u8')) {
+            if (fileName.endsWith('.m3u8')) {
                 contentType = 'application/vnd.apple.mpegurl';
-            } else if (segment.endsWith('.mp4') || segment.endsWith('.m4s')) {
+            } else if (fileName.endsWith('.ts')) {
+                contentType = 'video/mp2t';
+            } else if (fileName.endsWith('.mp4') || fileName.endsWith('.m4s')) {
                 contentType = 'video/mp4';
             }
             
@@ -212,20 +189,14 @@ export default async function hlsProxyRoutes(fastify, _options) {
             reply.header('Access-Control-Allow-Origin', '*');
             reply.header('Cache-Control', 'no-cache');
             
-            return reply.send(Buffer.from(response.data));
+            if (isTextFile) {
+                return reply.send(response.data);
+            } else {
+                return reply.send(Buffer.from(response.data));
+            }
         } catch (error) {
-            console.error(`[HLSProxy] Error proxying segment ${segment}:`, error.message);
-            return reply.code(502).send({ error: 'Failed to fetch segment' });
+            console.error(`[HLSProxy] Error proxying ${fullPath}:`, error.message);
+            return reply.code(502).send({ error: 'Failed to fetch resource' });
         }
-    });
-    
-    /**
-     * Handle CORS preflight
-     */
-    fastify.options('/:cameraPath/*', async (_request, reply) => {
-        reply.header('Access-Control-Allow-Origin', '*');
-        reply.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-        reply.header('Access-Control-Allow-Headers', 'Content-Type');
-        return reply.code(204).send();
     });
 }
