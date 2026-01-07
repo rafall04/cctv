@@ -101,25 +101,18 @@ export default async function hlsProxyRoutes(fastify, _options) {
     const mediamtxHlsUrl = config.mediamtx?.hlsUrlInternal || 'http://localhost:8888';
     
     /**
-     * Handle CORS preflight for all HLS routes
-     */
-    fastify.options('/*', async (_request, reply) => {
-        reply.header('Access-Control-Allow-Origin', '*');
-        reply.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-        reply.header('Access-Control-Allow-Headers', '*');
-        return reply.code(204).send();
-    });
-    
-    /**
      * Proxy ALL HLS requests to MediaMTX
      * Handles: index.m3u8, stream.m3u8, .ts, .mp4, .m4s files
+     * 
+     * NOTE: CORS headers are handled by Fastify CORS plugin in server.js
+     * Do NOT add manual CORS headers here to avoid duplicate header issues
      */
     fastify.get('/*', async (request, reply) => {
         // Get the full path after /hls/
         const fullPath = request.params['*'];
         
         if (!fullPath) {
-            return reply.code(400).send({ error: 'Invalid path' });
+            return reply.code(400).send('Invalid path - use /hls/{cameraPath}/index.m3u8');
         }
         
         // Extract camera path (first segment)
@@ -159,20 +152,44 @@ export default async function hlsProxyRoutes(fastify, _options) {
             const targetUrl = `${mediamtxHlsUrl}/${fullPath}`;
             const isTextFile = fileName.endsWith('.m3u8');
             
-            const response = await axios.get(targetUrl, {
-                headers: {
-                    'User-Agent': request.headers['user-agent'] || 'HLSProxy',
-                },
-                timeout: 10000,
-                responseType: isTextFile ? 'text' : 'arraybuffer',
-                validateStatus: () => true
-            });
+            // For init.mp4 files, retry a few times as they may not be ready yet
+            const isInitFile = fileName.includes('init.mp4') || fileName.includes('_init.mp4');
+            const maxRetries = isInitFile ? 3 : 1;
+            let lastError = null;
+            let response = null;
             
-            if (response.status !== 200) {
-                return reply.code(response.status).send({ 
-                    error: 'Resource not available',
-                    status: response.status 
-                });
+            for (let attempt = 0; attempt < maxRetries; attempt++) {
+                try {
+                    response = await axios.get(targetUrl, {
+                        headers: {
+                            'User-Agent': request.headers['user-agent'] || 'HLSProxy',
+                        },
+                        timeout: 10000,
+                        responseType: isTextFile ? 'text' : 'arraybuffer',
+                        validateStatus: () => true
+                    });
+                    
+                    if (response.status === 200) {
+                        break; // Success, exit retry loop
+                    }
+                    
+                    // For init files, wait and retry on 404
+                    if (isInitFile && response.status === 404 && attempt < maxRetries - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms
+                        continue;
+                    }
+                    
+                    break; // Non-retryable error
+                } catch (err) {
+                    lastError = err;
+                    if (attempt < maxRetries - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                    }
+                }
+            }
+            
+            if (!response && lastError) {
+                throw lastError;
             }
             
             // Determine content type based on extension
@@ -185,9 +202,16 @@ export default async function hlsProxyRoutes(fastify, _options) {
                 contentType = 'video/mp4';
             }
             
+            // Pass through the actual status code from MediaMTX
+            // NOTE: CORS headers handled by Fastify CORS plugin
+            if (response.status !== 200) {
+                // For non-200 responses, pass through status but with proper headers
+                reply.header('Content-Type', 'text/plain');
+                reply.header('Cache-Control', 'no-cache');
+                return reply.code(response.status).send('');
+            }
+            
             reply.header('Content-Type', contentType);
-            // CORS headers - Nginx doesn't add them for /hls, so we add here
-            reply.header('Access-Control-Allow-Origin', '*');
             reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
             reply.header('Pragma', 'no-cache');
             reply.header('Expires', '0');
@@ -199,7 +223,7 @@ export default async function hlsProxyRoutes(fastify, _options) {
             }
         } catch (error) {
             console.error(`[HLSProxy] Error proxying ${fullPath}:`, error.message);
-            return reply.code(502).send({ error: 'Failed to fetch resource' });
+            return reply.code(502).send('');
         }
     });
 }
