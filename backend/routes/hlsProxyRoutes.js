@@ -8,13 +8,18 @@
  * - Any HLS-compatible player
  * 
  * Routes:
- * - GET /hls/:cameraPath/index.m3u8 - Main playlist (creates/updates session)
- * - GET /hls/:cameraPath/:segment - Video segments (updates session heartbeat)
+ * - GET /hls/:streamKey/index.m3u8 - Main playlist (creates/updates session)
+ * - GET /hls/:streamKey/:segment - Video segments (updates session heartbeat)
+ * 
+ * Supports both:
+ * - Legacy format: camera1, camera2, etc.
+ * - New UUID format: 04bd5387-9db4-4cf0-9f8d-7fb42cc76263
  */
 
 import axios from 'axios';
 import { config } from '../config/config.js';
 import viewerSessionService from '../services/viewerSessionService.js';
+import { queryOne } from '../database/database.js';
 
 // Session cache to avoid creating duplicate sessions for same IP+camera
 // Key: `${ip}_${cameraId}`, Value: { sessionId, lastAccess }
@@ -50,12 +55,49 @@ function getRealIP(request) {
     return request.ip || request.socket?.remoteAddress || 'unknown';
 }
 
+// Cache for stream_key -> camera_id mapping to avoid repeated DB queries
+const cameraIdCache = new Map();
+const CAMERA_CACHE_TTL = 300000; // 5 minutes
+
 /**
- * Extract camera ID from path (e.g., "camera1" -> 1)
+ * Extract camera ID from stream path
+ * Supports both legacy (camera1) and UUID (stream_key) formats
+ * @param {string} streamPath - The stream path (e.g., "camera1" or "04bd5387-9db4-4cf0-9f8d-7fb42cc76263")
+ * @returns {number|null} Camera ID or null if not found
  */
-function extractCameraId(cameraPath) {
-    const match = cameraPath.match(/camera(\d+)/);
-    return match ? parseInt(match[1]) : null;
+function extractCameraId(streamPath) {
+    // Legacy format: camera1, camera2, etc.
+    const legacyMatch = streamPath.match(/^camera(\d+)$/);
+    if (legacyMatch) {
+        return parseInt(legacyMatch[1]);
+    }
+    
+    // UUID format: check cache first
+    const cached = cameraIdCache.get(streamPath);
+    if (cached && Date.now() - cached.timestamp < CAMERA_CACHE_TTL) {
+        return cached.cameraId;
+    }
+    
+    // UUID format: lookup from database
+    // UUID pattern: 8-4-4-4-12 hex characters
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidPattern.test(streamPath)) {
+        try {
+            const camera = queryOne('SELECT id FROM cameras WHERE stream_key = ?', [streamPath]);
+            if (camera) {
+                // Cache the result
+                cameraIdCache.set(streamPath, {
+                    cameraId: camera.id,
+                    timestamp: Date.now()
+                });
+                return camera.id;
+            }
+        } catch (error) {
+            console.error('[HLSProxy] Error looking up camera by stream_key:', error.message);
+        }
+    }
+    
+    return null;
 }
 
 /**
@@ -88,7 +130,7 @@ function getOrCreateSession(ip, cameraId, request) {
             lastAccess: Date.now()
         });
         
-        console.log(`[HLSProxy] New session: ${sessionId} for camera${cameraId} from ${ip}`);
+        console.log(`[HLSProxy] New session: ${sessionId} for stream ${cameraPath} (camera ${cameraId}) from ${ip}`);
         return sessionId;
     } catch (error) {
         console.error('[HLSProxy] Error creating session:', error.message);

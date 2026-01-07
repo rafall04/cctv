@@ -85,9 +85,29 @@ export async function getDashboardStats(request, reply) {
             });
         });
 
+        // Build a lookup map for stream_key -> camera info
+        const camerasByStreamKey = {};
+        const camerasByLegacyPath = {};
+        const allCameras = query('SELECT id, name, stream_key FROM cameras WHERE enabled = 1');
+        allCameras.forEach(cam => {
+            if (cam.stream_key) {
+                camerasByStreamKey[cam.stream_key] = cam;
+            }
+            // Also map legacy format for backward compatibility
+            camerasByLegacyPath[`camera${cam.id}`] = cam;
+        });
+
         const activeStreams = (mtxStats.paths || []).map(p => {
-            const cameraId = p.name.replace('camera', '');
-            const cam = queryOne('SELECT name FROM cameras WHERE id = ?', [cameraId]);
+            // Try to find camera by stream_key (UUID) first, then by legacy path (camera1, camera2, etc)
+            let cam = camerasByStreamKey[p.name] || camerasByLegacyPath[p.name];
+            let cameraId = cam ? cam.id : null;
+            
+            // If still not found, try legacy extraction for backward compatibility
+            if (!cam && p.name.match(/^camera(\d+)$/)) {
+                const legacyId = p.name.replace('camera', '');
+                cam = queryOne('SELECT id, name FROM cameras WHERE id = ?', [legacyId]);
+                cameraId = cam ? cam.id : legacyId;
+            }
             
             // Determine stream state
             let state = 'idle';
@@ -98,17 +118,17 @@ export async function getDashboardStats(request, reply) {
             }
             
             // Get viewer count and sessions from viewerSessionService
-            const cameraIdInt = parseInt(cameraId);
-            const viewers = viewersByCamera[cameraIdInt] || 0;
-            const sessions = sessionsByCamera[cameraIdInt] || [];
+            const cameraIdInt = cameraId ? parseInt(cameraId) : null;
+            const viewers = cameraIdInt ? (viewersByCamera[cameraIdInt] || 0) : 0;
+            const sessions = cameraIdInt ? (sessionsByCamera[cameraIdInt] || []) : [];
             
             // Only show bandwidth when there are active viewers
             // When no viewers, bandwidth should be 0 (stream is just being kept warm)
             const hasActiveViewers = viewers > 0;
             
             return {
-                id: cameraId,
-                name: cam ? cam.name : p.name,
+                id: cameraId || p.name,
+                name: cam ? cam.name : `Unknown (${p.name.substring(0, 8)}...)`,
                 ready: p.ready || false,
                 state: state,
                 viewers: viewers,
