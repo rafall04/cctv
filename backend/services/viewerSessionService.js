@@ -355,6 +355,245 @@ class ViewerSessionService {
             };
         }
     }
+
+    /**
+     * Get comprehensive analytics data for dashboard
+     * @param {string} period - 'today', '7days', '30days', 'all'
+     */
+    getAnalytics(period = '7days') {
+        try {
+            // Determine date filter
+            let dateFilter = '';
+            switch (period) {
+                case 'today':
+                    dateFilter = "AND date(started_at) = date('now')";
+                    break;
+                case '7days':
+                    dateFilter = "AND date(started_at) >= date('now', '-7 days')";
+                    break;
+                case '30days':
+                    dateFilter = "AND date(started_at) >= date('now', '-30 days')";
+                    break;
+                default:
+                    dateFilter = '';
+            }
+
+            // Overview stats
+            const overview = queryOne(`
+                SELECT 
+                    COUNT(*) as total_sessions,
+                    COUNT(DISTINCT ip_address) as unique_visitors,
+                    COALESCE(SUM(duration_seconds), 0) as total_watch_time,
+                    COALESCE(AVG(duration_seconds), 0) as avg_session_duration,
+                    COALESCE(MAX(duration_seconds), 0) as longest_session
+                FROM viewer_session_history
+                WHERE 1=1 ${dateFilter}
+            `) || {};
+
+            // Sessions by day (for chart)
+            const sessionsByDay = query(`
+                SELECT 
+                    date(started_at) as date,
+                    COUNT(*) as sessions,
+                    COUNT(DISTINCT ip_address) as unique_visitors,
+                    COALESCE(SUM(duration_seconds), 0) as total_watch_time
+                FROM viewer_session_history
+                WHERE 1=1 ${dateFilter}
+                GROUP BY date(started_at)
+                ORDER BY date ASC
+            `);
+
+            // Sessions by hour (for heatmap)
+            const sessionsByHour = query(`
+                SELECT 
+                    strftime('%H', started_at) as hour,
+                    COUNT(*) as sessions
+                FROM viewer_session_history
+                WHERE 1=1 ${dateFilter}
+                GROUP BY strftime('%H', started_at)
+                ORDER BY hour ASC
+            `);
+
+            // Top cameras by views
+            const topCameras = query(`
+                SELECT 
+                    camera_id,
+                    camera_name,
+                    COUNT(*) as total_views,
+                    COUNT(DISTINCT ip_address) as unique_viewers,
+                    COALESCE(SUM(duration_seconds), 0) as total_watch_time,
+                    COALESCE(AVG(duration_seconds), 0) as avg_duration
+                FROM viewer_session_history
+                WHERE 1=1 ${dateFilter}
+                GROUP BY camera_id, camera_name
+                ORDER BY total_views DESC
+                LIMIT 10
+            `);
+
+            // Device breakdown
+            const deviceBreakdown = query(`
+                SELECT 
+                    device_type,
+                    COUNT(*) as count,
+                    ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM viewer_session_history WHERE 1=1 ${dateFilter}), 1) as percentage
+                FROM viewer_session_history
+                WHERE 1=1 ${dateFilter}
+                GROUP BY device_type
+                ORDER BY count DESC
+            `);
+
+            // Top visitors by IP
+            const topVisitors = query(`
+                SELECT 
+                    ip_address,
+                    COUNT(*) as total_sessions,
+                    COUNT(DISTINCT camera_id) as cameras_watched,
+                    COALESCE(SUM(duration_seconds), 0) as total_watch_time,
+                    MAX(started_at) as last_visit
+                FROM viewer_session_history
+                WHERE 1=1 ${dateFilter}
+                GROUP BY ip_address
+                ORDER BY total_sessions DESC
+                LIMIT 20
+            `);
+
+            // Recent sessions
+            const recentSessions = query(`
+                SELECT 
+                    id,
+                    camera_id,
+                    camera_name,
+                    ip_address,
+                    device_type,
+                    started_at,
+                    ended_at,
+                    duration_seconds
+                FROM viewer_session_history
+                WHERE 1=1 ${dateFilter}
+                ORDER BY started_at DESC
+                LIMIT 50
+            `);
+
+            // Peak hours analysis
+            const peakHours = query(`
+                SELECT 
+                    strftime('%H', started_at) as hour,
+                    COUNT(*) as sessions,
+                    COUNT(DISTINCT ip_address) as unique_visitors
+                FROM viewer_session_history
+                WHERE 1=1 ${dateFilter}
+                GROUP BY strftime('%H', started_at)
+                ORDER BY sessions DESC
+                LIMIT 5
+            `);
+
+            // Current active viewers
+            const activeViewers = this.getTotalActiveViewers();
+            const activeSessions = this.getActiveSessions();
+
+            return {
+                period,
+                overview: {
+                    totalSessions: overview.total_sessions || 0,
+                    uniqueVisitors: overview.unique_visitors || 0,
+                    totalWatchTime: overview.total_watch_time || 0,
+                    avgSessionDuration: Math.round(overview.avg_session_duration || 0),
+                    longestSession: overview.longest_session || 0,
+                    activeViewers,
+                },
+                charts: {
+                    sessionsByDay,
+                    sessionsByHour,
+                },
+                topCameras,
+                deviceBreakdown,
+                topVisitors,
+                recentSessions,
+                peakHours,
+                activeSessions: activeSessions.map(s => ({
+                    sessionId: s.session_id,
+                    cameraId: s.camera_id,
+                    cameraName: s.camera_name,
+                    ipAddress: s.ip_address,
+                    deviceType: s.device_type,
+                    startedAt: s.started_at,
+                    durationSeconds: s.duration_seconds
+                })),
+            };
+        } catch (error) {
+            console.error('[ViewerSession] Error getting analytics:', error);
+            return {
+                period,
+                overview: {
+                    totalSessions: 0,
+                    uniqueVisitors: 0,
+                    totalWatchTime: 0,
+                    avgSessionDuration: 0,
+                    longestSession: 0,
+                    activeViewers: 0,
+                },
+                charts: { sessionsByDay: [], sessionsByHour: [] },
+                topCameras: [],
+                deviceBreakdown: [],
+                topVisitors: [],
+                recentSessions: [],
+                peakHours: [],
+                activeSessions: [],
+            };
+        }
+    }
+
+    /**
+     * Get real-time viewer data for live dashboard
+     */
+    getRealTimeData() {
+        try {
+            const activeViewers = this.getTotalActiveViewers();
+            const activeSessions = this.getActiveSessions();
+            const viewersByCamera = this.getViewerCountByCamera();
+
+            // Get last 5 minutes activity
+            const recentActivity = query(`
+                SELECT 
+                    camera_name,
+                    ip_address,
+                    device_type,
+                    started_at
+                FROM viewer_session_history
+                WHERE datetime(started_at) >= datetime('now', '-5 minutes')
+                ORDER BY started_at DESC
+                LIMIT 10
+            `);
+
+            return {
+                activeViewers,
+                activeSessions: activeSessions.map(s => ({
+                    sessionId: s.session_id,
+                    cameraId: s.camera_id,
+                    cameraName: s.camera_name,
+                    ipAddress: s.ip_address,
+                    deviceType: s.device_type,
+                    startedAt: s.started_at,
+                    durationSeconds: s.duration_seconds
+                })),
+                viewersByCamera: viewersByCamera.map(v => ({
+                    cameraId: v.camera_id,
+                    viewerCount: v.viewer_count
+                })),
+                recentActivity,
+                timestamp: new Date().toISOString(),
+            };
+        } catch (error) {
+            console.error('[ViewerSession] Error getting real-time data:', error);
+            return {
+                activeViewers: 0,
+                activeSessions: [],
+                viewersByCamera: [],
+                recentActivity: [],
+                timestamp: new Date().toISOString(),
+            };
+        }
+    }
 }
 
 export default new ViewerSessionService();

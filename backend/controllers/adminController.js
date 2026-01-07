@@ -226,3 +226,55 @@ export async function getTelegramConfig(request, reply) {
         });
     }
 }
+
+/**
+ * Get viewer analytics data
+ * Query params: period (today, 7days, 30days, all)
+ */
+export async function getViewerAnalytics(request, reply) {
+    try {
+        const { period = '7days' } = request.query;
+        
+        // Validate period
+        const validPeriods = ['today', '7days', '30days', 'all'];
+        if (!validPeriods.includes(period)) {
+            return reply.code(400).send({
+                success: false,
+                message: 'Invalid period. Use: today, 7days, 30days, or all',
+            });
+        }
+
+        const analytics = viewerSessionService.getAnalytics(period);
+
+        return reply.send({
+            success: true,
+            data: analytics,
+        });
+    } catch (error) {
+        console.error('Get viewer analytics error:', error);
+        return reply.code(500).send({
+            success: false,
+            message: 'Internal server error',
+        });
+    }
+}
+
+/**
+ * Get real-time viewer data (for live dashboard updates)
+ */
+export async function getRealTimeViewers(request, reply) {
+    try {
+        const data = viewerSessionService.getRealTimeData();
+
+        return reply.send({
+            success: true,
+            data,
+        });
+    } catch (error) {
+        console.error('Get real-time viewers error:', error);
+        return reply.code(500).send({
+            success: false,
+            message: 'Internal server error',
+        });
+    }
+}

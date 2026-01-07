@@ -12,5 +12,31 @@ export const adminService = {
                 message: error.response?.data?.message || 'Failed to fetch statistics'
             };
         }
+    },
+
+    async getViewerAnalytics(period = '7days') {
+        try {
+            const response = await apiClient.get(`/api/admin/analytics/viewers?period=${period}`);
+            return response.data;
+        } catch (error) {
+            console.error('Get viewer analytics error:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to fetch analytics'
+            };
+        }
+    },
+
+    async getRealTimeViewers() {
+        try {
+            const response = await apiClient.get('/api/admin/analytics/realtime');
+            return response.data;
+        } catch (error) {
+            console.error('Get real-time viewers error:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to fetch real-time data'
+            };
+        }
     }
 };

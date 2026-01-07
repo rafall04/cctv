@@ -114,8 +114,12 @@ export const config = {
   // Telegram Bot Configuration
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN || '',
-    chatId: process.env.TELEGRAM_CHAT_ID || '',
-    enabled: !!(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID),
+    // Chat ID untuk monitoring kamera (offline/online alerts)
+    monitoringChatId: process.env.TELEGRAM_MONITORING_CHAT_ID || '',
+    // Chat ID untuk kritik & saran
+    feedbackChatId: process.env.TELEGRAM_FEEDBACK_CHAT_ID || '',
+    // Legacy support - fallback to single chat ID
+    enabled: !!(process.env.TELEGRAM_BOT_TOKEN && (process.env.TELEGRAM_MONITORING_CHAT_ID || process.env.TELEGRAM_FEEDBACK_CHAT_ID)),
   },
 };
 

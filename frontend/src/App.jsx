@@ -10,6 +10,7 @@ import CameraManagement from './pages/CameraManagement';
 import AreaManagement from './pages/AreaManagement';
 import UserManagement from './pages/UserManagement';
 import FeedbackManagement from './pages/FeedbackManagement';
+import ViewerAnalytics from './pages/ViewerAnalytics';
 import Dashboard from './pages/Dashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminLayout from './components/AdminLayout';
@@ -74,6 +75,16 @@ function App() {
                         <ProtectedRoute>
                             <AdminLayout>
                                 <FeedbackManagement />
+                            </AdminLayout>
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/admin/analytics"
+                    element={
+                        <ProtectedRoute>
+                            <AdminLayout>
+                                <ViewerAnalytics />
                             </AdminLayout>
                         </ProtectedRoute>
                     }
