@@ -102,12 +102,10 @@ export default async function hlsProxyRoutes(fastify, _options) {
     
     /**
      * Handle CORS preflight for all HLS routes
+     * NOTE: Nginx also adds CORS headers, so we only handle OPTIONS here
      */
     fastify.options('/*', async (_request, reply) => {
-        reply.header('Access-Control-Allow-Origin', '*');
-        reply.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-        reply.header('Access-Control-Allow-Headers', '*');
-        reply.header('Access-Control-Max-Age', '86400');
+        // Let Nginx handle CORS headers
         return reply.code(204).send();
     });
     
@@ -187,10 +185,7 @@ export default async function hlsProxyRoutes(fastify, _options) {
             }
             
             reply.header('Content-Type', contentType);
-            reply.header('Access-Control-Allow-Origin', '*');
-            reply.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-            reply.header('Access-Control-Allow-Headers', '*');
-            reply.header('Access-Control-Expose-Headers', '*');
+            // NOTE: CORS headers are set by Nginx, don't duplicate here
             reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
             reply.header('Pragma', 'no-cache');
             reply.header('Expires', '0');
