@@ -109,9 +109,9 @@ class CameraHealthService {
             const activePaths = await this.getActivePaths();
             const db = new Database(dbPath);
             
-            // Get all enabled cameras
+            // Get all enabled cameras (include stream_key for path lookup)
             const cameras = db.prepare(`
-                SELECT id, name, location, is_online 
+                SELECT id, name, location, is_online, stream_key 
                 FROM cameras 
                 WHERE enabled = 1
             `).all();
@@ -127,7 +127,8 @@ class CameraHealthService {
             let changedCount = 0;
 
             for (const camera of cameras) {
-                const pathName = `camera${camera.id}`;
+                // Use stream_key if available, fallback to legacy camera{id} format
+                const pathName = camera.stream_key || `camera${camera.id}`;
                 const pathInfo = activePaths.get(pathName);
                 
                 // Camera is online if:
@@ -252,13 +253,18 @@ class CameraHealthService {
     async checkCamera(cameraId) {
         try {
             const activePaths = await this.getActivePaths();
-            const pathName = `camera${cameraId}`;
+            
+            // Get camera's stream_key from database
+            const db = new Database(dbPath);
+            const camera = db.prepare('SELECT stream_key FROM cameras WHERE id = ?').get(cameraId);
+            
+            // Use stream_key if available, fallback to legacy format
+            const pathName = camera?.stream_key || `camera${cameraId}`;
             const pathInfo = activePaths.get(pathName);
             
             const isOnline = pathInfo?.isOnline ? 1 : 0;
             
             // Update database
-            const db = new Database(dbPath);
             db.prepare(`
                 UPDATE cameras 
                 SET is_online = ?, last_online_check = datetime('now') 

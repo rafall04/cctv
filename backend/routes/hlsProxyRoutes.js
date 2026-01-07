@@ -130,7 +130,7 @@ function getOrCreateSession(ip, cameraId, request) {
             lastAccess: Date.now()
         });
         
-        console.log(`[HLSProxy] New session: ${sessionId} for stream ${cameraPath} (camera ${cameraId}) from ${ip}`);
+        console.log(`[HLSProxy] New session: ${sessionId} for stream (camera ${cameraId}) from ${ip}`);
         return sessionId;
     } catch (error) {
         console.error('[HLSProxy] Error creating session:', error.message);
