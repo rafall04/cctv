@@ -230,18 +230,34 @@ class MediaMtxService {
     }
 
     /**
-     * Synchronizes the camera configurations between the database and MediaMTX.
-     * Only adds missing paths and removes orphaned ones - doesn't update existing paths
-     * @param {number} retries - Number of retries if MediaMTX is not ready
+     * Get current path configuration from MediaMTX
+     * @param {string} pathName - The path name to get config for
+     * @returns {Promise<object|null>}
      */
-    async syncCameras(retries = 5) {
+    async getPathConfig(pathName) {
+        try {
+            const response = await axios.get(`${mediaMtxApiBaseUrl}/config/paths/get/${pathName}`, { timeout: 5000 });
+            return response.data;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Synchronizes the camera configurations between the database and MediaMTX.
+     * Adds missing paths, updates paths with wrong source, and removes orphaned ones.
+     * @param {number} retries - Number of retries if MediaMTX is not ready
+     * @param {boolean} forceUpdate - Force update all paths even if they exist
+     */
+    async syncCameras(retries = 5, forceUpdate = false) {
         // Check if MediaMTX is ready
         const status = await this.getStatus();
         if (!status.online) {
             if (retries > 0) {
                 await new Promise(resolve => setTimeout(resolve, 3000));
-                return this.syncCameras(retries - 1);
+                return this.syncCameras(retries - 1, forceUpdate);
             }
+            console.log('[MediaMTX] Sync failed - MediaMTX is offline');
             return;
         }
 
@@ -261,15 +277,16 @@ class MediaMtxService {
             await this.removePath(pathName);
         }
 
-        // Only add paths that don't exist yet (don't update existing ones)
+        // Add or update paths
         const configuredPathsSet = new Set(configuredPaths);
         let added = 0;
+        let updated = 0;
         
         for (const camera of dbCameras) {
-            if (!camera.path_name || !camera.rtsp_url?.startsWith('rtsp://')) continue;
-            
-            // Skip if path already exists - don't update to avoid stream interruption
-            if (configuredPathsSet.has(camera.path_name)) continue;
+            if (!camera.path_name || !camera.rtsp_url?.startsWith('rtsp://')) {
+                console.log(`[MediaMTX] Skipping camera ${camera.id}: invalid path_name or rtsp_url`);
+                continue;
+            }
 
             const pathConfig = {
                 source: camera.rtsp_url,
@@ -280,26 +297,46 @@ class MediaMtxService {
             };
 
             try {
-                await axios.post(`${mediaMtxApiBaseUrl}/config/paths/add/${camera.path_name}`, pathConfig, { timeout: 5000 });
-                added++;
+                if (!configuredPathsSet.has(camera.path_name)) {
+                    // Path doesn't exist - add it
+                    await axios.post(`${mediaMtxApiBaseUrl}/config/paths/add/${camera.path_name}`, pathConfig, { timeout: 5000 });
+                    console.log(`[MediaMTX] Added path: ${camera.path_name} -> ${camera.rtsp_url}`);
+                    added++;
+                } else if (forceUpdate) {
+                    // Path exists but force update requested - check if source matches
+                    const currentConfig = await this.getPathConfig(camera.path_name);
+                    if (currentConfig && currentConfig.source !== camera.rtsp_url) {
+                        await axios.patch(`${mediaMtxApiBaseUrl}/config/paths/patch/${camera.path_name}`, pathConfig, { timeout: 5000 });
+                        console.log(`[MediaMTX] Updated path: ${camera.path_name} -> ${camera.rtsp_url}`);
+                        updated++;
+                    }
+                }
             } catch (error) {
-                // Path might already exist, ignore
+                console.error(`[MediaMTX] Error syncing path ${camera.path_name}:`, error.message);
             }
         }
 
-        if (added > 0 || orphanedPaths.length > 0) {
-            console.log(`[MediaMTX] Sync complete: +${added} added, -${orphanedPaths.length} removed`);
+        if (added > 0 || updated > 0 || orphanedPaths.length > 0) {
+            console.log(`[MediaMTX] Sync complete: +${added} added, ~${updated} updated, -${orphanedPaths.length} removed`);
         }
     }
 
     /**
      * Force update a specific camera path in MediaMTX
-     * Called when camera RTSP URL is changed
-     * @param {number} cameraId - The camera ID
-     * @param {string} rtspUrl - The new RTSP URL
+     * Called when camera RTSP URL is changed or camera is created/enabled
+     * @param {number|string} cameraId - The camera ID
+     * @param {string} rtspUrl - The RTSP URL
+     * @returns {Promise<object>}
      */
     async updateCameraPath(cameraId, rtspUrl) {
         const pathName = `camera${cameraId}`;
+        
+        // Validate RTSP URL
+        if (!rtspUrl || !rtspUrl.startsWith('rtsp://')) {
+            console.error(`[MediaMTX] Invalid RTSP URL for ${pathName}: ${rtspUrl}`);
+            return { success: false, error: 'Invalid RTSP URL' };
+        }
+
         const pathConfig = {
             source: rtspUrl,
             sourceProtocol: 'tcp',
@@ -311,12 +348,23 @@ class MediaMtxService {
         try {
             const exists = await this.pathConfigExists(pathName);
             if (exists) {
+                // Check if source is different before updating
+                const currentConfig = await this.getPathConfig(pathName);
+                if (currentConfig && currentConfig.source === rtspUrl) {
+                    console.log(`[MediaMTX] Path ${pathName} already has correct source, skipping update`);
+                    return { success: true, action: 'unchanged' };
+                }
+                
                 await axios.patch(`${mediaMtxApiBaseUrl}/config/paths/patch/${pathName}`, pathConfig, { timeout: 5000 });
+                console.log(`[MediaMTX] Updated path: ${pathName} -> ${rtspUrl}`);
+                return { success: true, action: 'updated' };
             } else {
                 await axios.post(`${mediaMtxApiBaseUrl}/config/paths/add/${pathName}`, pathConfig, { timeout: 5000 });
+                console.log(`[MediaMTX] Added path: ${pathName} -> ${rtspUrl}`);
+                return { success: true, action: 'added' };
             }
-            return { success: true };
         } catch (error) {
+            console.error(`[MediaMTX] Error updating path ${pathName}:`, error.message);
             return { success: false, error: error.message };
         }
     }

@@ -141,9 +141,14 @@ export async function createCamera(request, reply) {
 
         // Add path to MediaMTX if camera is enabled
         if (isEnabled) {
-            mediaMtxService.updateCameraPath(result.lastInsertRowid, private_rtsp_url).catch(err => {
+            try {
+                const mtxResult = await mediaMtxService.updateCameraPath(result.lastInsertRowid, private_rtsp_url);
+                if (!mtxResult.success) {
+                    console.error(`[Camera] Failed to add MediaMTX path for camera ${result.lastInsertRowid}:`, mtxResult.error);
+                }
+            } catch (err) {
                 console.error('MediaMTX add path error:', err.message);
-            });
+            }
         }
 
         return reply.code(201).send({
@@ -272,14 +277,21 @@ export async function updateCamera(request, reply) {
 
         if (newEnabled === 0 || newEnabled === false) {
             // Camera disabled - remove path
-            mediaMtxService.removeCameraPath(id).catch(err => {
+            try {
+                await mediaMtxService.removeCameraPath(id);
+            } catch (err) {
                 console.error('MediaMTX remove path error:', err.message);
-            });
+            }
         } else if (rtspChanged || (enabledChanged && newEnabled)) {
             // RTSP URL changed or camera re-enabled - update/add path
-            mediaMtxService.updateCameraPath(id, newRtspUrl).catch(err => {
+            try {
+                const mtxResult = await mediaMtxService.updateCameraPath(id, newRtspUrl);
+                if (!mtxResult.success) {
+                    console.error(`[Camera] Failed to update MediaMTX path for camera ${id}:`, mtxResult.error);
+                }
+            } catch (err) {
                 console.error('MediaMTX update path error:', err.message);
-            });
+            }
         }
 
         return reply.send({

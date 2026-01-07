@@ -76,6 +76,79 @@ export default async function adminRoutes(fastify, options) {
         }
     });
 
+    // Debug endpoint - MediaMTX path configurations
+    fastify.get('/debug/mediamtx-paths', {
+        onRequest: [authMiddleware],
+        handler: async (request, reply) => {
+            try {
+                const axios = (await import('axios')).default;
+                
+                // Get configured paths from MediaMTX
+                const configRes = await axios.get('http://localhost:9997/v3/config/paths/list', { timeout: 5000 });
+                const configuredPaths = configRes.data?.items || [];
+                
+                // Get database cameras
+                const dbCameras = mediaMtxService.getDatabaseCameras();
+                
+                // Compare
+                const comparison = dbCameras.map(cam => {
+                    const mtxPath = configuredPaths.find(p => p.name === cam.path_name);
+                    return {
+                        cameraId: cam.id,
+                        cameraName: cam.name,
+                        pathName: cam.path_name,
+                        dbRtspUrl: cam.rtsp_url,
+                        mtxSource: mtxPath?.source || null,
+                        inMediaMTX: !!mtxPath,
+                        sourceMatch: mtxPath?.source === cam.rtsp_url
+                    };
+                });
+                
+                return reply.send({
+                    success: true,
+                    data: {
+                        dbCamerasCount: dbCameras.length,
+                        mtxPathsCount: configuredPaths.length,
+                        comparison,
+                        orphanedPaths: configuredPaths
+                            .filter(p => p.name.startsWith('camera') && !dbCameras.some(c => c.path_name === p.name))
+                            .map(p => ({ name: p.name, source: p.source }))
+                    }
+                });
+            } catch (error) {
+                return reply.code(500).send({
+                    success: false,
+                    message: error.message
+                });
+            }
+        }
+    });
+
+    // Force sync MediaMTX paths with database
+    fastify.post('/mediamtx/sync', {
+        onRequest: [authMiddleware],
+        handler: async (request, reply) => {
+            try {
+                const { forceUpdate } = request.body || {};
+                
+                console.log(`[Admin] Force sync MediaMTX requested by ${request.user.username}, forceUpdate=${forceUpdate}`);
+                
+                await mediaMtxService.syncCameras(3, forceUpdate === true);
+                
+                return reply.send({
+                    success: true,
+                    message: 'MediaMTX sync completed'
+                });
+            } catch (error) {
+                console.error('MediaMTX sync error:', error);
+                return reply.code(500).send({
+                    success: false,
+                    message: error.message
+                });
+            }
+        }
+    });
+
     // API Key Management Endpoints
     // POST /api/admin/api-keys - Generate new API key
     fastify.post('/api-keys', {
