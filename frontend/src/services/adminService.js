@@ -53,9 +53,22 @@ export const adminService = {
         }
     },
 
-    async testTelegramNotification() {
+    async updateTelegramConfig(config) {
         try {
-            const response = await apiClient.post('/api/admin/telegram/test');
+            const response = await apiClient.put('/api/admin/telegram/config', config);
+            return response.data;
+        } catch (error) {
+            console.error('Update Telegram config error:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to update Telegram config'
+            };
+        }
+    },
+
+    async testTelegramNotification(type = 'monitoring') {
+        try {
+            const response = await apiClient.post('/api/admin/telegram/test', { type });
             return response.data;
         } catch (error) {
             console.error('Test Telegram notification error:', error);
