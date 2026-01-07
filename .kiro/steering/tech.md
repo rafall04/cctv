@@ -22,6 +22,72 @@
   - WebRTC endpoint: `http://localhost:8889`
   - API endpoint: `http://localhost:9997`
 
+## Stream Architecture
+
+### UUID Stream Keys (Security)
+Sistem menggunakan UUID v4 sebagai `stream_key` untuk setiap kamera, bukan format `camera{id}` yang mudah ditebak.
+
+**Alasan:**
+- URL stream tidak bisa ditebak (`/hls/04bd5387-9db4-4cf0-9f8d-7fb42cc76263/` vs `/hls/camera1/`)
+- Mencegah enumeration attack
+- Setiap kamera memiliki stream_key unik yang di-generate saat create
+
+**Database Schema:**
+```sql
+-- Kolom stream_key di tabel cameras
+stream_key TEXT UNIQUE  -- UUID v4, contoh: '04bd5387-9db4-4cf0-9f8d-7fb42cc76263'
+```
+
+**Flow:**
+1. Camera dibuat → generate UUID v4 sebagai `stream_key`
+2. MediaMTX path menggunakan `stream_key` sebagai nama path
+3. Frontend request stream via `/hls/{stream_key}/index.m3u8`
+4. HLS proxy route backend untuk session tracking
+
+**Files terkait:**
+- `backend/controllers/cameraController.js` - Generate stream_key saat create
+- `backend/services/mediaMtxService.js` - Sync path dengan stream_key
+- `backend/controllers/streamController.js` - Return stream URL dengan stream_key
+- `backend/routes/hlsProxyRoutes.js` - Proxy HLS dengan lookup stream_key
+
+### Stream Preload/Warming Service
+Sistem menggunakan preload stream untuk mempercepat initial load video.
+
+**Cara Kerja:**
+1. Backend startup → `streamWarmer.js` mulai warming enabled cameras
+2. Service melakukan HTTP request ke HLS endpoint untuk trigger MediaMTX pull RTSP
+3. Stream sudah ready saat user pertama kali akses (tidak perlu tunggu RTSP connect)
+
+**Konfigurasi:**
+```javascript
+// backend/services/streamWarmer.js
+const WARM_INTERVAL = 60000;      // Re-warm setiap 60 detik
+const WARM_DELAY_BETWEEN = 500;   // Delay 500ms antar kamera
+```
+
+**Files terkait:**
+- `backend/services/streamWarmer.js` - Service utama preload
+- `backend/server.js` - Start warming saat server ready
+
+**Catatan Penting:**
+- Warming service menggunakan `stream_key` bukan `camera{id}`
+- Health check menggunakan `/config/paths/list` (configured paths) bukan `/paths/list` (active streams)
+- Alasan: `sourceOnDemand: true` berarti stream hanya aktif saat ada viewer
+
+### Camera Health Check
+Health check untuk status kamera di dashboard admin.
+
+**Endpoint yang digunakan:**
+- `/config/paths/list` - List semua path yang dikonfigurasi (termasuk yang belum aktif)
+- BUKAN `/paths/list` - Hanya menampilkan stream yang sedang aktif
+
+**Alasan:**
+Karena MediaMTX menggunakan `sourceOnDemand: true`, stream hanya aktif saat ada viewer. Jika menggunakan `/paths/list`, kamera akan selalu terlihat offline saat tidak ada viewer.
+
+**Files terkait:**
+- `backend/services/cameraHealthService.js` - Health check logic
+- `backend/controllers/adminController.js` - Dashboard stats dengan stream_key lookup
+
 ## Development Commands
 
 ### Backend (Node.js/Fastify)

@@ -401,21 +401,11 @@ class MediaMtxService {
 
     /**
      * Remove a specific camera path from MediaMTX by stream key
-     * @param {string} streamKey - The stream key to remove
+     * @param {string} streamKey - The stream key (UUID) to remove
      */
     async removeCameraPathByKey(streamKey) {
         if (!streamKey) return { success: false, error: 'Missing stream key' };
         return this.removePath(streamKey);
-    }
-
-    /**
-     * @deprecated Use removeCameraPathByKey instead
-     * Remove a specific camera path from MediaMTX by camera ID
-     * This is kept for backward compatibility during migration
-     * @param {number} cameraId - The camera ID
-     */
-    async removeCameraPath(cameraId) {
-        return this.removePath(`camera${cameraId}`);
     }
 
     /**

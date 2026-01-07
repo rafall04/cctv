@@ -288,24 +288,16 @@ export async function updateCamera(request, reply) {
         const rtspChanged = private_rtsp_url !== undefined && private_rtsp_url !== existingCamera.private_rtsp_url;
         const enabledChanged = enabled !== undefined && enabled !== existingCamera.enabled;
 
-        // Also remove old camera{id} path if it exists (migration from old format)
-        const oldPathName = `camera${id}`;
-
         if (newEnabled === 0 || newEnabled === false) {
-            // Camera disabled - remove both old and new paths
+            // Camera disabled - remove path from MediaMTX
             try {
                 await mediaMtxService.removeCameraPathByKey(streamKey);
-                await mediaMtxService.removePath(oldPathName); // Clean up old format
             } catch (err) {
                 console.error('MediaMTX remove path error:', err.message);
             }
         } else if (rtspChanged || (enabledChanged && newEnabled)) {
-            // RTSP URL changed or camera re-enabled - update/add path using stream_key
+            // RTSP URL changed or camera re-enabled - update/add path
             try {
-                // Remove old format path if exists
-                await mediaMtxService.removePath(oldPathName);
-                
-                // Add/update with new stream_key format
                 const mtxResult = await mediaMtxService.updateCameraPath(streamKey, newRtspUrl);
                 if (!mtxResult.success) {
                     console.error(`[Camera] Failed to update MediaMTX path for camera ${id}:`, mtxResult.error);
@@ -360,12 +352,11 @@ export async function deleteCamera(request, reply) {
             deletedByUsername: request.user.username
         }, request);
 
-        // Remove paths from MediaMTX (both old and new format)
+        // Remove path from MediaMTX
         try {
             if (camera.stream_key) {
                 await mediaMtxService.removeCameraPathByKey(camera.stream_key);
             }
-            await mediaMtxService.removePath(`camera${id}`); // Clean up old format
         } catch (err) {
             console.error('MediaMTX remove path error:', err.message);
         }
