@@ -85,29 +85,18 @@ export async function getDashboardStats(request, reply) {
             });
         });
 
-        // Build a lookup map for stream_key -> camera info
+        // Build lookup map for stream_key -> camera info
         const camerasByStreamKey = {};
-        const camerasByLegacyPath = {};
         const allCameras = query('SELECT id, name, stream_key FROM cameras WHERE enabled = 1');
         allCameras.forEach(cam => {
             if (cam.stream_key) {
                 camerasByStreamKey[cam.stream_key] = cam;
             }
-            // Also map legacy format for backward compatibility
-            camerasByLegacyPath[`camera${cam.id}`] = cam;
         });
 
         const activeStreams = (mtxStats.paths || []).map(p => {
-            // Try to find camera by stream_key (UUID) first, then by legacy path (camera1, camera2, etc)
-            let cam = camerasByStreamKey[p.name] || camerasByLegacyPath[p.name];
-            let cameraId = cam ? cam.id : null;
-            
-            // If still not found, try legacy extraction for backward compatibility
-            if (!cam && p.name.match(/^camera(\d+)$/)) {
-                const legacyId = p.name.replace('camera', '');
-                cam = queryOne('SELECT id, name FROM cameras WHERE id = ?', [legacyId]);
-                cameraId = cam ? cam.id : legacyId;
-            }
+            const cam = camerasByStreamKey[p.name];
+            const cameraId = cam ? cam.id : null;
             
             // Determine stream state
             let state = 'idle';

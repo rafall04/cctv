@@ -247,12 +247,10 @@ class MediaMtxService {
     /**
      * Synchronizes the camera configurations between the database and MediaMTX.
      * Adds missing paths, updates paths with wrong source, and removes orphaned ones.
-     * Also handles migration from old camera{id} format to UUID stream_key format.
      * @param {number} retries - Number of retries if MediaMTX is not ready
      * @param {boolean} forceUpdate - Force update all paths even if they exist
      */
     async syncCameras(retries = 5, forceUpdate = false) {
-        // Check if MediaMTX is ready
         const status = await this.getStatus();
         if (!status.online) {
             if (retries > 0) {
@@ -265,36 +263,13 @@ class MediaMtxService {
 
         const configuredPaths = await this.getConfiguredPaths();
         const dbCameras = this.getDatabaseCameras();
-        
-        // Build set of valid paths (stream_key based)
         const dbCameraPaths = new Set(dbCameras.map(cam => cam.path_name));
-        
-        // Also track old format paths that should be removed
-        const oldFormatPaths = new Set(dbCameras.map(cam => `camera${cam.id}`));
 
-        // Remove orphaned paths:
-        // 1. Old camera{id} format paths (migrating to stream_key)
-        // 2. Paths not in database
+        // Remove orphaned paths (not in database)
         const systemPaths = ['all', 'all_others', 'health'];
         const orphanedPaths = configuredPaths.filter(path => {
             if (systemPaths.includes(path)) return false;
-            
-            // If it's an old format path (camera1, camera2, etc) and we have stream_key, remove it
-            if (path.match(/^camera\d+$/) && oldFormatPaths.has(path)) {
-                // Check if this camera has a stream_key (new format)
-                const cam = dbCameras.find(c => `camera${c.id}` === path);
-                if (cam && cam.stream_key && cam.stream_key !== path) {
-                    console.log(`[MediaMTX] Will migrate ${path} to ${cam.stream_key}`);
-                    return true; // Remove old format
-                }
-            }
-            
-            // Remove if not in database at all
-            if (!dbCameraPaths.has(path) && !path.match(/^camera\d+$/)) {
-                return true;
-            }
-            
-            return false;
+            return !dbCameraPaths.has(path);
         });
 
         for (const pathName of orphanedPaths) {
@@ -302,7 +277,7 @@ class MediaMtxService {
             console.log(`[MediaMTX] Removed orphaned path: ${pathName}`);
         }
 
-        // Add or update paths using stream_key
+        // Add or update paths
         const configuredPathsSet = new Set(configuredPaths);
         let added = 0;
         let updated = 0;
@@ -323,16 +298,14 @@ class MediaMtxService {
 
             try {
                 if (!configuredPathsSet.has(camera.path_name)) {
-                    // Path doesn't exist - add it
                     await axios.post(`${mediaMtxApiBaseUrl}/config/paths/add/${camera.path_name}`, pathConfig, { timeout: 5000 });
-                    console.log(`[MediaMTX] Added path: ${camera.path_name} -> ${camera.rtsp_url}`);
+                    console.log(`[MediaMTX] Added path: ${camera.path_name}`);
                     added++;
                 } else if (forceUpdate) {
-                    // Path exists but force update requested - check if source matches
                     const currentConfig = await this.getPathConfig(camera.path_name);
                     if (currentConfig && currentConfig.source !== camera.rtsp_url) {
                         await axios.patch(`${mediaMtxApiBaseUrl}/config/paths/patch/${camera.path_name}`, pathConfig, { timeout: 5000 });
-                        console.log(`[MediaMTX] Updated path: ${camera.path_name} -> ${camera.rtsp_url}`);
+                        console.log(`[MediaMTX] Updated path: ${camera.path_name}`);
                         updated++;
                     }
                 }

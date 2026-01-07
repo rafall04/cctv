@@ -2,18 +2,10 @@
  * HLS Proxy Routes
  * Proxies HLS stream requests to MediaMTX while tracking viewer sessions
  * 
- * This allows tracking ALL viewers, whether they access via:
- * - Frontend website
- * - Direct URL access (VLC, browser, etc.)
- * - Any HLS-compatible player
- * 
  * Routes:
- * - GET /hls/:streamKey/index.m3u8 - Main playlist (creates/updates session)
- * - GET /hls/:streamKey/:segment - Video segments (updates session heartbeat)
+ * - GET /hls/:streamKey/* - Proxy HLS requests (creates/updates session)
  * 
- * Supports both:
- * - Legacy format: camera1, camera2, etc.
- * - New UUID format: 04bd5387-9db4-4cf0-9f8d-7fb42cc76263
+ * Stream key format: UUID (e.g., 04bd5387-9db4-4cf0-9f8d-7fb42cc76263)
  */
 
 import axios from 'axios';
@@ -60,32 +52,23 @@ const cameraIdCache = new Map();
 const CAMERA_CACHE_TTL = 300000; // 5 minutes
 
 /**
- * Extract camera ID from stream path
- * Supports both legacy (camera1) and UUID (stream_key) formats
- * @param {string} streamPath - The stream path (e.g., "camera1" or "04bd5387-9db4-4cf0-9f8d-7fb42cc76263")
+ * Extract camera ID from stream path (UUID stream_key)
+ * @param {string} streamPath - The stream path (UUID format)
  * @returns {number|null} Camera ID or null if not found
  */
 function extractCameraId(streamPath) {
-    // Legacy format: camera1, camera2, etc.
-    const legacyMatch = streamPath.match(/^camera(\d+)$/);
-    if (legacyMatch) {
-        return parseInt(legacyMatch[1]);
-    }
-    
-    // UUID format: check cache first
+    // Check cache first
     const cached = cameraIdCache.get(streamPath);
     if (cached && Date.now() - cached.timestamp < CAMERA_CACHE_TTL) {
         return cached.cameraId;
     }
     
     // UUID format: lookup from database
-    // UUID pattern: 8-4-4-4-12 hex characters
     const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (uuidPattern.test(streamPath)) {
         try {
             const camera = queryOne('SELECT id FROM cameras WHERE stream_key = ?', [streamPath]);
             if (camera) {
-                // Cache the result
                 cameraIdCache.set(streamPath, {
                     cameraId: camera.id,
                     timestamp: Date.now()
