@@ -2,6 +2,7 @@
  * Camera Health Service
  * Monitors camera online/offline status via MediaMTX API
  * Updates database with status every 30-60 seconds
+ * Sends Telegram notifications on status changes
  */
 
 import axios from 'axios';
@@ -9,6 +10,11 @@ import Database from 'better-sqlite3';
 import { config } from '../config/config.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { 
+    sendCameraOfflineNotification, 
+    sendCameraOnlineNotification,
+    isTelegramConfigured 
+} from './telegramService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -24,6 +30,8 @@ class CameraHealthService {
         this.checkInterval = null;
         this.isRunning = false;
         this.lastCheck = null;
+        // Track when cameras went offline for downtime calculation
+        this.offlineSince = new Map(); // cameraId -> timestamp
     }
 
     /**
@@ -103,7 +111,7 @@ class CameraHealthService {
             
             // Get all enabled cameras
             const cameras = db.prepare(`
-                SELECT id, name, is_online 
+                SELECT id, name, location, is_online 
                 FROM cameras 
                 WHERE enabled = 1
             `).all();
@@ -132,10 +140,49 @@ class CameraHealthService {
                     updateStmt.run(isOnline, camera.id);
                     changedCount++;
                     
-                    if (isOnline) {
-                        console.log(`[CameraHealth] ${camera.name} is now ONLINE`);
+                    // Send Telegram notification on status change
+                    if (isTelegramConfigured()) {
+                        if (isOnline) {
+                            // Camera came back online
+                            console.log(`[CameraHealth] ${camera.name} is now ONLINE`);
+                            
+                            // Calculate downtime if we tracked when it went offline
+                            let downtime = null;
+                            if (this.offlineSince.has(camera.id)) {
+                                downtime = Math.floor((Date.now() - this.offlineSince.get(camera.id)) / 1000);
+                                this.offlineSince.delete(camera.id);
+                            }
+                            
+                            // Send online notification (async, don't await)
+                            sendCameraOnlineNotification({
+                                id: camera.id,
+                                name: camera.name,
+                                location: camera.location
+                            }, downtime).catch(err => {
+                                console.error('[CameraHealth] Failed to send online notification:', err.message);
+                            });
+                        } else {
+                            // Camera went offline
+                            console.log(`[CameraHealth] ${camera.name} is now OFFLINE`);
+                            
+                            // Track when camera went offline
+                            this.offlineSince.set(camera.id, Date.now());
+                            
+                            // Send offline notification (async, don't await)
+                            sendCameraOfflineNotification({
+                                id: camera.id,
+                                name: camera.name,
+                                location: camera.location
+                            }).catch(err => {
+                                console.error('[CameraHealth] Failed to send offline notification:', err.message);
+                            });
+                        }
                     } else {
-                        console.log(`[CameraHealth] ${camera.name} is now OFFLINE`);
+                        if (isOnline) {
+                            console.log(`[CameraHealth] ${camera.name} is now ONLINE`);
+                        } else {
+                            console.log(`[CameraHealth] ${camera.name} is now OFFLINE`);
+                        }
                     }
                 }
 

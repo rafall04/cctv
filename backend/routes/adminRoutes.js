@@ -1,4 +1,4 @@
-import { getDashboardStats } from '../controllers/adminController.js';
+import { getDashboardStats, testTelegramNotification, getTelegramConfig } from '../controllers/adminController.js';
 import { generateApiKey, listApiKeys, deleteApiKey } from '../controllers/apiKeyController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 import { createApiKeySchema, apiKeyIdParamSchema } from '../middleware/schemaValidators.js';
@@ -9,6 +9,17 @@ export default async function adminRoutes(fastify, options) {
     fastify.get('/stats', {
         onRequest: [authMiddleware],
         handler: getDashboardStats,
+    });
+
+    // Telegram notification endpoints
+    fastify.post('/telegram/test', {
+        onRequest: [authMiddleware],
+        handler: testTelegramNotification,
+    });
+
+    fastify.get('/telegram/status', {
+        onRequest: [authMiddleware],
+        handler: getTelegramConfig,
     });
 
     // Debug endpoint - raw MediaMTX data (for troubleshooting viewer count)

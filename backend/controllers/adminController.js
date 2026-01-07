@@ -2,6 +2,7 @@ import os from 'os';
 import { query, queryOne } from '../database/database.js';
 import mediaMtxService from '../services/mediaMtxService.js';
 import viewerSessionService from '../services/viewerSessionService.js';
+import { sendTestNotification, getTelegramStatus, isTelegramConfigured } from '../services/telegramService.js';
 
 export async function getDashboardStats(request, reply) {
     try {
@@ -164,6 +165,61 @@ export async function getDashboardStats(request, reply) {
         });
     } catch (error) {
         console.error('Get dashboard stats error:', error);
+        return reply.code(500).send({
+            success: false,
+            message: 'Internal server error',
+        });
+    }
+}
+
+
+/**
+ * Test Telegram notification
+ */
+export async function testTelegramNotification(request, reply) {
+    try {
+        if (!isTelegramConfigured()) {
+            return reply.code(400).send({
+                success: false,
+                message: 'Telegram bot belum dikonfigurasi. Silakan atur TELEGRAM_BOT_TOKEN dan TELEGRAM_CHAT_ID di file .env',
+            });
+        }
+
+        const sent = await sendTestNotification();
+        
+        if (sent) {
+            return reply.send({
+                success: true,
+                message: 'Notifikasi test berhasil dikirim ke Telegram',
+            });
+        } else {
+            return reply.code(500).send({
+                success: false,
+                message: 'Gagal mengirim notifikasi test. Periksa konfigurasi bot token dan chat ID.',
+            });
+        }
+    } catch (error) {
+        console.error('Test Telegram notification error:', error);
+        return reply.code(500).send({
+            success: false,
+            message: 'Internal server error',
+        });
+    }
+}
+
+/**
+ * Get Telegram configuration status
+ */
+export async function getTelegramConfig(request, reply) {
+    try {
+        const status = getTelegramStatus();
+        
+        return reply.send({
+            success: true,
+            data: status,
+        });
+    } catch (error) {
+        console.error('Get Telegram config error:', error);
         return reply.code(500).send({
             success: false,
             message: 'Internal server error',
