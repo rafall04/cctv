@@ -114,12 +114,14 @@ class StreamWarmer {
 
     /**
      * Warm all enabled cameras with staggered start
+     * @param {Array} cameras - Array of camera objects with id and stream_key
      */
     async warmAllCameras(cameras) {
         console.log(`[StreamWarmer] Pre-warming ${cameras.length} camera streams...`);
         
         for (const camera of cameras) {
-            const pathName = `camera${camera.id}`;
+            // Use stream_key if available, fallback to legacy camera{id} format
+            const pathName = camera.stream_key || `camera${camera.id}`;
             
             // Start warming without waiting for result
             this.warmStream(pathName);
