@@ -1,9 +1,11 @@
 import apiClient from './apiClient';
 
-const getStreamBaseUrl = () => {
+/**
+ * Get base URL for API/backend
+ * Used for HLS proxy which routes through backend for session tracking
+ */
+const getApiBaseUrl = () => {
     // In production (HTTPS), always use HTTPS with the API domain
-    // In development, use env var or localhost
-    // IMPORTANT: Use trailing slash to avoid nginx redirect to HTTP
     if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
         const hostname = window.location.hostname;
         if (hostname === 'cctv.raf.my.id') {
@@ -15,10 +17,44 @@ const getStreamBaseUrl = () => {
     return import.meta.env.VITE_API_URL || 'http://localhost:3000';
 };
 
+/**
+ * Convert HLS URL to use backend proxy for automatic session tracking
+ * This ensures ALL viewers (frontend, VLC, direct URL) are tracked
+ * 
+ * Original: /hls/camera1/index.m3u8 or http://localhost:8888/camera1/index.m3u8
+ * Converted: https://api-cctv.raf.my.id/hls/camera1/index.m3u8
+ */
+const convertToProxyHlsUrl = (hlsUrl) => {
+    if (!hlsUrl) return hlsUrl;
+    
+    const baseUrl = getApiBaseUrl();
+    
+    // Extract camera path from URL (e.g., "camera1")
+    // Handles both relative (/hls/camera1/...) and absolute (http://localhost:8888/camera1/...)
+    let cameraPath = null;
+    
+    if (hlsUrl.includes('/hls/')) {
+        // Already using proxy format
+        const match = hlsUrl.match(/\/hls\/(camera\d+)/);
+        cameraPath = match ? match[1] : null;
+    } else {
+        // Direct MediaMTX URL format: http://host:port/camera1/index.m3u8
+        const match = hlsUrl.match(/\/(camera\d+)\/index\.m3u8/);
+        cameraPath = match ? match[1] : null;
+    }
+    
+    if (cameraPath) {
+        return `${baseUrl}/hls/${cameraPath}/index.m3u8`;
+    }
+    
+    // Fallback: return original URL if can't parse
+    return hlsUrl;
+};
+
 const makeStreamUrlsAbsolute = (streams) => {
     if (!streams) return streams;
     
-    const baseUrl = getStreamBaseUrl();
+    const baseUrl = getApiBaseUrl();
     
     const makeAbsolute = (url) => {
         if (!url) return url;
@@ -39,7 +75,8 @@ const makeStreamUrlsAbsolute = (streams) => {
     };
     
     return {
-        hls: makeAbsolute(streams.hls),
+        // Use backend HLS proxy for automatic session tracking
+        hls: convertToProxyHlsUrl(streams.hls),
         webrtc: makeAbsolute(streams.webrtc),
     };
 };

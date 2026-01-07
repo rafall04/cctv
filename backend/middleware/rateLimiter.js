@@ -38,7 +38,8 @@ export const RATE_LIMIT_CONFIG = {
     whitelist: [
         '/health',
         '/api/stream',
-        '/api/viewer/heartbeat'  // Viewer heartbeat needs frequent calls (every 10s)
+        '/api/viewer/heartbeat',  // Viewer heartbeat needs frequent calls (every 10s)
+        '/hls'                    // HLS proxy - high frequency segment requests
     ],
     // Auth endpoint prefixes
     authPrefixes: [

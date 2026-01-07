@@ -94,7 +94,8 @@ export async function originValidatorMiddleware(fastify, _options) {
     const skipPaths = [
         '/health',
         '/api/stream',  // Stream endpoints need to be accessible
-        '/api/viewer'   // Viewer tracking endpoints
+        '/api/viewer',  // Viewer tracking endpoints
+        '/hls'          // HLS proxy - public streaming endpoint
     ];
     
     fastify.addHook('onRequest', async (request, reply) => {

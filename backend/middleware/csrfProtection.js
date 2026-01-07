@@ -40,7 +40,8 @@ export const CSRF_SKIP_ENDPOINTS = [
     '/api/viewer/start',                // Viewer tracking - public endpoint
     '/api/viewer/heartbeat',            // Viewer tracking - public endpoint
     '/api/viewer/stop',                 // Viewer tracking - public endpoint
-    '/health'                           // Health check endpoint
+    '/health',                          // Health check endpoint
+    '/hls'                              // HLS proxy - public streaming endpoint
 ];
 
 /**

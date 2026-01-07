@@ -26,6 +26,7 @@ import userRoutes from './routes/userRoutes.js';
 import feedbackRoutes from './routes/feedbackRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
 import viewerRoutes from './routes/viewerRoutes.js';
+import hlsProxyRoutes from './routes/hlsProxyRoutes.js';
 import mediaMtxService from './services/mediaMtxService.js';
 import streamWarmer from './services/streamWarmer.js';
 import cameraHealthService from './services/cameraHealthService.js';
@@ -206,6 +207,7 @@ await fastify.register(userRoutes, { prefix: '/api/users' });
 await fastify.register(feedbackRoutes, { prefix: '/api/feedback' });
 await fastify.register(settingsRoutes);
 await fastify.register(viewerRoutes, { prefix: '/api/viewer' });
+await fastify.register(hlsProxyRoutes, { prefix: '/hls' });
 
 // ============================================
 // GLOBAL ERROR HANDLER
@@ -269,6 +271,10 @@ const start = async () => {
         console.log('    POST   /api/viewer/start');
         console.log('    POST   /api/viewer/heartbeat');
         console.log('    POST   /api/viewer/stop');
+        console.log('');
+        console.log('  HLS Proxy (auto session tracking):');
+        console.log('    GET    /hls/:cameraPath/index.m3u8');
+        console.log('    GET    /hls/:cameraPath/:segment');
         console.log('');
         console.log('  Admin (requires JWT + CSRF):');
         console.log('    POST   /api/auth/logout');

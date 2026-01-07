@@ -29,7 +29,8 @@ export const API_KEY_VALIDATOR_CONFIG = {
     ],
     // Endpoint prefixes that don't require API key validation
     publicPrefixes: [
-        '/api/stream/'
+        '/api/stream/',
+        '/hls/'                 // HLS proxy - public streaming endpoint
     ],
     // Whether to enforce API key validation (can be disabled for development)
     enabled: process.env.API_KEY_VALIDATION_ENABLED !== 'false'
