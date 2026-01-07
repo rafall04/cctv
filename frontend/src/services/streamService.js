@@ -21,30 +21,38 @@ const getApiBaseUrl = () => {
  * Convert HLS URL to use backend proxy for automatic session tracking
  * This ensures ALL viewers (frontend, VLC, direct URL) are tracked
  * 
- * Original: /hls/camera1/index.m3u8 or http://localhost:8888/camera1/index.m3u8
- * Converted: https://api-cctv.raf.my.id/hls/camera1/index.m3u8
+ * Supports both formats:
+ * - Legacy: /hls/camera1/index.m3u8
+ * - New UUID: /hls/04bd5387-9db4-4cf0-9f8d-7fb42cc76263/index.m3u8
+ * 
+ * Converted: https://api-cctv.raf.my.id/hls/{stream_key}/index.m3u8
  */
 const convertToProxyHlsUrl = (hlsUrl) => {
     if (!hlsUrl) return hlsUrl;
     
     const baseUrl = getApiBaseUrl();
     
-    // Extract camera path from URL (e.g., "camera1")
-    // Handles both relative (/hls/camera1/...) and absolute (http://localhost:8888/camera1/...)
-    let cameraPath = null;
+    // Extract stream path from URL
+    // Supports both legacy (camera1) and new UUID format (04bd5387-9db4-4cf0-9f8d-7fb42cc76263)
+    // UUID pattern: 8-4-4-4-12 hex characters
+    const uuidPattern = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+    const legacyPattern = 'camera\\d+';
+    const streamPathPattern = `(${uuidPattern}|${legacyPattern})`;
+    
+    let streamPath = null;
     
     if (hlsUrl.includes('/hls/')) {
-        // Already using proxy format
-        const match = hlsUrl.match(/\/hls\/(camera\d+)/);
-        cameraPath = match ? match[1] : null;
+        // Already using proxy format: /hls/{stream_key}/index.m3u8
+        const match = hlsUrl.match(new RegExp(`/hls/${streamPathPattern}`, 'i'));
+        streamPath = match ? match[1] : null;
     } else {
-        // Direct MediaMTX URL format: http://host:port/camera1/index.m3u8
-        const match = hlsUrl.match(/\/(camera\d+)\/index\.m3u8/);
-        cameraPath = match ? match[1] : null;
+        // Direct MediaMTX URL format: http://host:port/{stream_key}/index.m3u8
+        const match = hlsUrl.match(new RegExp(`/${streamPathPattern}/index\\.m3u8`, 'i'));
+        streamPath = match ? match[1] : null;
     }
     
-    if (cameraPath) {
-        return `${baseUrl}/hls/${cameraPath}/index.m3u8`;
+    if (streamPath) {
+        return `${baseUrl}/hls/${streamPath}/index.m3u8`;
     }
     
     // Fallback: return original URL if can't parse
