@@ -12,6 +12,7 @@
  * - GET /hls/:cameraPath/:segment - Video segments (updates session heartbeat)
  */
 
+import axios from 'axios';
 import { config } from '../config/config.js';
 import viewerSessionService from '../services/viewerSessionService.js';
 
@@ -68,8 +69,12 @@ function getOrCreateSession(ip, cameraId, request) {
         // Update last access time
         cached.lastAccess = Date.now();
         
-        // Send heartbeat to keep session alive
-        viewerSessionService.heartbeat(cached.sessionId);
+        // Send heartbeat to keep session alive (async, don't wait)
+        try {
+            viewerSessionService.heartbeat(cached.sessionId);
+        } catch (e) {
+            // Ignore heartbeat errors
+        }
         
         return cached.sessionId;
     }
@@ -86,7 +91,7 @@ function getOrCreateSession(ip, cameraId, request) {
         console.log(`[HLSProxy] New session: ${sessionId} for camera${cameraId} from ${ip}`);
         return sessionId;
     } catch (error) {
-        console.error('[HLSProxy] Error creating session:', error);
+        console.error('[HLSProxy] Error creating session:', error.message);
         return null;
     }
 }
@@ -107,34 +112,38 @@ export default async function hlsProxyRoutes(fastify, _options) {
         }
         
         const ip = getRealIP(request);
-        const userAgent = request.headers['user-agent'] || '';
         
-        // Create or update session
-        getOrCreateSession(ip, cameraId, request);
+        // Create or update session (don't block on errors)
+        try {
+            getOrCreateSession(ip, cameraId, request);
+        } catch (e) {
+            console.error('[HLSProxy] Session error:', e.message);
+        }
         
         // Proxy request to MediaMTX
         try {
-            const response = await fetch(`${mediamtxHlsUrl}/${cameraPath}/index.m3u8`, {
+            const response = await axios.get(`${mediamtxHlsUrl}/${cameraPath}/index.m3u8`, {
                 headers: {
-                    'User-Agent': userAgent,
-                }
+                    'User-Agent': request.headers['user-agent'] || 'HLSProxy',
+                },
+                timeout: 10000,
+                responseType: 'text',
+                validateStatus: () => true // Don't throw on non-2xx
             });
             
-            if (!response.ok) {
+            if (response.status !== 200) {
                 return reply.code(response.status).send({ 
                     error: 'Stream not available',
                     status: response.status 
                 });
             }
             
-            const content = await response.text();
-            
             // Set appropriate headers
             reply.header('Content-Type', 'application/vnd.apple.mpegurl');
             reply.header('Access-Control-Allow-Origin', '*');
             reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
             
-            return reply.send(content);
+            return reply.send(response.data);
         } catch (error) {
             console.error(`[HLSProxy] Error proxying playlist for ${cameraPath}:`, error.message);
             return reply.code(502).send({ error: 'Failed to fetch stream' });
@@ -156,25 +165,32 @@ export default async function hlsProxyRoutes(fastify, _options) {
         const cameraId = extractCameraId(cameraPath);
         const ip = getRealIP(request);
         
-        // Update session heartbeat for segment requests
+        // Update session heartbeat for segment requests (don't block)
         if (cameraId) {
-            const cacheKey = `${ip}_${cameraId}`;
-            const cached = sessionCache.get(cacheKey);
-            if (cached) {
-                cached.lastAccess = Date.now();
-                viewerSessionService.heartbeat(cached.sessionId);
+            try {
+                const cacheKey = `${ip}_${cameraId}`;
+                const cached = sessionCache.get(cacheKey);
+                if (cached) {
+                    cached.lastAccess = Date.now();
+                    viewerSessionService.heartbeat(cached.sessionId);
+                }
+            } catch (e) {
+                // Ignore heartbeat errors
             }
         }
         
         // Proxy request to MediaMTX
         try {
-            const response = await fetch(`${mediamtxHlsUrl}/${cameraPath}/${segment}`, {
+            const response = await axios.get(`${mediamtxHlsUrl}/${cameraPath}/${segment}`, {
                 headers: {
-                    'User-Agent': request.headers['user-agent'] || '',
-                }
+                    'User-Agent': request.headers['user-agent'] || 'HLSProxy',
+                },
+                timeout: 10000,
+                responseType: 'arraybuffer',
+                validateStatus: () => true
             });
             
-            if (!response.ok) {
+            if (response.status !== 200) {
                 return reply.code(response.status).send({ error: 'Segment not available' });
             }
             
@@ -187,9 +203,7 @@ export default async function hlsProxyRoutes(fastify, _options) {
             reply.header('Access-Control-Allow-Origin', '*');
             reply.header('Cache-Control', 'no-cache');
             
-            // Stream the response
-            const buffer = await response.arrayBuffer();
-            return reply.send(Buffer.from(buffer));
+            return reply.send(Buffer.from(response.data));
         } catch (error) {
             console.error(`[HLSProxy] Error proxying segment ${segment}:`, error.message);
             return reply.code(502).send({ error: 'Failed to fetch segment' });
