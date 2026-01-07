@@ -63,9 +63,25 @@ export async function getDashboardStats(request, reply) {
         // Get viewer data from viewerSessionService (frontend-based tracking)
         const viewerStats = viewerSessionService.getViewerStats();
         const activeViewers = viewerStats.activeViewers;
+        const activeSessions = viewerStats.activeSessions || [];
+        
+        // Group sessions by camera for quick lookup
         const viewersByCamera = {};
+        const sessionsByCamera = {};
         viewerStats.viewersByCamera.forEach(v => {
             viewersByCamera[v.camera_id] = v.viewer_count;
+        });
+        activeSessions.forEach(session => {
+            if (!sessionsByCamera[session.camera_id]) {
+                sessionsByCamera[session.camera_id] = [];
+            }
+            sessionsByCamera[session.camera_id].push({
+                sessionId: session.session_id,
+                ipAddress: session.ip_address,
+                deviceType: session.device_type,
+                startedAt: session.started_at,
+                durationSeconds: session.duration_seconds
+            });
         });
 
         const activeStreams = (mtxStats.paths || []).map(p => {
@@ -80,8 +96,10 @@ export async function getDashboardStats(request, reply) {
                 state = 'buffering';
             }
             
-            // Get viewer count from viewerSessionService
-            const viewers = viewersByCamera[parseInt(cameraId)] || 0;
+            // Get viewer count and sessions from viewerSessionService
+            const cameraIdInt = parseInt(cameraId);
+            const viewers = viewersByCamera[cameraIdInt] || 0;
+            const sessions = sessionsByCamera[cameraIdInt] || [];
             
             return {
                 id: cameraId,
@@ -89,6 +107,7 @@ export async function getDashboardStats(request, reply) {
                 ready: p.ready || false,
                 state: state,
                 viewers: viewers,
+                sessions: sessions, // Include session details with IP
                 bytesReceived: p.bytesReceived || 0,
                 bytesSent: p.bytesSent || 0
             };
@@ -124,7 +143,17 @@ export async function getDashboardStats(request, reply) {
                 system: systemInfo,
                 streams: activeStreams,
                 recentLogs: recentLogs,
-                mtxConnected: !mtxStats.error
+                mtxConnected: !mtxStats.error,
+                // Include all active sessions for "All Viewers" view
+                allSessions: activeSessions.map(s => ({
+                    sessionId: s.session_id,
+                    cameraId: s.camera_id,
+                    cameraName: s.camera_name,
+                    ipAddress: s.ip_address,
+                    deviceType: s.device_type,
+                    startedAt: s.started_at,
+                    durationSeconds: s.duration_seconds
+                }))
             }
         });
     } catch (error) {

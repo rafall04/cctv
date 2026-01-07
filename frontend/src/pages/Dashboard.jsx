@@ -7,6 +7,141 @@ import { Alert } from '../components/ui/Alert';
 import { useNotification } from '../contexts/NotificationContext';
 
 /**
+ * Viewer Sessions Modal - Shows list of viewers with IP addresses
+ */
+function ViewerSessionsModal({ title, sessions, onClose }) {
+    const formatDuration = (seconds) => {
+        if (!seconds || seconds < 60) return `${seconds || 0}s`;
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        if (mins < 60) return `${mins}m ${secs}s`;
+        const hours = Math.floor(mins / 60);
+        return `${hours}h ${mins % 60}m`;
+    };
+
+    const getDeviceIcon = (type) => {
+        if (type === 'mobile') return (
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+        );
+        if (type === 'tablet') return (
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 18h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+        );
+        return (
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+        );
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={onClose}>
+            <div 
+                className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden"
+                onClick={e => e.stopPropagation()}
+            >
+                {/* Header */}
+                <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-purple-100 dark:bg-purple-500/20 rounded-xl flex items-center justify-center text-purple-500">
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-gray-900 dark:text-white">{title}</h3>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{sessions.length} viewer aktif</p>
+                        </div>
+                    </div>
+                    <button 
+                        onClick={onClose}
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                    >
+                        <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                {/* Content */}
+                <div className="overflow-y-auto max-h-[60vh]">
+                    {sessions.length === 0 ? (
+                        <div className="p-8 text-center">
+                            <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+                                <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                            </div>
+                            <p className="text-gray-500 dark:text-gray-400">Tidak ada viewer aktif</p>
+                        </div>
+                    ) : (
+                        <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                            {sessions.map((session, idx) => (
+                                <div key={session.sessionId || idx} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                                    <div className="flex items-start gap-3">
+                                        {/* Device Icon */}
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                                            session.deviceType === 'mobile' ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-500' :
+                                            session.deviceType === 'tablet' ? 'bg-purple-100 dark:bg-purple-500/20 text-purple-500' :
+                                            'bg-gray-100 dark:bg-gray-700 text-gray-500'
+                                        }`}>
+                                            {getDeviceIcon(session.deviceType)}
+                                        </div>
+                                        
+                                        {/* Info */}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-mono text-sm font-semibold text-gray-900 dark:text-white">
+                                                    {session.ipAddress}
+                                                </span>
+                                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                                    session.deviceType === 'mobile' ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400' :
+                                                    session.deviceType === 'tablet' ? 'bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400' :
+                                                    'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                                                }`}>
+                                                    {session.deviceType || 'desktop'}
+                                                </span>
+                                            </div>
+                                            {session.cameraName && (
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                                    📹 {session.cameraName}
+                                                </p>
+                                            )}
+                                            <div className="flex items-center gap-3 mt-1 text-xs text-gray-400 dark:text-gray-500">
+                                                <span>⏱️ {formatDuration(session.durationSeconds)}</span>
+                                                {session.startedAt && (
+                                                    <span>
+                                                        Mulai: {new Date(session.startedAt + 'Z').toLocaleTimeString('id-ID', { 
+                                                            hour: '2-digit', 
+                                                            minute: '2-digit' 
+                                                        })}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Live indicator */}
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">LIVE</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/**
  * Dashboard Skeleton Components
  * Requirements: 3.4, 8.1, 8.2, 8.3, 8.4, 8.5
  */
@@ -113,6 +248,7 @@ export default function Dashboard() {
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [viewerModal, setViewerModal] = useState(null); // { title, sessions }
     const [lastSuccessfulUpdate, setLastSuccessfulUpdate] = useState(null);
     const [refreshError, setRefreshError] = useState(false);
     const [isRetrying, setIsRetrying] = useState(false);
@@ -353,8 +489,14 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* Viewers */}
-                <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6 hover:shadow-lg hover:border-purple-500/30 transition-all group">
+                {/* Viewers - Clickable to show all sessions */}
+                <div 
+                    className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6 hover:shadow-lg hover:border-purple-500/30 transition-all group cursor-pointer"
+                    onClick={() => setViewerModal({ 
+                        title: 'Semua Viewer Aktif', 
+                        sessions: stats?.allSessions || [] 
+                    })}
+                >
                     <div className="flex items-center justify-between mb-4">
                         <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-purple-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-purple-500/30 group-hover:scale-110 transition-transform">
                             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -365,7 +507,7 @@ export default function Dashboard() {
                         <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Viewers</span>
                     </div>
                     <h3 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{stats?.summary.activeViewers}</h3>
-                    <p className="text-xs text-gray-400 dark:text-gray-500">Active Sessions</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">Klik untuk lihat detail</p>
                 </div>
 
                 {/* Memory */}
@@ -490,10 +632,17 @@ export default function Dashboard() {
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4 text-center">
-                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 dark:bg-gray-700/50 rounded-lg">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></span>
+                                                    <button
+                                                        onClick={() => setViewerModal({
+                                                            title: `Viewer - ${stream.name}`,
+                                                            sessions: stream.sessions || []
+                                                        })}
+                                                        className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 dark:bg-gray-700/50 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors cursor-pointer"
+                                                        title="Klik untuk lihat detail viewer"
+                                                    >
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${stream.viewers > 0 ? 'bg-purple-500 animate-pulse' : 'bg-gray-400'}`}></span>
                                                         <span className="text-sm font-semibold text-gray-900 dark:text-white">{stream.viewers}</span>
-                                                    </span>
+                                                    </button>
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
                                                     <p className="text-sm font-semibold text-sky-500">↑ {formatBytes(stream.bytesSent)}</p>
@@ -576,6 +725,15 @@ export default function Dashboard() {
                     </div>
                 </div>
             </div>
+
+            {/* Viewer Sessions Modal */}
+            {viewerModal && (
+                <ViewerSessionsModal
+                    title={viewerModal.title}
+                    sessions={viewerModal.sessions}
+                    onClose={() => setViewerModal(null)}
+                />
+            )}
         </div>
     );
 }
