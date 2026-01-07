@@ -5,18 +5,26 @@
  * Features:
  * - Track active viewers per camera
  * - Store session history for analytics
- * - Auto-cleanup stale sessions (no heartbeat for 30s)
+ * - Auto-cleanup stale sessions (no heartbeat for 15s)
  * - Get real IP from proxy headers
+ * 
+ * Timing Configuration:
+ * - Frontend heartbeat: every 5 seconds
+ * - Backend session timeout: 15 seconds (no heartbeat)
+ * - Backend cleanup interval: every 5 seconds
+ * - Max staleness: ~20 seconds (15s timeout + 5s cleanup)
  */
 
 import { query, queryOne, execute } from '../database/database.js';
 import { v4 as uuidv4 } from 'uuid';
 
 // Session timeout in seconds (if no heartbeat received)
-const SESSION_TIMEOUT = 30;
+// Reduced from 30s to 15s for more realtime data
+const SESSION_TIMEOUT = 15;
 
 // Cleanup interval in milliseconds
-const CLEANUP_INTERVAL = 15000; // 15 seconds
+// Reduced from 15s to 5s for faster stale session detection
+const CLEANUP_INTERVAL = 5000; // 5 seconds
 
 class ViewerSessionService {
     constructor() {

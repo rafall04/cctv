@@ -4,9 +4,14 @@
  * 
  * Supports multiple concurrent sessions (for multi-view)
  * 
+ * Timing Configuration:
+ * - Heartbeat interval: 5 seconds
+ * - Backend timeout: 15 seconds
+ * - This ensures sessions stay active with 3 heartbeats before timeout
+ * 
  * Usage:
  * 1. Call startSession(cameraId) when user starts watching - returns sessionId
- * 2. Service automatically sends heartbeats every 10 seconds for all active sessions
+ * 2. Service automatically sends heartbeats every 5 seconds for all active sessions
  * 3. Call stopSession(sessionId) when user stops watching
  * 4. Call stopAllSessions() on component unmount
  */
@@ -14,7 +19,8 @@
 import apiClient from './apiClient';
 
 // Heartbeat interval in milliseconds
-const HEARTBEAT_INTERVAL = 10000; // 10 seconds
+// Reduced from 10s to 5s for more reliable session tracking
+const HEARTBEAT_INTERVAL = 5000; // 5 seconds
 
 class ViewerService {
     constructor() {
