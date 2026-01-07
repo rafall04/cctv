@@ -38,5 +38,31 @@ export const adminService = {
                 message: error.response?.data?.message || 'Failed to fetch real-time data'
             };
         }
+    },
+
+    async getTelegramStatus() {
+        try {
+            const response = await apiClient.get('/api/admin/telegram/status');
+            return response.data;
+        } catch (error) {
+            console.error('Get Telegram status error:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to fetch Telegram status'
+            };
+        }
+    },
+
+    async testTelegramNotification() {
+        try {
+            const response = await apiClient.post('/api/admin/telegram/test');
+            return response.data;
+        } catch (error) {
+            console.error('Test Telegram notification error:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to send test notification'
+            };
+        }
     }
 };
