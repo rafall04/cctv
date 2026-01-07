@@ -70,27 +70,51 @@ class CameraHealthService {
 
     /**
      * Get active paths from MediaMTX
-     * A path is considered "ready" if it has source ready or readers
+     * A path is considered "configured" if it exists in MediaMTX config
+     * A path is "streaming" if source is ready or has readers
      * @returns {Promise<Map<string, object>>} Map of path name to path info
      */
     async getActivePaths() {
         try {
-            const response = await axios.get(`${mediaMtxApiBaseUrl}/paths/list`, { 
+            // Get configured paths from config (not just active paths)
+            const configResponse = await axios.get(`${mediaMtxApiBaseUrl}/config/paths/list`, { 
                 timeout: 5000 
             });
             
             const pathMap = new Map();
-            const items = response.data?.items || [];
+            const configItems = configResponse.data?.items || [];
             
-            for (const item of items) {
+            // First, mark all configured paths as "online" (path exists = camera configured)
+            for (const item of configItems) {
                 pathMap.set(item.name, {
                     name: item.name,
-                    ready: item.ready || false,
-                    sourceReady: item.sourceReady || false,
-                    readers: item.readers?.length || 0,
-                    // Consider online if source is ready OR has active readers
-                    isOnline: item.sourceReady || (item.readers?.length > 0)
+                    configured: true,
+                    ready: false,
+                    sourceReady: false,
+                    readers: 0,
+                    // Camera is online if it's configured in MediaMTX
+                    // (sourceOnDemand means source won't be ready until someone watches)
+                    isOnline: true
                 });
+            }
+            
+            // Then get active paths to check if they're actually streaming
+            try {
+                const pathsResponse = await axios.get(`${mediaMtxApiBaseUrl}/paths/list`, { 
+                    timeout: 5000 
+                });
+                const activeItems = pathsResponse.data?.items || [];
+                
+                for (const item of activeItems) {
+                    if (pathMap.has(item.name)) {
+                        const existing = pathMap.get(item.name);
+                        existing.ready = item.ready || false;
+                        existing.sourceReady = item.sourceReady || false;
+                        existing.readers = item.readers?.length || 0;
+                    }
+                }
+            } catch (e) {
+                // Paths list might fail if no active streams, that's OK
             }
             
             return pathMap;
@@ -116,6 +140,9 @@ class CameraHealthService {
                 WHERE enabled = 1
             `).all();
 
+            // Debug: log what paths we found
+            console.log(`[CameraHealth] Found ${activePaths.size} configured paths in MediaMTX`);
+
             const updateStmt = db.prepare(`
                 UPDATE cameras 
                 SET is_online = ?, last_online_check = datetime('now') 
@@ -131,9 +158,13 @@ class CameraHealthService {
                 const pathName = camera.stream_key || `camera${camera.id}`;
                 const pathInfo = activePaths.get(pathName);
                 
+                // Debug: log path lookup
+                if (!pathInfo) {
+                    console.log(`[CameraHealth] Camera ${camera.id} (${camera.name}): path "${pathName}" NOT found in MediaMTX`);
+                }
+                
                 // Camera is online if:
-                // 1. Path exists in MediaMTX AND
-                // 2. Source is ready OR has active readers
+                // 1. Path exists in MediaMTX config (configured = online)
                 const isOnline = pathInfo?.isOnline ? 1 : 0;
                 
                 // Only update if status changed
@@ -197,10 +228,8 @@ class CameraHealthService {
             db.close();
             this.lastCheck = new Date();
 
-            // Only log if there were changes or periodically
-            if (changedCount > 0) {
-                console.log(`[CameraHealth] Status: ${onlineCount} online, ${offlineCount} offline (${changedCount} changed)`);
-            }
+            // Always log status for debugging
+            console.log(`[CameraHealth] Check complete: ${onlineCount} online, ${offlineCount} offline (${changedCount} changed)`);
 
         } catch (error) {
             console.error('[CameraHealth] Check failed:', error.message);
