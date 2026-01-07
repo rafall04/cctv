@@ -193,7 +193,7 @@ function Toast({ message, type = 'info', onClose }) {
 function ToastContainer({ toasts, removeToast }) {
     if (toasts.length === 0) return null;
     return (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-3 w-full max-w-sm px-4">
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[1002] flex flex-col gap-3 w-full max-w-sm px-4">
             {toasts.map(toast => (
                 <Toast key={toast.id} {...toast} onClose={() => removeToast(toast.id)} />
             ))}
@@ -1961,7 +1961,7 @@ function Navbar({ cameraCount }) {
     }, []);
     
     return (
-        <nav className="sticky top-0 z-40 bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-800/50">
+        <nav className="sticky top-0 z-[1001] bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-800/50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16">
                     {/* Logo - SEO optimized with proper heading structure */}
