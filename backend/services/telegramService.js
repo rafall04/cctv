@@ -1,39 +1,100 @@
 /**
  * Telegram Notification Service
  * Sends alerts for camera status changes, feedback, and system events
- * Supports separate chat IDs for monitoring and feedback
+ * Configuration stored in database (settings table)
  */
 
-import { config } from '../config/config.js';
+import { queryOne, execute } from '../database/database.js';
 
 // Cooldown tracking to prevent spam
-const notificationCooldowns = new Map(); // key: `camera_${id}_${type}` -> lastSentTime
-const COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes cooldown per camera per event type
+const notificationCooldowns = new Map();
+const COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+
+// Cache for settings (refresh every 60 seconds)
+let settingsCache = null;
+let settingsCacheTime = 0;
+const CACHE_TTL = 60000; // 60 seconds
 
 /**
- * Check if notification is in cooldown period
- * @param {string} key - Unique key for the notification type
- * @returns {boolean} - True if in cooldown
+ * Get Telegram settings from database with caching
  */
+function getTelegramSettings() {
+    const now = Date.now();
+    if (settingsCache && (now - settingsCacheTime) < CACHE_TTL) {
+        return settingsCache;
+    }
+
+    try {
+        const setting = queryOne('SELECT value FROM settings WHERE key = ?', ['telegram_config']);
+        if (setting) {
+            settingsCache = JSON.parse(setting.value);
+        } else {
+            settingsCache = {
+                botToken: '',
+                monitoringChatId: '',
+                feedbackChatId: '',
+                enabled: false
+            };
+        }
+        settingsCacheTime = now;
+        return settingsCache;
+    } catch (error) {
+        console.error('[Telegram] Error reading settings:', error);
+        return {
+            botToken: '',
+            monitoringChatId: '',
+            feedbackChatId: '',
+            enabled: false
+        };
+    }
+}
+
+/**
+ * Clear settings cache (call after update)
+ */
+export function clearSettingsCache() {
+    settingsCache = null;
+    settingsCacheTime = 0;
+}
+
+/**
+ * Save Telegram settings to database
+ */
+export function saveTelegramSettings(settings) {
+    try {
+        const valueStr = JSON.stringify(settings);
+        const existing = queryOne('SELECT * FROM settings WHERE key = ?', ['telegram_config']);
+        
+        if (existing) {
+            execute(
+                'UPDATE settings SET value = ?, updated_at = CURRENT_TIMESTAMP WHERE key = ?',
+                [valueStr, 'telegram_config']
+            );
+        } else {
+            execute(
+                'INSERT INTO settings (key, value, description) VALUES (?, ?, ?)',
+                ['telegram_config', valueStr, 'Telegram Bot Configuration']
+            );
+        }
+        
+        clearSettingsCache();
+        return true;
+    } catch (error) {
+        console.error('[Telegram] Error saving settings:', error);
+        return false;
+    }
+}
+
 function isInCooldown(key) {
     const lastSent = notificationCooldowns.get(key);
     if (!lastSent) return false;
     return (Date.now() - lastSent) < COOLDOWN_MS;
 }
 
-/**
- * Set cooldown for a notification
- * @param {string} key - Unique key for the notification type
- */
 function setCooldown(key) {
     notificationCooldowns.set(key, Date.now());
 }
 
-/**
- * Format timestamp to WIB (Indonesia time)
- * @param {Date} date 
- * @returns {string}
- */
 function formatTimeWIB(date = new Date()) {
     return new Intl.DateTimeFormat('id-ID', {
         timeZone: 'Asia/Jakarta',
@@ -49,17 +110,16 @@ function formatTimeWIB(date = new Date()) {
 
 /**
  * Send message to Telegram bot
- * @param {string} message - Message to send (HTML format)
- * @param {string} chatId - Target chat ID
- * @returns {Promise<boolean>} - Success status
  */
 async function sendToTelegram(message, chatId) {
-    if (!config.telegram.botToken || !chatId) {
-        console.log('[Telegram] Bot not configured or chat ID missing, skipping message');
+    const settings = getTelegramSettings();
+    
+    if (!settings.botToken || !chatId) {
+        console.log('[Telegram] Bot not configured or chat ID missing');
         return false;
     }
 
-    const url = `https://api.telegram.org/bot${config.telegram.botToken}/sendMessage`;
+    const url = `https://api.telegram.org/bot${settings.botToken}/sendMessage`;
 
     try {
         const response = await fetch(url, {
@@ -76,36 +136,27 @@ async function sendToTelegram(message, chatId) {
         const data = await response.json();
         
         if (!data.ok) {
-            console.error('[Telegram] Failed to send message:', data.description);
+            console.error('[Telegram] Failed:', data.description);
             return false;
         }
 
         return true;
     } catch (error) {
-        console.error('[Telegram] Error sending message:', error.message);
+        console.error('[Telegram] Error:', error.message);
         return false;
     }
 }
 
-/**
- * Send message to monitoring chat (camera alerts)
- */
 export async function sendMonitoringMessage(message) {
-    return sendToTelegram(message, config.telegram.monitoringChatId);
+    const settings = getTelegramSettings();
+    return sendToTelegram(message, settings.monitoringChatId);
 }
 
-/**
- * Send message to feedback chat (kritik & saran)
- */
 export async function sendFeedbackMessage(message) {
-    return sendToTelegram(message, config.telegram.feedbackChatId);
+    const settings = getTelegramSettings();
+    return sendToTelegram(message, settings.feedbackChatId);
 }
 
-/**
- * Send camera offline notification
- * @param {Object} camera - Camera data { id, name, location }
- * @returns {Promise<boolean>}
- */
 export async function sendCameraOfflineNotification(camera) {
     const cooldownKey = `camera_${camera.id}_offline`;
     
@@ -132,12 +183,6 @@ ${camera.location ? `📍 ${camera.location}` : ''}
     return sent;
 }
 
-/**
- * Send camera online notification
- * @param {Object} camera - Camera data { id, name, location }
- * @param {number} downtime - Downtime in seconds (optional)
- * @returns {Promise<boolean>}
- */
 export async function sendCameraOnlineNotification(camera, downtime = null) {
     const cooldownKey = `camera_${camera.id}_online`;
     
@@ -150,11 +195,7 @@ export async function sendCameraOnlineNotification(camera, downtime = null) {
     if (downtime && downtime > 0) {
         const minutes = Math.floor(downtime / 60);
         const seconds = downtime % 60;
-        if (minutes > 0) {
-            downtimeText = `\n⏱ Downtime: ${minutes}m ${seconds}s`;
-        } else {
-            downtimeText = `\n⏱ Downtime: ${seconds}s`;
-        }
+        downtimeText = minutes > 0 ? `\n⏱ Downtime: ${minutes}m ${seconds}s` : `\n⏱ Downtime: ${seconds}s`;
     }
 
     const message = `
@@ -175,17 +216,9 @@ ${camera.location ? `📍 ${camera.location}` : ''}
     return sent;
 }
 
-/**
- * Send multiple cameras offline notification (batch)
- * @param {Array} cameras - Array of camera objects
- * @returns {Promise<boolean>}
- */
 export async function sendMultipleCamerasOfflineNotification(cameras) {
     if (cameras.length === 0) return false;
-    
-    if (cameras.length === 1) {
-        return sendCameraOfflineNotification(cameras[0]);
-    }
+    if (cameras.length === 1) return sendCameraOfflineNotification(cameras[0]);
 
     const cameraList = cameras.map(c => `• ${c.name}`).join('\n');
     
@@ -201,10 +234,6 @@ ${cameraList}
     return sendMonitoringMessage(message);
 }
 
-/**
- * Send feedback notification to Telegram (kritik & saran)
- * @param {Object} feedback - Feedback data
- */
 export async function sendFeedbackNotification(feedback) {
     const message = `
 📬 <b>Kritik & Saran Baru</b>
@@ -222,77 +251,41 @@ ${feedback.message}
     return sendFeedbackMessage(message);
 }
 
-/**
- * Send daily summary notification
- * @param {Object} stats - Daily statistics
- */
-export async function sendDailySummary(stats) {
-    const message = `
-📊 <b>Laporan Harian CCTV</b>
-━━━━━━━━━━━━━━━━━━━━
-📅 ${formatTimeWIB()}
-
-📹 <b>Kamera:</b>
-• Total: ${stats.totalCameras}
-• Online: ${stats.onlineCameras}
-• Offline: ${stats.offlineCameras}
-
-👥 <b>Penonton Hari Ini:</b>
-• Unique: ${stats.uniqueViewers}
-• Total Sesi: ${stats.totalSessions}
-• Total Durasi: ${Math.round(stats.totalWatchTime / 60)} menit
-
-🏆 <b>Kamera Terpopuler:</b>
-${stats.topCamera || 'Belum ada data'}
-━━━━━━━━━━━━━━━━━━━━
-    `.trim();
-
-    return sendMonitoringMessage(message);
-}
-
-/**
- * Send test notification to monitoring chat
- * @returns {Promise<boolean>}
- */
-export async function sendTestNotification() {
+export async function sendTestNotification(type = 'monitoring') {
     const message = `
 ✅ <b>Test Notifikasi Berhasil</b>
 ━━━━━━━━━━━━━━━━━━━━
 Bot Telegram terhubung dengan baik.
+Tipe: ${type === 'monitoring' ? 'Monitoring Kamera' : 'Kritik & Saran'}
 ⏰ ${formatTimeWIB()}
 ━━━━━━━━━━━━━━━━━━━━
     `.trim();
 
+    if (type === 'feedback') {
+        return sendFeedbackMessage(message);
+    }
     return sendMonitoringMessage(message);
 }
 
-/**
- * Check if Telegram monitoring is configured
- * @returns {boolean}
- */
 export function isTelegramConfigured() {
-    return !!(config.telegram.botToken && config.telegram.monitoringChatId);
+    const settings = getTelegramSettings();
+    return !!(settings.botToken && settings.monitoringChatId);
 }
 
-/**
- * Check if Telegram feedback is configured
- * @returns {boolean}
- */
 export function isFeedbackConfigured() {
-    return !!(config.telegram.botToken && config.telegram.feedbackChatId);
+    const settings = getTelegramSettings();
+    return !!(settings.botToken && settings.feedbackChatId);
 }
 
-/**
- * Get Telegram configuration status
- * @returns {Object}
- */
 export function getTelegramStatus() {
+    const settings = getTelegramSettings();
     return {
-        enabled: config.telegram.enabled,
-        monitoringConfigured: !!(config.telegram.botToken && config.telegram.monitoringChatId),
-        feedbackConfigured: !!(config.telegram.botToken && config.telegram.feedbackChatId),
-        monitoringChatId: config.telegram.monitoringChatId ? `***${config.telegram.monitoringChatId.slice(-4)}` : null,
-        feedbackChatId: config.telegram.feedbackChatId ? `***${config.telegram.feedbackChatId.slice(-4)}` : null,
+        enabled: !!(settings.botToken && (settings.monitoringChatId || settings.feedbackChatId)),
+        monitoringConfigured: !!(settings.botToken && settings.monitoringChatId),
+        feedbackConfigured: !!(settings.botToken && settings.feedbackChatId),
+        botToken: settings.botToken ? `${settings.botToken.substring(0, 10)}...` : '',
+        monitoringChatId: settings.monitoringChatId || '',
+        feedbackChatId: settings.feedbackChatId || '',
     };
 }
 
@@ -303,9 +296,10 @@ export default {
     sendCameraOnlineNotification,
     sendMultipleCamerasOfflineNotification,
     sendFeedbackNotification,
-    sendDailySummary,
     sendTestNotification,
     isTelegramConfigured,
     isFeedbackConfigured,
     getTelegramStatus,
+    saveTelegramSettings,
+    clearSettingsCache,
 };

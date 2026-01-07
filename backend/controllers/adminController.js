@@ -2,7 +2,13 @@ import os from 'os';
 import { query, queryOne } from '../database/database.js';
 import mediaMtxService from '../services/mediaMtxService.js';
 import viewerSessionService from '../services/viewerSessionService.js';
-import { sendTestNotification, getTelegramStatus, isTelegramConfigured } from '../services/telegramService.js';
+import { 
+    sendTestNotification, 
+    getTelegramStatus, 
+    isTelegramConfigured,
+    saveTelegramSettings,
+    clearSettingsCache 
+} from '../services/telegramService.js';
 
 export async function getDashboardStats(request, reply) {
     try {
@@ -199,14 +205,16 @@ export async function getDashboardStats(request, reply) {
  */
 export async function testTelegramNotification(request, reply) {
     try {
-        if (!isTelegramConfigured()) {
+        const { type = 'monitoring' } = request.body || {};
+        
+        if (type === 'monitoring' && !isTelegramConfigured()) {
             return reply.code(400).send({
                 success: false,
-                message: 'Telegram bot belum dikonfigurasi. Silakan atur TELEGRAM_BOT_TOKEN dan TELEGRAM_CHAT_ID di file .env',
+                message: 'Telegram monitoring belum dikonfigurasi',
             });
         }
 
-        const sent = await sendTestNotification();
+        const sent = await sendTestNotification(type);
         
         if (sent) {
             return reply.send({
@@ -241,6 +249,43 @@ export async function getTelegramConfig(request, reply) {
         });
     } catch (error) {
         console.error('Get Telegram config error:', error);
+        return reply.code(500).send({
+            success: false,
+            message: 'Internal server error',
+        });
+    }
+}
+
+/**
+ * Update Telegram configuration
+ */
+export async function updateTelegramConfig(request, reply) {
+    try {
+        const { botToken, monitoringChatId, feedbackChatId } = request.body;
+
+        const settings = {
+            botToken: botToken || '',
+            monitoringChatId: monitoringChatId || '',
+            feedbackChatId: feedbackChatId || '',
+            enabled: !!(botToken && (monitoringChatId || feedbackChatId))
+        };
+
+        const saved = saveTelegramSettings(settings);
+        
+        if (saved) {
+            return reply.send({
+                success: true,
+                message: 'Konfigurasi Telegram berhasil disimpan',
+                data: getTelegramStatus(),
+            });
+        } else {
+            return reply.code(500).send({
+                success: false,
+                message: 'Gagal menyimpan konfigurasi',
+            });
+        }
+    } catch (error) {
+        console.error('Update Telegram config error:', error);
         return reply.code(500).send({
             success: false,
             message: 'Internal server error',
