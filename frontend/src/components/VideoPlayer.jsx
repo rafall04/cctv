@@ -1,21 +1,18 @@
 import { useEffect, useRef, useState, memo, useCallback } from 'react';
-import { detectDeviceTier, getDeviceCapabilities, getMobileDeviceType } from '../utils/deviceDetector';
+import { getDeviceCapabilities } from '../utils/deviceDetector';
 import { getHLSConfig } from '../utils/hlsConfig';
-import { createErrorRecoveryHandler, getBackoffDelay } from '../utils/errorRecovery';
+import { createErrorRecoveryHandler } from '../utils/errorRecovery';
 import { createVisibilityObserver } from '../utils/visibilityObserver';
 import { createOrientationObserver, getCurrentOrientation } from '../utils/orientationObserver';
-// New imports for stream loading fix
-import { preloadHls, getPreloadedHls, isPreloaded, getPreloadStatus } from '../utils/preloadManager';
-import { createLoadingTimeoutHandler, getTimeoutDuration } from '../utils/loadingTimeoutHandler';
-import { LoadingStage, LOADING_STAGE_MESSAGES, getStageMessage, createStreamError } from '../utils/streamLoaderTypes';
-import { createFallbackHandler, getRetryDelay } from '../utils/fallbackHandler';
+import { preloadHls } from '../utils/preloadManager';
+import { createLoadingTimeoutHandler } from '../utils/loadingTimeoutHandler';
+import { LoadingStage, getStageMessage, createStreamError } from '../utils/streamLoaderTypes';
+import { createFallbackHandler } from '../utils/fallbackHandler';
 
 /**
  * Optimized VideoPlayer Component
  * Integrates device-adaptive HLS configuration, error recovery, visibility-based stream control,
  * loading timeout detection, progressive loading stages, and auto-retry functionality.
- * 
- * **Validates: Requirements 1.1, 1.2, 1.3, 1.4, 1.5, 2.1, 2.2, 2.3, 2.4, 2.5, 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 4.2, 4.3, 4.4, 4.5, 5.2, 5.3, 6.1, 6.2, 6.3, 6.4, 7.1, 7.2, 7.3, 7.4, 7.5**
  */
 const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = false }) => {
     const videoRef = useRef(null);
