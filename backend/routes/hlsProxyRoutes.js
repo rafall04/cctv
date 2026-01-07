@@ -97,7 +97,8 @@ function getOrCreateSession(ip, cameraId, request) {
 }
 
 export default async function hlsProxyRoutes(fastify, _options) {
-    const mediamtxHlsUrl = config.mediamtx?.hlsUrl || 'http://localhost:8888';
+    // IMPORTANT: Use internal URL to MediaMTX, not public URL
+    const mediamtxHlsUrl = config.mediamtx?.hlsUrlInternal || 'http://localhost:8888';
     
     /**
      * Proxy HLS playlist request (index.m3u8)
