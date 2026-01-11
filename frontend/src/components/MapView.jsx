@@ -1005,8 +1005,8 @@ const MapView = memo(({
                 style={{ minHeight: '450px', zIndex: 1 }}
                 zoomControl={false}
             >
-                {/* Layer Control - Pilihan Peta */}
-                <LayersControl position="topright">
+                {/* Layer Control - Pilihan Peta (posisi bottomleft, di atas legend) */}
+                <LayersControl position="bottomleft">
                     {/* Street Map - Default */}
                     <LayersControl.BaseLayer checked name="Street">
                         <TileLayer
@@ -1050,8 +1050,8 @@ const MapView = memo(({
                 ))}
             </MapContainer>
 
-            {/* Filter & Stats - Top */}
-            <div className="absolute top-3 left-3 right-3 z-[1000] flex items-start justify-between gap-2 flex-wrap">
+            {/* Filter & Stats - Top Left */}
+            <div className="absolute top-3 left-3 z-[1000] flex flex-col gap-2">
                 {/* Area Filter */}
                 <select
                     value={selectedArea}
@@ -1066,8 +1066,8 @@ const MapView = memo(({
                     ))}
                 </select>
 
-                {/* Stats */}
-                <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg text-sm">
+                {/* Stats - di bawah filter */}
+                <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg text-sm w-fit">
                     <span className="flex items-center gap-1.5">
                         <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"/>
                         <span className="font-medium text-gray-700 dark:text-gray-200">{stats.stabil}</span>
@@ -1098,8 +1098,8 @@ const MapView = memo(({
                 </div>
             </div>
 
-            {/* Legend - Bottom Left - posisi lebih ke pojok bawah */}
-            <div className="absolute bottom-3 left-3 z-[1000]">
+            {/* Legend - Bottom Left - di atas layer control */}
+            <div className="absolute bottom-14 left-3 z-[1000]">
                 <div className="px-2.5 py-1.5 bg-white/95 dark:bg-gray-800/95 rounded-lg shadow-lg text-[10px]">
                     <div className="flex items-center gap-2 flex-wrap">
                         <span className="flex items-center gap-1">

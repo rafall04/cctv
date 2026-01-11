@@ -30,8 +30,8 @@
 /* Leaflet Layers Control - Modern Styling */
 .leaflet-control-layers {
     border: none !important;
-    border-radius: 12px !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    border-radius: 10px !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
     background: white !important;
     padding: 0 !important;
     overflow: hidden;
@@ -42,16 +42,16 @@
 }
 
 .leaflet-control-layers-toggle {
-    width: 36px !important;
-    height: 36px !important;
-    background-size: 20px 20px !important;
+    width: 32px !important;
+    height: 32px !important;
+    background-size: 18px 18px !important;
     background-position: center !important;
-    border-radius: 10px !important;
+    border-radius: 8px !important;
 }
 
 .leaflet-control-layers-expanded {
-    padding: 8px 12px !important;
-    min-width: 140px;
+    padding: 6px 10px !important;
+    min-width: 120px;
 }
 
 .leaflet-control-layers-list {
@@ -62,13 +62,13 @@
 .leaflet-control-layers-overlays label {
     display: flex !important;
     align-items: center !important;
-    gap: 8px !important;
-    padding: 6px 4px !important;
+    gap: 6px !important;
+    padding: 5px 4px !important;
     margin: 0 !important;
     cursor: pointer !important;
-    border-radius: 6px !important;
+    border-radius: 5px !important;
     transition: background-color 0.15s ease !important;
-    font-size: 13px !important;
+    font-size: 12px !important;
     font-weight: 500 !important;
     color: #374151 !important;
 }
@@ -86,18 +86,24 @@
 .leaflet-control-layers-base input,
 .leaflet-control-layers-overlays input {
     margin: 0 !important;
-    width: 16px !important;
-    height: 16px !important;
+    width: 14px !important;
+    height: 14px !important;
     accent-color: #0ea5e9 !important;
 }
 
 .leaflet-control-layers-separator {
     border-top: 1px solid #e5e7eb !important;
-    margin: 6px 0 !important;
+    margin: 4px 0 !important;
 }
 
 .dark .leaflet-control-layers-separator {
     border-top-color: #374151 !important;
+}
+
+/* Posisi bottomleft - beri margin agar tidak terlalu mepet */
+.leaflet-bottom.leaflet-left .leaflet-control-layers {
+    margin-bottom: 8px !important;
+    margin-left: 10px !important;
 }
 
 @layer base {
