@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useRef, useState, memo, useCallback, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, useMap, ZoomControl } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMap, ZoomControl, LayersControl } from 'react-leaflet';
 import L from 'leaflet';
 import Hls from 'hls.js';
 import 'leaflet/dist/leaflet.css';
@@ -1005,10 +1005,44 @@ const MapView = memo(({
                 style={{ minHeight: '450px', zIndex: 1 }}
                 zoomControl={false}
             >
-                <TileLayer
-                    attribution='&copy; <a href="https://rafnet.my.id" target="_blank">RAF NET</a>'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
+                {/* Layer Control - Pilihan Peta */}
+                <LayersControl position="topright">
+                    {/* Street Map - Default */}
+                    <LayersControl.BaseLayer checked name="Street">
+                        <TileLayer
+                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        />
+                    </LayersControl.BaseLayer>
+                    
+                    {/* Satelit - Google Satellite */}
+                    <LayersControl.BaseLayer name="Satelit">
+                        <TileLayer
+                            attribution='&copy; Google'
+                            url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
+                            maxZoom={20}
+                        />
+                    </LayersControl.BaseLayer>
+                    
+                    {/* Hybrid - Google Satellite dengan Label */}
+                    <LayersControl.BaseLayer name="Hybrid">
+                        <TileLayer
+                            attribution='&copy; Google'
+                            url="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+                            maxZoom={20}
+                        />
+                    </LayersControl.BaseLayer>
+                    
+                    {/* Terrain - Google Terrain */}
+                    <LayersControl.BaseLayer name="Terrain">
+                        <TileLayer
+                            attribution='&copy; Google'
+                            url="https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}"
+                            maxZoom={20}
+                        />
+                    </LayersControl.BaseLayer>
+                </LayersControl>
+                
                 <ZoomControl position="bottomright" />
                 <MapController center={center} zoom={zoom} bounds={bounds} />
                 {filtered.map(camera => (

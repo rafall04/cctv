@@ -27,6 +27,79 @@
     transform: scale(1.1);
 }
 
+/* Leaflet Layers Control - Modern Styling */
+.leaflet-control-layers {
+    border: none !important;
+    border-radius: 12px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    background: white !important;
+    padding: 0 !important;
+    overflow: hidden;
+}
+
+.dark .leaflet-control-layers {
+    background: rgb(31, 41, 55) !important;
+}
+
+.leaflet-control-layers-toggle {
+    width: 36px !important;
+    height: 36px !important;
+    background-size: 20px 20px !important;
+    background-position: center !important;
+    border-radius: 10px !important;
+}
+
+.leaflet-control-layers-expanded {
+    padding: 8px 12px !important;
+    min-width: 140px;
+}
+
+.leaflet-control-layers-list {
+    margin: 0 !important;
+}
+
+.leaflet-control-layers-base label,
+.leaflet-control-layers-overlays label {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 6px 4px !important;
+    margin: 0 !important;
+    cursor: pointer !important;
+    border-radius: 6px !important;
+    transition: background-color 0.15s ease !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    color: #374151 !important;
+}
+
+.dark .leaflet-control-layers-base label,
+.dark .leaflet-control-layers-overlays label {
+    color: #e5e7eb !important;
+}
+
+.leaflet-control-layers-base label:hover,
+.leaflet-control-layers-overlays label:hover {
+    background: rgba(14, 165, 233, 0.1) !important;
+}
+
+.leaflet-control-layers-base input,
+.leaflet-control-layers-overlays input {
+    margin: 0 !important;
+    width: 16px !important;
+    height: 16px !important;
+    accent-color: #0ea5e9 !important;
+}
+
+.leaflet-control-layers-separator {
+    border-top: 1px solid #e5e7eb !important;
+    margin: 6px 0 !important;
+}
+
+.dark .leaflet-control-layers-separator {
+    border-top-color: #374151 !important;
+}
+
 @layer base {
     html {
         scroll-behavior: smooth;
