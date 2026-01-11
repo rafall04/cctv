@@ -1005,8 +1005,8 @@ const MapView = memo(({
                 style={{ minHeight: '450px', zIndex: 1 }}
                 zoomControl={false}
             >
-                {/* Layer Control - Pilihan Peta (posisi bottomleft, di atas legend) */}
-                <LayersControl position="bottomleft">
+                {/* Layer Control - Pilihan Peta (posisi topright - area kosong) */}
+                <LayersControl position="topright">
                     {/* Street Map - Default */}
                     <LayersControl.BaseLayer checked name="Street">
                         <TileLayer
@@ -1050,9 +1050,8 @@ const MapView = memo(({
                 ))}
             </MapContainer>
 
-            {/* Filter & Stats - Top Left */}
-            <div className="absolute top-3 left-3 z-[1000] flex flex-col gap-2">
-                {/* Area Filter */}
+            {/* Filter Area - Top Left */}
+            <div className="absolute top-3 left-3 z-[1000]">
                 <select
                     value={selectedArea}
                     onChange={handleAreaChange}
@@ -1065,9 +1064,11 @@ const MapView = memo(({
                         </option>
                     ))}
                 </select>
+            </div>
 
-                {/* Stats - di bawah filter */}
-                <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg text-sm w-fit">
+            {/* Stats - Top Center */}
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000]">
+                <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg text-sm">
                     <span className="flex items-center gap-1.5">
                         <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"/>
                         <span className="font-medium text-gray-700 dark:text-gray-200">{stats.stabil}</span>
@@ -1098,8 +1099,8 @@ const MapView = memo(({
                 </div>
             </div>
 
-            {/* Legend - Bottom Left - di atas layer control */}
-            <div className="absolute bottom-14 left-3 z-[1000]">
+            {/* Legend - Bottom Left */}
+            <div className="absolute bottom-3 left-3 z-[1000]">
                 <div className="px-2.5 py-1.5 bg-white/95 dark:bg-gray-800/95 rounded-lg shadow-lg text-[10px]">
                     <div className="flex items-center gap-2 flex-wrap">
                         <span className="flex items-center gap-1">

@@ -100,10 +100,10 @@
     border-top-color: #374151 !important;
 }
 
-/* Posisi bottomleft - beri margin agar tidak terlalu mepet */
-.leaflet-bottom.leaflet-left .leaflet-control-layers {
-    margin-bottom: 8px !important;
-    margin-left: 10px !important;
+/* Posisi topright - margin dari atas untuk tidak menutupi elemen lain */
+.leaflet-top.leaflet-right .leaflet-control-layers {
+    margin-top: 10px !important;
+    margin-right: 10px !important;
 }
 
 @layer base {
