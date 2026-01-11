@@ -1055,7 +1055,7 @@ const MapView = memo(({
                 <select
                     value={selectedArea}
                     onChange={handleAreaChange}
-                    className="px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg shadow-lg text-sm font-medium border-0 focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer"
+                    className="px-2.5 py-1.5 sm:px-3 sm:py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg shadow-lg text-xs sm:text-sm font-medium border-0 focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer max-w-[180px] sm:max-w-none truncate"
                 >
                     <option value="all">{mapSettings.name || 'Semua Lokasi'} ({camerasWithCoords.length})</option>
                     {areaNames.map(area => (
@@ -1066,23 +1066,23 @@ const MapView = memo(({
                 </select>
             </div>
 
-            {/* Stats - Top Center */}
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000]">
-                <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg text-sm">
-                    <span className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"/>
+            {/* Stats - Bottom Center (di atas attribution) */}
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-[1000]">
+                <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 sm:px-3 sm:py-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg text-xs sm:text-sm">
+                    <span className="flex items-center gap-1">
+                        <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-emerald-500"/>
                         <span className="font-medium text-gray-700 dark:text-gray-200">{stats.stabil}</span>
                     </span>
                     <span className="text-gray-300 dark:text-gray-600">|</span>
-                    <span className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-orange-500"/>
+                    <span className="flex items-center gap-1">
+                        <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-orange-500"/>
                         <span className="font-medium text-gray-700 dark:text-gray-200">{stats.tunnel}</span>
                     </span>
                     {stats.offline > 0 && (
                         <>
                             <span className="text-gray-300 dark:text-gray-600">|</span>
-                            <span className="flex items-center gap-1.5">
-                                <span className="w-2.5 h-2.5 rounded-full bg-gray-500"/>
+                            <span className="flex items-center gap-1">
+                                <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-gray-500"/>
                                 <span className="font-medium text-gray-700 dark:text-gray-200">{stats.offline}</span>
                             </span>
                         </>
@@ -1090,8 +1090,8 @@ const MapView = memo(({
                     {stats.maintenance > 0 && (
                         <>
                             <span className="text-gray-300 dark:text-gray-600">|</span>
-                            <span className="flex items-center gap-1.5">
-                                <span className="w-2.5 h-2.5 rounded-full bg-red-500"/>
+                            <span className="flex items-center gap-1">
+                                <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-red-500"/>
                                 <span className="font-medium text-gray-700 dark:text-gray-200">{stats.maintenance}</span>
                             </span>
                         </>
@@ -1099,24 +1099,24 @@ const MapView = memo(({
                 </div>
             </div>
 
-            {/* Legend - Bottom Left */}
-            <div className="absolute bottom-3 left-3 z-[1000]">
-                <div className="px-2.5 py-1.5 bg-white/95 dark:bg-gray-800/95 rounded-lg shadow-lg text-[10px]">
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <span className="flex items-center gap-1">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500"/>
+            {/* Legend - Bottom Left (di atas stats) */}
+            <div className="absolute bottom-12 sm:bottom-14 left-3 z-[1000]">
+                <div className="px-2 py-1 sm:px-2.5 sm:py-1.5 bg-white/95 dark:bg-gray-800/95 rounded-lg shadow-lg text-[9px] sm:text-[10px]">
+                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                        <span className="flex items-center gap-0.5 sm:gap-1">
+                            <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-500"/>
                             <span className="text-gray-600 dark:text-gray-300">Stabil</span>
                         </span>
-                        <span className="flex items-center gap-1">
-                            <span className="w-2 h-2 rounded-full bg-orange-500"/>
+                        <span className="flex items-center gap-0.5 sm:gap-1">
+                            <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-orange-500"/>
                             <span className="text-gray-600 dark:text-gray-300">Tunnel</span>
                         </span>
-                        <span className="flex items-center gap-1">
-                            <span className="w-2 h-2 rounded-full bg-gray-500"/>
+                        <span className="flex items-center gap-0.5 sm:gap-1">
+                            <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-gray-500"/>
                             <span className="text-gray-600 dark:text-gray-300">Offline</span>
                         </span>
-                        <span className="flex items-center gap-1">
-                            <span className="w-2 h-2 rounded-full bg-red-500"/>
+                        <span className="flex items-center gap-0.5 sm:gap-1">
+                            <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-500"/>
                             <span className="text-gray-600 dark:text-gray-300">Perbaikan</span>
                         </span>
                     </div>
