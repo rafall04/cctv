@@ -433,46 +433,46 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
 });
 
 // ============================================
-// ZOOMABLE VIDEO COMPONENT - Ultra smooth pan/zoom with RAF throttling
-// Transform on wrapper div, not video. Uses RAF-based throttling for 60fps max.
+// ZOOMABLE VIDEO COMPONENT - Optimized for low-end devices
+// Disables heavy features (willChange, RAF throttle) on low-end
 // ============================================
 const ZoomableVideo = memo(function ZoomableVideo({ videoRef, maxZoom = 4, onZoomChange }) {
     const wrapperRef = useRef(null);
     const transformThrottleRef = useRef(null);
     const stateRef = useRef({ zoom: 1, panX: 0, panY: 0, dragging: false, startX: 0, startY: 0, startPanX: 0, startPanY: 0 });
+    const isLowEnd = detectDeviceTier() === 'low';
 
     const getMaxPan = (z) => z <= 1 ? 0 : ((z - 1) / (2 * z)) * 100;
     const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
-    // Initialize RAF throttle on mount
+    // Initialize RAF throttle on mount - skip on low-end
     useEffect(() => {
-        if (wrapperRef.current) {
+        if (wrapperRef.current && !isLowEnd) {
             transformThrottleRef.current = createTransformThrottle(wrapperRef.current);
         }
         return () => {
             transformThrottleRef.current?.cancel();
         };
-    }, []);
+    }, [isLowEnd]);
 
     const applyTransform = useCallback((animate = false) => {
         if (!wrapperRef.current) return;
         const { zoom, panX, panY } = stateRef.current;
         
-        if (animate) {
-            // For animated transitions, apply directly with CSS transition
+        if (animate && !isLowEnd) {
             wrapperRef.current.style.transition = 'transform 0.2s ease-out';
             wrapperRef.current.style.transform = `scale(${zoom}) translate(${panX}%, ${panY}%)`;
         } else {
-            // For rapid updates, use RAF throttle
             wrapperRef.current.style.transition = 'none';
-            if (transformThrottleRef.current) {
+            // On low-end, apply directly without RAF throttle
+            if (transformThrottleRef.current && !isLowEnd) {
                 transformThrottleRef.current.update(zoom, panX, panY);
             } else {
                 wrapperRef.current.style.transform = `scale(${zoom}) translate(${panX}%, ${panY}%)`;
             }
         }
         onZoomChange?.(zoom);
-    }, [onZoomChange]);
+    }, [onZoomChange, isLowEnd]);
 
     const handleZoom = useCallback((delta, animate = true) => {
         const s = stateRef.current;
@@ -517,13 +517,13 @@ const ZoomableVideo = memo(function ZoomableVideo({ videoRef, maxZoom = 4, onZoo
         s.panX = clamp(s.startPanX + dx * factor, -max, max);
         s.panY = clamp(s.startPanY + dy * factor, -max, max);
         
-        // Use RAF-throttled transform update for smooth 60fps max
-        if (transformThrottleRef.current) {
+        // On low-end, apply directly without RAF throttle
+        if (transformThrottleRef.current && !isLowEnd) {
             transformThrottleRef.current.update(s.zoom, s.panX, s.panY);
         } else {
             wrapperRef.current.style.transform = `scale(${s.zoom}) translate(${s.panX}%, ${s.panY}%)`;
         }
-    }, []);
+    }, [isLowEnd]);
 
     const handlePointerUp = useCallback((e) => {
         const s = stateRef.current;
@@ -561,8 +561,9 @@ const ZoomableVideo = memo(function ZoomableVideo({ videoRef, maxZoom = 4, onZoo
             style={{ 
                 transformOrigin: 'center center', 
                 cursor: 'default',
-                touchAction: 'none', // Critical for mobile smoothness
-                willChange: 'transform'
+                touchAction: 'none',
+                // CRITICAL: willChange creates GPU layer - disable on low-end to reduce memory
+                willChange: isLowEnd ? 'auto' : 'transform'
             }}
         >
             <video 
