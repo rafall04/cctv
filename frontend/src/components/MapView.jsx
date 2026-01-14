@@ -1005,27 +1005,10 @@ const MapView = memo(({
                 style={{ minHeight: '450px', zIndex: 1 }}
                 zoomControl={false}
             >
-                {/* Layer Control - Pilihan Peta (posisi topright - area kosong) */}
+                {/* Layer Control - Pilihan Peta (posisi topright) */}
                 <LayersControl position="topright">
-                    {/* Street Map - Default */}
-                    <LayersControl.BaseLayer checked name="Street">
-                        <TileLayer
-                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                        />
-                    </LayersControl.BaseLayer>
-                    
-                    {/* Satelit - Google Satellite */}
-                    <LayersControl.BaseLayer name="Satelit">
-                        <TileLayer
-                            attribution='&copy; Google'
-                            url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
-                            maxZoom={20}
-                        />
-                    </LayersControl.BaseLayer>
-                    
-                    {/* Hybrid - Google Satellite dengan Label */}
-                    <LayersControl.BaseLayer name="Hybrid">
+                    {/* Hybrid - Google Satellite dengan Label (Default) */}
+                    <LayersControl.BaseLayer checked name="Hybrid">
                         <TileLayer
                             attribution='&copy; Google'
                             url="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
@@ -1033,12 +1016,11 @@ const MapView = memo(({
                         />
                     </LayersControl.BaseLayer>
                     
-                    {/* Terrain - Google Terrain */}
-                    <LayersControl.BaseLayer name="Terrain">
+                    {/* Street Map */}
+                    <LayersControl.BaseLayer name="Street">
                         <TileLayer
-                            attribution='&copy; Google'
-                            url="https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}"
-                            maxZoom={20}
+                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                         />
                     </LayersControl.BaseLayer>
                 </LayersControl>
