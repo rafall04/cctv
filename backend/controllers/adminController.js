@@ -296,18 +296,20 @@ export async function updateTelegramConfig(request, reply) {
 
 /**
  * Get viewer analytics data
- * Query params: period (today, 7days, 30days, all)
+ * Query params: period (today, yesterday, 7days, 30days, all, or date:YYYY-MM-DD)
  */
 export async function getViewerAnalytics(request, reply) {
     try {
         const { period = '7days' } = request.query;
         
-        // Validate period
-        const validPeriods = ['today', '7days', '30days', 'all'];
-        if (!validPeriods.includes(period)) {
+        // Validate period - allow standard periods or custom date format
+        const validPeriods = ['today', 'yesterday', '7days', '30days', 'all'];
+        const isCustomDate = period.startsWith('date:') && /^date:\d{4}-\d{2}-\d{2}$/.test(period);
+        
+        if (!validPeriods.includes(period) && !isCustomDate) {
             return reply.code(400).send({
                 success: false,
-                message: 'Invalid period. Use: today, 7days, 30days, or all',
+                message: 'Invalid period. Use: today, yesterday, 7days, 30days, all, or date:YYYY-MM-DD',
             });
         }
 

@@ -336,7 +336,7 @@ class ViewerSessionService {
 
     /**
      * Get comprehensive analytics data for dashboard
-     * @param {string} period - 'today', '7days', '30days', 'all'
+     * @param {string} period - 'today', 'yesterday', '7days', '30days', 'all', or 'date:YYYY-MM-DD'
      * Uses WIB timezone for date filtering
      */
     getAnalytics(period = '7days') {
@@ -345,18 +345,32 @@ class ViewerSessionService {
             let dateFilter = '';
             const todayDate = getWIBDate();
             
-            switch (period) {
-                case 'today':
-                    dateFilter = `AND date(started_at) = '${todayDate}'`;
-                    break;
-                case '7days':
+            // Handle custom date format: "date:YYYY-MM-DD"
+            if (period.startsWith('date:')) {
+                const customDate = period.substring(5);
+                // Validate date format
+                if (/^\d{4}-\d{2}-\d{2}$/.test(customDate)) {
+                    dateFilter = `AND date(started_at) = '${customDate}'`;
+                } else {
                     dateFilter = `AND date(started_at) >= '${getWIBDateWithOffset(-7)}'`;
-                    break;
-                case '30days':
-                    dateFilter = `AND date(started_at) >= '${getWIBDateWithOffset(-30)}'`;
-                    break;
-                default:
-                    dateFilter = '';
+                }
+            } else {
+                switch (period) {
+                    case 'today':
+                        dateFilter = `AND date(started_at) = '${todayDate}'`;
+                        break;
+                    case 'yesterday':
+                        dateFilter = `AND date(started_at) = '${getWIBDateWithOffset(-1)}'`;
+                        break;
+                    case '7days':
+                        dateFilter = `AND date(started_at) >= '${getWIBDateWithOffset(-7)}'`;
+                        break;
+                    case '30days':
+                        dateFilter = `AND date(started_at) >= '${getWIBDateWithOffset(-30)}'`;
+                        break;
+                    default:
+                        dateFilter = '';
+                }
             }
 
             // Overview stats
