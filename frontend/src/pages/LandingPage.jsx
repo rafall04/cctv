@@ -814,6 +814,7 @@ function VideoPopup({ camera, onClose }) {
         let hls = null;
         let cancelled = false;
         let playbackCheckInterval = null;
+        let isLive = false; // Flag to prevent setState after live
 
         abortControllerRef.current = new AbortController();
         setStatus('connecting');
@@ -826,8 +827,10 @@ function VideoPopup({ camera, onClose }) {
 
         // Only change to 'live' once video starts playing - don't revert on buffering
         const handlePlaying = () => {
-            if (cancelled) return;
+            if (cancelled || isLive) return; // Skip if already live
+            isLive = true; // Set flag to prevent future setState
             clearInterval(playbackCheckInterval);
+            playbackCheckInterval = null;
             setStatus('live');
             setLoadingStage(LoadingStage.PLAYING);
             // Clear timeout on success
@@ -846,8 +849,9 @@ function VideoPopup({ camera, onClose }) {
         // Some browsers don't fire 'playing' event reliably
         const startPlaybackCheck = () => {
             playbackCheckInterval = setInterval(() => {
-                if (cancelled) {
+                if (cancelled || isLive) {
                     clearInterval(playbackCheckInterval);
+                    playbackCheckInterval = null;
                     return;
                 }
                 // Check if video is actually playing (has time progress or buffered data)
@@ -864,8 +868,9 @@ function VideoPopup({ camera, onClose }) {
         };
         
         const handleError = () => {
-            if (cancelled) return;
+            if (cancelled || isLive) return; // Don't show error if already playing
             clearInterval(playbackCheckInterval);
+            playbackCheckInterval = null;
             setStatus('error');
             setLoadingStage(LoadingStage.ERROR);
         };
@@ -900,7 +905,7 @@ function VideoPopup({ camera, onClose }) {
                 startPlaybackCheck();
                 
                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                    if (cancelled) return;
+                    if (cancelled || isLive) return; // Skip if already live
                     // Update to buffering stage
                     setLoadingStage(LoadingStage.BUFFERING);
                     if (loadingTimeoutHandlerRef.current) {
@@ -911,7 +916,7 @@ function VideoPopup({ camera, onClose }) {
                 
                 // FRAG_LOADED fires when first fragment is loaded - more reliable than MANIFEST_PARSED
                 hls.on(Hls.Events.FRAG_LOADED, () => {
-                    if (cancelled) return;
+                    if (cancelled || isLive) return; // Skip if already live
                     // If still in LOADING stage, move to BUFFERING
                     setLoadingStage(prev => {
                         if (prev === LoadingStage.LOADING || prev === LoadingStage.CONNECTING) {
@@ -929,18 +934,13 @@ function VideoPopup({ camera, onClose }) {
                 });
 
                 hls.on(Hls.Events.FRAG_BUFFERED, () => {
-                    if (cancelled) return;
+                    if (cancelled || isLive) return; // Skip if already live
                     // Langsung set PLAYING dan status live setelah buffered
-                    setLoadingStage(LoadingStage.PLAYING);
-                    setStatus('live'); // Hilangkan overlay segera
-                    // Force play
-                    if (video.paused) {
-                        video.play().catch(() => {});
-                    }
+                    handlePlaying(); // Use handlePlaying to set isLive flag
                 });
                 
                 hls.on(Hls.Events.ERROR, (_, d) => {
-                    if (cancelled) return;
+                    if (cancelled || isLive) return; // Don't handle errors if already playing
                     
                     // For non-fatal errors, just continue
                     if (!d.fatal) return;
@@ -1410,6 +1410,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         let hls = null;
         let cancelled = false;
         let initTimeout = null;
+        let isLive = false; // Flag to prevent setState after live
 
         abortControllerRef.current = new AbortController();
         setStatus('connecting');
@@ -1418,8 +1419,10 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
 
         // Only change to 'live' once video starts playing - don't revert on buffering
         const handlePlaying = () => {
-            if (cancelled) return;
+            if (cancelled || isLive) return; // Skip if already live
+            isLive = true; // Set flag to prevent future setState
             clearInterval(playbackCheckInterval);
+            playbackCheckInterval = null;
             setStatus('live');
             setLoadingStage(LoadingStage.PLAYING);
             // Clear timeout on success
@@ -1436,8 +1439,9 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         // Fallback: Check video state periodically
         const startPlaybackCheck = () => {
             playbackCheckInterval = setInterval(() => {
-                if (cancelled) {
+                if (cancelled || isLive) {
                     clearInterval(playbackCheckInterval);
+                    playbackCheckInterval = null;
                     return;
                 }
                 if (video.readyState >= 3 && video.buffered.length > 0) {
@@ -1451,8 +1455,9 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         };
         
         const handleError = () => {
-            if (cancelled) return;
+            if (cancelled || isLive) return; // Don't show error if already playing
             clearInterval(playbackCheckInterval);
+            playbackCheckInterval = null;
             setStatus('error');
             setLoadingStage(LoadingStage.ERROR);
             // Notify parent of error for isolation tracking
@@ -1498,7 +1503,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 startPlaybackCheck();
                 
                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                    if (cancelled) return;
+                    if (cancelled || isLive) return; // Skip if already live
                     setLoadingStage(LoadingStage.BUFFERING);
                     if (loadingTimeoutHandlerRef.current) {
                         loadingTimeoutHandlerRef.current.updateStage(LoadingStage.BUFFERING);
@@ -1508,7 +1513,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 
                 // FRAG_LOADED fires when first fragment is loaded
                 hls.on(Hls.Events.FRAG_LOADED, () => {
-                    if (cancelled) return;
+                    if (cancelled || isLive) return; // Skip if already live
                     setLoadingStage(prev => {
                         if (prev === LoadingStage.LOADING || prev === LoadingStage.CONNECTING) {
                             if (loadingTimeoutHandlerRef.current) {
@@ -1524,17 +1529,13 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 });
 
                 hls.on(Hls.Events.FRAG_BUFFERED, () => {
-                    if (cancelled) return;
-                    // Langsung set PLAYING dan status live setelah buffered
-                    setLoadingStage(LoadingStage.PLAYING);
-                    setStatus('live'); // Hilangkan overlay segera
-                    if (video.paused) {
-                        video.play().catch(() => {});
-                    }
+                    if (cancelled || isLive) return; // Skip if already live
+                    // Langsung set live setelah buffered
+                    handlePlaying(); // Use handlePlaying to set isLive flag
                 });
                 
                 hls.on(Hls.Events.ERROR, (_, d) => {
-                    if (cancelled) return;
+                    if (cancelled || isLive) return; // Don't handle errors if already playing
                     
                     // For non-fatal errors, just continue
                     if (!d.fatal) return;
