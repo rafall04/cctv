@@ -1946,19 +1946,22 @@ function MultiViewLayout({ cameras, onRemove, onClose }) {
 // ============================================
 // NAVBAR - Enhanced with live indicator
 // Disables animations on low-end devices - **Validates: Requirements 5.2**
+// Clock update interval optimized: 10s on low-end, 1s on high-end
 // ============================================
 function Navbar({ cameraCount }) {
     const { isDark, toggleTheme } = useTheme();
     const [currentTime, setCurrentTime] = useState(new Date());
     const disableAnimations = shouldDisableAnimations();
     
+    // Optimized clock interval: 10s on low-end devices to reduce re-renders
     useEffect(() => {
-        const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+        const clockInterval = disableAnimations ? 10000 : 1000;
+        const timer = setInterval(() => setCurrentTime(new Date()), clockInterval);
         return () => clearInterval(timer);
-    }, []);
+    }, [disableAnimations]);
     
     return (
-        <nav className="sticky top-0 z-[1001] bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-800/50">
+        <nav className={`sticky top-0 z-[1001] bg-white/90 dark:bg-gray-900/90 ${disableAnimations ? '' : 'backdrop-blur-xl'} border-b border-gray-200/50 dark:border-gray-800/50`}>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16">
                     {/* Logo - SEO optimized with proper heading structure */}
@@ -1987,7 +1990,7 @@ function Navbar({ cameraCount }) {
                         <span className="text-xs text-gray-500 dark:text-gray-400">Bojonegoro</span>
                         <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
                         <span className="text-sm font-mono text-gray-600 dark:text-gray-300">
-                            {currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                            {currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: disableAnimations ? undefined : '2-digit' })}
                         </span>
                     </div>
                     
@@ -3208,8 +3211,11 @@ export default function LandingPage() {
     // Track camera status changes and notify user
     useCameraStatusTracker(cameras, addToast);
     
-    // Auto-refresh cameras every 30 seconds to get updated online status
+    // Auto-refresh cameras - interval based on device tier
+    // Low-end: 60s, Medium: 30s, High: 15s
     useEffect(() => {
+        const refreshMs = deviceTier === 'low' ? 60000 : deviceTier === 'high' ? 15000 : 30000;
+        
         const refreshInterval = setInterval(async () => {
             try {
                 const camsRes = await streamService.getAllActiveStreams();
@@ -3220,10 +3226,13 @@ export default function LandingPage() {
                 // Silent fail - don't show error for background refresh
                 console.warn('Background refresh failed:', err);
             }
-        }, 30000); // 30 seconds
+        }, refreshMs);
         
         return () => clearInterval(refreshInterval);
-    }, []);
+    }, [deviceTier]);
+
+    // Check if heavy effects should be disabled
+    const disableHeavyEffects = deviceTier === 'low';
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
@@ -3231,9 +3240,13 @@ export default function LandingPage() {
             
             {/* Hero Section - SEO optimized with Indonesian content */}
             <header className="relative overflow-hidden bg-gradient-to-br from-sky-500/10 via-transparent to-purple-500/10 dark:from-sky-500/5 dark:to-purple-500/5">
-                {/* Decorative elements */}
-                <div className="absolute top-0 left-1/4 w-64 h-64 bg-sky-500/10 rounded-full blur-3xl pointer-events-none"></div>
-                <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                {/* Decorative elements - hidden on low-end devices */}
+                {!disableHeavyEffects && (
+                    <>
+                        <div className="absolute top-0 left-1/4 w-64 h-64 bg-sky-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                        <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                    </>
+                )}
                 
                 <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 text-center">
                     {/* RAF NET Badge */}
@@ -3244,7 +3257,7 @@ export default function LandingPage() {
                     
                     <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold mb-4 shadow-sm">
                         <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            {!disableHeavyEffects && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
                             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                         </span>
                         LIVE STREAMING 24 JAM
