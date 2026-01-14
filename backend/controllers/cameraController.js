@@ -6,16 +6,43 @@ import {
     logCameraUpdated, 
     logCameraDeleted 
 } from '../services/securityAuditLogger.js';
+import cache, { CacheTTL, CacheNamespace, cacheKey } from '../services/cacheService.js';
+
+// Cache keys
+const CACHE_ALL_CAMERAS = cacheKey(CacheNamespace.CAMERAS, 'all');
+const CACHE_ACTIVE_CAMERAS = cacheKey(CacheNamespace.CAMERAS, 'active');
+
+/**
+ * Invalidate all camera-related caches
+ */
+function invalidateCameraCache() {
+    cache.invalidate(`${CacheNamespace.CAMERAS}:`);
+    cache.invalidate(`${CacheNamespace.STREAMS}:`);
+    console.log('[Cache] Camera cache invalidated');
+}
 
 // Get all cameras (admin only - includes disabled cameras)
 export async function getAllCameras(request, reply) {
     try {
+        // Try cache first
+        const cached = cache.get(CACHE_ALL_CAMERAS);
+        if (cached) {
+            return reply.send({
+                success: true,
+                data: cached,
+                cached: true
+            });
+        }
+
         const cameras = query(
             `SELECT c.*, a.name as area_name 
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 
              ORDER BY c.id ASC`
         );
+
+        // Cache for 30 seconds (admin data, shorter TTL)
+        cache.set(CACHE_ALL_CAMERAS, cameras, CacheTTL.SHORT);
 
         return reply.send({
             success: true,
@@ -33,6 +60,16 @@ export async function getAllCameras(request, reply) {
 // Get active cameras (public - only enabled cameras, no RTSP URLs)
 export async function getActiveCameras(request, reply) {
     try {
+        // Try cache first (public endpoint, longer TTL)
+        const cached = cache.get(CACHE_ACTIVE_CAMERAS);
+        if (cached) {
+            return reply.send({
+                success: true,
+                data: cached,
+                cached: true
+            });
+        }
+
         const cameras = query(
             `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel, 
                     c.latitude, c.longitude, c.status, a.name as area_name 
@@ -41,6 +78,9 @@ export async function getActiveCameras(request, reply) {
              WHERE c.enabled = 1 
              ORDER BY c.is_tunnel ASC, c.id ASC`
         );
+
+        // Cache for 2 minutes (public data, can be longer)
+        cache.set(CACHE_ACTIVE_CAMERAS, cameras, CacheTTL.MEDIUM);
 
         return reply.send({
             success: true,
@@ -142,6 +182,9 @@ export async function createCamera(request, reply) {
             createdByUserId: request.user.id,
             createdByUsername: request.user.username
         }, request);
+
+        // Invalidate camera cache
+        invalidateCameraCache();
 
         // Add path to MediaMTX if camera is enabled (using stream_key as path)
         if (isEnabled) {
@@ -282,6 +325,9 @@ export async function updateCamera(request, reply) {
             changes: { name, description, location, group_name, area_id, enabled }
         }, request);
 
+        // Invalidate camera cache
+        invalidateCameraCache();
+
         // Handle MediaMTX path updates (using stream_key as path)
         const newEnabled = enabled !== undefined ? enabled : existingCamera.enabled;
         const newRtspUrl = private_rtsp_url !== undefined ? private_rtsp_url : existingCamera.private_rtsp_url;
@@ -351,6 +397,9 @@ export async function deleteCamera(request, reply) {
             deletedByUserId: request.user.id,
             deletedByUsername: request.user.username
         }, request);
+
+        // Invalidate camera cache
+        invalidateCameraCache();
 
         // Remove path from MediaMTX
         try {

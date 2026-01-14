@@ -1,13 +1,42 @@
 import { query, queryOne, execute, transaction } from '../database/database.js';
+import cache, { CacheTTL, CacheNamespace, cacheKey } from '../services/cacheService.js';
+
+// Cache keys
+const CACHE_ALL_AREAS = cacheKey(CacheNamespace.AREAS, 'all');
+const CACHE_AREA_FILTERS = cacheKey(CacheNamespace.AREAS, 'filters');
+
+/**
+ * Invalidate all area-related caches
+ */
+function invalidateAreaCache() {
+    cache.invalidate(`${CacheNamespace.AREAS}:`);
+    // Also invalidate camera cache karena area_name bisa berubah
+    cache.invalidate(`${CacheNamespace.CAMERAS}:`);
+    console.log('[Cache] Area cache invalidated');
+}
 
 export async function getAllAreas(request, reply) {
     try {
+        // Try cache first
+        const cached = cache.get(CACHE_ALL_AREAS);
+        if (cached) {
+            return reply.send({
+                success: true,
+                data: cached,
+                cached: true
+            });
+        }
+
         const areas = query(`
             SELECT a.*, 
                    (SELECT COUNT(*) FROM cameras c WHERE c.area_id = a.id) as camera_count
             FROM areas a 
             ORDER BY a.kecamatan, a.kelurahan, a.rw, a.rt, a.name ASC
         `);
+
+        // Cache for 5 minutes
+        cache.set(CACHE_ALL_AREAS, areas, CacheTTL.LONG);
+
         return reply.send({
             success: true,
             data: areas,
@@ -24,17 +53,32 @@ export async function getAllAreas(request, reply) {
 // Get unique filter options for hierarchical filtering
 export async function getAreaFilters(request, reply) {
     try {
+        // Try cache first
+        const cached = cache.get(CACHE_AREA_FILTERS);
+        if (cached) {
+            return reply.send({
+                success: true,
+                data: cached,
+                cached: true
+            });
+        }
+
         const kecamatans = query(`SELECT DISTINCT kecamatan FROM areas WHERE kecamatan IS NOT NULL AND kecamatan != '' ORDER BY kecamatan`);
         const kelurahans = query(`SELECT DISTINCT kelurahan, kecamatan FROM areas WHERE kelurahan IS NOT NULL AND kelurahan != '' ORDER BY kelurahan`);
         const rws = query(`SELECT DISTINCT rw, kelurahan, kecamatan FROM areas WHERE rw IS NOT NULL AND rw != '' ORDER BY rw`);
         
+        const data = {
+            kecamatans: kecamatans.map(k => k.kecamatan),
+            kelurahans,
+            rws,
+        };
+
+        // Cache for 15 minutes (filters rarely change)
+        cache.set(CACHE_AREA_FILTERS, data, CacheTTL.VERY_LONG);
+
         return reply.send({
             success: true,
-            data: {
-                kecamatans: kecamatans.map(k => k.kecamatan),
-                kelurahans,
-                rws,
-            },
+            data,
         });
     } catch (error) {
         console.error('Get area filters error:', error);
@@ -88,6 +132,9 @@ export async function createArea(request, reply) {
 
         const newArea = queryOne('SELECT * FROM areas WHERE id = ?', [result.lastInsertRowid]);
 
+        // Invalidate area cache
+        invalidateAreaCache();
+
         return reply.code(201).send({
             success: true,
             message: 'Area created successfully',
@@ -138,6 +185,9 @@ export async function updateArea(request, reply) {
 
         const updatedArea = queryOne('SELECT * FROM areas WHERE id = ?', [id]);
 
+        // Invalidate area cache
+        invalidateAreaCache();
+
         return reply.send({
             success: true,
             message: 'Area updated successfully',
@@ -180,6 +230,9 @@ export async function deleteArea(request, reply) {
         }
 
         execute('DELETE FROM areas WHERE id = ?', [id]);
+
+        // Invalidate area cache
+        invalidateAreaCache();
 
         return reply.send({
             success: true,

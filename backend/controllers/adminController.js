@@ -9,6 +9,7 @@ import {
     saveTelegramSettings,
     clearSettingsCache 
 } from '../services/telegramService.js';
+import cache from '../services/cacheService.js';
 
 export async function getDashboardStats(request, reply) {
     try {
@@ -338,6 +339,48 @@ export async function getRealTimeViewers(request, reply) {
         });
     } catch (error) {
         console.error('Get real-time viewers error:', error);
+        return reply.code(500).send({
+            success: false,
+            message: 'Internal server error',
+        });
+    }
+}
+
+
+/**
+ * Get cache statistics (admin only)
+ */
+export async function getCacheStats(request, reply) {
+    try {
+        const stats = cache.stats();
+
+        return reply.send({
+            success: true,
+            data: stats,
+        });
+    } catch (error) {
+        console.error('Get cache stats error:', error);
+        return reply.code(500).send({
+            success: false,
+            message: 'Internal server error',
+        });
+    }
+}
+
+/**
+ * Clear all cache (admin only)
+ */
+export async function clearCache(request, reply) {
+    try {
+        const cleared = cache.clear();
+
+        return reply.send({
+            success: true,
+            message: `Cache cleared successfully. ${cleared} entries removed.`,
+            data: { cleared },
+        });
+    } catch (error) {
+        console.error('Clear cache error:', error);
         return reply.code(500).send({
             success: false,
             message: 'Internal server error',
