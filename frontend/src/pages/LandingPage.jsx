@@ -686,13 +686,33 @@ function VideoPopup({ camera, onClose }) {
         red: 'bg-red-500/20 text-red-400',
     };
 
-    // Track fullscreen state to disable animations
+    // Track fullscreen state to disable animations and unlock orientation on exit
     useEffect(() => {
         const handleFullscreenChange = () => {
-            setIsFullscreen(!!document.fullscreenElement);
+            const isNowFullscreen = !!document.fullscreenElement;
+            setIsFullscreen(isNowFullscreen);
+            
+            // Unlock orientation when exiting fullscreen (e.g., via ESC key)
+            if (!isNowFullscreen && screen.orientation && screen.orientation.unlock) {
+                try {
+                    screen.orientation.unlock();
+                } catch (err) {
+                    // Ignore unlock errors
+                }
+            }
         };
         document.addEventListener('fullscreenchange', handleFullscreenChange);
-        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+        return () => {
+            document.removeEventListener('fullscreenchange', handleFullscreenChange);
+            // Cleanup: unlock orientation on unmount
+            if (screen.orientation && screen.orientation.unlock) {
+                try {
+                    screen.orientation.unlock();
+                } catch (err) {
+                    // Ignore unlock errors
+                }
+            }
+        };
     }, []);
 
     // Viewer session tracking - track when user starts/stops watching
@@ -1062,10 +1082,38 @@ function VideoPopup({ camera, onClose }) {
 
     const toggleFS = async () => {
         try {
-            // Use outer wrapper for fullscreen to avoid layout issues
-            if (!document.fullscreenElement) await outerWrapperRef.current?.requestFullscreen?.();
-            else await document.exitFullscreen?.();
-        } catch {}
+            if (!document.fullscreenElement) {
+                // Enter fullscreen
+                await outerWrapperRef.current?.requestFullscreen?.();
+                
+                // Lock to landscape orientation on mobile
+                if (screen.orientation && screen.orientation.lock) {
+                    try {
+                        await screen.orientation.lock('landscape').catch(() => {
+                            // Fallback: try landscape-primary if landscape fails
+                            screen.orientation.lock('landscape-primary').catch(() => {});
+                        });
+                    } catch (err) {
+                        // Orientation lock not supported or failed, continue anyway
+                        console.log('Orientation lock not supported');
+                    }
+                }
+            } else {
+                // Exit fullscreen
+                await document.exitFullscreen?.();
+                
+                // Unlock orientation
+                if (screen.orientation && screen.orientation.unlock) {
+                    try {
+                        screen.orientation.unlock();
+                    } catch (err) {
+                        // Ignore unlock errors
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('Fullscreen error:', err);
+        }
     };
 
     const takeSnapshot = () => {
@@ -1310,13 +1358,33 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
     const url = camera.streams?.hls;
     const deviceTier = detectDeviceTier();
 
-    // Track fullscreen state to disable animations
+    // Track fullscreen state to disable animations and unlock orientation on exit
     useEffect(() => {
         const handleFullscreenChange = () => {
-            setIsFullscreen(!!document.fullscreenElement);
+            const isNowFullscreen = !!document.fullscreenElement;
+            setIsFullscreen(isNowFullscreen);
+            
+            // Unlock orientation when exiting fullscreen (e.g., via ESC key)
+            if (!isNowFullscreen && screen.orientation && screen.orientation.unlock) {
+                try {
+                    screen.orientation.unlock();
+                } catch (err) {
+                    // Ignore unlock errors
+                }
+            }
         };
         document.addEventListener('fullscreenchange', handleFullscreenChange);
-        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+        return () => {
+            document.removeEventListener('fullscreenchange', handleFullscreenChange);
+            // Cleanup: unlock orientation on unmount
+            if (screen.orientation && screen.orientation.unlock) {
+                try {
+                    screen.orientation.unlock();
+                } catch (err) {
+                    // Ignore unlock errors
+                }
+            }
+        };
     }, []);
 
     // Viewer session tracking - track when user starts/stops watching this camera
@@ -1701,9 +1769,36 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
 
     const toggleFS = async () => {
         try {
-            if (!document.fullscreenElement) await containerRef.current?.requestFullscreen?.();
-            else await document.exitFullscreen?.();
-        } catch {}
+            if (!document.fullscreenElement) {
+                // Enter fullscreen
+                await containerRef.current?.requestFullscreen?.();
+                
+                // Lock to landscape orientation on mobile
+                if (screen.orientation && screen.orientation.lock) {
+                    try {
+                        await screen.orientation.lock('landscape').catch(() => {
+                            screen.orientation.lock('landscape-primary').catch(() => {});
+                        });
+                    } catch (err) {
+                        console.log('Orientation lock not supported');
+                    }
+                }
+            } else {
+                // Exit fullscreen
+                await document.exitFullscreen?.();
+                
+                // Unlock orientation
+                if (screen.orientation && screen.orientation.unlock) {
+                    try {
+                        screen.orientation.unlock();
+                    } catch (err) {
+                        // Ignore unlock errors
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('Fullscreen error:', err);
+        }
     };
 
     const takeSnapshot = () => {
