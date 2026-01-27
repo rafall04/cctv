@@ -12,6 +12,7 @@ import { detectDeviceTier } from '../utils/deviceDetector';
 import { settingsService } from '../services/settingsService';
 import { getHLSConfig } from '../utils/hlsConfig';
 import { viewerService } from '../services/viewerService';
+import { createTransformThrottle } from '../utils/rafThrottle';
 
 // Fix Leaflet icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -170,9 +171,9 @@ const VideoModal = memo(({ camera, onClose }) => {
     const videoRef = useRef(null);
     const videoWrapperRef = useRef(null);
     const modalRef = useRef(null);
-    const outerWrapperRef = useRef(null); // Add ref for outer wrapper
+    const outerWrapperRef = useRef(null);
     const hlsRef = useRef(null);
-    const rafRef = useRef(null);
+    const transformThrottleRef = useRef(null);
     const playbackCheckRef = useRef(null);
     
     // Status: 'connecting' | 'loading' | 'buffering' | 'playing' | 'maintenance' | 'offline' | 'error'
@@ -200,23 +201,35 @@ const VideoModal = memo(({ camera, onClose }) => {
     const getMaxPan = (z) => z <= 1 ? 0 : ((z - 1) / (2 * z)) * 100;
     const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
+    // Initialize RAF throttle on mount - skip on low-end
+    useEffect(() => {
+        if (videoWrapperRef.current && !isLowEnd) {
+            transformThrottleRef.current = createTransformThrottle(videoWrapperRef.current);
+        }
+        return () => {
+            transformThrottleRef.current?.cancel();
+        };
+    }, []);
+
     // Apply transform langsung ke DOM (bypass React re-render)
     const applyTransform = useCallback((animate = false) => {
         if (!videoWrapperRef.current) return;
         const { zoom, panX, panY } = stateRef.current;
-        videoWrapperRef.current.style.transition = animate ? 'transform 0.15s ease-out' : 'none';
-        videoWrapperRef.current.style.transform = `scale(${zoom}) translate(${panX}%, ${panY}%)`;
+        
+        if (animate && !isLowEnd) {
+            videoWrapperRef.current.style.transition = 'transform 0.2s ease-out';
+            videoWrapperRef.current.style.transform = `scale(${zoom}) translate(${panX}%, ${panY}%)`;
+        } else {
+            videoWrapperRef.current.style.transition = 'none';
+            // On low-end, apply directly without RAF throttle
+            if (transformThrottleRef.current && !isLowEnd) {
+                transformThrottleRef.current.update(zoom, panX, panY);
+            } else {
+                videoWrapperRef.current.style.transform = `scale(${zoom}) translate(${panX}%, ${panY}%)`;
+            }
+        }
         setZoomDisplay(zoom);
     }, []);
-
-    // RAF-throttled transform
-    const scheduleTransform = useCallback(() => {
-        if (rafRef.current) return;
-        rafRef.current = requestAnimationFrame(() => {
-            applyTransform(false);
-            rafRef.current = null;
-        });
-    }, [applyTransform]);
 
     // Fullscreen toggle with landscape orientation lock
     const toggleFullscreen = useCallback(async () => {
@@ -354,8 +367,8 @@ const VideoModal = memo(({ camera, onClose }) => {
             s.panX = clamp(s.panX, -max, max);
             s.panY = clamp(s.panY, -max, max);
         }
-        scheduleTransform();
-    }, [scheduleTransform]);
+        applyTransform(false);
+    }, [applyTransform]);
 
     const handlePointerDown = useCallback((e) => {
         const s = stateRef.current;
@@ -370,12 +383,23 @@ const VideoModal = memo(({ camera, onClose }) => {
     const handlePointerMove = useCallback((e) => {
         const s = stateRef.current;
         if (!s.dragging) return;
+        
+        const dx = e.clientX - s.startX;
+        const dy = e.clientY - s.startY;
         const max = getMaxPan(s.zoom);
-        const factor = 0.15;
-        s.panX = clamp(s.startPanX + (e.clientX - s.startX) * factor, -max, max);
-        s.panY = clamp(s.startPanY + (e.clientY - s.startY) * factor, -max, max);
-        scheduleTransform();
-    }, [scheduleTransform]);
+        
+        // Direct 1:1 mapping with container size factor
+        const factor = 0.15; // Adjust for natural feel
+        s.panX = clamp(s.startPanX + dx * factor, -max, max);
+        s.panY = clamp(s.startPanY + dy * factor, -max, max);
+        
+        // On low-end, apply directly without RAF throttle
+        if (transformThrottleRef.current && !isLowEnd) {
+            transformThrottleRef.current.update(s.zoom, s.panX, s.panY);
+        } else {
+            videoWrapperRef.current.style.transform = `scale(${s.zoom}) translate(${s.panX}%, ${s.panY}%)`;
+        }
+    }, []);
 
     const handlePointerUp = useCallback((e) => {
         const s = stateRef.current;
