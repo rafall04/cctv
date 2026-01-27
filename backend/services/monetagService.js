@@ -1,4 +1,4 @@
-import { query, run } from '../database/database.js';
+import { query, execute } from '../database/database.js';
 
 /**
  * Get Monetag settings
@@ -51,7 +51,7 @@ export function updateMonetagSettings(userId, settings) {
             direct_link_zone_id
         } = settings;
 
-        const result = run(`
+        const result = execute(`
             UPDATE monetag_settings 
             SET 
                 popunder_enabled = ?,
