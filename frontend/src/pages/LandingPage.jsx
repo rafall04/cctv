@@ -592,6 +592,18 @@ function VideoPopup({ camera, onClose }) {
     const fallbackHandlerRef = useRef(null);
     const abortControllerRef = useRef(null);
     
+    // Handle close with fullscreen exit
+    const handleClose = async () => {
+        if (document.fullscreenElement) {
+            try {
+                await document.exitFullscreen?.();
+            } catch (error) {
+                console.error('Error exiting fullscreen:', error);
+            }
+        }
+        onClose();
+    };
+    
     // Check camera status first
     const isMaintenance = camera.status === 'maintenance';
     const isOffline = camera.is_online === 0;
@@ -1205,8 +1217,12 @@ function VideoPopup({ camera, onClose }) {
                                     </div>
                                     <div className="flex items-center gap-2">
                                         {status === 'live' && <button onClick={takeSnapshot} className="p-2 hover:bg-white/20 active:bg-white/30 rounded-xl text-white bg-white/10"><Icons.Image /></button>}
-                                        <button onClick={toggleFS} className="p-2 hover:bg-white/20 active:bg-white/30 rounded-xl text-white bg-white/10"><Icons.Fullscreen /></button>
-                                        <button onClick={onClose} className="p-2 hover:bg-white/20 active:bg-white/30 rounded-xl text-white bg-white/10"><Icons.X /></button>
+                                        <button onClick={toggleFS} className="p-2 hover:bg-white/20 active:bg-white/30 rounded-xl text-white bg-white/10">
+                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25"/>
+                                            </svg>
+                                        </button>
+                                        <button onClick={handleClose} className="p-2 hover:bg-white/20 active:bg-white/30 rounded-xl text-white bg-white/10"><Icons.X /></button>
                                     </div>
                                 </div>
                             </div>
@@ -1350,6 +1366,18 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
     const loadingTimeoutHandlerRef = useRef(null);
     const fallbackHandlerRef = useRef(null);
     const abortControllerRef = useRef(null);
+    
+    // Handle close with fullscreen exit
+    const handleClose = async () => {
+        if (document.fullscreenElement) {
+            try {
+                await document.exitFullscreen?.();
+            } catch (error) {
+                console.error('Error exiting fullscreen:', error);
+            }
+        }
+        onRemove();
+    };
     
     // Check camera status first - same as VideoPopup
     const isMaintenance = camera.status === 'maintenance';
@@ -1877,7 +1905,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                     <span className="ml-1 text-[8px] text-amber-400">retry {autoRetryCount}/3</span>
                 )}
             </div>
-            <button onClick={onRemove} className={`absolute top-2 right-2 z-10 p-1.5 bg-red-500/80 hover:bg-red-500 rounded-lg text-white shadow ${isFullscreen ? 'hidden' : ''}`}><Icons.X /></button>
+            <button onClick={handleClose} className={`absolute top-2 right-2 z-10 p-1.5 bg-red-500/80 hover:bg-red-500 rounded-lg text-white shadow ${isFullscreen ? 'hidden' : ''}`}><Icons.X /></button>
             {/* Overlay controls - render only on hover, no transition in fullscreen, hide in fullscreen */}
             <div className={`absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 z-10 ${isFullscreen ? 'hidden' : 'transition-opacity'}`}>
                 <div className="flex items-center justify-between gap-2">
