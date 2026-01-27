@@ -30,11 +30,10 @@
 - Service files: placed directly in `/etc/systemd/system/`
 
 ### Network Configuration
-- **NO CORS/Domain Filtering**: Ubuntu 20.04 deployments should accept all origins
-- **Simplified CORS**: Use wildcard `*` or remove CORS restrictions entirely
-- **Reason**: Domain/IP filtering consistently causes deployment issues
-- **Backend CORS**: Set to accept all origins in production
-- **Frontend Proxy**: Remove origin restrictions
+- **CORS Configuration**: Configure allowed origins di environment variables
+- **Security Middleware**: Multi-layer security dengan rate limiting, CSRF, input sanitization
+- **Backend CORS**: Set allowed origins di ALLOWED_ORIGINS environment variable
+- **Frontend Proxy**: Vite proxy untuk development, Nginx proxy untuk production
 
 ### Directory Structure (Ubuntu 20.04)
 ```
@@ -61,29 +60,69 @@ PORT=3000
 HOST=0.0.0.0
 NODE_ENV=production
 
-# NO CORS RESTRICTIONS
-CORS_ORIGIN=*
-# OR completely disable CORS filtering
+# CORS Configuration
+CORS_ORIGIN=https://cctv.raf.my.id,http://cctv.raf.my.id,http://172.17.11.12
+# Atau gunakan * untuk accept all (tidak recommended untuk production)
 
 # Database
 DATABASE_PATH=/var/www/rafnet-cctv/data/cctv.db
 
 # MediaMTX
 MEDIAMTX_API_URL=http://localhost:9997
-MEDIAMTX_HLS_URL=http://localhost:8888
-MEDIAMTX_WEBRTC_URL=http://localhost:8889
+MEDIAMTX_HLS_URL_INTERNAL=http://localhost:8888
+MEDIAMTX_WEBRTC_URL_INTERNAL=http://localhost:8889
+PUBLIC_HLS_PATH=/hls
+PUBLIC_WEBRTC_PATH=/webrtc
+PUBLIC_STREAM_BASE_URL=https://cctv.raf.my.id
 
 # Security
-JWT_SECRET=production-secret-change-this
-JWT_EXPIRATION=24h
+JWT_SECRET=production-secret-change-this-to-random-string
+JWT_EXPIRATION=1h
+JWT_REFRESH_EXPIRATION=7d
+
+# Security Features
+API_KEY_VALIDATION_ENABLED=true
+API_KEY_SECRET=your-api-key-secret
+CSRF_ENABLED=true
+CSRF_SECRET=your-csrf-secret
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_PUBLIC=100
+RATE_LIMIT_AUTH=30
+RATE_LIMIT_ADMIN=60
+
+# Brute Force Protection
+BRUTE_FORCE_ENABLED=true
+MAX_LOGIN_ATTEMPTS=5
+MAX_IP_ATTEMPTS=10
+LOCKOUT_DURATION_MINUTES=30
+IP_BLOCK_DURATION_MINUTES=60
+
+# Password Policy
+PASSWORD_MIN_LENGTH=12
+PASSWORD_MAX_AGE_DAYS=90
+PASSWORD_HISTORY_COUNT=5
+
+# Session Management
+SESSION_ABSOLUTE_TIMEOUT_HOURS=24
+
+# Audit Logging
+AUDIT_LOG_RETENTION_DAYS=90
+
+# Allowed Origins (comma-separated)
+ALLOWED_ORIGINS=https://cctv.raf.my.id,http://cctv.raf.my.id,http://172.17.11.12
+
+# Telegram Bot (optional)
+TELEGRAM_BOT_TOKEN=your-bot-token
+TELEGRAM_MONITORING_CHAT_ID=your-monitoring-chat-id
+TELEGRAM_FEEDBACK_CHAT_ID=your-feedback-chat-id
 ```
 
 ### Frontend (.env)
 ```env
 # Ubuntu 20.04 Production Settings
-VITE_API_URL=http://localhost:3000
-# OR use server IP/domain
-# VITE_API_URL=http://YOUR_SERVER_IP:3000
+VITE_API_URL=https://cctv.raf.my.id
+# Atau gunakan server IP
+# VITE_API_URL=http://172.17.11.12
 ```
 
 ## Deployment Commands
@@ -140,33 +179,67 @@ systemctl restart nginx
 ### Windows Development
 - Standard CORS with specific origins
 - Allow localhost:5173, localhost:3000
+- Configure di backend/server.js
 
 ### Ubuntu 20.04 Production
-- **DISABLE CORS filtering completely**
-- Accept all origins to avoid deployment issues
-- Rationale: Internal network deployment, CORS causes more problems than it solves
+- **Configure allowed origins** di environment variables
+- Set ALLOWED_ORIGINS dengan comma-separated list
+- Example: `ALLOWED_ORIGINS=https://cctv.raf.my.id,http://172.17.11.12`
+- CORS middleware akan validate origin dari request
 
 ### Backend CORS Settings (Ubuntu 20.04)
 ```javascript
 // In backend/config/config.js
+const parseAllowedOrigins = () => {
+  const defaultOrigins = [
+    'https://cctv.raf.my.id',
+    'http://cctv.raf.my.id',
+    'http://172.17.11.12',
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:8080'
+  ];
+  
+  if (process.env.ALLOWED_ORIGINS) {
+    return process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim());
+  }
+  
+  return defaultOrigins;
+};
+
 export const config = {
-  cors: {
-    // Ubuntu 20.04: Accept all origins
-    origin: true, // or '*'
-    credentials: true,
+  security: {
+    allowedOrigins: parseAllowedOrigins(),
   },
 };
 
-// Alternative: Disable CORS entirely
-// Don't register @fastify/cors plugin
+// In backend/server.js
+await fastify.register(cors, {
+    origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'), false);
+        }
+    },
+    credentials: true,
+});
 ```
 
 ### Frontend Proxy Settings (Ubuntu 20.04)
 ```javascript
-// In frontend/vite.config.js - Production build
+// In frontend/vite.config.js - Development only
 export default defineConfig({
-  // Remove proxy configuration for production
-  // Proxy only needed in development
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+    },
+  },
 });
 ```
 
@@ -193,10 +266,10 @@ systemctl daemon-reload
 ## Troubleshooting Rules
 
 ### CORS Issues (Ubuntu 20.04)
-1. **First Solution**: Disable CORS entirely
-2. **Second Solution**: Set origin to `*` or `true`
-3. **Never**: Try to configure specific domains/IPs
-4. **Reason**: Ubuntu 20.04 network configuration varies too much
+1. **First Solution**: Check ALLOWED_ORIGINS environment variable
+2. **Second Solution**: Add origin ke allowed list
+3. **Debug**: Check backend logs untuk rejected origins
+4. **Verify**: Test dengan curl -H "Origin: https://your-domain.com"
 
 ### Permission Issues
 - Always run as root in Ubuntu 20.04
