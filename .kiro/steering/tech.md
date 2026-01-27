@@ -4,51 +4,69 @@
 
 ### Backend
 - **Runtime**: Node.js 20+ with ES modules (`"type": "module"`)
-- **Framework**: Fastify 4.x (high-performance web framework)
-- **Database**: SQLite with better-sqlite3 (embedded database)
-- **Authentication**: JWT with @fastify/jwt, bcrypt for password hashing
-- **HTTP Client**: Axios for MediaMTX API communication
+- **Framework**: Fastify 4.28.1 (high-performance web framework)
+- **Database**: SQLite with better-sqlite3 11.7.0 (embedded database)
+- **Authentication**: JWT with @fastify/jwt 8.0.1, bcrypt 5.1.1 for password hashing
+- **HTTP Client**: Axios 1.13.2 for MediaMTX API communication
+- **Security**: 
+  - @fastify/helmet 13.0.2 (security headers)
+  - @fastify/rate-limit 10.3.0 (rate limiting)
+  - @fastify/cookie 9.4.0 (cookie management)
+  - @fastify/cors 9.0.1 (CORS handling)
+- **Utilities**: 
+  - uuid 9.0.1 (UUID generation untuk stream keys)
+  - nanoid 5.0.8 (ID generation)
+  - dotenv 16.4.5 (environment variables)
 
 ### Frontend
-- **Framework**: React 18.x with functional components and hooks
-- **Build Tool**: Vite 5.x (fast development and build)
-- **Routing**: React Router DOM 6.x
-- **Styling**: Tailwind CSS 3.x with custom design system
-- **Video Streaming**: HLS.js for video playback
+- **Framework**: React 18.3.1 with functional components and hooks
+- **Build Tool**: Vite 5.3.1 (fast development and build)
+- **Routing**: React Router DOM 6.26.0
+- **Styling**: Tailwind CSS 3.4.4 with custom design system
+- **Video Streaming**: HLS.js 1.5.15 for video playback
+- **Maps**: Leaflet 1.9.4 + React Leaflet 4.2.1 (camera location mapping)
+- **HTTP Client**: Axios 1.7.7
 
 ### External Services
 - **MediaMTX**: RTSP to WebRTC/HLS transcoding server
   - HLS endpoint: `http://localhost:8888`
   - WebRTC endpoint: `http://localhost:8889`
   - API endpoint: `http://localhost:9997`
+- **Telegram Bot**: Notifikasi monitoring kamera dan feedback (optional)
 
 ## Stream Architecture
 
-### UUID Stream Keys (Security)
-Sistem menggunakan UUID v4 sebagai `stream_key` untuk setiap kamera, bukan format `camera{id}` yang mudah ditebak.
-
-**Alasan:**
-- URL stream tidak bisa ditebak (`/hls/04bd5387-9db4-4cf0-9f8d-7fb42cc76263/` vs `/hls/camera1/`)
-- Mencegah enumeration attack
-- Setiap kamera memiliki stream_key unik yang di-generate saat create
+### Camera Path Management
+Sistem menggunakan `camera{id}` sebagai path MediaMTX untuk setiap kamera.
 
 **Database Schema:**
 ```sql
--- Kolom stream_key di tabel cameras
-stream_key TEXT UNIQUE  -- UUID v4, contoh: '04bd5387-9db4-4cf0-9f8d-7fb42cc76263'
+CREATE TABLE cameras (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    private_rtsp_url TEXT NOT NULL,
+    description TEXT,
+    location TEXT,
+    group_name TEXT,
+    area_id INTEGER,
+    enabled INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (area_id) REFERENCES areas(id) ON DELETE SET NULL
+)
 ```
 
 **Flow:**
-1. Camera dibuat → generate UUID v4 sebagai `stream_key`
-2. MediaMTX path menggunakan `stream_key` sebagai nama path
-3. Frontend request stream via `/hls/{stream_key}/index.m3u8`
+1. Camera dibuat dengan ID auto-increment
+2. MediaMTX path menggunakan `camera{id}` sebagai nama path
+3. Frontend request stream via `/hls/camera{id}/index.m3u8`
 4. HLS proxy route backend untuk session tracking
 
 **Files terkait:**
-- `backend/controllers/cameraController.js` - Generate stream_key saat create
-- `backend/services/mediaMtxService.js` - Sync path dengan stream_key
-- `backend/controllers/streamController.js` - Return stream URL dengan stream_key
-- `backend/routes/hlsProxyRoutes.js` - Proxy HLS dengan lookup stream_key
+- `backend/controllers/cameraController.js` - CRUD operations
+- `backend/services/mediaMtxService.js` - Sync dengan MediaMTX
+- `backend/controllers/streamController.js` - Return stream URLs
+- `backend/routes/hlsProxyRoutes.js` - Proxy HLS dengan session tracking
 
 ### Stream Preload/Warming Service
 Sistem menggunakan preload stream untuk mempercepat initial load video.
@@ -86,7 +104,7 @@ Karena MediaMTX menggunakan `sourceOnDemand: true`, stream hanya aktif saat ada 
 
 **Files terkait:**
 - `backend/services/cameraHealthService.js` - Health check logic
-- `backend/controllers/adminController.js` - Dashboard stats dengan stream_key lookup
+- `backend/controllers/adminController.js` - Dashboard stats dengan camera lookup
 
 ## Development Commands
 
@@ -222,24 +240,6 @@ const mobileConfig = getMobileHLSConfig('medium'); // Mobile-specific config
 | maxBufferSize | 30MB | 45MB | 60MB |
 | startLevel | 0 (lowest) | -1 (auto) | -1 (auto) |
 
-### Stream Controller (`frontend/src/utils/streamController.js`)
-Manages video stream lifecycle with visibility awareness.
-
-```javascript
-// Usage
-import { createStreamController } from '../utils/streamController';
-
-const controller = createStreamController(videoElement, streamUrl, {
-    onStatusChange: (status) => console.log(status),
-    deviceTier: 'medium',
-    pauseDelay: 5000 // 5s delay before pausing invisible streams
-});
-
-controller.pause();
-controller.resume();
-controller.destroy();
-```
-
 ### Error Recovery (`frontend/src/utils/errorRecovery.js`)
 Handles HLS errors with exponential backoff.
 
@@ -273,22 +273,6 @@ observer.observe(element, (isVisible) => {
 });
 observer.unobserve(element);
 observer.disconnect();
-```
-
-### Adaptive Quality (`frontend/src/utils/adaptiveQuality.js`)
-Monitors bandwidth and adjusts video quality dynamically.
-
-```javascript
-// Usage
-import { createAdaptiveQuality } from '../utils/adaptiveQuality';
-
-const aq = createAdaptiveQuality(hls, {
-    lowBandwidthThreshold: 500000,  // 500kbps
-    highBandwidthThreshold: 2000000, // 2Mbps
-    onQualityChange: (level, bandwidth) => console.log('Quality:', level)
-});
-aq.start();
-aq.stop();
 ```
 
 ### Multi-View Manager (`frontend/src/utils/multiViewManager.js`)
@@ -384,20 +368,57 @@ console.log(observer.isActive());       // true/false
 observer.stop();
 ```
 
+### Additional Utilities
+
+**Animation Control (`frontend/src/utils/animationControl.js`)**
+- Controls CSS animations based on device performance
+- Disables animations on low-end devices
+
+**Connection Tester (`frontend/src/utils/connectionTester.js`)**
+- Tests network connectivity before loading streams
+- Provides connection quality metrics
+
+**Fallback Handler (`frontend/src/utils/fallbackHandler.js`)**
+- Handles stream fallback scenarios (WebRTC → HLS)
+- Automatic quality degradation
+
+**Loading Timeout Handler (`frontend/src/utils/loadingTimeoutHandler.js`)**
+- Manages loading timeouts for streams
+- Prevents infinite loading states
+
+**Performance Optimizer (`frontend/src/utils/performanceOptimizer.js`)**
+- Global performance optimization utilities
+- Memory management helpers
+
+**Preload Manager (`frontend/src/utils/preloadManager.js`)**
+- Manages stream preloading
+- Prioritizes visible streams
+
+**Stream Init Queue (`frontend/src/utils/streamInitQueue.js`)**
+- Queues stream initialization
+- Prevents concurrent initialization overload
+
+**Validators (`frontend/src/utils/validators.js`)**
+- Input validation utilities
+- URL and data validation
+
 ## Testing Libraries
 
 ### Property-Based Testing
 - **Library**: fast-check
-- **Location**: `frontend/src/__tests__/`
+- **Backend Version**: 4.5.2
+- **Frontend Version**: 3.23.0
+- **Test Runner**: Vitest 4.0.16 (backend), Vitest 2.1.0 (frontend)
 - **Config**: Minimum 100 iterations per property test
 
 ```bash
-# Install
-cd frontend
-npm install --save-dev fast-check
+# Install (already included in devDependencies)
+cd backend && npm install
+cd frontend && npm install
 
 # Run tests
-npm test
+npm test          # Run once
+npm run test:watch # Watch mode
 ```
 
 ### Test File Naming
@@ -405,15 +426,14 @@ npm test
 - Property tests: `*.property.test.js`
 - Integration tests: `*.integration.test.js`
 
-### Property Test Files
+### Property Test Files (if created)
 | Test File | Module Tested | Properties Validated |
 |-----------|---------------|---------------------|
 | `deviceDetector.property.test.js` | deviceDetector | Device tier consistency |
 | `hlsConfig.property.test.js` | hlsConfig | Config correctness by tier |
 | `errorRecovery.property.test.js` | errorRecovery | Exponential backoff |
-| `streamController.property.test.js` | streamController | Visibility-based control |
 | `resourceCleanup.property.test.js` | VideoPlayer | Resource cleanup |
 | `rafThrottle.property.test.js` | rafThrottle | Event throttling (≤60fps) |
-| `adaptiveQuality.property.test.js` | adaptiveQuality | Bandwidth-based quality |
-| `mobileConfig.property.test.js` | hlsConfig | Mobile configuration |
 | `multiViewManager.property.test.js` | multiViewManager | Stream limits, cleanup |
+
+**Note**: Test files should be deleted after spec completion (see cleanup.md)
