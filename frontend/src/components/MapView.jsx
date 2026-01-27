@@ -372,6 +372,7 @@ const VideoModal = memo(({ camera, onClose }) => {
     }, [applyTransform]);
 
     const handlePointerDown = useCallback((e) => {
+        e.stopPropagation(); // Prevent background click
         const s = stateRef.current;
         if (s.zoom <= 1) return;
         s.dragging = true;
@@ -403,6 +404,7 @@ const VideoModal = memo(({ camera, onClose }) => {
     }, []);
 
     const handlePointerUp = useCallback((e) => {
+        e.stopPropagation(); // Prevent background click
         const s = stateRef.current;
         s.dragging = false;
         if (videoWrapperRef.current) videoWrapperRef.current.style.cursor = s.zoom > 1 ? 'grab' : 'default';
