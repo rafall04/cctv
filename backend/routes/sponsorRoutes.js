@@ -15,44 +15,44 @@ import {
     removeSponsorFromCamera,
     getCamerasWithSponsors
 } from '../controllers/sponsorController.js';
-import { fingerprintAuthMiddleware } from '../middleware/fingerprintValidator.js';
+import { authMiddleware } from '../middleware/authMiddleware.js';
 
 export default async function sponsorRoutes(fastify, options) {
     // Public routes
     fastify.get('/active', getActiveSponsors);
     fastify.get('/cameras', getCamerasWithSponsors);
 
-    // Protected routes (admin only)
+    // Protected routes (admin only) - Use authMiddleware instead of fingerprintAuthMiddleware
     fastify.get('/', {
-        preHandler: fingerprintAuthMiddleware
+        preHandler: authMiddleware
     }, getAllSponsors);
 
     fastify.get('/stats', {
-        preHandler: fingerprintAuthMiddleware
+        preHandler: authMiddleware
     }, getSponsorStats);
 
     fastify.get('/:id', {
-        preHandler: fingerprintAuthMiddleware
+        preHandler: authMiddleware
     }, getSponsorById);
 
     fastify.post('/', {
-        preHandler: fingerprintAuthMiddleware
+        preHandler: authMiddleware
     }, createSponsor);
 
     fastify.put('/:id', {
-        preHandler: fingerprintAuthMiddleware
+        preHandler: authMiddleware
     }, updateSponsor);
 
     fastify.delete('/:id', {
-        preHandler: fingerprintAuthMiddleware
+        preHandler: authMiddleware
     }, deleteSponsor);
 
     // Camera-sponsor assignment
     fastify.post('/camera/:cameraId/assign', {
-        preHandler: fingerprintAuthMiddleware
+        preHandler: authMiddleware
     }, assignSponsorToCamera);
 
     fastify.delete('/camera/:cameraId/remove', {
-        preHandler: fingerprintAuthMiddleware
+        preHandler: authMiddleware
     }, removeSponsorFromCamera);
 }
