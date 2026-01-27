@@ -49,7 +49,8 @@ export function MonetagPopunder() {
 
         const invokeScript = document.createElement('script');
         invokeScript.type = 'text/javascript';
-        invokeScript.src = `https://www.topcreativeformat.com/${config.popunder.zoneId}/invoke.js`;
+        const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+        invokeScript.src = `${protocol}//www.topcreativeformat.com/${config.popunder.zoneId}/invoke.js`;
         invokeScript.async = true;
         document.body.appendChild(invokeScript);
 
@@ -108,7 +109,8 @@ export function MonetagNativeBanner({ className = '' }) {
 
         const invokeScript = document.createElement('script');
         invokeScript.type = 'text/javascript';
-        invokeScript.src = `https://www.topcreativeformat.com/${config.nativeBanner.zoneId}/invoke.js`;
+        const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+        invokeScript.src = `${protocol}//www.topcreativeformat.com/${config.nativeBanner.zoneId}/invoke.js`;
         invokeScript.async = true;
         containerRef.current.appendChild(invokeScript);
 
@@ -195,7 +197,8 @@ export function MonetagBanner({ size = 'leaderboard', className = '' }) {
 
         const invokeScript = document.createElement('script');
         invokeScript.type = 'text/javascript';
-        invokeScript.src = `https://www.topcreativeformat.com/${config.directLink.zoneId}/invoke.js`;
+        const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+        invokeScript.src = `${protocol}//www.topcreativeformat.com/${config.directLink.zoneId}/invoke.js`;
         invokeScript.async = true;
         containerRef.current.appendChild(invokeScript);
 
@@ -337,7 +340,8 @@ export function MonetagSocialBar() {
 
         const invokeScript = document.createElement('script');
         invokeScript.type = 'text/javascript';
-        invokeScript.src = `https://www.topcreativeformat.com/${config.socialBar.zoneId}/invoke.js`;
+        const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+        invokeScript.src = `${protocol}//www.topcreativeformat.com/${config.socialBar.zoneId}/invoke.js`;
         invokeScript.async = true;
         document.body.appendChild(invokeScript);
 
