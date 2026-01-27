@@ -14,10 +14,6 @@ import { LoadingStage, getStageMessage, createStreamError } from '../utils/strea
 import { createFallbackHandler } from '../utils/fallbackHandler';
 import { shouldDisableAnimations } from '../utils/animationControl';
 import { getGlobalStreamInitQueue, shouldUseQueuedInit } from '../utils/streamInitQueue';
-// Monetag Ads - Popunder only (paling mudah dan menguntungkan)
-import { MonetagPopunder } from '../components/MonetagAds';
-// Monetag Video Ad - Native Banner untuk video player
-import MonetagVideoAd from '../components/MonetagVideoAd';
 // Feedback widget
 import FeedbackWidget from '../components/FeedbackWidget';
 // Map view - lazy loaded for performance
@@ -1337,13 +1333,6 @@ function VideoPopup({ camera, onClose }) {
                         </div>
                     )}
                 </div>
-
-                {/* Native Banner - Muncul HANYA saat video play - hide in fullscreen */}
-                {status === 'live' && !isFullscreen && (
-                    <div className="shrink-0 p-3 sm:p-4 bg-gray-900 border-t border-white/10">
-                        <MonetagVideoAd isPlaying={true} size="large" />
-                    </div>
-                )}
 
                 {/* Footer - hide in fullscreen */}
                 <div className={`shrink-0 p-3 sm:p-4 bg-gray-900 border-t border-white/10 ${isFullscreen ? 'hidden' : ''}`}>
@@ -3551,22 +3540,6 @@ export default function LandingPage() {
                     <StatsBar cameras={cameras} areas={areas} onCameraClick={setPopup} />
                 </div>
             </header>
-
-            {/* 
-                Monetag Popunder - CPM Tertinggi ($3-8)
-                - Tab baru muncul DI BELAKANG (tidak mengganggu user)
-                - Hanya 1x per user per 24 jam
-                - TIDAK BUTUH TEMPAT KHUSUS di website
-                - Component ini TIDAK RENDER APAPUN di UI
-                
-                Setup:
-                1. Daftar Monetag: https://www.monetag.com/
-                2. Buat Popunder zone
-                3. Copy Zone ID
-                4. Update di: frontend/src/components/MonetagAds.jsx
-                   MONETAG_CONFIG.popunder.zoneId = 'YOUR_ZONE_ID'
-            */}
-            <MonetagPopunder />
 
             <CamerasSection
                 cameras={cameras}
