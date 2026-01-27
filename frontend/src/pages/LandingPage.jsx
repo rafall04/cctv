@@ -568,7 +568,7 @@ const ZoomableVideo = memo(function ZoomableVideo({ videoRef, maxZoom = 4, onZoo
         >
             <video 
                 ref={videoRef}
-                className={`w-full h-full pointer-events-none ${isFullscreen ? 'object-cover' : 'object-contain'}`}
+                className="w-full h-full pointer-events-none object-contain"
                 muted
                 playsInline 
                 autoPlay 
@@ -1179,10 +1179,10 @@ function VideoPopup({ camera, onClose }) {
                 <div ref={wrapperRef} className={`relative bg-black overflow-hidden ${isFullscreen ? 'flex-1' : 'flex-1 min-h-0'}`} onDoubleClick={toggleFS}>
                     <ZoomableVideo videoRef={videoRef} maxZoom={4} onZoomChange={setZoom} isFullscreen={isFullscreen} />
                     
-                    {/* Floating controls for fullscreen mode - inside video container */}
+                    {/* Floating controls for fullscreen mode - Always visible on mobile */}
                     {isFullscreen && (
                         <>
-                            <div className="absolute top-0 left-0 right-0 z-50 p-4 bg-gradient-to-b from-black/80 to-transparent opacity-0 hover:opacity-100 transition-opacity pointer-events-auto">
+                            <div className="absolute top-0 left-0 right-0 z-50 p-4 bg-gradient-to-b from-black/80 to-transparent pointer-events-auto">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <h2 className="text-white font-bold text-lg">{camera.name}</h2>
@@ -1192,18 +1192,18 @@ function VideoPopup({ camera, onClose }) {
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        {status === 'live' && <button onClick={takeSnapshot} className="p-2 hover:bg-white/20 rounded-xl text-white bg-white/10"><Icons.Image /></button>}
-                                        <button onClick={toggleFS} className="p-2 hover:bg-white/20 rounded-xl text-white bg-white/10"><Icons.Fullscreen /></button>
-                                        <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-xl text-white bg-white/10"><Icons.X /></button>
+                                        {status === 'live' && <button onClick={takeSnapshot} className="p-2 hover:bg-white/20 active:bg-white/30 rounded-xl text-white bg-white/10"><Icons.Image /></button>}
+                                        <button onClick={toggleFS} className="p-2 hover:bg-white/20 active:bg-white/30 rounded-xl text-white bg-white/10"><Icons.Fullscreen /></button>
+                                        <button onClick={onClose} className="p-2 hover:bg-white/20 active:bg-white/30 rounded-xl text-white bg-white/10"><Icons.X /></button>
                                     </div>
                                 </div>
                             </div>
                             
-                            <div className="absolute bottom-4 right-4 z-50 flex items-center gap-1 bg-black/80 rounded-xl p-1 opacity-0 hover:opacity-100 transition-opacity pointer-events-auto">
-                                <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-2 hover:bg-white/20 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomOut /></button>
+                            <div className="absolute bottom-4 right-4 z-50 flex items-center gap-1 bg-black/80 rounded-xl p-1 pointer-events-auto">
+                                <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-2 hover:bg-white/20 active:bg-white/30 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomOut /></button>
                                 <span className="text-white text-xs font-medium w-12 text-center">{Math.round(zoom * 100)}%</span>
-                                <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 4} className="p-2 hover:bg-white/20 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomIn /></button>
-                                {zoom > 1 && <button onClick={() => getZoomableWrapper()?._reset?.()} className="p-2 hover:bg-white/20 rounded-lg text-white ml-1"><Icons.Reset /></button>}
+                                <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 4} className="p-2 hover:bg-white/20 active:bg-white/30 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomIn /></button>
+                                {zoom > 1 && <button onClick={() => getZoomableWrapper()?._reset?.()} className="p-2 hover:bg-white/20 active:bg-white/30 rounded-lg text-white ml-1"><Icons.Reset /></button>}
                             </div>
                         </>
                     )}
@@ -1870,11 +1870,11 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 </div>
             </div>
             
-            {/* Floating controls for fullscreen mode */}
+            {/* Floating controls for fullscreen mode - Always visible on mobile */}
             {isFullscreen && (
                 <div className="absolute inset-0 z-50 pointer-events-none">
-                    {/* Top bar with camera name and exit */}
-                    <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/80 to-transparent opacity-0 hover:opacity-100 transition-opacity pointer-events-auto">
+                    {/* Top bar with camera name and exit - Always visible */}
+                    <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/80 to-transparent pointer-events-auto">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold text-white shadow ${statusBadge.color}`}>
@@ -1883,20 +1883,20 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                                 </span>
                                 <p className="text-white text-sm font-medium">{camera.name}</p>
                             </div>
-                            <button onClick={toggleFS} className="p-2 hover:bg-white/20 rounded-xl text-white bg-white/10"><Icons.Fullscreen /></button>
+                            <button onClick={toggleFS} className="p-2 hover:bg-white/20 active:bg-white/30 rounded-xl text-white bg-white/10"><Icons.Fullscreen /></button>
                         </div>
                     </div>
                     
-                    {/* Bottom controls */}
-                    <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-black/80 rounded-xl p-1 opacity-0 hover:opacity-100 transition-opacity pointer-events-auto">
-                        <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-2 hover:bg-white/20 disabled:opacity-30 rounded text-white"><Icons.ZoomOut /></button>
+                    {/* Bottom controls - Always visible on mobile */}
+                    <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-black/80 rounded-xl p-1 pointer-events-auto">
+                        <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-2 hover:bg-white/20 active:bg-white/30 disabled:opacity-30 rounded text-white"><Icons.ZoomOut /></button>
                         <span className="text-white text-xs w-12 text-center">{Math.round(zoom * 100)}%</span>
-                        <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 3} className="p-2 hover:bg-white/20 disabled:opacity-30 rounded text-white"><Icons.ZoomIn /></button>
-                        {zoom > 1 && <button onClick={() => getZoomableWrapper()?._reset?.()} className="p-2 hover:bg-white/20 rounded text-white"><Icons.Reset /></button>}
+                        <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 3} className="p-2 hover:bg-white/20 active:bg-white/30 disabled:opacity-30 rounded text-white"><Icons.ZoomIn /></button>
+                        {zoom > 1 && <button onClick={() => getZoomableWrapper()?._reset?.()} className="p-2 hover:bg-white/20 active:bg-white/30 rounded text-white"><Icons.Reset /></button>}
                         {status === 'live' && (
                             <>
                                 <div className="w-px h-4 bg-white/20 mx-1" />
-                                <button onClick={takeSnapshot} className="p-2 hover:bg-white/20 rounded text-white"><Icons.Image /></button>
+                                <button onClick={takeSnapshot} className="p-2 hover:bg-white/20 active:bg-white/30 rounded text-white"><Icons.Image /></button>
                             </>
                         )}
                     </div>
