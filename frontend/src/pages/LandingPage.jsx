@@ -436,7 +436,7 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
 // ZOOMABLE VIDEO COMPONENT - Optimized for low-end devices
 // Disables heavy features (willChange, RAF throttle) on low-end
 // ============================================
-const ZoomableVideo = memo(function ZoomableVideo({ videoRef, maxZoom = 4, onZoomChange }) {
+const ZoomableVideo = memo(function ZoomableVideo({ videoRef, maxZoom = 4, onZoomChange, isFullscreen = false }) {
     const wrapperRef = useRef(null);
     const transformThrottleRef = useRef(null);
     const stateRef = useRef({ zoom: 1, panX: 0, panY: 0, dragging: false, startX: 0, startY: 0, startPanX: 0, startPanY: 0 });
@@ -568,7 +568,7 @@ const ZoomableVideo = memo(function ZoomableVideo({ videoRef, maxZoom = 4, onZoo
         >
             <video 
                 ref={videoRef}
-                className="w-full h-full object-contain pointer-events-none"
+                className={`w-full h-full pointer-events-none ${isFullscreen ? 'object-cover' : 'object-contain'}`}
                 muted
                 playsInline 
                 autoPlay 
@@ -1174,7 +1174,7 @@ function VideoPopup({ camera, onClose }) {
 
                 {/* Video - expand to full screen in fullscreen mode */}
                 <div ref={wrapperRef} className={`relative bg-black overflow-hidden ${isFullscreen ? 'flex-1' : 'flex-1 min-h-0'}`} onDoubleClick={toggleFS}>
-                    <ZoomableVideo videoRef={videoRef} maxZoom={4} onZoomChange={setZoom} />
+                    <ZoomableVideo videoRef={videoRef} maxZoom={4} onZoomChange={setZoom} isFullscreen={isFullscreen} />
                     
                     {/* Floating controls for fullscreen mode - inside video container */}
                     {isFullscreen && (
@@ -1834,7 +1834,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
     return (
         <div ref={containerRef} className={`relative w-full h-full bg-black rounded-xl overflow-hidden group ${isFullscreen ? 'rounded-none' : ''}`}>
             <div ref={wrapperRef} className="w-full h-full">
-                <ZoomableVideo videoRef={videoRef} status={status} maxZoom={3} onZoomChange={setZoom} />
+                <ZoomableVideo videoRef={videoRef} status={status} maxZoom={3} onZoomChange={setZoom} isFullscreen={isFullscreen} />
             </div>
             {/* Status badge - disable pulse animation in fullscreen and on low-end devices */}
             <div className="absolute top-2 left-2 z-10 pointer-events-none">

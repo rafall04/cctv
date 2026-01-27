@@ -679,7 +679,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                                 cursor: stateRef.current.zoom > 1 ? 'grab' : 'default'
                             }}
                         >
-                            <video ref={videoRef} className="w-full h-full object-contain pointer-events-none" muted playsInline autoPlay />
+                            <video ref={videoRef} className={`w-full h-full pointer-events-none ${isFullscreen ? 'object-cover' : 'object-contain'}`} muted playsInline autoPlay />
                         </div>
                     )}
 
