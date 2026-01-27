@@ -16,6 +16,8 @@ import { shouldDisableAnimations } from '../utils/animationControl';
 import { getGlobalStreamInitQueue, shouldUseQueuedInit } from '../utils/streamInitQueue';
 // Monetag Ads - Popunder only (paling mudah dan menguntungkan)
 import { MonetagPopunder } from '../components/MonetagAds';
+// Monetag Video Ad - Native Banner untuk video player
+import MonetagVideoAd from '../components/MonetagVideoAd';
 // Feedback widget
 import FeedbackWidget from '../components/FeedbackWidget';
 // Map view - lazy loaded for performance
@@ -1335,6 +1337,13 @@ function VideoPopup({ camera, onClose }) {
                         </div>
                     )}
                 </div>
+
+                {/* Native Banner - Muncul HANYA saat video play - hide in fullscreen */}
+                {status === 'live' && !isFullscreen && (
+                    <div className="shrink-0 p-3 sm:p-4 bg-gray-900 border-t border-white/10">
+                        <MonetagVideoAd isPlaying={true} size="large" />
+                    </div>
+                )}
 
                 {/* Footer - hide in fullscreen */}
                 <div className={`shrink-0 p-3 sm:p-4 bg-gray-900 border-t border-white/10 ${isFullscreen ? 'hidden' : ''}`}>

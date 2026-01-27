@@ -24,9 +24,9 @@ const MONETAG_CONFIG = {
     },
     
     // Native Banner - Iklan yang blend dengan konten
-    // OPTIONAL: Aktifkan jika mau tambah revenue
+    // ENABLED: Muncul di bawah video saat play
     nativeBanner: {
-        enabled: false, // Set true jika mau gunakan
+        enabled: true, // ENABLED untuk kombinasi optimal
         zoneId: 'YOUR_NATIVE_ZONE_ID', // Contoh: '8360607'
     },
     
