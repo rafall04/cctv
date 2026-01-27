@@ -685,19 +685,97 @@ const VideoModal = memo(({ camera, onClose }) => {
                                 cursor: stateRef.current.zoom > 1 ? 'grab' : 'default'
                             }}
                         >
-                            <video ref={videoRef} className="w-full h-full pointer-events-none object-cover" muted playsInline autoPlay />
+                            <video ref={videoRef} className={`w-full h-full pointer-events-none ${isFullscreen ? 'object-contain' : 'object-cover'}`} muted playsInline autoPlay />
                         </div>
                     )}
 
-                    {/* Close button */}
+                    {/* Close button - hide in fullscreen */}
                     <button 
                         onClick={onClose} 
-                        className="absolute top-2 right-2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-lg z-20"
+                        className={`absolute top-2 right-2 p-2 bg-black/60 hover:bg-black/80 active:bg-black text-white rounded-lg z-20 ${isFullscreen ? 'hidden' : ''}`}
                     >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path d="M6 18L18 6M6 6l12 12"/>
                         </svg>
                     </button>
+
+                    {/* Floating controls for fullscreen mode - Always visible on mobile */}
+                    {isFullscreen && (
+                        <div className="absolute inset-0 z-50 pointer-events-none">
+                            {/* Top bar with camera name and exit */}
+                            <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/80 to-transparent pointer-events-auto">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold text-white shadow bg-emerald-500/20">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                            {status === 'playing' ? 'LIVE' : 'LOADING'}
+                                        </span>
+                                        <p className="text-white text-sm font-medium">{camera.name}</p>
+                                    </div>
+                                    <button onClick={onClose} className="p-2 hover:bg-white/20 active:bg-white/30 rounded-xl text-white bg-white/10">
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path d="M6 18L18 6M6 6l12 12"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {/* Bottom controls - Zoom + Screenshot + Fullscreen */}
+                            <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-black/80 rounded-xl p-1 pointer-events-auto">
+                                <button
+                                    onClick={handleZoomOut}
+                                    disabled={zoomDisplay <= MIN_ZOOM}
+                                    className="p-2 hover:bg-white/20 active:bg-white/30 disabled:opacity-30 rounded text-white"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"/>
+                                    </svg>
+                                </button>
+                                <span className="text-white text-xs w-12 text-center">{Math.round(zoomDisplay * 100)}%</span>
+                                <button
+                                    onClick={handleZoomIn}
+                                    disabled={zoomDisplay >= MAX_ZOOM}
+                                    className="p-2 hover:bg-white/20 active:bg-white/30 disabled:opacity-30 rounded text-white"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"/>
+                                    </svg>
+                                </button>
+                                {zoomDisplay > 1 && (
+                                    <button
+                                        onClick={handleResetZoom}
+                                        className="p-2 hover:bg-white/20 active:bg-white/30 rounded text-white"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/>
+                                        </svg>
+                                    </button>
+                                )}
+                                {status === 'playing' && (
+                                    <>
+                                        <div className="w-px h-4 bg-white/20 mx-1" />
+                                        <button
+                                            onClick={takeSnapshot}
+                                            className="p-2 hover:bg-white/20 active:bg-white/30 rounded text-white"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                            </svg>
+                                        </button>
+                                    </>
+                                )}
+                                <div className="w-px h-4 bg-white/20 mx-1" />
+                                <button
+                                    onClick={toggleFullscreen}
+                                    className="p-2 hover:bg-white/20 active:bg-white/30 rounded text-white"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Zoom hint */}
                     {zoomDisplay > 1 && (
@@ -707,8 +785,8 @@ const VideoModal = memo(({ camera, onClose }) => {
                     )}
                 </div>
 
-                {/* Info Panel */}
-                <div className="p-3 border-t border-gray-800">
+                {/* Info Panel - hide in fullscreen */}
+                <div className={`p-3 border-t border-gray-800 ${isFullscreen ? 'hidden' : ''}`}>
                     <div className="flex items-center justify-between gap-2 mb-2">
                         <h3 className="text-white font-bold text-sm sm:text-base truncate flex-1">{camera.name}</h3>
                         
