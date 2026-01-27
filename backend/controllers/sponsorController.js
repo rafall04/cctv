@@ -4,7 +4,7 @@
  */
 
 import sponsorService from '../services/sponsorService.js';
-import { logAuditEvent } from '../services/securityAuditLogger.js';
+import { logAdminAction } from '../services/securityAuditLogger.js';
 
 /**
  * Get all sponsors (admin only)
@@ -83,13 +83,13 @@ export async function createSponsor(request, reply) {
         const result = sponsorService.createSponsor(sponsorData);
         
         // Audit log
-        logAuditEvent('sponsor_created', {
+        logAdminAction({
+            action: 'sponsor_created',
             sponsor_id: result.lastInsertRowid,
             sponsor_name: sponsorData.name,
             package: sponsorData.package,
-            user_id: request.user.id,
-            ip: request.ip
-        });
+            userId: request.user.id
+        }, request);
         
         return reply.code(201).send({
             success: true,
@@ -127,13 +127,13 @@ export async function updateSponsor(request, reply) {
         sponsorService.updateSponsor(id, sponsorData);
         
         // Audit log
-        logAuditEvent('sponsor_updated', {
+        logAdminAction({
+            action: 'sponsor_updated',
             sponsor_id: id,
             sponsor_name: sponsorData.name || existingSponsor.name,
             changes: sponsorData,
-            user_id: request.user.id,
-            ip: request.ip
-        });
+            userId: request.user.id
+        }, request);
         
         return reply.send({
             success: true,
@@ -167,12 +167,12 @@ export async function deleteSponsor(request, reply) {
         sponsorService.deleteSponsor(id);
         
         // Audit log
-        logAuditEvent('sponsor_deleted', {
+        logAdminAction({
+            action: 'sponsor_deleted',
             sponsor_id: id,
             sponsor_name: existingSponsor.name,
-            user_id: request.user.id,
-            ip: request.ip
-        });
+            userId: request.user.id
+        }, request);
         
         return reply.send({
             success: true,
@@ -222,13 +222,13 @@ export async function assignSponsorToCamera(request, reply) {
         sponsorService.assignSponsorToCamera(cameraId, sponsorData);
         
         // Audit log
-        logAuditEvent('sponsor_assigned', {
+        logAdminAction({
+            action: 'sponsor_assigned',
             camera_id: cameraId,
             sponsor_name: sponsorData.sponsor_name,
             sponsor_package: sponsorData.sponsor_package,
-            user_id: request.user.id,
-            ip: request.ip
-        });
+            userId: request.user.id
+        }, request);
         
         return reply.send({
             success: true,
@@ -253,11 +253,11 @@ export async function removeSponsorFromCamera(request, reply) {
         sponsorService.removeSponsorFromCamera(cameraId);
         
         // Audit log
-        logAuditEvent('sponsor_removed', {
+        logAdminAction({
+            action: 'sponsor_removed',
             camera_id: cameraId,
-            user_id: request.user.id,
-            ip: request.ip
-        });
+            userId: request.user.id
+        }, request);
         
         return reply.send({
             success: true,
