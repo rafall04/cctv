@@ -3,7 +3,7 @@ import {
     updateMonetagSettingsHandler,
     getPublicMonetagConfigHandler
 } from '../controllers/monetagController.js';
-import { authenticateToken } from '../middleware/authMiddleware.js';
+import { authMiddleware } from '../middleware/authMiddleware.js';
 import { validateMonetagSettings } from '../middleware/schemaValidators.js';
 
 export default async function monetagRoutes(fastify, options) {
@@ -12,10 +12,10 @@ export default async function monetagRoutes(fastify, options) {
 
     // Admin endpoints - Require authentication
     fastify.get('/settings', { 
-        preHandler: [authenticateToken] 
+        preHandler: [authMiddleware] 
     }, getMonetagSettingsHandler);
 
     fastify.put('/settings', { 
-        preHandler: [authenticateToken, validateMonetagSettings] 
+        preHandler: [authMiddleware, validateMonetagSettings] 
     }, updateMonetagSettingsHandler);
 }
