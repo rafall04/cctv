@@ -273,9 +273,9 @@ const VideoModal = memo(({ camera, onClose }) => {
         }
     }, []);
 
-    // Handle close - just call onClose, parent will handle fullscreen exit
-    const handleClose = useCallback(() => {
-        onClose();
+    // Handle close - await parent's async closeModal
+    const handleClose = useCallback(async () => {
+        await onClose();
     }, [onClose]);
 
     // Screenshot/snapshot
