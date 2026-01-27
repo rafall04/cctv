@@ -14,6 +14,8 @@ import { LoadingStage, getStageMessage, createStreamError } from '../utils/strea
 import { createFallbackHandler } from '../utils/fallbackHandler';
 import { shouldDisableAnimations } from '../utils/animationControl';
 import { getGlobalStreamInitQueue, shouldUseQueuedInit } from '../utils/streamInitQueue';
+// Monetag Ads
+import { MonetagAds, MonetagNativeBanner } from '../components/MonetagAds';
 // Feedback widget
 import FeedbackWidget from '../components/FeedbackWidget';
 // Map view - lazy loaded for performance
@@ -3540,6 +3542,17 @@ export default function LandingPage() {
                     <StatsBar cameras={cameras} areas={areas} onCameraClick={setPopup} />
                 </div>
             </header>
+
+            {/* Monetag Ads - Popunder + Push Notifications (Load once) */}
+            <MonetagAds />
+
+            {/* Native Banner - Desktop Only */}
+            <div className="hidden md:block max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8">
+                <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-xl p-4 border border-gray-200/50 dark:border-gray-700/50 shadow-sm">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 text-center mb-2">Advertisement</p>
+                    <MonetagNativeBanner />
+                </div>
+            </div>
 
             <CamerasSection
                 cameras={cameras}
