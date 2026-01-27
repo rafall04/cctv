@@ -185,8 +185,6 @@ export default function CameraManagement() {
         setSubmitting(true);
         try {
             const data = { ...formData, enabled: formData.enabled ? 1 : 0, is_tunnel: formData.is_tunnel ? 1 : 0, status: formData.status };
-            console.log('Submitting data:', data);
-            console.log('formData.status:', formData.status);
             const result = editingCamera 
                 ? await cameraService.updateCamera(editingCamera.id, data)
                 : await cameraService.createCamera(data);
