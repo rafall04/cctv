@@ -347,7 +347,7 @@ const VideoModal = memo(({ camera, onClose }) => {
     const handleWheel = useCallback((e) => {
         e.preventDefault();
         const s = stateRef.current;
-        s.zoom = clamp(s.zoom + (e.deltaY < 0 ? 0.25 : -0.25), MIN_ZOOM, MAX_ZOOM);
+        s.zoom = clamp(s.zoom + (e.deltaY < 0 ? 0.5 : -0.5), MIN_ZOOM, MAX_ZOOM);
         if (s.zoom <= 1) { s.panX = 0; s.panY = 0; }
         else {
             const max = getMaxPan(s.zoom);
