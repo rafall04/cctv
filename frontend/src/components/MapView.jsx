@@ -175,7 +175,6 @@ const VideoModal = memo(({ camera, onClose }) => {
     const hlsRef = useRef(null);
     const transformThrottleRef = useRef(null);
     const playbackCheckRef = useRef(null);
-    const isClosingRef = useRef(false); // Flag to prevent state updates during close
     
     // Status: 'connecting' | 'loading' | 'buffering' | 'playing' | 'maintenance' | 'offline' | 'error'
     const [status, setStatus] = useState('connecting');
@@ -274,22 +273,6 @@ const VideoModal = memo(({ camera, onClose }) => {
         }
     }, []);
 
-    // Handle close with fullscreen exit - EXACT COPY from working Grid View VideoPopup
-    const handleClose = useCallback(async () => {
-        isClosingRef.current = true; // Set flag to prevent state updates
-        
-        if (document.fullscreenElement) {
-            try {
-                await document.exitFullscreen?.();
-                // Wait for fullscreen transition to complete
-                await new Promise(resolve => setTimeout(resolve, 150));
-            } catch (error) {
-                console.error('Error exiting fullscreen:', error);
-            }
-        }
-        onClose();
-    }, [onClose]);
-
     // Screenshot/snapshot
     const takeSnapshot = useCallback(() => {
         if (!videoRef.current || status !== 'playing') return;
@@ -306,9 +289,6 @@ const VideoModal = memo(({ camera, onClose }) => {
     // Track fullscreen state and unlock orientation on exit
     useEffect(() => {
         const handleFullscreenChange = () => {
-            // Skip state update if closing
-            if (isClosingRef.current) return;
-            
             const isNowFullscreen = !!document.fullscreenElement;
             setIsFullscreen(isNowFullscreen);
             
@@ -614,7 +594,7 @@ const VideoModal = memo(({ camera, onClose }) => {
         <div 
             ref={outerWrapperRef}
             className={`fixed inset-0 z-[2000] bg-black ${isFullscreen ? '' : 'flex items-center justify-center p-2 sm:p-4 bg-black/90'}`}
-            onClick={handleClose}
+            onClick={onClose}
         >
             <div 
                 ref={modalRef}
@@ -735,7 +715,7 @@ const VideoModal = memo(({ camera, onClose }) => {
 
                     {/* Close button - hide in fullscreen */}
                     <button 
-                        onClick={handleClose} 
+                        onClick={onClose} 
                         className={`absolute top-2 right-2 p-2 bg-black/60 hover:bg-black/80 active:bg-black text-white rounded-lg z-20 ${isFullscreen ? 'hidden' : ''}`}
                     >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -769,7 +749,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25"/>
                                             </svg>
                                         </button>
-                                        <button onClick={handleClose} className="p-2 hover:bg-white/20 active:bg-white/30 rounded-xl text-white bg-white/10">
+                                        <button onClick={onClose} className="p-2 hover:bg-white/20 active:bg-white/30 rounded-xl text-white bg-white/10">
                                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                                 <path d="M6 18L18 6M6 6l12 12"/>
                                             </svg>
@@ -1134,8 +1114,7 @@ const MapView = memo(({
     }, []);
     
     const closeModal = useCallback(() => {
-        // VideoModal handleClose already handles fullscreen exit
-        // Just close the modal
+        // Simple close - no fullscreen handling needed
         setModalCamera(null);
         // preserveMapPosition tetap true agar map tidak reset
     }, []);
