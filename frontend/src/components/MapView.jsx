@@ -273,17 +273,8 @@ const VideoModal = memo(({ camera, onClose }) => {
         }
     }, []);
 
-    // Handle close with fullscreen exit
-    const handleClose = useCallback(async () => {
-        if (document.fullscreenElement) {
-            try {
-                await document.exitFullscreen?.();
-                // Wait for fullscreen transition to complete
-                await new Promise(resolve => setTimeout(resolve, 100));
-            } catch (error) {
-                console.error('Error exiting fullscreen:', error);
-            }
-        }
+    // Handle close - just call onClose, parent will handle fullscreen exit
+    const handleClose = useCallback(() => {
         onClose();
     }, [onClose]);
 
