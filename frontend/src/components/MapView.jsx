@@ -579,7 +579,7 @@ const VideoModal = memo(({ camera, onClose }) => {
             >
                 {/* Video Container - optimized dengan pointer events */}
                 <div 
-                    className="relative bg-black aspect-video overflow-hidden"
+                    className={`relative bg-black overflow-hidden ${isFullscreen ? 'w-full h-full' : 'aspect-video'}`}
                     onWheel={handleWheel}
                     onPointerDown={handlePointerDown}
                     onPointerMove={handlePointerMove}
