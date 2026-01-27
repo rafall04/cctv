@@ -175,6 +175,7 @@ const VideoModal = memo(({ camera, onClose }) => {
     const hlsRef = useRef(null);
     const transformThrottleRef = useRef(null);
     const playbackCheckRef = useRef(null);
+    const isClosingRef = useRef(false); // Flag to prevent state updates during close
     
     // Status: 'connecting' | 'loading' | 'buffering' | 'playing' | 'maintenance' | 'offline' | 'error'
     const [status, setStatus] = useState('connecting');
@@ -275,11 +276,13 @@ const VideoModal = memo(({ camera, onClose }) => {
 
     // Handle close with fullscreen exit - EXACT COPY from working Grid View VideoPopup
     const handleClose = useCallback(async () => {
+        isClosingRef.current = true; // Set flag to prevent state updates
+        
         if (document.fullscreenElement) {
             try {
                 await document.exitFullscreen?.();
                 // Wait for fullscreen transition to complete
-                await new Promise(resolve => setTimeout(resolve, 100));
+                await new Promise(resolve => setTimeout(resolve, 150));
             } catch (error) {
                 console.error('Error exiting fullscreen:', error);
             }
@@ -303,6 +306,9 @@ const VideoModal = memo(({ camera, onClose }) => {
     // Track fullscreen state and unlock orientation on exit
     useEffect(() => {
         const handleFullscreenChange = () => {
+            // Skip state update if closing
+            if (isClosingRef.current) return;
+            
             const isNowFullscreen = !!document.fullscreenElement;
             setIsFullscreen(isNowFullscreen);
             
