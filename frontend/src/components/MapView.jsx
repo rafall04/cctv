@@ -273,9 +273,18 @@ const VideoModal = memo(({ camera, onClose }) => {
         }
     }, []);
 
-    // Handle close - await parent's async closeModal
+    // Handle close with fullscreen exit - EXACT COPY from working Grid View VideoPopup
     const handleClose = useCallback(async () => {
-        await onClose();
+        if (document.fullscreenElement) {
+            try {
+                await document.exitFullscreen?.();
+                // Wait for fullscreen transition to complete
+                await new Promise(resolve => setTimeout(resolve, 100));
+            } catch (error) {
+                console.error('Error exiting fullscreen:', error);
+            }
+        }
+        onClose();
     }, [onClose]);
 
     // Screenshot/snapshot
@@ -1118,19 +1127,9 @@ const MapView = memo(({
         setModalCamera(camera);
     }, []);
     
-    const closeModal = useCallback(async () => {
-        // Exit fullscreen first if active
-        if (document.fullscreenElement) {
-            try {
-                await document.exitFullscreen?.();
-                // Wait for fullscreen transition to complete
-                await new Promise(resolve => setTimeout(resolve, 100));
-            } catch (error) {
-                console.error('Error exiting fullscreen:', error);
-            }
-        }
-        
-        // Then close modal
+    const closeModal = useCallback(() => {
+        // VideoModal handleClose already handles fullscreen exit
+        // Just close the modal
         setModalCamera(null);
         // preserveMapPosition tetap true agar map tidak reset
     }, []);
