@@ -326,7 +326,6 @@ const VideoModal = memo(({ camera, onClose }) => {
         document.body.style.overflow = 'hidden';
         return () => { 
             document.body.style.overflow = ''; 
-            if (rafRef.current) cancelAnimationFrame(rafRef.current);
             if (playbackCheckRef.current) clearInterval(playbackCheckRef.current);
         };
     }, []);
