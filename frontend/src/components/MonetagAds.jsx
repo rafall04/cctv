@@ -1,57 +1,12 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { monetagService } from '../services/monetagService';
 
 /**
  * Monetag Ads Component
  * Supports multiple ad formats: Popunder, Native, Banner, Push Notifications
  * 
- * SETUP INSTRUCTIONS:
- * 1. Daftar di https://www.monetag.com/
- * 2. Tambahkan website Anda
- * 3. Buat ad zones untuk setiap format
- * 4. Copy zone IDs dan update di sini
+ * Config is now loaded from database via API (managed from admin panel)
  */
-
-// ============================================
-// MONETAG CONFIGURATION
-// ============================================
-// Ganti dengan Zone IDs dari Monetag dashboard Anda
-const MONETAG_CONFIG = {
-    // Popunder - Muncul 1x per user per 24 jam (CPM tertinggi)
-    // RECOMMENDED: Mulai dengan ini dulu!
-    popunder: {
-        enabled: true,
-        zoneId: 'YOUR_POPUNDER_ZONE_ID', // Contoh: '8360606'
-    },
-    
-    // Native Banner - Iklan yang blend dengan konten
-    // ENABLED: Muncul di bawah video saat play
-    nativeBanner: {
-        enabled: true, // ENABLED untuk kombinasi optimal
-        zoneId: 'YOUR_NATIVE_ZONE_ID', // Contoh: '8360607'
-    },
-    
-    // Direct Link - Banner ads
-    // OPTIONAL: Jarang digunakan
-    directLink: {
-        enabled: false, // Set true jika mau gunakan
-        zoneId: 'YOUR_DIRECT_LINK_ZONE_ID', // Contoh: '8360608'
-    },
-    
-    // Push Notifications - Requires service worker
-    // OPTIONAL: Setup lebih kompleks, aktifkan nanti jika perlu
-    pushNotifications: {
-        enabled: false, // Set true jika mau gunakan
-        zoneId: 'YOUR_PUSH_ZONE_ID', // Contoh: '8360609'
-        swPath: '/sw.js', // Service worker path
-    },
-    
-    // Social Bar - Sticky bar at bottom
-    // OPTIONAL: Bisa mengganggu UX
-    socialBar: {
-        enabled: false, // Set true jika ingin gunakan
-        zoneId: 'YOUR_SOCIAL_BAR_ZONE_ID',
-    }
-};
 
 /**
  * Monetag Popunder Component
@@ -59,20 +14,31 @@ const MONETAG_CONFIG = {
  */
 export function MonetagPopunder() {
     const scriptLoaded = useRef(false);
+    const [config, setConfig] = useState(null);
 
     useEffect(() => {
-        if (!MONETAG_CONFIG.popunder.enabled) return;
+        // Load config from API
+        monetagService.getPublicMonetagConfig()
+            .then(response => {
+                if (response.success) {
+                    setConfig(response.data);
+                }
+            })
+            .catch(error => {
+                console.error('[Monetag] Failed to load config:', error);
+            });
+    }, []);
+
+    useEffect(() => {
+        if (!config) return;
+        if (!config.popunder.enabled) return;
         if (scriptLoaded.current) return;
-        if (MONETAG_CONFIG.popunder.zoneId === 'YOUR_POPUNDER_ZONE_ID') {
-            console.warn('[Monetag] Popunder zone ID not configured');
-            return;
-        }
 
         const script = document.createElement('script');
         script.type = 'text/javascript';
         script.innerHTML = `
             atOptions = {
-                'key' : '${MONETAG_CONFIG.popunder.zoneId}',
+                'key' : '${config.popunder.zoneId}',
                 'format' : 'iframe',
                 'height' : 90,
                 'width' : 728,
@@ -83,7 +49,7 @@ export function MonetagPopunder() {
 
         const invokeScript = document.createElement('script');
         invokeScript.type = 'text/javascript';
-        invokeScript.src = `//www.topcreativeformat.com/${MONETAG_CONFIG.popunder.zoneId}/invoke.js`;
+        invokeScript.src = `//www.topcreativeformat.com/${config.popunder.zoneId}/invoke.js`;
         invokeScript.async = true;
         document.body.appendChild(invokeScript);
 
@@ -94,7 +60,7 @@ export function MonetagPopunder() {
             if (script.parentNode) script.parentNode.removeChild(script);
             if (invokeScript.parentNode) invokeScript.parentNode.removeChild(invokeScript);
         };
-    }, []);
+    }, [config]);
 
     return null; // Popunder tidak memerlukan UI element
 }
@@ -106,21 +72,32 @@ export function MonetagPopunder() {
 export function MonetagNativeBanner({ className = '' }) {
     const containerRef = useRef(null);
     const scriptLoaded = useRef(false);
+    const [config, setConfig] = useState(null);
 
     useEffect(() => {
-        if (!MONETAG_CONFIG.nativeBanner.enabled) return;
+        // Load config from API
+        monetagService.getPublicMonetagConfig()
+            .then(response => {
+                if (response.success) {
+                    setConfig(response.data);
+                }
+            })
+            .catch(error => {
+                console.error('[Monetag] Failed to load config:', error);
+            });
+    }, []);
+
+    useEffect(() => {
+        if (!config) return;
+        if (!config.nativeBanner.enabled) return;
         if (!containerRef.current) return;
         if (scriptLoaded.current) return;
-        if (MONETAG_CONFIG.nativeBanner.zoneId === 'YOUR_NATIVE_ZONE_ID') {
-            console.warn('[Monetag] Native banner zone ID not configured');
-            return;
-        }
 
         const script = document.createElement('script');
         script.type = 'text/javascript';
         script.innerHTML = `
             atOptions = {
-                'key' : '${MONETAG_CONFIG.nativeBanner.zoneId}',
+                'key' : '${config.nativeBanner.zoneId}',
                 'format' : 'iframe',
                 'height' : 250,
                 'width' : 300,
@@ -131,7 +108,7 @@ export function MonetagNativeBanner({ className = '' }) {
 
         const invokeScript = document.createElement('script');
         invokeScript.type = 'text/javascript';
-        invokeScript.src = `//www.topcreativeformat.com/${MONETAG_CONFIG.nativeBanner.zoneId}/invoke.js`;
+        invokeScript.src = `//www.topcreativeformat.com/${config.nativeBanner.zoneId}/invoke.js`;
         invokeScript.async = true;
         containerRef.current.appendChild(invokeScript);
 
@@ -142,9 +119,9 @@ export function MonetagNativeBanner({ className = '' }) {
                 containerRef.current.innerHTML = '';
             }
         };
-    }, []);
+    }, [config]);
 
-    if (!MONETAG_CONFIG.nativeBanner.enabled) return null;
+    if (!config || !config.nativeBanner.enabled) return null;
 
     return (
         <div 
@@ -173,6 +150,7 @@ export function MonetagNativeBanner({ className = '' }) {
 export function MonetagBanner({ size = 'leaderboard', className = '' }) {
     const containerRef = useRef(null);
     const scriptLoaded = useRef(false);
+    const [config, setConfig] = useState(null);
 
     const sizes = {
         leaderboard: { width: 728, height: 90 },
@@ -184,19 +162,29 @@ export function MonetagBanner({ size = 'leaderboard', className = '' }) {
     const currentSize = sizes[size] || sizes.leaderboard;
 
     useEffect(() => {
-        if (!MONETAG_CONFIG.directLink.enabled) return;
+        // Load config from API
+        monetagService.getPublicMonetagConfig()
+            .then(response => {
+                if (response.success) {
+                    setConfig(response.data);
+                }
+            })
+            .catch(error => {
+                console.error('[Monetag] Failed to load config:', error);
+            });
+    }, []);
+
+    useEffect(() => {
+        if (!config) return;
+        if (!config.directLink.enabled) return;
         if (!containerRef.current) return;
         if (scriptLoaded.current) return;
-        if (MONETAG_CONFIG.directLink.zoneId === 'YOUR_DIRECT_LINK_ZONE_ID') {
-            console.warn('[Monetag] Direct link zone ID not configured');
-            return;
-        }
 
         const script = document.createElement('script');
         script.type = 'text/javascript';
         script.innerHTML = `
             atOptions = {
-                'key' : '${MONETAG_CONFIG.directLink.zoneId}',
+                'key' : '${config.directLink.zoneId}',
                 'format' : 'iframe',
                 'height' : ${currentSize.height},
                 'width' : ${currentSize.width},
@@ -207,7 +195,7 @@ export function MonetagBanner({ size = 'leaderboard', className = '' }) {
 
         const invokeScript = document.createElement('script');
         invokeScript.type = 'text/javascript';
-        invokeScript.src = `//www.topcreativeformat.com/${MONETAG_CONFIG.directLink.zoneId}/invoke.js`;
+        invokeScript.src = `//www.topcreativeformat.com/${config.directLink.zoneId}/invoke.js`;
         invokeScript.async = true;
         containerRef.current.appendChild(invokeScript);
 
@@ -218,9 +206,9 @@ export function MonetagBanner({ size = 'leaderboard', className = '' }) {
                 containerRef.current.innerHTML = '';
             }
         };
-    }, [currentSize.height, currentSize.width]);
+    }, [config, currentSize.height, currentSize.width]);
 
-    if (!MONETAG_CONFIG.directLink.enabled) return null;
+    if (!config || !config.directLink.enabled) return null;
 
     return (
         <div 
@@ -248,14 +236,25 @@ export function MonetagBanner({ size = 'leaderboard', className = '' }) {
  */
 export function MonetagPushNotifications() {
     const initialized = useRef(false);
+    const [config, setConfig] = useState(null);
 
     useEffect(() => {
-        if (!MONETAG_CONFIG.pushNotifications.enabled) return;
+        // Load config from API
+        monetagService.getPublicMonetagConfig()
+            .then(response => {
+                if (response.success) {
+                    setConfig(response.data);
+                }
+            })
+            .catch(error => {
+                console.error('[Monetag] Failed to load config:', error);
+            });
+    }, []);
+
+    useEffect(() => {
+        if (!config) return;
+        if (!config.pushNotifications.enabled) return;
         if (initialized.current) return;
-        if (MONETAG_CONFIG.pushNotifications.zoneId === 'YOUR_PUSH_ZONE_ID') {
-            console.warn('[Monetag] Push notifications zone ID not configured');
-            return;
-        }
 
         // Check if service worker is supported
         if (!('serviceWorker' in navigator)) {
@@ -264,7 +263,7 @@ export function MonetagPushNotifications() {
         }
 
         // Register service worker
-        navigator.serviceWorker.register(MONETAG_CONFIG.pushNotifications.swPath)
+        navigator.serviceWorker.register(config.pushNotifications.swPath)
             .then(registration => {
                 console.log('[Monetag] Service Worker registered:', registration);
                 
@@ -277,7 +276,7 @@ export function MonetagPushNotifications() {
                     })(
                         document.createElement('script'),
                         'https://inklinkor.com/tag.min.js',
-                        ${MONETAG_CONFIG.pushNotifications.zoneId},
+                        ${config.pushNotifications.zoneId},
                         document.body||document.documentElement
                     )
                 `;
@@ -292,7 +291,7 @@ export function MonetagPushNotifications() {
         return () => {
             // Cleanup if needed
         };
-    }, []);
+    }, [config]);
 
     return null; // Push notifications tidak memerlukan UI element
 }
@@ -303,20 +302,31 @@ export function MonetagPushNotifications() {
  */
 export function MonetagSocialBar() {
     const scriptLoaded = useRef(false);
+    const [config, setConfig] = useState(null);
 
     useEffect(() => {
-        if (!MONETAG_CONFIG.socialBar.enabled) return;
+        // Load config from API
+        monetagService.getPublicMonetagConfig()
+            .then(response => {
+                if (response.success) {
+                    setConfig(response.data);
+                }
+            })
+            .catch(error => {
+                console.error('[Monetag] Failed to load config:', error);
+            });
+    }, []);
+
+    useEffect(() => {
+        if (!config) return;
+        if (!config.socialBar.enabled) return;
         if (scriptLoaded.current) return;
-        if (MONETAG_CONFIG.socialBar.zoneId === 'YOUR_SOCIAL_BAR_ZONE_ID') {
-            console.warn('[Monetag] Social bar zone ID not configured');
-            return;
-        }
 
         const script = document.createElement('script');
         script.type = 'text/javascript';
         script.innerHTML = `
             atOptions = {
-                'key' : '${MONETAG_CONFIG.socialBar.zoneId}',
+                'key' : '${config.socialBar.zoneId}',
                 'format' : 'iframe',
                 'height' : 60,
                 'width' : 468,
@@ -327,7 +337,7 @@ export function MonetagSocialBar() {
 
         const invokeScript = document.createElement('script');
         invokeScript.type = 'text/javascript';
-        invokeScript.src = `//www.topcreativeformat.com/${MONETAG_CONFIG.socialBar.zoneId}/invoke.js`;
+        invokeScript.src = `//www.topcreativeformat.com/${config.socialBar.zoneId}/invoke.js`;
         invokeScript.async = true;
         document.body.appendChild(invokeScript);
 
@@ -337,7 +347,7 @@ export function MonetagSocialBar() {
             if (script.parentNode) script.parentNode.removeChild(script);
             if (invokeScript.parentNode) invokeScript.parentNode.removeChild(invokeScript);
         };
-    }, []);
+    }, [config]);
 
     return null;
 }

@@ -1,9 +1,12 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { monetagService } from '../services/monetagService';
 
 /**
  * Monetag Video Ad Component
  * Native Banner yang muncul HANYA saat video sedang play
  * Digunakan di modal video dan multi-view
+ * 
+ * Config is now loaded from database via API (managed from admin panel)
  * 
  * Props:
  * - isPlaying: boolean - Apakah video sedang play
@@ -11,18 +14,11 @@ import { useEffect, useRef } from 'react';
  * - size: 'small' | 'medium' | 'large' - Ukuran banner (default: 'medium')
  */
 
-// Import config dari MonetagAds
-const MONETAG_CONFIG = {
-    nativeBanner: {
-        enabled: true,
-        zoneId: 'YOUR_NATIVE_ZONE_ID', // Akan di-sync dengan MonetagAds.jsx
-    }
-};
-
 function MonetagVideoAd({ isPlaying = false, className = '', size = 'medium' }) {
     const containerRef = useRef(null);
     const scriptLoadedRef = useRef(false);
     const adLoadedRef = useRef(false);
+    const [config, setConfig] = useState(null);
 
     // Size configurations
     const sizes = {
@@ -34,17 +30,27 @@ function MonetagVideoAd({ isPlaying = false, className = '', size = 'medium' }) 
     const currentSize = sizes[size] || sizes.medium;
 
     useEffect(() => {
+        // Load config from API
+        monetagService.getPublicMonetagConfig()
+            .then(response => {
+                if (response.success) {
+                    setConfig(response.data);
+                }
+            })
+            .catch(error => {
+                console.error('[Monetag Video Ad] Failed to load config:', error);
+            });
+    }, []);
+
+    useEffect(() => {
         // Hanya load jika:
-        // 1. Native banner enabled
-        // 2. Video sedang play
-        // 3. Zone ID sudah dikonfigurasi
+        // 1. Config sudah loaded
+        // 2. Native banner enabled
+        // 3. Video sedang play
         // 4. Belum pernah di-load
-        if (!MONETAG_CONFIG.nativeBanner.enabled) return;
+        if (!config) return;
+        if (!config.nativeBanner.enabled) return;
         if (!isPlaying) return;
-        if (MONETAG_CONFIG.nativeBanner.zoneId === 'YOUR_NATIVE_ZONE_ID') {
-            console.warn('[Monetag Video Ad] Native banner zone ID not configured');
-            return;
-        }
         if (!containerRef.current) return;
         if (scriptLoadedRef.current) return;
 
@@ -53,7 +59,7 @@ function MonetagVideoAd({ isPlaying = false, className = '', size = 'medium' }) 
         script.type = 'text/javascript';
         script.innerHTML = `
             atOptions = {
-                'key' : '${MONETAG_CONFIG.nativeBanner.zoneId}',
+                'key' : '${config.nativeBanner.zoneId}',
                 'format' : 'iframe',
                 'height' : ${currentSize.height},
                 'width' : ${currentSize.width},
@@ -64,7 +70,7 @@ function MonetagVideoAd({ isPlaying = false, className = '', size = 'medium' }) 
 
         const invokeScript = document.createElement('script');
         invokeScript.type = 'text/javascript';
-        invokeScript.src = `//www.topcreativeformat.com/${MONETAG_CONFIG.nativeBanner.zoneId}/invoke.js`;
+        invokeScript.src = `//www.topcreativeformat.com/${config.nativeBanner.zoneId}/invoke.js`;
         invokeScript.async = true;
         invokeScript.onload = () => {
             adLoadedRef.current = true;
@@ -85,15 +91,15 @@ function MonetagVideoAd({ isPlaying = false, className = '', size = 'medium' }) 
             scriptLoadedRef.current = false;
             adLoadedRef.current = false;
         };
-    }, [isPlaying, currentSize.height, currentSize.width]);
+    }, [config, isPlaying, currentSize.height, currentSize.width]);
 
     // Jangan render jika:
-    // 1. Native banner disabled
-    // 2. Video tidak play
-    // 3. Zone ID belum dikonfigurasi
-    if (!MONETAG_CONFIG.nativeBanner.enabled) return null;
+    // 1. Config belum loaded
+    // 2. Native banner disabled
+    // 3. Video tidak play
+    if (!config) return null;
+    if (!config.nativeBanner.enabled) return null;
     if (!isPlaying) return null;
-    if (MONETAG_CONFIG.nativeBanner.zoneId === 'YOUR_NATIVE_ZONE_ID') return null;
 
     return (
         <div className={`monetag-video-ad ${className}`}>

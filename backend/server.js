@@ -28,6 +28,7 @@ import settingsRoutes from './routes/settingsRoutes.js';
 import viewerRoutes from './routes/viewerRoutes.js';
 import hlsProxyRoutes from './routes/hlsProxyRoutes.js';
 import sponsorRoutes from './routes/sponsorRoutes.js';
+import monetagRoutes from './routes/monetagRoutes.js';
 import mediaMtxService from './services/mediaMtxService.js';
 import streamWarmer from './services/streamWarmer.js';
 import cameraHealthService from './services/cameraHealthService.js';
@@ -210,6 +211,7 @@ await fastify.register(settingsRoutes);
 await fastify.register(viewerRoutes, { prefix: '/api/viewer' });
 await fastify.register(hlsProxyRoutes, { prefix: '/hls' });
 await fastify.register(sponsorRoutes, { prefix: '/api/sponsors' });
+await fastify.register(monetagRoutes, { prefix: '/api/monetag' });
 
 // ============================================
 // GLOBAL ERROR HANDLER

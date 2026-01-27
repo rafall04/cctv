@@ -12,6 +12,7 @@ import UserManagement from './pages/UserManagement';
 import FeedbackManagement from './pages/FeedbackManagement';
 import ViewerAnalytics from './pages/ViewerAnalytics';
 import Settings from './pages/Settings';
+import MonetagSettings from './pages/MonetagSettings';
 import Dashboard from './pages/Dashboard';
 import SponsorManagement from './pages/SponsorManagement';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -108,6 +109,14 @@ function App() {
                             <AdminLayout>
                                 <SponsorManagement />
                             </AdminLayout>
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/admin/monetag"
+                    element={
+                        <ProtectedRoute>
+                            <MonetagSettings />
                         </ProtectedRoute>
                     }
                 />
