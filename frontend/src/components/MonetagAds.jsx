@@ -17,31 +17,36 @@ import { useEffect, useRef } from 'react';
 // Ganti dengan Zone IDs dari Monetag dashboard Anda
 const MONETAG_CONFIG = {
     // Popunder - Muncul 1x per user per 24 jam (CPM tertinggi)
+    // RECOMMENDED: Mulai dengan ini dulu!
     popunder: {
         enabled: true,
         zoneId: 'YOUR_POPUNDER_ZONE_ID', // Contoh: '8360606'
     },
     
     // Native Banner - Iklan yang blend dengan konten
+    // OPTIONAL: Aktifkan jika mau tambah revenue
     nativeBanner: {
-        enabled: true,
+        enabled: false, // Set true jika mau gunakan
         zoneId: 'YOUR_NATIVE_ZONE_ID', // Contoh: '8360607'
     },
     
     // Direct Link - Banner ads
+    // OPTIONAL: Jarang digunakan
     directLink: {
-        enabled: true,
+        enabled: false, // Set true jika mau gunakan
         zoneId: 'YOUR_DIRECT_LINK_ZONE_ID', // Contoh: '8360608'
     },
     
     // Push Notifications - Requires service worker
+    // OPTIONAL: Setup lebih kompleks, aktifkan nanti jika perlu
     pushNotifications: {
-        enabled: true,
+        enabled: false, // Set true jika mau gunakan
         zoneId: 'YOUR_PUSH_ZONE_ID', // Contoh: '8360609'
         swPath: '/sw.js', // Service worker path
     },
     
     // Social Bar - Sticky bar at bottom
+    // OPTIONAL: Bisa mengganggu UX
     socialBar: {
         enabled: false, // Set true jika ingin gunakan
         zoneId: 'YOUR_SOCIAL_BAR_ZONE_ID',
