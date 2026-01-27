@@ -93,6 +93,21 @@ export const createCameraSchema = {
             status: {
                 type: 'string',
                 enum: ['active', 'maintenance', 'offline']
+            },
+            sponsor_name: {
+                anyOf: [{ type: 'string', maxLength: 100 }, { type: 'null' }]
+            },
+            sponsor_logo: {
+                anyOf: [{ type: 'string', maxLength: 500 }, { type: 'null' }]
+            },
+            sponsor_url: {
+                anyOf: [{ type: 'string', maxLength: 500 }, { type: 'null' }]
+            },
+            sponsor_package: {
+                anyOf: [
+                    { type: 'string', enum: ['bronze', 'silver', 'gold'] },
+                    { type: 'null' }
+                ]
             }
         },
         additionalProperties: false
@@ -141,6 +156,21 @@ export const updateCameraSchema = {
             status: {
                 type: 'string',
                 enum: ['active', 'maintenance', 'offline']
+            },
+            sponsor_name: {
+                anyOf: [{ type: 'string', maxLength: 100 }, { type: 'null' }]
+            },
+            sponsor_logo: {
+                anyOf: [{ type: 'string', maxLength: 500 }, { type: 'null' }]
+            },
+            sponsor_url: {
+                anyOf: [{ type: 'string', maxLength: 500 }, { type: 'null' }]
+            },
+            sponsor_package: {
+                anyOf: [
+                    { type: 'string', enum: ['bronze', 'silver', 'gold'] },
+                    { type: 'null' }
+                ]
             }
         },
         additionalProperties: false

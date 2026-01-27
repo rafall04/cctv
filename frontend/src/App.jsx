@@ -13,6 +13,7 @@ import FeedbackManagement from './pages/FeedbackManagement';
 import ViewerAnalytics from './pages/ViewerAnalytics';
 import Settings from './pages/Settings';
 import Dashboard from './pages/Dashboard';
+import SponsorManagement from './pages/SponsorManagement';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminLayout from './components/AdminLayout';
 
@@ -96,6 +97,16 @@ function App() {
                         <ProtectedRoute>
                             <AdminLayout>
                                 <Settings />
+                            </AdminLayout>
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/admin/sponsors"
+                    element={
+                        <ProtectedRoute>
+                            <AdminLayout>
+                                <SponsorManagement />
                             </AdminLayout>
                         </ProtectedRoute>
                     }
