@@ -749,11 +749,6 @@ const VideoModal = memo(({ camera, onClose }) => {
                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25"/>
                                             </svg>
                                         </button>
-                                        <button onClick={onClose} className="p-2 hover:bg-white/20 active:bg-white/30 rounded-xl text-white bg-white/10">
-                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                <path d="M6 18L18 6M6 6l12 12"/>
-                                            </svg>
-                                        </button>
                                     </div>
                                 </div>
                             </div>
