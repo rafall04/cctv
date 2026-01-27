@@ -1100,8 +1100,8 @@ function VideoPopup({ camera, onClose }) {
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 p-2 sm:p-4" onClick={onClose}>
             <div ref={modalRef} className="relative w-full max-w-5xl bg-gray-900 rounded-2xl overflow-hidden shadow-2xl flex flex-col" style={{ maxHeight: 'calc(100vh - 16px)' }} onClick={(e) => e.stopPropagation()}>
-                {/* Header */}
-                <div className="shrink-0 flex items-center justify-between p-3 sm:p-4 bg-gray-900 border-b border-white/10">
+                {/* Header - hide in fullscreen */}
+                <div className={`shrink-0 flex items-center justify-between p-3 sm:p-4 bg-gray-900 border-b border-white/10 ${isFullscreen ? 'hidden' : ''}`}>
                     <div className="flex-1 min-w-0 pr-4">
                         <div className="flex items-center gap-2 flex-wrap">
                             <h2 className="text-white font-bold text-sm sm:text-lg truncate">{camera.name}</h2>
@@ -1122,8 +1122,8 @@ function VideoPopup({ camera, onClose }) {
                     </div>
                 </div>
 
-                {/* Video */}
-                <div ref={wrapperRef} className="relative flex-1 min-h-0 bg-black overflow-hidden" onDoubleClick={toggleFS}>
+                {/* Video - expand to full screen in fullscreen mode */}
+                <div ref={wrapperRef} className={`relative bg-black overflow-hidden ${isFullscreen ? 'absolute inset-0' : 'flex-1 min-h-0'}`} onDoubleClick={toggleFS}>
                     <ZoomableVideo videoRef={videoRef} maxZoom={4} onZoomChange={setZoom} />
                     
                     {/* Maintenance Overlay */}
@@ -1222,8 +1222,38 @@ function VideoPopup({ camera, onClose }) {
                     )}
                 </div>
 
-                {/* Footer */}
-                <div className="shrink-0 p-3 sm:p-4 bg-gray-900 border-t border-white/10">
+                {/* Floating controls for fullscreen mode */}
+                {isFullscreen && (
+                    <div className="absolute top-0 left-0 right-0 z-50 p-4 bg-gradient-to-b from-black/80 to-transparent opacity-0 hover:opacity-100 transition-opacity">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <h2 className="text-white font-bold text-lg">{camera.name}</h2>
+                                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold ${statusDisplay.color}`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${statusDisplay.dotColor}`} />
+                                    {statusDisplay.label}
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {status === 'live' && <button onClick={takeSnapshot} className="p-2 hover:bg-white/20 rounded-xl text-white bg-white/10"><Icons.Image /></button>}
+                                <button onClick={toggleFS} className="p-2 hover:bg-white/20 rounded-xl text-white bg-white/10"><Icons.Fullscreen /></button>
+                                <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-xl text-white bg-white/10"><Icons.X /></button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Floating zoom controls for fullscreen mode */}
+                {isFullscreen && (
+                    <div className="absolute bottom-4 right-4 z-50 flex items-center gap-1 bg-black/80 rounded-xl p-1 opacity-0 hover:opacity-100 transition-opacity">
+                        <button onClick={() => getWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-2 hover:bg-white/20 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomOut /></button>
+                        <span className="text-white text-xs font-medium w-12 text-center">{Math.round(zoom * 100)}%</span>
+                        <button onClick={() => getWrapper()?._zoomIn?.()} disabled={zoom >= 4} className="p-2 hover:bg-white/20 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomIn /></button>
+                        {zoom > 1 && <button onClick={() => getWrapper()?._reset?.()} className="p-2 hover:bg-white/20 rounded-lg text-white ml-1"><Icons.Reset /></button>}
+                    </div>
+                )}
+
+                {/* Footer - hide in fullscreen */}
+                <div className={`shrink-0 p-3 sm:p-4 bg-gray-900 border-t border-white/10 ${isFullscreen ? 'hidden' : ''}`}>
                     <div className="flex items-center justify-between gap-4">
                         <div className="flex-1 min-w-0">
                             {camera.description && <p className="text-gray-400 text-xs sm:text-sm line-clamp-1">{camera.description}</p>}
@@ -1706,7 +1736,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
     const disableAnimations = shouldDisableAnimations();
 
     return (
-        <div ref={containerRef} className="relative w-full h-full bg-black rounded-xl overflow-hidden group">
+        <div ref={containerRef} className={`relative w-full h-full bg-black rounded-xl overflow-hidden group ${isFullscreen ? 'rounded-none' : ''}`}>
             <div ref={wrapperRef} className="w-full h-full">
                 <ZoomableVideo videoRef={videoRef} status={status} maxZoom={3} onZoomChange={setZoom} />
             </div>
@@ -1720,9 +1750,9 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                     <span className="ml-1 text-[8px] text-amber-400">retry {autoRetryCount}/3</span>
                 )}
             </div>
-            <button onClick={onRemove} className="absolute top-2 right-2 z-10 p-1.5 bg-red-500/80 hover:bg-red-500 rounded-lg text-white shadow"><Icons.X /></button>
-            {/* Overlay controls - render only on hover, no transition in fullscreen */}
-            <div className={`absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 z-10 ${isFullscreen ? '' : 'transition-opacity'}`}>
+            <button onClick={onRemove} className={`absolute top-2 right-2 z-10 p-1.5 bg-red-500/80 hover:bg-red-500 rounded-lg text-white shadow ${isFullscreen ? 'hidden' : ''}`}><Icons.X /></button>
+            {/* Overlay controls - render only on hover, no transition in fullscreen, hide in fullscreen */}
+            <div className={`absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 z-10 ${isFullscreen ? 'hidden' : 'transition-opacity'}`}>
                 <div className="flex items-center justify-between gap-2">
                     <p className="text-white text-xs font-medium truncate flex-1">{camera.name}</p>
                     <div className="flex items-center gap-1">
@@ -1736,6 +1766,39 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                     </div>
                 </div>
             </div>
+            
+            {/* Floating controls for fullscreen mode */}
+            {isFullscreen && (
+                <div className="absolute inset-0 z-50 pointer-events-none">
+                    {/* Top bar with camera name and exit */}
+                    <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/80 to-transparent opacity-0 hover:opacity-100 transition-opacity pointer-events-auto">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold text-white shadow ${statusBadge.color}`}>
+                                    <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                                    {statusBadge.label}
+                                </span>
+                                <p className="text-white text-sm font-medium">{camera.name}</p>
+                            </div>
+                            <button onClick={toggleFS} className="p-2 hover:bg-white/20 rounded-xl text-white bg-white/10"><Icons.Fullscreen /></button>
+                        </div>
+                    </div>
+                    
+                    {/* Bottom controls */}
+                    <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-black/80 rounded-xl p-1 opacity-0 hover:opacity-100 transition-opacity pointer-events-auto">
+                        <button onClick={() => getWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-2 hover:bg-white/20 disabled:opacity-30 rounded text-white"><Icons.ZoomOut /></button>
+                        <span className="text-white text-xs w-12 text-center">{Math.round(zoom * 100)}%</span>
+                        <button onClick={() => getWrapper()?._zoomIn?.()} disabled={zoom >= 3} className="p-2 hover:bg-white/20 disabled:opacity-30 rounded text-white"><Icons.ZoomIn /></button>
+                        {zoom > 1 && <button onClick={() => getWrapper()?._reset?.()} className="p-2 hover:bg-white/20 rounded text-white"><Icons.Reset /></button>}
+                        {status === 'live' && (
+                            <>
+                                <div className="w-px h-4 bg-white/20 mx-1" />
+                                <button onClick={takeSnapshot} className="p-2 hover:bg-white/20 rounded text-white"><Icons.Image /></button>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
             
             {/* Progressive Loading Overlay - **Validates: Requirements 4.1, 4.2, 4.3, 4.4, 5.2** */}
             {status === 'connecting' && (
