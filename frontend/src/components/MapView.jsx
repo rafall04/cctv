@@ -1118,6 +1118,8 @@ const MapView = memo(({
         if (document.fullscreenElement) {
             try {
                 await document.exitFullscreen?.();
+                // Wait for fullscreen transition to complete
+                await new Promise(resolve => setTimeout(resolve, 100));
             } catch (error) {
                 console.error('Error exiting fullscreen:', error);
             }
