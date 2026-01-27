@@ -28,13 +28,13 @@ export const SECURITY_HEADERS_CONFIG = {
     // Content-Security-Policy restricts resource origins
     contentSecurityPolicy: [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://www.topcreativeformat.com https://www.topcreativeformat.com https://inklinkor.com",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://www.topcreativeformat.com https://inklinkor.com",
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: blob: https: http:",
         "font-src 'self' data:",
         "connect-src 'self' ws: wss: http: https:",
         "media-src 'self' blob: http: https:",
-        "frame-src http://www.topcreativeformat.com https://www.topcreativeformat.com",
+        "frame-src http://www.topcreativeformat.com",
         "frame-ancestors 'none'"
     ].join('; '),
     
