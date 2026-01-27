@@ -7,13 +7,17 @@ ssh root@172.17.11.12 << 'EOF'
 cd /var/www/rafnet-cctv
 
 echo "📥 Pulling latest changes from GitHub..."
-git pull origin main
+git fetch origin
+git reset --hard origin/main
 
 echo "🔄 Restarting backend..."
 pm2 restart rafnet-cctv-backend
 
-echo "📊 Checking backend status..."
-pm2 logs rafnet-cctv-backend --lines 20 --nostream
+sleep 3
 
+echo "📊 Checking backend status..."
+pm2 logs rafnet-cctv-backend --lines 30 --nostream
+
+echo ""
 echo "✅ Production update complete!"
 EOF
