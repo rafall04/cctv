@@ -3,7 +3,7 @@
  * Mengelola sponsor dan sponsorship packages
  */
 
-import { query, run } from '../database/database.js';
+import { query, execute } from '../database/database.js';
 
 /**
  * Get all sponsors
@@ -51,7 +51,7 @@ export function createSponsor(sponsorData) {
         notes
     } = sponsorData;
 
-    return run(`
+    return execute(`
         INSERT INTO sponsors (
             name, logo, url, package, price, active,
             start_date, end_date, contact_name, contact_email,
@@ -142,7 +142,7 @@ export function updateSponsor(id, sponsorData) {
     updates.push('updated_at = CURRENT_TIMESTAMP');
     values.push(id);
 
-    return run(
+    return execute(
         `UPDATE sponsors SET ${updates.join(', ')} WHERE id = ?`,
         values
     );
@@ -152,7 +152,7 @@ export function updateSponsor(id, sponsorData) {
  * Delete sponsor
  */
 export function deleteSponsor(id) {
-    return run('DELETE FROM sponsors WHERE id = ?', [id]);
+    return execute('DELETE FROM sponsors WHERE id = ?', [id]);
 }
 
 /**
@@ -204,7 +204,7 @@ export function getExpiringSponsorships() {
 export function assignSponsorToCamera(cameraId, sponsorData) {
     const { sponsor_name, sponsor_logo, sponsor_url, sponsor_package } = sponsorData;
     
-    return run(`
+    return execute(`
         UPDATE cameras 
         SET sponsor_name = ?,
             sponsor_logo = ?,
@@ -219,7 +219,7 @@ export function assignSponsorToCamera(cameraId, sponsorData) {
  * Remove sponsor from camera
  */
 export function removeSponsorFromCamera(cameraId) {
-    return run(`
+    return execute(`
         UPDATE cameras 
         SET sponsor_name = NULL,
             sponsor_logo = NULL,
