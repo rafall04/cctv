@@ -84,6 +84,18 @@ const handleClose = async () => {
     await document.exitFullscreen(); // BUG: Masih race condition!
     onClose(); // Component unmount terlalu cepat
 };
+
+// DOUBLE EXIT FULLSCREEN (child + parent)
+// Child component:
+const handleClose = async () => {
+    await document.exitFullscreen(); // Exit di child
+    onClose(); // Call parent
+};
+// Parent component:
+const closeModal = async () => {
+    await document.exitFullscreen(); // Exit LAGI di parent → RACE CONDITION!
+    setModalCamera(null);
+};
 ```
 
 ### ✅ SELALU:
@@ -100,6 +112,20 @@ const handleClose = async () => {
     }
     onClose();
 };
+
+// ATAU jika parent sudah handle fullscreen exit:
+// Child component - hanya call onClose
+const handleClose = () => {
+    onClose(); // Parent akan handle fullscreen exit
+};
+// Parent component - handle fullscreen exit
+const closeModal = async () => {
+    if (document.fullscreenElement) {
+        await document.exitFullscreen?.();
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    setModalCamera(null);
+};
 ```
 
 ## Testing Requirements
@@ -114,6 +140,14 @@ Setiap perubahan fullscreen/close button WAJIB test:
 6. **Map View**: Semua scenario di atas
 
 ## Bug History
+
+### Bug: Double Fullscreen Exit in MapView (Fixed)
+- **Date**: 2025-01-28
+- **Cause**: VideoModal `handleClose` dan parent `closeModal` sama-sama exit fullscreen → race condition
+- **Solution**: VideoModal `handleClose` hanya call `onClose()`, biarkan parent handle fullscreen exit
+- **Files**: MapView.jsx
+- **Commit**: "Fix: Remove duplicate fullscreen exit in VideoModal handleClose - parent closeModal already handles it"
+- **Lesson**: Jangan exit fullscreen di child component jika parent sudah handle
 
 ### Bug: Blank Screen on Close (Fixed)
 - **Date**: 2025-01-28
