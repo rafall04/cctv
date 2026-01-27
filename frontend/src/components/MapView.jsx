@@ -225,6 +225,9 @@ const VideoModal = memo(({ camera, onClose }) => {
                 // Enter fullscreen - use outer wrapper
                 await outerWrapperRef.current?.requestFullscreen?.();
                 
+                // Reset zoom to 1.0 when entering fullscreen to avoid "auto zoom" effect
+                handleResetZoom();
+                
                 // Lock to landscape orientation on mobile
                 if (screen.orientation && screen.orientation.lock) {
                     try {
@@ -239,6 +242,9 @@ const VideoModal = memo(({ camera, onClose }) => {
             } else {
                 // Exit fullscreen
                 await document.exitFullscreen?.();
+                
+                // Reset zoom when exiting fullscreen
+                handleResetZoom();
                 
                 // Unlock orientation
                 if (screen.orientation && screen.orientation.unlock) {
@@ -679,7 +685,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                                 cursor: stateRef.current.zoom > 1 ? 'grab' : 'default'
                             }}
                         >
-                            <video ref={videoRef} className={`w-full h-full pointer-events-none ${isFullscreen ? 'object-cover' : 'object-contain'}`} muted playsInline autoPlay />
+                            <video ref={videoRef} className="w-full h-full pointer-events-none object-cover" muted playsInline autoPlay />
                         </div>
                     )}
 

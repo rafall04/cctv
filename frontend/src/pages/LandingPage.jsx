@@ -568,7 +568,7 @@ const ZoomableVideo = memo(function ZoomableVideo({ videoRef, maxZoom = 4, onZoo
         >
             <video 
                 ref={videoRef}
-                className="w-full h-full pointer-events-none object-contain"
+                className="w-full h-full pointer-events-none object-cover"
                 muted
                 playsInline 
                 autoPlay 
@@ -1086,6 +1086,12 @@ function VideoPopup({ camera, onClose }) {
                 // Enter fullscreen
                 await outerWrapperRef.current?.requestFullscreen?.();
                 
+                // Reset zoom to 1.0 when entering fullscreen to avoid "auto zoom" effect
+                const wrapper = getZoomableWrapper();
+                if (wrapper && wrapper._reset) {
+                    wrapper._reset();
+                }
+                
                 // Lock to landscape orientation on mobile
                 if (screen.orientation && screen.orientation.lock) {
                     try {
@@ -1101,6 +1107,12 @@ function VideoPopup({ camera, onClose }) {
             } else {
                 // Exit fullscreen
                 await document.exitFullscreen?.();
+                
+                // Reset zoom when exiting fullscreen
+                const wrapper = getZoomableWrapper();
+                if (wrapper && wrapper._reset) {
+                    wrapper._reset();
+                }
                 
                 // Unlock orientation
                 if (screen.orientation && screen.orientation.unlock) {
@@ -1776,6 +1788,12 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 // Enter fullscreen
                 await containerRef.current?.requestFullscreen?.();
                 
+                // Reset zoom to 1.0 when entering fullscreen to avoid "auto zoom" effect
+                const wrapper = getZoomableWrapper();
+                if (wrapper && wrapper._reset) {
+                    wrapper._reset();
+                }
+                
                 // Lock to landscape orientation on mobile
                 if (screen.orientation && screen.orientation.lock) {
                     try {
@@ -1789,6 +1807,12 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             } else {
                 // Exit fullscreen
                 await document.exitFullscreen?.();
+                
+                // Reset zoom when exiting fullscreen
+                const wrapper = getZoomableWrapper();
+                if (wrapper && wrapper._reset) {
+                    wrapper._reset();
+                }
                 
                 // Unlock orientation
                 if (screen.orientation && screen.orientation.unlock) {
