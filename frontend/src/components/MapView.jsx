@@ -231,6 +231,13 @@ const VideoModal = memo(({ camera, onClose }) => {
         setZoomDisplay(zoom);
     }, []);
 
+    // Reset zoom function - must be defined before toggleFullscreen
+    const handleResetZoom = useCallback(() => {
+        const s = stateRef.current;
+        s.zoom = 1; s.panX = 0; s.panY = 0;
+        applyTransform(true);
+    }, [applyTransform]);
+
     // Fullscreen toggle with landscape orientation lock
     const toggleFullscreen = useCallback(async () => {
         try {
@@ -348,12 +355,6 @@ const VideoModal = memo(({ camera, onClose }) => {
             s.panX = clamp(s.panX, -max, max);
             s.panY = clamp(s.panY, -max, max);
         }
-        applyTransform(true);
-    }, [applyTransform]);
-
-    const handleResetZoom = useCallback(() => {
-        const s = stateRef.current;
-        s.zoom = 1; s.panX = 0; s.panY = 0;
         applyTransform(true);
     }, [applyTransform]);
 
