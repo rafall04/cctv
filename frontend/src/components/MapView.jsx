@@ -170,6 +170,7 @@ const VideoModal = memo(({ camera, onClose }) => {
     const videoRef = useRef(null);
     const videoWrapperRef = useRef(null);
     const modalRef = useRef(null);
+    const outerWrapperRef = useRef(null); // Add ref for outer wrapper
     const hlsRef = useRef(null);
     const rafRef = useRef(null);
     const playbackCheckRef = useRef(null);
@@ -217,15 +218,40 @@ const VideoModal = memo(({ camera, onClose }) => {
         });
     }, [applyTransform]);
 
-    // Fullscreen toggle
+    // Fullscreen toggle with landscape orientation lock
     const toggleFullscreen = useCallback(async () => {
         try {
             if (!document.fullscreenElement) {
-                await modalRef.current?.requestFullscreen?.();
+                // Enter fullscreen - use outer wrapper
+                await outerWrapperRef.current?.requestFullscreen?.();
+                
+                // Lock to landscape orientation on mobile
+                if (screen.orientation && screen.orientation.lock) {
+                    try {
+                        await screen.orientation.lock('landscape').catch(() => {
+                            // Fallback: try landscape-primary if landscape fails
+                            screen.orientation.lock('landscape-primary').catch(() => {});
+                        });
+                    } catch (err) {
+                        console.log('Orientation lock not supported');
+                    }
+                }
             } else {
+                // Exit fullscreen
                 await document.exitFullscreen?.();
+                
+                // Unlock orientation
+                if (screen.orientation && screen.orientation.unlock) {
+                    try {
+                        screen.orientation.unlock();
+                    } catch (err) {
+                        // Ignore unlock errors
+                    }
+                }
             }
-        } catch {}
+        } catch (err) {
+            console.error('Fullscreen error:', err);
+        }
     }, []);
 
     // Screenshot/snapshot
@@ -241,13 +267,33 @@ const VideoModal = memo(({ camera, onClose }) => {
         link.click();
     }, [camera.name, status]);
 
-    // Track fullscreen state
+    // Track fullscreen state and unlock orientation on exit
     useEffect(() => {
         const handleFullscreenChange = () => {
-            setIsFullscreen(!!document.fullscreenElement);
+            const isNowFullscreen = !!document.fullscreenElement;
+            setIsFullscreen(isNowFullscreen);
+            
+            // Unlock orientation when exiting fullscreen (e.g., via ESC key)
+            if (!isNowFullscreen && screen.orientation && screen.orientation.unlock) {
+                try {
+                    screen.orientation.unlock();
+                } catch (err) {
+                    // Ignore unlock errors
+                }
+            }
         };
         document.addEventListener('fullscreenchange', handleFullscreenChange);
-        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+        return () => {
+            document.removeEventListener('fullscreenchange', handleFullscreenChange);
+            // Cleanup: unlock orientation on unmount
+            if (screen.orientation && screen.orientation.unlock) {
+                try {
+                    screen.orientation.unlock();
+                } catch (err) {
+                    // Ignore unlock errors
+                }
+            }
+        };
     }, []);
 
     useEffect(() => {
@@ -516,12 +562,13 @@ const VideoModal = memo(({ camera, onClose }) => {
 
     return (
         <div 
-            className="fixed inset-0 z-[2000] flex items-center justify-center p-2 sm:p-4 bg-black/90" 
+            ref={outerWrapperRef}
+            className={`fixed inset-0 z-[2000] bg-black ${isFullscreen ? '' : 'flex items-center justify-center p-2 sm:p-4 bg-black/90'}`}
             onClick={onClose}
         >
             <div 
                 ref={modalRef}
-                className="bg-gray-900 rounded-xl w-full max-w-4xl overflow-hidden shadow-2xl border border-gray-800" 
+                className={`bg-gray-900 overflow-hidden shadow-2xl border border-gray-800 ${isFullscreen ? 'w-full h-full' : 'rounded-xl w-full max-w-4xl'}`}
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Video Container - optimized dengan pointer events */}
