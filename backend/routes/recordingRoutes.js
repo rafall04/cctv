@@ -19,6 +19,19 @@ export default async function recordingRoutes(fastify) {
     // ============================================
     // ADMIN ROUTES (Protected)
     // ============================================
+    
+    // IMPORTANT: Static routes MUST come before dynamic routes
+    // Otherwise /recordings/overview will match /recordings/:cameraId
+
+    // Get recordings overview (dashboard) - MUST BE FIRST
+    fastify.get('/recordings/overview', {
+        onRequest: [authMiddleware]
+    }, getRecordingsOverview);
+
+    // Get restart logs - MUST BE BEFORE :cameraId routes
+    fastify.get('/recordings/restarts', {
+        onRequest: [authMiddleware]
+    }, getRestartLogs);
 
     // Start recording
     fastify.post('/recordings/:cameraId/start', {
@@ -35,21 +48,12 @@ export default async function recordingRoutes(fastify) {
         onRequest: [authMiddleware]
     }, getRecordingStatus);
 
-    // Get recordings overview (dashboard)
-    fastify.get('/recordings/overview', {
-        onRequest: [authMiddleware]
-    }, getRecordingsOverview);
-
     // Update recording settings
     fastify.put('/recordings/:cameraId/settings', {
         onRequest: [authMiddleware]
     }, updateRecordingSettings);
 
-    // Get restart logs
-    fastify.get('/recordings/restarts', {
-        onRequest: [authMiddleware]
-    }, getRestartLogs);
-
+    // Get restart logs for specific camera
     fastify.get('/recordings/:cameraId/restarts', {
         onRequest: [authMiddleware]
     }, getRestartLogs);
