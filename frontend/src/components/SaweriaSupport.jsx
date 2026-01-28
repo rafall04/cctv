@@ -4,28 +4,70 @@ import { useState, useEffect } from 'react';
  * Saweria Support Component
  * 
  * Features:
- * 1. Modal popup on first visit (localStorage tracking)
+ * 1. Modal popup on every visit with random variations (user-friendly)
  * 2. Floating banner (minimizable, persistent)
  * 3. Smooth animations and transitions
+ * 4. "Don't show again" option for users who don't want to see it
  * 
  * Usage:
  * <SaweriaSupport link="https://saweria.co/raflialdi" />
  */
 
-const STORAGE_KEY = 'saweria_modal_shown';
+const STORAGE_KEY = 'saweria_dont_show';
 const BANNER_MINIMIZED_KEY = 'saweria_banner_minimized';
+
+// Modal variations for variety (random selection)
+const MODAL_VARIATIONS = [
+    {
+        emoji: '☕',
+        title: 'Traktir Kopi Dong! 😊',
+        subtitle: 'Biar semangat maintain server & kamera 24/7',
+        message1: 'Halo! 👋 Senang banget kamu pakai layanan CCTV gratis ini.',
+        message2: 'Kalau kamu merasa terbantu, traktir kopi buat kami yuk! Seikhlasnya aja, berapapun sangat berarti buat jaga server tetap nyala ⚡',
+        gradient: 'from-orange-500 via-amber-500 to-yellow-500',
+    },
+    {
+        emoji: '💝',
+        title: 'Dukung Kami Yuk! 🙏',
+        subtitle: 'Bantu jaga layanan ini tetap gratis',
+        message1: 'Terima kasih sudah pakai layanan CCTV gratis kami! 🎉',
+        message2: 'Dukungan kamu akan sangat membantu kami untuk terus menyediakan layanan ini. Seikhlasnya aja ya! 😊',
+        gradient: 'from-pink-500 via-rose-500 to-red-500',
+    },
+    {
+        emoji: '🚀',
+        title: 'Bantu Kami Berkembang!',
+        subtitle: 'Server & bandwidth butuh biaya lho',
+        message1: 'Layanan ini gratis untuk semua, tapi server & bandwidth tetap butuh biaya 💸',
+        message2: 'Kalau kamu mau bantu, traktir kopi kami dong! Nominal berapa aja sangat berarti 🙏',
+        gradient: 'from-blue-500 via-cyan-500 to-teal-500',
+    },
+    {
+        emoji: '⚡',
+        title: 'Keep The Server Running!',
+        subtitle: 'Listrik & internet 24/7 butuh support',
+        message1: 'Server ini nyala 24/7 biar kamu bisa pantau CCTV kapan aja! ⏰',
+        message2: 'Bantu kami bayar listrik & internet dong! Seikhlasnya, yang penting dari hati ❤️',
+        gradient: 'from-purple-500 via-violet-500 to-indigo-500',
+    },
+];
 
 export default function SaweriaSupport({ link = 'https://saweria.co/raflialdi' }) {
     const [showModal, setShowModal] = useState(false);
     const [showBanner, setShowBanner] = useState(false);
     const [bannerMinimized, setBannerMinimized] = useState(false);
+    const [modalVariation, setModalVariation] = useState(MODAL_VARIATIONS[0]);
 
     useEffect(() => {
-        // Check if modal has been shown before
-        const modalShown = localStorage.getItem(STORAGE_KEY);
+        // Check if user chose "don't show again"
+        const dontShow = localStorage.getItem(STORAGE_KEY);
         const bannerMinimized = localStorage.getItem(BANNER_MINIMIZED_KEY);
 
-        if (!modalShown) {
+        // Select random modal variation
+        const randomIndex = Math.floor(Math.random() * MODAL_VARIATIONS.length);
+        setModalVariation(MODAL_VARIATIONS[randomIndex]);
+
+        if (dontShow !== 'true') {
             // Show modal after user scrolls a bit (shows engagement)
             let hasScrolled = false;
             
@@ -54,7 +96,7 @@ export default function SaweriaSupport({ link = 'https://saweria.co/raflialdi' }
                 window.removeEventListener('scroll', handleScroll);
             };
         } else {
-            // If modal already shown, show banner after 3 seconds
+            // If user chose "don't show", show banner after 3 seconds
             const bannerTimer = setTimeout(() => {
                 setShowBanner(true);
                 setBannerMinimized(bannerMinimized === 'true');
@@ -66,7 +108,6 @@ export default function SaweriaSupport({ link = 'https://saweria.co/raflialdi' }
 
     const handleModalClose = () => {
         setShowModal(false);
-        localStorage.setItem(STORAGE_KEY, 'true');
         
         // Show banner after closing modal
         setTimeout(() => {
@@ -74,8 +115,17 @@ export default function SaweriaSupport({ link = 'https://saweria.co/raflialdi' }
         }, 2000);
     };
 
-    const handleModalSupport = () => {
+    const handleModalDontShow = () => {
+        setShowModal(false);
         localStorage.setItem(STORAGE_KEY, 'true');
+        
+        // Show banner after choosing "don't show"
+        setTimeout(() => {
+            setShowBanner(true);
+        }, 2000);
+    };
+
+    const handleModalSupport = () => {
         window.open(link, '_blank', 'noopener,noreferrer');
         setShowModal(false);
         
@@ -116,37 +166,36 @@ export default function SaweriaSupport({ link = 'https://saweria.co/raflialdi' }
                     
                     {/* Modal Content */}
                     <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-slideUp">
-                        {/* Gradient Header */}
-                        <div className="bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-500 p-6 text-center">
+                        {/* Gradient Header - Dynamic based on variation */}
+                        <div className={`bg-gradient-to-r ${modalVariation.gradient} p-6 text-center`}>
                             <div className="w-16 h-16 mx-auto mb-4 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center animate-bounce">
-                                <span className="text-4xl">☕</span>
+                                <span className="text-4xl">{modalVariation.emoji}</span>
                             </div>
                             <h2 className="text-2xl font-bold text-white mb-2">
-                                Traktir Kopi Dong! 😊
+                                {modalVariation.title}
                             </h2>
                             <p className="text-white/90 text-sm">
-                                Biar semangat maintain server & kamera 24/7
+                                {modalVariation.subtitle}
                             </p>
                         </div>
 
                         {/* Body */}
                         <div className="p-6">
                             <p className="text-gray-700 dark:text-gray-300 text-center mb-4 leading-relaxed">
-                                Halo! 👋 Senang banget kamu pakai layanan CCTV gratis ini.
+                                {modalVariation.message1}
                             </p>
                             <p className="text-gray-700 dark:text-gray-300 text-center mb-6 leading-relaxed">
-                                Kalau kamu merasa terbantu, traktir kopi buat kami yuk! 
-                                Seikhlasnya aja, berapapun sangat berarti buat jaga server tetap nyala ⚡
+                                {modalVariation.message2}
                             </p>
 
                             {/* Buttons */}
                             <div className="flex flex-col gap-3">
                                 <button
                                     onClick={handleModalSupport}
-                                    className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                                    className={`w-full bg-gradient-to-r ${modalVariation.gradient} hover:opacity-90 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl`}
                                 >
                                     <span className="flex items-center justify-center gap-2">
-                                        <span>☕</span>
+                                        <span>{modalVariation.emoji}</span>
                                         <span>Traktir Kopi Sekarang</span>
                                     </span>
                                 </button>
@@ -157,10 +206,17 @@ export default function SaweriaSupport({ link = 'https://saweria.co/raflialdi' }
                                 >
                                     Lain Kali Aja 😅
                                 </button>
+
+                                <button
+                                    onClick={handleModalDontShow}
+                                    className="w-full text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 text-sm py-2 transition-colors"
+                                >
+                                    Jangan Tampilkan Lagi
+                                </button>
                             </div>
 
                             <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-4">
-                                💝 Pesan ini cuma muncul sekali kok
+                                💝 Terima kasih atas pengertiannya
                             </p>
                         </div>
                     </div>
