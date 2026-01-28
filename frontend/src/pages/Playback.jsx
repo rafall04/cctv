@@ -334,21 +334,11 @@ function Playback() {
                 const direction = targetTime > previousTime ? 1 : -1;
                 const limitedTarget = previousTime + (MAX_SEEK_DISTANCE * direction);
                 
-                // Calculate remaining distance
-                const remainingDistance = Math.abs(targetTime - limitedTarget);
-                const remainingMinutes = Math.floor(remainingDistance / 60);
-                const remainingSeconds = Math.floor(remainingDistance % 60);
+                console.log('[Seek] Limited to:', limitedTarget);
                 
-                console.log('[Seek] Limited to:', limitedTarget, 'Remaining:', remainingDistance);
-                
-                // Show warning with progress info - use callback to avoid re-render during seek
+                // Show warning - use callback to avoid re-render during seek
                 setTimeout(() => {
-                    setSeekWarning({
-                        type: 'limit',
-                        remaining: remainingMinutes > 0 || remainingSeconds > 0
-                            ? `${remainingMinutes > 0 ? `${remainingMinutes} menit ` : ''}${remainingSeconds} detik. Klik lagi untuk lanjut.`
-                            : null
-                    });
+                    setSeekWarning({ type: 'limit' });
                 }, 0);
                 
                 // Force limited seek
@@ -535,20 +525,10 @@ function Playback() {
         const direction = targetTime > currentPos ? 1 : -1;
         const limitedTarget = currentPos + (MAX_SEEK_DISTANCE * direction);
         
-        // Calculate remaining distance
-        const remainingDistance = Math.abs(targetTime - limitedTarget);
-        const remainingMinutes = Math.floor(remainingDistance / 60);
-        const remainingSeconds = Math.floor(remainingDistance % 60);
+        console.log('[SmartSeek] Limited to:', limitedTarget);
         
-        console.log('[SmartSeek] Limited to:', limitedTarget, 'Remaining:', remainingDistance);
-        
-        // Show user-friendly warning
-        setSeekWarning({
-            type: 'limit',
-            remaining: remainingMinutes > 0 || remainingSeconds > 0
-                ? `${remainingMinutes > 0 ? `${remainingMinutes} menit ` : ''}${remainingSeconds} detik. Klik lagi untuk lanjut.`
-                : null
-        });
+        // Show simple warning
+        setSeekWarning({ type: 'limit' });
         
         // Perform limited seek
         videoRef.current.currentTime = limitedTarget;
@@ -725,12 +705,7 @@ function Playback() {
                                         <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                                     </svg>
                                     <div className="flex-1 min-w-0">
-                                        <p className="font-semibold text-sm sm:text-base">Video melompat 3 menit (batas aman)</p>
-                                        {seekWarning.remaining && (
-                                            <p className="text-xs sm:text-sm mt-1 text-blue-100">
-                                                Sisa: {seekWarning.remaining}
-                                            </p>
-                                        )}
+                                        <p className="font-semibold text-sm sm:text-base">Video maksimal lompat 3 menit</p>
                                     </div>
                                     <button
                                         onClick={() => setSeekWarning(null)}
