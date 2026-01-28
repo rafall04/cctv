@@ -374,9 +374,6 @@ class RecordingService {
             console.error(`Error cleaning up segments for camera ${cameraId}:`, error);
         }
     }
-                    execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
-                });
-            }
 
         } catch (error) {
             console.error(`Error cleaning up old segments:`, error);
