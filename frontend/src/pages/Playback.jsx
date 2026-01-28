@@ -848,7 +848,7 @@ function Playback() {
                                 </li>
                                 <li className="flex items-start gap-2">
                                     <span className="flex-shrink-0 mt-0.5">•</span>
-                                    <span><strong>Kecepatan:</strong> Klik tombol kecepatan di pojok kanan atas video (0.5x - 2x)</span>
+                                    <span><strong>Kecepatan:</strong> Klik kanan bawah video → titik 3 → kecepatan pemutaran (0.5x - 2x)</span>
                                 </li>
                                 <li className="flex items-start gap-2">
                                     <span className="flex-shrink-0 mt-0.5">•</span>
