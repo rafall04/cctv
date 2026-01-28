@@ -16,6 +16,8 @@ function Playback() {
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
     const [videoError, setVideoError] = useState(null);
+    const [isSeeking, setIsSeeking] = useState(false);
+    const [isBuffering, setIsBuffering] = useState(false);
     
     const videoRef = useRef(null);
     const timelineRef = useRef(null);
@@ -242,20 +244,103 @@ function Playback() {
         };
     }, [selectedSegment, selectedCamera]);
 
-    // Update current time
+    // Update current time and handle seeking
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
 
         const handleTimeUpdate = () => setCurrentTime(video.currentTime);
         const handleLoadedMetadata = () => setDuration(video.duration);
+        
+        // CRITICAL: Handle seeking events
+        const handleSeeking = () => {
+            console.log('[Video] Seeking to:', video.currentTime);
+            setIsSeeking(true);
+            setIsBuffering(true);
+            setVideoError(null);
+        };
+        
+        const handleSeeked = () => {
+            console.log('[Video] Seeked to:', video.currentTime, 'readyState:', video.readyState);
+            setIsSeeking(false);
+            
+            // CRITICAL: Force play after seek if video was playing
+            if (!video.paused) {
+                const playPromise = video.play();
+                if (playPromise !== undefined) {
+                    playPromise
+                        .then(() => {
+                            setIsBuffering(false);
+                        })
+                        .catch(error => {
+                            console.error('[Video] Play after seek failed:', error);
+                            // Retry once after 500ms
+                            setTimeout(() => {
+                                video.play()
+                                    .then(() => setIsBuffering(false))
+                                    .catch(e => {
+                                        console.error('[Video] Retry play failed:', e);
+                                        setIsBuffering(false);
+                                    });
+                            }, 500);
+                        });
+                }
+            } else {
+                setIsBuffering(false);
+            }
+        };
+        
+        const handleWaiting = () => {
+            console.log('[Video] Waiting for data at:', video.currentTime);
+            setIsBuffering(true);
+        };
+        
+        const handlePlaying = () => {
+            console.log('[Video] Playing at:', video.currentTime);
+            setIsBuffering(false);
+        };
+        
+        const handleCanPlay = () => {
+            console.log('[Video] Can play at:', video.currentTime);
+            setIsBuffering(false);
+        };
+        
+        const handleStalled = () => {
+            console.warn('[Video] Stalled at:', video.currentTime);
+            setIsBuffering(true);
+            
+            // Try to recover from stall after 3 seconds
+            setTimeout(() => {
+                if (video.readyState < 3 && video.networkState !== 3) {
+                    console.log('[Video] Attempting to recover from stall...');
+                    const currentPos = video.currentTime;
+                    video.load();
+                    video.currentTime = currentPos;
+                    if (!video.paused) {
+                        video.play().catch(e => console.error('[Video] Recovery play failed:', e));
+                    }
+                }
+            }, 3000);
+        };
 
         video.addEventListener('timeupdate', handleTimeUpdate);
         video.addEventListener('loadedmetadata', handleLoadedMetadata);
+        video.addEventListener('seeking', handleSeeking);
+        video.addEventListener('seeked', handleSeeked);
+        video.addEventListener('waiting', handleWaiting);
+        video.addEventListener('playing', handlePlaying);
+        video.addEventListener('canplay', handleCanPlay);
+        video.addEventListener('stalled', handleStalled);
 
         return () => {
             video.removeEventListener('timeupdate', handleTimeUpdate);
             video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            video.removeEventListener('seeking', handleSeeking);
+            video.removeEventListener('seeked', handleSeeked);
+            video.removeEventListener('waiting', handleWaiting);
+            video.removeEventListener('playing', handlePlaying);
+            video.removeEventListener('canplay', handleCanPlay);
+            video.removeEventListener('stalled', handleStalled);
         };
     }, [selectedSegment]);
 
@@ -404,7 +489,21 @@ function Playback() {
                             className="w-full h-full"
                             controls
                             playsInline
+                            preload="metadata"
+                            crossOrigin="anonymous"
                         />
+                        
+                        {/* Buffering/Seeking Indicator */}
+                        {(isBuffering || isSeeking) && !videoError && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/50 pointer-events-none">
+                                <div className="text-center">
+                                    <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-white mb-4 mx-auto"></div>
+                                    <p className="text-white text-lg font-medium">
+                                        {isSeeking ? 'Seeking...' : 'Buffering...'}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
                         
                         {/* Error Overlay */}
                         {videoError && (
