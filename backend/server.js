@@ -29,10 +29,12 @@ import viewerRoutes from './routes/viewerRoutes.js';
 import hlsProxyRoutes from './routes/hlsProxyRoutes.js';
 import sponsorRoutes from './routes/sponsorRoutes.js';
 import saweriaRoutes from './routes/saweriaRoutes.js';
+import recordingRoutes from './routes/recordingRoutes.js';
 import mediaMtxService from './services/mediaMtxService.js';
 import streamWarmer from './services/streamWarmer.js';
 import cameraHealthService from './services/cameraHealthService.js';
 import viewerSessionService from './services/viewerSessionService.js';
+import { recordingService } from './services/recordingService.js';
 
 const fastify = Fastify({
     logger: config.server.env === 'production' 
@@ -212,6 +214,7 @@ await fastify.register(viewerRoutes, { prefix: '/api/viewer' });
 await fastify.register(hlsProxyRoutes, { prefix: '/hls' });
 await fastify.register(sponsorRoutes, { prefix: '/api/sponsors' });
 await fastify.register(saweriaRoutes, { prefix: '/api/saweria' });
+await fastify.register(recordingRoutes, { prefix: '/api' });
 
 // ============================================
 // GLOBAL ERROR HANDLER
@@ -320,6 +323,11 @@ const start = async () => {
         // Start viewer session cleanup service
         viewerSessionService.startCleanup();
         console.log('[ViewerSession] Session cleanup service started (15s interval)');
+        
+        // Auto-start recordings untuk cameras yang enable_recording = 1
+        console.log('[Recording] Auto-starting recordings...');
+        await recordingService.autoStartRecordings();
+        console.log('[Recording] Recording service initialized');
     } catch (err) {
         fastify.log.error(err);
         process.exit(1);
