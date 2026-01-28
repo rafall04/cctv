@@ -266,6 +266,8 @@ export async function streamSegment(request, reply) {
     try {
         const { cameraId, filename } = request.params;
 
+        console.log(`[Stream Request] Camera: ${cameraId}, File: ${filename}`);
+
         // Validate segment exists in database
         const segment = queryOne(
             'SELECT * FROM recording_segments WHERE camera_id = ? AND filename = ?',
@@ -273,27 +275,48 @@ export async function streamSegment(request, reply) {
         );
 
         if (!segment) {
+            console.error(`[Stream Error] Segment not in database: ${filename}`);
             return reply.code(404).send({
                 success: false,
-                message: 'Segment not found'
+                message: 'Segment not found in database'
             });
         }
+
+        console.log(`[Stream Info] DB file_path: ${segment.file_path}, DB file_size: ${segment.file_size}`);
 
         // Check if file exists
         if (!existsSync(segment.file_path)) {
+            console.error(`[Stream Error] File not found on disk: ${segment.file_path}`);
             return reply.code(404).send({
                 success: false,
-                message: 'Segment file not found'
+                message: 'Segment file not found on disk'
             });
         }
 
-        // Get file stats
+        // Get ACTUAL file stats from disk
         const stats = statSync(segment.file_path);
+        console.log(`[Stream Info] Actual file size on disk: ${stats.size} bytes (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
+
+        // Update database if file size mismatch (file masih growing saat entry dibuat)
+        if (Math.abs(stats.size - segment.file_size) > 1024 * 1024) { // Difference > 1MB
+            console.log(`[Stream Info] Updating file size in database: ${segment.file_size} -> ${stats.size}`);
+            execute(
+                'UPDATE recording_segments SET file_size = ? WHERE id = ?',
+                [stats.size, segment.id]
+            );
+        }
+
+        // Set CORS headers explicitly
+        reply.header('Access-Control-Allow-Origin', '*');
+        reply.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        reply.header('Access-Control-Allow-Headers', 'Range');
+        reply.header('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
 
         // Set headers for video streaming
         reply.header('Content-Type', 'video/mp4');
         reply.header('Content-Length', stats.size);
         reply.header('Accept-Ranges', 'bytes');
+        reply.header('Cache-Control', 'public, max-age=3600');
 
         // Handle range requests (for seeking)
         const range = request.headers.range;
@@ -302,6 +325,8 @@ export async function streamSegment(request, reply) {
             const start = parseInt(parts[0], 10);
             const end = parts[1] ? parseInt(parts[1], 10) : stats.size - 1;
             const chunksize = (end - start) + 1;
+
+            console.log(`[Stream Info] Range request: ${start}-${end}/${stats.size}`);
 
             reply.code(206);
             reply.header('Content-Range', `bytes ${start}-${end}/${stats.size}`);
@@ -312,14 +337,16 @@ export async function streamSegment(request, reply) {
         }
 
         // Stream entire file
+        console.log(`[Stream Info] Streaming entire file: ${stats.size} bytes`);
         const stream = createReadStream(segment.file_path);
         return reply.send(stream);
 
     } catch (error) {
-        console.error('Stream segment error:', error);
+        console.error('[Stream Error] Exception:', error);
         return reply.code(500).send({
             success: false,
-            message: 'Internal server error'
+            message: 'Internal server error',
+            error: error.message
         });
     }
 }

@@ -235,44 +235,59 @@ class RecordingService {
         const cameraDir = join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
         const filePath = join(cameraDir, filename);
 
-        // Wait longer for large files to be fully written (10 seconds)
+        console.log(`[Segment] Detected new segment: camera${cameraId}/${filename}`);
+
+        // Wait 15 seconds for FFmpeg to finish writing the file
         setTimeout(async () => {
             try {
                 if (!existsSync(filePath)) {
-                    console.warn(`Segment file not found: ${filePath}`);
+                    console.warn(`[Segment] File not found: ${filePath}`);
                     return;
                 }
 
-                // Wait for file size to stabilize (check twice with 2s gap)
+                // Wait for file size to stabilize - check 3 times with 3s gaps
+                console.log(`[Segment] Waiting for file size to stabilize: ${filename}`);
+                
                 let fileSize1 = statSync(filePath).size;
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                await new Promise(resolve => setTimeout(resolve, 3000));
                 
                 if (!existsSync(filePath)) {
-                    console.warn(`Segment file disappeared: ${filePath}`);
+                    console.warn(`[Segment] File disappeared during check: ${filePath}`);
                     return;
                 }
                 
                 let fileSize2 = statSync(filePath).size;
+                await new Promise(resolve => setTimeout(resolve, 3000));
                 
-                // If file still growing, wait more
-                if (fileSize2 > fileSize1) {
-                    await new Promise(resolve => setTimeout(resolve, 3000));
+                if (!existsSync(filePath)) {
+                    console.warn(`[Segment] File disappeared during check: ${filePath}`);
+                    return;
+                }
+                
+                let fileSize3 = statSync(filePath).size;
+
+                // If file still growing, wait one more time
+                if (fileSize3 > fileSize2 || fileSize2 > fileSize1) {
+                    console.log(`[Segment] File still growing, waiting more... (${fileSize1} -> ${fileSize2} -> ${fileSize3})`);
+                    await new Promise(resolve => setTimeout(resolve, 5000));
                     if (!existsSync(filePath)) return;
-                    fileSize2 = statSync(filePath).size;
+                    fileSize3 = statSync(filePath).size;
                 }
 
-                const fileSize = fileSize2;
+                const fileSize = fileSize3;
 
-                // Skip if file is empty or too small (< 1MB = likely incomplete)
-                if (fileSize < 1024 * 1024) {
-                    console.warn(`Segment too small, skipping: ${filename} (${fileSize} bytes)`);
+                console.log(`[Segment] Final file size: ${(fileSize / 1024 / 1024).toFixed(2)} MB`);
+
+                // Skip if file is empty or too small (< 5MB = likely incomplete for 10min segment)
+                if (fileSize < 5 * 1024 * 1024) {
+                    console.warn(`[Segment] File too small, skipping: ${filename} (${(fileSize / 1024 / 1024).toFixed(2)} MB)`);
                     return;
                 }
 
                 // Parse filename untuk get timestamp
                 const match = filename.match(/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
                 if (!match) {
-                    console.warn(`Invalid filename format: ${filename}`);
+                    console.warn(`[Segment] Invalid filename format: ${filename}`);
                     return;
                 }
 
@@ -287,7 +302,12 @@ class RecordingService {
                 );
 
                 if (existing) {
-                    console.log(`Segment already in database: ${filename}`);
+                    console.log(`[Segment] Already in database, updating size: ${filename}`);
+                    // Update file size if different
+                    execute(
+                        'UPDATE recording_segments SET file_size = ? WHERE id = ?',
+                        [fileSize, existing.id]
+                    );
                     return;
                 }
 
@@ -307,15 +327,15 @@ class RecordingService {
                     ]
                 );
 
-                console.log(`✓ Segment created: camera${cameraId}/${filename} (${(fileSize / 1024 / 1024).toFixed(2)} MB)`);
+                console.log(`✓ Segment saved: camera${cameraId}/${filename} (${(fileSize / 1024 / 1024).toFixed(2)} MB)`);
 
                 // Auto-delete old segments
                 this.cleanupOldSegments(cameraId);
 
             } catch (error) {
-                console.error(`Error handling segment creation:`, error);
+                console.error(`[Segment] Error handling segment creation:`, error);
             }
-        }, 10000); // Wait 10 seconds for file to be fully written
+        }, 15000); // Wait 15 seconds initial delay
     }
 
     /**
