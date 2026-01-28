@@ -48,11 +48,30 @@ class RecordingService {
                 return { success: false, message: 'Camera not found' };
             }
 
+            // Validate RTSP URL
+            if (!camera.private_rtsp_url || !camera.private_rtsp_url.startsWith('rtsp://')) {
+                console.error(`Invalid RTSP URL for camera ${cameraId}: ${camera.private_rtsp_url}`);
+                return { success: false, message: 'Invalid RTSP URL' };
+            }
+
+            // Check if camera is enabled
+            if (!camera.enabled) {
+                return { success: false, message: 'Camera is disabled' };
+            }
+
+            // Check if recording is enabled
+            if (!camera.enable_recording) {
+                return { success: false, message: 'Recording not enabled for this camera' };
+            }
+
             // Create camera recording directory
             const cameraDir = join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
             if (!existsSync(cameraDir)) {
                 mkdirSync(cameraDir, { recursive: true });
             }
+
+            console.log(`Starting recording for camera ${cameraId} (${camera.name})`);
+            console.log(`RTSP URL: ${camera.private_rtsp_url.replace(/:[^:@]+@/, ':****@')}`); // Hide password
 
             // FFmpeg command - stream copy (no re-encoding)
             const outputPattern = join(cameraDir, '%Y%m%d_%H%M%S.mp4');
@@ -87,6 +106,8 @@ class RecordingService {
             });
 
             // Handle ffmpeg output
+            let ffmpegOutput = '';
+            
             ffmpeg.stdout.on('data', (data) => {
                 // Update last data time
                 const health = streamHealthMap.get(cameraId);
@@ -97,6 +118,7 @@ class RecordingService {
 
             ffmpeg.stderr.on('data', (data) => {
                 const output = data.toString();
+                ffmpegOutput += output;
                 
                 // Update last data time
                 const health = streamHealthMap.get(cameraId);
@@ -112,16 +134,27 @@ class RecordingService {
                         this.onSegmentCreated(cameraId, filename);
                     }
                 }
+                
+                // Log errors
+                if (output.includes('error') || output.includes('Error') || output.includes('failed')) {
+                    console.error(`[FFmpeg Camera ${cameraId}] ${output.trim()}`);
+                }
+            });
+
+            ffmpeg.on('error', (error) => {
+                console.error(`FFmpeg spawn error for camera ${cameraId}:`, error);
+                activeRecordings.delete(cameraId);
             });
 
             ffmpeg.on('close', (code) => {
-                console.log(`FFmpeg process for camera ${cameraId} exited with code ${code}`);
-                activeRecordings.delete(cameraId);
-                
-                // If unexpected exit, log it
                 if (code !== 0 && code !== null) {
+                    console.error(`FFmpeg process for camera ${cameraId} exited with code ${code}`);
+                    console.error(`Last FFmpeg output:\n${ffmpegOutput.slice(-1000)}`); // Last 1000 chars
                     this.logRestart(cameraId, 'process_crashed', false);
+                } else {
+                    console.log(`FFmpeg process for camera ${cameraId} stopped normally`);
                 }
+                activeRecordings.delete(cameraId);
             });
 
             // Update camera status

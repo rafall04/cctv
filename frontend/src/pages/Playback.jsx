@@ -55,15 +55,18 @@ function Playback() {
         const fetchSegments = async () => {
             try {
                 const response = await recordingService.getSegments(selectedCamera.id);
-                if (response.success) {
-                    setSegments(response.data);
+                if (response.success && response.data) {
+                    // Handle response structure: response.data.segments is the array
+                    const segmentsArray = response.data.segments || [];
+                    setSegments(segmentsArray);
                     // Auto-select latest segment
-                    if (response.data.length > 0) {
-                        setSelectedSegment(response.data[response.data.length - 1]);
+                    if (segmentsArray.length > 0) {
+                        setSelectedSegment(segmentsArray[segmentsArray.length - 1]);
                     }
                 }
             } catch (error) {
                 console.error('Failed to fetch segments:', error);
+                setSegments([]);
             }
         };
 
