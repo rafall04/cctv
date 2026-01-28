@@ -23,11 +23,13 @@ function Playback() {
     const [isSeeking, setIsSeeking] = useState(false);
     const [isBuffering, setIsBuffering] = useState(false);
     const [seekWarning, setSeekWarning] = useState(null); // Warning toast for long seeks
+    const [seekProgress, setSeekProgress] = useState(null); // Progress info for seeking
     
     const videoRef = useRef(null);
     const timelineRef = useRef(null);
     const isInitialLoadRef = useRef(true); // Track initial load
     const lastSeekTimeRef = useRef(0); // Track last seek position for smart limiting
+    const bufferingTimeoutRef = useRef(null); // Track buffering timeout
 
     // Fetch cameras with recording enabled
     useEffect(() => {
@@ -71,7 +73,12 @@ function Playback() {
         setIsSeeking(false);
         setIsBuffering(false);
         setSeekWarning(null); // Clear warning juga
+        setSeekProgress(null); // Clear progress info
         lastSeekTimeRef.current = 0; // Reset last seek position
+        if (bufferingTimeoutRef.current) {
+            clearTimeout(bufferingTimeoutRef.current);
+            bufferingTimeoutRef.current = null;
+        }
 
         const fetchSegments = async () => {
             try {
@@ -109,7 +116,12 @@ function Playback() {
             setIsSeeking(false);
             setIsBuffering(false);
             setSeekWarning(null);
+            setSeekProgress(null);
             lastSeekTimeRef.current = 0;
+            if (bufferingTimeoutRef.current) {
+                clearTimeout(bufferingTimeoutRef.current);
+                bufferingTimeoutRef.current = null;
+            }
         };
     }, [selectedCamera]); // Only depend on selectedCamera
 
@@ -315,56 +327,83 @@ function Playback() {
             const previousTime = lastSeekTimeRef.current || 0;
             const seekDistance = Math.abs(targetTime - previousTime);
             
-            // Clear previous warning
-            setSeekWarning(null);
+            console.log('[Seek] Target:', targetTime, 'Previous:', previousTime, 'Distance:', seekDistance);
             
             // If seek distance exceeds limit, apply limiter
             if (seekDistance > MAX_SEEK_DISTANCE) {
                 const direction = targetTime > previousTime ? 1 : -1;
                 const limitedTarget = previousTime + (MAX_SEEK_DISTANCE * direction);
                 
-                // Show warning - PERSISTENT until user seeks again or manually closes
+                // Calculate remaining distance
                 const remainingDistance = Math.abs(targetTime - limitedTarget);
                 const remainingMinutes = Math.floor(remainingDistance / 60);
+                const remainingSeconds = Math.floor(remainingDistance % 60);
                 
+                console.log('[Seek] Limited to:', limitedTarget, 'Remaining:', remainingDistance);
+                
+                // Show warning with progress info
                 setSeekWarning({
-                    message: `Skip dibatasi maksimal 3 menit per kali untuk menghindari buffering.`,
-                    suggestion: remainingMinutes > 0 
-                        ? `Masih ${remainingMinutes} menit lagi ke target. Skip lagi untuk lanjut.`
+                    type: 'limit',
+                    message: `Video melompat 3 menit (batas aman untuk menghindari buffering lama)`,
+                    remaining: remainingMinutes > 0 || remainingSeconds > 0
+                        ? `Masih tersisa ${remainingMinutes > 0 ? `${remainingMinutes} menit ` : ''}${remainingSeconds} detik lagi. Klik timeline lagi untuk lanjut.`
                         : null
                 });
                 
                 // Force limited seek
                 video.currentTime = limitedTarget;
                 lastSeekTimeRef.current = limitedTarget;
-                
-                // DON'T auto-hide warning - let user read it and close manually or seek again
             } else {
+                // Normal seek - clear warning if it was a limit warning
+                if (seekWarning?.type === 'limit') {
+                    setSeekWarning(null);
+                }
+                
                 // Update last seek position for next check
                 lastSeekTimeRef.current = targetTime;
             }
             
+            // Show seeking indicator
             setIsSeeking(true);
             setIsBuffering(true);
             setVideoError(null);
+            
+            // Clear any existing buffering timeout
+            if (bufferingTimeoutRef.current) {
+                clearTimeout(bufferingTimeoutRef.current);
+            }
         };
         
         const handleSeeked = () => {
+            console.log('[Seek] Seeked event fired');
             setIsSeeking(false);
             
-            // Force play after seek if video was playing
+            // DON'T immediately clear buffering - wait for video to actually start playing
+            // Set a timeout to clear buffering if video doesn't start playing
+            if (bufferingTimeoutRef.current) {
+                clearTimeout(bufferingTimeoutRef.current);
+            }
+            
+            bufferingTimeoutRef.current = setTimeout(() => {
+                console.log('[Seek] Buffering timeout - forcing clear');
+                setIsBuffering(false);
+            }, 3000); // 3 second timeout
+            
+            // Try to play after seek
             if (!video.paused) {
                 const playPromise = video.play();
                 if (playPromise !== undefined) {
                     playPromise
                         .then(() => {
-                            setIsBuffering(false);
+                            console.log('[Seek] Play successful after seek');
+                            // Buffering will be cleared by 'playing' event
                         })
                         .catch(error => {
                             console.error('[Video] Play after seek failed:', error);
+                            // Retry once after delay
                             setTimeout(() => {
                                 video.play()
-                                    .then(() => setIsBuffering(false))
+                                    .then(() => console.log('[Seek] Retry play successful'))
                                     .catch(e => {
                                         console.error('[Video] Retry play failed:', e);
                                         setIsBuffering(false);
@@ -372,21 +411,34 @@ function Playback() {
                             }, 500);
                         });
                 }
-            } else {
-                setIsBuffering(false);
             }
         };
         
         const handleWaiting = () => {
+            console.log('[Video] Waiting for data...');
             setIsBuffering(true);
         };
         
         const handlePlaying = () => {
+            console.log('[Video] Playing');
             setIsBuffering(false);
+            
+            // Clear buffering timeout when video starts playing
+            if (bufferingTimeoutRef.current) {
+                clearTimeout(bufferingTimeoutRef.current);
+                bufferingTimeoutRef.current = null;
+            }
         };
         
         const handleCanPlay = () => {
+            console.log('[Video] Can play');
             setIsBuffering(false);
+            
+            // Clear buffering timeout
+            if (bufferingTimeoutRef.current) {
+                clearTimeout(bufferingTimeoutRef.current);
+                bufferingTimeoutRef.current = null;
+            }
         };
         
         const handleStalled = () => {
@@ -446,8 +498,14 @@ function Playback() {
             video.removeEventListener('canplay', handleCanPlay);
             video.removeEventListener('stalled', handleStalled);
             video.removeEventListener('progress', handleProgress);
+            
+            // Clear buffering timeout
+            if (bufferingTimeoutRef.current) {
+                clearTimeout(bufferingTimeoutRef.current);
+                bufferingTimeoutRef.current = null;
+            }
         };
-    }, [selectedSegment]);
+    }, [selectedSegment, seekWarning]); // Add seekWarning to deps to preserve warning state
 
     // CRITICAL: Smart Seek Handler with 3-minute limit
     const handleSmartSeek = (targetTime) => {
@@ -456,13 +514,17 @@ function Playback() {
         const currentPos = videoRef.current.currentTime;
         const seekDistance = Math.abs(targetTime - currentPos);
         
-        // Clear previous warning
-        setSeekWarning(null);
+        console.log('[SmartSeek] Target:', targetTime, 'Current:', currentPos, 'Distance:', seekDistance);
         
         // If seek distance is within safe range, allow direct seek
         if (seekDistance <= MAX_SEEK_DISTANCE) {
             videoRef.current.currentTime = targetTime;
             lastSeekTimeRef.current = targetTime;
+            
+            // Clear limit warning if exists
+            if (seekWarning?.type === 'limit') {
+                setSeekWarning(null);
+            }
             return;
         }
         
@@ -470,22 +532,25 @@ function Playback() {
         const direction = targetTime > currentPos ? 1 : -1;
         const limitedTarget = currentPos + (MAX_SEEK_DISTANCE * direction);
         
-        // Show warning to user - PERSISTENT until user seeks again or manually closes
+        // Calculate remaining distance
         const remainingDistance = Math.abs(targetTime - limitedTarget);
         const remainingMinutes = Math.floor(remainingDistance / 60);
+        const remainingSeconds = Math.floor(remainingDistance % 60);
         
+        console.log('[SmartSeek] Limited to:', limitedTarget, 'Remaining:', remainingDistance);
+        
+        // Show user-friendly warning
         setSeekWarning({
-            message: `Skip dibatasi maksimal 3 menit per kali untuk menghindari buffering.`,
-            suggestion: remainingMinutes > 0 
-                ? `Masih ${remainingMinutes} menit lagi ke target. Klik lagi untuk lanjut.`
+            type: 'limit',
+            message: `Video melompat 3 menit (batas aman untuk menghindari buffering lama)`,
+            remaining: remainingMinutes > 0 || remainingSeconds > 0
+                ? `Masih tersisa ${remainingMinutes > 0 ? `${remainingMinutes} menit ` : ''}${remainingSeconds} detik lagi. Klik timeline lagi untuk lanjut.`
                 : null
         });
         
         // Perform limited seek
         videoRef.current.currentTime = limitedTarget;
         lastSeekTimeRef.current = limitedTarget;
-        
-        // DON'T auto-hide warning - let user read it and close manually or seek again
     };
     
     // Handle timeline click with smart seek
@@ -511,11 +576,16 @@ function Playback() {
     // Handle segment click
     const handleSegmentClick = (segment) => {
         setSelectedSegment(segment);
-        // Clear warning saat ganti segment
+        // Clear states saat ganti segment
         setSeekWarning(null);
+        setSeekProgress(null);
         setIsSeeking(false);
         setIsBuffering(false);
         lastSeekTimeRef.current = 0;
+        if (bufferingTimeoutRef.current) {
+            clearTimeout(bufferingTimeoutRef.current);
+            bufferingTimeoutRef.current = null;
+        }
     };
 
     // Format time
@@ -654,37 +724,46 @@ function Playback() {
                             crossOrigin="anonymous"
                         />
                         
-                        {/* Buffering/Seeking Indicator */}
+                        {/* Buffering/Seeking Indicator with Better UX */}
                         {(isBuffering || isSeeking) && !videoError && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/50 pointer-events-none">
-                                <div className="text-center">
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/60 pointer-events-none">
+                                <div className="text-center bg-black/80 px-8 py-6 rounded-xl">
                                     <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-white mb-4 mx-auto"></div>
-                                    <p className="text-white text-lg font-medium">
-                                        {isSeeking ? 'Seeking...' : 'Buffering...'}
+                                    <p className="text-white text-lg font-medium mb-2">
+                                        {isSeeking ? 'Memuat video...' : 'Buffering...'}
+                                    </p>
+                                    <p className="text-gray-300 text-sm">
+                                        {isSeeking ? 'Mohon tunggu, video sedang dimuat' : 'Menunggu data video'}
                                     </p>
                                 </div>
                             </div>
                         )}
                         
-                        {/* Seek Warning Toast */}
+                        {/* Seek Warning Toast - User Friendly */}
                         {seekWarning && (
-                            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 max-w-md w-full mx-4">
-                                <div className="bg-yellow-500 text-yellow-900 px-4 py-3 rounded-lg shadow-lg border-2 border-yellow-600">
+                            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 max-w-lg w-full mx-4">
+                                <div className="bg-blue-500 text-white px-5 py-4 rounded-xl shadow-2xl border-2 border-blue-400">
                                     <div className="flex items-start gap-3">
-                                        <svg className="w-6 h-6 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                        <svg className="w-7 h-7 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                                         </svg>
                                         <div className="flex-1">
-                                            <p className="font-semibold text-sm">{seekWarning.message}</p>
-                                            {seekWarning.suggestion && (
-                                                <p className="text-xs mt-1 text-yellow-800">{seekWarning.suggestion}</p>
+                                            <p className="font-bold text-base mb-1">ℹ️ Info Lompat Video</p>
+                                            <p className="text-sm mb-2">{seekWarning.message}</p>
+                                            {seekWarning.remaining && (
+                                                <div className="bg-blue-600 px-3 py-2 rounded-lg mt-2">
+                                                    <p className="text-sm font-medium">📍 {seekWarning.remaining}</p>
+                                                </div>
                                             )}
+                                            <p className="text-xs mt-2 text-blue-100">
+                                                💡 Tip: Ini normal dan mencegah video loading lama
+                                            </p>
                                         </div>
                                         <button
                                             onClick={() => setSeekWarning(null)}
-                                            className="flex-shrink-0 text-yellow-900 hover:text-yellow-950"
+                                            className="flex-shrink-0 text-white hover:text-blue-200 transition-colors"
                                         >
-                                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
                                                 <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                                             </svg>
                                         </button>
