@@ -81,6 +81,7 @@ function Playback() {
     useEffect(() => {
         if (!selectedSegment || !videoRef.current || !selectedCamera) return;
 
+        // Clear previous error state
         setVideoError(null);
         setDebugInfo(null);
 
@@ -98,7 +99,12 @@ function Playback() {
         console.log('Selected Camera:', selectedCamera);
         console.log('Selected Segment:', selectedSegment);
         console.log('Stream URL:', streamUrl);
-        console.log('Video Element:', videoRef.current);
+
+        // Clear video element first
+        const video = videoRef.current;
+        video.pause();
+        video.removeAttribute('src');
+        video.load(); // This triggers 'abort' and 'emptied' events
 
         // Test if URL is accessible
         fetch(streamUrl, { method: 'HEAD' })
@@ -146,13 +152,11 @@ function Playback() {
                     
                     console.log('File size check passed:', (fileSize / 1024 / 1024).toFixed(2), 'MB');
                     
-                    // Set video source
-                    videoRef.current.src = streamUrl;
-                    videoRef.current.load();
+                    // Set video source (only after validation passed)
+                    video.src = streamUrl;
+                    video.load();
                     
-                    console.log('Video src set to:', videoRef.current.src);
-                    console.log('Video readyState:', videoRef.current.readyState);
-                    console.log('Video networkState:', videoRef.current.networkState);
+                    console.log('Video src set to:', video.src);
                     
                     setDebugInfo(debugData);
                     
@@ -173,8 +177,6 @@ function Playback() {
             });
 
         // Video event listeners for debugging
-        const video = videoRef.current;
-        
         const handleLoadStart = () => console.log('Video: loadstart');
         const handleLoadedMetadata = () => {
             console.log('Video: loadedmetadata', {
@@ -196,20 +198,26 @@ function Playback() {
             };
             console.error('Video: error', errorInfo);
             
-            // Map error codes to messages
-            const errorMessages = {
-                1: 'MEDIA_ERR_ABORTED: Video loading aborted',
-                2: 'MEDIA_ERR_NETWORK: Network error while loading video',
-                3: 'MEDIA_ERR_DECODE: Video decoding failed',
-                4: 'MEDIA_ERR_SRC_NOT_SUPPORTED: Video format not supported'
-            };
-            
-            const errorMsg = errorMessages[video.error?.code] || 'Unknown video error';
-            setVideoError(errorMsg);
+            // Only set error if it's not an "Empty src" error (which happens during cleanup)
+            if (video.error && video.error.message && !video.error.message.includes('Empty src')) {
+                // Map error codes to messages
+                const errorMessages = {
+                    1: 'MEDIA_ERR_ABORTED: Video loading aborted',
+                    2: 'MEDIA_ERR_NETWORK: Network error while loading video',
+                    3: 'MEDIA_ERR_DECODE: Video decoding failed',
+                    4: 'MEDIA_ERR_SRC_NOT_SUPPORTED: Video format not supported (old segment format)'
+                };
+                
+                const errorMsg = errorMessages[video.error?.code] || 'Unknown video error';
+                setVideoError(errorMsg);
+            }
         };
         const handleStalled = () => console.warn('Video: stalled');
         const handleSuspend = () => console.log('Video: suspend');
-        const handleAbort = () => console.warn('Video: abort');
+        const handleAbort = () => {
+            console.log('Video: abort (cleanup)');
+            // Don't set error on abort - this is expected during cleanup
+        };
 
         video.addEventListener('loadstart', handleLoadStart);
         video.addEventListener('loadedmetadata', handleLoadedMetadata);
@@ -223,18 +231,21 @@ function Playback() {
 
         // Try to play after a short delay
         const playTimeout = setTimeout(() => {
-            const playPromise = video.play();
-            if (playPromise !== undefined) {
-                playPromise
-                    .then(() => {
-                        console.log('✓ Video playing successfully');
-                    })
-                    .catch(error => {
-                        console.error('✗ Play failed:', error.name, error.message);
-                        if (error.name !== 'AbortError') {
-                            setVideoError(`Play failed: ${error.message}`);
-                        }
-                    });
+            if (video.readyState >= 2) { // HAVE_CURRENT_DATA or better
+                const playPromise = video.play();
+                if (playPromise !== undefined) {
+                    playPromise
+                        .then(() => {
+                            console.log('✓ Video playing successfully');
+                            setVideoError(null); // Clear any previous errors
+                        })
+                        .catch(error => {
+                            console.error('✗ Play failed:', error.name, error.message);
+                            if (error.name !== 'AbortError') {
+                                setVideoError(`Play failed: ${error.message}`);
+                            }
+                        });
+                }
             }
         }, 500);
 
@@ -250,10 +261,10 @@ function Playback() {
             video.removeEventListener('suspend', handleSuspend);
             video.removeEventListener('abort', handleAbort);
             
-            if (videoRef.current) {
-                videoRef.current.pause();
-                videoRef.current.src = '';
-            }
+            // Proper cleanup
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
         };
     }, [selectedSegment, selectedCamera]);
 
@@ -641,48 +652,62 @@ function Playback() {
                         <div className="space-y-2 max-h-96 overflow-y-auto">
                             {[...segments].sort((a, b) => 
                                 new Date(b.start_time) - new Date(a.start_time)
-                            ).map((segment) => (
-                                <button
-                                    key={segment.id}
-                                    onClick={() => handleSegmentClick(segment)}
-                                    className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
-                                        selectedSegment?.id === segment.id
-                                            ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                                            : 'border-gray-200 dark:border-gray-800 hover:border-primary-300 dark:hover:border-primary-700'
-                                    }`}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                                                selectedSegment?.id === segment.id
-                                                    ? 'bg-primary-500 text-white'
-                                                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
-                                            }`}>
-                                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                                                    <path d="M8 5v14l11-7z"/>
-                                                </svg>
-                                            </div>
-                                            <div>
-                                                <div className="font-medium text-gray-900 dark:text-white">
-                                                    {formatTimestamp(segment.start_time)} - {formatTimestamp(segment.end_time)}
+                            ).map((segment) => {
+                                // Check if segment is likely old format (created before fragmented MP4 fix)
+                                const segmentDate = new Date(segment.created_at || segment.start_time);
+                                const cutoffDate = new Date('2026-01-28T13:00:00Z'); // Approximate time of fix
+                                const isOldFormat = segmentDate < cutoffDate;
+                                
+                                return (
+                                    <button
+                                        key={segment.id}
+                                        onClick={() => handleSegmentClick(segment)}
+                                        className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+                                            selectedSegment?.id === segment.id
+                                                ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                                                : 'border-gray-200 dark:border-gray-800 hover:border-primary-300 dark:hover:border-primary-700'
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                                                    selectedSegment?.id === segment.id
+                                                        ? 'bg-primary-500 text-white'
+                                                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                                                }`}>
+                                                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                                        <path d="M8 5v14l11-7z"/>
+                                                    </svg>
                                                 </div>
-                                                <div className="text-sm text-gray-600 dark:text-gray-400">
-                                                    Duration: {Math.round(segment.duration / 60)} min • Size: {formatFileSize(segment.file_size)}
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="font-medium text-gray-900 dark:text-white">
+                                                            {formatTimestamp(segment.start_time)} - {formatTimestamp(segment.end_time)}
+                                                        </div>
+                                                        {isOldFormat && (
+                                                            <span className="px-2 py-0.5 text-xs bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 rounded">
+                                                                Old Format
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                                                        Duration: {Math.round(segment.duration / 60)} min • Size: {formatFileSize(segment.file_size)}
+                                                    </div>
                                                 </div>
                                             </div>
+                                            
+                                            {selectedSegment?.id === segment.id && (
+                                                <div className="flex items-center gap-2 text-primary-500">
+                                                    <svg className="w-5 h-5 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
+                                                        <circle cx="12" cy="12" r="10"/>
+                                                    </svg>
+                                                    <span className="text-sm font-medium">Playing</span>
+                                                </div>
+                                            )}
                                         </div>
-                                        
-                                        {selectedSegment?.id === segment.id && (
-                                            <div className="flex items-center gap-2 text-primary-500">
-                                                <svg className="w-5 h-5 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
-                                                    <circle cx="12" cy="12" r="10"/>
-                                                </svg>
-                                                <span className="text-sm font-medium">Playing</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </button>
-                            ))}
+                                    </button>
+                                );
+                            })}
                         </div>
                     ) : (
                         <div className="text-center py-12 text-gray-600 dark:text-gray-400">
