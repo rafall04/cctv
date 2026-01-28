@@ -15,6 +15,8 @@ function Playback() {
     const [playbackSpeed, setPlaybackSpeed] = useState(1);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
+    const [videoError, setVideoError] = useState(null);
+    const [debugInfo, setDebugInfo] = useState(null);
     
     const videoRef = useRef(null);
     const timelineRef = useRef(null);
@@ -77,23 +79,148 @@ function Playback() {
 
     // Initialize video player (native HTML5, no HLS.js needed for MP4)
     useEffect(() => {
-        if (!selectedSegment || !videoRef.current) return;
+        if (!selectedSegment || !videoRef.current || !selectedCamera) return;
+
+        setVideoError(null);
+        setDebugInfo(null);
 
         const streamUrl = `${import.meta.env.VITE_API_URL}/api/recordings/${selectedCamera.id}/stream/${selectedSegment.filename}`;
-
-        // Direct MP4 playback (no HLS.js needed)
-        videoRef.current.src = streamUrl;
-        videoRef.current.load();
         
-        // Auto play
-        const playPromise = videoRef.current.play();
-        if (playPromise !== undefined) {
-            playPromise.catch(error => {
-                console.log('Auto-play prevented:', error);
+        const debugData = {
+            timestamp: new Date().toISOString(),
+            camera: { id: selectedCamera.id, name: selectedCamera.name },
+            segment: { filename: selectedSegment.filename, size: selectedSegment.file_size },
+            streamUrl: streamUrl,
+            apiUrl: import.meta.env.VITE_API_URL
+        };
+        
+        console.log('=== VIDEO PLAYER DEBUG ===');
+        console.log('Selected Camera:', selectedCamera);
+        console.log('Selected Segment:', selectedSegment);
+        console.log('Stream URL:', streamUrl);
+        console.log('Video Element:', videoRef.current);
+
+        // Test if URL is accessible
+        fetch(streamUrl, { method: 'HEAD' })
+            .then(response => {
+                const headInfo = {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: {
+                        contentType: response.headers.get('content-type'),
+                        contentLength: response.headers.get('content-length'),
+                        acceptRanges: response.headers.get('accept-ranges'),
+                        cors: response.headers.get('access-control-allow-origin')
+                    }
+                };
+                
+                console.log('HEAD Request Response:', headInfo);
+                debugData.headResponse = headInfo;
+                setDebugInfo(debugData);
+                
+                if (response.ok) {
+                    console.log('✓ URL is accessible');
+                    
+                    // Set video source
+                    videoRef.current.src = streamUrl;
+                    videoRef.current.load();
+                    
+                    console.log('Video src set to:', videoRef.current.src);
+                    console.log('Video readyState:', videoRef.current.readyState);
+                    console.log('Video networkState:', videoRef.current.networkState);
+                    
+                } else {
+                    const errorMsg = `HTTP ${response.status}: ${response.statusText}`;
+                    console.error('✗ URL returned error:', errorMsg);
+                    setVideoError(errorMsg);
+                }
+            })
+            .catch(error => {
+                const errorMsg = `Network error: ${error.message}`;
+                console.error('✗ Failed to fetch URL:', error);
+                setVideoError(errorMsg);
+                debugData.fetchError = error.message;
+                setDebugInfo(debugData);
             });
-        }
+
+        // Video event listeners for debugging
+        const video = videoRef.current;
+        
+        const handleLoadStart = () => console.log('Video: loadstart');
+        const handleLoadedMetadata = () => {
+            console.log('Video: loadedmetadata', {
+                duration: video.duration,
+                videoWidth: video.videoWidth,
+                videoHeight: video.videoHeight
+            });
+        };
+        const handleLoadedData = () => console.log('Video: loadeddata');
+        const handleCanPlay = () => console.log('Video: canplay');
+        const handleCanPlayThrough = () => console.log('Video: canplaythrough');
+        const handleError = (e) => {
+            const errorInfo = {
+                error: video.error,
+                code: video.error?.code,
+                message: video.error?.message,
+                networkState: video.networkState,
+                readyState: video.readyState
+            };
+            console.error('Video: error', errorInfo);
+            
+            // Map error codes to messages
+            const errorMessages = {
+                1: 'MEDIA_ERR_ABORTED: Video loading aborted',
+                2: 'MEDIA_ERR_NETWORK: Network error while loading video',
+                3: 'MEDIA_ERR_DECODE: Video decoding failed',
+                4: 'MEDIA_ERR_SRC_NOT_SUPPORTED: Video format not supported'
+            };
+            
+            const errorMsg = errorMessages[video.error?.code] || 'Unknown video error';
+            setVideoError(errorMsg);
+        };
+        const handleStalled = () => console.warn('Video: stalled');
+        const handleSuspend = () => console.log('Video: suspend');
+        const handleAbort = () => console.warn('Video: abort');
+
+        video.addEventListener('loadstart', handleLoadStart);
+        video.addEventListener('loadedmetadata', handleLoadedMetadata);
+        video.addEventListener('loadeddata', handleLoadedData);
+        video.addEventListener('canplay', handleCanPlay);
+        video.addEventListener('canplaythrough', handleCanPlayThrough);
+        video.addEventListener('error', handleError);
+        video.addEventListener('stalled', handleStalled);
+        video.addEventListener('suspend', handleSuspend);
+        video.addEventListener('abort', handleAbort);
+
+        // Try to play after a short delay
+        const playTimeout = setTimeout(() => {
+            const playPromise = video.play();
+            if (playPromise !== undefined) {
+                playPromise
+                    .then(() => {
+                        console.log('✓ Video playing successfully');
+                    })
+                    .catch(error => {
+                        console.error('✗ Play failed:', error.name, error.message);
+                        if (error.name !== 'AbortError') {
+                            setVideoError(`Play failed: ${error.message}`);
+                        }
+                    });
+            }
+        }, 500);
 
         return () => {
+            clearTimeout(playTimeout);
+            video.removeEventListener('loadstart', handleLoadStart);
+            video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            video.removeEventListener('loadeddata', handleLoadedData);
+            video.removeEventListener('canplay', handleCanPlay);
+            video.removeEventListener('canplaythrough', handleCanPlayThrough);
+            video.removeEventListener('error', handleError);
+            video.removeEventListener('stalled', handleStalled);
+            video.removeEventListener('suspend', handleSuspend);
+            video.removeEventListener('abort', handleAbort);
+            
             if (videoRef.current) {
                 videoRef.current.pause();
                 videoRef.current.src = '';
@@ -263,6 +390,30 @@ function Playback() {
                             playsInline
                         />
                         
+                        {/* Error Overlay */}
+                        {videoError && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/80 p-8">
+                                <div className="text-center max-w-md">
+                                    <svg className="w-16 h-16 mx-auto mb-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    <h3 className="text-xl font-semibold text-white mb-2">Video Error</h3>
+                                    <p className="text-red-300 mb-4">{videoError}</p>
+                                    <button
+                                        onClick={() => {
+                                            setVideoError(null);
+                                            if (videoRef.current) {
+                                                videoRef.current.load();
+                                            }
+                                        }}
+                                        className="px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors"
+                                    >
+                                        Retry
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                        
                         {/* Speed Control Overlay */}
                         <div className="absolute top-4 right-4 flex gap-2">
                             {[0.5, 1, 1.5, 2].map(speed => (
@@ -290,6 +441,84 @@ function Playback() {
                             </div>
                         )}
                     </div>
+                    
+                    {/* Debug Panel */}
+                    {debugInfo && (
+                        <div className="p-4 bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+                            <details className="text-sm">
+                                <summary className="cursor-pointer font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    🔍 Debug Information (Click to expand)
+                                </summary>
+                                <div className="mt-2 space-y-2 text-xs font-mono">
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="text-gray-600 dark:text-gray-400">Stream URL:</div>
+                                        <div className="text-gray-900 dark:text-white break-all">{debugInfo.streamUrl}</div>
+                                        
+                                        <div className="text-gray-600 dark:text-gray-400">API URL:</div>
+                                        <div className="text-gray-900 dark:text-white">{debugInfo.apiUrl}</div>
+                                        
+                                        <div className="text-gray-600 dark:text-gray-400">Camera ID:</div>
+                                        <div className="text-gray-900 dark:text-white">{debugInfo.camera.id}</div>
+                                        
+                                        <div className="text-gray-600 dark:text-gray-400">Filename:</div>
+                                        <div className="text-gray-900 dark:text-white">{debugInfo.segment.filename}</div>
+                                        
+                                        <div className="text-gray-600 dark:text-gray-400">DB File Size:</div>
+                                        <div className="text-gray-900 dark:text-white">{formatFileSize(debugInfo.segment.size)}</div>
+                                    </div>
+                                    
+                                    {debugInfo.headResponse && (
+                                        <>
+                                            <div className="border-t border-gray-300 dark:border-gray-600 pt-2 mt-2">
+                                                <div className="font-semibold text-gray-700 dark:text-gray-300 mb-1">HEAD Response:</div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div className="text-gray-600 dark:text-gray-400">Status:</div>
+                                                    <div className={debugInfo.headResponse.status === 200 ? 'text-green-600' : 'text-red-600'}>
+                                                        {debugInfo.headResponse.status} {debugInfo.headResponse.statusText}
+                                                    </div>
+                                                    
+                                                    <div className="text-gray-600 dark:text-gray-400">Content-Type:</div>
+                                                    <div className="text-gray-900 dark:text-white">{debugInfo.headResponse.headers.contentType || 'N/A'}</div>
+                                                    
+                                                    <div className="text-gray-600 dark:text-gray-400">Content-Length:</div>
+                                                    <div className="text-gray-900 dark:text-white">
+                                                        {debugInfo.headResponse.headers.contentLength 
+                                                            ? formatFileSize(parseInt(debugInfo.headResponse.headers.contentLength))
+                                                            : 'N/A'}
+                                                    </div>
+                                                    
+                                                    <div className="text-gray-600 dark:text-gray-400">Accept-Ranges:</div>
+                                                    <div className="text-gray-900 dark:text-white">{debugInfo.headResponse.headers.acceptRanges || 'N/A'}</div>
+                                                    
+                                                    <div className="text-gray-600 dark:text-gray-400">CORS:</div>
+                                                    <div className="text-gray-900 dark:text-white">{debugInfo.headResponse.headers.cors || 'N/A'}</div>
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+                                    
+                                    {debugInfo.fetchError && (
+                                        <div className="border-t border-red-300 dark:border-red-600 pt-2 mt-2">
+                                            <div className="font-semibold text-red-600 mb-1">Fetch Error:</div>
+                                            <div className="text-red-700 dark:text-red-400">{debugInfo.fetchError}</div>
+                                        </div>
+                                    )}
+                                    
+                                    <div className="border-t border-gray-300 dark:border-gray-600 pt-2 mt-2">
+                                        <button
+                                            onClick={() => {
+                                                const url = debugInfo.streamUrl;
+                                                window.open(url, '_blank');
+                                            }}
+                                            className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs"
+                                        >
+                                            Open URL in New Tab
+                                        </button>
+                                    </div>
+                                </div>
+                            </details>
+                        </div>
+                    )}
                 </div>
 
                 {/* Timeline */}
