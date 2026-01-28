@@ -113,7 +113,7 @@ export const createCameraSchema = {
                 anyOf: [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }]
             },
             recording_duration_hours: {
-                anyOf: [{ type: 'integer', minimum: 1, maximum: 24 }, { type: 'null' }]
+                anyOf: [{ type: 'integer', minimum: 1, maximum: 2160 }, { type: 'null' }]
             }
         },
         additionalProperties: false
@@ -182,7 +182,7 @@ export const updateCameraSchema = {
                 anyOf: [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }]
             },
             recording_duration_hours: {
-                anyOf: [{ type: 'integer', minimum: 1, maximum: 24 }, { type: 'null' }]
+                anyOf: [{ type: 'integer', minimum: 1, maximum: 2160 }, { type: 'null' }]
             }
         },
         additionalProperties: false
@@ -193,7 +193,7 @@ export const updateCameraSchema = {
         properties: {
             id: {
                 type: 'string',
-                pattern: '^[0-9]+$'
+                pattern: '^[0-9]+$'$'
             }
         }
     }
