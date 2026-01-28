@@ -66,6 +66,12 @@ function Playback() {
         setSelectedSegment(null);
         setSegments([]); // Clear segments array juga
         isInitialLoadRef.current = true; // Mark as initial load
+        
+        // CRITICAL FIX: Reset seeking/buffering states saat camera berubah
+        setIsSeeking(false);
+        setIsBuffering(false);
+        setSeekWarning(null); // Clear warning juga
+        lastSeekTimeRef.current = 0; // Reset last seek position
 
         const fetchSegments = async () => {
             try {
@@ -100,6 +106,10 @@ function Playback() {
             setSegments([]);
             setSelectedSegment(null);
             isInitialLoadRef.current = true; // Reset for next camera
+            setIsSeeking(false);
+            setIsBuffering(false);
+            setSeekWarning(null);
+            lastSeekTimeRef.current = 0;
         };
     }, [selectedCamera]); // Only depend on selectedCamera
 
@@ -313,7 +323,7 @@ function Playback() {
                 const direction = targetTime > previousTime ? 1 : -1;
                 const limitedTarget = previousTime + (MAX_SEEK_DISTANCE * direction);
                 
-                // Show warning
+                // Show warning - PERSISTENT until user seeks again or manually closes
                 const remainingDistance = Math.abs(targetTime - limitedTarget);
                 const remainingMinutes = Math.floor(remainingDistance / 60);
                 
@@ -328,8 +338,7 @@ function Playback() {
                 video.currentTime = limitedTarget;
                 lastSeekTimeRef.current = limitedTarget;
                 
-                // Auto-hide warning
-                setTimeout(() => setSeekWarning(null), 5000);
+                // DON'T auto-hide warning - let user read it and close manually or seek again
             } else {
                 // Update last seek position for next check
                 lastSeekTimeRef.current = targetTime;
@@ -461,7 +470,7 @@ function Playback() {
         const direction = targetTime > currentPos ? 1 : -1;
         const limitedTarget = currentPos + (MAX_SEEK_DISTANCE * direction);
         
-        // Show warning to user
+        // Show warning to user - PERSISTENT until user seeks again or manually closes
         const remainingDistance = Math.abs(targetTime - limitedTarget);
         const remainingMinutes = Math.floor(remainingDistance / 60);
         
@@ -476,8 +485,7 @@ function Playback() {
         videoRef.current.currentTime = limitedTarget;
         lastSeekTimeRef.current = limitedTarget;
         
-        // Auto-hide warning after 5 seconds
-        setTimeout(() => setSeekWarning(null), 5000);
+        // DON'T auto-hide warning - let user read it and close manually or seek again
     };
     
     // Handle timeline click with smart seek
@@ -503,6 +511,11 @@ function Playback() {
     // Handle segment click
     const handleSegmentClick = (segment) => {
         setSelectedSegment(segment);
+        // Clear warning saat ganti segment
+        setSeekWarning(null);
+        setIsSeeking(false);
+        setIsBuffering(false);
+        lastSeekTimeRef.current = 0;
     };
 
     // Format time
