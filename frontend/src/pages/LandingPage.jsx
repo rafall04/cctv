@@ -23,6 +23,8 @@ import SaweriaSupport from '../components/SaweriaSupport';
 import SaweriaLeaderboard from '../components/SaweriaLeaderboard';
 // Map view - lazy loaded for performance
 const MapView = lazy(() => import('../components/MapView'));
+// Playback - lazy loaded for performance
+const Playback = lazy(() => import('./Playback'));
 
 // ============================================
 // DEVICE-ADAPTIVE HLS CONFIG
@@ -2447,7 +2449,7 @@ function FilterDropdown({ areas, selected, onChange, cameras, kecamatans = [], k
 // ============================================
 function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, multiCameras }) {
     const [connectionTab, setConnectionTab] = useState('all'); // 'all', 'stable', 'tunnel'
-    const [viewMode, setViewMode] = useState('map'); // 'grid' or 'map'
+    const [viewMode, setViewMode] = useState('map'); // 'grid', 'map', or 'playback'
     const [searchQuery, setSearchQuery] = useState('');
     const [showSearchDropdown, setShowSearchDropdown] = useState(false);
     const [focusedCameraId, setFocusedCameraId] = useState(null);
@@ -2565,7 +2567,7 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                             </p>
                         </div>
                         
-                        {/* View Mode Toggle - Maps diutamakan di depan */}
+                        {/* View Mode Toggle - Maps, Grid, Playback */}
                         <div className="flex items-center p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
                             <button
                                 onClick={() => setViewMode('map')}
@@ -2588,6 +2590,17 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                                 title="Grid View (Multi-View)"
                             >
                                 <Icons.Grid />
+                            </button>
+                            <button
+                                onClick={() => setViewMode('playback')}
+                                className={`p-2.5 rounded-lg transition-colors ${
+                                    viewMode === 'playback'
+                                        ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-sky-400 shadow-sm'
+                                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                                }`}
+                                title="Playback Rekaman"
+                            >
+                                <Icons.Clock />
                             </button>
                         </div>
                     </div>
@@ -2827,6 +2840,14 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                             </button>
                         )}
                     </div>
+                ) : viewMode === 'playback' ? (
+                    <Suspense fallback={
+                        <div className="h-[600px] bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center">
+                            <div className="w-6 h-6 border-2 border-gray-300 border-t-sky-500 rounded-full animate-spin"/>
+                        </div>
+                    }>
+                        <Playback />
+                    </Suspense>
                 ) : viewMode === 'map' ? (
                     <Suspense fallback={
                         <div className="h-[450px] bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center">
