@@ -263,7 +263,7 @@ class RecordingService {
 
         console.log(`[Segment] Detected new segment: camera${cameraId}/${filename}`);
 
-        // Wait 15 seconds for FFmpeg to finish writing the file
+        // Reduced wait: 5 seconds (FFmpeg should have closed file by now)
         setTimeout(async () => {
             try {
                 if (!existsSync(filePath)) {
@@ -271,11 +271,11 @@ class RecordingService {
                     return;
                 }
 
-                // Wait for file size to stabilize - check 3 times with 3s gaps
-                console.log(`[Segment] Waiting for file size to stabilize: ${filename}`);
+                // Quick file size check - 2 times with 2s gaps (reduced from 3x3s)
+                console.log(`[Segment] Checking file stability: ${filename}`);
                 
                 let fileSize1 = statSync(filePath).size;
-                await new Promise(resolve => setTimeout(resolve, 3000));
+                await new Promise(resolve => setTimeout(resolve, 2000));
                 
                 if (!existsSync(filePath)) {
                     console.warn(`[Segment] File disappeared during check: ${filePath}`);
@@ -283,24 +283,16 @@ class RecordingService {
                 }
                 
                 let fileSize2 = statSync(filePath).size;
-                await new Promise(resolve => setTimeout(resolve, 3000));
-                
-                if (!existsSync(filePath)) {
-                    console.warn(`[Segment] File disappeared during check: ${filePath}`);
-                    return;
-                }
-                
-                let fileSize3 = statSync(filePath).size;
 
-                // If file still growing, wait one more time
-                if (fileSize3 > fileSize2 || fileSize2 > fileSize1) {
-                    console.log(`[Segment] File still growing, waiting more... (${fileSize1} -> ${fileSize2} -> ${fileSize3})`);
-                    await new Promise(resolve => setTimeout(resolve, 5000));
+                // If still growing, wait 3s more (reduced from 5s)
+                if (fileSize2 > fileSize1) {
+                    console.log(`[Segment] File still growing, waiting... (${fileSize1} -> ${fileSize2})`);
+                    await new Promise(resolve => setTimeout(resolve, 3000));
                     if (!existsSync(filePath)) return;
-                    fileSize3 = statSync(filePath).size;
+                    fileSize2 = statSync(filePath).size;
                 }
 
-                const fileSize = fileSize3;
+                const fileSize = fileSize2;
 
                 console.log(`[Segment] Final file size: ${(fileSize / 1024 / 1024).toFixed(2)} MB`);
 
@@ -310,19 +302,19 @@ class RecordingService {
                     return;
                 }
 
-                // CRITICAL: Wait additional 10 seconds to ensure FFmpeg finished writing
-                console.log(`[Segment] Waiting 10s to ensure file is complete: ${filename}`);
-                await new Promise(resolve => setTimeout(resolve, 10000));
+                // Reduced wait: 5 seconds (down from 10s)
+                console.log(`[Segment] Final wait to ensure file is complete: ${filename}`);
+                await new Promise(resolve => setTimeout(resolve, 5000));
                 
-                // Check file size one more time
+                // Quick final check
                 if (!existsSync(filePath)) {
                     console.warn(`[Segment] File disappeared: ${filePath}`);
                     return;
                 }
                 
                 const finalCheck = statSync(filePath).size;
-                if (finalCheck !== fileSize) {
-                    console.log(`[Segment] File still growing (${fileSize} -> ${finalCheck}), will retry later: ${filename}`);
+                if (Math.abs(finalCheck - fileSize) > 1024 * 100) { // Allow 100KB difference
+                    console.log(`[Segment] File still changing (${fileSize} -> ${finalCheck}), will retry later: ${filename}`);
                     return;
                 }
 
@@ -336,12 +328,12 @@ class RecordingService {
                     unlinkSync(tempPath);
                 }
                 
-                // Check if file is complete using ffprobe (synchronous)
+                // Quick ffprobe check (with shorter timeout)
                 try {
                     const { execSync } = await import('child_process');
                     const ffprobeOutput = execSync(
                         `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`,
-                        { encoding: 'utf8', timeout: 5000 }
+                        { encoding: 'utf8', timeout: 3000 } // Reduced from 5s to 3s
                     ).trim();
                     
                     if (!ffprobeOutput || parseFloat(ffprobeOutput) < 1) {

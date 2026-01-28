@@ -72,8 +72,8 @@ function Playback() {
         };
 
         fetchSegments();
-        // Refresh segments every 30 seconds
-        const interval = setInterval(fetchSegments, 30000);
+        // Refresh segments every 10 seconds for near real-time updates
+        const interval = setInterval(fetchSegments, 10000);
         return () => clearInterval(interval);
     }, [selectedCamera, selectedSegment]);
 
