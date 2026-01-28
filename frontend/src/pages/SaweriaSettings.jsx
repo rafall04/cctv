@@ -107,107 +107,105 @@ export default function SaweriaSettings() {
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl overflow-hidden">
-                    <div className="p-6 space-y-6">
-                        {/* Saweria Link */}
-                        <div>
-                            <label htmlFor="saweria_link" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Link Saweria <span className="text-red-500">*</span>
+                <div className="p-6 space-y-6">
+                    {/* Saweria Link */}
+                    <div>
+                        <label htmlFor="saweria_link" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Link Saweria <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                            type="url"
+                            id="saweria_link"
+                            name="saweria_link"
+                            value={settings.saweria_link}
+                            onChange={handleChange}
+                            placeholder="https://saweria.co/username"
+                            required
+                            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                        />
+                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                            Masukkan link profil Saweria Anda (harus dimulai dengan http:// atau https://)
+                        </p>
+                    </div>
+
+                    {/* Enable/Disable */}
+                    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+                        <div className="flex-1">
+                            <label htmlFor="enabled" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Aktifkan Popup Saweria
                             </label>
-                            <input
-                                type="url"
-                                id="saweria_link"
-                                name="saweria_link"
-                                value={settings.saweria_link}
-                                onChange={handleChange}
-                                placeholder="https://saweria.co/username"
-                                required
-                                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-                            />
-                            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                                Masukkan link profil Saweria Anda (harus dimulai dengan http:// atau https://)
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                Tampilkan popup donasi Saweria di halaman publik
                             </p>
                         </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                id="enabled"
+                                name="enabled"
+                                checked={settings.enabled}
+                                onChange={handleChange}
+                                className="sr-only peer"
+                            />
+                            <div className="w-14 h-7 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-300 dark:peer-focus:ring-sky-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all dark:border-gray-600 peer-checked:bg-sky-500"></div>
+                        </label>
+                    </div>
 
-                        {/* Enable/Disable */}
-                        <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
-                            <div className="flex-1">
-                                <label htmlFor="enabled" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Aktifkan Popup Saweria
-                                </label>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">
-                                    Tampilkan popup donasi Saweria di halaman publik
-                                </p>
-                            </div>
-                            <label className="relative inline-flex items-center cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    id="enabled"
-                                    name="enabled"
-                                    checked={settings.enabled}
-                                    onChange={handleChange}
-                                    className="sr-only peer"
-                                />
-                                <div className="w-14 h-7 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-300 dark:peer-focus:ring-sky-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all dark:border-gray-600 peer-checked:bg-sky-500"></div>
-                            </label>
-                        </div>
-
-                        {/* Preview */}
-                        {settings.saweria_link && (
-                            <div className="p-4 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-500/10 dark:to-amber-500/10 border border-orange-200 dark:border-orange-500/20 rounded-xl">
-                                <div className="flex items-center gap-3 mb-3">
-                                    <span className="text-2xl">☕</span>
-                                    <div>
-                                        <h4 className="font-semibold text-gray-900 dark:text-white">Preview Link</h4>
-                                        <p className="text-sm text-gray-600 dark:text-gray-400">Link ini akan digunakan di popup dan footer</p>
-                                    </div>
+                    {/* Preview */}
+                    {settings.saweria_link && (
+                        <div className="p-4 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-500/10 dark:to-amber-500/10 border border-orange-200 dark:border-orange-500/20 rounded-xl">
+                            <div className="flex items-center gap-3 mb-3">
+                                <span className="text-2xl">☕</span>
+                                <div>
+                                    <h4 className="font-semibold text-gray-900 dark:text-white">Preview Link</h4>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">Link ini akan digunakan di popup dan footer</p>
                                 </div>
-                                <a
-                                    href={settings.saweria_link}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 shadow-md text-sm"
-                                >
-                                    <span>☕</span>
-                                    <span>Traktir Kopi Yuk!</span>
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                    </svg>
-                                </a>
                             </div>
-                        )}
-                    </div>
+                            <a
+                                href={settings.saweria_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-105 shadow-md text-sm"
+                            >
+                                <span>☕</span>
+                                <span>Traktir Kopi Yuk!</span>
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                            </a>
+                        </div>
+                    )}
+                </div>
 
-                    {/* Footer */}
-                    <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700/50 flex justify-end gap-3">
-                        <button
-                            type="button"
-                            onClick={fetchSettings}
-                            disabled={saving}
-                            className="px-6 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                        >
-                            Reset
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={saving}
-                            className="px-6 py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-lg shadow-sky-500/30"
-                        >
-                            {saving ? (
-                                <span className="flex items-center gap-2">
-                                    <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    Menyimpan...
-                                </span>
-                            ) : (
-                                'Simpan Pengaturan'
-                            )}
-                        </button>
-                    </div>
-                </form>
+                {/* Footer */}
+                <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700/50 flex justify-end gap-3">
+                    <button
+                        type="button"
+                        onClick={fetchSettings}
+                        disabled={saving}
+                        className="px-6 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                    >
+                        Reset
+                    </button>
+                    <button
+                        type="submit"
+                        disabled={saving}
+                        className="px-6 py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-lg shadow-sky-500/30"
+                    >
+                        {saving ? (
+                            <span className="flex items-center gap-2">
+                                <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Menyimpan...
+                            </span>
+                        ) : (
+                            'Simpan Pengaturan'
+                        )}
+                    </button>
+                </div>
+            </form>
         </div>
     );
 }
-
-export default SaweriaSettings;
