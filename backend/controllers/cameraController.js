@@ -205,6 +205,17 @@ export async function createCamera(request, reply) {
             }
         }
 
+        // Start recording if enabled
+        if (isEnabled && isRecordingEnabled) {
+            try {
+                const { recordingService } = await import('../services/recordingService.js');
+                console.log(`[Camera ${result.lastInsertRowid}] Auto-starting recording (camera created with recording enabled)`);
+                await recordingService.startRecording(result.lastInsertRowid);
+            } catch (err) {
+                console.error(`[Camera ${result.lastInsertRowid}] Failed to start recording:`, err.message);
+            }
+        }
+
         return reply.code(201).send({
             success: true,
             message: 'Camera created successfully',
@@ -229,8 +240,8 @@ export async function updateCamera(request, reply) {
         const { id } = request.params;
         const { name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, enable_recording, recording_duration_hours } = request.body;
 
-        // Check if camera exists (include stream_key)
-        const existingCamera = queryOne('SELECT id, name, private_rtsp_url, enabled, stream_key FROM cameras WHERE id = ?', [id]);
+        // Check if camera exists (include stream_key and enable_recording)
+        const existingCamera = queryOne('SELECT id, name, private_rtsp_url, enabled, stream_key, enable_recording FROM cameras WHERE id = ?', [id]);
 
         if (!existingCamera) {
             return reply.code(404).send({
@@ -367,6 +378,34 @@ export async function updateCamera(request, reply) {
                 }
             } catch (err) {
                 console.error('MediaMTX update path error:', err.message);
+            }
+        }
+
+        // Handle recording start/stop when enable_recording changes
+        if (enable_recording !== undefined) {
+            const { recordingService } = await import('../services/recordingService.js');
+            const newRecordingEnabled = enable_recording === true || enable_recording === 1;
+            const oldRecordingEnabled = existingCamera.enable_recording === 1;
+            const cameraEnabled = (newEnabled === 1 || newEnabled === true);
+
+            if (newRecordingEnabled !== oldRecordingEnabled) {
+                if (newRecordingEnabled && cameraEnabled) {
+                    // Start recording
+                    console.log(`[Camera ${id}] Auto-starting recording (enable_recording changed to true)`);
+                    try {
+                        await recordingService.startRecording(parseInt(id));
+                    } catch (err) {
+                        console.error(`[Camera ${id}] Failed to start recording:`, err.message);
+                    }
+                } else if (!newRecordingEnabled) {
+                    // Stop recording
+                    console.log(`[Camera ${id}] Auto-stopping recording (enable_recording changed to false)`);
+                    try {
+                        await recordingService.stopRecording(parseInt(id));
+                    } catch (err) {
+                        console.error(`[Camera ${id}] Failed to stop recording:`, err.message);
+                    }
+                }
             }
         }
 
