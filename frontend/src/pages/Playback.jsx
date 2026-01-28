@@ -16,7 +16,6 @@ function Playback() {
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
     const [videoError, setVideoError] = useState(null);
-    const [debugInfo, setDebugInfo] = useState(null);
     
     const videoRef = useRef(null);
     const timelineRef = useRef(null);
@@ -60,8 +59,9 @@ function Playback() {
                     // Handle response structure: response.data.segments is the array
                     const segmentsArray = response.data.segments || [];
                     setSegments(segmentsArray);
-                    // Auto-select latest segment
-                    if (segmentsArray.length > 0) {
+                    
+                    // Auto-select latest segment ONLY if no segment is currently selected
+                    if (segmentsArray.length > 0 && !selectedSegment) {
                         setSelectedSegment(segmentsArray[segmentsArray.length - 1]);
                     }
                 }
@@ -75,7 +75,7 @@ function Playback() {
         // Refresh segments every 30 seconds
         const interval = setInterval(fetchSegments, 30000);
         return () => clearInterval(interval);
-    }, [selectedCamera]);
+    }, [selectedCamera, selectedSegment]);
 
     // Initialize video player (native HTML5, no HLS.js needed for MP4)
     useEffect(() => {
@@ -83,17 +83,8 @@ function Playback() {
 
         // Clear previous error state
         setVideoError(null);
-        setDebugInfo(null);
 
         const streamUrl = `${import.meta.env.VITE_API_URL}/api/recordings/${selectedCamera.id}/stream/${selectedSegment.filename}`;
-        
-        const debugData = {
-            timestamp: new Date().toISOString(),
-            camera: { id: selectedCamera.id, name: selectedCamera.name },
-            segment: { filename: selectedSegment.filename, size: selectedSegment.file_size },
-            streamUrl: streamUrl,
-            apiUrl: import.meta.env.VITE_API_URL
-        };
         
         console.log('=== VIDEO PLAYER DEBUG ===');
         console.log('Selected Camera:', selectedCamera);
@@ -109,44 +100,33 @@ function Playback() {
         // Test if URL is accessible
         fetch(streamUrl, { method: 'HEAD' })
             .then(response => {
-                const headInfo = {
+                console.log('HEAD Request Response:', {
                     status: response.status,
                     statusText: response.statusText,
-                    headers: {
-                        contentType: response.headers.get('content-type'),
-                        contentLength: response.headers.get('content-length'),
-                        acceptRanges: response.headers.get('accept-ranges'),
-                        cors: response.headers.get('access-control-allow-origin'),
-                        cacheControl: response.headers.get('cache-control')
-                    }
-                };
-                
-                console.log('HEAD Request Response:', headInfo);
-                debugData.headResponse = headInfo;
+                    contentType: response.headers.get('content-type'),
+                    contentLength: response.headers.get('content-length')
+                });
                 
                 if (response.ok) {
                     console.log('✓ URL is accessible');
-                    console.log('Content-Type:', headInfo.headers.contentType);
-                    console.log('Content-Length:', headInfo.headers.contentLength, 'bytes');
+                    
+                    const contentType = response.headers.get('content-type');
+                    const contentLength = response.headers.get('content-length');
                     
                     // Check if content-type is correct
-                    if (!headInfo.headers.contentType || !headInfo.headers.contentType.includes('video')) {
-                        const errorMsg = `Invalid Content-Type: ${headInfo.headers.contentType}`;
+                    if (!contentType || !contentType.includes('video')) {
+                        const errorMsg = `Invalid Content-Type: ${contentType}`;
                         console.error('✗', errorMsg);
                         setVideoError(errorMsg);
-                        debugData.error = errorMsg;
-                        setDebugInfo(debugData);
                         return;
                     }
                     
                     // Check if file size is reasonable (> 1MB for 10min segment)
-                    const fileSize = parseInt(headInfo.headers.contentLength || '0');
+                    const fileSize = parseInt(contentLength || '0');
                     if (fileSize < 1024 * 1024) {
                         const errorMsg = `File too small: ${(fileSize / 1024).toFixed(2)} KB (expected > 1 MB)`;
                         console.error('✗', errorMsg);
                         setVideoError(errorMsg);
-                        debugData.error = errorMsg;
-                        setDebugInfo(debugData);
                         return;
                     }
                     
@@ -158,22 +138,16 @@ function Playback() {
                     
                     console.log('Video src set to:', video.src);
                     
-                    setDebugInfo(debugData);
-                    
                 } else {
                     const errorMsg = `HTTP ${response.status}: ${response.statusText}`;
                     console.error('✗ URL returned error:', errorMsg);
                     setVideoError(errorMsg);
-                    debugData.error = errorMsg;
-                    setDebugInfo(debugData);
                 }
             })
             .catch(error => {
                 const errorMsg = `Network error: ${error.message}`;
                 console.error('✗ Failed to fetch URL:', error);
                 setVideoError(errorMsg);
-                debugData.fetchError = error.message;
-                setDebugInfo(debugData);
             });
 
         // Video event listeners for debugging
@@ -483,84 +457,6 @@ function Playback() {
                             </div>
                         )}
                     </div>
-                    
-                    {/* Debug Panel */}
-                    {debugInfo && (
-                        <div className="p-4 bg-gray-100 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-                            <details className="text-sm">
-                                <summary className="cursor-pointer font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    🔍 Debug Information (Click to expand)
-                                </summary>
-                                <div className="mt-2 space-y-2 text-xs font-mono">
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div className="text-gray-600 dark:text-gray-400">Stream URL:</div>
-                                        <div className="text-gray-900 dark:text-white break-all">{debugInfo.streamUrl}</div>
-                                        
-                                        <div className="text-gray-600 dark:text-gray-400">API URL:</div>
-                                        <div className="text-gray-900 dark:text-white">{debugInfo.apiUrl}</div>
-                                        
-                                        <div className="text-gray-600 dark:text-gray-400">Camera ID:</div>
-                                        <div className="text-gray-900 dark:text-white">{debugInfo.camera.id}</div>
-                                        
-                                        <div className="text-gray-600 dark:text-gray-400">Filename:</div>
-                                        <div className="text-gray-900 dark:text-white">{debugInfo.segment.filename}</div>
-                                        
-                                        <div className="text-gray-600 dark:text-gray-400">DB File Size:</div>
-                                        <div className="text-gray-900 dark:text-white">{formatFileSize(debugInfo.segment.size)}</div>
-                                    </div>
-                                    
-                                    {debugInfo.headResponse && (
-                                        <>
-                                            <div className="border-t border-gray-300 dark:border-gray-600 pt-2 mt-2">
-                                                <div className="font-semibold text-gray-700 dark:text-gray-300 mb-1">HEAD Response:</div>
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    <div className="text-gray-600 dark:text-gray-400">Status:</div>
-                                                    <div className={debugInfo.headResponse.status === 200 ? 'text-green-600' : 'text-red-600'}>
-                                                        {debugInfo.headResponse.status} {debugInfo.headResponse.statusText}
-                                                    </div>
-                                                    
-                                                    <div className="text-gray-600 dark:text-gray-400">Content-Type:</div>
-                                                    <div className="text-gray-900 dark:text-white">{debugInfo.headResponse.headers.contentType || 'N/A'}</div>
-                                                    
-                                                    <div className="text-gray-600 dark:text-gray-400">Content-Length:</div>
-                                                    <div className="text-gray-900 dark:text-white">
-                                                        {debugInfo.headResponse.headers.contentLength 
-                                                            ? formatFileSize(parseInt(debugInfo.headResponse.headers.contentLength))
-                                                            : 'N/A'}
-                                                    </div>
-                                                    
-                                                    <div className="text-gray-600 dark:text-gray-400">Accept-Ranges:</div>
-                                                    <div className="text-gray-900 dark:text-white">{debugInfo.headResponse.headers.acceptRanges || 'N/A'}</div>
-                                                    
-                                                    <div className="text-gray-600 dark:text-gray-400">CORS:</div>
-                                                    <div className="text-gray-900 dark:text-white">{debugInfo.headResponse.headers.cors || 'N/A'}</div>
-                                                </div>
-                                            </div>
-                                        </>
-                                    )}
-                                    
-                                    {debugInfo.fetchError && (
-                                        <div className="border-t border-red-300 dark:border-red-600 pt-2 mt-2">
-                                            <div className="font-semibold text-red-600 mb-1">Fetch Error:</div>
-                                            <div className="text-red-700 dark:text-red-400">{debugInfo.fetchError}</div>
-                                        </div>
-                                    )}
-                                    
-                                    <div className="border-t border-gray-300 dark:border-gray-600 pt-2 mt-2">
-                                        <button
-                                            onClick={() => {
-                                                const url = debugInfo.streamUrl;
-                                                window.open(url, '_blank');
-                                            }}
-                                            className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs"
-                                        >
-                                            Open URL in New Tab
-                                        </button>
-                                    </div>
-                                </div>
-                            </details>
-                        </div>
-                    )}
                 </div>
 
                 {/* Timeline */}
