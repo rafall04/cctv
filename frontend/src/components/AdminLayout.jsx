@@ -69,6 +69,7 @@ export default function AdminLayout({ children }) {
         { label: 'Dashboard', path: '/admin/dashboard', icon: <Icons.Dashboard />, color: 'sky' },
         { label: 'Analytics', path: '/admin/analytics', icon: <Icons.Analytics />, color: 'indigo' },
         { label: 'Cameras', path: '/admin/cameras', icon: <Icons.Camera />, color: 'emerald' },
+        { label: 'Recordings', path: '/admin/recordings', icon: <Icons.Camera />, color: 'red' },
         { label: 'Areas', path: '/admin/areas', icon: <Icons.MapPin />, color: 'purple' },
         { label: 'Sponsors', path: '/admin/sponsors', icon: <Icons.Feedback />, color: 'yellow' },
         { label: 'Users', path: '/admin/users', icon: <Icons.Users />, color: 'amber' },

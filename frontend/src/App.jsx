@@ -15,6 +15,7 @@ import Settings from './pages/Settings';
 import SaweriaSettings from './pages/SaweriaSettings';
 import Dashboard from './pages/Dashboard';
 import SponsorManagement from './pages/SponsorManagement';
+import RecordingDashboard from './pages/RecordingDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminLayout from './components/AdminLayout';
 
@@ -118,6 +119,16 @@ function App() {
                         <ProtectedRoute>
                             <AdminLayout>
                                 <SaweriaSettings />
+                            </AdminLayout>
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/admin/recordings"
+                    element={
+                        <ProtectedRoute>
+                            <AdminLayout>
+                                <RecordingDashboard />
                             </AdminLayout>
                         </ProtectedRoute>
                     }

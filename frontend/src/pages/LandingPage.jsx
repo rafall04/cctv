@@ -359,7 +359,7 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
                     </div>
                 )}
                 
-                {/* Status badges - LIVE with Tunnel indicator */}
+                {/* Status badges - LIVE with Tunnel indicator and Recording */}
                 <div className="absolute top-3 left-3 flex items-center gap-1.5">
                     {isMaintenance ? (
                         <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-600/90 text-white text-[10px] font-bold shadow-lg">
@@ -385,6 +385,16 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
                                 </span>
                                 LIVE
                             </span>
+                            {/* Recording badge - shown if camera is recording */}
+                            {camera.is_recording && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-600/90 text-white text-[10px] font-bold shadow-lg" title="Sedang merekam">
+                                    <span className="relative flex h-1.5 w-1.5">
+                                        {!disableAnimations && <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>}
+                                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
+                                    </span>
+                                    REC
+                                </span>
+                            )}
                             {/* Tunnel badge - shown next to LIVE if tunnel connection */}
                             {isTunnel && (
                                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-orange-500/90 text-white text-[10px] font-bold shadow-lg" title="Koneksi Tunnel - mungkin kurang stabil">
