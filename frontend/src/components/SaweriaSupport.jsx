@@ -231,18 +231,18 @@ export default function SaweriaSupport() {
         <>
             {/* Modal Popup - Device-Adaptive */}
             {showModal && (
-                <div className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 ${isLowEnd ? 'animate-fadeIn' : 'animate-fadeIn'}`}>
-                    {/* Backdrop - Simple on low-end, blur on high-end */}
+                <div className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 ${isLowEnd ? '' : 'animate-fadeIn'}`}>
+                    {/* Backdrop - No blur on low-end */}
                     <div 
-                        className={`absolute inset-0 bg-black/60 ${isLowEnd ? '' : 'backdrop-blur-sm'}`}
+                        className={`absolute inset-0 ${isLowEnd ? 'bg-black/70' : 'bg-black/60 backdrop-blur-sm'}`}
                         onClick={handleModalClose}
                     />
                     
-                    {/* Modal Content - Simplified animations on low-end */}
-                    <div className={`relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden ${isLowEnd ? 'animate-fadeIn' : 'animate-slideUp'}`}>
-                        {/* Gradient Header - Dynamic based on variation */}
+                    {/* Modal Content - No animations on low-end */}
+                    <div className={`relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden ${isLowEnd ? '' : 'animate-slideUp'}`}>
+                        {/* Gradient Header - No backdrop blur on low-end */}
                         <div className={`bg-gradient-to-r ${modalVariation.gradient} p-6 text-center`}>
-                            <div className={`w-16 h-16 mx-auto mb-4 bg-white/20 ${isLowEnd ? '' : 'backdrop-blur-sm'} rounded-full flex items-center justify-center ${isLowEnd ? '' : 'animate-bounce'}`}>
+                            <div className={`w-16 h-16 mx-auto mb-4 ${isLowEnd ? 'bg-white/30' : 'bg-white/20 backdrop-blur-sm'} rounded-full flex items-center justify-center ${isLowEnd ? '' : 'animate-bounce'}`}>
                                 <span className="text-4xl">{modalVariation.emoji}</span>
                             </div>
                             <h2 className="text-2xl font-bold text-white mb-2">
@@ -278,11 +278,11 @@ export default function SaweriaSupport() {
                                 {modalVariation.footer}
                             </p>
 
-                            {/* Buttons - Simplified hover on low-end */}
+                            {/* Buttons - No transform on low-end */}
                             <div className="flex flex-col gap-3">
                                 <button
                                     onClick={handleModalSupport}
-                                    className={`w-full bg-gradient-to-r ${modalVariation.gradient} hover:opacity-90 text-white font-semibold py-3 px-6 rounded-xl transition-opacity duration-300 ${isLowEnd ? '' : 'transform hover:scale-105'} shadow-lg`}
+                                    className={`w-full bg-gradient-to-r ${modalVariation.gradient} hover:opacity-90 text-white font-semibold py-3 px-6 rounded-xl transition-opacity shadow-lg`}
                                 >
                                     <span className="flex items-center justify-center gap-2">
                                         <span>{modalVariation.emoji}</span>
@@ -292,7 +292,7 @@ export default function SaweriaSupport() {
                                 
                                 <button
                                     onClick={handleModalClose}
-                                    className={`w-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium py-3 px-6 rounded-xl transition-colors duration-300`}
+                                    className="w-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium py-3 px-6 rounded-xl transition-colors"
                                 >
                                     Lain Kali Aja 😅
                                 </button>
@@ -315,21 +315,21 @@ export default function SaweriaSupport() {
 
             {/* Floating Banner - Persistent, Device-Adaptive */}
             {showBanner && (
-                <div className={`fixed bottom-6 right-6 z-[9998] transition-all duration-300 ${
+                <div className={`fixed bottom-6 right-6 z-[9998] transition-all ${
                     bannerMinimized ? 'w-14' : 'w-80'
-                }`} style={{ bottom: '5.5rem' }}> {/* Adjusted to avoid FeedbackWidget */}
+                }`} style={{ bottom: '5.5rem' }}>
                     {bannerMinimized ? (
-                        /* Minimized State - Simplified on low-end */
+                        /* Minimized State - No animations on low-end */
                         <button
                             onClick={handleBannerMaximize}
-                            className={`w-14 h-14 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-full shadow-lg transition-all duration-300 ${isLowEnd ? '' : 'hover:shadow-xl transform hover:scale-110'} flex items-center justify-center text-2xl ${isLowEnd ? '' : 'animate-bounce'}`}
+                            className={`w-14 h-14 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-full shadow-lg transition-colors flex items-center justify-center text-2xl ${isLowEnd ? '' : 'animate-bounce'}`}
                             title="Traktir Kopi Yuk!"
                         >
                             ☕
                         </button>
                     ) : (
-                        /* Expanded State - Simplified animations on low-end */
-                        <div className={`bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden border border-orange-200 dark:border-orange-900/30 ${isLowEnd ? 'animate-fadeIn' : 'animate-slideInRight'}`}>
+                        /* Expanded State - No animations on low-end */
+                        <div className={`bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden border border-orange-200 dark:border-orange-900/30 ${isLowEnd ? '' : 'animate-slideInRight'}`}>
                             {/* Header */}
                             <div className="bg-gradient-to-r from-orange-500 to-amber-500 p-4 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
@@ -385,7 +385,7 @@ export default function SaweriaSupport() {
 
                                 <button
                                     onClick={handleBannerSupport}
-                                    className={`w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold py-2.5 px-4 rounded-xl transition-all duration-300 ${isLowEnd ? '' : 'transform hover:scale-105'} shadow-md text-sm`}
+                                    className={`w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold py-2.5 px-4 rounded-xl transition-colors shadow-md text-sm`}
                                 >
                                     <span className="flex items-center justify-center gap-2">
                                         <span>☕</span>
