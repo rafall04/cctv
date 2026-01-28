@@ -653,10 +653,9 @@ function Playback() {
                             {[...segments].sort((a, b) => 
                                 new Date(b.start_time) - new Date(a.start_time)
                             ).map((segment) => {
-                                // Check if segment is likely old format (created before fragmented MP4 fix)
-                                const segmentDate = new Date(segment.created_at || segment.start_time);
-                                const cutoffDate = new Date('2026-01-28T13:00:00Z'); // Approximate time of fix
-                                const isOldFormat = segmentDate < cutoffDate;
+                                // Segment is likely compatible if duration is reasonable (> 1 minute)
+                                // Old format segments often have very short duration or very large file size relative to duration
+                                const isLikelyCompatible = segment.duration >= 60; // At least 1 minute
                                 
                                 return (
                                     <button
@@ -684,9 +683,9 @@ function Playback() {
                                                         <div className="font-medium text-gray-900 dark:text-white">
                                                             {formatTimestamp(segment.start_time)} - {formatTimestamp(segment.end_time)}
                                                         </div>
-                                                        {isOldFormat && (
+                                                        {!isLikelyCompatible && (
                                                             <span className="px-2 py-0.5 text-xs bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 rounded">
-                                                                Old Format
+                                                                May not play
                                                             </span>
                                                         )}
                                                     </div>
