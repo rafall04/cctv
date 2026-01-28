@@ -3405,15 +3405,18 @@ export default function LandingPage() {
                 const [camsRes, areasRes, saweriaRes] = await Promise.all([
                     streamService.getAllActiveStreams(),
                     areaService.getPublicAreas().catch(() => ({ success: false, data: [] })),
-                    getPublicSaweriaConfig().catch(() => ({ success: false, data: { enabled: true, saweria_link: 'https://saweria.co/raflialdi' } }))
+                    getPublicSaweriaConfig().catch((err) => {
+                        console.warn('Saweria config fetch failed, using defaults:', err);
+                        return { success: true, data: { enabled: true, saweria_link: 'https://saweria.co/raflialdi' } };
+                    })
                 ]);
                 
                 setCameras(camsRes.data || []);
                 setAreas(areasRes.data || []);
                 
-                // Set Saweria config
-                if (saweriaRes.success && saweriaRes.data) {
-                    setSaweriaEnabled(saweriaRes.data.enabled);
+                // Set Saweria config - with safe defaults
+                if (saweriaRes && saweriaRes.data) {
+                    setSaweriaEnabled(saweriaRes.data.enabled !== false);
                     if (saweriaRes.data.saweria_link) {
                         setSaweriaLink(saweriaRes.data.saweria_link);
                     }
