@@ -222,8 +222,8 @@ export default function AdminLayout({ children }) {
             )}
 
             {/* Main Content */}
-            <main className="lg:ml-72 min-h-screen">
-                <div className={`pb-8 px-4 lg:px-8 transition-all ${isOffline ? 'pt-32 lg:pt-20' : 'pt-20 lg:pt-8'}`}>
+            <main className="lg:ml-72 min-h-screen overflow-y-auto">
+                <div className={`pb-8 px-4 lg:px-8 transition-all ${isOffline ? 'pt-32 lg:pt-20' : 'pt-20 lg:pt-4'}`}>
                     <div className="max-w-7xl mx-auto">
                         {children}
                     </div>
