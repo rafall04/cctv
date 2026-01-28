@@ -36,6 +36,7 @@ export async function updateSaweriaSettingsHandler(request, reply) {
             logAdminAction({
                 action: 'saweria_settings_updated',
                 saweria_link: settings.saweria_link,
+                leaderboard_link: settings.leaderboard_link,
                 enabled: settings.enabled,
                 userId
             }, request);

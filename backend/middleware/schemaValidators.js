@@ -538,6 +538,10 @@ export const saweriaSettingsSchema = {
                 maxLength: 500,
                 pattern: '^https?://'
             },
+            leaderboard_link: {
+                type: 'string',
+                maxLength: 500
+            },
             enabled: {
                 type: 'boolean'
             }

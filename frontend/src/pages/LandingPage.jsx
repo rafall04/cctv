@@ -19,6 +19,8 @@ import { getGlobalStreamInitQueue, shouldUseQueuedInit } from '../utils/streamIn
 import FeedbackWidget from '../components/FeedbackWidget';
 // Saweria Support
 import SaweriaSupport from '../components/SaweriaSupport';
+// Saweria Leaderboard
+import SaweriaLeaderboard from '../components/SaweriaLeaderboard';
 // Map view - lazy loaded for performance
 const MapView = lazy(() => import('../components/MapView'));
 
@@ -3330,6 +3332,7 @@ export default function LandingPage() {
     
     // Saweria config state
     const [saweriaLink, setSaweriaLink] = useState('https://saweria.co/raflialdi');
+    const [saweriaLeaderboardLink, setSaweriaLeaderboardLink] = useState('');
     const [saweriaEnabled, setSaweriaEnabled] = useState(true);
     
     // Device-based stream limit
@@ -3419,6 +3422,9 @@ export default function LandingPage() {
                     setSaweriaEnabled(saweriaRes.data.enabled !== false);
                     if (saweriaRes.data.saweria_link) {
                         setSaweriaLink(saweriaRes.data.saweria_link);
+                    }
+                    if (saweriaRes.data.leaderboard_link) {
+                        setSaweriaLeaderboardLink(saweriaRes.data.leaderboard_link);
                     }
                 }
                 
@@ -3591,6 +3597,11 @@ export default function LandingPage() {
                 onAddMulti={handleAddMulti}
                 multiCameras={multiCameras}
             />
+
+            {/* Saweria Leaderboard - Placed after cameras section */}
+            {saweriaEnabled && saweriaLeaderboardLink && (
+                <SaweriaLeaderboard leaderboardLink={saweriaLeaderboardLink} />
+            )}
 
             <div className="flex-1" />
             <Footer 

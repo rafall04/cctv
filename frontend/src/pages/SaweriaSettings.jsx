@@ -8,6 +8,7 @@ export default function SaweriaSettings() {
     const [saving, setSaving] = useState(false);
     const [settings, setSettings] = useState({
         saweria_link: '',
+        leaderboard_link: '',
         enabled: true
     });
 
@@ -23,6 +24,7 @@ export default function SaweriaSettings() {
             if (response.success) {
                 setSettings({
                     saweria_link: response.data.saweria_link || '',
+                    leaderboard_link: response.data.leaderboard_link || '',
                     enabled: response.data.enabled === 1
                 });
             }
@@ -125,6 +127,25 @@ export default function SaweriaSettings() {
                         />
                         <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
                             Masukkan link profil Saweria Anda (harus dimulai dengan http:// atau https://)
+                        </p>
+                    </div>
+
+                    {/* Leaderboard Link */}
+                    <div>
+                        <label htmlFor="leaderboard_link" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Link Leaderboard Saweria
+                        </label>
+                        <input
+                            type="url"
+                            id="leaderboard_link"
+                            name="leaderboard_link"
+                            value={settings.leaderboard_link}
+                            onChange={handleChange}
+                            placeholder="https://saweria.co/overlays/leaderboard/username"
+                            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                        />
+                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                            Link leaderboard akan ditampilkan di halaman publik (opsional)
                         </p>
                     </div>
 

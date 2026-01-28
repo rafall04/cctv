@@ -12,6 +12,7 @@ export function getSaweriaSettings() {
             return {
                 id: 1,
                 saweria_link: 'https://saweria.co/raflialdi',
+                leaderboard_link: 'https://saweria.co/overlays/leaderboard/raflialdi',
                 enabled: 1,
                 updated_at: new Date().toISOString()
             };
@@ -29,16 +30,17 @@ export function getSaweriaSettings() {
  */
 export function updateSaweriaSettings(userId, settings) {
     try {
-        const { saweria_link, enabled } = settings;
+        const { saweria_link, leaderboard_link, enabled } = settings;
 
         const result = execute(`
             UPDATE saweria_settings 
             SET 
                 saweria_link = ?,
+                leaderboard_link = ?,
                 enabled = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = 1
-        `, [saweria_link, enabled ? 1 : 0]);
+        `, [saweria_link, leaderboard_link || null, enabled ? 1 : 0]);
 
         return result.changes > 0;
     } catch (error) {
@@ -58,20 +60,23 @@ export function getPublicSaweriaConfig() {
         if (!settings.enabled) {
             return {
                 enabled: false,
-                saweria_link: null
+                saweria_link: null,
+                leaderboard_link: null
             };
         }
         
         return {
             enabled: true,
-            saweria_link: settings.saweria_link
+            saweria_link: settings.saweria_link,
+            leaderboard_link: settings.leaderboard_link
         };
     } catch (error) {
         console.error('Error getting public Saweria config:', error);
         // Return safe default
         return {
             enabled: true,
-            saweria_link: 'https://saweria.co/raflialdi'
+            saweria_link: 'https://saweria.co/raflialdi',
+            leaderboard_link: 'https://saweria.co/overlays/leaderboard/raflialdi'
         };
     }
 }
