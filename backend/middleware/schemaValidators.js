@@ -64,7 +64,7 @@ export const createCameraSchema = {
                 type: 'string',
                 minLength: 1,
                 maxLength: 500,
-                pattern: '^rtsp://'
+                pattern: '^rtsp://.+$'
             },
             description: {
                 anyOf: [{ type: 'string', maxLength: 500 }, { type: 'null' }]
@@ -133,7 +133,7 @@ export const updateCameraSchema = {
                 type: 'string',
                 minLength: 1,
                 maxLength: 500,
-                pattern: '^rtsp://'
+                pattern: '^rtsp://.+$'
             },
             description: {
                 anyOf: [{ type: 'string', maxLength: 500 }, { type: 'null' }]
@@ -548,7 +548,7 @@ export const saweriaSettingsSchema = {
                 type: 'string',
                 minLength: 1,
                 maxLength: 500,
-                pattern: '^https?://'
+                pattern: '^https?://.+$'
             },
             leaderboard_link: {
                 type: 'string',
