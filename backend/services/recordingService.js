@@ -310,6 +310,22 @@ class RecordingService {
                     return;
                 }
 
+                // CRITICAL: Wait additional 10 seconds to ensure FFmpeg finished writing
+                console.log(`[Segment] Waiting 10s to ensure file is complete: ${filename}`);
+                await new Promise(resolve => setTimeout(resolve, 10000));
+                
+                // Check file size one more time
+                if (!existsSync(filePath)) {
+                    console.warn(`[Segment] File disappeared: ${filePath}`);
+                    return;
+                }
+                
+                const finalCheck = statSync(filePath).size;
+                if (finalCheck !== fileSize) {
+                    console.log(`[Segment] File still growing (${fileSize} -> ${finalCheck}), will retry later: ${filename}`);
+                    return;
+                }
+
                 // CRITICAL FIX: Re-mux file to create proper MP4 index for seeking
                 console.log(`[Segment] Re-muxing file to fix MP4 index: ${filename}`);
                 const tempPath = filePath + '.remux.mp4';
@@ -620,10 +636,16 @@ class RecordingService {
             
             const cameraDirs = readdirSync(RECORDINGS_BASE_PATH);
             let cleanedCount = 0;
+            let dbCleanedCount = 0;
             
             cameraDirs.forEach(cameraDir => {
                 const fullPath = join(RECORDINGS_BASE_PATH, cameraDir);
                 if (!statSync(fullPath).isDirectory()) return;
+                
+                // Extract camera ID from directory name (e.g., "camera1" -> 1)
+                const cameraIdMatch = cameraDir.match(/camera(\d+)/);
+                if (!cameraIdMatch) return;
+                const cameraId = parseInt(cameraIdMatch[1]);
                 
                 const files = readdirSync(fullPath);
                 files.forEach(file => {
@@ -635,12 +657,30 @@ class RecordingService {
                         console.log(`[Cleanup] Deleted temp file: ${cameraDir}/${file}`);
                     }
                 });
+                
+                // Cleanup database entries for files that don't exist
+                const dbSegments = query(
+                    'SELECT * FROM recording_segments WHERE camera_id = ?',
+                    [cameraId]
+                );
+                
+                dbSegments.forEach(segment => {
+                    // Check if filename contains temp extensions or file doesn't exist
+                    if (segment.filename.includes('.temp.mp4') || 
+                        segment.filename.includes('.remux.mp4') ||
+                        !existsSync(segment.file_path)) {
+                        
+                        execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
+                        dbCleanedCount++;
+                        console.log(`[Cleanup] Deleted DB entry: ${segment.filename}`);
+                    }
+                });
             });
             
-            if (cleanedCount > 0) {
-                console.log(`[Cleanup] ✓ Cleaned up ${cleanedCount} temp files`);
+            if (cleanedCount > 0 || dbCleanedCount > 0) {
+                console.log(`[Cleanup] ✓ Cleaned up ${cleanedCount} temp files and ${dbCleanedCount} DB entries`);
             } else {
-                console.log('[Cleanup] No temp files found');
+                console.log('[Cleanup] No temp files or orphaned DB entries found');
             }
         } catch (error) {
             console.error('[Cleanup] Error cleaning temp files:', error);
