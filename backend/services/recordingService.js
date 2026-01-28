@@ -1,5 +1,5 @@
 import { spawn } from 'child_process';
-import { existsSync, mkdirSync, unlinkSync, statSync } from 'fs';
+import { existsSync, mkdirSync, unlinkSync, statSync, renameSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { query, queryOne, execute } from '../database/database.js';
@@ -73,7 +73,7 @@ class RecordingService {
             console.log(`Starting recording for camera ${cameraId} (${camera.name})`);
             console.log(`RTSP URL: ${camera.private_rtsp_url.replace(/:[^:@]+@/, ':****@')}`); // Hide password
 
-            // FFmpeg command - stream copy with proper MP4 for web
+            // FFmpeg command - stream copy with fragmented MP4 for web streaming
             const outputPattern = join(cameraDir, '%Y%m%d_%H%M%S.mp4');
             const ffmpegArgs = [
                 '-rtsp_transport', 'tcp',
@@ -84,7 +84,8 @@ class RecordingService {
                 '-f', 'segment',                 // Split ke segments
                 '-segment_time', '600',          // 10 menit per file (akan dipotong di keyframe terdekat)
                 '-segment_format', 'mp4',
-                '-segment_format_options', 'movflags=+faststart', // Web-compatible MP4 dengan proper index
+                // CRITICAL: Use frag_keyframe for seekable fragmented MP4
+                '-movflags', '+frag_keyframe+empty_moov+default_base_moof+faststart',
                 '-segment_atclocktime', '1',     // Align dengan clock time
                 '-reset_timestamps', '1',
                 '-strftime', '1',
@@ -287,6 +288,55 @@ class RecordingService {
                     return;
                 }
 
+                // CRITICAL FIX: Re-mux file to create proper MP4 index for seeking
+                console.log(`[Segment] Re-muxing file to fix MP4 index: ${filename}`);
+                const tempPath = filePath + '.temp.mp4';
+                
+                await new Promise((resolve, reject) => {
+                    const ffmpeg = spawn('ffmpeg', [
+                        '-i', filePath,
+                        '-c', 'copy',                    // Copy streams (no re-encode)
+                        '-movflags', '+faststart',       // Move moov atom to start
+                        '-y',                            // Overwrite
+                        tempPath
+                    ]);
+
+                    let ffmpegError = '';
+                    ffmpeg.stderr.on('data', (data) => {
+                        ffmpegError += data.toString();
+                    });
+
+                    ffmpeg.on('close', (code) => {
+                        if (code === 0) {
+                            console.log(`[Segment] Re-mux successful: ${filename}`);
+                            resolve();
+                        } else {
+                            console.error(`[Segment] Re-mux failed (code ${code}):`, ffmpegError.slice(-500));
+                            reject(new Error(`FFmpeg re-mux failed with code ${code}`));
+                        }
+                    });
+
+                    ffmpeg.on('error', (error) => {
+                        console.error(`[Segment] Re-mux spawn error:`, error);
+                        reject(error);
+                    });
+                });
+
+                // Replace original with re-muxed file
+                if (existsSync(tempPath)) {
+                    const tempStats = statSync(tempPath);
+                    console.log(`[Segment] Re-muxed file size: ${(tempStats.size / 1024 / 1024).toFixed(2)} MB`);
+                    
+                    // Delete original and rename temp
+                    unlinkSync(filePath);
+                    fs.renameSync(tempPath, filePath);
+                    
+                    console.log(`[Segment] ✓ File replaced with re-muxed version`);
+                } else {
+                    console.error(`[Segment] Re-muxed file not found: ${tempPath}`);
+                    return;
+                }
+
                 // Parse filename untuk get timestamp
                 const match = filename.match(/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
                 if (!match) {
@@ -297,6 +347,10 @@ class RecordingService {
                 const [, year, month, day, hour, minute, second] = match;
                 const startTime = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
                 const endTime = new Date(startTime.getTime() + 10 * 60 * 1000); // +10 menit
+
+                // Get final file size after re-mux
+                const finalStats = statSync(filePath);
+                const finalSize = finalStats.size;
 
                 // Check if already in database (prevent duplicates)
                 const existing = queryOne(
@@ -309,7 +363,7 @@ class RecordingService {
                     // Update file size if different
                     execute(
                         'UPDATE recording_segments SET file_size = ? WHERE id = ?',
-                        [fileSize, existing.id]
+                        [finalSize, existing.id]
                     );
                     return;
                 }
@@ -324,13 +378,13 @@ class RecordingService {
                         filename,
                         startTime.toISOString(),
                         endTime.toISOString(),
-                        fileSize,
+                        finalSize,
                         600, // 10 menit
                         filePath
                     ]
                 );
 
-                console.log(`✓ Segment saved: camera${cameraId}/${filename} (${(fileSize / 1024 / 1024).toFixed(2)} MB)`);
+                console.log(`✓ Segment saved: camera${cameraId}/${filename} (${(finalSize / 1024 / 1024).toFixed(2)} MB)`);
 
                 // Auto-delete old segments
                 this.cleanupOldSegments(cameraId);
