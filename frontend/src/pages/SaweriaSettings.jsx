@@ -75,15 +75,16 @@ function SaweriaSettings() {
 
     return (
         <AdminLayout>
-            {/* Header */}
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-                    Pengaturan Saweria
-                </h1>
-                <p className="text-gray-600 dark:text-gray-400">
-                    Kelola link donasi Saweria untuk website Anda
-                </p>
-            </div>
+            <div className="-mt-16 lg:-mt-0">
+                {/* Header */}
+                <div className="mb-8">
+                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                        Pengaturan Saweria
+                    </h1>
+                    <p className="text-gray-600 dark:text-gray-400">
+                        Kelola link donasi Saweria untuk website Anda
+                    </p>
+                </div>
 
             {/* Info Box */}
             <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl">
@@ -208,6 +209,7 @@ function SaweriaSettings() {
                         </button>
                     </div>
                 </form>
+            </div>
         </AdminLayout>
     );
 }
