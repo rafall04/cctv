@@ -125,8 +125,14 @@ function Playback() {
         video.removeAttribute('src');
         video.load(); // This triggers 'abort' and 'emptied' events
 
+        // CRITICAL FIX: Use AbortController to cancel fetch on cleanup
+        const abortController = new AbortController();
+
         // Test if URL is accessible
-        fetch(streamUrl, { method: 'HEAD' })
+        fetch(streamUrl, { 
+            method: 'HEAD',
+            signal: abortController.signal // Add abort signal
+        })
             .then(response => {
                 console.log('HEAD Request Response:', {
                     status: response.status,
@@ -173,6 +179,12 @@ function Playback() {
                 }
             })
             .catch(error => {
+                // Ignore AbortError - this is expected during cleanup
+                if (error.name === 'AbortError') {
+                    console.log('✓ Fetch aborted (cleanup)');
+                    return;
+                }
+                
                 const errorMsg = `Network error: ${error.message}`;
                 console.error('✗ Failed to fetch URL:', error);
                 setVideoError(errorMsg);
@@ -252,6 +264,9 @@ function Playback() {
         }, 500);
 
         return () => {
+            // CRITICAL: Abort fetch request to prevent 404 errors from old camera
+            abortController.abort();
+            
             clearTimeout(playTimeout);
             video.removeEventListener('loadstart', handleLoadStart);
             video.removeEventListener('loadedmetadata', handleLoadedMetadata);
