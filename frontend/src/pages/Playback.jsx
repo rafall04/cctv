@@ -57,6 +57,7 @@ function Playback() {
         // CRITICAL FIX: Reset selected segment saat camera berubah
         // Ini mencegah HTTP 404 karena segment dari camera lama
         setSelectedSegment(null);
+        setSegments([]); // Clear segments array juga
 
         const fetchSegments = async () => {
             try {
@@ -66,7 +67,7 @@ function Playback() {
                     const segmentsArray = response.data.segments || [];
                     setSegments(segmentsArray);
                     
-                    // Auto-select latest segment
+                    // Auto-select latest segment ONLY if segments exist
                     if (segmentsArray.length > 0) {
                         setSelectedSegment(segmentsArray[segmentsArray.length - 1]);
                     }
@@ -74,18 +75,34 @@ function Playback() {
             } catch (error) {
                 console.error('Failed to fetch segments:', error);
                 setSegments([]);
+                setSelectedSegment(null); // Clear segment on error
             }
         };
 
         fetchSegments();
         // Refresh segments every 10 seconds for near real-time updates
         const interval = setInterval(fetchSegments, 10000);
-        return () => clearInterval(interval);
-    }, [selectedCamera]); // Remove selectedSegment dari dependency
+        
+        // CRITICAL: Cleanup interval when camera changes
+        return () => {
+            clearInterval(interval);
+            // Clear states on unmount/camera change
+            setSegments([]);
+            setSelectedSegment(null);
+        };
+    }, [selectedCamera]); // Only depend on selectedCamera
 
     // Initialize video player (native HTML5, no HLS.js needed for MP4)
     useEffect(() => {
         if (!selectedSegment || !videoRef.current || !selectedCamera) return;
+
+        // CRITICAL VALIDATION: Pastikan segment benar-benar dari camera yang dipilih
+        // Cek apakah segment ada di segments array (yang sudah di-filter by camera)
+        const segmentBelongsToCamera = segments.some(s => s.id === selectedSegment.id);
+        if (!segmentBelongsToCamera && segments.length > 0) {
+            console.warn('⚠️ Selected segment does not belong to current camera, skipping');
+            return;
+        }
 
         // Clear previous error state
         setVideoError(null);
@@ -96,6 +113,7 @@ function Playback() {
         console.log('Selected Camera:', selectedCamera);
         console.log('Selected Segment:', selectedSegment);
         console.log('Stream URL:', streamUrl);
+        console.log('Segment belongs to camera:', segmentBelongsToCamera);
 
         // Clear video element first
         const video = videoRef.current;
@@ -246,7 +264,7 @@ function Playback() {
             video.removeAttribute('src');
             video.load();
         };
-    }, [selectedSegment, selectedCamera]);
+    }, [selectedSegment, selectedCamera, segments]); // Add segments to dependency
 
     // Update current time and handle seeking
     useEffect(() => {
