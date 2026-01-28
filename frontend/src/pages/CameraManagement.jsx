@@ -739,7 +739,7 @@ export default function CameraManagement() {
                                     </div>
                                     <div>
                                         <p className="text-sm font-medium text-gray-900 dark:text-white">Pengaturan Rekaman</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">Rolling buffer 5-6 jam</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Rolling buffer 1-10 jam</p>
                                     </div>
                                 </div>
 
@@ -760,7 +760,7 @@ export default function CameraManagement() {
                                 {formData.enable_recording && (
                                     <div>
                                         <label className="block text-sm text-gray-700 dark:text-gray-300 mb-2">
-                                            Durasi Rekaman
+                                            Durasi Penyimpanan
                                         </label>
                                         <select
                                             name="recording_duration_hours"
@@ -769,11 +769,19 @@ export default function CameraManagement() {
                                             disabled={isSubmitting}
                                             className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-red-500 disabled:opacity-50"
                                         >
+                                            <option value={1}>1 Jam (~1.8 GB)</option>
+                                            <option value={2}>2 Jam (~3.6 GB)</option>
+                                            <option value={3}>3 Jam (~5.4 GB)</option>
+                                            <option value={4}>4 Jam (~7.2 GB)</option>
                                             <option value={5}>5 Jam (~9 GB)</option>
                                             <option value={6}>6 Jam (~11 GB)</option>
+                                            <option value={7}>7 Jam (~13 GB)</option>
+                                            <option value={8}>8 Jam (~14 GB)</option>
+                                            <option value={9}>9 Jam (~16 GB)</option>
+                                            <option value={10}>10 Jam (~18 GB)</option>
                                         </select>
                                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                            File lama otomatis terhapus
+                                            File lama otomatis terhapus sesuai durasi
                                         </p>
                                     </div>
                                 )}
