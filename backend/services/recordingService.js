@@ -236,21 +236,60 @@ class RecordingService {
             const cameraDir = join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
             const filePath = join(cameraDir, filename);
 
-            // Wait a bit for file to be fully written
-            setTimeout(() => {
-                if (!existsSync(filePath)) return;
+            // Wait longer for large files to be fully written (10 seconds)
+            setTimeout(async () => {
+                if (!existsSync(filePath)) {
+                    console.warn(`Segment file not found: ${filePath}`);
+                    return;
+                }
 
-                // Get file stats
-                const stats = statSync(filePath);
-                const fileSize = stats.size;
+                // Wait for file size to stabilize (check twice with 2s gap)
+                let fileSize1 = statSync(filePath).size;
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                if (!existsSync(filePath)) {
+                    console.warn(`Segment file disappeared: ${filePath}`);
+                    return;
+                }
+                
+                let fileSize2 = statSync(filePath).size;
+                
+                // If file still growing, wait more
+                if (fileSize2 > fileSize1) {
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    if (!existsSync(filePath)) return;
+                    fileSize2 = statSync(filePath).size;
+                }
+
+                const fileSize = fileSize2;
+
+                // Skip if file is empty or too small (< 1MB = likely incomplete)
+                if (fileSize < 1024 * 1024) {
+                    console.warn(`Segment too small, skipping: ${filename} (${fileSize} bytes)`);
+                    return;
+                }
 
                 // Parse filename untuk get timestamp
                 const match = filename.match(/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
-                if (!match) return;
+                if (!match) {
+                    console.warn(`Invalid filename format: ${filename}`);
+                    return;
+                }
 
                 const [, year, month, day, hour, minute, second] = match;
                 const startTime = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
                 const endTime = new Date(startTime.getTime() + 10 * 60 * 1000); // +10 menit
+
+                // Check if already in database (prevent duplicates)
+                const existing = queryOne(
+                    'SELECT id FROM recording_segments WHERE camera_id = ? AND filename = ?',
+                    [cameraId, filename]
+                );
+
+                if (existing) {
+                    console.log(`Segment already in database: ${filename}`);
+                    return;
+                }
 
                 // Save to database
                 execute(
@@ -273,7 +312,7 @@ class RecordingService {
                 // Auto-delete old segments
                 this.cleanupOldSegments(cameraId);
 
-            }, 2000); // Wait 2 seconds
+            }, 10000); // Wait 10 seconds for file to be fully written
 
         } catch (error) {
             console.error(`Error handling segment creation:`, error);
@@ -285,13 +324,31 @@ class RecordingService {
      */
     cleanupOldSegments(cameraId) {
         try {
+            // First, cleanup database entries for files that don't exist
+            const allSegments = query(
+                'SELECT * FROM recording_segments WHERE camera_id = ?',
+                [cameraId]
+            );
+
+            let cleanedCount = 0;
+            allSegments.forEach(segment => {
+                if (!existsSync(segment.file_path)) {
+                    execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
+                    cleanedCount++;
+                }
+            });
+
+            if (cleanedCount > 0) {
+                console.log(`✓ Cleaned ${cleanedCount} orphaned database entries for camera ${cameraId}`);
+            }
+
             // Get camera recording duration
             const camera = queryOne('SELECT recording_duration_hours FROM cameras WHERE id = ?', [cameraId]);
             if (!camera) return;
 
             const maxSegments = camera.recording_duration_hours * 6; // 6 segments per jam
 
-            // Get all segments for this camera
+            // Get remaining segments (after cleanup)
             const segments = query(
                 'SELECT * FROM recording_segments WHERE camera_id = ? ORDER BY start_time ASC',
                 [cameraId]
@@ -309,6 +366,14 @@ class RecordingService {
                     }
 
                     // Delete from database
+                    execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
+                });
+            }
+
+        } catch (error) {
+            console.error(`Error cleaning up segments for camera ${cameraId}:`, error);
+        }
+    }
                     execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
                 });
             }
