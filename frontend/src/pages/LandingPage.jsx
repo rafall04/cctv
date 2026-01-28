@@ -2860,7 +2860,7 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
 // ============================================
 // FOOTER - Enhanced with more information
 // ============================================
-function Footer({ cameraCount, areaCount }) {
+function Footer({ cameraCount, areaCount, saweriaEnabled, saweriaLink }) {
     const whatsappNumber = '6289685645956'; // Format internasional tanpa +
     const whatsappLink = `https://wa.me/${whatsappNumber}?text=Halo%20Admin%20RAF%20NET`;
     
@@ -3593,7 +3593,12 @@ export default function LandingPage() {
             />
 
             <div className="flex-1" />
-            <Footer cameraCount={cameras.length} areaCount={areas.length} />
+            <Footer 
+                cameraCount={cameras.length} 
+                areaCount={areas.length}
+                saweriaEnabled={saweriaEnabled}
+                saweriaLink={saweriaLink}
+            />
 
             <MultiViewButton 
                 count={multiCameras.length} 
