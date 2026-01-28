@@ -26,18 +26,39 @@ export default function SaweriaSupport({ link = 'https://saweria.co/raflialdi' }
         const bannerMinimized = localStorage.getItem(BANNER_MINIMIZED_KEY);
 
         if (!modalShown) {
-            // Show modal after 10 seconds on first visit
-            const modalTimer = setTimeout(() => {
-                setShowModal(true);
-            }, 10000);
+            // Show modal after user scrolls a bit (shows engagement)
+            let hasScrolled = false;
+            
+            const handleScroll = () => {
+                if (!hasScrolled && window.scrollY > 100) {
+                    hasScrolled = true;
+                    setTimeout(() => {
+                        setShowModal(true);
+                    }, 1000); // 1 second after scroll
+                    window.removeEventListener('scroll', handleScroll);
+                }
+            };
 
-            return () => clearTimeout(modalTimer);
+            // Fallback: show after 5 seconds if user doesn't scroll
+            const fallbackTimer = setTimeout(() => {
+                if (!hasScrolled) {
+                    setShowModal(true);
+                }
+                window.removeEventListener('scroll', handleScroll);
+            }, 5000);
+
+            window.addEventListener('scroll', handleScroll);
+
+            return () => {
+                clearTimeout(fallbackTimer);
+                window.removeEventListener('scroll', handleScroll);
+            };
         } else {
-            // If modal already shown, show banner after 5 seconds
+            // If modal already shown, show banner after 3 seconds
             const bannerTimer = setTimeout(() => {
                 setShowBanner(true);
                 setBannerMinimized(bannerMinimized === 'true');
-            }, 5000);
+            }, 3000);
 
             return () => clearTimeout(bannerTimer);
         }
@@ -97,23 +118,25 @@ export default function SaweriaSupport({ link = 'https://saweria.co/raflialdi' }
                     <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-slideUp">
                         {/* Gradient Header */}
                         <div className="bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-500 p-6 text-center">
-                            <div className="w-16 h-16 mx-auto mb-4 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+                            <div className="w-16 h-16 mx-auto mb-4 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center animate-bounce">
                                 <span className="text-4xl">☕</span>
                             </div>
                             <h2 className="text-2xl font-bold text-white mb-2">
-                                Dukung Kami
+                                Traktir Kopi Dong! 😊
                             </h2>
                             <p className="text-white/90 text-sm">
-                                Bantu kami menjaga layanan ini tetap gratis
+                                Biar semangat maintain server & kamera 24/7
                             </p>
                         </div>
 
                         {/* Body */}
                         <div className="p-6">
+                            <p className="text-gray-700 dark:text-gray-300 text-center mb-4 leading-relaxed">
+                                Halo! 👋 Senang banget kamu pakai layanan CCTV gratis ini.
+                            </p>
                             <p className="text-gray-700 dark:text-gray-300 text-center mb-6 leading-relaxed">
-                                Jika Anda merasa terbantu dengan layanan CCTV gratis ini, 
-                                dukungan Anda akan sangat berarti untuk kami. 
-                                Terima kasih! 🙏
+                                Kalau kamu merasa terbantu, traktir kopi buat kami yuk! 
+                                Seikhlasnya aja, berapapun sangat berarti buat jaga server tetap nyala ⚡
                             </p>
 
                             {/* Buttons */}
@@ -124,7 +147,7 @@ export default function SaweriaSupport({ link = 'https://saweria.co/raflialdi' }
                                 >
                                     <span className="flex items-center justify-center gap-2">
                                         <span>☕</span>
-                                        <span>Kirim Dukungan</span>
+                                        <span>Traktir Kopi Sekarang</span>
                                     </span>
                                 </button>
                                 
@@ -132,12 +155,12 @@ export default function SaweriaSupport({ link = 'https://saweria.co/raflialdi' }
                                     onClick={handleModalClose}
                                     className="w-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium py-3 px-6 rounded-xl transition-all duration-300"
                                 >
-                                    Nanti Saja
+                                    Lain Kali Aja 😅
                                 </button>
                             </div>
 
                             <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-4">
-                                Pesan ini hanya muncul sekali
+                                💝 Pesan ini cuma muncul sekali kok
                             </p>
                         </div>
                     </div>
@@ -154,7 +177,7 @@ export default function SaweriaSupport({ link = 'https://saweria.co/raflialdi' }
                         <button
                             onClick={handleBannerMaximize}
                             className="w-14 h-14 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-110 flex items-center justify-center text-2xl animate-bounce"
-                            title="Dukung Kami"
+                            title="Traktir Kopi Yuk!"
                         >
                             ☕
                         </button>
@@ -164,13 +187,13 @@ export default function SaweriaSupport({ link = 'https://saweria.co/raflialdi' }
                             {/* Header */}
                             <div className="bg-gradient-to-r from-orange-500 to-amber-500 p-4 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <span className="text-2xl">☕</span>
+                                    <span className="text-2xl animate-bounce">☕</span>
                                     <div>
                                         <h3 className="text-white font-bold text-sm">
-                                            Dukung Kami
+                                            Traktir Kopi Yuk!
                                         </h3>
                                         <p className="text-white/80 text-xs">
-                                            via Saweria
+                                            Seikhlasnya aja 😊
                                         </p>
                                     </div>
                                 </div>
@@ -200,7 +223,7 @@ export default function SaweriaSupport({ link = 'https://saweria.co/raflialdi' }
                             {/* Body */}
                             <div className="p-4">
                                 <p className="text-gray-700 dark:text-gray-300 text-sm mb-4 leading-relaxed">
-                                    Bantu kami menjaga layanan ini tetap gratis untuk semua 🙏
+                                    Biar server & kamera tetap nyala 24/7, traktir kopi dong! ☕✨
                                 </p>
 
                                 <button
@@ -209,7 +232,7 @@ export default function SaweriaSupport({ link = 'https://saweria.co/raflialdi' }
                                 >
                                     <span className="flex items-center justify-center gap-2">
                                         <span>☕</span>
-                                        <span>Kirim Dukungan</span>
+                                        <span>Traktir Sekarang</span>
                                     </span>
                                 </button>
                             </div>

@@ -20,7 +20,7 @@ export default function SaweriaFooterLink({ link = 'https://saweria.co/raflialdi
             rel="noopener noreferrer"
         >
             <span className="text-lg">☕</span>
-            <span>Dukung Kami</span>
+            <span>Traktir Kopi Yuk!</span>
         </a>
     );
 }
