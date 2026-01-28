@@ -2563,7 +2563,7 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
     }, [searchQuery]);
 
     return (
-        <section className="py-6 sm:py-10">
+        <section id="playback-section" className="py-6 sm:py-10">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Header */}
                 <div className="flex flex-col gap-4 mb-4">
@@ -3673,18 +3673,23 @@ export default function LandingPage() {
                             
                             {/* CTA Button */}
                             <div className="flex-shrink-0 w-full sm:w-auto">
-                                <a
-                                    href="/playback"
-                                    className="block w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg transition-all transform hover:scale-105 text-center"
+                                <button
+                                    onClick={() => {
+                                        const playbackSection = document.getElementById('playback-section');
+                                        if (playbackSection) {
+                                            playbackSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                        }
+                                    }}
+                                    className="block w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg transition-all transform hover:scale-105 text-center cursor-pointer"
                                 >
                                     <span className="flex items-center justify-center gap-2">
                                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                         </svg>
-                                        <span>Buka Playback</span>
+                                        <span>Lihat Playback</span>
                                     </span>
-                                </a>
+                                </button>
                             </div>
                         </div>
                     </div>
