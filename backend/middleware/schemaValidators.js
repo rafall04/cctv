@@ -108,6 +108,12 @@ export const createCameraSchema = {
                     { type: 'string', enum: ['bronze', 'silver', 'gold'] },
                     { type: 'null' }
                 ]
+            },
+            enable_recording: {
+                anyOf: [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }]
+            },
+            recording_duration_hours: {
+                anyOf: [{ type: 'integer', minimum: 1, maximum: 24 }, { type: 'null' }]
             }
         },
         additionalProperties: false
@@ -171,6 +177,12 @@ export const updateCameraSchema = {
                     { type: 'string', enum: ['bronze', 'silver', 'gold'] },
                     { type: 'null' }
                 ]
+            },
+            enable_recording: {
+                anyOf: [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }]
+            },
+            recording_duration_hours: {
+                anyOf: [{ type: 'integer', minimum: 1, maximum: 24 }, { type: 'null' }]
             }
         },
         additionalProperties: false
