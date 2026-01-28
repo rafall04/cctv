@@ -545,7 +545,7 @@ function Playback() {
                             className="w-full h-full object-contain"
                             controls
                             playsInline
-                            preload="auto"
+                            preload="metadata"
                             crossOrigin="anonymous"
                         />
                         

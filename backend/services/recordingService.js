@@ -76,7 +76,7 @@ class RecordingService {
             console.log(`Starting recording for camera ${cameraId} (${camera.name})`);
             console.log(`RTSP URL: ${camera.private_rtsp_url.replace(/:[^:@]+@/, ':****@')}`); // Hide password
 
-            // FFmpeg command - stream copy with fragmented MP4 for web streaming
+            // FFmpeg command - stream copy with optimized MP4 for seeking
             const outputPattern = join(cameraDir, '%Y%m%d_%H%M%S.mp4');
             const ffmpegArgs = [
                 '-rtsp_transport', 'tcp',
@@ -87,8 +87,11 @@ class RecordingService {
                 '-f', 'segment',                 // Split ke segments
                 '-segment_time', '600',          // 10 menit per file (akan dipotong di keyframe terdekat)
                 '-segment_format', 'mp4',
-                // CRITICAL: Use frag_keyframe for seekable fragmented MP4
-                '-movflags', '+frag_keyframe+empty_moov+default_base_moof+faststart',
+                // CRITICAL: Optimized for HTTP Range Requests and seeking
+                // - frag_keyframe: Create keyframe-aligned fragments
+                // - empty_moov: Put moov atom at start (enables seeking)
+                // - default_base_moof: Use default base for moof boxes
+                '-movflags', '+frag_keyframe+empty_moov+default_base_moof',
                 '-segment_atclocktime', '1',     // Align dengan clock time
                 '-reset_timestamps', '1',
                 '-strftime', '1',
@@ -348,12 +351,14 @@ class RecordingService {
                     return;
                 }
                 
-                // Perform re-mux
+                // Perform re-mux with optimized settings for seeking
                 await new Promise((resolve, reject) => {
                     const ffmpeg = spawn('ffmpeg', [
                         '-i', filePath,
                         '-c', 'copy',                    // Copy streams (no re-encode)
-                        '-movflags', '+faststart',       // Move moov atom to start
+                        '-movflags', '+faststart',       // Move moov atom to start (CRITICAL for seeking)
+                        '-fflags', '+genpts',            // Generate presentation timestamps
+                        '-avoid_negative_ts', 'make_zero', // Normalize timestamps
                         '-y',                            // Overwrite
                         tempPath
                     ]);
