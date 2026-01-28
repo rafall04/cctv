@@ -2952,7 +2952,12 @@ function Footer({ cameraCount, areaCount }) {
                 </div>
 
                 {/* Support Us - Saweria Link */}
-                <div className="flex justify-center mb-6">
+                <div className="flex flex-col items-center gap-3 mb-6">
+                    <div className="text-center">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                            💝 Bantu kami tambah CCTV di lokasi strategis
+                        </p>
+                    </div>
                     <a
                         href="https://saweria.co/raflialdi"
                         target="_blank"
@@ -2962,6 +2967,9 @@ function Footer({ cameraCount, areaCount }) {
                         <span className="text-xl">☕</span>
                         <span>Traktir Kopi Yuk!</span>
                     </a>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 text-center max-w-md">
+                        Dukungan kamu akan membantu kami untuk upgrade server, tambah bandwidth, dan pasang CCTV di titik-titik penting lainnya 🎥
+                    </p>
                 </div>
                 
                 {/* SEO Keywords Section */}

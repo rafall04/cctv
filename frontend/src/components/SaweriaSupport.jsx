@@ -30,32 +30,56 @@ const MODAL_VARIATIONS = [
         title: 'Traktir Kopi Dong! 😊',
         subtitle: 'Biar semangat maintain server & kamera 24/7',
         message1: 'Halo! 👋 Senang banget kamu pakai layanan CCTV gratis ini.',
-        message2: 'Kalau kamu merasa terbantu, traktir kopi buat kami yuk! Seikhlasnya aja, berapapun sangat berarti buat jaga server tetap nyala ⚡',
+        message2: 'Dukungan kamu akan membantu kami untuk:',
+        features: [
+            '🎥 Menambah titik CCTV di lokasi strategis',
+            '⚡ Upgrade server biar makin cepat',
+            '🔧 Maintenance rutin semua kamera'
+        ],
+        footer: 'Seikhlasnya aja, berapapun sangat berarti! 💝',
         gradient: 'from-orange-500 via-amber-500 to-yellow-500',
     },
     {
-        emoji: '💝',
-        title: 'Dukung Kami Yuk! 🙏',
-        subtitle: 'Bantu jaga layanan ini tetap gratis',
-        message1: 'Terima kasih sudah pakai layanan CCTV gratis kami! 🎉',
-        message2: 'Dukungan kamu akan sangat membantu kami untuk terus menyediakan layanan ini. Seikhlasnya aja ya! 😊',
-        gradient: 'from-pink-500 via-rose-500 to-red-500',
+        emoji: '🎥',
+        title: 'Bantu Tambah CCTV Yuk! 📹',
+        subtitle: 'Lebih banyak kamera = lebih aman',
+        message1: 'Saat ini ada beberapa lokasi strategis yang belum terpasang CCTV 😢',
+        message2: 'Dengan dukungan kamu, kami bisa:',
+        features: [
+            '📍 Pasang CCTV di titik-titik penting',
+            '🌐 Expand coverage area monitoring',
+            '💪 Tingkatkan keamanan lingkungan'
+        ],
+        footer: 'Yuk bantu wujudkan! Nominal berapa aja sangat membantu 🙏',
+        gradient: 'from-blue-500 via-cyan-500 to-teal-500',
     },
     {
         emoji: '🚀',
-        title: 'Bantu Kami Berkembang!',
-        subtitle: 'Server & bandwidth butuh biaya lho',
-        message1: 'Layanan ini gratis untuk semua, tapi server & bandwidth tetap butuh biaya 💸',
-        message2: 'Kalau kamu mau bantu, traktir kopi kami dong! Nominal berapa aja sangat berarti 🙏',
-        gradient: 'from-blue-500 via-cyan-500 to-teal-500',
+        title: 'Mari Berkembang Bersama!',
+        subtitle: 'Dari kamu, untuk lingkungan lebih aman',
+        message1: 'Terima kasih sudah pakai layanan CCTV gratis kami! 🎉',
+        message2: 'Dukungan kamu akan kami gunakan untuk:',
+        features: [
+            '🎯 Beli & pasang CCTV di lokasi baru',
+            '📡 Upgrade bandwidth untuk streaming HD',
+            '🔋 Bayar listrik & internet 24/7'
+        ],
+        footer: 'Seikhlasnya dari hati, sangat berarti buat kami! ❤️',
+        gradient: 'from-purple-500 via-violet-500 to-indigo-500',
     },
     {
         emoji: '⚡',
         title: 'Keep The Server Running!',
-        subtitle: 'Listrik & internet 24/7 butuh support',
+        subtitle: 'Plus tambah kamera di lokasi strategis',
         message1: 'Server ini nyala 24/7 biar kamu bisa pantau CCTV kapan aja! ⏰',
-        message2: 'Bantu kami bayar listrik & internet dong! Seikhlasnya, yang penting dari hati ❤️',
-        gradient: 'from-purple-500 via-violet-500 to-indigo-500',
+        message2: 'Bantu kami untuk:',
+        features: [
+            '🎬 Tambah kamera di area yang belum ter-cover',
+            '💻 Maintain server & bandwidth',
+            '🛠️ Service rutin semua perangkat'
+        ],
+        footer: 'Traktir kopi kami dong! Yang penting dari hati 💝',
+        gradient: 'from-pink-500 via-rose-500 to-red-500',
     },
 ];
 
@@ -196,8 +220,24 @@ export default function SaweriaSupport({ link = 'https://saweria.co/raflialdi' }
                             <p className="text-gray-700 dark:text-gray-300 text-center mb-4 leading-relaxed">
                                 {modalVariation.message1}
                             </p>
-                            <p className="text-gray-700 dark:text-gray-300 text-center mb-6 leading-relaxed">
+                            <p className="text-gray-700 dark:text-gray-300 text-center mb-3 font-medium">
                                 {modalVariation.message2}
+                            </p>
+
+                            {/* Features List */}
+                            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 mb-4">
+                                <ul className="space-y-2">
+                                    {modalVariation.features.map((feature, index) => (
+                                        <li key={index} className="text-gray-700 dark:text-gray-300 text-sm flex items-start gap-2">
+                                            <span className="flex-shrink-0 mt-0.5">{feature.split(' ')[0]}</span>
+                                            <span>{feature.substring(feature.indexOf(' ') + 1)}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+
+                            <p className="text-gray-600 dark:text-gray-400 text-center text-sm mb-6 italic">
+                                {modalVariation.footer}
                             </p>
 
                             {/* Buttons - Simplified hover on low-end */}
@@ -290,9 +330,20 @@ export default function SaweriaSupport({ link = 'https://saweria.co/raflialdi' }
 
                             {/* Body */}
                             <div className="p-4">
-                                <p className="text-gray-700 dark:text-gray-300 text-sm mb-4 leading-relaxed">
-                                    Biar server & kamera tetap nyala 24/7, traktir kopi dong! ☕✨
+                                <p className="text-gray-700 dark:text-gray-300 text-sm mb-3 leading-relaxed font-medium">
+                                    Bantu kami untuk:
                                 </p>
+                                
+                                <ul className="text-gray-600 dark:text-gray-400 text-xs space-y-1.5 mb-4">
+                                    <li className="flex items-start gap-1.5">
+                                        <span>🎥</span>
+                                        <span>Tambah CCTV di lokasi strategis</span>
+                                    </li>
+                                    <li className="flex items-start gap-1.5">
+                                        <span>⚡</span>
+                                        <span>Jaga server tetap nyala 24/7</span>
+                                    </li>
+                                </ul>
 
                                 <button
                                     onClick={handleBannerSupport}
