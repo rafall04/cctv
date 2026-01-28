@@ -472,11 +472,11 @@ function Playback() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-8 px-4">
-            <div className="max-w-7xl mx-auto space-y-6">
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-2 sm:py-6 md:py-8 px-2 sm:px-4">
+            <div className="max-w-7xl mx-auto space-y-3 sm:space-y-4 md:space-y-6">
                 {/* Header */}
-                <div className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-lg">
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Playback Recording</h1>
+                <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-6 shadow-lg">
+                    <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4">Playback Recording</h1>
                     
                     {/* Camera Selector */}
                     <div className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -501,11 +501,11 @@ function Playback() {
                 </div>
 
                 {/* Video Player */}
-                <div className="bg-white dark:bg-gray-900 rounded-xl overflow-hidden shadow-lg">
+                <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl overflow-hidden shadow-lg">
                     <div className="aspect-video bg-black relative">
                         <video
                             ref={videoRef}
-                            className="w-full h-full"
+                            className="w-full h-full object-contain"
                             controls
                             playsInline
                             preload="auto"
@@ -548,13 +548,13 @@ function Playback() {
                             </div>
                         )}
                         
-                        {/* Speed Control Overlay */}
-                        <div className="absolute top-4 right-4 flex gap-2">
+                        {/* Speed Control Overlay - Hidden on mobile, show on hover on desktop */}
+                        <div className="hidden sm:flex absolute top-2 sm:top-4 right-2 sm:right-4 gap-1 sm:gap-2 opacity-0 hover:opacity-100 transition-opacity">
                             {[0.5, 1, 1.5, 2].map(speed => (
                                 <button
                                     key={speed}
                                     onClick={() => handleSpeedChange(speed)}
-                                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                    className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded text-xs sm:text-sm font-medium transition-colors ${
                                         playbackSpeed === speed
                                             ? 'bg-primary-500 text-white'
                                             : 'bg-black/50 text-white hover:bg-black/70'
@@ -565,9 +565,9 @@ function Playback() {
                             ))}
                         </div>
 
-                        {/* Current Segment Info - Pindah ke kanan bawah agar tidak halangi play button */}
+                        {/* Current Segment Info - Hidden on mobile to not block controls */}
                         {selectedSegment && (
-                            <div className="absolute bottom-4 right-4 bg-black/70 text-white px-4 py-2 rounded-lg text-sm pointer-events-none">
+                            <div className="hidden sm:block absolute bottom-16 sm:bottom-4 right-2 sm:right-4 bg-black/70 text-white px-2 sm:px-4 py-1 sm:py-2 rounded text-xs sm:text-sm pointer-events-none">
                                 <div className="font-medium">{formatTimestamp(selectedSegment.start_time)}</div>
                                 <div className="text-xs text-gray-300">
                                     {formatTime(currentTime)} / {formatTime(duration)}
@@ -579,19 +579,19 @@ function Playback() {
 
                 {/* Timeline */}
                 {timelineData.start && (
-                    <div className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-lg">
-                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Timeline</h2>
+                    <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-6 shadow-lg">
+                        <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">Timeline</h2>
                         
                         {/* Timeline Bar */}
-                        <div className="mb-6">
-                            <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-2">
+                        <div className="mb-4 sm:mb-6">
+                            <div className="flex justify-between text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">
                                 <span>{timelineData.start.toLocaleTimeString('id-ID')}</span>
                                 <span>{timelineData.end.toLocaleTimeString('id-ID')}</span>
                             </div>
                             
                             <div 
                                 ref={timelineRef}
-                                className="relative h-12 bg-gray-200 dark:bg-gray-800 rounded-lg overflow-hidden"
+                                className="relative h-8 sm:h-10 md:h-12 bg-gray-200 dark:bg-gray-800 rounded-lg overflow-hidden"
                             >
                                 {/* Segments on timeline */}
                                 {timelineData.sortedSegments.map((segment) => {
@@ -657,13 +657,13 @@ function Playback() {
                 )}
 
                 {/* Segment List */}
-                <div className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-lg">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-6 shadow-lg">
+                    <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">
                         Recording Segments ({segments.length})
                     </h2>
                     
                     {segments.length > 0 ? (
-                        <div className="space-y-2 max-h-96 overflow-y-auto">
+                        <div className="space-y-2 max-h-64 sm:max-h-80 md:max-h-96 overflow-y-auto">
                             {[...segments].sort((a, b) => 
                                 new Date(b.start_time) - new Date(a.start_time)
                             ).map((segment) => {
@@ -675,46 +675,46 @@ function Playback() {
                                     <button
                                         key={segment.id}
                                         onClick={() => handleSegmentClick(segment)}
-                                        className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+                                        className={`w-full text-left p-2 sm:p-3 md:p-4 rounded-lg border-2 transition-all ${
                                             selectedSegment?.id === segment.id
                                                 ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
                                                 : 'border-gray-200 dark:border-gray-800 hover:border-primary-300 dark:hover:border-primary-700'
                                         }`}
                                     >
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                                                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
                                                     selectedSegment?.id === segment.id
                                                         ? 'bg-primary-500 text-white'
                                                         : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
                                                 }`}>
-                                                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                                    <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24">
                                                         <path d="M8 5v14l11-7z"/>
                                                     </svg>
                                                 </div>
-                                                <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="font-medium text-gray-900 dark:text-white">
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <div className="font-medium text-sm sm:text-base text-gray-900 dark:text-white truncate">
                                                             {formatTimestamp(segment.start_time)} - {formatTimestamp(segment.end_time)}
                                                         </div>
                                                         {!isLikelyCompatible && (
-                                                            <span className="px-2 py-0.5 text-xs bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 rounded">
+                                                            <span className="px-1.5 sm:px-2 py-0.5 text-xs bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 rounded flex-shrink-0">
                                                                 May not play
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                                                    <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">
                                                         Duration: {Math.round(segment.duration / 60)} min • Size: {formatFileSize(segment.file_size)}
                                                     </div>
                                                 </div>
                                             </div>
                                             
                                             {selectedSegment?.id === segment.id && (
-                                                <div className="flex items-center gap-2 text-primary-500">
-                                                    <svg className="w-5 h-5 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
+                                                <div className="flex items-center gap-1 sm:gap-2 text-primary-500 flex-shrink-0">
+                                                    <svg className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
                                                         <circle cx="12" cy="12" r="10"/>
                                                     </svg>
-                                                    <span className="text-sm font-medium">Playing</span>
+                                                    <span className="hidden sm:inline text-sm font-medium">Playing</span>
                                                 </div>
                                             )}
                                         </div>
@@ -723,12 +723,12 @@ function Playback() {
                             })}
                         </div>
                     ) : (
-                        <div className="text-center py-12 text-gray-600 dark:text-gray-400">
-                            <svg className="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="text-center py-8 sm:py-12 text-gray-600 dark:text-gray-400">
+                            <svg className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                             </svg>
-                            <p>Belum ada recording tersedia</p>
-                            <p className="text-sm mt-2">Recording akan muncul setelah kamera mulai merekam</p>
+                            <p className="text-sm sm:text-base">Belum ada recording tersedia</p>
+                            <p className="text-xs sm:text-sm mt-2">Recording akan muncul setelah kamera mulai merekam</p>
                         </div>
                     )}
                 </div>
