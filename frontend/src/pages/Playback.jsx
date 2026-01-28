@@ -21,6 +21,7 @@ function Playback() {
     
     const videoRef = useRef(null);
     const timelineRef = useRef(null);
+    const isInitialLoadRef = useRef(true); // Track initial load
 
     // Fetch cameras with recording enabled
     useEffect(() => {
@@ -58,6 +59,7 @@ function Playback() {
         // Ini mencegah HTTP 404 karena segment dari camera lama
         setSelectedSegment(null);
         setSegments([]); // Clear segments array juga
+        isInitialLoadRef.current = true; // Mark as initial load
 
         const fetchSegments = async () => {
             try {
@@ -67,9 +69,11 @@ function Playback() {
                     const segmentsArray = response.data.segments || [];
                     setSegments(segmentsArray);
                     
-                    // Auto-select latest segment ONLY if segments exist
-                    if (segmentsArray.length > 0) {
+                    // CRITICAL FIX: Auto-select latest segment ONLY on initial load
+                    // Jangan auto-select saat interval refresh (biarkan user nonton segment yang dipilih)
+                    if (segmentsArray.length > 0 && isInitialLoadRef.current) {
                         setSelectedSegment(segmentsArray[segmentsArray.length - 1]);
+                        isInitialLoadRef.current = false; // Mark initial load complete
                     }
                 }
             } catch (error) {
@@ -89,6 +93,7 @@ function Playback() {
             // Clear states on unmount/camera change
             setSegments([]);
             setSelectedSegment(null);
+            isInitialLoadRef.current = true; // Reset for next camera
         };
     }, [selectedCamera]); // Only depend on selectedCamera
 
@@ -96,11 +101,10 @@ function Playback() {
     useEffect(() => {
         if (!selectedSegment || !videoRef.current || !selectedCamera) return;
 
-        // CRITICAL VALIDATION: Pastikan segment benar-benar dari camera yang dipilih
-        // Cek apakah segment ada di segments array (yang sudah di-filter by camera)
-        const segmentBelongsToCamera = segments.some(s => s.id === selectedSegment.id);
-        if (!segmentBelongsToCamera && segments.length > 0) {
-            console.warn('⚠️ Selected segment does not belong to current camera, skipping');
+        // CRITICAL VALIDATION: Pastikan segment filename tidak kosong
+        // Validasi dasar untuk mencegah request ke URL invalid
+        if (!selectedSegment.filename || selectedSegment.filename.trim() === '') {
+            console.warn('⚠️ Selected segment has invalid filename, skipping');
             return;
         }
 
@@ -110,10 +114,10 @@ function Playback() {
         const streamUrl = `${import.meta.env.VITE_API_URL}/api/recordings/${selectedCamera.id}/stream/${selectedSegment.filename}`;
         
         console.log('=== VIDEO PLAYER DEBUG ===');
-        console.log('Selected Camera:', selectedCamera);
-        console.log('Selected Segment:', selectedSegment);
+        console.log('Selected Camera ID:', selectedCamera.id);
+        console.log('Selected Segment ID:', selectedSegment.id);
+        console.log('Selected Segment Filename:', selectedSegment.filename);
         console.log('Stream URL:', streamUrl);
-        console.log('Segment belongs to camera:', segmentBelongsToCamera);
 
         // Clear video element first
         const video = videoRef.current;
@@ -264,7 +268,7 @@ function Playback() {
             video.removeAttribute('src');
             video.load();
         };
-    }, [selectedSegment, selectedCamera, segments]); // Add segments to dependency
+    }, [selectedSegment, selectedCamera]); // CRITICAL: Don't add segments to dependency - causes reload every 10s
 
     // Update current time and handle seeking
     useEffect(() => {
