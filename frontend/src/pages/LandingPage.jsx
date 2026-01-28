@@ -16,6 +16,8 @@ import { shouldDisableAnimations } from '../utils/animationControl';
 import { getGlobalStreamInitQueue, shouldUseQueuedInit } from '../utils/streamInitQueue';
 // Feedback widget
 import FeedbackWidget from '../components/FeedbackWidget';
+// Saweria Support
+import SaweriaSupport from '../components/SaweriaSupport';
 // Map view - lazy loaded for performance
 const MapView = lazy(() => import('../components/MapView'));
 
@@ -2948,6 +2950,19 @@ function Footer({ cameraCount, areaCount }) {
                     <span className="text-xs px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">Multi-View</span>
                     <span className="text-xs px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">Gratis Akses</span>
                 </div>
+
+                {/* Support Us - Saweria Link */}
+                <div className="flex justify-center mb-6">
+                    <a
+                        href="https://saweria.co/raflialdi"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                    >
+                        <span className="text-xl">☕</span>
+                        <span>Dukung Kami</span>
+                    </a>
+                </div>
                 
                 {/* SEO Keywords Section */}
                 <div className="text-center mb-4">
@@ -3574,6 +3589,9 @@ export default function LandingPage() {
             
             {/* Feedback Widget */}
             <FeedbackWidget />
+            
+            {/* Saweria Support - Modal + Floating Banner */}
+            <SaweriaSupport link="https://saweria.co/raflialdi" />
         </div>
     );
 }
