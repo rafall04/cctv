@@ -1,7 +1,7 @@
 import { query, queryOne, execute } from '../database/database.js';
 import { recordingService } from '../services/recordingService.js';
 import { logAdminAction } from '../services/securityAuditLogger.js';
-import { createReadStream, existsSync, readdirSync, statSync } from 'fs';
+import { createReadStream, existsSync, statSync } from 'fs';
 import { join } from 'path';
 
 /**

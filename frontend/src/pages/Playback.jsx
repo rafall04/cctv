@@ -309,7 +309,7 @@ function Playback() {
                                 className="relative h-12 bg-gray-200 dark:bg-gray-800 rounded-lg overflow-hidden"
                             >
                                 {/* Segments on timeline */}
-                                {timelineData.sortedSegments.map((segment, index) => {
+                                {timelineData.sortedSegments.map((segment) => {
                                     const segmentStart = new Date(segment.start_time);
                                     const segmentEnd = new Date(segment.end_time);
                                     const startOffset = ((segmentStart - timelineData.start) / 1000 / timelineData.duration) * 100;

@@ -1,5 +1,5 @@
 import { spawn } from 'child_process';
-import { existsSync, mkdirSync, unlinkSync, statSync, readdirSync } from 'fs';
+import { existsSync, mkdirSync, unlinkSync, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { query, queryOne, execute } from '../database/database.js';
@@ -110,7 +110,7 @@ class RecordingService {
             // Handle ffmpeg output
             let ffmpegOutput = '';
             
-            ffmpeg.stdout.on('data', (data) => {
+            ffmpeg.stdout.on('data', () => {
                 // Update last data time
                 const health = streamHealthMap.get(cameraId);
                 if (health) {
@@ -232,12 +232,12 @@ class RecordingService {
      * Handle segment creation
      */
     onSegmentCreated(cameraId, filename) {
-        try {
-            const cameraDir = join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
-            const filePath = join(cameraDir, filename);
+        const cameraDir = join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
+        const filePath = join(cameraDir, filename);
 
-            // Wait longer for large files to be fully written (10 seconds)
-            setTimeout(async () => {
+        // Wait longer for large files to be fully written (10 seconds)
+        setTimeout(async () => {
+            try {
                 if (!existsSync(filePath)) {
                     console.warn(`Segment file not found: ${filePath}`);
                     return;
@@ -312,11 +312,10 @@ class RecordingService {
                 // Auto-delete old segments
                 this.cleanupOldSegments(cameraId);
 
-            }, 10000); // Wait 10 seconds for file to be fully written
-
-        } catch (error) {
-            console.error(`Error handling segment creation:`, error);
-        }
+            } catch (error) {
+                console.error(`Error handling segment creation:`, error);
+            }
+        }, 10000); // Wait 10 seconds for file to be fully written
     }
 
     /**
