@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { saweriaService } from '../services/saweriaService';
 import { useNotification } from '../contexts/NotificationContext';
-import AdminLayout from '../components/AdminLayout';
 
-function SaweriaSettings() {
+export default function SaweriaSettings() {
     const { addNotification } = useNotification();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -65,29 +64,27 @@ function SaweriaSettings() {
 
     if (loading) {
         return (
-            <AdminLayout>
-                <div className="flex items-center justify-center min-h-[400px]">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-500"></div>
-                </div>
-            </AdminLayout>
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-500"></div>
+            </div>
         );
     }
 
     return (
-        <AdminLayout>
-            <div className="-mt-16 lg:-mt-0">
-                {/* Header */}
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-                        Pengaturan Saweria
-                    </h1>
-                    <p className="text-gray-600 dark:text-gray-400">
+        <div className="space-y-8">
+            {/* Header */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div>
+                    <p className="text-sm font-semibold text-sky-500 mb-1">Integrasi Donasi</p>
+                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Pengaturan Saweria</h1>
+                    <p className="text-gray-500 dark:text-gray-400 mt-1">
                         Kelola link donasi Saweria untuk website Anda
                     </p>
                 </div>
+            </div>
 
             {/* Info Box */}
-            <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl">
+            <div className="p-4 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl">
                 <div className="flex items-start gap-3">
                     <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white">
                         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -109,7 +106,7 @@ function SaweriaSettings() {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+            <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl overflow-hidden">
                     <div className="p-6 space-y-6">
                         {/* Saweria Link */}
                         <div>
@@ -181,7 +178,7 @@ function SaweriaSettings() {
                     </div>
 
                     {/* Footer */}
-                    <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-800 flex justify-end gap-3">
+                    <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700/50 flex justify-end gap-3">
                         <button
                             type="button"
                             onClick={fetchSettings}
@@ -210,8 +207,8 @@ function SaweriaSettings() {
                     </div>
                 </form>
             </div>
-        </AdminLayout>
-    );
+        );
+    }
 }
 
 export default SaweriaSettings;
