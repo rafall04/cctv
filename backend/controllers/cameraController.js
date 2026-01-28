@@ -131,7 +131,7 @@ export async function getCameraById(request, reply) {
 // Create new camera (admin only)
 export async function createCamera(request, reply) {
     try {
-        const { name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status } = request.body;
+        const { name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, enable_recording, recording_duration_hours } = request.body;
 
         // Validate required fields
         if (!name || !private_rtsp_url) {
@@ -153,6 +153,7 @@ export async function createCamera(request, reply) {
         // Convert boolean to integer for SQLite
         const isEnabled = enabled === true || enabled === 1 ? 1 : (enabled === false || enabled === 0 ? 0 : 1);
         const isTunnel = is_tunnel === true || is_tunnel === 1 ? 1 : 0;
+        const isRecordingEnabled = enable_recording === true || enable_recording === 1 ? 1 : 0;
         
         // Parse coordinates
         const latValue = latitude !== undefined && latitude !== '' && latitude !== null ? parseFloat(latitude) : null;
@@ -160,13 +161,19 @@ export async function createCamera(request, reply) {
         const lat = Number.isNaN(latValue) ? null : latValue;
         const lng = Number.isNaN(lngValue) ? null : lngValue;
 
+        // Recording duration (default 5 hours)
+        const durationValue = recording_duration_hours !== undefined && recording_duration_hours !== '' && recording_duration_hours !== null 
+            ? parseInt(recording_duration_hours, 10) 
+            : 5;
+        const recordingDuration = Number.isNaN(durationValue) ? 5 : durationValue;
+
         // Status: active, maintenance, offline
         const cameraStatus = status || 'active';
 
-        // Insert camera with stream_key
+        // Insert camera with stream_key and recording fields
         const result = execute(
-            'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [name, private_rtsp_url, description || null, location || null, group_name || null, finalAreaId, isEnabled, isTunnel, lat, lng, cameraStatus, streamKey]
+            'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, recording_duration_hours) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [name, private_rtsp_url, description || null, location || null, group_name || null, finalAreaId, isEnabled, isTunnel, lat, lng, cameraStatus, streamKey, isRecordingEnabled, recordingDuration]
         );
 
         // Log action
@@ -220,7 +227,7 @@ export async function createCamera(request, reply) {
 export async function updateCamera(request, reply) {
     try {
         const { id } = request.params;
-        const { name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status } = request.body;
+        const { name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, enable_recording, recording_duration_hours } = request.body;
 
         // Check if camera exists (include stream_key)
         const existingCamera = queryOne('SELECT id, name, private_rtsp_url, enabled, stream_key FROM cameras WHERE id = ?', [id]);
@@ -293,6 +300,16 @@ export async function updateCamera(request, reply) {
         if (status !== undefined) {
             updates.push('status = ?');
             values.push(status || 'active');
+        }
+        if (enable_recording !== undefined) {
+            updates.push('enable_recording = ?');
+            // Convert boolean to integer for SQLite
+            values.push(enable_recording === true || enable_recording === 1 ? 1 : 0);
+        }
+        if (recording_duration_hours !== undefined) {
+            updates.push('recording_duration_hours = ?');
+            const durationValue = recording_duration_hours === '' || recording_duration_hours === null ? null : parseInt(recording_duration_hours, 10);
+            values.push(Number.isNaN(durationValue) ? null : durationValue);
         }
 
         if (updates.length === 0) {
