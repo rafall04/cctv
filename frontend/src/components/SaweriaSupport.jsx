@@ -1,13 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { detectDeviceTier } from '../utils/deviceDetector';
 
 /**
- * Saweria Support Component
+ * Saweria Support Component - Optimized for Low-End Devices
  * 
  * Features:
  * 1. Modal popup on every visit with random variations (user-friendly)
  * 2. Floating banner (minimizable, persistent)
- * 3. Smooth animations and transitions
+ * 3. Device-adaptive animations (disabled on low-end)
  * 4. "Don't show again" option for users who don't want to see it
+ * 
+ * Performance optimizations:
+ * - Detect device tier and disable heavy animations on low-end
+ * - Use simple fade instead of backdrop blur on low-end
+ * - Memoize modal variation to prevent re-renders
+ * - Use CSS transforms for better performance
  * 
  * Usage:
  * <SaweriaSupport link="https://saweria.co/raflialdi" />
@@ -56,16 +63,21 @@ export default function SaweriaSupport({ link = 'https://saweria.co/raflialdi' }
     const [showModal, setShowModal] = useState(false);
     const [showBanner, setShowBanner] = useState(false);
     const [bannerMinimized, setBannerMinimized] = useState(false);
-    const [modalVariation, setModalVariation] = useState(MODAL_VARIATIONS[0]);
+    
+    // Detect device tier once and memoize
+    const deviceTier = useMemo(() => detectDeviceTier(), []);
+    const isLowEnd = deviceTier === 'low';
+    
+    // Select random modal variation once and memoize
+    const modalVariation = useMemo(() => {
+        const randomIndex = Math.floor(Math.random() * MODAL_VARIATIONS.length);
+        return MODAL_VARIATIONS[randomIndex];
+    }, []);
 
     useEffect(() => {
         // Check if user chose "don't show again"
         const dontShow = localStorage.getItem(STORAGE_KEY);
         const bannerMinimized = localStorage.getItem(BANNER_MINIMIZED_KEY);
-
-        // Select random modal variation
-        const randomIndex = Math.floor(Math.random() * MODAL_VARIATIONS.length);
-        setModalVariation(MODAL_VARIATIONS[randomIndex]);
 
         if (dontShow !== 'true') {
             // Show modal after user scrolls a bit (shows engagement)
@@ -89,7 +101,7 @@ export default function SaweriaSupport({ link = 'https://saweria.co/raflialdi' }
                 window.removeEventListener('scroll', handleScroll);
             }, 5000);
 
-            window.addEventListener('scroll', handleScroll);
+            window.addEventListener('scroll', handleScroll, { passive: true });
 
             return () => {
                 clearTimeout(fallbackTimer);
@@ -155,20 +167,20 @@ export default function SaweriaSupport({ link = 'https://saweria.co/raflialdi' }
 
     return (
         <>
-            {/* Modal Popup - First Visit Only */}
+            {/* Modal Popup - Device-Adaptive */}
             {showModal && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-fadeIn">
-                    {/* Backdrop */}
+                <div className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 ${isLowEnd ? 'animate-fadeIn' : 'animate-fadeIn'}`}>
+                    {/* Backdrop - Simple on low-end, blur on high-end */}
                     <div 
-                        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                        className={`absolute inset-0 bg-black/60 ${isLowEnd ? '' : 'backdrop-blur-sm'}`}
                         onClick={handleModalClose}
                     />
                     
-                    {/* Modal Content */}
-                    <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-slideUp">
+                    {/* Modal Content - Simplified animations on low-end */}
+                    <div className={`relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden ${isLowEnd ? 'animate-fadeIn' : 'animate-slideUp'}`}>
                         {/* Gradient Header - Dynamic based on variation */}
                         <div className={`bg-gradient-to-r ${modalVariation.gradient} p-6 text-center`}>
-                            <div className="w-16 h-16 mx-auto mb-4 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center animate-bounce">
+                            <div className={`w-16 h-16 mx-auto mb-4 bg-white/20 ${isLowEnd ? '' : 'backdrop-blur-sm'} rounded-full flex items-center justify-center ${isLowEnd ? '' : 'animate-bounce'}`}>
                                 <span className="text-4xl">{modalVariation.emoji}</span>
                             </div>
                             <h2 className="text-2xl font-bold text-white mb-2">
@@ -188,11 +200,11 @@ export default function SaweriaSupport({ link = 'https://saweria.co/raflialdi' }
                                 {modalVariation.message2}
                             </p>
 
-                            {/* Buttons */}
+                            {/* Buttons - Simplified hover on low-end */}
                             <div className="flex flex-col gap-3">
                                 <button
                                     onClick={handleModalSupport}
-                                    className={`w-full bg-gradient-to-r ${modalVariation.gradient} hover:opacity-90 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl`}
+                                    className={`w-full bg-gradient-to-r ${modalVariation.gradient} hover:opacity-90 text-white font-semibold py-3 px-6 rounded-xl transition-opacity duration-300 ${isLowEnd ? '' : 'transform hover:scale-105'} shadow-lg`}
                                 >
                                     <span className="flex items-center justify-center gap-2">
                                         <span>{modalVariation.emoji}</span>
@@ -202,7 +214,7 @@ export default function SaweriaSupport({ link = 'https://saweria.co/raflialdi' }
                                 
                                 <button
                                     onClick={handleModalClose}
-                                    className="w-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium py-3 px-6 rounded-xl transition-all duration-300"
+                                    className={`w-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium py-3 px-6 rounded-xl transition-colors duration-300`}
                                 >
                                     Lain Kali Aja 😅
                                 </button>
@@ -223,27 +235,27 @@ export default function SaweriaSupport({ link = 'https://saweria.co/raflialdi' }
                 </div>
             )}
 
-            {/* Floating Banner - Persistent */}
+            {/* Floating Banner - Persistent, Device-Adaptive */}
             {showBanner && (
                 <div className={`fixed bottom-6 right-6 z-[9998] transition-all duration-300 ${
                     bannerMinimized ? 'w-14' : 'w-80'
                 }`} style={{ bottom: '5.5rem' }}> {/* Adjusted to avoid FeedbackWidget */}
                     {bannerMinimized ? (
-                        /* Minimized State */
+                        /* Minimized State - Simplified on low-end */
                         <button
                             onClick={handleBannerMaximize}
-                            className="w-14 h-14 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-110 flex items-center justify-center text-2xl animate-bounce"
+                            className={`w-14 h-14 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-full shadow-lg transition-all duration-300 ${isLowEnd ? '' : 'hover:shadow-xl transform hover:scale-110'} flex items-center justify-center text-2xl ${isLowEnd ? '' : 'animate-bounce'}`}
                             title="Traktir Kopi Yuk!"
                         >
                             ☕
                         </button>
                     ) : (
-                        /* Expanded State */
-                        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden border border-orange-200 dark:border-orange-900/30 animate-slideInRight">
+                        /* Expanded State - Simplified animations on low-end */
+                        <div className={`bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden border border-orange-200 dark:border-orange-900/30 ${isLowEnd ? 'animate-fadeIn' : 'animate-slideInRight'}`}>
                             {/* Header */}
                             <div className="bg-gradient-to-r from-orange-500 to-amber-500 p-4 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <span className="text-2xl animate-bounce">☕</span>
+                                    <span className={`text-2xl ${isLowEnd ? '' : 'animate-bounce'}`}>☕</span>
                                     <div>
                                         <h3 className="text-white font-bold text-sm">
                                             Traktir Kopi Yuk!
@@ -284,7 +296,7 @@ export default function SaweriaSupport({ link = 'https://saweria.co/raflialdi' }
 
                                 <button
                                     onClick={handleBannerSupport}
-                                    className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold py-2.5 px-4 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg text-sm"
+                                    className={`w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold py-2.5 px-4 rounded-xl transition-all duration-300 ${isLowEnd ? '' : 'transform hover:scale-105'} shadow-md text-sm`}
                                 >
                                     <span className="flex items-center justify-center gap-2">
                                         <span>☕</span>
