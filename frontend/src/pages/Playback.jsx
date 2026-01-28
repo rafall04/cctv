@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { cameraService } from '../services/cameraService';
 import recordingService from '../services/recordingService';
-import Hls from 'hls.js';
 
 function Playback() {
     const [searchParams] = useSearchParams();
@@ -18,7 +17,6 @@ function Playback() {
     const [duration, setDuration] = useState(0);
     
     const videoRef = useRef(null);
-    const hlsRef = useRef(null);
     const timelineRef = useRef(null);
 
     // Fetch cameras with recording enabled
@@ -76,38 +74,28 @@ function Playback() {
         return () => clearInterval(interval);
     }, [selectedCamera]);
 
-    // Initialize HLS player
+    // Initialize video player (native HTML5, no HLS.js needed for MP4)
     useEffect(() => {
         if (!selectedSegment || !videoRef.current) return;
 
-        const streamUrl = `${import.meta.env.VITE_API_URL}/recordings/${selectedCamera.id}/stream/${selectedSegment.filename}`;
+        const streamUrl = `${import.meta.env.VITE_API_URL}/api/recordings/${selectedCamera.id}/stream/${selectedSegment.filename}`;
 
-        if (Hls.isSupported()) {
-            hlsRef.current = new Hls({
-                enableWorker: true,
-                lowLatencyMode: false,
+        // Direct MP4 playback (no HLS.js needed)
+        videoRef.current.src = streamUrl;
+        videoRef.current.load();
+        
+        // Auto play
+        const playPromise = videoRef.current.play();
+        if (playPromise !== undefined) {
+            playPromise.catch(error => {
+                console.log('Auto-play prevented:', error);
             });
-
-            hlsRef.current.loadSource(streamUrl);
-            hlsRef.current.attachMedia(videoRef.current);
-
-            hlsRef.current.on(Hls.Events.MANIFEST_PARSED, () => {
-                videoRef.current.play();
-            });
-
-            hlsRef.current.on(Hls.Events.ERROR, (event, data) => {
-                if (data.fatal) {
-                    console.error('HLS Error:', data);
-                }
-            });
-        } else if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
-            videoRef.current.src = streamUrl;
         }
 
         return () => {
-            if (hlsRef.current) {
-                hlsRef.current.destroy();
-                hlsRef.current = null;
+            if (videoRef.current) {
+                videoRef.current.pause();
+                videoRef.current.src = '';
             }
         };
     }, [selectedSegment, selectedCamera]);
