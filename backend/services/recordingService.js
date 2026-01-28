@@ -375,11 +375,6 @@ class RecordingService {
         }
     }
 
-        } catch (error) {
-            console.error(`Error cleaning up old segments:`, error);
-        }
-    }
-
     /**
      * Log restart event
      */
