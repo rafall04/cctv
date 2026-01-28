@@ -341,22 +341,24 @@ function Playback() {
                 
                 console.log('[Seek] Limited to:', limitedTarget, 'Remaining:', remainingDistance);
                 
-                // Show warning with progress info
-                setSeekWarning({
-                    type: 'limit',
-                    message: `Video melompat 3 menit (batas aman untuk menghindari buffering lama)`,
-                    remaining: remainingMinutes > 0 || remainingSeconds > 0
-                        ? `Masih tersisa ${remainingMinutes > 0 ? `${remainingMinutes} menit ` : ''}${remainingSeconds} detik lagi. Klik timeline lagi untuk lanjut.`
-                        : null
-                });
+                // Show warning with progress info - use callback to avoid re-render during seek
+                setTimeout(() => {
+                    setSeekWarning({
+                        type: 'limit',
+                        message: `Video melompat 3 menit (batas aman untuk menghindari buffering lama)`,
+                        remaining: remainingMinutes > 0 || remainingSeconds > 0
+                            ? `Masih tersisa ${remainingMinutes > 0 ? `${remainingMinutes} menit ` : ''}${remainingSeconds} detik lagi. Klik timeline lagi untuk lanjut.`
+                            : null
+                    });
+                }, 0);
                 
                 // Force limited seek
                 video.currentTime = limitedTarget;
                 lastSeekTimeRef.current = limitedTarget;
             } else {
-                // Normal seek - clear warning if it was a limit warning
+                // Normal seek - clear warning if it was a limit warning (use callback)
                 if (seekWarning?.type === 'limit') {
-                    setSeekWarning(null);
+                    setTimeout(() => setSeekWarning(null), 0);
                 }
                 
                 // Update last seek position for next check
@@ -375,7 +377,7 @@ function Playback() {
         };
         
         const handleSeeked = () => {
-            console.log('[Seek] Seeked event fired');
+            console.log('[Seek] Seeked event fired, readyState:', video.readyState);
             setIsSeeking(false);
             
             // DON'T immediately clear buffering - wait for video to actually start playing
@@ -387,30 +389,32 @@ function Playback() {
             bufferingTimeoutRef.current = setTimeout(() => {
                 console.log('[Seek] Buffering timeout - forcing clear');
                 setIsBuffering(false);
-            }, 3000); // 3 second timeout
+            }, 5000); // 5 second timeout (increased from 3s)
             
-            // Try to play after seek
-            if (!video.paused) {
+            // CRITICAL: Only try to play if video was already playing before seek
+            // Don't force play if user paused the video
+            if (!video.paused && video.readyState >= 2) {
+                // Video is already playing or ready to play, let it continue naturally
+                console.log('[Seek] Video will continue playing naturally');
+            } else if (!video.paused) {
+                // Video wants to play but not ready yet, try to play
+                console.log('[Seek] Attempting to resume playback');
                 const playPromise = video.play();
                 if (playPromise !== undefined) {
                     playPromise
                         .then(() => {
                             console.log('[Seek] Play successful after seek');
-                            // Buffering will be cleared by 'playing' event
                         })
                         .catch(error => {
                             console.error('[Video] Play after seek failed:', error);
-                            // Retry once after delay
-                            setTimeout(() => {
-                                video.play()
-                                    .then(() => console.log('[Seek] Retry play successful'))
-                                    .catch(e => {
-                                        console.error('[Video] Retry play failed:', e);
-                                        setIsBuffering(false);
-                                    });
-                            }, 500);
+                            // Don't retry - let user click play if needed
+                            setIsBuffering(false);
                         });
                 }
+            } else {
+                // Video is paused, clear buffering immediately
+                console.log('[Seek] Video is paused, clearing buffering');
+                setIsBuffering(false);
             }
         };
         
@@ -505,7 +509,7 @@ function Playback() {
                 bufferingTimeoutRef.current = null;
             }
         };
-    }, [selectedSegment, seekWarning]); // Add seekWarning to deps to preserve warning state
+    }, [selectedSegment]); // CRITICAL: Remove seekWarning from deps - it causes video reload!
 
     // CRITICAL: Smart Seek Handler with 3-minute limit
     const handleSmartSeek = (targetTime) => {
