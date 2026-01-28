@@ -91,6 +91,7 @@ export default function SaweriaSupport() {
     const [bannerMinimized, setBannerMinimized] = useState(false);
     const [saweriaLink, setSaweriaLink] = useState('https://saweria.co/raflialdi'); // Default fallback
     const [isEnabled, setIsEnabled] = useState(true);
+    const [configLoaded, setConfigLoaded] = useState(false);
     
     // Detect device tier once and memoize
     const deviceTier = useMemo(() => detectDeviceTier(), []);
@@ -102,7 +103,7 @@ export default function SaweriaSupport() {
         return MODAL_VARIATIONS[randomIndex];
     }, []);
 
-    // Fetch Saweria config from API
+    // Fetch Saweria config from API - only once on mount
     useEffect(() => {
         const fetchConfig = async () => {
             try {
@@ -116,6 +117,8 @@ export default function SaweriaSupport() {
             } catch (error) {
                 console.error('Failed to fetch Saweria config:', error);
                 // Keep default values on error
+            } finally {
+                setConfigLoaded(true);
             }
         };
         
@@ -123,6 +126,12 @@ export default function SaweriaSupport() {
     }, []);
 
     useEffect(() => {
+        // Wait for config to load
+        if (!configLoaded) return;
+        
+        // Don't show anything if disabled
+        if (!isEnabled) return;
+        
         // Check if user chose "don't show again"
         const dontShow = localStorage.getItem(STORAGE_KEY);
         const bannerMinimized = localStorage.getItem(BANNER_MINIMIZED_KEY);
@@ -164,7 +173,7 @@ export default function SaweriaSupport() {
 
             return () => clearTimeout(bannerTimer);
         }
-    }, []);
+    }, [configLoaded, isEnabled]);
 
     const handleModalClose = () => {
         setShowModal(false);
