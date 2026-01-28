@@ -73,16 +73,14 @@ class RecordingService {
             console.log(`Starting recording for camera ${cameraId} (${camera.name})`);
             console.log(`RTSP URL: ${camera.private_rtsp_url.replace(/:[^:@]+@/, ':****@')}`); // Hide password
 
-            // FFmpeg command - stream copy video, convert audio to AAC
+            // FFmpeg command - video only (no audio, 0% CPU overhead)
             const outputPattern = join(cameraDir, '%Y%m%d_%H%M%S.mp4');
             const ffmpegArgs = [
                 '-rtsp_transport', 'tcp',
                 '-i', camera.private_rtsp_url,
-                '-map', '0:v',                   // Map video stream
-                '-c:v', 'copy',                  // Copy video (no re-encode)
-                '-map', '0:a?',                  // Map audio if exists (optional)
-                '-c:a', 'aac',                   // Convert audio to AAC (MP4 compatible)
-                '-b:a', '64k',                   // Audio bitrate 64kbps
+                '-map', '0:v',                   // Map video only (skip audio)
+                '-c:v', 'copy',                  // Copy video (no re-encode, 0% CPU)
+                '-an',                           // No audio
                 '-f', 'segment',                 // Split ke segments
                 '-segment_time', '600',          // 10 menit per file
                 '-segment_format', 'mp4',
