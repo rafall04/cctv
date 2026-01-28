@@ -12,7 +12,7 @@ import apiClient from './apiClient';
  * Start recording untuk camera
  */
 export const startRecording = async (cameraId, durationHours = 5) => {
-    const response = await apiClient.post(`/admin/recordings/${cameraId}/start`, {
+    const response = await apiClient.post(`/api/recordings/${cameraId}/start`, {
         duration_hours: durationHours
     });
     return response.data;
@@ -22,7 +22,7 @@ export const startRecording = async (cameraId, durationHours = 5) => {
  * Stop recording untuk camera
  */
 export const stopRecording = async (cameraId) => {
-    const response = await apiClient.post(`/admin/recordings/${cameraId}/stop`);
+    const response = await apiClient.post(`/api/recordings/${cameraId}/stop`);
     return response.data;
 };
 
@@ -30,7 +30,7 @@ export const stopRecording = async (cameraId) => {
  * Get recording status untuk camera
  */
 export const getRecordingStatus = async (cameraId) => {
-    const response = await apiClient.get(`/admin/recordings/${cameraId}/status`);
+    const response = await apiClient.get(`/api/recordings/${cameraId}/status`);
     return response.data;
 };
 
@@ -38,7 +38,7 @@ export const getRecordingStatus = async (cameraId) => {
  * Get recordings overview (dashboard)
  */
 export const getRecordingsOverview = async () => {
-    const response = await apiClient.get('/admin/recordings/overview');
+    const response = await apiClient.get('/api/recordings/overview');
     return response.data;
 };
 
@@ -46,7 +46,7 @@ export const getRecordingsOverview = async () => {
  * Update recording settings
  */
 export const updateRecordingSettings = async (cameraId, settings) => {
-    const response = await apiClient.put(`/admin/recordings/${cameraId}/settings`, settings);
+    const response = await apiClient.put(`/api/recordings/${cameraId}/settings`, settings);
     return response.data;
 };
 
@@ -55,8 +55,8 @@ export const updateRecordingSettings = async (cameraId, settings) => {
  */
 export const getRestartLogs = async (cameraId = null, limit = 50) => {
     const url = cameraId 
-        ? `/admin/recordings/${cameraId}/restarts?limit=${limit}`
-        : `/admin/recordings/restarts?limit=${limit}`;
+        ? `/api/recordings/${cameraId}/restarts?limit=${limit}`
+        : `/api/recordings/restarts?limit=${limit}`;
     const response = await apiClient.get(url);
     return response.data;
 };
