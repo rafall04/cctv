@@ -190,14 +190,22 @@ export default function CameraManagement() {
         
         setSubmitting(true);
         try {
+            // Ensure recording_duration_hours is a number
+            const recordingDuration = formData.recording_duration_hours 
+                ? parseInt(formData.recording_duration_hours, 10) 
+                : 5;
+            
             const data = { 
                 ...formData, 
                 enabled: formData.enabled ? 1 : 0, 
                 is_tunnel: formData.is_tunnel ? 1 : 0, 
                 status: formData.status,
                 enable_recording: formData.enable_recording ? 1 : 0,
-                recording_duration_hours: formData.recording_duration_hours || 5
+                recording_duration_hours: recordingDuration
             };
+            
+            console.log('[Camera Submit] Data being sent:', data);
+            
             const result = editingCamera 
                 ? await cameraService.updateCamera(editingCamera.id, data)
                 : await cameraService.createCamera(data);
@@ -225,7 +233,10 @@ export default function CameraManagement() {
                 }
             }
         } catch (err) {
-            const errorMessage = err.response?.data?.message || 'Something went wrong';
+            console.error('[Camera Submit] Error:', err);
+            console.error('[Camera Submit] Error response:', err.response?.data);
+            
+            const errorMessage = err.response?.data?.message || err.message || 'Something went wrong';
             
             // Handle duplicate name error (Requirements: 4.4)
             if (errorMessage.toLowerCase().includes('already exists') || 
