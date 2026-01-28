@@ -11,13 +11,14 @@ export default function SaweriaLeaderboard({ leaderboardLink }) {
                 <div className="text-center mb-6">
                     <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-orange-100 to-amber-100 dark:from-orange-500/20 dark:to-amber-500/20 text-orange-600 dark:text-orange-400 text-xs font-semibold mb-3 shadow-sm">
                         <span className="text-lg">🏆</span>
-                        <span>Top Supporters</span>
+                        <span>Apresiasi Donatur</span>
                     </div>
                     <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">
-                        Leaderboard Donasi
+                        Daftar Donatur Terbaik
                     </h2>
                     <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto text-sm sm:text-base mb-6">
-                        Terima kasih kepada para supporter yang telah mendukung RAF NET CCTV
+                        Terima kasih kepada para donatur yang telah berkontribusi mendukung operasional RAF NET CCTV. 
+                        Donasi Anda membantu kami menyediakan layanan monitoring gratis untuk masyarakat.
                     </p>
                 </div>
 
@@ -36,10 +37,11 @@ export default function SaweriaLeaderboard({ leaderboardLink }) {
                             
                             {/* Title */}
                             <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                                Lihat Top Donatur
+                                Lihat Daftar Lengkap Donatur
                             </h3>
                             <p className="text-gray-600 dark:text-gray-400 mb-6 text-sm">
-                                Klik tombol di bawah untuk melihat daftar lengkap para supporter yang telah berkontribusi
+                                Klik tombol di bawah untuk melihat daftar lengkap para donatur yang telah berkontribusi. 
+                                Setiap donasi sangat berarti untuk keberlangsungan layanan CCTV gratis ini.
                             </p>
                             
                             {/* CTA Button */}
@@ -50,7 +52,7 @@ export default function SaweriaLeaderboard({ leaderboardLink }) {
                                 className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-500 hover:from-orange-600 hover:via-amber-600 hover:to-yellow-600 text-white font-bold rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl text-base"
                             >
                                 <span className="text-2xl">🏆</span>
-                                <span>Buka Leaderboard</span>
+                                <span>Lihat Daftar Donatur</span>
                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                                 </svg>
@@ -62,13 +64,13 @@ export default function SaweriaLeaderboard({ leaderboardLink }) {
                                     <svg className="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
-                                    <span>Real-time Update</span>
+                                    <span>Update Otomatis</span>
                                 </div>
                                 <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/80 dark:bg-gray-800/80 rounded-lg text-xs font-medium text-gray-700 dark:text-gray-300 shadow-sm">
                                     <svg className="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
-                                    <span>Verified Supporters</span>
+                                    <span>Transparan & Terverifikasi</span>
                                 </div>
                             </div>
                         </div>
@@ -78,7 +80,7 @@ export default function SaweriaLeaderboard({ leaderboardLink }) {
                 {/* Footer Note */}
                 <div className="mt-6 text-center">
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Powered by <a href="https://saweria.co" target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:text-orange-600 font-medium">Saweria</a>
+                        Sistem donasi dikelola oleh <a href="https://saweria.co" target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:text-orange-600 font-medium">Saweria</a>
                     </p>
                 </div>
             </div>
