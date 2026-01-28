@@ -23,7 +23,8 @@ function Playback() {
     useEffect(() => {
         const fetchCameras = async () => {
             try {
-                const response = await cameraService.getAllCameras();
+                // Use public endpoint for active cameras
+                const response = await cameraService.getActiveCameras();
                 if (response.success) {
                     const recordingCameras = response.data.filter(cam => cam.enable_recording);
                     setCameras(recordingCameras);
