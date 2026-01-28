@@ -54,6 +54,10 @@ function Playback() {
     useEffect(() => {
         if (!selectedCamera) return;
 
+        // CRITICAL FIX: Reset selected segment saat camera berubah
+        // Ini mencegah HTTP 404 karena segment dari camera lama
+        setSelectedSegment(null);
+
         const fetchSegments = async () => {
             try {
                 const response = await recordingService.getSegments(selectedCamera.id);
@@ -62,8 +66,8 @@ function Playback() {
                     const segmentsArray = response.data.segments || [];
                     setSegments(segmentsArray);
                     
-                    // Auto-select latest segment ONLY if no segment is currently selected
-                    if (segmentsArray.length > 0 && !selectedSegment) {
+                    // Auto-select latest segment
+                    if (segmentsArray.length > 0) {
                         setSelectedSegment(segmentsArray[segmentsArray.length - 1]);
                     }
                 }
@@ -77,7 +81,7 @@ function Playback() {
         // Refresh segments every 10 seconds for near real-time updates
         const interval = setInterval(fetchSegments, 10000);
         return () => clearInterval(interval);
-    }, [selectedCamera, selectedSegment]);
+    }, [selectedCamera]); // Remove selectedSegment dari dependency
 
     // Initialize video player (native HTML5, no HLS.js needed for MP4)
     useEffect(() => {
