@@ -309,18 +309,41 @@ function Playback() {
             console.warn('[Video] Stalled at:', video.currentTime);
             setIsBuffering(true);
             
-            // Try to recover from stall after 3 seconds
+            // AGGRESSIVE: Try to recover from stall immediately
             setTimeout(() => {
                 if (video.readyState < 3 && video.networkState !== 3) {
-                    console.log('[Video] Attempting to recover from stall...');
+                    console.log('[Video] Attempting aggressive recovery from stall...');
+                    
+                    // Strategy 1: Just reload current position
                     const currentPos = video.currentTime;
+                    const wasPaused = video.paused;
+                    
                     video.load();
-                    video.currentTime = currentPos;
-                    if (!video.paused) {
-                        video.play().catch(e => console.error('[Video] Recovery play failed:', e));
-                    }
+                    
+                    // Wait for metadata
+                    const onLoadedMetadata = () => {
+                        video.currentTime = currentPos;
+                        if (!wasPaused) {
+                            video.play().catch(e => console.error('[Video] Recovery play failed:', e));
+                        }
+                        video.removeEventListener('loadedmetadata', onLoadedMetadata);
+                    };
+                    
+                    video.addEventListener('loadedmetadata', onLoadedMetadata);
                 }
-            }, 3000);
+            }, 2000); // Reduced from 3s to 2s
+        };
+        
+        const handleProgress = () => {
+            // Log buffered ranges for debugging
+            if (video.buffered.length > 0) {
+                const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+                const bufferedSeconds = bufferedEnd - video.currentTime;
+                
+                if (bufferedSeconds < 5 && !video.paused) {
+                    console.log('[Video] Low buffer:', bufferedSeconds.toFixed(1), 'seconds ahead');
+                }
+            }
         };
 
         video.addEventListener('timeupdate', handleTimeUpdate);
@@ -331,6 +354,7 @@ function Playback() {
         video.addEventListener('playing', handlePlaying);
         video.addEventListener('canplay', handleCanPlay);
         video.addEventListener('stalled', handleStalled);
+        video.addEventListener('progress', handleProgress);
 
         return () => {
             video.removeEventListener('timeupdate', handleTimeUpdate);
@@ -341,6 +365,7 @@ function Playback() {
             video.removeEventListener('playing', handlePlaying);
             video.removeEventListener('canplay', handleCanPlay);
             video.removeEventListener('stalled', handleStalled);
+            video.removeEventListener('progress', handleProgress);
         };
     }, [selectedSegment]);
 
@@ -489,7 +514,7 @@ function Playback() {
                             className="w-full h-full"
                             controls
                             playsInline
-                            preload="metadata"
+                            preload="auto"
                             crossOrigin="anonymous"
                         />
                         
