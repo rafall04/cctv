@@ -11,10 +11,23 @@
 ## Auto-Push Implementation
 
 ### Standard Auto-Push Sequence
-```bash
-# REQUIRED after every change
+
+#### Windows PowerShell
+```powershell
+# CRITICAL: Use semicolons (;) not && in PowerShell
 git add .
-git commit -m "[TYPE]: [Description of changes]"
+git commit -m "[TYPE]: [Description]"
+git push origin main
+
+# Or one-liner with semicolons
+git add . ; git commit -m "Fix: Description" ; git push origin main
+```
+
+#### Ubuntu 20.04 Bash
+```bash
+# Use && for sequential execution with error checking
+git add . && \
+git commit -m "[TYPE]: [Description]" && \
 git push origin main
 ```
 
@@ -31,37 +44,23 @@ git push origin main
 
 ### Windows (PowerShell)
 ```powershell
-# Add to PowerShell profile or use directly
-function Git-AutoPush {
-    param(
-        [Parameter(Mandatory=$true)]
-        [string]$Message,
-        [string]$Branch = "main"
-    )
-    
-    Write-Host "🔄 Auto-pushing changes..." -ForegroundColor Yellow
-    
+# CRITICAL: PowerShell does NOT support && operator
+# Use semicolons (;) to separate commands
+
+# Simple one-liner (use semicolons, not &&)
+git add . ; git commit -m "Your message" ; git push origin main
+
+# Function for better error handling
+function Git-Push {
+    param([string]$msg = "Auto-update")
     git add .
-    if ($LASTEXITCODE -eq 0) {
-        git commit -m $Message
-        if ($LASTEXITCODE -eq 0) {
-            git push origin $Branch
-            if ($LASTEXITCODE -eq 0) {
-                Write-Host "✅ Successfully pushed: $Message" -ForegroundColor Green
-            } else {
-                Write-Host "❌ Failed to push to GitHub" -ForegroundColor Red
-            }
-        } else {
-            Write-Host "❌ Failed to commit changes" -ForegroundColor Red
-        }
-    } else {
-        Write-Host "❌ Failed to add files" -ForegroundColor Red
-    }
+    if ($?) { git commit -m $msg }
+    if ($?) { git push origin main }
+    if ($?) { Write-Host "✅ Pushed: $msg" -ForegroundColor Green }
 }
 
-# Usage examples
-Git-AutoPush "Fix: Updated Windows CORS configuration"
-Git-AutoPush "Feature: Added new camera management UI"
+# Usage
+Git-Push "Fix: Updated configuration"
 ```
 
 ### Ubuntu 20.04 (Bash)
@@ -99,11 +98,17 @@ git_auto_push "Update: Modified MediaMTX configuration"
 ## Integration with Development Workflow
 
 ### After Code Changes
+```powershell
+# Windows PowerShell - use semicolons
+git add . ; git commit -m "Fix: Resolved camera streaming issue" ; git push origin main
+git add . ; git commit -m "Feature: Added new admin dashboard component" ; git push origin main
+git add . ; git commit -m "Update: Modified API endpoint for better error handling" ; git push origin main
+```
+
 ```bash
-# Immediate push after any code modification
-git_auto_push "Fix: Resolved camera streaming issue"
-git_auto_push "Feature: Added new admin dashboard component"
-git_auto_push "Update: Modified API endpoint for better error handling"
+# Ubuntu 20.04 - use &&
+git add . && git commit -m "Fix: Resolved camera streaming issue" && git push origin main
+git add . && git commit -m "Feature: Added new admin dashboard component" && git push origin main
 ```
 
 ### After Configuration Changes

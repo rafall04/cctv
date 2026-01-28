@@ -82,13 +82,12 @@ class RecordingService {
                 '-c:v', 'copy',                  // Copy video codec (0% CPU)
                 '-an',                           // No audio
                 '-f', 'segment',                 // Split ke segments
-                '-segment_time', '600',          // 10 menit per file
+                '-segment_time', '600',          // 10 menit per file (akan dipotong di keyframe terdekat)
                 '-segment_format', 'mp4',
-                '-segment_format_options', 'movflags=+faststart+frag_keyframe+empty_moov', // Web-compatible MP4
+                '-segment_format_options', 'movflags=+faststart', // Web-compatible MP4 dengan proper index
                 '-segment_atclocktime', '1',     // Align dengan clock time
                 '-reset_timestamps', '1',
                 '-strftime', '1',
-                '-break_non_keyframes', '1',     // Allow breaking at non-keyframes to respect segment_time
                 outputPattern
             ];
 
