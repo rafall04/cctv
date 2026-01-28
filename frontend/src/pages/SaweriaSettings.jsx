@@ -75,41 +75,40 @@ function SaweriaSettings() {
 
     return (
         <AdminLayout>
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-                {/* Header */}
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-                        Pengaturan Saweria
-                    </h1>
-                    <p className="text-gray-600 dark:text-gray-400">
-                        Kelola link donasi Saweria untuk website Anda
-                    </p>
-                </div>
+            {/* Header */}
+            <div className="mb-8">
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                    Pengaturan Saweria
+                </h1>
+                <p className="text-gray-600 dark:text-gray-400">
+                    Kelola link donasi Saweria untuk website Anda
+                </p>
+            </div>
 
-                {/* Info Box */}
-                <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl">
-                    <div className="flex items-start gap-3">
-                        <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white">
-                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                        </div>
-                        <div className="flex-1">
-                            <h3 className="font-semibold text-blue-900 dark:text-blue-400 mb-1">
-                                Cara Setup Saweria
-                            </h3>
-                            <ol className="text-sm text-blue-800 dark:text-blue-400 space-y-1 list-decimal list-inside">
-                                <li>Buat akun di <a href="https://saweria.co/" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600">Saweria.co</a></li>
-                                <li>Dapatkan link profil Saweria Anda (contoh: https://saweria.co/username)</li>
-                                <li>Masukkan link tersebut di form di bawah</li>
-                                <li>Aktifkan toggle untuk menampilkan popup donasi</li>
-                            </ol>
-                        </div>
+            {/* Info Box */}
+            <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl">
+                <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white">
+                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <div className="flex-1">
+                        <h3 className="font-semibold text-blue-900 dark:text-blue-400 mb-1">
+                            Cara Setup Saweria
+                        </h3>
+                        <ol className="text-sm text-blue-800 dark:text-blue-400 space-y-1 list-decimal list-inside">
+                            <li>Buat akun di <a href="https://saweria.co/" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600">Saweria.co</a></li>
+                            <li>Dapatkan link profil Saweria Anda (contoh: https://saweria.co/username)</li>
+                            <li>Masukkan link tersebut di form di bawah</li>
+                            <li>Aktifkan toggle untuk menampilkan popup donasi</li>
+                        </ol>
                     </div>
                 </div>
+            </div>
 
-                {/* Form */}
-                <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
                     <div className="p-6 space-y-6">
                         {/* Saweria Link */}
                         <div>
@@ -209,7 +208,6 @@ function SaweriaSettings() {
                         </button>
                     </div>
                 </form>
-            </div>
         </AdminLayout>
     );
 }
