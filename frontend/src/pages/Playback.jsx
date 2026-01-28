@@ -390,15 +390,17 @@ function Playback() {
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Playback Recording</h1>
                     
                     {/* Camera Selector */}
-                    <div className="flex items-center gap-4">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Pilih Kamera:</label>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                            Pilih Kamera:
+                        </label>
                         <select
                             value={selectedCamera?.id || ''}
                             onChange={(e) => {
                                 const camera = cameras.find(c => c.id === parseInt(e.target.value));
                                 setSelectedCamera(camera);
                             }}
-                            className="flex-1 max-w-md px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
+                            className="flex-1 px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         >
                             {cameras.map(camera => (
                                 <option key={camera.id} value={camera.id}>
