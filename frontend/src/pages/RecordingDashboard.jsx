@@ -21,15 +21,21 @@ function RecordingDashboard() {
                 recordingService.getRestartLogs()
             ]);
 
-            if (recordingsRes.success) {
-                setRecordings(recordingsRes.data);
+            console.log('Recordings response:', recordingsRes);
+            console.log('Restarts response:', restartsRes);
+
+            if (recordingsRes.success && recordingsRes.data) {
+                // Handle both old and new response format
+                const camerasData = recordingsRes.data.cameras || recordingsRes.data || [];
+                setRecordings(camerasData);
             }
 
-            if (restartsRes.success) {
+            if (restartsRes.success && restartsRes.data) {
                 setRestartLogs(restartsRes.data);
             }
         } catch (error) {
             console.error('Failed to fetch recording data:', error);
+            showNotification(error.response?.data?.message || 'Failed to load recording data', 'error');
         } finally {
             setLoading(false);
         }
@@ -101,71 +107,80 @@ function RecordingDashboard() {
 
             {/* Recording Status Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {recordings.map((recording) => (
-                    <div
-                        key={recording.camera_id}
-                        className="bg-dark-900/90 backdrop-blur-md border border-dark-700/50 rounded-xl p-6"
-                    >
-                        <div className="flex items-start justify-between mb-4">
-                            <div>
-                                <h3 className="text-lg font-semibold text-white">{recording.camera_name}</h3>
-                                <p className="text-sm text-dark-300">{recording.location || 'No location'}</p>
-                            </div>
-                            <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                recording.is_recording
-                                    ? 'bg-red-500/20 text-red-400'
-                                    : 'bg-dark-700 text-dark-300'
-                            }`}>
-                                {recording.is_recording ? '● Recording' : 'Stopped'}
-                            </div>
-                        </div>
-
-                        <div className="space-y-2 mb-4">
-                            <div className="flex justify-between text-sm">
-                                <span className="text-dark-400">Duration:</span>
-                                <span className="text-white">{recording.recording_duration_hours}h</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-dark-400">Segments:</span>
-                                <span className="text-white">{recording.segment_count || 0}</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-dark-400">Total Size:</span>
-                                <span className="text-white">{formatFileSize(recording.total_size || 0)}</span>
-                            </div>
-                            {recording.oldest_segment && (
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-dark-400">Oldest:</span>
-                                    <span className="text-white">{formatTimestamp(recording.oldest_segment)}</span>
+                {recordings.map((recording) => {
+                    // Handle both runtime_status object and direct properties
+                    const isRecording = recording.runtime_status?.isRecording || recording.recording_status === 'recording';
+                    const segmentCount = recording.storage?.segmentCount || recording.segment_count || 0;
+                    const totalSize = recording.storage?.totalSize || recording.total_size || 0;
+                    const oldestSegment = recording.storage?.oldestSegment || recording.oldest_segment;
+                    const newestSegment = recording.storage?.newestSegment || recording.newest_segment;
+                    
+                    return (
+                        <div
+                            key={recording.id || recording.camera_id}
+                            className="bg-dark-900/90 backdrop-blur-md border border-dark-700/50 rounded-xl p-6"
+                        >
+                            <div className="flex items-start justify-between mb-4">
+                                <div>
+                                    <h3 className="text-lg font-semibold text-white">{recording.name || recording.camera_name}</h3>
+                                    <p className="text-sm text-dark-300">{recording.location || 'No location'}</p>
                                 </div>
-                            )}
-                            {recording.newest_segment && (
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-dark-400">Newest:</span>
-                                    <span className="text-white">{formatTimestamp(recording.newest_segment)}</span>
+                                <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                    isRecording
+                                        ? 'bg-red-500/20 text-red-400'
+                                        : 'bg-dark-700 text-dark-300'
+                                }`}>
+                                    {isRecording ? '● Recording' : 'Stopped'}
                                 </div>
-                            )}
-                        </div>
+                            </div>
 
-                        <div className="flex gap-2">
-                            {recording.is_recording ? (
-                                <button
-                                    onClick={() => handleStopRecording(recording.camera_id)}
-                                    className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
-                                >
-                                    Stop Recording
-                                </button>
-                            ) : (
-                                <button
-                                    onClick={() => handleStartRecording(recording.camera_id)}
-                                    className="flex-1 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
-                                >
-                                    Start Recording
-                                </button>
-                            )}
+                            <div className="space-y-2 mb-4">
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-dark-400">Duration:</span>
+                                    <span className="text-white">{recording.recording_duration_hours || 5}h</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-dark-400">Segments:</span>
+                                    <span className="text-white">{segmentCount}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-dark-400">Total Size:</span>
+                                    <span className="text-white">{formatFileSize(totalSize)}</span>
+                                </div>
+                                {oldestSegment && (
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-dark-400">Oldest:</span>
+                                        <span className="text-white">{formatTimestamp(oldestSegment)}</span>
+                                    </div>
+                                )}
+                                {newestSegment && (
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-dark-400">Newest:</span>
+                                        <span className="text-white">{formatTimestamp(newestSegment)}</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex gap-2">
+                                {isRecording ? (
+                                    <button
+                                        onClick={() => handleStopRecording(recording.id || recording.camera_id)}
+                                        className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+                                    >
+                                        Stop Recording
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => handleStartRecording(recording.id || recording.camera_id)}
+                                        className="flex-1 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+                                    >
+                                        Start Recording
+                                    </button>
+                                )}
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
 
             {recordings.length === 0 && (
