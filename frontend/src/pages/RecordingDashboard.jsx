@@ -6,6 +6,7 @@ function RecordingDashboard() {
     const [recordings, setRecordings] = useState([]);
     const [restartLogs, setRestartLogs] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const { showNotification } = useNotification();
 
     useEffect(() => {
@@ -16,26 +17,32 @@ function RecordingDashboard() {
 
     const fetchData = async () => {
         try {
+            setError(null);
+            
             const [recordingsRes, restartsRes] = await Promise.all([
                 recordingService.getRecordingsOverview(),
                 recordingService.getRestartLogs()
             ]);
 
-            console.log('Recordings response:', recordingsRes);
-            console.log('Restarts response:', restartsRes);
-
             if (recordingsRes.success && recordingsRes.data) {
                 // Handle both old and new response format
                 const camerasData = recordingsRes.data.cameras || recordingsRes.data || [];
                 setRecordings(camerasData);
+            } else {
+                setRecordings([]);
             }
 
             if (restartsRes.success && restartsRes.data) {
                 setRestartLogs(restartsRes.data);
+            } else {
+                setRestartLogs([]);
             }
         } catch (error) {
             console.error('Failed to fetch recording data:', error);
-            showNotification(error.response?.data?.message || 'Failed to load recording data', 'error');
+            const errorMessage = error.response?.data?.message || error.message || 'Failed to load recording data';
+            setError(errorMessage);
+            setRecordings([]);
+            setRestartLogs([]);
         } finally {
             setLoading(false);
         }
@@ -104,6 +111,27 @@ function RecordingDashboard() {
                 <h1 className="text-2xl font-bold text-white mb-2">Recording Dashboard</h1>
                 <p className="text-dark-300">Monitor dan kelola recording CCTV</p>
             </div>
+
+            {/* Error State */}
+            {error && (
+                <div className="bg-red-900/20 border border-red-500/50 rounded-xl p-6">
+                    <div className="flex items-center gap-3">
+                        <svg className="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div>
+                            <h3 className="text-red-400 font-semibold">Error Loading Data</h3>
+                            <p className="text-red-300 text-sm mt-1">{error}</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={fetchData}
+                        className="mt-4 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+                    >
+                        Retry
+                    </button>
+                </div>
+            )}
 
             {/* Recording Status Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
