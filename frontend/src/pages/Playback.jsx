@@ -797,17 +797,18 @@ function Playback() {
                             </div>
                         )}
                         
-                        {/* Speed Control Overlay - Hidden on mobile, show on hover on desktop */}
-                        <div className="hidden sm:flex absolute top-2 sm:top-4 right-2 sm:right-4 gap-1 sm:gap-2 opacity-0 hover:opacity-100 transition-opacity">
+                        {/* Speed Control Overlay - Always visible on desktop */}
+                        <div className="hidden sm:flex absolute top-2 sm:top-4 right-2 sm:right-4 gap-1 sm:gap-2 z-30">
                             {[0.5, 1, 1.5, 2].map(speed => (
                                 <button
                                     key={speed}
                                     onClick={() => handleSpeedChange(speed)}
-                                    className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded text-xs sm:text-sm font-medium transition-colors ${
+                                    className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all shadow-lg ${
                                         playbackSpeed === speed
-                                            ? 'bg-primary-500 text-white'
-                                            : 'bg-black/50 text-white hover:bg-black/70'
+                                            ? 'bg-primary-500 text-white scale-110'
+                                            : 'bg-black/70 text-white hover:bg-black/90 hover:scale-105'
                                     }`}
+                                    title={`Kecepatan ${speed}x`}
                                 >
                                     {speed}x
                                 </button>
@@ -849,7 +850,7 @@ function Playback() {
                                 </li>
                                 <li className="flex items-start gap-2">
                                     <span className="flex-shrink-0 mt-0.5">•</span>
-                                    <span><strong>Kecepatan:</strong> Hover di pojok kanan atas video untuk ubah kecepatan playback (0.5x - 2x)</span>
+                                    <span><strong>Kecepatan:</strong> Klik tombol kecepatan di pojok kanan atas video (0.5x - 2x)</span>
                                 </li>
                                 <li className="flex items-start gap-2">
                                     <span className="flex-shrink-0 mt-0.5">•</span>
