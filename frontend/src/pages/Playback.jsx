@@ -299,8 +299,42 @@ function Playback() {
         const handleTimeUpdate = () => setCurrentTime(video.currentTime);
         const handleLoadedMetadata = () => setDuration(video.duration);
         
-        // CRITICAL: Handle seeking events
+        // CRITICAL: Intercept seeking with smart limiter
         const handleSeeking = () => {
+            const targetTime = video.currentTime;
+            const previousTime = lastSeekTimeRef.current || 0;
+            const seekDistance = Math.abs(targetTime - previousTime);
+            
+            // Clear previous warning
+            setSeekWarning(null);
+            
+            // If seek distance exceeds limit, apply limiter
+            if (seekDistance > MAX_SEEK_DISTANCE) {
+                const direction = targetTime > previousTime ? 1 : -1;
+                const limitedTarget = previousTime + (MAX_SEEK_DISTANCE * direction);
+                
+                // Show warning
+                const remainingDistance = Math.abs(targetTime - limitedTarget);
+                const remainingMinutes = Math.floor(remainingDistance / 60);
+                
+                setSeekWarning({
+                    message: `Skip dibatasi maksimal 3 menit per kali untuk menghindari buffering.`,
+                    suggestion: remainingMinutes > 0 
+                        ? `Masih ${remainingMinutes} menit lagi ke target. Skip lagi untuk lanjut.`
+                        : null
+                });
+                
+                // Force limited seek
+                video.currentTime = limitedTarget;
+                lastSeekTimeRef.current = limitedTarget;
+                
+                // Auto-hide warning
+                setTimeout(() => setSeekWarning(null), 5000);
+            } else {
+                // Update last seek position for next check
+                lastSeekTimeRef.current = targetTime;
+            }
+            
             setIsSeeking(true);
             setIsBuffering(true);
             setVideoError(null);
