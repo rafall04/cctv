@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { cameraService } from '../services/cameraService';
-import { recordingService } from '../services/recordingService';
+import recordingService from '../services/recordingService';
 import Hls from 'hls.js';
 
 function Playback() {

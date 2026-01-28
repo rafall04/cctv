@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { recordingService } from '../services/recordingService';
+import recordingService from '../services/recordingService';
 import { useNotification } from '../contexts/NotificationContext';
 
 function RecordingDashboard() {
