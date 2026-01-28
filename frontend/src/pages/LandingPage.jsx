@@ -2457,9 +2457,9 @@ function FilterDropdown({ areas, selected, onChange, cameras, kecamatans = [], k
 // ============================================
 // CAMERAS SECTION - Connection filter only for Grid view
 // ============================================
-function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, multiCameras }) {
+function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, multiCameras, viewMode, setViewMode }) {
     const [connectionTab, setConnectionTab] = useState('all'); // 'all', 'stable', 'tunnel'
-    const [viewMode, setViewMode] = useState('map'); // 'grid', 'map', or 'playback'
+    // viewMode now controlled by parent
     const [searchQuery, setSearchQuery] = useState('');
     const [showSearchDropdown, setShowSearchDropdown] = useState(false);
     const [focusedCameraId, setFocusedCameraId] = useState(null);
@@ -3357,6 +3357,7 @@ export default function LandingPage() {
     const [loading, setLoading] = useState(true);
     const [popup, setPopup] = useState(null);
     const [multiCameras, setMultiCameras] = useState([]);
+    const [viewMode, setViewMode] = useState('map'); // Control viewMode from parent
     const [showMulti, setShowMulti] = useState(false);
     const [toasts, setToasts] = useState([]);
     const [maxReached, setMaxReached] = useState(false);
@@ -3675,10 +3676,15 @@ export default function LandingPage() {
                             <div className="flex-shrink-0 w-full sm:w-auto">
                                 <button
                                     onClick={() => {
-                                        const playbackSection = document.getElementById('playback-section');
-                                        if (playbackSection) {
-                                            playbackSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                        }
+                                        // Set viewMode to playback
+                                        setViewMode('playback');
+                                        // Scroll to section after state update
+                                        setTimeout(() => {
+                                            const playbackSection = document.getElementById('playback-section');
+                                            if (playbackSection) {
+                                                playbackSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                            }
+                                        }, 100);
                                     }}
                                     className="block w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg transition-all transform hover:scale-105 text-center cursor-pointer"
                                 >
@@ -3703,6 +3709,8 @@ export default function LandingPage() {
                 onCameraClick={setPopup}
                 onAddMulti={handleAddMulti}
                 multiCameras={multiCameras}
+                viewMode={viewMode}
+                setViewMode={setViewMode}
             />
 
             {/* Saweria Leaderboard - Placed after cameras section */}
