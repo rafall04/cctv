@@ -314,6 +314,39 @@ class RecordingService {
                 console.log(`[Segment] Re-muxing file to fix MP4 index: ${filename}`);
                 const tempPath = filePath + '.temp.mp4';
                 
+                // Check if file is complete by trying to read moov atom
+                // If FFmpeg is still writing, skip and let scanner catch it later
+                const { spawn: spawnSync } = await import('child_process');
+                const ffprobeCheck = spawnSync('ffprobe', [
+                    '-v', 'error',
+                    '-show_entries', 'format=duration',
+                    '-of', 'default=noprint_wrappers=1:nokey=1',
+                    filePath
+                ]);
+
+                let ffprobeOutput = '';
+                ffprobeCheck.stdout.on('data', (data) => {
+                    ffprobeOutput += data.toString();
+                });
+
+                await new Promise((resolve) => {
+                    ffprobeCheck.on('close', (code) => {
+                        if (code !== 0 || !ffprobeOutput.trim()) {
+                            console.log(`[Segment] File not ready for re-mux yet (ffprobe failed), will retry later: ${filename}`);
+                            resolve(false);
+                        } else {
+                            console.log(`[Segment] File is complete, duration: ${ffprobeOutput.trim()}s`);
+                            resolve(true);
+                        }
+                    });
+                });
+
+                // If file not ready, skip for now (scanner will catch it later)
+                if (!ffprobeOutput.trim()) {
+                    console.log(`[Segment] Skipping re-mux for now: ${filename}`);
+                    return;
+                }
+                
                 await new Promise((resolve, reject) => {
                     const ffmpeg = spawn('ffmpeg', [
                         '-i', filePath,
@@ -351,7 +384,7 @@ class RecordingService {
                     
                     // Delete original and rename temp
                     unlinkSync(filePath);
-                    fs.renameSync(tempPath, filePath);
+                    renameSync(tempPath, filePath);
                     
                     console.log(`[Segment] ✓ File replaced with re-muxed version`);
                 } else {
