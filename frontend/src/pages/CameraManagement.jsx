@@ -739,7 +739,7 @@ export default function CameraManagement() {
                                     </div>
                                     <div>
                                         <p className="text-sm font-medium text-gray-900 dark:text-white">Pengaturan Rekaman</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">Rolling buffer 1-10 jam</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Rolling buffer 1 jam - 3 bulan</p>
                                     </div>
                                 </div>
 
@@ -769,19 +769,45 @@ export default function CameraManagement() {
                                             disabled={isSubmitting}
                                             className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-red-500 disabled:opacity-50"
                                         >
-                                            <option value={1}>1 Jam (~1.8 GB)</option>
-                                            <option value={2}>2 Jam (~3.6 GB)</option>
-                                            <option value={3}>3 Jam (~5.4 GB)</option>
-                                            <option value={4}>4 Jam (~7.2 GB)</option>
-                                            <option value={5}>5 Jam (~9 GB)</option>
-                                            <option value={6}>6 Jam (~11 GB)</option>
-                                            <option value={7}>7 Jam (~13 GB)</option>
-                                            <option value={8}>8 Jam (~14 GB)</option>
-                                            <option value={9}>9 Jam (~16 GB)</option>
-                                            <option value={10}>10 Jam (~18 GB)</option>
+                                            <optgroup label="Per Jam (1-10 jam)">
+                                                <option value={1}>1 Jam (~1.8 GB)</option>
+                                                <option value={2}>2 Jam (~3.6 GB)</option>
+                                                <option value={3}>3 Jam (~5.4 GB)</option>
+                                                <option value={4}>4 Jam (~7.2 GB)</option>
+                                                <option value={5}>5 Jam (~9 GB)</option>
+                                                <option value={6}>6 Jam (~11 GB)</option>
+                                                <option value={7}>7 Jam (~13 GB)</option>
+                                                <option value={8}>8 Jam (~14 GB)</option>
+                                                <option value={9}>9 Jam (~16 GB)</option>
+                                                <option value={10}>10 Jam (~18 GB)</option>
+                                            </optgroup>
+                                            <optgroup label="Setengah Hari (12-18 jam)">
+                                                <option value={12}>12 Jam (~22 GB)</option>
+                                                <option value={15}>15 Jam (~27 GB)</option>
+                                                <option value={18}>18 Jam (~32 GB)</option>
+                                            </optgroup>
+                                            <optgroup label="Per Hari (1-7 hari)">
+                                                <option value={24}>1 Hari / 24 Jam (~43 GB)</option>
+                                                <option value={48}>2 Hari / 48 Jam (~86 GB)</option>
+                                                <option value={72}>3 Hari / 72 Jam (~130 GB)</option>
+                                                <option value={96}>4 Hari / 96 Jam (~173 GB)</option>
+                                                <option value={120}>5 Hari / 120 Jam (~216 GB)</option>
+                                                <option value={144}>6 Hari / 144 Jam (~259 GB)</option>
+                                                <option value={168}>7 Hari / 168 Jam (~302 GB)</option>
+                                            </optgroup>
+                                            <optgroup label="Per Minggu (1-4 minggu)">
+                                                <option value={336}>2 Minggu / 14 Hari (~605 GB)</option>
+                                                <option value={504}>3 Minggu / 21 Hari (~907 GB)</option>
+                                                <option value={672}>4 Minggu / 28 Hari (~1.2 TB)</option>
+                                            </optgroup>
+                                            <optgroup label="Per Bulan (1-3 bulan)">
+                                                <option value={720}>1 Bulan / 30 Hari (~1.3 TB)</option>
+                                                <option value={1440}>2 Bulan / 60 Hari (~2.6 TB)</option>
+                                                <option value={2160}>3 Bulan / 90 Hari (~3.9 TB)</option>
+                                            </optgroup>
                                         </select>
                                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                            File lama otomatis terhapus sesuai durasi
+                                            File lama otomatis terhapus sesuai durasi. Estimasi untuk 1080p@25fps.
                                         </p>
                                     </div>
                                 )}
