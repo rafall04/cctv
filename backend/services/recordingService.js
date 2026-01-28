@@ -73,13 +73,19 @@ class RecordingService {
             console.log(`Starting recording for camera ${cameraId} (${camera.name})`);
             console.log(`RTSP URL: ${camera.private_rtsp_url.replace(/:[^:@]+@/, ':****@')}`); // Hide password
 
-            // FFmpeg command - video only (no audio, 0% CPU overhead)
+            // FFmpeg command - transcode to H.264 for browser compatibility
             const outputPattern = join(cameraDir, '%Y%m%d_%H%M%S.mp4');
             const ffmpegArgs = [
                 '-rtsp_transport', 'tcp',
                 '-i', camera.private_rtsp_url,
                 '-map', '0:v',                   // Map video only (skip audio)
-                '-c:v', 'copy',                  // Copy video (no re-encode, 0% CPU)
+                '-c:v', 'libx264',               // Encode to H.264 (browser compatible)
+                '-preset', 'ultrafast',          // Fastest encoding (low CPU)
+                '-crf', '28',                    // Quality (23=high, 28=medium, lower CPU)
+                '-profile:v', 'baseline',        // H.264 baseline profile (most compatible)
+                '-level', '3.0',                 // H.264 level 3.0 (compatible)
+                '-pix_fmt', 'yuv420p',           // Pixel format (required for compatibility)
+                '-movflags', '+faststart',       // Enable fast start for web playback
                 '-an',                           // No audio
                 '-f', 'segment',                 // Split ke segments
                 '-segment_time', '600',          // 10 menit per file
@@ -89,6 +95,8 @@ class RecordingService {
                 '-strftime', '1',
                 outputPattern
             ];
+
+            console.log(`FFmpeg encoding: H.264 baseline, preset ultrafast, CRF 28`);
 
             // Spawn ffmpeg process
             const ffmpeg = spawn('ffmpeg', ffmpegArgs);

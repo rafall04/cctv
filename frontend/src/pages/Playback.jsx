@@ -110,16 +110,41 @@ function Playback() {
                         contentType: response.headers.get('content-type'),
                         contentLength: response.headers.get('content-length'),
                         acceptRanges: response.headers.get('accept-ranges'),
-                        cors: response.headers.get('access-control-allow-origin')
+                        cors: response.headers.get('access-control-allow-origin'),
+                        cacheControl: response.headers.get('cache-control')
                     }
                 };
                 
                 console.log('HEAD Request Response:', headInfo);
                 debugData.headResponse = headInfo;
-                setDebugInfo(debugData);
                 
                 if (response.ok) {
                     console.log('✓ URL is accessible');
+                    console.log('Content-Type:', headInfo.headers.contentType);
+                    console.log('Content-Length:', headInfo.headers.contentLength, 'bytes');
+                    
+                    // Check if content-type is correct
+                    if (!headInfo.headers.contentType || !headInfo.headers.contentType.includes('video')) {
+                        const errorMsg = `Invalid Content-Type: ${headInfo.headers.contentType}`;
+                        console.error('✗', errorMsg);
+                        setVideoError(errorMsg);
+                        debugData.error = errorMsg;
+                        setDebugInfo(debugData);
+                        return;
+                    }
+                    
+                    // Check if file size is reasonable (> 1MB for 10min segment)
+                    const fileSize = parseInt(headInfo.headers.contentLength || '0');
+                    if (fileSize < 1024 * 1024) {
+                        const errorMsg = `File too small: ${(fileSize / 1024).toFixed(2)} KB (expected > 1 MB)`;
+                        console.error('✗', errorMsg);
+                        setVideoError(errorMsg);
+                        debugData.error = errorMsg;
+                        setDebugInfo(debugData);
+                        return;
+                    }
+                    
+                    console.log('File size check passed:', (fileSize / 1024 / 1024).toFixed(2), 'MB');
                     
                     // Set video source
                     videoRef.current.src = streamUrl;
@@ -129,10 +154,14 @@ function Playback() {
                     console.log('Video readyState:', videoRef.current.readyState);
                     console.log('Video networkState:', videoRef.current.networkState);
                     
+                    setDebugInfo(debugData);
+                    
                 } else {
                     const errorMsg = `HTTP ${response.status}: ${response.statusText}`;
                     console.error('✗ URL returned error:', errorMsg);
                     setVideoError(errorMsg);
+                    debugData.error = errorMsg;
+                    setDebugInfo(debugData);
                 }
             })
             .catch(error => {
