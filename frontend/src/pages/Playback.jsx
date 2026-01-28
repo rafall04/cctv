@@ -254,17 +254,15 @@ function Playback() {
         
         // CRITICAL: Handle seeking events
         const handleSeeking = () => {
-            console.log('[Video] Seeking to:', video.currentTime);
             setIsSeeking(true);
             setIsBuffering(true);
             setVideoError(null);
         };
         
         const handleSeeked = () => {
-            console.log('[Video] Seeked to:', video.currentTime, 'readyState:', video.readyState);
             setIsSeeking(false);
             
-            // CRITICAL: Force play after seek if video was playing
+            // Force play after seek if video was playing
             if (!video.paused) {
                 const playPromise = video.play();
                 if (playPromise !== undefined) {
@@ -274,7 +272,6 @@ function Playback() {
                         })
                         .catch(error => {
                             console.error('[Video] Play after seek failed:', error);
-                            // Retry once after 500ms
                             setTimeout(() => {
                                 video.play()
                                     .then(() => setIsBuffering(false))
@@ -291,17 +288,14 @@ function Playback() {
         };
         
         const handleWaiting = () => {
-            console.log('[Video] Waiting for data at:', video.currentTime);
             setIsBuffering(true);
         };
         
         const handlePlaying = () => {
-            console.log('[Video] Playing at:', video.currentTime);
             setIsBuffering(false);
         };
         
         const handleCanPlay = () => {
-            console.log('[Video] Can play at:', video.currentTime);
             setIsBuffering(false);
         };
         
@@ -309,18 +303,14 @@ function Playback() {
             console.warn('[Video] Stalled at:', video.currentTime);
             setIsBuffering(true);
             
-            // AGGRESSIVE: Try to recover from stall immediately
+            // Try to recover from stall
             setTimeout(() => {
                 if (video.readyState < 3 && video.networkState !== 3) {
-                    console.log('[Video] Attempting aggressive recovery from stall...');
-                    
-                    // Strategy 1: Just reload current position
                     const currentPos = video.currentTime;
                     const wasPaused = video.paused;
                     
                     video.load();
                     
-                    // Wait for metadata
                     const onLoadedMetadata = () => {
                         video.currentTime = currentPos;
                         if (!wasPaused) {
@@ -331,17 +321,17 @@ function Playback() {
                     
                     video.addEventListener('loadedmetadata', onLoadedMetadata);
                 }
-            }, 2000); // Reduced from 3s to 2s
+            }, 2000);
         };
         
         const handleProgress = () => {
-            // Log buffered ranges for debugging
+            // Monitor buffer status
             if (video.buffered.length > 0) {
                 const bufferedEnd = video.buffered.end(video.buffered.length - 1);
                 const bufferedSeconds = bufferedEnd - video.currentTime;
                 
                 if (bufferedSeconds < 5 && !video.paused) {
-                    console.log('[Video] Low buffer:', bufferedSeconds.toFixed(1), 'seconds ahead');
+                    console.log('[Video] Low buffer:', bufferedSeconds.toFixed(1), 's');
                 }
             }
         };
