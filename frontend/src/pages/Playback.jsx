@@ -70,9 +70,9 @@ function Playback() {
                     setSegments(segmentsArray);
                     
                     // CRITICAL FIX: Auto-select latest segment ONLY on initial load
-                    // Jangan auto-select saat interval refresh (biarkan user nonton segment yang dipilih)
+                    // Segments diurutkan DESC (terbaru dulu), jadi index 0 = segment terbaru
                     if (segmentsArray.length > 0 && isInitialLoadRef.current) {
-                        setSelectedSegment(segmentsArray[segmentsArray.length - 1]);
+                        setSelectedSegment(segmentsArray[0]); // Index 0 = latest segment (DESC order)
                         isInitialLoadRef.current = false; // Mark initial load complete
                     }
                 }

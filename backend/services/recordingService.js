@@ -263,7 +263,8 @@ class RecordingService {
 
         console.log(`[Segment] Detected new segment: camera${cameraId}/${filename}`);
 
-        // Reduced wait: 5 seconds (FFmpeg should have closed file by now)
+        // Optimized wait: 3 seconds (reduced from 15s)
+        // FFmpeg should have closed file by now with proper segment settings
         setTimeout(async () => {
             try {
                 if (!existsSync(filePath)) {
@@ -302,9 +303,9 @@ class RecordingService {
                     return;
                 }
 
-                // Reduced wait: 5 seconds (down from 10s)
+                // Reduced wait: 3 seconds (optimized from 5s)
                 console.log(`[Segment] Final wait to ensure file is complete: ${filename}`);
-                await new Promise(resolve => setTimeout(resolve, 5000));
+                await new Promise(resolve => setTimeout(resolve, 3000));
                 
                 // Quick final check
                 if (!existsSync(filePath)) {
@@ -456,7 +457,7 @@ class RecordingService {
             } catch (error) {
                 console.error(`[Segment] Error handling segment creation:`, error);
             }
-        }, 15000); // Wait 15 seconds initial delay
+        }, 3000); // Wait 3 seconds initial delay (optimized from 15s)
     }
 
     /**
