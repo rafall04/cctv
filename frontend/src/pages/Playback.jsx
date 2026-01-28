@@ -3,6 +3,10 @@ import { useSearchParams } from 'react-router-dom';
 import { cameraService } from '../services/cameraService';
 import recordingService from '../services/recordingService';
 
+// CRITICAL: Maximum safe seek distance (3 minutes = 180 seconds)
+// Seeking beyond this may cause buffering issues due to keyframe intervals
+const MAX_SEEK_DISTANCE = 180;
+
 function Playback() {
     const [searchParams] = useSearchParams();
     const cameraIdFromUrl = searchParams.get('camera');
@@ -18,10 +22,12 @@ function Playback() {
     const [videoError, setVideoError] = useState(null);
     const [isSeeking, setIsSeeking] = useState(false);
     const [isBuffering, setIsBuffering] = useState(false);
+    const [seekWarning, setSeekWarning] = useState(null); // Warning toast for long seeks
     
     const videoRef = useRef(null);
     const timelineRef = useRef(null);
     const isInitialLoadRef = useRef(true); // Track initial load
+    const lastSeekTimeRef = useRef(0); // Track last seek position for smart limiting
 
     // Fetch cameras with recording enabled
     useEffect(() => {
@@ -400,6 +406,58 @@ function Playback() {
         };
     }, [selectedSegment]);
 
+    // CRITICAL: Smart Seek Handler with 3-minute limit
+    const handleSmartSeek = (targetTime) => {
+        if (!videoRef.current) return;
+        
+        const currentPos = videoRef.current.currentTime;
+        const seekDistance = Math.abs(targetTime - currentPos);
+        
+        // Clear previous warning
+        setSeekWarning(null);
+        
+        // If seek distance is within safe range, allow direct seek
+        if (seekDistance <= MAX_SEEK_DISTANCE) {
+            videoRef.current.currentTime = targetTime;
+            lastSeekTimeRef.current = targetTime;
+            return;
+        }
+        
+        // Long seek detected - limit to MAX_SEEK_DISTANCE
+        const direction = targetTime > currentPos ? 1 : -1;
+        const limitedTarget = currentPos + (MAX_SEEK_DISTANCE * direction);
+        
+        // Show warning to user
+        const remainingDistance = Math.abs(targetTime - limitedTarget);
+        const remainingMinutes = Math.floor(remainingDistance / 60);
+        
+        setSeekWarning({
+            message: `Skip dibatasi maksimal 3 menit per kali untuk menghindari buffering.`,
+            suggestion: remainingMinutes > 0 
+                ? `Masih ${remainingMinutes} menit lagi ke target. Klik lagi untuk lanjut.`
+                : null
+        });
+        
+        // Perform limited seek
+        videoRef.current.currentTime = limitedTarget;
+        lastSeekTimeRef.current = limitedTarget;
+        
+        // Auto-hide warning after 5 seconds
+        setTimeout(() => setSeekWarning(null), 5000);
+    };
+    
+    // Handle timeline click with smart seek
+    const handleTimelineClick = (e) => {
+        if (!videoRef.current || !timelineRef.current) return;
+        
+        const rect = timelineRef.current.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const percentage = clickX / rect.width;
+        const targetTime = percentage * duration;
+        
+        handleSmartSeek(targetTime);
+    };
+
     // Handle playback speed change
     const handleSpeedChange = (speed) => {
         setPlaybackSpeed(speed);
@@ -561,6 +619,33 @@ function Playback() {
                             </div>
                         )}
                         
+                        {/* Seek Warning Toast */}
+                        {seekWarning && (
+                            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 max-w-md w-full mx-4">
+                                <div className="bg-yellow-500 text-yellow-900 px-4 py-3 rounded-lg shadow-lg border-2 border-yellow-600">
+                                    <div className="flex items-start gap-3">
+                                        <svg className="w-6 h-6 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                        </svg>
+                                        <div className="flex-1">
+                                            <p className="font-semibold text-sm">{seekWarning.message}</p>
+                                            {seekWarning.suggestion && (
+                                                <p className="text-xs mt-1 text-yellow-800">{seekWarning.suggestion}</p>
+                                            )}
+                                        </div>
+                                        <button
+                                            onClick={() => setSeekWarning(null)}
+                                            className="flex-shrink-0 text-yellow-900 hover:text-yellow-950"
+                                        >
+                                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        
                         {/* Error Overlay */}
                         {videoError && (
                             <div className="absolute inset-0 flex items-center justify-center bg-black/80 p-8">
@@ -628,7 +713,8 @@ function Playback() {
                             
                             <div 
                                 ref={timelineRef}
-                                className="relative h-8 sm:h-10 md:h-12 bg-gray-200 dark:bg-gray-800 rounded-lg overflow-hidden"
+                                onClick={handleTimelineClick}
+                                className="relative h-8 sm:h-10 md:h-12 bg-gray-200 dark:bg-gray-800 rounded-lg overflow-hidden cursor-pointer"
                             >
                                 {/* Segments on timeline */}
                                 {timelineData.sortedSegments.map((segment) => {
