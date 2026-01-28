@@ -345,6 +345,26 @@ export async function updateCamera(request, reply) {
         // Invalidate camera cache
         invalidateCameraCache();
 
+        // CRITICAL FIX: Handle recording start/stop when enable_recording changes
+        if (enable_recording !== undefined) {
+            const { recordingService } = await import('../services/recordingService.js');
+            const newRecordingEnabled = enable_recording === true || enable_recording === 1;
+            const oldRecordingEnabled = existingCamera.enable_recording === 1;
+            const cameraEnabled = newEnabled === 1 || newEnabled === true;
+
+            if (newRecordingEnabled !== oldRecordingEnabled) {
+                if (newRecordingEnabled && cameraEnabled) {
+                    // Start recording
+                    console.log(`[Camera ${id}] Starting recording (enable_recording changed to true)`);
+                    await recordingService.startRecording(parseInt(id));
+                } else if (!newRecordingEnabled) {
+                    // Stop recording
+                    console.log(`[Camera ${id}] Stopping recording (enable_recording changed to false)`);
+                    await recordingService.stopRecording(parseInt(id));
+                }
+            }
+        }
+
         // Handle MediaMTX path updates (using stream_key as path)
         const newEnabled = enabled !== undefined ? enabled : existingCamera.enabled;
         const newRtspUrl = private_rtsp_url !== undefined ? private_rtsp_url : existingCamera.private_rtsp_url;
