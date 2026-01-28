@@ -312,41 +312,34 @@ class RecordingService {
 
                 // CRITICAL FIX: Re-mux file to create proper MP4 index for seeking
                 console.log(`[Segment] Re-muxing file to fix MP4 index: ${filename}`);
-                const tempPath = filePath + '.temp.mp4';
+                const tempPath = filePath + '.remux.mp4';
                 
-                // Check if file is complete by trying to read moov atom
-                // If FFmpeg is still writing, skip and let scanner catch it later
-                const { spawn: spawnSync } = await import('child_process');
-                const ffprobeCheck = spawnSync('ffprobe', [
-                    '-v', 'error',
-                    '-show_entries', 'format=duration',
-                    '-of', 'default=noprint_wrappers=1:nokey=1',
-                    filePath
-                ]);
-
-                let ffprobeOutput = '';
-                ffprobeCheck.stdout.on('data', (data) => {
-                    ffprobeOutput += data.toString();
-                });
-
-                await new Promise((resolve) => {
-                    ffprobeCheck.on('close', (code) => {
-                        if (code !== 0 || !ffprobeOutput.trim()) {
-                            console.log(`[Segment] File not ready for re-mux yet (ffprobe failed), will retry later: ${filename}`);
-                            resolve(false);
-                        } else {
-                            console.log(`[Segment] File is complete, duration: ${ffprobeOutput.trim()}s`);
-                            resolve(true);
-                        }
-                    });
-                });
-
-                // If file not ready, skip for now (scanner will catch it later)
-                if (!ffprobeOutput.trim()) {
-                    console.log(`[Segment] Skipping re-mux for now: ${filename}`);
+                // Clean up any existing temp files first
+                if (existsSync(tempPath)) {
+                    console.log(`[Segment] Cleaning up existing temp file: ${tempPath}`);
+                    unlinkSync(tempPath);
+                }
+                
+                // Check if file is complete using ffprobe (synchronous)
+                try {
+                    const { execSync } = await import('child_process');
+                    const ffprobeOutput = execSync(
+                        `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`,
+                        { encoding: 'utf8', timeout: 5000 }
+                    ).trim();
+                    
+                    if (!ffprobeOutput || parseFloat(ffprobeOutput) < 1) {
+                        console.log(`[Segment] File not ready (duration: ${ffprobeOutput}s), will retry later: ${filename}`);
+                        return;
+                    }
+                    
+                    console.log(`[Segment] File is complete, duration: ${ffprobeOutput}s`);
+                } catch (error) {
+                    console.log(`[Segment] ffprobe check failed, file not ready: ${filename}`);
                     return;
                 }
                 
+                // Perform re-mux
                 await new Promise((resolve, reject) => {
                     const ffmpeg = spawn('ffmpeg', [
                         '-i', filePath,
@@ -367,12 +360,20 @@ class RecordingService {
                             resolve();
                         } else {
                             console.error(`[Segment] Re-mux failed (code ${code}):`, ffmpegError.slice(-500));
+                            // Clean up failed temp file
+                            if (existsSync(tempPath)) {
+                                unlinkSync(tempPath);
+                            }
                             reject(new Error(`FFmpeg re-mux failed with code ${code}`));
                         }
                     });
 
                     ffmpeg.on('error', (error) => {
                         console.error(`[Segment] Re-mux spawn error:`, error);
+                        // Clean up on error
+                        if (existsSync(tempPath)) {
+                            unlinkSync(tempPath);
+                        }
                         reject(error);
                     });
                 });
@@ -562,6 +563,9 @@ class RecordingService {
      * Scans recording folders every 60 seconds for new MP4 files
      */
     startSegmentScanner() {
+        // Initial cleanup of temp files
+        this.cleanupTempFiles();
+        
         setInterval(() => {
             // Get all active recordings
             activeRecordings.forEach((recording, cameraId) => {
@@ -570,9 +574,12 @@ class RecordingService {
                 if (!existsSync(cameraDir)) return;
 
                 try {
-                    // Get all MP4 files in directory
+                    // Get all MP4 files in directory (exclude temp files)
                     const files = readdirSync(cameraDir)
-                        .filter(f => f.endsWith('.mp4') && f.match(/\d{8}_\d{6}\.mp4/));
+                        .filter(f => {
+                            // Only match: YYYYMMDD_HHMMSS.mp4 (exactly)
+                            return /^\d{8}_\d{6}\.mp4$/.test(f);
+                        });
 
                     // Check each file
                     files.forEach(filename => {
@@ -600,6 +607,44 @@ class RecordingService {
                 }
             });
         }, 60000); // Scan every 60 seconds
+    }
+
+    /**
+     * Cleanup temp files from failed re-mux attempts
+     */
+    cleanupTempFiles() {
+        try {
+            console.log('[Cleanup] Scanning for temp files...');
+            
+            if (!existsSync(RECORDINGS_BASE_PATH)) return;
+            
+            const cameraDirs = readdirSync(RECORDINGS_BASE_PATH);
+            let cleanedCount = 0;
+            
+            cameraDirs.forEach(cameraDir => {
+                const fullPath = join(RECORDINGS_BASE_PATH, cameraDir);
+                if (!statSync(fullPath).isDirectory()) return;
+                
+                const files = readdirSync(fullPath);
+                files.forEach(file => {
+                    // Delete any .temp.mp4 or .remux.mp4 files
+                    if (file.includes('.temp.mp4') || file.includes('.remux.mp4')) {
+                        const filePath = join(fullPath, file);
+                        unlinkSync(filePath);
+                        cleanedCount++;
+                        console.log(`[Cleanup] Deleted temp file: ${cameraDir}/${file}`);
+                    }
+                });
+            });
+            
+            if (cleanedCount > 0) {
+                console.log(`[Cleanup] ✓ Cleaned up ${cleanedCount} temp files`);
+            } else {
+                console.log('[Cleanup] No temp files found');
+            }
+        } catch (error) {
+            console.error('[Cleanup] Error cleaning temp files:', error);
+        }
     }
 
     /**
