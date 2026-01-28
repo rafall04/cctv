@@ -603,16 +603,19 @@ const VideoModal = memo(({ camera, onClose }) => {
                 className={`bg-gray-900 overflow-hidden shadow-2xl border border-gray-800 ${isFullscreen ? 'w-full h-full' : 'rounded-xl w-full max-w-4xl'}`}
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Video Container - optimized dengan pointer events */}
+                {/* Video Container - optimized dengan pointer events, no aspect-video constraint untuk support 4:3 */}
                 <div 
-                    className={`relative bg-black overflow-hidden ${isFullscreen ? 'w-full h-full' : 'aspect-video'}`}
+                    className={`relative bg-black overflow-hidden ${isFullscreen ? 'w-full h-full' : 'w-full'}`}
+                    style={{ 
+                        touchAction: 'none',
+                        aspectRatio: isFullscreen ? 'auto' : 'auto'
+                    }}
                     onWheel={handleWheel}
                     onPointerDown={handlePointerDown}
                     onPointerMove={handlePointerMove}
                     onPointerUp={handlePointerUp}
                     onPointerCancel={handlePointerUp}
                     onPointerLeave={handlePointerUp}
-                    style={{ touchAction: 'none' }}
                 >
                     {/* Progressive Loading Overlay - dengan animasi buffering */}
                 {(status === 'connecting' || status === 'loading' || status === 'buffering' || 
@@ -711,7 +714,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                                 cursor: stateRef.current.zoom > 1 ? 'grab' : 'default'
                             }}
                         >
-                            <video ref={videoRef} className={`w-full h-full pointer-events-none ${isFullscreen ? 'object-contain' : 'object-cover'}`} muted playsInline autoPlay />
+                            <video ref={videoRef} className={`w-full h-full pointer-events-none ${isFullscreen ? 'object-contain' : 'object-contain'}`} muted playsInline autoPlay />
                         </div>
                     )}
 
