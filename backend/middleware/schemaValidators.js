@@ -523,3 +523,45 @@ export const schemas = {
     // Stream
     streamCameraIdParam: streamCameraIdParamSchema
 };
+
+// ============================================
+// Saweria Settings Schema
+// ============================================
+
+export const saweriaSettingsSchema = {
+    body: {
+        type: 'object',
+        properties: {
+            saweria_link: {
+                type: 'string',
+                minLength: 1,
+                maxLength: 500,
+                pattern: '^https?://'
+            },
+            enabled: {
+                type: 'boolean'
+            }
+        },
+        required: ['saweria_link', 'enabled'],
+        additionalProperties: false
+    }
+};
+
+// Validator middleware for Saweria settings
+export async function validateSaweriaSettings(request, reply) {
+    try {
+        await request.compileValidationSchema(saweriaSettingsSchema.body)(request.body);
+    } catch (error) {
+        if (error.validation) {
+            return reply.code(400).send({
+                success: false,
+                message: 'Invalid Saweria settings data',
+                errors: error.validation.map(v => ({
+                    field: v.instancePath?.replace('/', '') || v.params?.missingProperty || 'body',
+                    message: v.message
+                }))
+            });
+        }
+        throw error;
+    }
+}

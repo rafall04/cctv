@@ -12,6 +12,7 @@ import UserManagement from './pages/UserManagement';
 import FeedbackManagement from './pages/FeedbackManagement';
 import ViewerAnalytics from './pages/ViewerAnalytics';
 import Settings from './pages/Settings';
+import SaweriaSettings from './pages/SaweriaSettings';
 import Dashboard from './pages/Dashboard';
 import SponsorManagement from './pages/SponsorManagement';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -107,6 +108,16 @@ function App() {
                         <ProtectedRoute>
                             <AdminLayout>
                                 <SponsorManagement />
+                            </AdminLayout>
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/admin/saweria"
+                    element={
+                        <ProtectedRoute>
+                            <AdminLayout>
+                                <SaweriaSettings />
                             </AdminLayout>
                         </ProtectedRoute>
                     }

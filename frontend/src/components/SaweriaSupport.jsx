@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { detectDeviceTier } from '../utils/deviceDetector';
+import { getPublicSaweriaConfig } from '../services/saweriaService';
 
 /**
  * Saweria Support Component - Optimized for Low-End Devices
@@ -9,6 +10,7 @@ import { detectDeviceTier } from '../utils/deviceDetector';
  * 2. Floating banner (minimizable, persistent)
  * 3. Device-adaptive animations (disabled on low-end)
  * 4. "Don't show again" option for users who don't want to see it
+ * 5. Dynamic link from admin settings
  * 
  * Performance optimizations:
  * - Detect device tier and disable heavy animations on low-end
@@ -17,7 +19,7 @@ import { detectDeviceTier } from '../utils/deviceDetector';
  * - Use CSS transforms for better performance
  * 
  * Usage:
- * <SaweriaSupport link="https://saweria.co/raflialdi" />
+ * <SaweriaSupport />
  */
 
 const STORAGE_KEY = 'saweria_dont_show';
@@ -83,10 +85,12 @@ const MODAL_VARIATIONS = [
     },
 ];
 
-export default function SaweriaSupport({ link = 'https://saweria.co/raflialdi' }) {
+export default function SaweriaSupport() {
     const [showModal, setShowModal] = useState(false);
     const [showBanner, setShowBanner] = useState(false);
     const [bannerMinimized, setBannerMinimized] = useState(false);
+    const [saweriaLink, setSaweriaLink] = useState('https://saweria.co/raflialdi'); // Default fallback
+    const [isEnabled, setIsEnabled] = useState(true);
     
     // Detect device tier once and memoize
     const deviceTier = useMemo(() => detectDeviceTier(), []);
@@ -96,6 +100,26 @@ export default function SaweriaSupport({ link = 'https://saweria.co/raflialdi' }
     const modalVariation = useMemo(() => {
         const randomIndex = Math.floor(Math.random() * MODAL_VARIATIONS.length);
         return MODAL_VARIATIONS[randomIndex];
+    }, []);
+
+    // Fetch Saweria config from API
+    useEffect(() => {
+        const fetchConfig = async () => {
+            try {
+                const response = await getPublicSaweriaConfig();
+                if (response.success && response.data) {
+                    setIsEnabled(response.data.enabled);
+                    if (response.data.saweria_link) {
+                        setSaweriaLink(response.data.saweria_link);
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to fetch Saweria config:', error);
+                // Keep default values on error
+            }
+        };
+        
+        fetchConfig();
     }, []);
 
     useEffect(() => {
@@ -162,7 +186,7 @@ export default function SaweriaSupport({ link = 'https://saweria.co/raflialdi' }
     };
 
     const handleModalSupport = () => {
-        window.open(link, '_blank', 'noopener,noreferrer');
+        window.open(saweriaLink, '_blank', 'noopener,noreferrer');
         setShowModal(false);
         
         // Show banner after supporting
@@ -186,8 +210,13 @@ export default function SaweriaSupport({ link = 'https://saweria.co/raflialdi' }
     };
 
     const handleBannerSupport = () => {
-        window.open(link, '_blank', 'noopener,noreferrer');
+        window.open(saweriaLink, '_blank', 'noopener,noreferrer');
     };
+
+    // Don't render if disabled from admin
+    if (!isEnabled) {
+        return null;
+    }
 
     return (
         <>

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef, memo, lazy, Suspense, useMemo
 import { streamService } from '../services/streamService';
 import { areaService } from '../services/areaService';
 import { viewerService } from '../services/viewerService';
+import { getPublicSaweriaConfig } from '../services/saweriaService';
 import { useTheme } from '../contexts/ThemeContext';
 import { createTransformThrottle } from '../utils/rafThrottle';
 import { detectDeviceTier, getMaxConcurrentStreams, isMobileDevice, getMobileDeviceType } from '../utils/deviceDetector';
@@ -2952,25 +2953,27 @@ function Footer({ cameraCount, areaCount }) {
                 </div>
 
                 {/* Support Us - Saweria Link */}
-                <div className="flex flex-col items-center gap-3 mb-6">
-                    <div className="text-center">
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                            💝 Bantu kami tambah CCTV di lokasi strategis
+                {saweriaEnabled && (
+                    <div className="flex flex-col items-center gap-3 mb-6">
+                        <div className="text-center">
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                💝 Bantu kami tambah CCTV di lokasi strategis
+                            </p>
+                        </div>
+                        <a
+                            href={saweriaLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                        >
+                            <span className="text-xl">☕</span>
+                            <span>Traktir Kopi Yuk!</span>
+                        </a>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 text-center max-w-md">
+                            Dukungan kamu akan membantu kami untuk upgrade server, tambah bandwidth, dan pasang CCTV di titik-titik penting lainnya 🎥
                         </p>
                     </div>
-                    <a
-                        href="https://saweria.co/raflialdi"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
-                    >
-                        <span className="text-xl">☕</span>
-                        <span>Traktir Kopi Yuk!</span>
-                    </a>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 text-center max-w-md">
-                        Dukungan kamu akan membantu kami untuk upgrade server, tambah bandwidth, dan pasang CCTV di titik-titik penting lainnya 🎥
-                    </p>
-                </div>
+                )}
                 
                 {/* SEO Keywords Section */}
                 <div className="text-center mb-4">
@@ -3325,6 +3328,10 @@ export default function LandingPage() {
     const [toasts, setToasts] = useState([]);
     const [maxReached, setMaxReached] = useState(false);
     
+    // Saweria config state
+    const [saweriaLink, setSaweriaLink] = useState('https://saweria.co/raflialdi');
+    const [saweriaEnabled, setSaweriaEnabled] = useState(true);
+    
     // Device-based stream limit
     const [deviceTier] = useState(() => detectDeviceTier());
     const maxStreams = getMaxConcurrentStreams(deviceTier);
@@ -3394,14 +3401,23 @@ export default function LandingPage() {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                // Fetch cameras and areas in parallel
-                const [camsRes, areasRes] = await Promise.all([
+                // Fetch cameras, areas, and Saweria config in parallel
+                const [camsRes, areasRes, saweriaRes] = await Promise.all([
                     streamService.getAllActiveStreams(),
-                    areaService.getPublicAreas().catch(() => ({ success: false, data: [] }))
+                    areaService.getPublicAreas().catch(() => ({ success: false, data: [] })),
+                    getPublicSaweriaConfig().catch(() => ({ success: false, data: { enabled: true, saweria_link: 'https://saweria.co/raflialdi' } }))
                 ]);
                 
                 setCameras(camsRes.data || []);
                 setAreas(areasRes.data || []);
+                
+                // Set Saweria config
+                if (saweriaRes.success && saweriaRes.data) {
+                    setSaweriaEnabled(saweriaRes.data.enabled);
+                    if (saweriaRes.data.saweria_link) {
+                        setSaweriaLink(saweriaRes.data.saweria_link);
+                    }
+                }
                 
                 // Show welcome toast if cameras loaded
                 if (camsRes.data?.length > 0) {
@@ -3599,7 +3615,7 @@ export default function LandingPage() {
             <FeedbackWidget />
             
             {/* Saweria Support - Modal + Floating Banner */}
-            <SaweriaSupport link="https://saweria.co/raflialdi" />
+            <SaweriaSupport />
         </div>
     );
 }
