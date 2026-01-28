@@ -1,5 +1,5 @@
 import { spawn } from 'child_process';
-import { existsSync, mkdirSync, unlinkSync, statSync, renameSync } from 'fs';
+import { existsSync, mkdirSync, unlinkSync, statSync, renameSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { query, queryOne, execute } from '../database/database.js';
@@ -29,6 +29,9 @@ class RecordingService {
 
         // Start health monitoring
         this.startHealthMonitoring();
+        
+        // Start periodic segment scanner (fallback if FFmpeg output detection fails)
+        this.startSegmentScanner();
     }
 
     /**
@@ -132,13 +135,32 @@ class RecordingService {
                     health.lastDataTime = Date.now();
                 }
 
-                // Detect new segment creation
-                if (output.includes('Opening') && output.includes('.mp4')) {
+                // Detect new segment creation - multiple patterns for different FFmpeg versions
+                // Pattern 1: "Opening 'filename.mp4' for writing"
+                // Pattern 2: "[segment @ ...] Opening 'filename.mp4' for writing"
+                // Pattern 3: Just the filename in output when segment starts
+                if ((output.includes('Opening') || output.includes('segment')) && output.includes('.mp4')) {
                     const match = output.match(/(\d{8}_\d{6}\.mp4)/);
                     if (match) {
                         const filename = match[1];
+                        console.log(`[FFmpeg] Detected segment creation: ${filename}`);
                         this.onSegmentCreated(cameraId, filename);
                     }
+                }
+                
+                // Additional detection: Look for segment completion messages
+                if (output.includes('Closing') && output.includes('.mp4')) {
+                    const match = output.match(/(\d{8}_\d{6}\.mp4)/);
+                    if (match) {
+                        const filename = match[1];
+                        console.log(`[FFmpeg] Detected segment completion: ${filename}`);
+                        // Don't call onSegmentCreated here, it's already called on Opening
+                    }
+                }
+                
+                // Log all segment-related messages for debugging
+                if (output.includes('.mp4') && (output.includes('segment') || output.includes('Opening') || output.includes('Closing'))) {
+                    console.log(`[FFmpeg Segment Debug] ${output.trim()}`);
                 }
                 
                 // Log errors
@@ -500,6 +522,51 @@ class RecordingService {
                 }
             });
         }, 5000); // Check every 5 seconds
+    }
+
+    /**
+     * Periodic segment scanner - fallback if FFmpeg output detection fails
+     * Scans recording folders every 60 seconds for new MP4 files
+     */
+    startSegmentScanner() {
+        setInterval(() => {
+            // Get all active recordings
+            activeRecordings.forEach((recording, cameraId) => {
+                const cameraDir = join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
+                
+                if (!existsSync(cameraDir)) return;
+
+                try {
+                    // Get all MP4 files in directory
+                    const files = readdirSync(cameraDir)
+                        .filter(f => f.endsWith('.mp4') && f.match(/\d{8}_\d{6}\.mp4/));
+
+                    // Check each file
+                    files.forEach(filename => {
+                        // Check if already in database
+                        const existing = queryOne(
+                            'SELECT id FROM recording_segments WHERE camera_id = ? AND filename = ?',
+                            [cameraId, filename]
+                        );
+
+                        if (!existing) {
+                            const filePath = join(cameraDir, filename);
+                            const stats = statSync(filePath);
+                            
+                            // Only process files that are at least 30 seconds old (likely complete)
+                            const fileAge = Date.now() - stats.mtimeMs;
+                            if (fileAge > 30000) {
+                                console.log(`[Scanner] Found unregistered segment: ${filename} (age: ${Math.round(fileAge/1000)}s)`);
+                                // Trigger segment processing
+                                this.onSegmentCreated(cameraId, filename);
+                            }
+                        }
+                    });
+                } catch (error) {
+                    console.error(`[Scanner] Error scanning camera ${cameraId}:`, error);
+                }
+            });
+        }, 60000); // Scan every 60 seconds
     }
 
     /**
