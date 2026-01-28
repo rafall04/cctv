@@ -73,8 +73,7 @@ class RecordingService {
             console.log(`Starting recording for camera ${cameraId} (${camera.name})`);
             console.log(`RTSP URL: ${camera.private_rtsp_url.replace(/:[^:@]+@/, ':****@')}`); // Hide password
 
-            // FFmpeg command - stream copy (0% CPU overhead)
-            // Only use copy if source is H.264, otherwise will need transcoding
+            // FFmpeg command - stream copy with fragmented MP4 for web compatibility
             const outputPattern = join(cameraDir, '%Y%m%d_%H%M%S.mp4');
             const ffmpegArgs = [
                 '-rtsp_transport', 'tcp',
@@ -82,17 +81,17 @@ class RecordingService {
                 '-map', '0:v',                   // Map video only (skip audio)
                 '-c:v', 'copy',                  // Copy video codec (0% CPU)
                 '-an',                           // No audio
-                '-movflags', '+faststart',       // Enable fast start for web playback
                 '-f', 'segment',                 // Split ke segments
                 '-segment_time', '600',          // 10 menit per file
                 '-segment_format', 'mp4',
+                '-segment_format_options', 'movflags=+frag_keyframe+empty_moov+default_base_moof', // Fragmented MP4 for streaming
                 '-segment_atclocktime', '1',     // Align dengan clock time
                 '-reset_timestamps', '1',
                 '-strftime', '1',
                 outputPattern
             ];
 
-            console.log(`FFmpeg recording: stream copy mode (0% CPU overhead)`);
+            console.log(`FFmpeg recording: stream copy with fragmented MP4 (0% CPU overhead)`);
 
             // Spawn ffmpeg process
             const ffmpeg = spawn('ffmpeg', ffmpegArgs);
