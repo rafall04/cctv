@@ -328,11 +328,32 @@ export async function streamSegment(request, reply) {
 
             console.log(`[Stream Info] Range request: ${start}-${end}/${stats.size}`);
 
+            // CRITICAL: Validate range is within file bounds
+            if (start >= stats.size || end >= stats.size || start < 0 || end < start) {
+                console.error(`[Stream Error] Invalid range: ${start}-${end} for file size ${stats.size}`);
+                return reply.code(416).send({
+                    success: false,
+                    message: 'Requested range not satisfiable'
+                });
+            }
+
             reply.code(206);
             reply.header('Content-Range', `bytes ${start}-${end}/${stats.size}`);
             reply.header('Content-Length', chunksize);
 
             const stream = createReadStream(segment.file_path, { start, end });
+            
+            // Handle stream errors
+            stream.on('error', (error) => {
+                console.error(`[Stream Error] Read stream error:`, error);
+                if (!reply.sent) {
+                    reply.code(500).send({
+                        success: false,
+                        message: 'Stream read error'
+                    });
+                }
+            });
+
             return reply.send(stream);
         }
 
