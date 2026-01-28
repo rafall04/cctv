@@ -6,6 +6,7 @@ import { ToastContainer } from './components/ui/ToastContainer';
 import { ApiClientInitializer } from './components/ApiClientInitializer';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
+import Playback from './pages/Playback';
 import CameraManagement from './pages/CameraManagement';
 import AreaManagement from './pages/AreaManagement';
 import UserManagement from './pages/UserManagement';
@@ -30,6 +31,7 @@ function App() {
             <Routes>
                 {/* Public routes */}
                 <Route path="/" element={<LandingPage />} />
+                <Route path="/playback" element={<Playback />} />
                 <Route path="/admin/login" element={<LoginPage />} />
 
                 {/* Protected admin routes */}
