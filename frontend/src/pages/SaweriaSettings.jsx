@@ -206,9 +206,8 @@ export default function SaweriaSettings() {
                         </button>
                     </div>
                 </form>
-            </div>
-        );
-    }
+        </div>
+    );
 }
 
 export default SaweriaSettings;
