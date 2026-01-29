@@ -60,10 +60,10 @@ Prevents sensitive files from being committed to Git:
 cd /var/www/rafnet-cctv
 
 # Backup current config
-cp /etc/nginx/sites-available/cctv /etc/nginx/sites-available/cctv.backup
+cp /etc/nginx/sites-available/rafnet-cctv /etc/nginx/sites-available/rafnet-cctv.backup
 
 # Copy new config
-cp deployment/nginx.conf /etc/nginx/sites-available/cctv
+cp deployment/nginx.conf /etc/nginx/sites-available/rafnet-cctv
 
 # Test configuration
 nginx -t
@@ -200,7 +200,7 @@ systemctl stop nginx
 ./deployment/security-cleanup.sh
 
 # Update Nginx config
-cp deployment/nginx.conf /etc/nginx/sites-available/cctv
+cp deployment/nginx.conf /etc/nginx/sites-available/rafnet-cctv
 nginx -t
 systemctl start nginx
 ```
