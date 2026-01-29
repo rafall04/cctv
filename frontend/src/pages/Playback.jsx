@@ -672,9 +672,7 @@ function Playback() {
             <div className="max-w-7xl mx-auto space-y-3 sm:space-y-4 md:space-y-6">
                 {/* Header */}
                 <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-6 shadow-lg">
-                    <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4">
-                        <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Playback Recording</h1>
-                    </div>
+                    <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4">Playback Recording</h1>
                     
                     {/* Camera Selector */}
                     <div className="space-y-3">
@@ -698,44 +696,47 @@ function Playback() {
                             </select>
                         </div>
                         
-                        {/* Codec Info - Strategis dan Jelas */}
-                        {selectedCamera?.video_codec && (
-                            <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/30 rounded-lg">
-                                <div className="flex items-center gap-2 flex-shrink-0">
-                                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                                    </svg>
-                                    <CodecBadge codec={selectedCamera.video_codec} size="md" showWarning={true} />
+                        {/* Camera Info - Compact & Clear */}
+                        {selectedCamera && (
+                            <div className="flex items-center justify-between gap-3 p-2.5 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700/50">
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                    {/* Location */}
+                                    {selectedCamera.location && (
+                                        <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400 text-sm">
+                                            <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                                            </svg>
+                                            <span className="truncate">{selectedCamera.location}</span>
+                                        </div>
+                                    )}
+                                    
+                                    {/* Codec Badge */}
+                                    {selectedCamera.video_codec && (
+                                        <div className="flex items-center gap-1.5">
+                                            <CodecBadge codec={selectedCamera.video_codec} size="sm" showWarning={true} />
+                                        </div>
+                                    )}
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm text-gray-700 dark:text-gray-300 font-medium mb-1">
-                                        Video Codec: {selectedCamera.video_codec.toUpperCase()}
-                                    </p>
-                                    <p className="text-xs text-gray-600 dark:text-gray-400">
-                                        {getCodecDescription(selectedCamera.video_codec)}
-                                    </p>
-                                    {(() => {
-                                        const warning = getCodecWarning(selectedCamera.video_codec);
-                                        if (warning) {
-                                            return (
-                                                <div className={`mt-2 p-2 rounded ${
-                                                    warning.severity === 'error' 
-                                                        ? 'bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-800' 
-                                                        : 'bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-800'
-                                                }`}>
-                                                    <p className={`text-xs font-medium ${
-                                                        warning.severity === 'error'
-                                                            ? 'text-red-700 dark:text-red-300'
-                                                            : 'text-yellow-700 dark:text-yellow-300'
-                                                    }`}>
-                                                        ⚠️ {warning.message}
-                                                    </p>
-                                                </div>
-                                            );
-                                        }
-                                        return null;
-                                    })()}
-                                </div>
+                                
+                                {/* Compact Warning - Only if needed */}
+                                {selectedCamera.video_codec && (() => {
+                                    const warning = getCodecWarning(selectedCamera.video_codec);
+                                    if (warning) {
+                                        return (
+                                            <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${
+                                                warning.severity === 'error' 
+                                                    ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' 
+                                                    : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
+                                            }`}>
+                                                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                                </svg>
+                                                <span className="whitespace-nowrap">{warning.shortMessage}</span>
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                })()}
                             </div>
                         )}
                     </div>

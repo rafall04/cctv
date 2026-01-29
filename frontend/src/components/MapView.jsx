@@ -13,6 +13,7 @@ import { settingsService } from '../services/settingsService';
 import { getHLSConfig } from '../utils/hlsConfig';
 import { viewerService } from '../services/viewerService';
 import { createTransformThrottle } from '../utils/rafThrottle';
+import CodecBadge from './CodecBadge';
 
 // Fix Leaflet icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -736,6 +737,9 @@ const VideoModal = memo(({ camera, onClose }) => {
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <h2 className="text-white font-bold text-lg">{camera.name}</h2>
+                                        {camera.video_codec && (
+                                            <CodecBadge codec={camera.video_codec} size="sm" showWarning={true} />
+                                        )}
                                         <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold text-white shadow bg-emerald-500/20">
                                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                                             {status === 'playing' ? 'LIVE' : 'LOADING'}
@@ -804,7 +808,12 @@ const VideoModal = memo(({ camera, onClose }) => {
                 {/* Info Panel - hide in fullscreen */}
                 <div className={`p-3 border-t border-gray-800 ${isFullscreen ? 'hidden' : ''}`}>
                     <div className="flex items-center justify-between gap-2 mb-2">
-                        <h3 className="text-white font-bold text-sm sm:text-base truncate flex-1">{camera.name}</h3>
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <h3 className="text-white font-bold text-sm sm:text-base truncate">{camera.name}</h3>
+                            {camera.video_codec && (
+                                <CodecBadge codec={camera.video_codec} size="sm" showWarning={true} />
+                            )}
+                        </div>
                         
                         {/* Controls: Zoom + Screenshot + Fullscreen */}
                         {!isMaintenance && status !== 'error' && (
