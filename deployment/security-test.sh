@@ -13,7 +13,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Base URL (change this to your domain)
-BASE_URL="${1:-http://cctv.raf.my.id:800}"
+BASE_URL="${1:-https://cctv.raf.my.id}"
 
 echo "Testing URL: $BASE_URL"
 echo ""
