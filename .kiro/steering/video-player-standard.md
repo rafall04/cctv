@@ -4,6 +4,8 @@
 
 Semua komponen video player (MapView, LandingPage Grid View, Playback) harus mengikuti standar yang sama untuk konsistensi UX.
 
+**PENTING:** Playback adalah fitur untuk memutar rekaman video (bukan live stream). Playback memiliki kontrol tambahan seperti timeline, speed control, dan segment selection yang tidak ada di live stream player.
+
 ## Struktur Video Modal/Popup
 
 ### 1. MapView - Info di Atas Video
@@ -42,7 +44,34 @@ Semua komponen video player (MapView, LandingPage Grid View, Playback) harus men
 └─────────────────────────────────────┘
 ```
 
-### 3. Mode Fullscreen (Semua View)
+### 3. Playback - Recording Player dengan Timeline
+
+```
+┌─────────────────────────────────────┐
+│ Header Info                         │
+│ - Camera selector dropdown          │
+│ - Date picker                       │
+│ - Segment list                      │
+├─────────────────────────────────────┤
+│                                     │
+│         Video Player Area           │
+│         (dengan timeline controls)  │
+│                                     │
+├─────────────────────────────────────┤
+│ Timeline Controls                   │
+│ - Play/Pause                        │
+│ - Timeline slider                   │
+│ - Speed control (0.5x - 2x)         │
+│ - Current time / Duration           │
+│ - Download button                   │
+└─────────────────────────────────────┘
+```
+
+**Perbedaan Playback vs Live Stream:**
+- Playback: Ada timeline, speed control, seek, download
+- Live Stream: Hanya play/pause, snapshot, fullscreen
+
+### 4. Mode Fullscreen (Semua View)
 
 ```
 ┌─────────────────────────────────────┐
@@ -60,6 +89,11 @@ Semua komponen video player (MapView, LandingPage Grid View, Playback) harus men
 │ - Zoom controls                     │
 └─────────────────────────────────────┘
 ```
+
+**Note untuk Playback Fullscreen:**
+- Timeline controls tetap visible di bottom
+- Speed control accessible
+- Exit fullscreen button di top right
 
 ## Codec Info Display Rules
 
@@ -138,10 +172,85 @@ Semua komponen video player (MapView, LandingPage Grid View, Playback) harus men
 {/* Fullscreen top bar - sama seperti MapView */}
 ```
 
+#### Playback Page
+```jsx
+{/* Header - Camera & Date Selection */}
+<div className="bg-white dark:bg-gray-900 rounded-lg p-4 shadow-lg">
+    <h1 className="text-2xl font-bold mb-4">Playback Recording</h1>
+    
+    {/* Camera Selector */}
+    <select value={selectedCamera} onChange={handleCameraChange}>
+        {cameras.map(camera => (
+            <option key={camera.id} value={camera.id}>
+                {camera.name}
+            </option>
+        ))}
+    </select>
+    
+    {/* Date Picker */}
+    <input type="date" value={selectedDate} onChange={handleDateChange} />
+    
+    {/* Segment List */}
+    <div className="segment-list">
+        {segments.map(segment => (
+            <button 
+                key={segment.id} 
+                onClick={() => setSelectedSegment(segment)}
+                className={selectedSegment?.id === segment.id ? 'active' : ''}
+            >
+                {segment.start_time} - {segment.end_time}
+            </button>
+        ))}
+    </div>
+</div>
+
+{/* Video Player dengan Timeline Controls */}
+<div className="video-container">
+    <video ref={videoRef} controls />
+    
+    {/* Custom Timeline Controls */}
+    <div className="timeline-controls">
+        <button onClick={togglePlayPause}>
+            {isPlaying ? <PauseIcon /> : <PlayIcon />}
+        </button>
+        
+        <input 
+            type="range" 
+            min="0" 
+            max={duration} 
+            value={currentTime}
+            onChange={handleSeek}
+        />
+        
+        <span>{formatTime(currentTime)} / {formatTime(duration)}</span>
+        
+        {/* Speed Control */}
+        <select value={playbackSpeed} onChange={handleSpeedChange}>
+            <option value="0.5">0.5x</option>
+            <option value="1">1x</option>
+            <option value="1.5">1.5x</option>
+            <option value="2">2x</option>
+        </select>
+        
+        <button onClick={handleDownload}>
+            <DownloadIcon />
+        </button>
+    </div>
+</div>
+```
+
+**Catatan Penting untuk Playback:**
+- Gunakan `<video>` native controls atau custom controls
+- JANGAN gunakan HLS.js untuk playback recording (gunakan direct video URL)
+- Implementasikan seek dengan validasi (max 180 detik dari posisi saat ini)
+- Speed control menggunakan `video.playbackRate`
+- Download button untuk download segment recording
+
 ## Checklist Implementasi
 
 Saat membuat atau memodifikasi video player component:
 
+**Live Stream (MapView & GridView):**
 - [ ] MapView: Info di atas video (header)
 - [ ] GridView: Info di bawah video (footer)
 - [ ] Codec badge ditampilkan di samping nama kamera
@@ -149,6 +258,17 @@ Saat membuat atau memodifikasi video player component:
 - [ ] Fullscreen mode: codec badge di top bar
 - [ ] Responsive untuk mobile dan desktop
 - [ ] Konsisten dengan komponen lain
+
+**Playback Recording:**
+- [ ] Camera selector dropdown dengan list semua kamera
+- [ ] Date picker untuk pilih tanggal recording
+- [ ] Segment list untuk pilih segment waktu
+- [ ] Timeline controls (play/pause, seek, time display)
+- [ ] Speed control (0.5x, 1x, 1.5x, 2x)
+- [ ] Download button untuk download segment
+- [ ] Seek validation (max 180 detik dari posisi saat ini)
+- [ ] Error handling untuk segment tidak tersedia
+- [ ] Loading state saat load segment baru
 
 ## Alasan Standarisasi
 
@@ -160,12 +280,24 @@ Saat membuat atau memodifikasi video player component:
 ## Testing
 
 Saat testing video player:
+
+**Live Stream:**
 1. Buka kamera di MapView → Cek info di atas video
 2. Buka kamera di GridView → Cek info di bawah video
 3. Klik fullscreen → Cek codec badge di top bar
 4. Test dengan kamera H264 dan H265
 5. Test di mobile (portrait & landscape)
 6. Pastikan codec badge muncul dengan jelas
+
+**Playback Recording:**
+1. Pilih kamera dari dropdown → Cek segment list muncul
+2. Pilih tanggal → Cek segment list update
+3. Klik segment → Cek video load dan play
+4. Test timeline seek → Cek validasi max 180 detik
+5. Test speed control → Cek playback speed berubah (0.5x - 2x)
+6. Test download button → Cek file download
+7. Test error handling → Cek pesan error jika segment tidak ada
+8. Test di mobile → Cek responsive controls
 
 ## Maintenance
 
