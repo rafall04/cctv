@@ -866,7 +866,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                                         className="p-1.5 hover:bg-gray-700 disabled:opacity-30 rounded text-white transition-colors"
                                         title="Zoom Out"
                                     >
-                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                             <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"/>
                                         </svg>
                                     </button>
@@ -877,7 +877,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                                         className="p-1.5 hover:bg-gray-700 disabled:opacity-30 rounded text-white transition-colors"
                                         title="Zoom In"
                                     >
-                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                             <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"/>
                                         </svg>
                                     </button>
@@ -887,7 +887,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                                             className="p-1.5 hover:bg-gray-700 rounded text-white transition-colors"
                                             title="Reset Zoom"
                                         >
-                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                                 <path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/>
                                             </svg>
                                         </button>
@@ -915,7 +915,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                                     className="p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-white transition-colors"
                                     title={isFullscreen ? "Keluar Fullscreen" : "Fullscreen"}
                                 >
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                         {isFullscreen ? (
                                             <path d="M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3"/>
                                         ) : (
@@ -930,7 +930,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                                     className="p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-white transition-colors"
                                     title="Tutup"
                                 >
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                         <path d="M6 18L18 6M6 6l12 12"/>
                                     </svg>
                                 </button>
