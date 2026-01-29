@@ -17,7 +17,7 @@ export async function getStreamUrls(request, reply) {
 
         const camera = queryOne(
             `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel,
-                    c.latitude, c.longitude, c.stream_key,
+                    c.latitude, c.longitude, c.stream_key, c.video_codec,
                     a.name as area_name, a.rt, a.rw, a.kelurahan, a.kecamatan
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 
@@ -70,7 +70,7 @@ export async function getAllActiveStreams(request, reply) {
     try {
         const cameras = query(
             `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel,
-                    c.latitude, c.longitude, c.status, c.is_online, c.last_online_check, c.stream_key,
+                    c.latitude, c.longitude, c.status, c.is_online, c.last_online_check, c.stream_key, c.video_codec,
                     a.name as area_name, a.rt, a.rw, a.kelurahan, a.kecamatan
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 
