@@ -21,6 +21,8 @@ import FeedbackWidget from '../components/FeedbackWidget';
 import SaweriaSupport from '../components/SaweriaSupport';
 // Saweria Leaderboard
 import SaweriaLeaderboard from '../components/SaweriaLeaderboard';
+// Codec Badge
+import CodecBadge from '../components/CodecBadge';
 // Map view - lazy loaded for performance
 const MapView = lazy(() => import('../components/MapView'));
 // Playback - lazy loaded for performance
@@ -429,13 +431,18 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
             
             {/* Camera info */}
             <div className="p-4 cursor-pointer" onClick={onClick}>
-                <h3 className={`font-bold truncate mb-1 ${
-                    isMaintenance 
-                        ? 'text-red-600 dark:text-red-400' 
-                        : 'text-gray-900 dark:text-white'
-                } ${!disableAnimations ? 'group-hover/card:text-sky-500 transition-colors' : ''}`}>
-                    {camera.name}
-                </h3>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                    <h3 className={`font-bold truncate flex-1 ${
+                        isMaintenance 
+                            ? 'text-red-600 dark:text-red-400' 
+                            : 'text-gray-900 dark:text-white'
+                    } ${!disableAnimations ? 'group-hover/card:text-sky-500 transition-colors' : ''}`}>
+                        {camera.name}
+                    </h3>
+                    {camera.video_codec && (
+                        <CodecBadge codec={camera.video_codec} size="sm" showWarning={false} />
+                    )}
+                </div>
                 
                 {/* Location */}
                 {camera.location && (

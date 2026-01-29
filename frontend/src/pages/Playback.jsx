@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { cameraService } from '../services/cameraService';
 import recordingService from '../services/recordingService';
+import CodecBadge from '../components/CodecBadge';
 
 // CRITICAL: Maximum safe seek distance (3 minutes = 180 seconds)
 // Seeking beyond this may cause buffering issues due to keyframe intervals
@@ -670,7 +671,12 @@ function Playback() {
             <div className="max-w-7xl mx-auto space-y-3 sm:space-y-4 md:space-y-6">
                 {/* Header */}
                 <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-6 shadow-lg">
-                    <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4">Playback Recording</h1>
+                    <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4">
+                        <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Playback Recording</h1>
+                        {selectedCamera?.video_codec && (
+                            <CodecBadge codec={selectedCamera.video_codec} size="md" showWarning={true} />
+                        )}
+                    </div>
                     
                     {/* Camera Selector */}
                     <div className="flex flex-col sm:flex-row sm:items-center gap-3">
