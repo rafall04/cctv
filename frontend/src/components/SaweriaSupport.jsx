@@ -265,35 +265,35 @@ export default function SaweriaSupport() {
                         onClick={handleModalClose}
                     />
                     
-                    {/* Modal Content - No animations on low-end */}
-                    <div className={`relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden ${isLowEnd ? '' : 'animate-slideUp'}`}>
-                        {/* Gradient Header - No backdrop blur on low-end */}
-                        <div className={`bg-gradient-to-r ${modalVariation.gradient} p-6 text-center`}>
-                            <div className={`w-16 h-16 mx-auto mb-4 ${isLowEnd ? 'bg-white/30' : 'bg-white/20 backdrop-blur-sm'} rounded-full flex items-center justify-center text-white ${isLowEnd ? '' : 'animate-bounce'}`}>
+                    {/* Modal Content - Responsive with scroll */}
+                    <div className={`relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto ${isLowEnd ? '' : 'animate-slideUp'}`}>
+                        {/* Gradient Header - Responsive padding */}
+                        <div className={`bg-gradient-to-r ${modalVariation.gradient} p-4 sm:p-6 text-center`}>
+                            <div className={`w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 ${isLowEnd ? 'bg-white/30' : 'bg-white/20 backdrop-blur-sm'} rounded-full flex items-center justify-center text-white ${isLowEnd ? '' : 'animate-bounce'}`}>
                                 {modalVariation.icon}
                             </div>
-                            <h2 className="text-2xl font-bold text-white mb-2">
+                            <h2 className="text-xl sm:text-2xl font-bold text-white mb-1.5 sm:mb-2">
                                 {modalVariation.title}
                             </h2>
-                            <p className="text-white/90 text-sm">
+                            <p className="text-white/90 text-xs sm:text-sm">
                                 {modalVariation.subtitle}
                             </p>
                         </div>
 
-                        {/* Body */}
-                        <div className="p-6">
-                            <p className="text-gray-700 dark:text-gray-300 text-center mb-4 leading-relaxed">
+                        {/* Body - Responsive padding */}
+                        <div className="p-4 sm:p-6">
+                            <p className="text-gray-700 dark:text-gray-300 text-center mb-3 sm:mb-4 leading-relaxed text-sm">
                                 {modalVariation.message1}
                             </p>
-                            <p className="text-gray-700 dark:text-gray-300 text-center mb-3 font-medium">
+                            <p className="text-gray-700 dark:text-gray-300 text-center mb-2.5 sm:mb-3 font-medium text-sm">
                                 {modalVariation.message2}
                             </p>
 
-                            {/* Features List */}
-                            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 mb-4">
-                                <ul className="space-y-2.5">
+                            {/* Features List - Compact spacing */}
+                            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3 sm:p-4 mb-3 sm:mb-4">
+                                <ul className="space-y-2">
                                     {modalVariation.features.map((feature, index) => (
-                                        <li key={index} className="text-gray-700 dark:text-gray-300 text-sm flex items-center gap-3">
+                                        <li key={index} className="text-gray-700 dark:text-gray-300 text-xs sm:text-sm flex items-center gap-2.5">
                                             <span className="flex-shrink-0 text-gray-500 dark:text-gray-400">{feature.icon}</span>
                                             <span>{feature.text}</span>
                                         </li>
@@ -301,15 +301,15 @@ export default function SaweriaSupport() {
                                 </ul>
                             </div>
 
-                            <p className="text-gray-600 dark:text-gray-400 text-center text-sm mb-6 italic">
+                            <p className="text-gray-600 dark:text-gray-400 text-center text-xs sm:text-sm mb-4 sm:mb-6 italic">
                                 {modalVariation.footer}
                             </p>
 
-                            {/* Buttons - No transform on low-end */}
-                            <div className="flex flex-col gap-3">
+                            {/* Buttons - Compact spacing */}
+                            <div className="flex flex-col gap-2.5">
                                 <button
                                     onClick={handleModalSupport}
-                                    className={`w-full bg-gradient-to-r ${modalVariation.gradient} hover:opacity-90 text-white font-semibold py-3 px-6 rounded-xl transition-opacity shadow-lg`}
+                                    className={`w-full bg-gradient-to-r ${modalVariation.gradient} hover:opacity-90 text-white font-semibold py-2.5 sm:py-3 px-4 sm:px-6 rounded-xl transition-opacity shadow-lg text-sm`}
                                 >
                                     <span className="flex items-center justify-center gap-2">
                                         <CoffeeIcon />
@@ -319,21 +319,21 @@ export default function SaweriaSupport() {
                                 
                                 <button
                                     onClick={handleModalClose}
-                                    className="w-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium py-3 px-6 rounded-xl transition-colors"
+                                    className="w-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium py-2.5 sm:py-3 px-4 sm:px-6 rounded-xl transition-colors text-sm"
                                 >
                                     Lain Kali Aja
                                 </button>
 
                                 <button
                                     onClick={handleModalDontShow}
-                                    className="w-full text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 text-sm py-2 transition-colors"
+                                    className="w-full text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 text-xs sm:text-sm py-1.5 sm:py-2 transition-colors"
                                 >
                                     Jangan Tampilkan Lagi
                                 </button>
                             </div>
 
-                            <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-4 flex items-center justify-center gap-1.5">
-                                <svg className="w-4 h-4 text-pink-500" fill="currentColor" viewBox="0 0 24 24">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-3 sm:mt-4 flex items-center justify-center gap-1.5">
+                                <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-pink-500" fill="currentColor" viewBox="0 0 24 24">
                                     <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
                                 </svg>
                                 <span>Terima kasih atas pengertiannya</span>
