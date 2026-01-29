@@ -25,62 +25,87 @@ import { getPublicSaweriaConfig } from '../services/saweriaService';
 const STORAGE_KEY = 'saweria_dont_show';
 const BANNER_MINIMIZED_KEY = 'saweria_banner_minimized';
 
+// Icon components for modal variations
+const CoffeeIcon = () => (
+    <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+    </svg>
+);
+
+const CameraIcon = () => (
+    <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+    </svg>
+);
+
+const RocketIcon = () => (
+    <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+    </svg>
+);
+
+const BoltIcon = () => (
+    <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+    </svg>
+);
+
 // Modal variations for variety (random selection)
 const MODAL_VARIATIONS = [
     {
-        emoji: '☕',
-        title: 'Traktir Kopi Dong! 😊',
+        icon: <CoffeeIcon />,
+        title: 'Traktir Kopi Dong!',
         subtitle: 'Biar semangat maintain server & kamera 24/7',
-        message1: 'Halo! 👋 Senang banget kamu pakai layanan CCTV gratis ini.',
+        message1: 'Halo! Senang banget kamu pakai layanan CCTV gratis ini.',
         message2: 'Dukungan kamu akan membantu kami untuk:',
         features: [
-            '🎥 Menambah titik CCTV di lokasi strategis',
-            '⚡ Upgrade server biar makin cepat',
-            '🔧 Maintenance rutin semua kamera'
+            { icon: <CameraIcon />, text: 'Menambah titik CCTV di lokasi strategis' },
+            { icon: <BoltIcon />, text: 'Upgrade server biar makin cepat' },
+            { icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>, text: 'Maintenance rutin semua kamera' }
         ],
-        footer: 'Seikhlasnya aja, berapapun sangat berarti! 💝',
+        footer: 'Seikhlasnya aja, berapapun sangat berarti!',
         gradient: 'from-orange-500 via-amber-500 to-yellow-500',
     },
     {
-        emoji: '🎥',
-        title: 'Bantu Tambah CCTV Yuk! 📹',
+        icon: <CameraIcon />,
+        title: 'Bantu Tambah CCTV Yuk!',
         subtitle: 'Lebih banyak kamera = lebih aman',
-        message1: 'Saat ini ada beberapa lokasi strategis yang belum terpasang CCTV 😢',
+        message1: 'Saat ini ada beberapa lokasi strategis yang belum terpasang CCTV.',
         message2: 'Dengan dukungan kamu, kami bisa:',
         features: [
-            '📍 Pasang CCTV di titik-titik penting',
-            '🌐 Expand coverage area monitoring',
-            '💪 Tingkatkan keamanan lingkungan'
+            { icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" /><circle cx="12" cy="11" r="3" /></svg>, text: 'Pasang CCTV di titik-titik penting' },
+            { icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>, text: 'Expand coverage area monitoring' },
+            { icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>, text: 'Tingkatkan keamanan lingkungan' }
         ],
-        footer: 'Yuk bantu wujudkan! Nominal berapa aja sangat membantu 🙏',
+        footer: 'Yuk bantu wujudkan! Nominal berapa aja sangat membantu.',
         gradient: 'from-blue-500 via-cyan-500 to-teal-500',
     },
     {
-        emoji: '🚀',
+        icon: <RocketIcon />,
         title: 'Mari Berkembang Bersama!',
         subtitle: 'Dari kamu, untuk lingkungan lebih aman',
-        message1: 'Terima kasih sudah pakai layanan CCTV gratis kami! 🎉',
+        message1: 'Terima kasih sudah pakai layanan CCTV gratis kami!',
         message2: 'Dukungan kamu akan kami gunakan untuk:',
         features: [
-            '🎯 Beli & pasang CCTV di lokasi baru',
-            '📡 Upgrade bandwidth untuk streaming HD',
-            '🔋 Bayar listrik & internet 24/7'
+            { icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg>, text: 'Beli & pasang CCTV di lokasi baru' },
+            { icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" /></svg>, text: 'Upgrade bandwidth untuk streaming HD' },
+            { icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>, text: 'Bayar listrik & internet 24/7' }
         ],
-        footer: 'Seikhlasnya dari hati, sangat berarti buat kami! ❤️',
+        footer: 'Seikhlasnya dari hati, sangat berarti buat kami!',
         gradient: 'from-purple-500 via-violet-500 to-indigo-500',
     },
     {
-        emoji: '⚡',
+        icon: <BoltIcon />,
         title: 'Keep The Server Running!',
         subtitle: 'Plus tambah kamera di lokasi strategis',
-        message1: 'Server ini nyala 24/7 biar kamu bisa pantau CCTV kapan aja! ⏰',
+        message1: 'Server ini nyala 24/7 biar kamu bisa pantau CCTV kapan aja!',
         message2: 'Bantu kami untuk:',
         features: [
-            '🎬 Tambah kamera di area yang belum ter-cover',
-            '💻 Maintain server & bandwidth',
-            '🛠️ Service rutin semua perangkat'
+            { icon: <CameraIcon />, text: 'Tambah kamera di area yang belum ter-cover' },
+            { icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>, text: 'Maintain server & bandwidth' },
+            { icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>, text: 'Service rutin semua perangkat' }
         ],
-        footer: 'Traktir kopi kami dong! Yang penting dari hati 💝',
+        footer: 'Traktir kopi kami dong! Yang penting dari hati.',
         gradient: 'from-pink-500 via-rose-500 to-red-500',
     },
 ];
@@ -242,8 +267,8 @@ export default function SaweriaSupport() {
                     <div className={`relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden ${isLowEnd ? '' : 'animate-slideUp'}`}>
                         {/* Gradient Header - No backdrop blur on low-end */}
                         <div className={`bg-gradient-to-r ${modalVariation.gradient} p-6 text-center`}>
-                            <div className={`w-16 h-16 mx-auto mb-4 ${isLowEnd ? 'bg-white/30' : 'bg-white/20 backdrop-blur-sm'} rounded-full flex items-center justify-center ${isLowEnd ? '' : 'animate-bounce'}`}>
-                                <span className="text-4xl">{modalVariation.emoji}</span>
+                            <div className={`w-16 h-16 mx-auto mb-4 ${isLowEnd ? 'bg-white/30' : 'bg-white/20 backdrop-blur-sm'} rounded-full flex items-center justify-center text-white ${isLowEnd ? '' : 'animate-bounce'}`}>
+                                {modalVariation.icon}
                             </div>
                             <h2 className="text-2xl font-bold text-white mb-2">
                                 {modalVariation.title}
@@ -267,8 +292,8 @@ export default function SaweriaSupport() {
                                 <ul className="space-y-2">
                                     {modalVariation.features.map((feature, index) => (
                                         <li key={index} className="text-gray-700 dark:text-gray-300 text-sm flex items-start gap-2">
-                                            <span className="flex-shrink-0 mt-0.5">{feature.split(' ')[0]}</span>
-                                            <span>{feature.substring(feature.indexOf(' ') + 1)}</span>
+                                            <span className="flex-shrink-0 mt-0.5 text-gray-500 dark:text-gray-400">{feature.icon}</span>
+                                            <span>{feature.text}</span>
                                         </li>
                                     ))}
                                 </ul>
@@ -285,7 +310,7 @@ export default function SaweriaSupport() {
                                     className={`w-full bg-gradient-to-r ${modalVariation.gradient} hover:opacity-90 text-white font-semibold py-3 px-6 rounded-xl transition-opacity shadow-lg`}
                                 >
                                     <span className="flex items-center justify-center gap-2">
-                                        <span>{modalVariation.emoji}</span>
+                                        <CoffeeIcon />
                                         <span>Traktir Kopi Sekarang</span>
                                     </span>
                                 </button>
@@ -294,7 +319,7 @@ export default function SaweriaSupport() {
                                     onClick={handleModalClose}
                                     className="w-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium py-3 px-6 rounded-xl transition-colors"
                                 >
-                                    Lain Kali Aja 😅
+                                    Lain Kali Aja
                                 </button>
 
                                 <button
@@ -305,8 +330,11 @@ export default function SaweriaSupport() {
                                 </button>
                             </div>
 
-                            <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-4">
-                                💝 Terima kasih atas pengertiannya
+                            <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-4 flex items-center justify-center gap-1.5">
+                                <svg className="w-4 h-4 text-pink-500" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                                </svg>
+                                <span>Terima kasih atas pengertiannya</span>
                             </p>
                         </div>
                     </div>
@@ -322,10 +350,12 @@ export default function SaweriaSupport() {
                         /* Minimized State - No animations on low-end */
                         <button
                             onClick={handleBannerMaximize}
-                            className={`w-14 h-14 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-full shadow-lg transition-colors flex items-center justify-center text-2xl ${isLowEnd ? '' : 'animate-bounce'}`}
+                            className={`w-14 h-14 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-full shadow-lg transition-colors flex items-center justify-center ${isLowEnd ? '' : 'animate-bounce'}`}
                             title="Traktir Kopi Yuk!"
                         >
-                            ☕
+                            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
                         </button>
                     ) : (
                         /* Expanded State - No animations on low-end */
@@ -333,13 +363,17 @@ export default function SaweriaSupport() {
                             {/* Header */}
                             <div className="bg-gradient-to-r from-orange-500 to-amber-500 p-4 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <span className={`text-2xl ${isLowEnd ? '' : 'animate-bounce'}`}>☕</span>
+                                    <div className={`${isLowEnd ? '' : 'animate-bounce'}`}>
+                                        <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                        </svg>
+                                    </div>
                                     <div>
                                         <h3 className="text-white font-bold text-sm">
                                             Traktir Kopi Yuk!
                                         </h3>
                                         <p className="text-white/80 text-xs">
-                                            Seikhlasnya aja 😊
+                                            Seikhlasnya aja
                                         </p>
                                     </div>
                                 </div>
@@ -374,11 +408,15 @@ export default function SaweriaSupport() {
                                 
                                 <ul className="text-gray-600 dark:text-gray-400 text-xs space-y-1.5 mb-4">
                                     <li className="flex items-start gap-1.5">
-                                        <span>🎥</span>
+                                        <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                        </svg>
                                         <span>Tambah CCTV di lokasi strategis</span>
                                     </li>
                                     <li className="flex items-start gap-1.5">
-                                        <span>⚡</span>
+                                        <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                        </svg>
                                         <span>Jaga server tetap nyala 24/7</span>
                                     </li>
                                 </ul>
@@ -388,7 +426,9 @@ export default function SaweriaSupport() {
                                     className={`w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold py-2.5 px-4 rounded-xl transition-colors shadow-md text-sm`}
                                 >
                                     <span className="flex items-center justify-center gap-2">
-                                        <span>☕</span>
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                        </svg>
                                         <span>Traktir Sekarang</span>
                                     </span>
                                 </button>
