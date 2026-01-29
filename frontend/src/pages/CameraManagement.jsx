@@ -72,6 +72,7 @@ export default function CameraManagement() {
         {
             name: '',
             private_rtsp_url: '',
+            video_codec: 'h264',
             description: '',
             location: '',
             group_name: '',
@@ -133,6 +134,7 @@ export default function CameraManagement() {
         resetWith({
             name: '',
             private_rtsp_url: '',
+            video_codec: 'h264',
             description: '',
             location: '',
             group_name: '',
@@ -154,6 +156,7 @@ export default function CameraManagement() {
         resetWith({
             name: camera.name,
             private_rtsp_url: camera.private_rtsp_url,
+            video_codec: camera.video_codec || 'h264',
             description: camera.description || '',
             location: camera.location || '',
             group_name: camera.group_name || '',
@@ -643,6 +646,46 @@ export default function CameraManagement() {
                                 ) : (
                                     <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{getRtspFormatHint()}</p>
                                 )}
+                            </div>
+
+                            {/* Video Codec Selection */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Video Codec
+                                </label>
+                                <div className="flex gap-4">
+                                    <label className="flex items-center gap-2 cursor-pointer group">
+                                        <input
+                                            type="radio"
+                                            name="video_codec"
+                                            value="h264"
+                                            checked={formData.video_codec === 'h264'}
+                                            onChange={handleFormChange}
+                                            disabled={isSubmitting}
+                                            className="w-4 h-4 text-sky-600 focus:ring-sky-500 focus:ring-2 disabled:opacity-50"
+                                        />
+                                        <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-sky-600 dark:group-hover:text-sky-400">
+                                            H.264 (Universal)
+                                        </span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer group">
+                                        <input
+                                            type="radio"
+                                            name="video_codec"
+                                            value="h265"
+                                            checked={formData.video_codec === 'h265'}
+                                            onChange={handleFormChange}
+                                            disabled={isSubmitting}
+                                            className="w-4 h-4 text-purple-600 focus:ring-purple-500 focus:ring-2 disabled:opacity-50"
+                                        />
+                                        <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-purple-600 dark:group-hover:text-purple-400">
+                                            H.265 (Safari only)
+                                        </span>
+                                    </label>
+                                </div>
+                                <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                    H.265 lebih efisien bandwidth tapi hanya support di Safari. H.264 kompatibel dengan semua browser.
+                                </p>
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
