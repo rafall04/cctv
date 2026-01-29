@@ -928,8 +928,8 @@ const VideoModal = memo(({ camera, onClose }) => {
                     </div>
                 </div>
                 
-                {/* Codec Info Bar - Visible & Clear */}
-                {camera.video_codec && status === 'playing' && !isFullscreen && (
+                {/* Codec Info Bar - Always visible when codec exists */}
+                {camera.video_codec && !isFullscreen && (
                     <div className="p-2 bg-gray-800/50 border-t border-gray-700">
                         <div className="flex items-center gap-2 text-xs text-gray-400">
                             <svg className="w-3.5 h-3.5 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
