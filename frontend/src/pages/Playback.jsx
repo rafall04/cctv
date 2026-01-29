@@ -671,75 +671,96 @@ function Playback() {
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-2 sm:py-6 md:py-8 px-2 sm:px-4">
             <div className="max-w-7xl mx-auto space-y-3 sm:space-y-4 md:space-y-6">
                 {/* Header */}
-                <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-6 shadow-lg">
-                    <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4">Playback Recording</h1>
+                <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-6 shadow-lg space-y-3 sm:space-y-4">
+                    <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Playback Recording</h1>
                     
                     {/* Camera Selector */}
-                    <div className="space-y-3">
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                                Pilih Kamera:
-                            </label>
-                            <select
-                                value={selectedCamera?.id || ''}
-                                onChange={(e) => {
-                                    const camera = cameras.find(c => c.id === parseInt(e.target.value));
-                                    setSelectedCamera(camera);
-                                }}
-                                className="flex-1 px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                            >
-                                {cameras.map(camera => (
-                                    <option key={camera.id} value={camera.id}>
-                                        {camera.name} - {camera.location || 'No location'}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        
-                        {/* Camera Info - Compact & Clear */}
-                        {selectedCamera && (
-                            <div className="flex items-center justify-between gap-3 p-2.5 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700/50">
-                                <div className="flex items-center gap-3 flex-1 min-w-0">
-                                    {/* Location */}
-                                    {selectedCamera.location && (
-                                        <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400 text-sm">
-                                            <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                                <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                                            </svg>
-                                            <span className="truncate">{selectedCamera.location}</span>
-                                        </div>
-                                    )}
-                                    
-                                    {/* Codec Badge */}
-                                    {selectedCamera.video_codec && (
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                            Pilih Kamera:
+                        </label>
+                        <select
+                            value={selectedCamera?.id || ''}
+                            onChange={(e) => {
+                                const camera = cameras.find(c => c.id === parseInt(e.target.value));
+                                setSelectedCamera(camera);
+                            }}
+                            className="flex-1 px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        >
+                            {cameras.map(camera => (
+                                <option key={camera.id} value={camera.id}>
+                                    {camera.name} - {camera.location || 'No location'}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    
+                    {/* Camera Info - Compact & Clear */}
+                    {selectedCamera && (
+                        <div className="space-y-2">
+                            {/* Location & Codec Row */}
+                            <div className="flex flex-wrap items-center gap-3 p-2.5 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700/50">
+                                {/* Location */}
+                                {selectedCamera.location && (
+                                    <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400 text-sm">
+                                        <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                                        </svg>
+                                        <span>{selectedCamera.location}</span>
+                                    </div>
+                                )}
+                                
+                                {/* Codec Badge */}
+                                {selectedCamera.video_codec && (
+                                    <>
+                                        <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
                                         <div className="flex items-center gap-1.5">
                                             <CodecBadge codec={selectedCamera.video_codec} size="sm" showWarning={true} />
                                         </div>
-                                    )}
-                                </div>
+                                    </>
+                                )}
                                 
-                                {/* Compact Warning - Only if needed */}
+                                {/* Warning Badge - Separate */}
                                 {selectedCamera.video_codec && (() => {
                                     const warning = getCodecWarning(selectedCamera.video_codec);
                                     if (warning) {
                                         return (
-                                            <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${
-                                                warning.severity === 'error' 
-                                                    ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' 
-                                                    : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
-                                            }`}>
-                                                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                                </svg>
-                                                <span className="whitespace-nowrap">{warning.shortMessage}</span>
-                                            </div>
+                                            <>
+                                                <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
+                                                <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${
+                                                    warning.severity === 'error' 
+                                                        ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' 
+                                                        : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
+                                                }`}>
+                                                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                                    </svg>
+                                                    <span className="whitespace-nowrap">{warning.shortMessage}</span>
+                                                </div>
+                                            </>
                                         );
                                     }
                                     return null;
                                 })()}
                             </div>
-                        )}
-                    </div>
+                            
+                            {/* Codec Info Guide */}
+                            <div className="p-3 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/30 rounded-lg">
+                                <div className="flex items-start gap-2">
+                                    <svg className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                    </svg>
+                                    <div className="flex-1 text-xs text-gray-700 dark:text-gray-300">
+                                        <p className="font-medium mb-1">Tentang Video Codec:</p>
+                                        <ul className="space-y-0.5 text-gray-600 dark:text-gray-400">
+                                            <li>• <strong>H.264</strong>: Kompatibel dengan semua browser (Chrome, Firefox, Safari, Edge)</li>
+                                            <li>• <strong>H.265</strong>: Lebih hemat bandwidth, tapi hanya Safari yang full support. Chrome/Edge tergantung hardware device.</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Video Player */}

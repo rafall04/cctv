@@ -927,6 +927,23 @@ const VideoModal = memo(({ camera, onClose }) => {
                         </div>
                     </div>
                 </div>
+                
+                {/* Codec Info Bar - Visible & Clear */}
+                {camera.video_codec && status === 'playing' && !isFullscreen && (
+                    <div className="p-2 bg-gray-800/50 border-t border-gray-700">
+                        <div className="flex items-center gap-2 text-xs text-gray-400">
+                            <svg className="w-3.5 h-3.5 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                            </svg>
+                            <span>
+                                Codec: <strong className="text-white">{camera.video_codec.toUpperCase()}</strong>
+                                {camera.video_codec === 'h265' && (
+                                    <span className="ml-1 text-yellow-400">• Terbaik di Safari</span>
+                                )}
+                            </span>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
