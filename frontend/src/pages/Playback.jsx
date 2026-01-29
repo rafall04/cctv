@@ -22,8 +22,52 @@ function Playback() {
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
     const [videoError, setVideoError] = useState(null);
+    const [errorType, setErrorType] = useState(null);
     const [isSeeking, setIsSeeking] = useState(false);
     const [isBuffering, setIsBuffering] = useState(false);
+
+    // Error message mapping - konsisten dengan MapView/GridView
+    const getErrorInfo = () => {
+        const errors = {
+            codec: { 
+                title: 'Codec Tidak Didukung', 
+                desc: 'Browser Anda tidak mendukung codec H.265/HEVC yang digunakan kamera ini. Coba gunakan browser lain atau perangkat yang mendukung H.265.',
+                color: 'yellow',
+                icon: (
+                    <svg className="w-10 h-10 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                )
+            },
+            network: { 
+                title: 'Koneksi Gagal', 
+                desc: 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.',
+                color: 'orange',
+                icon: (
+                    <svg className="w-10 h-10 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414"/>
+                    </svg>
+                )
+            },
+            default: { 
+                title: 'Video Tidak Tersedia', 
+                desc: 'Terjadi kesalahan saat memuat video. Silakan coba lagi.',
+                color: 'red',
+                icon: (
+                    <svg className="w-10 h-10 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                )
+            }
+        };
+        return errors[errorType] || errors.default;
+    };
+
+    const errorColorClasses = {
+        yellow: 'bg-yellow-500/20',
+        orange: 'bg-orange-500/20',
+        red: 'bg-red-500/20'
+    };
     const [seekWarning, setSeekWarning] = useState(null); // Warning toast for long seeks
     const [seekProgress, setSeekProgress] = useState(null); // Progress info for seeking
     
@@ -140,6 +184,7 @@ function Playback() {
 
         // Clear previous error state
         setVideoError(null);
+        setErrorType(null);
 
         const streamUrl = `${import.meta.env.VITE_API_URL}/api/recordings/${selectedCamera.id}/stream/${selectedSegment.filename}`;
         
@@ -244,7 +289,7 @@ function Playback() {
             
             // Only set error if it's not an "Empty src" error (which happens during cleanup)
             if (video.error && video.error.message && !video.error.message.includes('Empty src')) {
-                // Map error codes to messages
+                // Map error codes to messages and types
                 const errorMessages = {
                     1: 'MEDIA_ERR_ABORTED: Video loading aborted',
                     2: 'MEDIA_ERR_NETWORK: Network error while loading video',
@@ -254,6 +299,20 @@ function Playback() {
                 
                 const errorMsg = errorMessages[video.error?.code] || 'Unknown video error';
                 setVideoError(errorMsg);
+                
+                // Detect error type for better error display
+                if (video.error?.code === 4) {
+                    // Check if it's codec issue (H.265 not supported)
+                    if (selectedCamera?.video_codec === 'h265') {
+                        setErrorType('codec');
+                    } else {
+                        setErrorType('default');
+                    }
+                } else if (video.error?.code === 2) {
+                    setErrorType('network');
+                } else {
+                    setErrorType('default');
+                }
             }
         };
         const handleStalled = () => console.warn('Video: stalled');
@@ -360,6 +419,7 @@ function Playback() {
             setIsSeeking(true);
             setIsBuffering(true);
             setVideoError(null);
+            setErrorType(null);
             
             // Clear any existing buffering timeout
             if (bufferingTimeoutRef.current) {
@@ -771,25 +831,37 @@ function Playback() {
                             </div>
                         )}
                         
-                        {/* Error Overlay */}
+                        {/* Error Overlay - Konsisten dengan MapView/GridView */}
                         {videoError && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/80 p-8">
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/90 p-8">
                                 <div className="text-center max-w-md">
-                                    <svg className="w-16 h-16 mx-auto mb-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                    </svg>
-                                    <h3 className="text-xl font-semibold text-white mb-2">Video Error</h3>
-                                    <p className="text-red-300 mb-4">{videoError}</p>
+                                    {(() => {
+                                        const info = getErrorInfo();
+                                        const colorClass = errorColorClasses[info.color] || errorColorClasses.red;
+                                        return (
+                                            <>
+                                                <div className={`w-16 h-16 mx-auto mb-4 rounded-full ${colorClass} flex items-center justify-center`}>
+                                                    {info.icon}
+                                                </div>
+                                                <h3 className="text-white font-semibold text-lg mb-2">{info.title}</h3>
+                                                <p className="text-gray-400 text-sm mb-4">{info.desc}</p>
+                                            </>
+                                        );
+                                    })()}
                                     <button
                                         onClick={() => {
                                             setVideoError(null);
+                                            setErrorType(null);
                                             if (videoRef.current) {
                                                 videoRef.current.load();
                                             }
                                         }}
-                                        className="px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors"
+                                        className="inline-flex items-center gap-2 px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg font-medium transition-colors"
                                     >
-                                        Retry
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                        </svg>
+                                        Coba Lagi
                                     </button>
                                 </div>
                             </div>
