@@ -818,7 +818,7 @@ function Playback() {
                             <ul className="space-y-1.5 text-xs sm:text-sm text-blue-800 dark:text-blue-200">
                                 <li className="flex items-start gap-2">
                                     <span className="flex-shrink-0 mt-0.5">•</span>
-                                    <span><strong>Skip Video:</strong> Maksimal 3 menit per kali untuk menghindari buffering lama</span>
+                                    <span><strong>Skip Video:</strong> Maksimal lompat 3 menit per sekali skip untuk menghindari buffering lama</span>
                                 </li>
                                 <li className="flex items-start gap-2">
                                     <span className="flex-shrink-0 mt-0.5">•</span>
@@ -826,7 +826,7 @@ function Playback() {
                                 </li>
                                 <li className="flex items-start gap-2">
                                     <span className="flex-shrink-0 mt-0.5">•</span>
-                                    <span><strong>Kecepatan:</strong> Klik tombol kecepatan di pojok kanan atas video (0.5x - 2x)</span>
+                                    <span><strong>Kecepatan:</strong> Klik tombol di pojok kanan atas video untuk mengatur kecepatan (0.5x - 2x)</span>
                                 </li>
                                 <li className="flex items-start gap-2">
                                     <span className="flex-shrink-0 mt-0.5">•</span>
