@@ -770,8 +770,8 @@ function Playback() {
                             </div>
                         )}
                         
-                        {/* Speed Control Overlay - Always visible on desktop */}
-                        <div className="hidden sm:flex absolute top-2 sm:top-4 right-2 sm:right-4 gap-1 sm:gap-2 z-30">
+                        {/* Speed Control Overlay - Visible on all devices */}
+                        <div className="flex absolute top-2 sm:top-4 right-2 sm:right-4 gap-1 sm:gap-2 z-30">
                             {[0.5, 1, 1.5, 2].map(speed => (
                                 <button
                                     key={speed}
@@ -826,7 +826,7 @@ function Playback() {
                                 </li>
                                 <li className="flex items-start gap-2">
                                     <span className="flex-shrink-0 mt-0.5">•</span>
-                                    <span><strong>Kecepatan:</strong> Klik kanan bawah video → titik 3 → kecepatan pemutaran (0.5x - 2x)</span>
+                                    <span><strong>Kecepatan:</strong> Klik tombol kecepatan di pojok kanan atas video (0.5x - 2x)</span>
                                 </li>
                                 <li className="flex items-start gap-2">
                                     <span className="flex-shrink-0 mt-0.5">•</span>
