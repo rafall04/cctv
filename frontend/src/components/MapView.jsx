@@ -583,7 +583,7 @@ const VideoModal = memo(({ camera, onClose }) => {
 
     const getErrorMessage = useCallback(() => {
         const errors = {
-            codec: { title: 'Codec Tidak Didukung', desc: 'Browser Anda tidak mendukung codec H.265/HEVC. Coba browser lain.', color: 'yellow' },
+            codec: { title: 'Codec Tidak Didukung', desc: 'Browser Anda tidak mendukung codec H.265/HEVC yang digunakan kamera ini. Coba gunakan browser lain seperti Safari.', color: 'yellow' },
             network: { title: 'Koneksi Gagal', desc: 'Tidak dapat terhubung ke server stream.', color: 'orange' },
             default: { title: 'Stream Tidak Tersedia', desc: 'Terjadi kesalahan saat memuat stream.', color: 'red' }
         };

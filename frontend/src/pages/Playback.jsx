@@ -31,7 +31,7 @@ function Playback() {
         const errors = {
             codec: { 
                 title: 'Codec Tidak Didukung', 
-                desc: 'Browser Anda tidak mendukung codec H.265/HEVC yang digunakan kamera ini. Coba gunakan browser lain atau perangkat yang mendukung H.265.',
+                desc: 'Browser Anda tidak mendukung codec H.265/HEVC yang digunakan kamera ini. Coba gunakan browser lain seperti Safari.',
                 color: 'yellow',
                 icon: (
                     <svg className="w-10 h-10 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">

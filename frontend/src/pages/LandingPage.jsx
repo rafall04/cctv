@@ -660,7 +660,7 @@ function VideoPopup({ camera, onClose }) {
             case 'codec':
                 return {
                     title: 'Codec Tidak Didukung',
-                    desc: 'Browser Anda tidak mendukung codec H.265/HEVC yang digunakan kamera ini. Coba gunakan browser lain atau perangkat yang mendukung H.265.',
+                    desc: 'Browser Anda tidak mendukung codec H.265/HEVC yang digunakan kamera ini. Coba gunakan browser lain seperti Safari.',
                     color: 'yellow',
                     icon: (
                         <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
