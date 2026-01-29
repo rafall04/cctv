@@ -853,79 +853,96 @@ const VideoModal = memo(({ camera, onClose }) => {
                 </div>
 
                 {/* Controls Panel - hide in fullscreen */}
-                <div className={`p-3 border-t border-gray-800 flex items-center justify-between ${isFullscreen ? 'hidden' : ''}`}>
-                    <div className="text-xs text-gray-400">
-                        Gunakan scroll untuk zoom, geser untuk pan
-                    </div>
-                    
-                    {/* Controls: Zoom + Screenshot + Fullscreen */}
-                    {!isMaintenance && status !== 'error' && (
-                        <div className="flex items-center gap-1 shrink-0">
-                            {/* Zoom Controls */}
-                            <div className="flex items-center gap-0.5 bg-gray-800 rounded-lg p-0.5">
-                                <button
-                                    onClick={handleZoomOut}
-                                    disabled={zoomDisplay <= MIN_ZOOM}
-                                    className="p-1.5 hover:bg-gray-700 disabled:opacity-30 rounded text-white transition-colors"
-                                    title="Zoom Out"
-                                >
-                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"/>
-                                    </svg>
-                                </button>
-                                <span className="text-white text-[10px] font-medium w-8 text-center">{Math.round(zoomDisplay * 100)}%</span>
-                                <button
-                                    onClick={handleZoomIn}
-                                    disabled={zoomDisplay >= MAX_ZOOM}
-                                    className="p-1.5 hover:bg-gray-700 disabled:opacity-30 rounded text-white transition-colors"
-                                    title="Zoom In"
-                                >
-                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"/>
-                                    </svg>
-                                </button>
-                                {zoomDisplay > 1 && (
+                <div className={`border-t border-gray-800 ${isFullscreen ? 'hidden' : ''}`}>
+                    {/* Controls */}
+                    <div className="p-3 flex items-center justify-between">
+                        <div className="text-xs text-gray-400">
+                            Gunakan scroll untuk zoom, geser untuk pan
+                        </div>
+                        
+                        {/* Controls: Zoom + Screenshot + Fullscreen */}
+                        {!isMaintenance && status !== 'error' && (
+                            <div className="flex items-center gap-1 shrink-0">
+                                {/* Zoom Controls */}
+                                <div className="flex items-center gap-0.5 bg-gray-800 rounded-lg p-0.5">
                                     <button
-                                        onClick={handleResetZoom}
-                                        className="p-1.5 hover:bg-gray-700 rounded text-white transition-colors"
-                                        title="Reset Zoom"
+                                        onClick={handleZoomOut}
+                                        disabled={zoomDisplay <= MIN_ZOOM}
+                                        className="p-1.5 hover:bg-gray-700 disabled:opacity-30 rounded text-white transition-colors"
+                                        title="Zoom Out"
                                     >
                                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                            <path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/>
+                                            <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"/>
+                                        </svg>
+                                    </button>
+                                    <span className="text-white text-[10px] font-medium w-8 text-center">{Math.round(zoomDisplay * 100)}%</span>
+                                    <button
+                                        onClick={handleZoomIn}
+                                        disabled={zoomDisplay >= MAX_ZOOM}
+                                        className="p-1.5 hover:bg-gray-700 disabled:opacity-30 rounded text-white transition-colors"
+                                        title="Zoom In"
+                                    >
+                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"/>
+                                        </svg>
+                                    </button>
+                                    {zoomDisplay > 1 && (
+                                        <button
+                                            onClick={handleResetZoom}
+                                            className="p-1.5 hover:bg-gray-700 rounded text-white transition-colors"
+                                            title="Reset Zoom"
+                                        >
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/>
+                                            </svg>
+                                        </button>
+                                    )}
+                                </div>
+                                
+                                {/* Screenshot Button */}
+                                {status === 'playing' && (
+                                    <button
+                                        onClick={takeSnapshot}
+                                        className="p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-white transition-colors"
+                                        title="Ambil Screenshot"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                                            <path d="M21 15l-5-5L5 21"/>
                                         </svg>
                                     </button>
                                 )}
-                            </div>
-                            
-                            {/* Screenshot Button */}
-                            {status === 'playing' && (
+                                
+                                {/* Fullscreen Button */}
                                 <button
-                                    onClick={takeSnapshot}
+                                    onClick={toggleFullscreen}
                                     className="p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-white transition-colors"
-                                    title="Ambil Screenshot"
+                                    title={isFullscreen ? "Keluar Fullscreen" : "Fullscreen"}
                                 >
                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <rect x="3" y="3" width="18" height="18" rx="2"/>
-                                        <circle cx="8.5" cy="8.5" r="1.5"/>
-                                        <path d="M21 15l-5-5L5 21"/>
+                                        {isFullscreen ? (
+                                            <path d="M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3"/>
+                                        ) : (
+                                            <path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+                                        )}
                                     </svg>
                                 </button>
-                            )}
-                            
-                            {/* Fullscreen Button */}
-                            <button
-                                onClick={toggleFullscreen}
-                                className="p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-white transition-colors"
-                                title={isFullscreen ? "Keluar Fullscreen" : "Fullscreen"}
-                            >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    {isFullscreen ? (
-                                        <path d="M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3"/>
-                                    ) : (
-                                        <path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
-                                    )}
+                            </div>
+                        )}
+                    </div>
+                    
+                    {/* Codec Description - Simpel dan Jelas */}
+                    {camera.video_codec && camera.video_codec === 'h265' && (
+                        <div className="px-3 pb-3">
+                            <div className="flex items-start gap-2 px-3 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                                <svg className="w-4 h-4 text-yellow-400 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                                 </svg>
-                            </button>
+                                <div className="flex-1 text-xs text-yellow-400">
+                                    <strong>Codec H.265:</strong> Terbaik di Safari. Chrome/Edge tergantung hardware device.
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>

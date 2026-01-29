@@ -1201,31 +1201,52 @@ function VideoPopup({ camera, onClose }) {
 
     return (
         <div ref={outerWrapperRef} className={`fixed inset-0 z-[9999] bg-black ${isFullscreen ? '' : 'flex items-center justify-center bg-black/95 p-2 sm:p-4'}`} onClick={onClose}>
-            <div ref={modalRef} className={`relative bg-gray-900 overflow-hidden shadow-2xl flex flex-col ${isFullscreen ? 'w-full h-full' : 'w-full max-w-5xl rounded-2xl'}`} style={isFullscreen ? {} : { maxHeight: 'calc(100vh - 16px)' }} onClick={(e) => e.stopPropagation()}>
-                {/* Header - hide in fullscreen */}
-                <div className={`shrink-0 flex items-center justify-between p-3 sm:p-4 bg-gray-900 border-b border-white/10 ${isFullscreen ? 'hidden' : ''}`}>
-                    <div className="flex-1 min-w-0 pr-4">
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <h2 className="text-white font-bold text-sm sm:text-lg truncate">{camera.name}</h2>
-                            {camera.video_codec && (
-                                <CodecBadge codec={camera.video_codec} size="sm" showWarning={true} />
-                            )}
-                            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${statusDisplay.color}`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${statusDisplay.dotColor} ${status === 'live' && !isFullscreen && !disableAnimations ? 'animate-pulse' : ''}`} />
-                                {statusDisplay.label}
-                            </span>
-                            {isAutoRetrying && (
-                                <span className="text-[10px] text-amber-400">Auto-retry {autoRetryCount}/3...</span>
-                            )}
+            <div ref={modalRef} className={`relative bg-gray-900 overflow-hidden shadow-2xl flex flex-col ${isFullscreen ? 'w-full h-full' : 'w-full max-w-5xl rounded-2xl border border-gray-800'}`} style={isFullscreen ? {} : { maxHeight: 'calc(100vh - 16px)' }} onClick={(e) => e.stopPropagation()}>
+                
+                {/* Header Info - di atas video (hide in fullscreen) */}
+                {!isFullscreen && (
+                    <div className="p-3 border-b border-gray-800">
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <h3 className="text-white font-bold text-sm sm:text-base truncate">{camera.name}</h3>
+                                {camera.video_codec && (
+                                    <CodecBadge codec={camera.video_codec} size="sm" showWarning={false} />
+                                )}
+                            </div>
+                            {/* Status badges */}
+                            <div className="flex items-center gap-1 shrink-0">
+                                {isMaintenance ? (
+                                    <span className="px-1.5 py-0.5 rounded bg-red-500 text-white text-[10px] font-bold">Perbaikan</span>
+                                ) : isOffline ? (
+                                    <span className="px-1.5 py-0.5 rounded bg-gray-500 text-white text-[10px] font-bold">Offline</span>
+                                ) : (
+                                    <>
+                                        <span className={`w-1.5 h-1.5 rounded-full bg-red-500 ${disableAnimations ? '' : 'animate-pulse'}`}/>
+                                        <span className={`px-1.5 py-0.5 rounded text-white text-[10px] font-bold ${camera.is_tunnel ? 'bg-orange-500' : 'bg-emerald-500'}`}>
+                                            {camera.is_tunnel ? 'Tunnel' : 'Stabil'}
+                                        </span>
+                                    </>
+                                )}
+                            </div>
                         </div>
-                        {camera.location && <p className="text-gray-400 text-xs sm:text-sm flex items-center gap-1.5 mt-1 truncate"><Icons.MapPin /> {camera.location}</p>}
+                        {/* Location + Area */}
+                        {(camera.location || camera.area_name) && (
+                            <div className="flex items-center gap-2 mt-1.5">
+                                {camera.location && (
+                                    <span className="text-gray-400 text-xs flex items-center gap-1 truncate">
+                                        <Icons.MapPin />
+                                        <span className="truncate">{camera.location}</span>
+                                    </span>
+                                )}
+                                {camera.area_name && (
+                                    <span className="px-1.5 py-0.5 bg-sky-500/20 text-sky-400 rounded text-[10px] font-medium shrink-0">
+                                        {camera.area_name}
+                                    </span>
+                                )}
+                            </div>
+                        )}
                     </div>
-                    <div className="flex items-center gap-1 sm:gap-2">
-                        {status === 'live' && <button onClick={takeSnapshot} className="p-2 hover:bg-white/10 rounded-xl text-white"><Icons.Image /></button>}
-                        <button onClick={toggleFS} className="p-2 hover:bg-white/10 rounded-xl text-white"><Icons.Fullscreen /></button>
-                        <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl text-white"><Icons.X /></button>
-                    </div>
-                </div>
+                )}
 
                 {/* Video - expand to full screen in fullscreen mode */}
                 <div ref={wrapperRef} className={`relative bg-black overflow-hidden ${isFullscreen ? 'flex-1' : 'flex-1 min-h-0'}`} onDoubleClick={toggleFS}>
@@ -1239,7 +1260,7 @@ function VideoPopup({ camera, onClose }) {
                                     <div className="flex items-center gap-3 flex-wrap">
                                         <h2 className="text-white font-bold text-lg">{camera.name}</h2>
                                         {camera.video_codec && (
-                                            <CodecBadge codec={camera.video_codec} size="sm" showWarning={true} />
+                                            <CodecBadge codec={camera.video_codec} size="sm" showWarning={false} />
                                         )}
                                         <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold ${statusDisplay.color}`}>
                                             <span className={`w-1.5 h-1.5 rounded-full ${statusDisplay.dotColor}`} />
@@ -1376,57 +1397,67 @@ function VideoPopup({ camera, onClose }) {
                     )}
                 </div>
 
-                {/* Footer - hide in fullscreen */}
-                <div className={`shrink-0 p-3 sm:p-4 bg-gray-900 border-t border-white/10 ${isFullscreen ? 'hidden' : ''}`}>
-                    <div className="flex items-center justify-between gap-4 mb-2">
-                        <div className="flex-1 min-w-0">
-                            {camera.description && <p className="text-gray-400 text-xs sm:text-sm line-clamp-1">{camera.description}</p>}
-                            {camera.area_name && <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400">{camera.area_name}</span>}
+                {/* Controls Panel + Codec Description - hide in fullscreen */}
+                <div className={`shrink-0 border-t border-gray-800 ${isFullscreen ? 'hidden' : ''}`}>
+                    {/* Controls */}
+                    <div className="p-3 flex items-center justify-between">
+                        <div className="text-xs text-gray-400">
+                            Gunakan scroll untuk zoom, geser untuk pan
                         </div>
-                        <div className="flex items-center gap-1 bg-white/5 rounded-xl p-1">
-                            <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-2 hover:bg-white/10 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomOut /></button>
-                            <span className="text-white text-xs font-medium w-12 text-center">{Math.round(zoom * 100)}%</span>
-                            <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 4} className="p-2 hover:bg-white/10 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomIn /></button>
-                            {zoom > 1 && <button onClick={() => getZoomableWrapper()?._reset?.()} className="p-2 hover:bg-white/10 rounded-lg text-white ml-1"><Icons.Reset /></button>}
+                        
+                        {/* Zoom Controls */}
+                        <div className="flex items-center gap-1 shrink-0">
+                            <div className="flex items-center gap-0.5 bg-gray-800 rounded-lg p-0.5">
+                                <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-1.5 hover:bg-gray-700 disabled:opacity-30 rounded text-white transition-colors" title="Zoom Out">
+                                    <Icons.ZoomOut />
+                                </button>
+                                <span className="text-white text-[10px] font-medium w-8 text-center">{Math.round(zoom * 100)}%</span>
+                                <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 4} className="p-1.5 hover:bg-gray-700 disabled:opacity-30 rounded text-white transition-colors" title="Zoom In">
+                                    <Icons.ZoomIn />
+                                </button>
+                                {zoom > 1 && (
+                                    <button onClick={() => getZoomableWrapper()?._reset?.()} className="p-1.5 hover:bg-gray-700 rounded text-white transition-colors" title="Reset Zoom">
+                                        <Icons.Reset />
+                                    </button>
+                                )}
+                            </div>
+                            
+                            {/* Screenshot Button */}
+                            {status === 'live' && (
+                                <button onClick={takeSnapshot} className="p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-white transition-colors" title="Ambil Screenshot">
+                                    <Icons.Image />
+                                </button>
+                            )}
+                            
+                            {/* Fullscreen Button */}
+                            <button onClick={toggleFS} className="p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-white transition-colors" title={isFullscreen ? "Keluar Fullscreen" : "Fullscreen"}>
+                                <Icons.Fullscreen />
+                            </button>
+                            
+                            {/* Close Button */}
+                            <button onClick={onClose} className="p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-white transition-colors" title="Tutup">
+                                <Icons.X />
+                            </button>
                         </div>
                     </div>
                     
-                    {/* Codec Info - DI DALAM Footer */}
-                    {camera.video_codec && (
-                        <div className="pt-2 border-t border-white/5">
-                            <div className="flex items-center gap-2 mb-1.5">
-                                <svg className="w-3.5 h-3.5 text-gray-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    {/* Codec Description - Simpel dan Jelas */}
+                    {camera.video_codec && camera.video_codec === 'h265' && (
+                        <div className="px-3 pb-3">
+                            <div className="flex items-start gap-2 px-3 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                                <svg className="w-4 h-4 text-yellow-400 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                                 </svg>
-                                <span className="text-xs text-gray-400">
-                                    Codec: <strong className="text-white">{camera.video_codec.toUpperCase()}</strong>
-                                </span>
-                                <CodecBadge codec={camera.video_codec} size="sm" showWarning={false} />
+                                <div className="flex-1 text-xs text-yellow-400">
+                                    <strong>Codec H.265:</strong> Terbaik di Safari. Chrome/Edge tergantung hardware device.
+                                </div>
                             </div>
-                            {/* Warning/Description - Compact */}
-                            {camera.video_codec === 'h265' ? (
-                                <div className="flex items-start gap-1.5 px-2 py-1 bg-yellow-500/10 border border-yellow-500/20 rounded text-[10px] text-yellow-400">
-                                    <svg className="w-3 h-3 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                    </svg>
-                                    <span>Terbaik di Safari. Chrome/Edge tergantung hardware.</span>
-                                </div>
-                            ) : (
-                                <div className="text-[10px] text-gray-500">
-                                    ✓ Kompatibel dengan semua browser
-                                </div>
-                            )}
                         </div>
                     )}
                 </div>
             </div>
         </div>
     );
-}
-
-// ============================================
-// MULTI-VIEW VIDEO ITEM - Optimized with fullscreen detection, error isolation, timeout handler, and auto-retry
-// Each stream is isolated - errors in one don't affect others
 // Now handles offline/maintenance cameras properly
 // **Validates: Requirements 1.1, 1.2, 1.3, 2.3, 4.1, 4.2, 4.3, 4.4, 6.1, 6.2, 6.3, 6.4, 7.1, 7.2, 7.3**
 // ============================================
