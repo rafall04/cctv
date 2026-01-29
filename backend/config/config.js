@@ -25,7 +25,8 @@ const parseAllowedOrigins = () => {
   const defaultOrigins = [
     'https://cctv.raf.my.id',
     'http://cctv.raf.my.id',
-    'http://172.17.11.12',
+    'http://172.17.11.12:800',      // IP access with port
+    'http://172.17.11.12',           // IP access without port (fallback)
     'http://localhost:5173',
     'http://localhost:3000',
     'http://localhost:8080'
