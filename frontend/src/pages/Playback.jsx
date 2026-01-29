@@ -132,7 +132,7 @@ function Playback() {
         // CRITICAL VALIDATION: Pastikan segment filename tidak kosong
         // Validasi dasar untuk mencegah request ke URL invalid
         if (!selectedSegment.filename || selectedSegment.filename.trim() === '') {
-            console.warn('⚠️ Selected segment has invalid filename, skipping');
+            console.warn('[Playback] Selected segment has invalid filename, skipping');
             return;
         }
 
@@ -809,8 +809,11 @@ function Playback() {
                             </svg>
                         </div>
                         <div className="flex-1">
-                            <h3 className="text-sm sm:text-base font-semibold text-blue-900 dark:text-blue-100 mb-2">
-                                ℹ️ Cara Menggunakan Playback
+                            <h3 className="text-sm sm:text-base font-semibold text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2">
+                                <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span>Cara Menggunakan Playback</span>
                             </h3>
                             <ul className="space-y-1.5 text-xs sm:text-sm text-blue-800 dark:text-blue-200">
                                 <li className="flex items-start gap-2">
