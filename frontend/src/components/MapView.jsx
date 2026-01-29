@@ -195,6 +195,16 @@ const VideoModal = memo(({ camera, onClose }) => {
     const isMaintenance = camera.status === 'maintenance';
     const isOffline = camera.is_online === 0;
     const isTunnel = camera.is_tunnel === 1 || camera.is_tunnel === true;
+    
+    // DEBUG: Log camera data untuk troubleshooting
+    useEffect(() => {
+        console.log('[MapView VideoModal] Camera data:', {
+            id: camera.id,
+            name: camera.name,
+            video_codec: camera.video_codec,
+            hasCodec: !!camera.video_codec
+        });
+    }, [camera]);
 
     const MIN_ZOOM = 1;
     const MAX_ZOOM = 4;
