@@ -1401,8 +1401,13 @@ function VideoPopup({ camera, onClose }) {
                 <div className={`shrink-0 border-t border-gray-800 ${isFullscreen ? 'hidden' : ''}`}>
                     {/* Controls */}
                     <div className="p-3 flex items-center justify-between">
-                        <div className="text-xs text-gray-400">
-                            Gunakan scroll untuk zoom, geser untuk pan
+                        {/* Camera Description - Kiri Bawah */}
+                        <div className="text-xs text-gray-400 flex-1 min-w-0 mr-3">
+                            {camera.description ? (
+                                <span className="line-clamp-2">{camera.description}</span>
+                            ) : (
+                                <span className="text-gray-500 italic">Tidak ada deskripsi</span>
+                            )}
                         </div>
                         
                         {/* Zoom Controls */}

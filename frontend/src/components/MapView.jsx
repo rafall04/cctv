@@ -766,16 +766,6 @@ const VideoModal = memo(({ camera, onClose }) => {
                         </div>
                     )}
 
-                    {/* Close button - hide in fullscreen */}
-                    <button 
-                        onClick={onClose} 
-                        className={`absolute top-2 right-2 p-2 bg-black/60 hover:bg-black/80 active:bg-black text-white rounded-lg z-20 ${isFullscreen ? 'hidden' : ''}`}
-                    >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-
                     {/* Floating controls for fullscreen mode - Always visible on mobile */}
                     {isFullscreen && (
                         <div className="absolute inset-0 z-50 pointer-events-none">
@@ -856,11 +846,16 @@ const VideoModal = memo(({ camera, onClose }) => {
                 <div className={`border-t border-gray-800 ${isFullscreen ? 'hidden' : ''}`}>
                     {/* Controls */}
                     <div className="p-3 flex items-center justify-between">
-                        <div className="text-xs text-gray-400">
-                            Gunakan scroll untuk zoom, geser untuk pan
+                        {/* Camera Description - Kiri Bawah */}
+                        <div className="text-xs text-gray-400 flex-1 min-w-0 mr-3">
+                            {camera.description ? (
+                                <span className="line-clamp-2">{camera.description}</span>
+                            ) : (
+                                <span className="text-gray-500 italic">Tidak ada deskripsi</span>
+                            )}
                         </div>
                         
-                        {/* Controls: Zoom + Screenshot + Fullscreen */}
+                        {/* Controls: Zoom + Screenshot + Fullscreen + Close */}
                         {!isMaintenance && status !== 'error' && (
                             <div className="flex items-center gap-1 shrink-0">
                                 {/* Zoom Controls */}
@@ -926,6 +921,17 @@ const VideoModal = memo(({ camera, onClose }) => {
                                         ) : (
                                             <path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
                                         )}
+                                    </svg>
+                                </button>
+                                
+                                {/* Close Button */}
+                                <button
+                                    onClick={onClose}
+                                    className="p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-white transition-colors"
+                                    title="Tutup"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path d="M6 18L18 6M6 6l12 12"/>
                                     </svg>
                                 </button>
                             </div>
