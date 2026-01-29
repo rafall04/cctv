@@ -49,6 +49,7 @@ export async function getStreamUrls(request, reply) {
                     is_tunnel: camera.is_tunnel,
                     latitude: camera.latitude,
                     longitude: camera.longitude,
+                    video_codec: camera.video_codec,
                     rt: camera.rt,
                     rw: camera.rw,
                     kelurahan: camera.kelurahan,

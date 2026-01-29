@@ -615,17 +615,6 @@ function VideoPopup({ camera, onClose }) {
     const loadingTimeoutHandlerRef = useRef(null);
     const fallbackHandlerRef = useRef(null);
     const abortControllerRef = useRef(null);
-    
-    // DEBUG: Log camera data untuk troubleshooting
-    useEffect(() => {
-        console.log('[LandingPage VideoPopup] Camera data:', {
-            id: camera.id,
-            name: camera.name,
-            video_codec: camera.video_codec,
-            hasCodec: !!camera.video_codec
-        });
-    }, [camera]);
-    
     // Handle close with fullscreen exit
     const handleClose = async () => {
         if (document.fullscreenElement) {
