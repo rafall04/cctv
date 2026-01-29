@@ -293,7 +293,7 @@ class MediaMtxService {
                 sourceProtocol: 'tcp',
                 sourceOnDemand: true,
                 sourceOnDemandStartTimeout: '10s',
-                sourceOnDemandCloseAfter: '30s',
+                sourceOnDemandCloseAfter: '10s', // Reduced from 30s to 10s for faster recovery
             };
 
             try {
@@ -345,7 +345,7 @@ class MediaMtxService {
             sourceProtocol: 'tcp',
             sourceOnDemand: true,
             sourceOnDemandStartTimeout: '10s',
-            sourceOnDemandCloseAfter: '30s',
+            sourceOnDemandCloseAfter: '10s', // Reduced from 30s to 10s for faster recovery
         };
 
         try {
