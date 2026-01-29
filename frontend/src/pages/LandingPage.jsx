@@ -440,7 +440,7 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
                         {camera.name}
                     </h3>
                     {camera.video_codec && (
-                        <CodecBadge codec={camera.video_codec} size="sm" showWarning={false} />
+                        <CodecBadge codec={camera.video_codec} size="sm" showWarning={true} />
                     )}
                 </div>
                 
@@ -1208,6 +1208,9 @@ function VideoPopup({ camera, onClose }) {
                     <div className="flex-1 min-w-0 pr-4">
                         <div className="flex items-center gap-2 flex-wrap">
                             <h2 className="text-white font-bold text-sm sm:text-lg truncate">{camera.name}</h2>
+                            {camera.video_codec && (
+                                <CodecBadge codec={camera.video_codec} size="sm" showWarning={true} />
+                            )}
                             <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${statusDisplay.color}`}>
                                 <span className={`w-1.5 h-1.5 rounded-full ${statusDisplay.dotColor} ${status === 'live' && !isFullscreen && !disableAnimations ? 'animate-pulse' : ''}`} />
                                 {statusDisplay.label}
@@ -1236,6 +1239,9 @@ function VideoPopup({ camera, onClose }) {
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <h2 className="text-white font-bold text-lg">{camera.name}</h2>
+                                        {camera.video_codec && (
+                                            <CodecBadge codec={camera.video_codec} size="sm" showWarning={true} />
+                                        )}
                                         <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold ${statusDisplay.color}`}>
                                             <span className={`w-1.5 h-1.5 rounded-full ${statusDisplay.dotColor}`} />
                                             {statusDisplay.label}

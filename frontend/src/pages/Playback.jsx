@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { cameraService } from '../services/cameraService';
 import recordingService from '../services/recordingService';
 import CodecBadge from '../components/CodecBadge';
+import { getCodecWarning, getCodecDescription } from '../utils/codecSupport';
 
 // CRITICAL: Maximum safe seek distance (3 minutes = 180 seconds)
 // Seeking beyond this may cause buffering issues due to keyframe intervals
@@ -673,30 +674,70 @@ function Playback() {
                 <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-6 shadow-lg">
                     <div className="flex items-center justify-between gap-3 mb-3 sm:mb-4">
                         <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Playback Recording</h1>
-                        {selectedCamera?.video_codec && (
-                            <CodecBadge codec={selectedCamera.video_codec} size="md" showWarning={true} />
-                        )}
                     </div>
                     
                     {/* Camera Selector */}
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                            Pilih Kamera:
-                        </label>
-                        <select
-                            value={selectedCamera?.id || ''}
-                            onChange={(e) => {
-                                const camera = cameras.find(c => c.id === parseInt(e.target.value));
-                                setSelectedCamera(camera);
-                            }}
-                            className="flex-1 px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        >
-                            {cameras.map(camera => (
-                                <option key={camera.id} value={camera.id}>
-                                    {camera.name} - {camera.location || 'No location'}
-                                </option>
-                            ))}
-                        </select>
+                    <div className="space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                                Pilih Kamera:
+                            </label>
+                            <select
+                                value={selectedCamera?.id || ''}
+                                onChange={(e) => {
+                                    const camera = cameras.find(c => c.id === parseInt(e.target.value));
+                                    setSelectedCamera(camera);
+                                }}
+                                className="flex-1 px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            >
+                                {cameras.map(camera => (
+                                    <option key={camera.id} value={camera.id}>
+                                        {camera.name} - {camera.location || 'No location'}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        
+                        {/* Codec Info - Strategis dan Jelas */}
+                        {selectedCamera?.video_codec && (
+                            <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/30 rounded-lg">
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                    </svg>
+                                    <CodecBadge codec={selectedCamera.video_codec} size="md" showWarning={true} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm text-gray-700 dark:text-gray-300 font-medium mb-1">
+                                        Video Codec: {selectedCamera.video_codec.toUpperCase()}
+                                    </p>
+                                    <p className="text-xs text-gray-600 dark:text-gray-400">
+                                        {getCodecDescription(selectedCamera.video_codec)}
+                                    </p>
+                                    {(() => {
+                                        const warning = getCodecWarning(selectedCamera.video_codec);
+                                        if (warning) {
+                                            return (
+                                                <div className={`mt-2 p-2 rounded ${
+                                                    warning.severity === 'error' 
+                                                        ? 'bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-800' 
+                                                        : 'bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-800'
+                                                }`}>
+                                                    <p className={`text-xs font-medium ${
+                                                        warning.severity === 'error'
+                                                            ? 'text-red-700 dark:text-red-300'
+                                                            : 'text-yellow-700 dark:text-yellow-300'
+                                                    }`}>
+                                                        ⚠️ {warning.message}
+                                                    </p>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
