@@ -72,6 +72,33 @@ function Playback() {
     const [seekProgress, setSeekProgress] = useState(null); // Progress info for seeking
     const [autoPlayNotification, setAutoPlayNotification] = useState(null); // Notification for auto-play next segment
     
+    // Auto-play toggle state with localStorage persistence
+    const [autoPlayEnabled, setAutoPlayEnabled] = useState(() => {
+        // Load from localStorage, default to true if not set
+        const saved = localStorage.getItem('playback-autoplay-enabled');
+        return saved !== null ? saved === 'true' : true;
+    });
+    
+    // Handle auto-play toggle with localStorage persistence
+    const handleAutoPlayToggle = () => {
+        const newValue = !autoPlayEnabled;
+        setAutoPlayEnabled(newValue);
+        localStorage.setItem('playback-autoplay-enabled', String(newValue));
+        
+        // Show feedback notification
+        setAutoPlayNotification({
+            type: newValue ? 'enabled' : 'disabled',
+            message: newValue 
+                ? 'Auto-play diaktifkan - segment berikutnya akan diputar otomatis' 
+                : 'Auto-play dinonaktifkan - video akan berhenti di akhir segment'
+        });
+        
+        // Auto-hide notification after 3 seconds
+        setTimeout(() => {
+            setAutoPlayNotification(null);
+        }, 3000);
+    };
+    
     const videoRef = useRef(null);
     const timelineRef = useRef(null);
     const isInitialLoadRef = useRef(true); // Track initial load
@@ -389,6 +416,24 @@ function Playback() {
         const handleEnded = () => {
             console.log('[Video] Ended - looking for next segment');
             
+            // Check if auto-play is enabled
+            if (!autoPlayEnabled) {
+                console.log('[Video] Auto-play disabled by user - stopping playback');
+                
+                // Show notification that playback stopped
+                setAutoPlayNotification({
+                    type: 'stopped',
+                    message: 'Video selesai - Auto-play dinonaktifkan'
+                });
+                
+                // Auto-hide after 5 seconds
+                setTimeout(() => {
+                    setAutoPlayNotification(null);
+                }, 5000);
+                
+                return; // Early return - don't auto-play
+            }
+            
             if (!selectedSegment || segments.length === 0) {
                 console.log('[Video] No segment selected or no segments available');
                 return;
@@ -648,7 +693,7 @@ function Playback() {
                 bufferingTimeoutRef.current = null;
             }
         };
-    }, [selectedSegment, segments]); // CRITICAL: Add segments to deps for handleEnded to access latest segments
+    }, [selectedSegment, segments, autoPlayEnabled]); // CRITICAL: Add autoPlayEnabled to deps for handleEnded to check latest value
 
     // CRITICAL: Smart Seek Handler with 3-minute limit
     const handleSmartSeek = (targetTime) => {
@@ -866,6 +911,46 @@ function Playback() {
                             )}
                         </div>
                     )}
+                    
+                    {/* Auto-Play Toggle - Modern toggle switch */}
+                    <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2 flex-1">
+                                <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/>
+                                </svg>
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                                        Auto-play Segment Berikutnya
+                                    </div>
+                                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                                        {autoPlayEnabled 
+                                            ? 'Video akan otomatis lanjut ke segment berikutnya' 
+                                            : 'Video akan berhenti di akhir segment'}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {/* Toggle Switch */}
+                            <button
+                                onClick={handleAutoPlayToggle}
+                                className={`relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                                    autoPlayEnabled 
+                                        ? 'bg-blue-600' 
+                                        : 'bg-gray-300 dark:bg-gray-600'
+                                }`}
+                                role="switch"
+                                aria-checked={autoPlayEnabled}
+                                aria-label="Toggle auto-play"
+                            >
+                                <span
+                                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                        autoPlayEnabled ? 'translate-x-5' : 'translate-x-0'
+                                    }`}
+                                />
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Video Player */}
@@ -878,16 +963,26 @@ function Playback() {
                                     ? 'bg-green-500 border-green-400'
                                     : autoPlayNotification.type === 'gap'
                                     ? 'bg-yellow-500 border-yellow-400'
+                                    : autoPlayNotification.type === 'enabled'
+                                    ? 'bg-green-500 border-green-400'
+                                    : autoPlayNotification.type === 'disabled'
+                                    ? 'bg-gray-500 border-gray-400'
+                                    : autoPlayNotification.type === 'stopped'
+                                    ? 'bg-gray-500 border-gray-400'
                                     : 'bg-blue-500 border-blue-400'
                             } text-white`}>
                                 <div className="flex items-start gap-3">
-                                    {autoPlayNotification.type === 'complete' ? (
+                                    {autoPlayNotification.type === 'complete' || autoPlayNotification.type === 'enabled' ? (
                                         <svg className="w-6 h-6 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                         </svg>
                                     ) : autoPlayNotification.type === 'gap' ? (
                                         <svg className="w-6 h-6 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                             <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                        </svg>
+                                    ) : autoPlayNotification.type === 'disabled' || autoPlayNotification.type === 'stopped' ? (
+                                        <svg className="w-6 h-6 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd" />
                                         </svg>
                                     ) : (
                                         <svg className="w-6 h-6 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
