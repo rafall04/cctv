@@ -3499,14 +3499,21 @@ export default function LandingPage() {
                 // But if the API is reachable, MediaMTX should be too (same server)
                 let apiUrl;
                 
-                if (window.location.protocol === 'https:') {
-                    const hostname = window.location.hostname;
+                const hostname = window.location.hostname;
+                const protocol = window.location.protocol;
+                
+                // If accessing via IP address, use relative path
+                if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) {
+                    apiUrl = '/api/health';
+                } else if (protocol === 'https:') {
+                    // HTTPS with domain
                     if (hostname === 'cctv.raf.my.id') {
                         apiUrl = 'https://api-cctv.raf.my.id/health';
                     } else {
-                        apiUrl = `${window.location.protocol}//${hostname.replace('cctv.', 'api-cctv.')}/health`;
+                        apiUrl = `${protocol}//${hostname.replace('cctv.', 'api-cctv.')}/health`;
                     }
                 } else {
+                    // HTTP with domain or development
                     const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
                     apiUrl = `${baseUrl.replace(/\/$/, '')}/health`;
                 }

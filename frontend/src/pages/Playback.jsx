@@ -216,7 +216,8 @@ function Playback() {
         setVideoError(null);
         setErrorType(null);
 
-        const streamUrl = `${import.meta.env.VITE_API_URL}/api/recordings/${selectedCamera.id}/stream/${selectedSegment.filename}`;
+        // Use getSegmentStreamUrl from recordingService (handles IP and domain)
+        const streamUrl = recordingService.getSegmentStreamUrl(selectedCamera.id, selectedSegment.filename);
         
         console.log('=== VIDEO PLAYER DEBUG ===');
         console.log('Selected Camera ID:', selectedCamera.id);

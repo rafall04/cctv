@@ -4,6 +4,35 @@ import apiClient from './apiClient';
  * Recording Service - Frontend API calls
  */
 
+/**
+ * Get base URL for API/backend
+ * Handles both domain and IP-based access
+ */
+const getApiBaseUrl = () => {
+    if (typeof window !== 'undefined') {
+        const hostname = window.location.hostname;
+        const protocol = window.location.protocol;
+        
+        // If accessing via IP address, use relative path (Nginx will proxy)
+        if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) {
+            return ''; // Empty string = relative path
+        }
+        
+        // If HTTPS with domain, use HTTPS API domain
+        if (protocol === 'https:' && hostname === 'cctv.raf.my.id') {
+            return 'https://api-cctv.raf.my.id';
+        }
+        
+        // HTTP with domain
+        if (hostname === 'cctv.raf.my.id') {
+            return 'http://api-cctv.raf.my.id';
+        }
+    }
+    
+    // Fallback for development
+    return import.meta.env.VITE_API_URL || 'http://localhost:3000';
+};
+
 // ============================================
 // ADMIN - Recording Control
 // ============================================
@@ -77,7 +106,7 @@ export const getSegments = async (cameraId) => {
  * Get stream URL untuk segment
  */
 export const getSegmentStreamUrl = (cameraId, filename) => {
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const baseUrl = getApiBaseUrl();
     return `${baseUrl}/api/recordings/${cameraId}/stream/${filename}`;
 };
 
@@ -85,7 +114,7 @@ export const getSegmentStreamUrl = (cameraId, filename) => {
  * Get HLS playlist URL untuk seamless playback
  */
 export const getPlaylistUrl = (cameraId) => {
-    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const baseUrl = getApiBaseUrl();
     return `${baseUrl}/api/recordings/${cameraId}/playlist.m3u8`;
 };
 

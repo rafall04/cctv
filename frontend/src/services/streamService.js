@@ -5,15 +5,27 @@ import apiClient from './apiClient';
  * Used for HLS proxy which routes through backend for session tracking
  */
 const getApiBaseUrl = () => {
-    // In production (HTTPS), always use HTTPS with the API domain
-    if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+    if (typeof window !== 'undefined') {
         const hostname = window.location.hostname;
-        if (hostname === 'cctv.raf.my.id') {
+        const protocol = window.location.protocol;
+        
+        // If accessing via IP address, use relative path (Nginx will proxy)
+        if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) {
+            return ''; // Empty string = relative path, Nginx proxies /api and /hls to backend
+        }
+        
+        // If HTTPS with domain, use HTTPS API domain
+        if (protocol === 'https:' && hostname === 'cctv.raf.my.id') {
             return 'https://api-cctv.raf.my.id';
         }
-        // Fallback: construct from current hostname
-        return `https://${hostname.replace('cctv.', 'api-cctv.')}`;
+        
+        // HTTP with domain (development or custom setup)
+        if (hostname === 'cctv.raf.my.id') {
+            return 'http://api-cctv.raf.my.id';
+        }
     }
+    
+    // Fallback for development
     return import.meta.env.VITE_API_URL || 'http://localhost:3000';
 };
 
