@@ -70,6 +70,7 @@ function Playback() {
     };
     const [seekWarning, setSeekWarning] = useState(null); // Warning toast for long seeks
     const [seekProgress, setSeekProgress] = useState(null); // Progress info for seeking
+    const [autoPlayNotification, setAutoPlayNotification] = useState(null); // Notification for auto-play next segment
     
     const videoRef = useRef(null);
     const timelineRef = useRef(null);
@@ -120,6 +121,7 @@ function Playback() {
         setIsBuffering(false);
         setSeekWarning(null); // Clear warning juga
         setSeekProgress(null); // Clear progress info
+        setAutoPlayNotification(null); // Clear auto-play notification
         lastSeekTimeRef.current = 0; // Reset last seek position
         if (bufferingTimeoutRef.current) {
             clearTimeout(bufferingTimeoutRef.current);
@@ -163,6 +165,7 @@ function Playback() {
             setIsBuffering(false);
             setSeekWarning(null);
             setSeekProgress(null);
+            setAutoPlayNotification(null); // Clear auto-play notification
             lastSeekTimeRef.current = 0;
             if (bufferingTimeoutRef.current) {
                 clearTimeout(bufferingTimeoutRef.current);
@@ -382,6 +385,89 @@ function Playback() {
         const handleTimeUpdate = () => setCurrentTime(video.currentTime);
         const handleLoadedMetadata = () => setDuration(video.duration);
         
+        // CRITICAL: Auto-play next segment when current video ends
+        const handleEnded = () => {
+            console.log('[Video] Ended - looking for next segment');
+            
+            if (!selectedSegment || segments.length === 0) {
+                console.log('[Video] No segment selected or no segments available');
+                return;
+            }
+            
+            // Find current segment index
+            // IMPORTANT: Segments are sorted DESC (newest first) in the array
+            const currentIndex = segments.findIndex(s => s.id === selectedSegment.id);
+            
+            if (currentIndex === -1) {
+                console.log('[Video] Current segment not found in segments array');
+                return;
+            }
+            
+            // Next segment chronologically is at currentIndex - 1 (because DESC order)
+            // Example: [segment3, segment2, segment1] - if playing segment2 (index 1), next is segment3 (index 0)
+            const nextSegment = segments[currentIndex - 1];
+            
+            if (nextSegment) {
+                // Check for gap between segments
+                const currentEnd = new Date(selectedSegment.end_time);
+                const nextStart = new Date(nextSegment.start_time);
+                const gapSeconds = (nextStart - currentEnd) / 1000;
+                
+                console.log('[Video] Next segment found:', {
+                    nextSegmentId: nextSegment.id,
+                    currentEnd: currentEnd.toISOString(),
+                    nextStart: nextStart.toISOString(),
+                    gapSeconds: gapSeconds
+                });
+                
+                // Show gap warning if gap > 30 seconds
+                if (gapSeconds > 30) {
+                    const gapMinutes = Math.round(gapSeconds / 60);
+                    console.log(`[Video] Gap detected: ${gapMinutes} minutes missing`);
+                    
+                    // Show notification about gap
+                    setAutoPlayNotification({
+                        type: 'gap',
+                        message: `Melewati ${gapMinutes} menit rekaman yang hilang`
+                    });
+                } else {
+                    // Show normal auto-play notification
+                    setAutoPlayNotification({
+                        type: 'next',
+                        message: 'Memutar segment berikutnya...'
+                    });
+                }
+                
+                // Auto-hide notification after 3 seconds
+                setTimeout(() => {
+                    setAutoPlayNotification(null);
+                }, 3000);
+                
+                // Auto-play next segment
+                console.log('[Video] Auto-playing next segment:', nextSegment.id);
+                setSelectedSegment(nextSegment);
+                
+                // Clear any existing warnings/errors for smooth transition
+                setVideoError(null);
+                setErrorType(null);
+                setSeekWarning(null);
+                setSeekProgress(null);
+            } else {
+                console.log('[Video] No more segments - playback complete');
+                
+                // Show completion notification
+                setAutoPlayNotification({
+                    type: 'complete',
+                    message: 'Playback selesai - tidak ada segment lagi'
+                });
+                
+                // Auto-hide after 5 seconds
+                setTimeout(() => {
+                    setAutoPlayNotification(null);
+                }, 5000);
+            }
+        };
+        
         // CRITICAL: Intercept seeking with smart limiter
         const handleSeeking = () => {
             const targetTime = video.currentTime;
@@ -535,6 +621,7 @@ function Playback() {
 
         video.addEventListener('timeupdate', handleTimeUpdate);
         video.addEventListener('loadedmetadata', handleLoadedMetadata);
+        video.addEventListener('ended', handleEnded); // CRITICAL: Auto-play next segment
         video.addEventListener('seeking', handleSeeking);
         video.addEventListener('seeked', handleSeeked);
         video.addEventListener('waiting', handleWaiting);
@@ -546,6 +633,7 @@ function Playback() {
         return () => {
             video.removeEventListener('timeupdate', handleTimeUpdate);
             video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            video.removeEventListener('ended', handleEnded); // CRITICAL: Cleanup
             video.removeEventListener('seeking', handleSeeking);
             video.removeEventListener('seeked', handleSeeked);
             video.removeEventListener('waiting', handleWaiting);
@@ -560,7 +648,7 @@ function Playback() {
                 bufferingTimeoutRef.current = null;
             }
         };
-    }, [selectedSegment]); // CRITICAL: Remove seekWarning from deps - it causes video reload!
+    }, [selectedSegment, segments]); // CRITICAL: Add segments to deps for handleEnded to access latest segments
 
     // CRITICAL: Smart Seek Handler with 3-minute limit
     const handleSmartSeek = (targetTime) => {
@@ -623,6 +711,7 @@ function Playback() {
         // Clear states saat ganti segment
         setSeekWarning(null);
         setSeekProgress(null);
+        setAutoPlayNotification(null); // Clear auto-play notification
         setIsSeeking(false);
         setIsBuffering(false);
         lastSeekTimeRef.current = 0;
@@ -781,6 +870,47 @@ function Playback() {
 
                 {/* Video Player */}
                 <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl overflow-hidden shadow-lg">
+                    {/* Auto-Play Notification - OUTSIDE video container to avoid being covered */}
+                    {autoPlayNotification && (
+                        <div className="relative z-50 p-3 sm:p-4">
+                            <div className={`px-4 sm:px-5 py-3 rounded-xl shadow-2xl border-2 ${
+                                autoPlayNotification.type === 'complete' 
+                                    ? 'bg-green-500 border-green-400'
+                                    : autoPlayNotification.type === 'gap'
+                                    ? 'bg-yellow-500 border-yellow-400'
+                                    : 'bg-blue-500 border-blue-400'
+                            } text-white`}>
+                                <div className="flex items-start gap-3">
+                                    {autoPlayNotification.type === 'complete' ? (
+                                        <svg className="w-6 h-6 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                        </svg>
+                                    ) : autoPlayNotification.type === 'gap' ? (
+                                        <svg className="w-6 h-6 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                        </svg>
+                                    ) : (
+                                        <svg className="w-6 h-6 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                                        </svg>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-semibold text-sm sm:text-base">{autoPlayNotification.message}</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setAutoPlayNotification(null)}
+                                        className="flex-shrink-0 text-white hover:text-gray-200 transition-colors"
+                                        aria-label="Tutup"
+                                    >
+                                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
                     {/* Seek Warning Toast - OUTSIDE video container to avoid being covered */}
                     {seekWarning && (
                         <div className="relative z-50 p-3 sm:p-4">
