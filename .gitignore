@@ -9,12 +9,17 @@ pnpm-lock.yaml
 .env.local
 .env.production
 .env.development
+.env.*
+*.env
 
 # Database
 backend/data/*.db
 backend/data/*.db-journal
 backend/data/*.db-shm
 backend/data/*.db-wal
+*.sql
+*.sqlite
+*.sqlite3
 
 # Logs
 logs/
@@ -48,3 +53,35 @@ mediamtx/logs/
 tmp/
 temp/
 *.tmp
+
+# Backup files (SECURITY)
+*.bak
+*.backup
+*.old
+*.orig
+*.save
+
+# Config backups (SECURITY)
+config.php.bak
+config.js.bak
+config.json.bak
+*.config.bak
+
+# Git directory (SECURITY)
+.git/
+
+# Apache configs (SECURITY)
+.htaccess
+.htpasswd
+
+# SSH keys (SECURITY)
+*.pem
+*.key
+id_rsa
+id_rsa.pub
+
+# Certificates (SECURITY)
+*.crt
+*.cer
+*.p12
+*.pfx
