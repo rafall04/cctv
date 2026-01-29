@@ -72,7 +72,7 @@ export async function getActiveCameras(request, reply) {
 
         const cameras = query(
             `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel, 
-                    c.latitude, c.longitude, c.status, c.enable_recording, a.name as area_name 
+                    c.latitude, c.longitude, c.status, c.enable_recording, c.video_codec, a.name as area_name 
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 
              WHERE c.enabled = 1 
@@ -131,13 +131,22 @@ export async function getCameraById(request, reply) {
 // Create new camera (admin only)
 export async function createCamera(request, reply) {
     try {
-        const { name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, enable_recording, recording_duration_hours } = request.body;
+        const { name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, enable_recording, recording_duration_hours, video_codec } = request.body;
 
         // Validate required fields
         if (!name || !private_rtsp_url) {
             return reply.code(400).send({
                 success: false,
                 message: 'Name and RTSP URL are required',
+            });
+        }
+
+        // Validate video_codec enum
+        const codecValue = video_codec || 'h264';
+        if (!['h264', 'h265'].includes(codecValue)) {
+            return reply.code(400).send({
+                success: false,
+                message: 'Invalid video codec. Must be h264 or h265',
             });
         }
 
@@ -170,10 +179,10 @@ export async function createCamera(request, reply) {
         // Status: active, maintenance, offline
         const cameraStatus = status || 'active';
 
-        // Insert camera with stream_key and recording fields
+        // Insert camera with stream_key, recording fields, and video_codec
         const result = execute(
-            'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, recording_duration_hours) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [name, private_rtsp_url, description || null, location || null, group_name || null, finalAreaId, isEnabled, isTunnel, lat, lng, cameraStatus, streamKey, isRecordingEnabled, recordingDuration]
+            'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, recording_duration_hours, video_codec) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [name, private_rtsp_url, description || null, location || null, group_name || null, finalAreaId, isEnabled, isTunnel, lat, lng, cameraStatus, streamKey, isRecordingEnabled, recordingDuration, codecValue]
         );
 
         // Log action
@@ -238,7 +247,7 @@ export async function createCamera(request, reply) {
 export async function updateCamera(request, reply) {
     try {
         const { id } = request.params;
-        const { name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, enable_recording, recording_duration_hours } = request.body;
+        const { name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, enable_recording, recording_duration_hours, video_codec } = request.body;
 
         // Check if camera exists (include stream_key and enable_recording)
         const existingCamera = queryOne('SELECT id, name, private_rtsp_url, enabled, stream_key, enable_recording FROM cameras WHERE id = ?', [id]);
@@ -321,6 +330,17 @@ export async function updateCamera(request, reply) {
             updates.push('recording_duration_hours = ?');
             const durationValue = recording_duration_hours === '' || recording_duration_hours === null ? null : parseInt(recording_duration_hours, 10);
             values.push(Number.isNaN(durationValue) ? null : durationValue);
+        }
+        if (video_codec !== undefined) {
+            // Validate enum
+            if (!['h264', 'h265'].includes(video_codec)) {
+                return reply.code(400).send({
+                    success: false,
+                    message: 'Invalid video codec. Must be h264 or h265',
+                });
+            }
+            updates.push('video_codec = ?');
+            values.push(video_codec);
         }
 
         if (updates.length === 0) {

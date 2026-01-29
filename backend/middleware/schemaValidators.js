@@ -66,6 +66,11 @@ export const createCameraSchema = {
                 maxLength: 500,
                 pattern: '^rtsp://.+$'
             },
+            video_codec: {
+                type: 'string',
+                enum: ['h264', 'h265'],
+                default: 'h264'
+            },
             description: {
                 anyOf: [{ type: 'string', maxLength: 500 }, { type: 'null' }]
             },
@@ -134,6 +139,10 @@ export const updateCameraSchema = {
                 minLength: 1,
                 maxLength: 500,
                 pattern: '^rtsp://.+$'
+            },
+            video_codec: {
+                type: 'string',
+                enum: ['h264', 'h265']
             },
             description: {
                 anyOf: [{ type: 'string', maxLength: 500 }, { type: 'null' }]
