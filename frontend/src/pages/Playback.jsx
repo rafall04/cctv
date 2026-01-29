@@ -832,6 +832,10 @@ function Playback() {
                                     <span className="flex-shrink-0 mt-0.5">•</span>
                                     <span><strong>Segment:</strong> Pilih segment di bawah untuk melihat recording pada waktu berbeda</span>
                                 </li>
+                                <li className="flex items-start gap-2">
+                                    <span className="flex-shrink-0 mt-0.5">•</span>
+                                    <span><strong>Stuck Loading:</strong> Jika loading lebih dari 10 detik, coba skip video perlahan 30 detik - 1 menit untuk mengatasi stuck</span>
+                                </li>
                             </ul>
                         </div>
                     </div>
