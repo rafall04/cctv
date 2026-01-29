@@ -735,7 +735,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                             {/* Top bar with camera name and exit */}
                             <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/80 to-transparent pointer-events-auto">
                                 <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-3 flex-wrap">
                                         <h2 className="text-white font-bold text-lg">{camera.name}</h2>
                                         {camera.video_codec && (
                                             <CodecBadge codec={camera.video_codec} size="sm" showWarning={true} />
@@ -760,6 +760,19 @@ const VideoModal = memo(({ camera, onClose }) => {
                                         </button>
                                     </div>
                                 </div>
+                                {/* Codec info detail - fullscreen mode */}
+                                {camera.video_codec && (
+                                    <div className="mt-2 flex items-center gap-2 text-xs">
+                                        <span className="text-gray-300">
+                                            Codec: <strong className="text-white">{camera.video_codec.toUpperCase()}</strong>
+                                        </span>
+                                        {camera.video_codec === 'h265' && (
+                                            <span className="text-yellow-400 text-[10px]">
+                                                ⚠ Terbaik di Safari
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                             
                             {/* Bottom controls - Zoom only */}
