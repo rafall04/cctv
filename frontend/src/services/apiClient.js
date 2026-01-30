@@ -169,11 +169,8 @@ apiClient.interceptors.request.use(
             config.headers['X-API-Key'] = API_KEY;
         }
         
-        // Add JWT token if available
-        const token = localStorage.getItem('token');
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-        }
+        // JWT tokens are in HttpOnly cookies - automatically sent by browser
+        // No need to manually attach Authorization header
         
         // Add CSRF token for state-changing requests
         if (isStateChangingMethod(config.method)) {
@@ -232,8 +229,6 @@ apiClient.interceptors.response.use(
             // Check if this is a token refresh failure
             if (originalRequest.url?.includes('/api/auth/refresh')) {
                 // Refresh failed, clear auth and redirect
-                localStorage.removeItem('token');
-                localStorage.removeItem('refreshToken');
                 localStorage.removeItem('user');
                 clearCsrfToken();
                 
@@ -246,29 +241,19 @@ apiClient.interceptors.response.use(
                 return Promise.reject(error);
             }
             
-            // Try to refresh token if we have a refresh token
-            const refreshToken = localStorage.getItem('refreshToken');
-            if (refreshToken && !originalRequest._retry) {
+            // Try to refresh token automatically (refresh token in HttpOnly cookie)
+            if (!originalRequest._retry) {
                 originalRequest._retry = true;
                 
                 try {
-                    const response = await apiClient.post('/api/auth/refresh', {
-                        refreshToken: refreshToken
-                    });
+                    const response = await apiClient.post('/api/auth/refresh');
                     
                     if (response.data.success) {
-                        const { accessToken, refreshToken: newRefreshToken } = response.data.data;
-                        localStorage.setItem('token', accessToken);
-                        localStorage.setItem('refreshToken', newRefreshToken);
-                        
-                        // Retry original request with new token
-                        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+                        // Tokens refreshed in cookies, retry original request
                         return apiClient(originalRequest);
                     }
                 } catch (refreshError) {
                     // Refresh failed, clear auth
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('refreshToken');
                     localStorage.removeItem('user');
                     clearCsrfToken();
                     
@@ -282,9 +267,7 @@ apiClient.interceptors.response.use(
                 }
             }
             
-            // No refresh token or retry failed
-            localStorage.removeItem('token');
-            localStorage.removeItem('refreshToken');
+            // No retry or retry failed
             localStorage.removeItem('user');
             clearCsrfToken();
             

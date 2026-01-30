@@ -29,13 +29,9 @@ export const authService = {
             });
 
             if (response.data.success) {
-                const { accessToken, refreshToken, user } = response.data.data;
+                const { user } = response.data.data;
                 
-                // Store tokens
-                localStorage.setItem('token', accessToken);
-                if (refreshToken) {
-                    localStorage.setItem('refreshToken', refreshToken);
-                }
+                // Store only user info (tokens are in HttpOnly cookies)
                 localStorage.setItem('user', JSON.stringify(user));
                 
                 return { 
@@ -106,44 +102,28 @@ export const authService = {
         } catch (error) {
             console.error('Logout error:', error);
         } finally {
-            // Always clear local storage and CSRF token
-            localStorage.removeItem('token');
-            localStorage.removeItem('refreshToken');
+            // Clear user data and CSRF token (cookies cleared by backend)
             localStorage.removeItem('user');
             clearCsrfToken();
         }
     },
 
     /**
-     * Refresh access token using refresh token
-     * @returns {Promise<Object>} Result with new tokens or error
+     * Refresh access token using refresh token from HttpOnly cookie
+     * @returns {Promise<Object>} Result with success status
      */
     async refreshTokens() {
-        const refreshToken = localStorage.getItem('refreshToken');
-        
-        if (!refreshToken) {
-            return { success: false, message: 'No refresh token available' };
-        }
-
         try {
-            const response = await apiClient.post('/api/auth/refresh', {
-                refreshToken: refreshToken
-            });
+            const response = await apiClient.post('/api/auth/refresh');
 
             if (response.data.success) {
-                const { accessToken, refreshToken: newRefreshToken } = response.data.data;
-                
-                localStorage.setItem('token', accessToken);
-                localStorage.setItem('refreshToken', newRefreshToken);
-                
+                // Tokens are in HttpOnly cookies, no need to store
                 return { success: true };
             }
 
             return { success: false, message: response.data.message };
         } catch (error) {
-            // Clear tokens on refresh failure
-            localStorage.removeItem('token');
-            localStorage.removeItem('refreshToken');
+            // Clear user data on refresh failure (cookies cleared by backend)
             localStorage.removeItem('user');
             clearCsrfToken();
             
@@ -177,35 +157,38 @@ export const authService = {
     },
 
     /**
-     * Check if user is authenticated (has token)
+     * Check if user is authenticated
+     * Since tokens are in HttpOnly cookies, we check if user data exists
      * @returns {boolean}
      */
     isAuthenticated() {
-        return !!localStorage.getItem('token');
+        return !!localStorage.getItem('user');
     },
 
     /**
-     * Check if user has refresh token
+     * Check if user has refresh token (always true if authenticated with cookies)
      * @returns {boolean}
      */
     hasRefreshToken() {
-        return !!localStorage.getItem('refreshToken');
+        return this.isAuthenticated();
     },
 
     /**
-     * Get stored access token
-     * @returns {string|null}
+     * Get stored access token (not available - in HttpOnly cookie)
+     * @deprecated Tokens are in HttpOnly cookies, not accessible from JavaScript
+     * @returns {null}
      */
     getAccessToken() {
-        return localStorage.getItem('token');
+        return null; // Tokens in HttpOnly cookies
     },
 
     /**
-     * Get stored refresh token
-     * @returns {string|null}
+     * Get stored refresh token (not available - in HttpOnly cookie)
+     * @deprecated Tokens are in HttpOnly cookies, not accessible from JavaScript
+     * @returns {null}
      */
     getRefreshToken() {
-        return localStorage.getItem('refreshToken');
+        return null; // Tokens in HttpOnly cookies
     }
 };
 
