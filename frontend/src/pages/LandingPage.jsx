@@ -592,7 +592,7 @@ const ZoomableVideo = memo(function ZoomableVideo({ videoRef, maxZoom = 4, onZoo
         >
             <video 
                 ref={videoRef}
-                className={`w-full h-full pointer-events-none ${isFullscreen ? 'object-contain' : 'object-cover'}`}
+                className="w-full h-full pointer-events-none object-contain"
                 muted
                 playsInline 
                 autoPlay 
