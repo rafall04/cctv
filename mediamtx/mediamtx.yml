@@ -15,8 +15,9 @@ hlsAlwaysRemux: yes
 hlsAllowOrigin: '*'
 # Segment duration: 2s (sweet spot for stability + reasonable latency)
 hlsSegmentDuration: 2s
-# Segment count: 7 (default, provides good buffer)
-hlsSegmentCount: 7
+# Segment count: 15 (extended buffer for network resilience)
+# History: 15 segments × 2s = 30s (prevents 404 during client network dropouts)
+hlsSegmentCount: 15
 # RAM Disk storage for instant access
 hlsDirectory: /dev/shm/mediamtx-live
 # NOTE: hlsPartDuration REMOVED - No LL-HLS (reduces CPU load)
