@@ -363,6 +363,14 @@ function Playback() {
         video.addEventListener('suspend', handleSuspend);
         video.addEventListener('abort', handleAbort);
 
+        // CRITICAL: Apply playback speed after video loads
+        const handleLoadedMetadataForSpeed = () => {
+            console.log('[Speed] Applying playback speed:', playbackSpeed);
+            video.playbackRate = playbackSpeed;
+        };
+        
+        video.addEventListener('loadedmetadata', handleLoadedMetadataForSpeed);
+        
         // Try to play after a short delay
         const playTimeout = setTimeout(() => {
             if (video.readyState >= 2) { // HAVE_CURRENT_DATA or better
@@ -390,6 +398,7 @@ function Playback() {
             clearTimeout(playTimeout);
             video.removeEventListener('loadstart', handleLoadStart);
             video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            video.removeEventListener('loadedmetadata', handleLoadedMetadataForSpeed); // Cleanup speed listener
             video.removeEventListener('loadeddata', handleLoadedData);
             video.removeEventListener('canplay', handleCanPlay);
             video.removeEventListener('canplaythrough', handleCanPlayThrough);
@@ -403,7 +412,7 @@ function Playback() {
             video.removeAttribute('src');
             video.load();
         };
-    }, [selectedSegment, selectedCamera]); // CRITICAL: Don't add segments to dependency - causes reload every 10s
+    }, [selectedSegment, selectedCamera, playbackSpeed]); // CRITICAL: Add playbackSpeed to deps to re-apply when changed
 
     // Update current time and handle seeking
     useEffect(() => {
@@ -755,11 +764,9 @@ function Playback() {
     const handleSegmentClick = (segment) => {
         setSelectedSegment(segment);
         
-        // FIX: Reset playback speed ke normal (1x) saat ganti segment
-        setPlaybackSpeed(1);
-        if (videoRef.current) {
-            videoRef.current.playbackRate = 1;
-        }
+        // REMOVED: Tidak perlu reset speed di sini
+        // Speed akan di-apply otomatis oleh useEffect saat video load
+        // Biarkan user mempertahankan speed preference mereka
         
         // Clear states saat ganti segment
         setSeekWarning(null);
