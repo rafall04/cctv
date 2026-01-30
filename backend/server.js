@@ -185,9 +185,17 @@ await fastify.register(jwt, {
 // ============================================
 // Whitelisted from rate limiting and API key validation
 fastify.get('/health', async (request, reply) => {
+    const now = new Date();
+    
+    // Convert to WIB (UTC+7)
+    const wibOffset = 7 * 60; // 7 hours in minutes
+    const wibTime = new Date(now.getTime() + wibOffset * 60 * 1000);
+    
     return { 
         status: 'ok', 
-        timestamp: new Date().toISOString(),
+        timestamp: now.toISOString(),
+        timestampWIB: wibTime.toISOString().replace('Z', '+07:00'),
+        timezone: 'Asia/Jakarta (WIB, UTC+7)',
         security: {
             rateLimiting: true,
             apiKeyValidation: config.security?.apiKeyValidationEnabled !== false,
