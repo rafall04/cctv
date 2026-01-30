@@ -1,5 +1,6 @@
 import { query, queryOne } from '../database/database.js';
 import { config } from '../config/config.js';
+import jwt from 'jsonwebtoken';
 
 const buildStreamUrls = (streamKey) => {
     const hlsBase = (config.mediamtx.hlsUrl || '/hls').replace(/\/$/, '');
@@ -94,6 +95,57 @@ export async function getAllActiveStreams(request, reply) {
         });
     } catch (error) {
         console.error('Get all active streams error:', error);
+        return reply.code(500).send({
+            success: false,
+            message: 'Internal server error',
+        });
+    }
+}
+
+/**
+ * Generate stream access token for secure HLS/WebRTC access
+ * Token includes camera ID and stream key, expires in 1 hour
+ */
+export async function generateStreamToken(request, reply) {
+    try {
+        const { cameraId } = request.params;
+
+        const camera = queryOne(
+            'SELECT id, stream_key, enabled FROM cameras WHERE id = ?',
+            [cameraId]
+        );
+
+        if (!camera || !camera.enabled) {
+            return reply.code(404).send({
+                success: false,
+                message: 'Camera not found or disabled',
+            });
+        }
+
+        const streamPath = camera.stream_key || `camera${camera.id}`;
+
+        // Generate token valid for 1 hour
+        const token = jwt.sign(
+            {
+                cameraId: camera.id,
+                streamKey: streamPath,
+                type: 'stream_access',
+                iat: Math.floor(Date.now() / 1000),
+            },
+            config.jwt.secret,
+            { expiresIn: '1h' }
+        );
+
+        return reply.send({
+            success: true,
+            data: {
+                token,
+                streamUrl: buildStreamUrls(streamPath).hls,
+                expiresIn: 3600, // 1 hour in seconds
+            },
+        });
+    } catch (error) {
+        console.error('Generate stream token error:', error);
         return reply.code(500).send({
             success: false,
             message: 'Internal server error',

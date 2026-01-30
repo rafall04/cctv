@@ -1,4 +1,4 @@
-import { getStreamUrls, getAllActiveStreams } from '../controllers/streamController.js';
+import { getStreamUrls, getAllActiveStreams, generateStreamToken } from '../controllers/streamController.js';
 import { streamCameraIdParamSchema } from '../middleware/schemaValidators.js';
 
 export default async function streamRoutes(fastify, options) {
@@ -12,4 +12,11 @@ export default async function streamRoutes(fastify, options) {
 
     // Get all active cameras with stream URLs
     fastify.get('/', getAllActiveStreams);
+
+    // Generate secure stream access token
+    // Returns token that must be included in HLS URL query parameter
+    fastify.get('/:cameraId/token', {
+        schema: streamCameraIdParamSchema,
+        handler: generateStreamToken,
+    });
 }

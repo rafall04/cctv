@@ -339,16 +339,68 @@ const start = async () => {
 // ============================================
 const shutdown = async () => {
     console.log('\n[Server] Shutting down gracefully...');
-    mediaMtxService.stopAutoSync();
-    streamWarmer.stopAll();
-    cameraHealthService.stop();
-    viewerSessionService.stopCleanup();
-    stopDailyCleanup();
-    await fastify.close();
-    process.exit(0);
+    
+    try {
+        // Stop all background services
+        console.log('[Shutdown] Stopping background services...');
+        mediaMtxService.stopAutoSync();
+        streamWarmer.stopAll();
+        cameraHealthService.stop();
+        viewerSessionService.stopCleanup();
+        stopDailyCleanup();
+        
+        // Cleanup MediaMTX paths to prevent zombie connections
+        console.log('[Shutdown] Cleaning up MediaMTX paths...');
+        try {
+            const warmedStreams = streamWarmer.getWarmedStreams();
+            for (const pathName of warmedStreams) {
+                await mediaMtxService.deletePath(pathName).catch(err => {
+                    console.warn(`[Shutdown] Failed to delete path ${pathName}:`, err.message);
+                });
+            }
+            console.log(`[Shutdown] Cleaned up ${warmedStreams.length} MediaMTX paths`);
+        } catch (error) {
+            console.error('[Shutdown] MediaMTX cleanup error:', error.message);
+        }
+        
+        // Close all active viewer sessions
+        console.log('[Shutdown] Closing active viewer sessions...');
+        try {
+            const activeSessions = viewerSessionService.getActiveSessions();
+            for (const session of activeSessions) {
+                viewerSessionService.stopSession(session.id);
+            }
+            console.log(`[Shutdown] Closed ${activeSessions.length} viewer sessions`);
+        } catch (error) {
+            console.error('[Shutdown] Session cleanup error:', error.message);
+        }
+        
+        // Close Fastify server
+        console.log('[Shutdown] Closing HTTP server...');
+        await fastify.close();
+        
+        console.log('[Shutdown] ✅ Graceful shutdown completed');
+        process.exit(0);
+    } catch (error) {
+        console.error('[Shutdown] ❌ Error during shutdown:', error);
+        process.exit(1);
+    }
 };
 
+// Handle multiple shutdown signals
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
+process.on('SIGHUP', shutdown);
+
+// Handle uncaught errors
+process.on('uncaughtException', (error) => {
+    console.error('[Fatal] Uncaught exception:', error);
+    shutdown();
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('[Fatal] Unhandled rejection at:', promise, 'reason:', reason);
+    shutdown();
+});
 
 start();
