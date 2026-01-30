@@ -694,7 +694,7 @@ function Playback() {
                 bufferingTimeoutRef.current = null;
             }
         };
-    }, [selectedSegment, segments, autoPlayEnabled]); // CRITICAL: Add autoPlayEnabled to deps for handleEnded to check latest value
+    }, [selectedSegment, autoPlayEnabled]); // FIX: Hapus 'segments' dari deps - menyebabkan re-register event listener yang rusak autoplay
 
     // CRITICAL: Smart Seek Handler with 3-minute limit
     const handleSmartSeek = (targetTime) => {
@@ -754,6 +754,13 @@ function Playback() {
     // Handle segment click
     const handleSegmentClick = (segment) => {
         setSelectedSegment(segment);
+        
+        // FIX: Reset playback speed ke normal (1x) saat ganti segment
+        setPlaybackSpeed(1);
+        if (videoRef.current) {
+            videoRef.current.playbackRate = 1;
+        }
+        
         // Clear states saat ganti segment
         setSeekWarning(null);
         setSeekProgress(null);
