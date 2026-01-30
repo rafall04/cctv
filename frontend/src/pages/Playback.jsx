@@ -412,7 +412,17 @@ function Playback() {
             video.removeAttribute('src');
             video.load();
         };
-    }, [selectedSegment, selectedCamera, playbackSpeed]); // CRITICAL: Add playbackSpeed to deps to re-apply when changed
+    }, [selectedSegment, selectedCamera]); // CRITICAL: Don't add playbackSpeed - causes video reload!
+
+    // CRITICAL: Separate useEffect for playback speed changes (without reloading video)
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+        
+        // Apply speed change immediately without reloading video
+        console.log('[Speed] Applying speed change:', playbackSpeed);
+        video.playbackRate = playbackSpeed;
+    }, [playbackSpeed]); // Only depend on playbackSpeed
 
     // Update current time and handle seeking
     useEffect(() => {
