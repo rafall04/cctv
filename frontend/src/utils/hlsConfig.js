@@ -2,92 +2,92 @@
  * HLS Configuration Module
  * Provides device-adaptive HLS.js configurations based on device tier
  * 
- * RAM MODE OPTIMIZED - Tuned for instant playback from RAM disk
- * - Reduced buffer lengths for faster startup
- * - liveSyncDurationCount: 2 (minimal latency)
- * - Aggressive timeouts for quick failure detection
+ * STANDARD HLS MODE - Prioritizing 100% Stability over <2s Latency
+ * - liveSyncDurationCount: 3 (safe buffer, prevents stuttering)
+ * - Standard buffer lengths for smooth playback
+ * - Balanced timeouts for reliability
  * 
  * **Validates: Requirements 1.2, 1.3, 1.4, 1.5**
  */
 
 /**
  * HLS configuration presets for each device tier
- * RAM MODE: Optimized for instant playback from /dev/shm
+ * STANDARD HLS MODE: Prioritizing stability and smooth playback
  */
 const HLS_CONFIGS = {
     low: {
         // Worker disabled for CPU savings on low-end devices
         enableWorker: false,
-        // Stability over latency
+        // STANDARD HLS: Stability over latency
         lowLatencyMode: false,
-        // MINIMAL buffers for instant startup from RAM
-        backBufferLength: 5,
-        maxBufferLength: 8,
-        maxMaxBufferLength: 15,
-        // 25MB max buffer size
-        maxBufferSize: 25 * 1000 * 1000,
+        // SAFE buffers for smooth playback
+        backBufferLength: 10,
+        maxBufferLength: 15,
+        maxMaxBufferLength: 30,
+        // 30MB max buffer size
+        maxBufferSize: 30 * 1000 * 1000,
         maxBufferHole: 0.5,
         // AUTO quality - let HLS.js decide
         startLevel: -1,
-        // INSTANT STARTUP: Minimal sync duration
-        liveSyncDurationCount: 2,
-        liveMaxLatencyDurationCount: 3,
-        // Shorter timeout for faster failure detection
+        // STABLE PLAYBACK: 3 segments buffer (prevents stuttering)
+        liveSyncDurationCount: 3,
+        liveMaxLatencyDurationCount: 5,
+        // Balanced timeouts for reliability
         fragLoadingTimeOut: 10000,
-        fragLoadingMaxRetry: 2,
-        fragLoadingRetryDelay: 800,
-        levelLoadingTimeOut: 8000,
-        levelLoadingMaxRetry: 2,
-        levelLoadingRetryDelay: 800,
-        manifestLoadingTimeOut: 8000,
-        manifestLoadingMaxRetry: 2,
-        manifestLoadingRetryDelay: 800,
+        fragLoadingMaxRetry: 3,
+        fragLoadingRetryDelay: 1000,
+        levelLoadingTimeOut: 10000,
+        levelLoadingMaxRetry: 3,
+        levelLoadingRetryDelay: 1000,
+        manifestLoadingTimeOut: 10000,
+        manifestLoadingMaxRetry: 3,
+        manifestLoadingRetryDelay: 1000,
     },
     medium: {
         enableWorker: true,
         lowLatencyMode: false,
-        // REDUCED buffers for faster startup
-        backBufferLength: 8,
-        maxBufferLength: 10,
-        maxMaxBufferLength: 20,
-        maxBufferSize: 40 * 1000 * 1000,
+        // BALANCED buffers for smooth playback
+        backBufferLength: 20,
+        maxBufferLength: 25,
+        maxMaxBufferLength: 45,
+        maxBufferSize: 45 * 1000 * 1000,
         maxBufferHole: 0.5,
         startLevel: -1,
-        // INSTANT STARTUP
-        liveSyncDurationCount: 2,
-        liveMaxLatencyDurationCount: 3,
-        fragLoadingTimeOut: 8000,
-        fragLoadingMaxRetry: 3,
-        fragLoadingRetryDelay: 600,
-        levelLoadingTimeOut: 6000,
-        levelLoadingMaxRetry: 2,
-        levelLoadingRetryDelay: 600,
-        manifestLoadingTimeOut: 6000,
-        manifestLoadingMaxRetry: 2,
-        manifestLoadingRetryDelay: 600,
+        // STABLE PLAYBACK: 3 segments buffer
+        liveSyncDurationCount: 3,
+        liveMaxLatencyDurationCount: 5,
+        fragLoadingTimeOut: 10000,
+        fragLoadingMaxRetry: 4,
+        fragLoadingRetryDelay: 1000,
+        levelLoadingTimeOut: 10000,
+        levelLoadingMaxRetry: 3,
+        levelLoadingRetryDelay: 1000,
+        manifestLoadingTimeOut: 10000,
+        manifestLoadingMaxRetry: 3,
+        manifestLoadingRetryDelay: 1000,
     },
     high: {
         enableWorker: true,
         lowLatencyMode: false,
-        // OPTIMIZED buffers for RAM disk
-        backBufferLength: 10,
-        maxBufferLength: 12,
-        maxMaxBufferLength: 25,
-        maxBufferSize: 50 * 1000 * 1000,
+        // OPTIMAL buffers for smooth playback
+        backBufferLength: 30,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
+        maxBufferSize: 60 * 1000 * 1000,
         maxBufferHole: 0.5,
         startLevel: -1,
-        // INSTANT STARTUP
-        liveSyncDurationCount: 2,
-        liveMaxLatencyDurationCount: 3,
-        fragLoadingTimeOut: 6000,
-        fragLoadingMaxRetry: 3,
-        fragLoadingRetryDelay: 500,
-        levelLoadingTimeOut: 5000,
-        levelLoadingMaxRetry: 2,
-        levelLoadingRetryDelay: 500,
-        manifestLoadingTimeOut: 5000,
-        manifestLoadingMaxRetry: 2,
-        manifestLoadingRetryDelay: 500,
+        // STABLE PLAYBACK: 3 segments buffer
+        liveSyncDurationCount: 3,
+        liveMaxLatencyDurationCount: 5,
+        fragLoadingTimeOut: 10000,
+        fragLoadingMaxRetry: 5,
+        fragLoadingRetryDelay: 1000,
+        levelLoadingTimeOut: 10000,
+        levelLoadingMaxRetry: 3,
+        levelLoadingRetryDelay: 1000,
+        manifestLoadingTimeOut: 10000,
+        manifestLoadingMaxRetry: 3,
+        manifestLoadingRetryDelay: 1000,
     },
 };
 
@@ -100,35 +100,35 @@ const MOBILE_OVERRIDES = {
 };
 
 /**
- * Mobile phone config - RAM MODE optimized
+ * Mobile phone config - STANDARD HLS optimized
  */
 const MOBILE_PHONE_CONFIG = {
-    maxBufferLength: 8,
-    maxMaxBufferLength: 15,
-    maxBufferSize: 20 * 1000 * 1000,
+    maxBufferLength: 15,
+    maxMaxBufferLength: 30,
+    maxBufferSize: 25 * 1000 * 1000,
     startLevel: -1,
-    liveSyncDurationCount: 2,
-    liveMaxLatencyDurationCount: 3,
+    liveSyncDurationCount: 3,
+    liveMaxLatencyDurationCount: 5,
     fragLoadingTimeOut: 10000,
-    fragLoadingRetryDelay: 800,
-    levelLoadingTimeOut: 8000,
-    manifestLoadingTimeOut: 8000,
+    fragLoadingRetryDelay: 1000,
+    levelLoadingTimeOut: 10000,
+    manifestLoadingTimeOut: 10000,
 };
 
 /**
- * Mobile tablet config - RAM MODE optimized
+ * Mobile tablet config - STANDARD HLS optimized
  */
 const MOBILE_TABLET_CONFIG = {
-    maxBufferLength: 10,
-    maxMaxBufferLength: 20,
-    maxBufferSize: 30 * 1000 * 1000,
+    maxBufferLength: 20,
+    maxMaxBufferLength: 40,
+    maxBufferSize: 35 * 1000 * 1000,
     startLevel: -1,
-    liveSyncDurationCount: 2,
-    liveMaxLatencyDurationCount: 3,
-    fragLoadingTimeOut: 8000,
-    fragLoadingRetryDelay: 600,
-    levelLoadingTimeOut: 6000,
-    manifestLoadingTimeOut: 6000,
+    liveSyncDurationCount: 3,
+    liveMaxLatencyDurationCount: 5,
+    fragLoadingTimeOut: 10000,
+    fragLoadingRetryDelay: 1000,
+    levelLoadingTimeOut: 10000,
+    manifestLoadingTimeOut: 10000,
 };
 
 /**

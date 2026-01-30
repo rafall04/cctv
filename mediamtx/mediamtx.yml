@@ -8,11 +8,18 @@ logDestinations: [stdout]
 api: yes
 apiAddress: :9997
 
-# HLS settings
+# HLS settings - STANDARD MODE (Stability Priority)
 hls: yes
 hlsAddress: :8888
 hlsAlwaysRemux: yes
 hlsAllowOrigin: '*'
+# Segment duration: 2s (sweet spot for stability + reasonable latency)
+hlsSegmentDuration: 2s
+# Segment count: 7 (default, provides good buffer)
+hlsSegmentCount: 7
+# RAM Disk storage for instant access
+hlsDirectory: /dev/shm/mediamtx-live
+# NOTE: hlsPartDuration REMOVED - No LL-HLS (reduces CPU load)
 
 # WebRTC settings
 webrtc: yes
