@@ -1,4 +1,7 @@
 # MediaMTX Configuration for RAF NET CCTV Production
+# ===================================================
+# RAM MODE: HLS segments written to /dev/shm for zero disk I/O latency
+# Recording: Handled separately by recordingService.js (writes to disk)
 
 # Logging
 logLevel: info
@@ -8,11 +11,26 @@ logDestinations: [stdout]
 api: yes
 apiAddress: :9997
 
-# HLS settings
+# HLS settings - OPTIMIZED FOR RAM DISK
 hls: yes
 hlsAddress: :8888
 hlsAlwaysRemux: yes
 hlsAllowOrigin: '*'
+
+# CRITICAL: Write HLS segments to RAM disk (/dev/shm)
+# This eliminates disk I/O bottleneck for live streaming
+hlsDirectory: /dev/shm/mediamtx-live
+
+# Segment settings - 2s segments for stability
+hlsSegmentDuration: 2s
+hlsSegmentCount: 5
+
+# Playlist settings
+hlsPartDuration: 1s
+hlsSegmentMaxSize: 50M
+
+# Write queue size - increased for better throughput
+writeQueueSize: 512
 
 # WebRTC settings
 webrtc: yes
