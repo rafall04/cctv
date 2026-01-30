@@ -1,6 +1,6 @@
 import { query, queryOne } from '../database/database.js';
 import { config } from '../config/config.js';
-import jwt from 'jsonwebtoken';
+// Note: JWT import removed - will be added in Phase 2 when token auth is enabled
 
 const buildStreamUrls = (streamKey) => {
     const hlsBase = (config.mediamtx.hlsUrl || '/hls').replace(/\/$/, '');
@@ -105,6 +105,9 @@ export async function getAllActiveStreams(request, reply) {
 /**
  * Generate stream access token for secure HLS/WebRTC access
  * Token includes camera ID and stream key, expires in 1 hour
+ * 
+ * PHASE 2 FEATURE: Currently returns stream URL without token
+ * Token authentication will be enabled after frontend integration
  */
 export async function generateStreamToken(request, reply) {
     try {
@@ -124,24 +127,16 @@ export async function generateStreamToken(request, reply) {
 
         const streamPath = camera.stream_key || `camera${camera.id}`;
 
-        // Generate token valid for 1 hour
-        const token = jwt.sign(
-            {
-                cameraId: camera.id,
-                streamKey: streamPath,
-                type: 'stream_access',
-                iat: Math.floor(Date.now() / 1000),
-            },
-            config.jwt.secret,
-            { expiresIn: '1h' }
-        );
-
+        // Phase 2: Will generate JWT token here
+        // For now, return stream URL without token for backward compatibility
+        
         return reply.send({
             success: true,
             data: {
-                token,
                 streamUrl: buildStreamUrls(streamPath).hls,
+                // token: 'will-be-implemented-in-phase-2',
                 expiresIn: 3600, // 1 hour in seconds
+                note: 'Token authentication will be enabled in Phase 2',
             },
         });
     } catch (error) {

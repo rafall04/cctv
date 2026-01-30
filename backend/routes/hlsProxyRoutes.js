@@ -7,11 +7,11 @@
  * 
  * Stream key format: UUID (e.g., 04bd5387-9db4-4cf0-9f8d-7fb42cc76263)
  * 
- * Security: Requires stream access token in query parameter or header
+ * Security: Stream token authentication temporarily disabled for compatibility
+ * Will be enabled in Phase 2 after frontend integration
  */
 
 import axios from 'axios';
-import jwt from 'jsonwebtoken';
 import { config } from '../config/config.js';
 import viewerSessionService from '../services/viewerSessionService.js';
 import { queryOne } from '../database/database.js';
@@ -127,49 +127,14 @@ function getOrCreateSession(ip, cameraId, request) {
 /**
  * Verify stream access token
  * Supports both query parameter (for HLS players) and header (for API calls)
+ * 
+ * TEMPORARILY DISABLED: Token validation will be enabled in Phase 2
+ * after frontend integration is complete
  */
 function verifyStreamToken(request, reply, done) {
-    // Get token from query parameter (HLS players) or header (API calls)
-    const token = request.query.token || request.headers['x-stream-token'];
-    
-    if (!token) {
-        return reply.code(403).send({ 
-            success: false,
-            error: 'Stream access denied',
-            message: 'Stream token required. Get token from /api/stream/:cameraId/token' 
-        });
-    }
-    
-    try {
-        const decoded = jwt.verify(token, config.jwt.secret);
-        
-        // Verify token type
-        if (decoded.type !== 'stream_access') {
-            return reply.code(403).send({ 
-                success: false,
-                error: 'Invalid token type',
-                message: 'Token must be a stream access token' 
-            });
-        }
-        
-        // Store decoded token in request for later validation
-        request.streamAuth = decoded;
-        done();
-    } catch (error) {
-        if (error.name === 'TokenExpiredError') {
-            return reply.code(403).send({ 
-                success: false,
-                error: 'Token expired',
-                message: 'Stream token has expired. Request a new token.' 
-            });
-        }
-        
-        return reply.code(403).send({ 
-            success: false,
-            error: 'Invalid token',
-            message: 'Stream token is invalid or malformed' 
-        });
-    }
+    // TODO: Enable token validation in Phase 2
+    // For now, allow all requests for backward compatibility
+    done();
 }
 
 export default async function hlsProxyRoutes(fastify, _options) {
@@ -180,31 +145,22 @@ export default async function hlsProxyRoutes(fastify, _options) {
      * Proxy ALL HLS requests to MediaMTX
      * Handles: index.m3u8, stream.m3u8, .ts, .mp4, .m4s files
      * 
-     * SECURITY: Requires valid stream token
+     * SECURITY: Token validation temporarily disabled for backward compatibility
      * NOTE: CORS headers are handled by Fastify CORS plugin in server.js
      * Do NOT add manual CORS headers here to avoid duplicate header issues
      */
-    fastify.get('/*', { preHandler: verifyStreamToken }, async (request, reply) => {
+    fastify.get('/*', async (request, reply) => {
         // Get the full path after /hls/
         const fullPath = request.params['*'];
         
         if (!fullPath) {
-            return reply.code(400).send('Invalid path - use /hls/{cameraPath}/index.m3u8?token=xxx');
+            return reply.code(400).send('Invalid path - use /hls/{cameraPath}/index.m3u8');
         }
         
         // Extract camera path (first segment)
         const pathParts = fullPath.split('/');
         const cameraPath = pathParts[0];
         const fileName = pathParts[pathParts.length - 1];
-        
-        // Verify stream key matches token
-        if (request.streamAuth.streamKey !== cameraPath) {
-            return reply.code(403).send({ 
-                success: false,
-                error: 'Token mismatch',
-                message: 'Stream token does not match requested camera' 
-            });
-        }
         
         // Extract camera ID for session tracking
         const cameraId = extractCameraId(cameraPath);
