@@ -23,7 +23,11 @@ hlsDirectory: /dev/shm/mediamtx-live
 
 # Segment settings - 2s segments for stability
 hlsSegmentDuration: 2s
-hlsSegmentCount: 5
+hlsSegmentCount: 7
+
+# CRITICAL: DO NOT use lowLatency variant (causes issues)
+# Use standard HLS for maximum compatibility
+# hlsVariant: lowLatency  # DISABLED - causes "requires at least 7 segments" error
 
 # Playlist settings
 hlsPartDuration: 1s
