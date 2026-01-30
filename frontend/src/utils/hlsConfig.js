@@ -2,8 +2,8 @@
  * HLS Configuration Module
  * Provides device-adaptive HLS.js configurations based on device tier
  * 
- * STANDARD HLS MODE - Prioritizing 100% Stability over <2s Latency
- * - liveSyncDurationCount: 3 (safe buffer, prevents stuttering)
+ * SYNCHRONIZED MULTI-CAMERA MODE - All cameras start at same live edge
+ * - liveSyncDurationCount: 1 (minimal latency, synchronized playback)
  * - Standard buffer lengths for smooth playback
  * - Balanced timeouts for reliability
  * 
@@ -29,9 +29,10 @@ const HLS_CONFIGS = {
         maxBufferHole: 0.5,
         // AUTO quality - let HLS.js decide
         startLevel: -1,
-        // STABLE PLAYBACK: 3 segments buffer (prevents stuttering)
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 5,
+        // SYNCHRONIZED PLAYBACK: 1 segment buffer (all cameras start at same position)
+        // Trade-off: Slightly less buffer, but cameras play in sync
+        liveSyncDurationCount: 1,
+        liveMaxLatencyDurationCount: 3,
         // Balanced timeouts for reliability
         fragLoadingTimeOut: 10000,
         fragLoadingMaxRetry: 3,
@@ -53,9 +54,9 @@ const HLS_CONFIGS = {
         maxBufferSize: 45 * 1000 * 1000,
         maxBufferHole: 0.5,
         startLevel: -1,
-        // STABLE PLAYBACK: 3 segments buffer
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 5,
+        // SYNCHRONIZED PLAYBACK: 1 segment buffer (all cameras start at same position)
+        liveSyncDurationCount: 1,
+        liveMaxLatencyDurationCount: 3,
         fragLoadingTimeOut: 10000,
         fragLoadingMaxRetry: 4,
         fragLoadingRetryDelay: 1000,
@@ -76,9 +77,9 @@ const HLS_CONFIGS = {
         maxBufferSize: 60 * 1000 * 1000,
         maxBufferHole: 0.5,
         startLevel: -1,
-        // STABLE PLAYBACK: 3 segments buffer
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 5,
+        // SYNCHRONIZED PLAYBACK: 1 segment buffer (all cameras start at same position)
+        liveSyncDurationCount: 1,
+        liveMaxLatencyDurationCount: 3,
         fragLoadingTimeOut: 10000,
         fragLoadingMaxRetry: 5,
         fragLoadingRetryDelay: 1000,
@@ -107,8 +108,8 @@ const MOBILE_PHONE_CONFIG = {
     maxMaxBufferLength: 30,
     maxBufferSize: 25 * 1000 * 1000,
     startLevel: -1,
-    liveSyncDurationCount: 3,
-    liveMaxLatencyDurationCount: 5,
+    liveSyncDurationCount: 1,
+    liveMaxLatencyDurationCount: 3,
     fragLoadingTimeOut: 10000,
     fragLoadingRetryDelay: 1000,
     levelLoadingTimeOut: 10000,
@@ -123,8 +124,8 @@ const MOBILE_TABLET_CONFIG = {
     maxMaxBufferLength: 40,
     maxBufferSize: 35 * 1000 * 1000,
     startLevel: -1,
-    liveSyncDurationCount: 3,
-    liveMaxLatencyDurationCount: 5,
+    liveSyncDurationCount: 1,
+    liveMaxLatencyDurationCount: 3,
     fragLoadingTimeOut: 10000,
     fragLoadingRetryDelay: 1000,
     levelLoadingTimeOut: 10000,
