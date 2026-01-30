@@ -127,11 +127,13 @@ function getOrCreateSession(ip, cameraId, request) {
 }
 
 /**
- * Verify stream access token
+ * Verify stream access token (OPTIONAL for public streams)
  * Supports both query parameter (for HLS players) and header (for API calls)
  * 
  * Token format: JWT with payload { cameraId, streamKey, type: 'stream_access' }
  * Valid for 1 hour
+ * 
+ * NOTE: Token is optional - viewer session tracking is used instead
  */
 function verifyStreamToken(request, reply, done) {
     // Extract token from query parameter or Authorization header
@@ -144,15 +146,13 @@ function verifyStreamToken(request, reply, done) {
         }
     }
     
-    // If no token provided, deny access
+    // If no token provided, allow access (public streams)
+    // Session tracking is handled separately
     if (!token) {
-        return reply.code(401).send({
-            success: false,
-            message: 'Stream access token required',
-        });
+        return done();
     }
     
-    // Verify JWT token
+    // If token provided, verify it
     try {
         const decoded = jwt.verify(token, config.jwt.secret);
         
