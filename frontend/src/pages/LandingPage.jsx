@@ -1399,30 +1399,30 @@ function VideoPopup({ camera, onClose }) {
                 </div>
 
                 {/* Controls Panel + Codec Description - hide in fullscreen */}
-                <div className={`shrink-0 border-t border-gray-800 ${isFullscreen ? 'hidden' : ''}`}>
+                <div className={`shrink-0 border-t border-gray-200 dark:border-gray-800 ${isFullscreen ? 'hidden' : ''}`}>
                     {/* Controls */}
                     <div className="p-3 flex items-center justify-between">
                         {/* Camera Description - Kiri Bawah */}
-                        <div className="text-xs text-gray-400 flex-1 min-w-0 mr-3">
+                        <div className="text-xs text-gray-600 dark:text-gray-400 flex-1 min-w-0 mr-3">
                             {camera.description ? (
                                 <span className="line-clamp-2">{camera.description}</span>
                             ) : (
-                                <span className="text-gray-500 italic">Tidak ada deskripsi</span>
+                                <span className="text-gray-500 dark:text-gray-500 italic">Tidak ada deskripsi</span>
                             )}
                         </div>
                         
                         {/* Zoom Controls */}
                         <div className="flex items-center gap-1 shrink-0">
-                            <div className="flex items-center gap-0.5 bg-gray-800 rounded-lg p-0.5">
-                                <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-1.5 hover:bg-gray-700 disabled:opacity-30 rounded text-white transition-colors" title="Zoom Out">
+                            <div className="flex items-center gap-0.5 bg-gray-200/90 dark:bg-gray-800 rounded-lg p-0.5">
+                                <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-1.5 hover:bg-gray-300/50 dark:hover:bg-gray-700 disabled:opacity-30 rounded text-gray-900 dark:text-white transition-colors" title="Zoom Out">
                                     <Icons.ZoomOut />
                                 </button>
-                                <span className="text-white text-[10px] font-medium w-8 text-center">{Math.round(zoom * 100)}%</span>
-                                <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 4} className="p-1.5 hover:bg-gray-700 disabled:opacity-30 rounded text-white transition-colors" title="Zoom In">
+                                <span className="text-gray-900 dark:text-white text-[10px] font-medium w-8 text-center">{Math.round(zoom * 100)}%</span>
+                                <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 4} className="p-1.5 hover:bg-gray-300/50 dark:hover:bg-gray-700 disabled:opacity-30 rounded text-gray-900 dark:text-white transition-colors" title="Zoom In">
                                     <Icons.ZoomIn />
                                 </button>
                                 {zoom > 1 && (
-                                    <button onClick={() => getZoomableWrapper()?._reset?.()} className="p-1.5 hover:bg-gray-700 rounded text-white transition-colors" title="Reset Zoom">
+                                    <button onClick={() => getZoomableWrapper()?._reset?.()} className="p-1.5 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-white transition-colors" title="Reset Zoom">
                                         <Icons.Reset />
                                     </button>
                                 )}
@@ -1430,18 +1430,18 @@ function VideoPopup({ camera, onClose }) {
                             
                             {/* Screenshot Button */}
                             {status === 'live' && (
-                                <button onClick={takeSnapshot} className="p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-white transition-colors" title="Ambil Screenshot">
+                                <button onClick={takeSnapshot} className="p-1.5 bg-gray-200/80 dark:bg-gray-800 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded-lg text-gray-900 dark:text-white transition-colors" title="Ambil Screenshot">
                                     <Icons.Image />
                                 </button>
                             )}
                             
                             {/* Fullscreen Button */}
-                            <button onClick={toggleFS} className="p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-white transition-colors" title={isFullscreen ? "Keluar Fullscreen" : "Fullscreen"}>
+                            <button onClick={toggleFS} className="p-1.5 bg-gray-200/80 dark:bg-gray-800 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded-lg text-gray-900 dark:text-white transition-colors" title={isFullscreen ? "Keluar Fullscreen" : "Fullscreen"}>
                                 <Icons.Fullscreen />
                             </button>
                             
                             {/* Close Button */}
-                            <button onClick={onClose} className="p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-white transition-colors" title="Tutup">
+                            <button onClick={onClose} className="p-1.5 bg-gray-200/80 dark:bg-gray-800 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded-lg text-gray-900 dark:text-white transition-colors" title="Tutup">
                                 <Icons.X />
                             </button>
                         </div>
