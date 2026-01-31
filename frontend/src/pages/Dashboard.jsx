@@ -837,7 +837,7 @@ export default function Dashboard() {
                     {/* Activity Log */}
                     <div>
                         <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Activity Log</h2>
-                    <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6">
+                        <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6">
                         <div className="space-y-6">
                             {stats?.recentLogs.length === 0 ? (
                                 /* No activity logs empty state - Requirements: 3.5 */
@@ -899,6 +899,7 @@ export default function Dashboard() {
                                 <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-500/10 px-2 py-0.5 rounded-lg">Online</span>
                             </div>
                         </div>
+                    </div>
                     </div>
                 </div>
             </div>
