@@ -454,7 +454,7 @@ export default function Dashboard() {
                     
                     {/* Quick Actions */}
                     <button
-                        onClick={() => navigate('/admin/cameras/add')}
+                        onClick={() => navigate('/admin/cameras')}
                         className="inline-flex items-center gap-2 px-4 py-2.5 bg-sky-500 hover:bg-sky-600 text-white font-medium rounded-xl shadow-sm hover:shadow-md transition-all"
                     >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
