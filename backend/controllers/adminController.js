@@ -136,6 +136,34 @@ export async function getDashboardStats(request, reply) {
             };
         });
 
+        // Camera status breakdown (online/offline/maintenance)
+        const cameraStatusBreakdown = {
+            online: 0,
+            offline: 0,
+            maintenance: 0
+        };
+        
+        allCameras.forEach(cam => {
+            const streamKey = cam.stream_key;
+            const hasStream = mtxStats.paths?.some(p => p.name === streamKey && (p.ready || p.sourceReady));
+            
+            if (hasStream) {
+                cameraStatusBreakdown.online++;
+            } else {
+                cameraStatusBreakdown.offline++;
+            }
+        });
+        
+        // Top 5 cameras by viewer count
+        const topCameras = allCameras
+            .map(cam => ({
+                id: cam.id,
+                name: cam.name,
+                viewers: viewersByCamera[cam.id] || 0
+            }))
+            .sort((a, b) => b.viewers - a.viewers)
+            .slice(0, 5);
+
         const recentLogs = query(`
             SELECT l.*, u.username 
             FROM audit_logs l
@@ -179,6 +207,9 @@ export async function getDashboardStats(request, reply) {
                 streams: activeStreams,
                 recentLogs: recentLogs,
                 mtxConnected: !mtxStats.error,
+                // Phase 1 additions
+                cameraStatusBreakdown: cameraStatusBreakdown,
+                topCameras: topCameras,
                 // Include all active sessions for "All Viewers" view
                 allSessions: activeSessions.map(s => ({
                     sessionId: s.session_id,

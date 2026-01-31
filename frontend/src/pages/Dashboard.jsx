@@ -5,6 +5,8 @@ import { Skeleton } from '../components/ui/Skeleton';
 import { EmptyState, NoStreamsEmptyState, NoActivityEmptyState } from '../components/ui/EmptyState';
 import { Alert } from '../components/ui/Alert';
 import { useNotification } from '../contexts/NotificationContext';
+import { CameraStatusOverview } from '../components/CameraStatusOverview';
+import { TopCamerasWidget } from '../components/TopCamerasWidget';
 
 /**
  * Viewer Sessions Modal - Shows list of viewers with IP addresses
@@ -440,7 +442,9 @@ export default function Dashboard() {
                         Monitoring {stats?.summary.totalCameras} cameras across {stats?.summary.totalAreas} areas
                     </p>
                 </div>
-                <div className="flex items-center gap-3">
+                
+                {/* Quick Actions Panel - Phase 1 */}
+                <div className="flex flex-wrap items-center gap-3">
                     {/* Last Update Time */}
                     {lastSuccessfulUpdate && (
                         <div className="px-4 py-2.5 bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700/50 rounded-xl shadow-sm">
@@ -448,10 +452,45 @@ export default function Dashboard() {
                             <p className="text-sm font-bold text-gray-900 dark:text-white">{formatLastUpdate(lastSuccessfulUpdate)}</p>
                         </div>
                     )}
+                    
+                    {/* Quick Actions */}
+                    <button
+                        onClick={() => navigate('/admin/cameras/add')}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-sky-500 hover:bg-sky-600 text-white font-medium rounded-xl shadow-sm hover:shadow-md transition-all"
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                        </svg>
+                        <span className="hidden sm:inline">Tambah Kamera</span>
+                        <span className="sm:hidden">Tambah</span>
+                    </button>
+                    
+                    <button
+                        onClick={() => navigate('/admin/analytics')}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all"
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        <span className="hidden sm:inline">Analytics</span>
+                    </button>
+                    
+                    <button
+                        onClick={() => loadStats(false)}
+                        disabled={isRetrying}
+                        className="inline-flex items-center justify-center w-10 h-10 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all disabled:opacity-50"
+                        title="Refresh Dashboard"
+                    >
+                        <svg className={`w-4 h-4 ${isRetrying ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                    </button>
+                    
                     <div className="px-4 py-2.5 bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700/50 rounded-xl shadow-sm">
                         <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase">Uptime</p>
                         <p className="text-sm font-bold text-gray-900 dark:text-white">{formatUptime(stats?.system.uptime)}</p>
                     </div>
+                    
                     {/* Connection Status Indicator - Requirements: 3.6 */}
                     <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border shadow-sm ${
                         stats?.mtxConnected 
@@ -549,6 +588,25 @@ export default function Dashboard() {
                     </div>
                     <p className="text-xs text-gray-400 dark:text-gray-500 mt-2 truncate" title={stats?.system.cpuModel}>{stats?.system.cpuModel || 'Unknown'}</p>
                 </div>
+            </div>
+
+            {/* Phase 1: Camera Status Overview & Top Cameras */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <CameraStatusOverview 
+                    breakdown={stats?.cameraStatusBreakdown}
+                    totalCameras={stats?.summary.totalCameras || 0}
+                />
+                <TopCamerasWidget 
+                    cameras={stats?.topCameras || []}
+                    onCameraClick={(camera) => {
+                        // Find camera sessions
+                        const cameraSessions = stats?.allSessions?.filter(s => s.cameraId === camera.id) || [];
+                        setViewerModal({
+                            title: `Viewer - ${camera.name}`,
+                            sessions: cameraSessions
+                        });
+                    }}
+                />
             </div>
 
             {/* Content Grid */}
