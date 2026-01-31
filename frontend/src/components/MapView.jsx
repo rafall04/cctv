@@ -595,12 +595,12 @@ const VideoModal = memo(({ camera, onClose }) => {
     return (
         <div 
             ref={outerWrapperRef}
-            className={`fixed inset-0 z-[2000] bg-black ${isFullscreen ? '' : 'flex items-center justify-center p-2 sm:p-4 bg-black/90'}`}
+            className={`fixed inset-0 z-[2000] ${isFullscreen ? 'bg-black dark:bg-black' : 'flex items-center justify-center p-2 sm:p-4 bg-black/90 dark:bg-black/90'}`}
             onClick={onClose}
         >
             <div 
                 ref={modalRef}
-                className={`bg-gray-900 overflow-hidden shadow-2xl border border-gray-800 ${isFullscreen ? 'w-full h-full' : 'rounded-xl w-full max-w-4xl'}`}
+                className={`bg-white dark:bg-gray-900 overflow-hidden shadow-2xl border border-gray-200 dark:border-gray-800 ${isFullscreen ? 'w-full h-full' : 'rounded-xl w-full max-w-4xl'}`}
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header Info - di atas video (hide in fullscreen) */}
@@ -653,7 +653,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                 
                 {/* Video Container - optimized dengan pointer events, no aspect-video constraint untuk support 4:3 */}
                 <div 
-                    className={`relative bg-black overflow-hidden ${isFullscreen ? 'w-full h-full' : 'w-full'}`}
+                    className={`relative bg-gray-100 dark:bg-black overflow-hidden ${isFullscreen ? 'w-full h-full' : 'w-full'}`}
                     style={{ 
                         touchAction: 'none',
                         aspectRatio: isFullscreen ? 'auto' : 'auto'
@@ -726,7 +726,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                     )}
                     
                     {status === 'offline' && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gray-900/80 z-10">
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gray-100/95 dark:bg-gray-900/80 z-10">
                             <div className="w-20 h-20 rounded-full bg-gray-700 flex items-center justify-center">
                                 <svg className="w-10 h-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M6 18L18 6"/>
@@ -800,7 +800,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                             </div>
                             
                             {/* Bottom controls - Zoom only */}
-                            <div className="absolute bottom-4 right-4 z-50 flex items-center gap-1 bg-black/80 rounded-xl p-1 pointer-events-auto">
+                            <div className="absolute bottom-4 right-4 z-50 flex items-center gap-1 bg-gray-900/80 dark:bg-black/80 rounded-xl p-1 pointer-events-auto">
                                 <button
                                     onClick={handleZoomOut}
                                     disabled={zoomDisplay <= MIN_ZOOM}
@@ -836,7 +836,7 @@ const VideoModal = memo(({ camera, onClose }) => {
 
                     {/* Zoom hint */}
                     {zoomDisplay > 1 && (
-                        <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-xs rounded-lg z-20">
+                        <div className="absolute bottom-2 left-2 px-2 py-1 bg-gray-900/60 dark:bg-black/60 text-white text-xs rounded-lg z-20">
                             Geser untuk pan
                         </div>
                     )}

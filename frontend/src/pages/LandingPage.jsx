@@ -1201,12 +1201,12 @@ function VideoPopup({ camera, onClose }) {
     const disableAnimations = shouldDisableAnimations();
 
     return (
-        <div ref={outerWrapperRef} className={`fixed inset-0 z-[9999] bg-black ${isFullscreen ? '' : 'flex items-center justify-center bg-black/95 p-2 sm:p-4'}`} onClick={onClose}>
-            <div ref={modalRef} className={`relative bg-gray-900 overflow-hidden shadow-2xl flex flex-col ${isFullscreen ? 'w-full h-full' : 'w-full max-w-5xl rounded-2xl border border-gray-800'}`} style={isFullscreen ? {} : { maxHeight: 'calc(100vh - 16px)' }} onClick={(e) => e.stopPropagation()}>
+        <div ref={outerWrapperRef} className={`fixed inset-0 z-[9999] ${isFullscreen ? 'bg-black dark:bg-black' : 'flex items-center justify-center bg-black/95 dark:bg-black/95 p-2 sm:p-4'}`} onClick={onClose}>
+            <div ref={modalRef} className={`relative bg-white dark:bg-gray-900 overflow-hidden shadow-2xl flex flex-col ${isFullscreen ? 'w-full h-full' : 'w-full max-w-5xl rounded-2xl border border-gray-200 dark:border-gray-800'}`} style={isFullscreen ? {} : { maxHeight: 'calc(100vh - 16px)' }} onClick={(e) => e.stopPropagation()}>
                 
                 {/* Header Info - di atas video (hide in fullscreen) */}
                 {!isFullscreen && (
-                    <div className="p-3 border-b border-gray-800">
+                    <div className="p-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
                         <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                                 <h3 className="text-white font-bold text-sm sm:text-base truncate">{camera.name}</h3>
@@ -1250,7 +1250,7 @@ function VideoPopup({ camera, onClose }) {
                 )}
 
                 {/* Video - expand to full screen in fullscreen mode */}
-                <div ref={wrapperRef} className={`relative bg-black overflow-hidden ${isFullscreen ? 'flex-1' : 'flex-1 min-h-0'}`} onDoubleClick={toggleFS}>
+                <div ref={wrapperRef} className={`relative bg-gray-100 dark:bg-black overflow-hidden ${isFullscreen ? 'flex-1' : 'flex-1 min-h-0'}`} onDoubleClick={toggleFS}>
                     <ZoomableVideo videoRef={videoRef} maxZoom={4} onZoomChange={setZoom} isFullscreen={isFullscreen} />
                     
                     {/* Floating controls for fullscreen mode - Always visible on mobile */}
@@ -1293,7 +1293,7 @@ function VideoPopup({ camera, onClose }) {
                                 )}
                             </div>
                             
-                            <div className="absolute bottom-4 right-4 z-50 flex items-center gap-1 bg-black/80 rounded-xl p-1 pointer-events-auto">
+                            <div className="absolute bottom-4 right-4 z-50 flex items-center gap-1 bg-gray-900/80 dark:bg-black/80 rounded-xl p-1 pointer-events-auto">
                                 <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-2 hover:bg-white/20 active:bg-white/30 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomOut /></button>
                                 <span className="text-white text-xs font-medium w-12 text-center">{Math.round(zoom * 100)}%</span>
                                 <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 4} className="p-2 hover:bg-white/20 active:bg-white/30 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomIn /></button>
@@ -1317,7 +1317,7 @@ function VideoPopup({ camera, onClose }) {
                     
                     {/* Offline Overlay */}
                     {status === 'offline' && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/90">
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100/95 dark:bg-gray-900/90">
                             <div className="w-20 h-20 rounded-full bg-gray-700 flex items-center justify-center mb-4">
                                 <svg className="w-10 h-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M6 18L18 6"/>
@@ -1341,7 +1341,7 @@ function VideoPopup({ camera, onClose }) {
                     
                     {/* Timeout Error Overlay - **Validates: Requirements 1.2, 1.4** */}
                     {status === 'timeout' && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90">
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100/95 dark:bg-black/90">
                             <div className="text-center p-6">
                                 <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-500/20 flex items-center justify-center">
                                     <Icons.Clock />
@@ -1371,7 +1371,7 @@ function VideoPopup({ camera, onClose }) {
                     
                     {/* Error Overlay */}
                     {status === 'error' && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90">
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100/95 dark:bg-black/90">
                             <div className="text-center p-6">
                                 {(() => {
                                     const info = getErrorInfo();
@@ -2002,7 +2002,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
     const disableAnimations = shouldDisableAnimations();
 
     return (
-        <div ref={containerRef} className={`relative w-full h-full bg-black rounded-xl overflow-hidden group ${isFullscreen ? 'rounded-none' : ''}`}>
+        <div ref={containerRef} className={`relative w-full h-full bg-gray-100 dark:bg-black rounded-xl overflow-hidden group ${isFullscreen ? 'rounded-none' : ''}`}>
             <div ref={wrapperRef} className="w-full h-full">
                 <ZoomableVideo videoRef={videoRef} status={status} maxZoom={3} onZoomChange={setZoom} isFullscreen={isFullscreen} />
             </div>
@@ -2051,7 +2051,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                     </div>
                     
                     {/* Bottom controls - Always visible on mobile */}
-                    <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-black/80 rounded-xl p-1 pointer-events-auto">
+                    <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-gray-900/80 dark:bg-black/80 rounded-xl p-1 pointer-events-auto">
                         <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-2 hover:bg-white/20 active:bg-white/30 disabled:opacity-30 rounded text-white"><Icons.ZoomOut /></button>
                         <span className="text-white text-xs w-12 text-center">{Math.round(zoom * 100)}%</span>
                         <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 3} className="p-2 hover:bg-white/20 active:bg-white/30 disabled:opacity-30 rounded text-white"><Icons.ZoomIn /></button>
@@ -2078,7 +2078,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             
             {/* Timeout Overlay */}
             {status === 'timeout' && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90">
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100/95 dark:bg-black/90">
                     <div className="text-center p-4">
                         <div className="w-10 h-10 mx-auto mb-2 rounded-full bg-amber-500/20 flex items-center justify-center">
                             <Icons.Clock />
@@ -2098,7 +2098,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             
             {/* Error Overlay */}
             {status === 'error' && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90">
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100/95 dark:bg-black/90">
                     <div className="text-center p-4">
                         <div className="w-10 h-10 mx-auto mb-2 rounded-full bg-red-500/20 flex items-center justify-center">
                             <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -2135,7 +2135,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             
             {/* Offline Overlay */}
             {status === 'offline' && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/95">
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100/95 dark:bg-gray-900/95">
                     <div className="text-center p-4">
                         <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-700 flex items-center justify-center">
                             <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -2203,8 +2203,8 @@ function MultiViewLayout({ cameras, onRemove, onClose }) {
     const getInitDelay = (index) => index * DEFAULT_STAGGER_DELAY;
 
     return (
-        <div className="fixed inset-0 z-50 bg-gray-950 flex flex-col">
-            <div className="shrink-0 flex items-center justify-between p-3 bg-gray-900 border-b border-white/10">
+        <div className="fixed inset-0 z-50 bg-gray-50 dark:bg-gray-950 flex flex-col">
+            <div className="shrink-0 flex items-center justify-between p-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10">
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-sky-500/20 flex items-center justify-center text-sky-400"><Icons.Layout /></div>
                     <div>
@@ -3241,7 +3241,7 @@ function StatsBar({ cameras, areas, onCameraClick }) {
         };
         
         return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={onClose}>
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 dark:bg-black/80" onClick={onClose}>
                 <div 
                     className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md max-h-[70vh] overflow-hidden"
                     onClick={e => e.stopPropagation()}
