@@ -8,7 +8,7 @@ import { createTransformThrottle } from '../utils/rafThrottle';
 import { detectDeviceTier, getMaxConcurrentStreams, isMobileDevice, getMobileDeviceType } from '../utils/deviceDetector';
 import { getHLSConfig } from '../utils/hlsConfig';
 import { DEFAULT_STAGGER_DELAY } from '../utils/multiViewManager';
-import { preloadHls } from '../utils/preloadManager';
+import Hls from 'hls.js';
 import { testMediaMTXConnection } from '../utils/connectionTester';
 import { createLoadingTimeoutHandler } from '../utils/loadingTimeoutHandler';
 import { LoadingStage, getStageMessage, createStreamError } from '../utils/streamLoaderTypes';
@@ -44,11 +44,7 @@ const getDeviceAdaptiveHLSConfig = () => {
     });
 };
 
-// Lazy load HLS.js - uses PreloadManager for caching
-// **Validates: Requirements 2.2, 2.3**
-const loadHls = async () => {
-    return preloadHls();
-};
+
 
 
 // ============================================
@@ -937,17 +933,16 @@ function VideoPopup({ camera, onClose }) {
         video.addEventListener('playing', handlePlaying);
         video.addEventListener('error', handleError);
 
-        // Lazy load HLS.js using PreloadManager - **Validates: Requirements 2.3**
-        loadHls().then(async Hls => {
-            if (cancelled) return;
-            
-            // Update loading stage - **Validates: Requirements 4.2**
-            setLoadingStage(LoadingStage.LOADING);
-            if (loadingTimeoutHandlerRef.current) {
-                loadingTimeoutHandlerRef.current.updateStage(LoadingStage.LOADING);
-            }
-            
-            if (Hls.isSupported()) {
+        // Direct HLS.js usage - no lazy loading needed
+        if (cancelled) return;
+        
+        // Update loading stage - **Validates: Requirements 4.2**
+        setLoadingStage(LoadingStage.LOADING);
+        if (loadingTimeoutHandlerRef.current) {
+            loadingTimeoutHandlerRef.current.updateStage(LoadingStage.LOADING);
+        }
+        
+        if (Hls.isSupported()) {
                 // Use device-adaptive HLS configuration
                 const hlsConfig = getDeviceAdaptiveHLSConfig();
                 hls = new Hls(hlsConfig);
@@ -956,9 +951,12 @@ function VideoPopup({ camera, onClose }) {
                 // Load source first, then attach media with small delay
                 // This helps prevent media errors on some browsers
                 hls.loadSource(url);
-                await new Promise(r => setTimeout(r, 50));
-                if (cancelled) return;
-                hls.attachMedia(video);
+                setTimeout(() => {
+                    if (!cancelled && hlsRef.current) {
+                        hls.attachMedia(video);
+                        startPlaybackCheck();
+                    }
+                }, 50);
                 
                 // Start playback check early - don't wait for events that may not fire
                 startPlaybackCheck();
@@ -1088,7 +1086,6 @@ function VideoPopup({ camera, onClose }) {
                 video.src = url;
                 video.addEventListener('loadedmetadata', () => video.play().catch(() => {}));
             }
-        });
 
         return () => {
             cancelled = true;
@@ -1730,8 +1727,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 loadingTimeoutHandlerRef.current.startTimeout(LoadingStage.CONNECTING);
             }
 
-            // Lazy load HLS.js using PreloadManager - **Validates: Requirements 2.3**
-            const Hls = await loadHls();
+            // HLS.js already imported directly
             
             if (cancelled) return;
 
@@ -3483,10 +3479,7 @@ export default function LandingPage() {
 
     // Preload HLS.js immediately on mount - **Validates: Requirements 2.1, 5.5**
     useEffect(() => {
-        // Start preloading HLS.js in background immediately
-        preloadHls().catch((err) => {
-            console.warn('HLS.js preload failed:', err);
-        });
+        // HLS.js now directly imported, no preload needed
     }, []);
 
     // Check MediaMTX server connectivity - **Validates: Requirements 3.1, 3.2, 3.5**
