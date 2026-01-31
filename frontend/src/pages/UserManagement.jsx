@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { userService } from '../services/userService';
 import { authService } from '../services/authService';
 import { useNotification } from '../contexts/NotificationContext';
-import { SkeletonTable } from '../components/ui/Skeleton';
+import { TableSkeleton } from '../components/ui/Skeleton';
 import { EmptyState, NoUsersEmptyState } from '../components/ui/EmptyState';
 import { Alert } from '../components/ui/Alert';
 
@@ -397,7 +397,7 @@ export default function UserManagement() {
 
             {/* Content */}
             {loading ? (
-                <SkeletonTable rows={5} columns={4} />
+                <TableSkeleton rows={5} columns={4} />
             ) : loadError ? (
                 <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-8">
                     <Alert 
