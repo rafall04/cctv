@@ -7,6 +7,7 @@ import { TrendBadge } from '../components/TrendIndicator';
 import { RetentionMetrics } from '../components/RetentionMetrics';
 import { CameraPerformanceTable } from '../components/CameraPerformanceTable';
 import { ActivityHeatmap, HeatmapDetailModal } from '../components/ActivityHeatmap';
+import { RealtimeActivityChart } from '../components/RealtimeChart';
 
 /**
  * Format duration in seconds to human readable format
@@ -761,6 +762,9 @@ export default function ViewerAnalytics() {
                     color="amber"
                 />
             </div>
+
+            {/* Real-time Activity Chart */}
+            <RealtimeActivityChart />
 
             {/* Active Viewers Section */}
             {activeSessions && activeSessions.length > 0 && (
