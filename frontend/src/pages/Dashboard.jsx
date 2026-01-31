@@ -261,7 +261,7 @@ export default function Dashboard() {
     const navigate = useNavigate();
     const { warning } = useNotification();
 
-    const loadStats = useCallback(async (isAutoRefresh = false) => {
+    const loadStats = useCallback(async (isAutoRefresh = false, period = 'today') => {
         try {
             if (!isAutoRefresh) {
                 setIsRetrying(true);
@@ -294,14 +294,20 @@ export default function Dashboard() {
     }, [stats]);
 
     useEffect(() => {
-        loadStats(false);
-        intervalRef.current = setInterval(() => loadStats(true), 10000);
+        loadStats(false, dateRange);
+        intervalRef.current = setInterval(() => loadStats(true, dateRange), 10000);
         return () => {
             if (intervalRef.current) {
                 clearInterval(intervalRef.current);
             }
         };
-    }, []);
+    }, [dateRange]); // Re-fetch when date range changes
+
+    const handleDateRangeChange = (range, customDates) => {
+        setDateRange(range);
+        setLoading(true);
+        loadStats(false, range);
+    };
 
     const handleRetry = () => {
         setError(null);
@@ -469,131 +475,45 @@ export default function Dashboard() {
                     </button>
                 </div>
 
-                {/* System Info & Quick Actions Row */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {/* System Info Cards */}
-                    <div className="flex flex-wrap gap-3">
-                        {/* MediaMTX Status */}
-                        <div className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border shadow-sm flex-1 min-w-[160px] ${
-                            stats?.mtxConnected 
-                                ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30' 
-                                : 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30'
-                        }`}>
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                                stats?.mtxConnected 
-                                    ? 'bg-emerald-100 dark:bg-emerald-500/20' 
-                                    : 'bg-red-100 dark:bg-red-500/20'
-                            }`}>
-                                <span className="relative flex h-3 w-3">
-                                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${stats?.mtxConnected ? 'bg-emerald-400' : 'bg-red-400'}`}></span>
-                                    <span className={`relative inline-flex rounded-full h-3 w-3 ${stats?.mtxConnected ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
-                                </span>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider mb-0.5 text-gray-500 dark:text-gray-400">
-                                    MediaMTX
-                                </p>
-                                <p className={`text-sm font-bold ${
-                                    stats?.mtxConnected 
-                                        ? 'text-emerald-600 dark:text-emerald-400' 
-                                        : 'text-red-600 dark:text-red-400'
-                                }`}>
-                                    {stats?.mtxConnected ? 'Online' : 'Offline'}
-                                </p>
-                            </div>
-                        </div>
+                {/* Quick Actions Only */}
+                <div className="flex flex-wrap items-center gap-3">
+                    <button
+                        onClick={() => navigate('/admin/cameras')}
+                        className="inline-flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-sky-500/25 hover:shadow-xl hover:shadow-sky-500/30 transition-all"
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                        </svg>
+                        <span>Tambah Kamera</span>
+                    </button>
+                    
+                    <button
+                        onClick={() => navigate('/admin/analytics')}
+                        className="inline-flex items-center gap-2 px-5 py-3 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all"
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        <span>Analytics</span>
+                    </button>
 
-                        {/* System Uptime */}
-                        <div className="flex items-center gap-2.5 px-4 py-3 bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700/50 rounded-xl shadow-sm flex-1 min-w-[140px]">
-                            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-500/20 rounded-lg flex items-center justify-center">
-                                <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-0.5">
-                                    Uptime
-                                </p>
-                                <p className="text-sm font-bold text-gray-900 dark:text-white truncate">
-                                    {formatUptime(stats?.system.uptime)}
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* System Health - CPU & Memory */}
-                        <div className="flex items-center gap-2.5 px-4 py-3 bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700/50 rounded-xl shadow-sm flex-1 min-w-[160px]">
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                                cpuLoad > 80 || memPercent > 90 
-                                    ? 'bg-red-100 dark:bg-red-500/20' 
-                                    : cpuLoad > 60 || memPercent > 75 
-                                    ? 'bg-amber-100 dark:bg-amber-500/20' 
-                                    : 'bg-emerald-100 dark:bg-emerald-500/20'
-                            }`}>
-                                <svg className={`w-5 h-5 ${
-                                    cpuLoad > 80 || memPercent > 90 
-                                        ? 'text-red-500' 
-                                        : cpuLoad > 60 || memPercent > 75 
-                                        ? 'text-amber-500' 
-                                        : 'text-emerald-500'
-                                }`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-                                </svg>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-0.5">
-                                    System
-                                </p>
-                                <p className="text-xs font-bold text-gray-900 dark:text-white">
-                                    CPU {cpuLoad.toFixed(0)}% • RAM {memPercent}%
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Quick Actions */}
-                    <div className="flex flex-wrap items-center gap-3 lg:justify-end">
-                        <button
-                            onClick={() => navigate('/admin/cameras')}
-                            className="inline-flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-sky-500/25 hover:shadow-xl hover:shadow-sky-500/30 transition-all"
-                        >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                            </svg>
-                            <span>Tambah Kamera</span>
-                        </button>
-                        
-                        <button
-                            onClick={() => navigate('/admin/analytics')}
-                            className="inline-flex items-center gap-2 px-5 py-3 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all"
-                        >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                            </svg>
-                            <span>Analytics</span>
-                        </button>
-
-                        <button
-                            onClick={() => navigate('/admin/settings')}
-                            className="inline-flex items-center gap-2 px-5 py-3 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all"
-                        >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                            <span>Settings</span>
-                        </button>
-                    </div>
+                    <button
+                        onClick={() => navigate('/admin/settings')}
+                        className="inline-flex items-center gap-2 px-5 py-3 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all"
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span>Settings</span>
+                    </button>
                 </div>
             </div>
 
             {/* Date Range Selector */}
             <DateRangeSelector 
                 value={dateRange} 
-                onChange={(range, customDates) => {
-                    setDateRange(range);
-                    // TODO: Implement filtering based on date range
-                    console.log('Date range changed:', range, customDates);
-                }} 
+                onChange={handleDateRangeChange}
             />
 
             {/* Quick Stats Mini Cards - Phase 2 */}
