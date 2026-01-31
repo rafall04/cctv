@@ -429,23 +429,22 @@ class ViewerSessionService {
                 avgSessionDuration: calculateTrend(overview.avg_session_duration, previousOverview.avg_session_duration)
             } : null;
 
-            // Retention metrics: New vs Returning visitors
+            // Retention metrics: New vs Returning visitors (OPTIMIZED)
+            // Menggunakan LEFT JOIN dan GROUP BY untuk performa lebih baik
             const retentionMetrics = queryOne(`
                 SELECT 
-                    COUNT(DISTINCT CASE WHEN visit_count = 1 THEN ip_address END) as new_visitors,
-                    COUNT(DISTINCT CASE WHEN visit_count > 1 THEN ip_address END) as returning_visitors,
-                    COUNT(DISTINCT CASE WHEN duration_seconds < 10 THEN ip_address END) as bounced_visitors,
-                    COUNT(DISTINCT ip_address) as total_unique_visitors
-                FROM (
-                    SELECT 
-                        ip_address,
-                        duration_seconds,
-                        (SELECT COUNT(*) FROM viewer_session_history h2 
-                         WHERE h2.ip_address = h1.ip_address 
-                         AND date(h2.started_at) <= date(h1.started_at)) as visit_count
-                    FROM viewer_session_history h1
-                    WHERE 1=1 ${dateFilter}
-                )
+                    COUNT(DISTINCT CASE WHEN visit_count = 1 THEN h1.ip_address END) as new_visitors,
+                    COUNT(DISTINCT CASE WHEN visit_count > 1 THEN h1.ip_address END) as returning_visitors,
+                    COUNT(DISTINCT CASE WHEN h1.duration_seconds < 10 THEN h1.ip_address END) as bounced_visitors,
+                    COUNT(DISTINCT h1.ip_address) as total_unique_visitors
+                FROM viewer_session_history h1
+                LEFT JOIN (
+                    SELECT ip_address, COUNT(*) as visit_count
+                    FROM viewer_session_history
+                    WHERE date(started_at) <= date('${todayDate}')
+                    GROUP BY ip_address
+                ) h2 ON h1.ip_address = h2.ip_address
+                WHERE 1=1 ${dateFilter}
             `) || {};
 
             const bounceRate = retentionMetrics.total_unique_visitors > 0 
