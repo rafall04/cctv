@@ -6,7 +6,6 @@ import { EmptyState, NoStreamsEmptyState, NoActivityEmptyState } from '../compon
 import { Alert } from '../components/ui/Alert';
 import { useNotification } from '../contexts/NotificationContext';
 import { CameraStatusOverview } from '../components/CameraStatusOverview';
-import { TopCamerasWidget } from '../components/TopCamerasWidget';
 
 /**
  * Viewer Sessions Modal - Shows list of viewers with IP addresses
@@ -590,37 +589,29 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            {/* Phase 1: Camera Status Overview & Top Cameras */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <CameraStatusOverview 
-                    breakdown={stats?.cameraStatusBreakdown}
-                    totalCameras={stats?.summary.totalCameras || 0}
-                />
-                <TopCamerasWidget 
-                    cameras={stats?.topCameras || []}
-                    onCameraClick={(camera) => {
-                        // Find camera sessions
-                        const cameraSessions = stats?.allSessions?.filter(s => s.cameraId === camera.id) || [];
-                        setViewerModal({
-                            title: `Viewer - ${camera.name}`,
-                            sessions: cameraSessions
-                        });
-                    }}
-                />
-            </div>
+            {/* Phase 1: Camera Status Overview (Full Width) */}
+            <CameraStatusOverview 
+                breakdown={stats?.cameraStatusBreakdown}
+                totalCameras={stats?.summary.totalCameras || 0}
+            />
 
             {/* Content Grid */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                {/* Streams Table */}
+                {/* Enhanced Live Streams Table */}
                 <div className="xl:col-span-2 space-y-4">
                     <div className="flex items-center justify-between">
                         <h2 className="text-xl font-bold text-gray-900 dark:text-white">Live Streams</h2>
-                        <Link to="/admin/cameras" className="text-sm font-semibold text-sky-500 hover:text-sky-600 transition-colors flex items-center gap-1">
-                            Manage All
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                            </svg>
-                        </Link>
+                        <div className="flex items-center gap-3">
+                            <span className="text-xs text-gray-400 dark:text-gray-500">
+                                Sorted by viewers
+                            </span>
+                            <Link to="/admin/cameras" className="text-sm font-semibold text-sky-500 hover:text-sky-600 transition-colors flex items-center gap-1">
+                                Manage All
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </Link>
+                        </div>
                     </div>
                     <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl overflow-hidden">
                         <div className="overflow-x-auto">
@@ -665,49 +656,78 @@ export default function Dashboard() {
                                             </td>
                                         </tr>
                                     ) : (
-                                        stats?.streams.map(stream => (
-                                            <tr key={stream.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 bg-gray-100 dark:bg-gray-700/50 rounded-xl flex items-center justify-center text-gray-400 dark:text-gray-500">
-                                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                                            </svg>
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-semibold text-gray-900 dark:text-white">{stream.name}</p>
-                                                            <p className="text-xs text-gray-400 dark:text-gray-500">ID: {stream.id}</p>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                                                        stream.state === 'ready' 
-                                                            ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' 
-                                                            : 'bg-amber-100 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                                                    }`}>
-                                                        {stream.state}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <button
-                                                        onClick={() => setViewerModal({
-                                                            title: `Viewer - ${stream.name}`,
-                                                            sessions: stream.sessions || []
-                                                        })}
-                                                        className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 dark:bg-gray-700/50 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors cursor-pointer"
-                                                        title="Klik untuk lihat detail viewer"
-                                                    >
-                                                        <span className={`w-1.5 h-1.5 rounded-full ${stream.viewers > 0 ? 'bg-purple-500 animate-pulse' : 'bg-gray-400'}`}></span>
-                                                        <span className="text-sm font-semibold text-gray-900 dark:text-white">{stream.viewers}</span>
-                                                    </button>
-                                                </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    <p className="text-sm font-semibold text-sky-500">↑ {formatBytes(stream.bytesSent)}</p>
-                                                    <p className="text-xs text-gray-400 dark:text-gray-500">↓ {formatBytes(stream.bytesReceived)}</p>
-                                                </td>
-                                            </tr>
-                                        ))
+                                        // Sort streams by viewers (descending)
+                                        [...stats.streams]
+                                            .sort((a, b) => b.viewers - a.viewers)
+                                            .map((stream, idx) => {
+                                                // Determine rank badge for top 3
+                                                const isTop3 = idx < 3 && stream.viewers > 0;
+                                                const rankBadge = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : null;
+                                                
+                                                return (
+                                                    <tr key={stream.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                                                        <td className="px-6 py-4">
+                                                            <div className="flex items-center gap-3">
+                                                                {/* Rank Badge for Top 3 */}
+                                                                {isTop3 && (
+                                                                    <span className="text-xl" title={`Rank #${idx + 1}`}>
+                                                                        {rankBadge}
+                                                                    </span>
+                                                                )}
+                                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                                                                    isTop3 
+                                                                        ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lg shadow-amber-500/30' 
+                                                                        : 'bg-gray-100 dark:bg-gray-700/50 text-gray-400 dark:text-gray-500'
+                                                                }`}>
+                                                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                                    </svg>
+                                                                </div>
+                                                                <div>
+                                                                    <p className="font-semibold text-gray-900 dark:text-white">{stream.name}</p>
+                                                                    <p className="text-xs text-gray-400 dark:text-gray-500">ID: {stream.id}</p>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                                                                stream.state === 'ready' 
+                                                                    ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' 
+                                                                    : 'bg-amber-100 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                                                            }`}>
+                                                                {stream.state}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-center">
+                                                            <button
+                                                                onClick={() => setViewerModal({
+                                                                    title: `Viewer - ${stream.name}`,
+                                                                    sessions: stream.sessions || []
+                                                                })}
+                                                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+                                                                    stream.viewers > 0
+                                                                        ? 'bg-purple-100 dark:bg-purple-500/20 hover:bg-purple-200 dark:hover:bg-purple-500/30'
+                                                                        : 'bg-gray-100 dark:bg-gray-700/50 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                                                }`}
+                                                                title="Klik untuk lihat detail viewer"
+                                                            >
+                                                                <span className={`w-1.5 h-1.5 rounded-full ${stream.viewers > 0 ? 'bg-purple-500 animate-pulse' : 'bg-gray-400'}`}></span>
+                                                                <span className={`text-sm font-semibold ${
+                                                                    stream.viewers > 0 
+                                                                        ? 'text-purple-600 dark:text-purple-400' 
+                                                                        : 'text-gray-600 dark:text-gray-400'
+                                                                }`}>
+                                                                    {stream.viewers}
+                                                                </span>
+                                                            </button>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right">
+                                                            <p className="text-sm font-semibold text-sky-500">↑ {formatBytes(stream.bytesSent)}</p>
+                                                            <p className="text-xs text-gray-400 dark:text-gray-500">↓ {formatBytes(stream.bytesReceived)}</p>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
                                     )}
                                 </tbody>
                             </table>
