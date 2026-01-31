@@ -432,75 +432,152 @@ export default function Dashboard() {
                     </div>
                 </div>
             )}
-            {/* Header - Requirements: 3.6 */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                <div>
-                    <p className="text-sm font-semibold text-sky-500 mb-1">System Overview</p>
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-                    <p className="text-gray-500 dark:text-gray-400 mt-1">
-                        Monitoring {stats?.summary.totalCameras} cameras across {stats?.summary.totalAreas} areas
-                    </p>
-                </div>
-                
-                {/* Quick Actions Panel - Phase 1 */}
-                <div className="flex flex-wrap items-center gap-3">
-                    {/* Last Update Time */}
-                    {lastSuccessfulUpdate && (
-                        <div className="px-4 py-2.5 bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700/50 rounded-xl shadow-sm">
-                            <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase">Last Update</p>
-                            <p className="text-sm font-bold text-gray-900 dark:text-white">{formatLastUpdate(lastSuccessfulUpdate)}</p>
+            {/* Header - Reorganized for better clarity */}
+            <div className="space-y-6">
+                {/* Title Section */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <div className="flex items-center gap-3 mb-2">
+                            <p className="text-sm font-semibold text-sky-500">System Overview</p>
+                            {lastSuccessfulUpdate && (
+                                <span className="text-xs text-gray-400 dark:text-gray-500">
+                                    • Updated {formatLastUpdate(lastSuccessfulUpdate)}
+                                </span>
+                            )}
                         </div>
-                    )}
+                        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+                        <p className="text-gray-500 dark:text-gray-400 mt-1">
+                            Monitoring {stats?.summary.totalCameras} cameras across {stats?.summary.totalAreas} areas
+                        </p>
+                    </div>
                     
-                    {/* Quick Actions */}
-                    <button
-                        onClick={() => navigate('/admin/cameras')}
-                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-sky-500 hover:bg-sky-600 text-white font-medium rounded-xl shadow-sm hover:shadow-md transition-all"
-                    >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                        </svg>
-                        <span className="hidden sm:inline">Tambah Kamera</span>
-                        <span className="sm:hidden">Tambah</span>
-                    </button>
-                    
-                    <button
-                        onClick={() => navigate('/admin/analytics')}
-                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all"
-                    >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                        </svg>
-                        <span className="hidden sm:inline">Analytics</span>
-                    </button>
-                    
+                    {/* Refresh Button - Standalone */}
                     <button
                         onClick={() => loadStats(false)}
                         disabled={isRetrying}
-                        className="inline-flex items-center justify-center w-10 h-10 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all disabled:opacity-50"
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all disabled:opacity-50 self-start sm:self-auto"
                         title="Refresh Dashboard"
                     >
                         <svg className={`w-4 h-4 ${isRetrying ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
+                        <span className="hidden sm:inline">Refresh</span>
                     </button>
-                    
-                    <div className="px-4 py-2.5 bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700/50 rounded-xl shadow-sm">
-                        <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase">Uptime</p>
-                        <p className="text-sm font-bold text-gray-900 dark:text-white">{formatUptime(stats?.system.uptime)}</p>
+                </div>
+
+                {/* System Info & Quick Actions Row */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* System Info Cards */}
+                    <div className="flex flex-wrap gap-3">
+                        {/* MediaMTX Status */}
+                        <div className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border shadow-sm flex-1 min-w-[160px] ${
+                            stats?.mtxConnected 
+                                ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30' 
+                                : 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30'
+                        }`}>
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                                stats?.mtxConnected 
+                                    ? 'bg-emerald-100 dark:bg-emerald-500/20' 
+                                    : 'bg-red-100 dark:bg-red-500/20'
+                            }`}>
+                                <span className="relative flex h-3 w-3">
+                                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${stats?.mtxConnected ? 'bg-emerald-400' : 'bg-red-400'}`}></span>
+                                    <span className={`relative inline-flex rounded-full h-3 w-3 ${stats?.mtxConnected ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
+                                </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider mb-0.5 text-gray-500 dark:text-gray-400">
+                                    MediaMTX
+                                </p>
+                                <p className={`text-sm font-bold ${
+                                    stats?.mtxConnected 
+                                        ? 'text-emerald-600 dark:text-emerald-400' 
+                                        : 'text-red-600 dark:text-red-400'
+                                }`}>
+                                    {stats?.mtxConnected ? 'Online' : 'Offline'}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* System Uptime */}
+                        <div className="flex items-center gap-2.5 px-4 py-3 bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700/50 rounded-xl shadow-sm flex-1 min-w-[140px]">
+                            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-500/20 rounded-lg flex items-center justify-center">
+                                <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-0.5">
+                                    Uptime
+                                </p>
+                                <p className="text-sm font-bold text-gray-900 dark:text-white truncate">
+                                    {formatUptime(stats?.system.uptime)}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* System Health - CPU & Memory */}
+                        <div className="flex items-center gap-2.5 px-4 py-3 bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700/50 rounded-xl shadow-sm flex-1 min-w-[160px]">
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                                cpuLoad > 80 || memPercent > 90 
+                                    ? 'bg-red-100 dark:bg-red-500/20' 
+                                    : cpuLoad > 60 || memPercent > 75 
+                                    ? 'bg-amber-100 dark:bg-amber-500/20' 
+                                    : 'bg-emerald-100 dark:bg-emerald-500/20'
+                            }`}>
+                                <svg className={`w-5 h-5 ${
+                                    cpuLoad > 80 || memPercent > 90 
+                                        ? 'text-red-500' 
+                                        : cpuLoad > 60 || memPercent > 75 
+                                        ? 'text-amber-500' 
+                                        : 'text-emerald-500'
+                                }`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                                </svg>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-0.5">
+                                    System
+                                </p>
+                                <p className="text-xs font-bold text-gray-900 dark:text-white">
+                                    CPU {cpuLoad.toFixed(0)}% • RAM {memPercent}%
+                                </p>
+                            </div>
+                        </div>
                     </div>
-                    
-                    {/* Connection Status Indicator - Requirements: 3.6 */}
-                    <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border shadow-sm ${
-                        stats?.mtxConnected 
-                            ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400' 
-                            : 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400'
-                    }`}>
-                        <span className="relative flex h-2 w-2">
-                            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${stats?.mtxConnected ? 'bg-emerald-400' : 'bg-red-400'}`}></span>
-                            <span className={`relative inline-flex rounded-full h-2 w-2 ${stats?.mtxConnected ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
-                        </span>
-                        <span className="text-sm font-semibold">MediaMTX: {stats?.mtxConnected ? 'Online' : 'Offline'}</span>
+
+                    {/* Quick Actions */}
+                    <div className="flex flex-wrap items-center gap-3 lg:justify-end">
+                        <button
+                            onClick={() => navigate('/admin/cameras')}
+                            className="inline-flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-sky-500/25 hover:shadow-xl hover:shadow-sky-500/30 transition-all"
+                        >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                            </svg>
+                            <span>Tambah Kamera</span>
+                        </button>
+                        
+                        <button
+                            onClick={() => navigate('/admin/analytics')}
+                            className="inline-flex items-center gap-2 px-5 py-3 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all"
+                        >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                            <span>Analytics</span>
+                        </button>
+
+                        <button
+                            onClick={() => navigate('/admin/settings')}
+                            className="inline-flex items-center gap-2 px-5 py-3 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all"
+                        >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            <span>Settings</span>
+                        </button>
                     </div>
                 </div>
             </div>
