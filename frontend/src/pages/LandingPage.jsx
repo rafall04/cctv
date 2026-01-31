@@ -15,6 +15,8 @@ import { LoadingStage, getStageMessage, createStreamError } from '../utils/strea
 import { createFallbackHandler } from '../utils/fallbackHandler';
 import { shouldDisableAnimations } from '../utils/animationControl';
 import { getGlobalStreamInitQueue, shouldUseQueuedInit } from '../utils/streamInitQueue';
+// Skeleton loaders
+import { GridSkeleton, CameraCardSkeleton } from '../components/ui/Skeleton';
 // Feedback widget
 import FeedbackWidget from '../components/FeedbackWidget';
 // Saweria Support
@@ -2902,10 +2904,7 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                 )}
 
                 {loading ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                        {/* Reduced skeleton count for low-end devices: 3 instead of 6 */}
-                        {[1, 2, 3].map(i => <CameraSkeleton key={i} />)}
-                    </div>
+                    <GridSkeleton items={6} columns={3} SkeletonComponent={CameraCardSkeleton} />
                 ) : displayCameras.length === 0 ? (
                     <div className="text-center py-16">
                         <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400">

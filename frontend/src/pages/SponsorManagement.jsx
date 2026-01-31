@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNotification } from '../contexts/NotificationContext';
 import * as sponsorService from '../services/sponsorService';
+import { TableSkeleton, StatCardSkeleton } from '../components/ui/Skeleton';
 
 function SponsorManagement() {
     const { showNotification } = useNotification();
@@ -142,8 +143,15 @@ function SponsorManagement() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+            <div className="p-6 space-y-6">
+                {/* Stats Skeleton */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <StatCardSkeleton />
+                    <StatCardSkeleton />
+                    <StatCardSkeleton />
+                </div>
+                {/* Table Skeleton */}
+                <TableSkeleton rows={5} columns={5} />
             </div>
         );
     }

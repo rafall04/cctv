@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { feedbackService } from '../services/feedbackService';
+import { TableSkeleton } from '../components/ui/Skeleton';
 
 const Icons = {
     Mail: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>,
@@ -154,7 +155,7 @@ export default function FeedbackManagement() {
                 <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
                     <div className="divide-y divide-gray-200 dark:divide-gray-700 max-h-[600px] overflow-y-auto">
                         {loading ? (
-                            <div className="p-8 text-center text-gray-500">Loading...</div>
+                            <TableSkeleton rows={5} columns={4} />
                         ) : feedbacks.length === 0 ? (
                             <div className="p-8 text-center text-gray-500">Tidak ada feedback</div>
                         ) : (

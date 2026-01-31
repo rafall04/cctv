@@ -1,198 +1,210 @@
-/**
- * Skeleton Components
- * 
- * Loading placeholder components with pulse animation.
- * Provides base Skeleton and compound components for common patterns.
- * 
- * Requirements: 8.1, 8.2, 8.3, 8.4, 8.5
- */
+import React from 'react';
 
 /**
- * Base Skeleton component with pulse animation
- * @param {Object} props
- * @param {string} [props.className] - Additional CSS classes
- * @param {'text' | 'circular' | 'rectangular'} [props.variant='rectangular'] - Shape variant
- * @param {string | number} [props.width] - Width (CSS value or number for pixels)
- * @param {string | number} [props.height] - Height (CSS value or number for pixels)
+ * Skeleton Component - Loading placeholder
+ * Digunakan untuk menampilkan loading state yang lebih baik dari spinner
  */
-export function Skeleton({ 
-    className = '', 
-    variant = 'rectangular',
-    width,
-    height,
-}) {
-    const baseClasses = 'animate-pulse bg-dark-700/50';
+
+export function Skeleton({ className = '', variant = 'default', ...props }) {
+    const baseClasses = 'animate-pulse bg-gray-700/50 rounded';
     
-    const variantClasses = {
-        text: 'rounded',
-        circular: 'rounded-full',
-        rectangular: 'rounded-lg',
+    const variants = {
+        default: '',
+        text: 'h-4 w-full',
+        title: 'h-6 w-3/4',
+        avatar: 'h-12 w-12 rounded-full',
+        button: 'h-10 w-24',
+        card: 'h-48 w-full',
+        thumbnail: 'aspect-video w-full',
     };
-
-    // Use Object.hasOwn to safely check for variant to avoid prototype pollution
-    const variantClass = Object.hasOwn(variantClasses, variant) 
-        ? variantClasses[variant] 
-        : variantClasses.rectangular;
-
-    const style = {};
-    if (width) {
-        style.width = typeof width === 'number' ? `${width}px` : width;
-    }
-    if (height) {
-        style.height = typeof height === 'number' ? `${height}px` : height;
-    }
-
+    
     return (
-        <div
-            className={`${baseClasses} ${variantClass} ${className}`}
-            style={style}
-            aria-hidden="true"
+        <div 
+            className={`${baseClasses} ${variants[variant]} ${className}`}
+            {...props}
         />
     );
 }
 
 /**
- * Skeleton card for loading card content
- * @param {Object} props
- * @param {number} [props.lines=3] - Number of text lines to show
- * @param {boolean} [props.showImage=true] - Whether to show image placeholder
- * @param {string} [props.className] - Additional CSS classes
+ * CameraCardSkeleton - Skeleton untuk camera card di grid
  */
-export function SkeletonCard({ lines = 3, showImage = true, className = '' }) {
+export function CameraCardSkeleton() {
     return (
-        <div className={`bg-dark-800/50 border border-dark-700/50 rounded-xl p-4 ${className}`}>
-            {showImage && (
-                <Skeleton 
-                    variant="rectangular" 
-                    className="w-full h-40 mb-4" 
-                />
-            )}
-            <Skeleton 
-                variant="text" 
-                className="h-5 w-3/4 mb-3" 
-            />
-            {Array.from({ length: lines }).map((_, index) => (
-                <Skeleton 
-                    key={index}
-                    variant="text" 
-                    className={`h-4 mb-2 ${index === lines - 1 ? 'w-1/2' : 'w-full'}`}
-                />
+        <div className="bg-dark-800/50 backdrop-blur-sm border border-dark-700/50 rounded-xl overflow-hidden">
+            {/* Video thumbnail skeleton */}
+            <Skeleton variant="thumbnail" className="rounded-none" />
+            
+            {/* Content skeleton */}
+            <div className="p-4 space-y-3">
+                {/* Title */}
+                <Skeleton variant="title" />
+                
+                {/* Location */}
+                <div className="space-y-2">
+                    <Skeleton variant="text" className="w-2/3" />
+                    <Skeleton variant="text" className="w-1/2" />
+                </div>
+                
+                {/* Badges */}
+                <div className="flex gap-2">
+                    <Skeleton className="h-6 w-16" />
+                    <Skeleton className="h-6 w-16" />
+                </div>
+                
+                {/* Button */}
+                <Skeleton variant="button" className="w-full" />
+            </div>
+        </div>
+    );
+}
+
+/**
+ * TableRowSkeleton - Skeleton untuk table row
+ */
+export function TableRowSkeleton({ columns = 5 }) {
+    return (
+        <tr className="border-b border-dark-700/50">
+            {Array.from({ length: columns }).map((_, index) => (
+                <td key={index} className="px-4 py-3">
+                    <Skeleton variant="text" />
+                </td>
+            ))}
+        </tr>
+    );
+}
+
+/**
+ * TableSkeleton - Skeleton untuk entire table
+ */
+export function TableSkeleton({ rows = 5, columns = 5 }) {
+    return (
+        <div className="overflow-x-auto">
+            <table className="w-full">
+                <thead className="bg-dark-800/50 border-b border-dark-700">
+                    <tr>
+                        {Array.from({ length: columns }).map((_, index) => (
+                            <th key={index} className="px-4 py-3 text-left">
+                                <Skeleton variant="text" className="w-24" />
+                            </th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody>
+                    {Array.from({ length: rows }).map((_, index) => (
+                        <TableRowSkeleton key={index} columns={columns} />
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+/**
+ * StatCardSkeleton - Skeleton untuk statistics card
+ */
+export function StatCardSkeleton() {
+    return (
+        <div className="bg-dark-800/50 backdrop-blur-sm border border-dark-700/50 rounded-xl p-6">
+            <div className="flex items-center justify-between mb-4">
+                <Skeleton className="h-8 w-8 rounded-lg" />
+                <Skeleton className="h-4 w-16" />
+            </div>
+            <Skeleton variant="title" className="mb-2" />
+            <Skeleton variant="text" className="w-1/2" />
+        </div>
+    );
+}
+
+/**
+ * ListItemSkeleton - Skeleton untuk list item
+ */
+export function ListItemSkeleton() {
+    return (
+        <div className="flex items-center gap-4 p-4 border-b border-dark-700/50">
+            <Skeleton variant="avatar" />
+            <div className="flex-1 space-y-2">
+                <Skeleton variant="title" />
+                <Skeleton variant="text" className="w-3/4" />
+            </div>
+            <Skeleton className="h-8 w-20" />
+        </div>
+    );
+}
+
+/**
+ * FormSkeleton - Skeleton untuk form
+ */
+export function FormSkeleton({ fields = 4 }) {
+    return (
+        <div className="space-y-4">
+            {Array.from({ length: fields }).map((_, index) => (
+                <div key={index} className="space-y-2">
+                    <Skeleton variant="text" className="w-32" />
+                    <Skeleton className="h-10 w-full" />
+                </div>
+            ))}
+            <div className="flex gap-3 pt-4">
+                <Skeleton variant="button" className="flex-1" />
+                <Skeleton variant="button" className="flex-1" />
+            </div>
+        </div>
+    );
+}
+
+/**
+ * GridSkeleton - Skeleton untuk grid layout
+ */
+export function GridSkeleton({ 
+    items = 6, 
+    columns = 3,
+    SkeletonComponent = CameraCardSkeleton 
+}) {
+    const gridCols = {
+        1: 'grid-cols-1',
+        2: 'grid-cols-1 md:grid-cols-2',
+        3: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3',
+        4: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4',
+    };
+    
+    return (
+        <div className={`grid ${gridCols[columns]} gap-6`}>
+            {Array.from({ length: items }).map((_, index) => (
+                <SkeletonComponent key={index} />
             ))}
         </div>
     );
 }
 
 /**
- * Skeleton table for loading table data
- * @param {Object} props
- * @param {number} [props.rows=5] - Number of rows to show
- * @param {number} [props.columns=4] - Number of columns to show
- * @param {string} [props.className] - Additional CSS classes
+ * DashboardSkeleton - Skeleton untuk dashboard page
  */
-export function SkeletonTable({ rows = 5, columns = 4, className = '' }) {
+export function DashboardSkeleton() {
     return (
-        <div className={`bg-dark-800/50 border border-dark-700/50 rounded-xl overflow-hidden ${className}`}>
-            {/* Header */}
-            <div className="bg-dark-700/30 px-4 py-3 border-b border-dark-700/50">
-                <div className="flex gap-4">
-                    {Array.from({ length: columns }).map((_, index) => (
-                        <Skeleton 
-                            key={`header-${index}`}
-                            variant="text" 
-                            className="h-4 flex-1" 
-                        />
-                    ))}
-                </div>
+        <div className="space-y-6">
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {Array.from({ length: 4 }).map((_, index) => (
+                    <StatCardSkeleton key={index} />
+                ))}
             </div>
-            {/* Rows */}
-            {Array.from({ length: rows }).map((_, rowIndex) => (
-                <div 
-                    key={`row-${rowIndex}`}
-                    className="px-4 py-3 border-b border-dark-700/30 last:border-b-0"
-                >
-                    <div className="flex gap-4 items-center">
-                        {Array.from({ length: columns }).map((_, colIndex) => (
-                            <Skeleton 
-                                key={`cell-${rowIndex}-${colIndex}`}
-                                variant="text" 
-                                className={`h-4 flex-1 ${colIndex === 0 ? 'w-1/4' : ''}`}
-                            />
+            
+            {/* Content Area */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-dark-800/50 backdrop-blur-sm border border-dark-700/50 rounded-xl p-6">
+                    <Skeleton variant="title" className="mb-4" />
+                    <div className="space-y-3">
+                        {Array.from({ length: 5 }).map((_, index) => (
+                            <ListItemSkeleton key={index} />
                         ))}
                     </div>
                 </div>
-            ))}
-        </div>
-    );
-}
-
-/**
- * Skeleton stats for loading statistics/metrics cards
- * @param {Object} props
- * @param {number} [props.count=4] - Number of stat cards to show
- * @param {string} [props.className] - Additional CSS classes
- */
-export function SkeletonStats({ count = 4, className = '' }) {
-    return (
-        <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 ${className}`}>
-            {Array.from({ length: count }).map((_, index) => (
-                <div 
-                    key={index}
-                    className="bg-dark-800/50 border border-dark-700/50 rounded-xl p-4"
-                >
-                    <div className="flex items-center justify-between mb-2">
-                        <Skeleton variant="text" className="h-4 w-24" />
-                        <Skeleton variant="circular" className="h-8 w-8" />
-                    </div>
-                    <Skeleton variant="text" className="h-8 w-20 mb-1" />
-                    <Skeleton variant="text" className="h-3 w-16" />
+                
+                <div className="bg-dark-800/50 backdrop-blur-sm border border-dark-700/50 rounded-xl p-6">
+                    <Skeleton variant="title" className="mb-4" />
+                    <Skeleton className="h-64 w-full" />
                 </div>
-            ))}
-        </div>
-    );
-}
-
-/**
- * Skeleton form for loading form content
- * @param {Object} props
- * @param {number} [props.fields=3] - Number of form fields to show
- * @param {string} [props.className] - Additional CSS classes
- */
-export function SkeletonForm({ fields = 3, className = '' }) {
-    return (
-        <div className={`space-y-4 ${className}`}>
-            {Array.from({ length: fields }).map((_, index) => (
-                <div key={index}>
-                    <Skeleton variant="text" className="h-4 w-24 mb-2" />
-                    <Skeleton variant="rectangular" className="h-10 w-full" />
-                </div>
-            ))}
-            <div className="flex gap-3 pt-2">
-                <Skeleton variant="rectangular" className="h-10 w-24" />
-                <Skeleton variant="rectangular" className="h-10 w-20" />
             </div>
         </div>
     );
 }
-
-/**
- * Skeleton button for loading button state
- * @param {Object} props
- * @param {string} [props.className] - Additional CSS classes
- * @param {'sm' | 'md' | 'lg'} [props.size='md'] - Button size
- */
-export function SkeletonButton({ className = '', size = 'md' }) {
-    const sizeClasses = {
-        sm: 'h-8 w-16',
-        md: 'h-10 w-24',
-        lg: 'h-12 w-32',
-    };
-
-    return (
-        <Skeleton 
-            variant="rectangular" 
-            className={`${sizeClasses[size]} ${className}`}
-        />
-    );
-}
-
-export default Skeleton;

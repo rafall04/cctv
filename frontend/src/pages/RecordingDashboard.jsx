@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import recordingService from '../services/recordingService';
 import { useNotification } from '../contexts/NotificationContext';
+import { TableSkeleton, StatCardSkeleton } from '../components/ui/Skeleton';
 
 function RecordingDashboard() {
     const [recordings, setRecordings] = useState([]);
@@ -98,8 +99,16 @@ function RecordingDashboard() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-screen">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+            <div className="p-6 space-y-6">
+                {/* Stats Skeleton */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <StatCardSkeleton />
+                    <StatCardSkeleton />
+                    <StatCardSkeleton />
+                    <StatCardSkeleton />
+                </div>
+                {/* Table Skeleton */}
+                <TableSkeleton rows={8} columns={6} />
             </div>
         );
     }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { saweriaService } from '../services/saweriaService';
 import { useNotification } from '../contexts/NotificationContext';
+import { FormSkeleton } from '../components/ui/Skeleton';
 
 export default function SaweriaSettings() {
     const { addNotification } = useNotification();
@@ -66,8 +67,8 @@ export default function SaweriaSettings() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-[400px]">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-500"></div>
+            <div className="p-6">
+                <FormSkeleton fields={5} />
             </div>
         );
     }
