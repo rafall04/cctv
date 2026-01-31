@@ -479,6 +479,20 @@ class ViewerSessionService {
                 ORDER BY hour ASC
             `);
 
+            // Activity Heatmap: 24 hours x 7 days
+            // 0 = Sunday, 1 = Monday, ..., 6 = Saturday (SQLite strftime '%w')
+            const activityHeatmap = query(`
+                SELECT 
+                    strftime('%w', started_at) as day_of_week,
+                    strftime('%H', started_at) as hour,
+                    COUNT(*) as sessions,
+                    COUNT(DISTINCT ip_address) as unique_visitors
+                FROM viewer_session_history
+                WHERE 1=1 ${dateFilter}
+                GROUP BY strftime('%w', started_at), strftime('%H', started_at)
+                ORDER BY day_of_week, hour
+            `);
+
             // Top cameras by views
             const topCameras = query(`
                 SELECT 
@@ -605,6 +619,7 @@ class ViewerSessionService {
                 charts: {
                     sessionsByDay,
                     sessionsByHour,
+                    activityHeatmap,
                 },
                 topCameras,
                 deviceBreakdown,
@@ -643,7 +658,7 @@ class ViewerSessionService {
                     bounceRate: 0,
                     retentionRate: 0,
                 },
-                charts: { sessionsByDay: [], sessionsByHour: [] },
+                charts: { sessionsByDay: [], sessionsByHour: [], activityHeatmap: [] },
                 topCameras: [],
                 deviceBreakdown: [],
                 topVisitors: [],

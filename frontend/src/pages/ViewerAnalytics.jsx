@@ -6,6 +6,7 @@ import { Alert } from '../components/ui/Alert';
 import { TrendBadge } from '../components/TrendIndicator';
 import { RetentionMetrics } from '../components/RetentionMetrics';
 import { CameraPerformanceTable } from '../components/CameraPerformanceTable';
+import { ActivityHeatmap, HeatmapDetailModal } from '../components/ActivityHeatmap';
 
 /**
  * Format duration in seconds to human readable format
@@ -529,6 +530,8 @@ export default function ViewerAnalytics() {
     const [selectedCamera, setSelectedCamera] = useState('');
     const [selectedDate, setSelectedDate] = useState(null);
     const [showDailyDetail, setShowDailyDetail] = useState(false);
+    const [heatmapCell, setHeatmapCell] = useState(null);
+    const [showHeatmapDetail, setShowHeatmapDetail] = useState(false);
     const [refreshError, setRefreshError] = useState(false);
     const [lastUpdate, setLastUpdate] = useState(null);
     const [sessionsPage, setSessionsPage] = useState(1);
@@ -593,6 +596,11 @@ export default function ViewerAnalytics() {
             setSelectedDate(item.rawDate);
             setShowDailyDetail(true);
         }
+    };
+
+    const handleHeatmapCellClick = (cellData) => {
+        setHeatmapCell(cellData);
+        setShowHeatmapDetail(true);
     };
 
     const handleExportSessions = () => {
@@ -669,6 +677,17 @@ export default function ViewerAnalytics() {
                     onClose={() => {
                         setShowDailyDetail(false);
                         setSelectedDate(null);
+                    }}
+                />
+            )}
+
+            {/* Heatmap Detail Modal */}
+            {showHeatmapDetail && (
+                <HeatmapDetailModal
+                    cellData={heatmapCell}
+                    onClose={() => {
+                        setShowHeatmapDetail(false);
+                        setHeatmapCell(null);
                     }}
                 />
             )}
@@ -820,6 +839,14 @@ export default function ViewerAnalytics() {
                     )}
                 </div>
             </div>
+
+            {/* Activity Heatmap */}
+            {charts?.activityHeatmap && charts.activityHeatmap.length > 0 && (
+                <ActivityHeatmap 
+                    data={charts.activityHeatmap} 
+                    onCellClick={handleHeatmapCellClick}
+                />
+            )}
 
             {/* Top Cameras & Device Breakdown */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
