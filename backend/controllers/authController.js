@@ -148,11 +148,12 @@ export async function login(request, reply) {
         );
 
         // Set access token cookie
+        // Use 'none' for cross-domain (cctv.raf.my.id -> api-cctv.raf.my.id)
         reply.setCookie('token', accessToken, {
             path: '/',
             httpOnly: true,
             secure: config.server.env === 'production',
-            sameSite: 'strict',
+            sameSite: config.server.env === 'production' ? 'none' : 'lax',
             maxAge: 60 * 60, // 1 hour (matches access token expiry)
         });
 
@@ -161,7 +162,7 @@ export async function login(request, reply) {
             path: '/api/auth/refresh',
             httpOnly: true,
             secure: config.server.env === 'production',
-            sameSite: 'strict',
+            sameSite: config.server.env === 'production' ? 'none' : 'lax',
             maxAge: 7 * 24 * 60 * 60, // 7 days
         });
 
@@ -349,11 +350,12 @@ export async function refreshTokens(request, reply) {
         }, request);
 
         // Set new access token cookie
+        // Use 'none' for cross-domain (cctv.raf.my.id -> api-cctv.raf.my.id)
         reply.setCookie('token', newAccessToken, {
             path: '/',
             httpOnly: true,
             secure: config.server.env === 'production',
-            sameSite: 'strict',
+            sameSite: config.server.env === 'production' ? 'none' : 'lax',
             maxAge: 60 * 60, // 1 hour
         });
 
@@ -362,7 +364,7 @@ export async function refreshTokens(request, reply) {
             path: '/api/auth/refresh',
             httpOnly: true,
             secure: config.server.env === 'production',
-            sameSite: 'strict',
+            sameSite: config.server.env === 'production' ? 'none' : 'lax',
             maxAge: 7 * 24 * 60 * 60, // 7 days
         });
 

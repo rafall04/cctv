@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { adminService } from '../services/adminService';
 
 /**
  * Lightweight Real-time Chart Component
@@ -210,16 +211,8 @@ export function RealtimeActivityChart() {
     // Fetch real-time data dari API
     const fetchRealtimeData = async () => {
         try {
-            // Gunakan endpoint getRealTimeViewers yang sudah ada
-            const response = await fetch('/api/admin/analytics/realtime', {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-            });
-            
-            if (!response.ok) throw new Error('Failed to fetch');
-            
-            const result = await response.json();
+            // Gunakan adminService yang sudah handle authentication
+            const result = await adminService.getRealTimeViewers();
             
             if (result.success) {
                 const now = new Date();
