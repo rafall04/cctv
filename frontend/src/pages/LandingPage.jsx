@@ -17,6 +17,8 @@ import { shouldDisableAnimations } from '../utils/animationControl';
 import { getGlobalStreamInitQueue, shouldUseQueuedInit } from '../utils/streamInitQueue';
 // Skeleton loaders
 import { GridSkeleton, CameraCardSkeleton } from '../components/ui/Skeleton';
+// Empty states
+import { NoSearchResultsEmptyState, NoDataWithFilterEmptyState } from '../components/ui/EmptyState';
 // Feedback widget
 import FeedbackWidget from '../components/FeedbackWidget';
 // Saweria Support
@@ -2906,38 +2908,29 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                 {loading ? (
                     <GridSkeleton items={6} columns={3} SkeletonComponent={CameraCardSkeleton} />
                 ) : displayCameras.length === 0 ? (
-                    <div className="text-center py-16">
-                        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400">
-                            {searchQuery ? <Icons.Search /> : <Icons.Camera />}
+                    searchQuery ? (
+                        <NoSearchResultsEmptyState 
+                            searchQuery={searchQuery}
+                            onClearSearch={clearSearch}
+                        />
+                    ) : connectionTab !== 'all' ? (
+                        <NoDataWithFilterEmptyState
+                            filterName={connectionTab === 'tunnel' ? 'Koneksi Tunnel' : 'Koneksi Stabil'}
+                            onClearFilter={() => setConnectionTab('all')}
+                        />
+                    ) : (
+                        <div className="text-center py-16">
+                            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400">
+                                <Icons.Camera />
+                            </div>
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                                Belum Ada Kamera
+                            </h3>
+                            <p className="text-gray-500 dark:text-gray-400">
+                                Kamera CCTV akan segera tersedia untuk ditonton.
+                            </p>
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                            {searchQuery ? 'Tidak Ditemukan' : 'Tidak Ada Kamera'}
-                        </h3>
-                        <p className="text-gray-500 dark:text-gray-400 mb-4">
-                            {searchQuery 
-                                ? `Tidak ada kamera yang cocok dengan "${searchQuery}".`
-                                : connectionTab === 'tunnel' 
-                                    ? 'Tidak ada kamera dengan koneksi tunnel.' 
-                                    : connectionTab === 'stable'
-                                        ? 'Tidak ada kamera dengan koneksi stabil.'
-                                        : 'Kamera akan segera tersedia.'}
-                        </p>
-                        {searchQuery ? (
-                            <button 
-                                onClick={clearSearch}
-                                className="text-sky-500 font-medium hover:text-sky-600 transition-colors"
-                            >
-                                Hapus Pencarian →
-                            </button>
-                        ) : connectionTab !== 'all' && (
-                            <button 
-                                onClick={() => setConnectionTab('all')}
-                                className="text-sky-500 font-medium hover:text-sky-600 transition-colors"
-                            >
-                                Lihat Semua Kamera →
-                            </button>
-                        )}
-                    </div>
+                    )
                 ) : viewMode === 'playback' ? (
                     <Suspense fallback={
                         <div className="h-[600px] bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center">

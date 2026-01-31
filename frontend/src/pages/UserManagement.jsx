@@ -3,7 +3,7 @@ import { userService } from '../services/userService';
 import { authService } from '../services/authService';
 import { useNotification } from '../contexts/NotificationContext';
 import { SkeletonTable } from '../components/ui/Skeleton';
-import { EmptyState } from '../components/ui/EmptyState';
+import { EmptyState, NoUsersEmptyState } from '../components/ui/EmptyState';
 import { Alert } from '../components/ui/Alert';
 
 /**
@@ -418,15 +418,7 @@ export default function UserManagement() {
                 </div>
             ) : users.length === 0 ? (
                 <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl">
-                    <EmptyState
-                        icon={<UsersIcon />}
-                        title="No Users Found"
-                        description="There are no user accounts in the system. This shouldn't normally happen."
-                        action={{
-                            label: 'Add User',
-                            onClick: openAddModal,
-                        }}
-                    />
+                    <NoUsersEmptyState onAddUser={openAddModal} />
                 </div>
             ) : (
                 <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl overflow-hidden">

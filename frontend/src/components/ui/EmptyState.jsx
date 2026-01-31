@@ -1,127 +1,151 @@
+import React from 'react';
+
 /**
- * EmptyState Component
- * 
- * Informative placeholder displayed when no data exists.
- * Supports icon, title, description, and action buttons.
- * 
- * Requirements: 9.1, 9.2, 9.4, 9.5, 9.6
+ * EmptyState Component - Improved empty states with illustrations
+ * Provides better UX when there's no data to display
  */
 
-// Default icons for common empty states
-const CameraIcon = () => (
-    <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-    </svg>
-);
-
-const FolderIcon = () => (
-    <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-            d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-    </svg>
-);
-
-const UsersIcon = () => (
-    <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-    </svg>
-);
-
-const SearchIcon = () => (
-    <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-    </svg>
-);
-
-const ActivityIcon = () => (
-    <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-    </svg>
-);
-
-const InboxIcon = () => (
-    <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-            d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-    </svg>
-);
-
-// Export icons for external use
-export const EMPTY_STATE_ICONS = {
-    camera: CameraIcon,
-    folder: FolderIcon,
-    users: UsersIcon,
-    search: SearchIcon,
-    activity: ActivityIcon,
-    inbox: InboxIcon,
+// SVG Illustrations
+const Illustrations = {
+    // No cameras illustration
+    NoCamera: () => (
+        <svg className="w-full h-full" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="100" cy="100" r="80" fill="currentColor" className="text-gray-100 dark:text-gray-800" />
+            <path d="M70 85h60v40H70z" fill="currentColor" className="text-gray-200 dark:text-gray-700" />
+            <circle cx="100" cy="105" r="15" fill="currentColor" className="text-gray-300 dark:text-gray-600" />
+            <path d="M130 85l15-10v40l-15-10" fill="currentColor" className="text-gray-300 dark:text-gray-600" />
+            <line x1="60" y1="60" x2="140" y2="140" stroke="currentColor" strokeWidth="4" strokeLinecap="round" className="text-red-400" />
+            <line x1="140" y1="60" x2="60" y2="140" stroke="currentColor" strokeWidth="4" strokeLinecap="round" className="text-red-400" />
+        </svg>
+    ),
+    
+    // No data/search results illustration
+    NoData: () => (
+        <svg className="w-full h-full" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="100" cy="100" r="80" fill="currentColor" className="text-gray-100 dark:text-gray-800" />
+            <circle cx="85" cy="85" r="30" stroke="currentColor" strokeWidth="4" className="text-gray-300 dark:text-gray-600" />
+            <line x1="107" y1="107" x2="130" y2="130" stroke="currentColor" strokeWidth="4" strokeLinecap="round" className="text-gray-300 dark:text-gray-600" />
+            <path d="M75 85h20M85 75v20" stroke="currentColor" strokeWidth="3" strokeLinecap="round" className="text-gray-400 dark:text-gray-500" />
+        </svg>
+    ),
+    
+    // No feedback illustration
+    NoFeedback: () => (
+        <svg className="w-full h-full" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="100" cy="100" r="80" fill="currentColor" className="text-gray-100 dark:text-gray-800" />
+            <rect x="60" y="70" width="80" height="60" rx="8" fill="currentColor" className="text-gray-200 dark:text-gray-700" />
+            <path d="M100 130l-10 15h20z" fill="currentColor" className="text-gray-200 dark:text-gray-700" />
+            <line x1="70" y1="85" x2="130" y2="85" stroke="currentColor" strokeWidth="3" strokeLinecap="round" className="text-gray-300 dark:text-gray-600" />
+            <line x1="70" y1="100" x2="120" y2="100" stroke="currentColor" strokeWidth="3" strokeLinecap="round" className="text-gray-300 dark:text-gray-600" />
+            <line x1="70" y1="115" x2="110" y2="115" stroke="currentColor" strokeWidth="3" strokeLinecap="round" className="text-gray-300 dark:text-gray-600" />
+        </svg>
+    ),
+    
+    // No users illustration
+    NoUsers: () => (
+        <svg className="w-full h-full" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="100" cy="100" r="80" fill="currentColor" className="text-gray-100 dark:text-gray-800" />
+            <circle cx="100" cy="85" r="20" fill="currentColor" className="text-gray-300 dark:text-gray-600" />
+            <path d="M70 130c0-16.569 13.431-30 30-30s30 13.431 30 30" fill="currentColor" className="text-gray-300 dark:text-gray-600" />
+            <circle cx="70" cy="95" r="12" fill="currentColor" className="text-gray-200 dark:text-gray-700" />
+            <circle cx="130" cy="95" r="12" fill="currentColor" className="text-gray-200 dark:text-gray-700" />
+        </svg>
+    ),
+    
+    // No areas illustration
+    NoAreas: () => (
+        <svg className="w-full h-full" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="100" cy="100" r="80" fill="currentColor" className="text-gray-100 dark:text-gray-800" />
+            <path d="M100 60l-30 30v40h60v-40z" fill="currentColor" className="text-gray-200 dark:text-gray-700" />
+            <rect x="85" y="110" width="12" height="20" fill="currentColor" className="text-gray-300 dark:text-gray-600" />
+            <rect x="75" y="85" width="15" height="15" fill="currentColor" className="text-gray-300 dark:text-gray-600" />
+            <rect x="110" y="85" width="15" height="15" fill="currentColor" className="text-gray-300 dark:text-gray-600" />
+        </svg>
+    ),
+    
+    // No activity/logs illustration
+    NoActivity: () => (
+        <svg className="w-full h-full" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="100" cy="100" r="80" fill="currentColor" className="text-gray-100 dark:text-gray-800" />
+            <circle cx="100" cy="100" r="50" stroke="currentColor" strokeWidth="4" className="text-gray-300 dark:text-gray-600" />
+            <line x1="100" y1="100" x2="100" y2="70" stroke="currentColor" strokeWidth="4" strokeLinecap="round" className="text-gray-400 dark:text-gray-500" />
+            <line x1="100" y1="100" x2="120" y2="100" stroke="currentColor" strokeWidth="4" strokeLinecap="round" className="text-gray-400 dark:text-gray-500" />
+        </svg>
+    ),
+    
+    // Error illustration
+    Error: () => (
+        <svg className="w-full h-full" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="100" cy="100" r="80" fill="currentColor" className="text-red-50 dark:text-red-900/20" />
+            <circle cx="100" cy="100" r="50" stroke="currentColor" strokeWidth="4" className="text-red-300 dark:text-red-700" />
+            <line x1="85" y1="85" x2="115" y2="115" stroke="currentColor" strokeWidth="4" strokeLinecap="round" className="text-red-500" />
+            <line x1="115" y1="85" x2="85" y2="115" stroke="currentColor" strokeWidth="4" strokeLinecap="round" className="text-red-500" />
+        </svg>
+    ),
+    
+    // Success/completed illustration
+    Success: () => (
+        <svg className="w-full h-full" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="100" cy="100" r="80" fill="currentColor" className="text-emerald-50 dark:text-emerald-900/20" />
+            <circle cx="100" cy="100" r="50" stroke="currentColor" strokeWidth="4" className="text-emerald-300 dark:text-emerald-700" />
+            <path d="M75 100l15 15 35-35" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-500" />
+        </svg>
+    ),
 };
 
 /**
- * EmptyState component for displaying when no data exists
- * @param {Object} props
- * @param {React.ReactNode} [props.icon] - Icon component or element to display
- * @param {string} [props.iconType] - Predefined icon type (camera, folder, users, search, activity, inbox)
- * @param {string} props.title - Title text
- * @param {string} props.description - Description text
- * @param {Object} [props.action] - Primary action button
- * @param {string} props.action.label - Button label
- * @param {Function} props.action.onClick - Button click handler
- * @param {Object} [props.secondaryAction] - Secondary action button
- * @param {string} props.secondaryAction.label - Button label
- * @param {Function} props.secondaryAction.onClick - Button click handler
- * @param {string} [props.className] - Additional CSS classes
+ * Base EmptyState Component
  */
 export function EmptyState({
-    icon,
-    iconType,
+    illustration = 'NoData',
     title,
     description,
     action,
+    actionLabel,
     secondaryAction,
+    secondaryActionLabel,
     className = '',
 }) {
-    // Determine which icon to render
-    const IconComponent = icon || (iconType && EMPTY_STATE_ICONS[iconType]) || InboxIcon;
-    const renderIcon = typeof IconComponent === 'function' ? <IconComponent /> : IconComponent;
-
+    const IllustrationComponent = Illustrations[illustration] || Illustrations.NoData;
+    
     return (
         <div className={`flex flex-col items-center justify-center py-12 px-4 text-center ${className}`}>
-            {/* Icon */}
-            <div className="text-dark-400 mb-4">
-                {renderIcon}
+            {/* Illustration */}
+            <div className="w-32 h-32 mb-6">
+                <IllustrationComponent />
             </div>
-
+            
             {/* Title */}
-            <h3 className="text-lg font-medium text-dark-200 mb-2">
-                {title}
-            </h3>
-
+            {title && (
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                    {title}
+                </h3>
+            )}
+            
             {/* Description */}
-            <p className="text-sm text-dark-400 max-w-sm mb-6">
-                {description}
-            </p>
-
+            {description && (
+                <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md mb-6">
+                    {description}
+                </p>
+            )}
+            
             {/* Actions */}
             {(action || secondaryAction) && (
-                <div className="flex flex-wrap gap-3 justify-center">
+                <div className="flex flex-col sm:flex-row gap-3">
                     {action && (
                         <button
-                            onClick={action.onClick}
-                            className="inline-flex items-center px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-dark-900"
+                            onClick={action}
+                            className="px-6 py-2.5 bg-sky-500 hover:bg-sky-600 text-white font-medium rounded-lg transition-colors shadow-sm"
                         >
-                            {action.label}
+                            {actionLabel || 'Take Action'}
                         </button>
                     )}
                     {secondaryAction && (
                         <button
-                            onClick={secondaryAction.onClick}
-                            className="inline-flex items-center px-4 py-2 bg-dark-700 hover:bg-dark-600 text-dark-200 text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-dark-500 focus:ring-offset-2 focus:ring-offset-dark-900"
+                            onClick={secondaryAction}
+                            className="px-6 py-2.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-lg transition-colors"
                         >
-                            {secondaryAction.label}
+                            {secondaryActionLabel || 'Secondary Action'}
                         </button>
                     )}
                 </div>
@@ -131,81 +155,151 @@ export function EmptyState({
 }
 
 /**
- * Preset empty states for common scenarios
+ * Preset Empty States for common scenarios
  */
 
+// No cameras found
 export function NoCamerasEmptyState({ onAddCamera }) {
     return (
         <EmptyState
-            iconType="camera"
-            title="No cameras configured"
-            description="Get started by adding your first camera to monitor your space."
-            action={{
-                label: 'Add Camera',
-                onClick: onAddCamera,
-            }}
+            illustration="NoCamera"
+            title="Belum Ada Kamera"
+            description="Mulai dengan menambahkan kamera CCTV pertama Anda. Kamera akan muncul di sini setelah ditambahkan."
+            action={onAddCamera}
+            actionLabel="Tambah Kamera"
         />
     );
 }
 
-export function NoAreasEmptyState({ onCreateArea }) {
+// No search results
+export function NoSearchResultsEmptyState({ searchQuery, onClearSearch }) {
     return (
         <EmptyState
-            iconType="folder"
-            title="No areas created"
-            description="Areas help you organize cameras by location or purpose. Create your first area to get started."
-            action={{
-                label: 'Create Area',
-                onClick: onCreateArea,
-            }}
+            illustration="NoData"
+            title="Tidak Ditemukan"
+            description={`Tidak ada hasil untuk "${searchQuery}". Coba kata kunci lain atau hapus filter pencarian.`}
+            action={onClearSearch}
+            actionLabel="Hapus Pencarian"
         />
     );
 }
 
-export function NoUsersEmptyState() {
+// No feedback
+export function NoFeedbackEmptyState() {
     return (
         <EmptyState
-            iconType="users"
-            title="No users found"
-            description="There are no user accounts in the system. This shouldn't normally happen."
+            illustration="NoFeedback"
+            title="Belum Ada Feedback"
+            description="Feedback dari pengguna akan muncul di sini. Tunggu hingga ada pengguna yang mengirimkan kritik atau saran."
         />
     );
 }
 
+// No users
+export function NoUsersEmptyState({ onAddUser }) {
+    return (
+        <EmptyState
+            illustration="NoUsers"
+            title="Belum Ada User"
+            description="Tambahkan user admin untuk mengelola sistem CCTV. Setiap user dapat memiliki role dan permission berbeda."
+            action={onAddUser}
+            actionLabel="Tambah User"
+        />
+    );
+}
+
+// No areas
+export function NoAreasEmptyState({ onAddArea }) {
+    return (
+        <EmptyState
+            illustration="NoAreas"
+            title="Belum Ada Area"
+            description="Buat area untuk mengelompokkan kamera berdasarkan lokasi. Area membantu organisasi kamera yang lebih baik."
+            action={onAddArea}
+            actionLabel="Tambah Area"
+        />
+    );
+}
+
+// No activity/logs
 export function NoActivityEmptyState() {
     return (
         <EmptyState
-            iconType="activity"
-            title="No recent activity"
-            description="Activity logs will appear here once actions are performed in the system."
+            illustration="NoActivity"
+            title="Belum Ada Aktivitas"
+            description="Aktivitas admin dan log sistem akan muncul di sini. Semua perubahan akan tercatat secara otomatis."
         />
     );
 }
 
-export function NoSearchResultsEmptyState({ onClearFilters }) {
+// No streams/viewers
+export function NoStreamsEmptyState() {
     return (
         <EmptyState
-            iconType="search"
-            title="No results found"
-            description="Try adjusting your search terms or clearing filters to see more results."
-            action={onClearFilters ? {
-                label: 'Clear Filters',
-                onClick: onClearFilters,
-            } : undefined}
+            illustration="NoCamera"
+            title="Tidak Ada Stream Aktif"
+            description="Belum ada viewer yang menonton kamera saat ini. Data viewer akan muncul ketika ada yang mengakses stream."
         />
     );
 }
 
-export function NoStreamsEmptyState({ onAddCamera }) {
+// Error state
+export function ErrorEmptyState({ error, onRetry }) {
     return (
         <EmptyState
-            iconType="camera"
-            title="No active streams"
-            description="There are no cameras currently streaming. Add a camera or enable an existing one to start viewing."
-            action={onAddCamera ? {
-                label: 'Add Camera',
-                onClick: onAddCamera,
-            } : undefined}
+            illustration="Error"
+            title="Terjadi Kesalahan"
+            description={error || "Gagal memuat data. Silakan coba lagi atau hubungi administrator jika masalah berlanjut."}
+            action={onRetry}
+            actionLabel="Coba Lagi"
+        />
+    );
+}
+
+// Success/completed state
+export function SuccessEmptyState({ title, description, onContinue, continueLabel }) {
+    return (
+        <EmptyState
+            illustration="Success"
+            title={title || "Berhasil!"}
+            description={description || "Operasi berhasil diselesaikan."}
+            action={onContinue}
+            actionLabel={continueLabel || "Lanjutkan"}
+        />
+    );
+}
+
+// No data with filter
+export function NoDataWithFilterEmptyState({ filterName, onClearFilter }) {
+    return (
+        <EmptyState
+            illustration="NoData"
+            title="Tidak Ada Data"
+            description={`Tidak ada data yang sesuai dengan filter "${filterName}". Coba ubah atau hapus filter untuk melihat lebih banyak data.`}
+            action={onClearFilter}
+            actionLabel="Hapus Filter"
+        />
+    );
+}
+
+// Maintenance mode
+export function MaintenanceEmptyState() {
+    return (
+        <EmptyState
+            illustration="NoCamera"
+            title="Sedang Maintenance"
+            description="Fitur ini sedang dalam perbaikan. Silakan coba lagi nanti atau hubungi administrator untuk informasi lebih lanjut."
+        />
+    );
+}
+
+// Coming soon
+export function ComingSoonEmptyState({ featureName }) {
+    return (
+        <EmptyState
+            illustration="NoData"
+            title="Segera Hadir"
+            description={`Fitur ${featureName || 'ini'} sedang dalam pengembangan dan akan segera tersedia. Nantikan update selanjutnya!`}
         />
     );
 }
