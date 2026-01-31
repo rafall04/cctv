@@ -4,6 +4,7 @@ import { SecurityProvider } from './contexts/SecurityContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { ToastContainer } from './components/ui/ToastContainer';
 import { ApiClientInitializer } from './components/ApiClientInitializer';
+import ErrorBoundary, { InlineErrorBoundary } from './components/ui/ErrorBoundary';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import CameraManagement from './pages/CameraManagement';
@@ -21,6 +22,7 @@ import AdminLayout from './components/AdminLayout';
 
 function App() {
     return (
+        <ErrorBoundary>
         <ThemeProvider>
         <SecurityProvider>
         <NotificationProvider>
@@ -145,6 +147,7 @@ function App() {
         </NotificationProvider>
         </SecurityProvider>
         </ThemeProvider>
+        </ErrorBoundary>
     );
 }
 
