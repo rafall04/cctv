@@ -211,7 +211,7 @@ export function RealtimeActivityChart() {
     const fetchRealtimeData = async () => {
         try {
             // Gunakan endpoint getRealTimeViewers yang sudah ada
-            const response = await fetch('/api/admin/realtime-viewers', {
+            const response = await fetch('/api/admin/analytics/realtime', {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
