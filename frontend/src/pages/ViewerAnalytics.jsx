@@ -3,6 +3,9 @@ import { adminService } from '../services/adminService';
 import { Skeleton } from '../components/ui/Skeleton';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Alert } from '../components/ui/Alert';
+import { TrendBadge } from '../components/TrendIndicator';
+import { RetentionMetrics } from '../components/RetentionMetrics';
+import { CameraPerformanceTable } from '../components/CameraPerformanceTable';
 
 /**
  * Format duration in seconds to human readable format
@@ -148,9 +151,9 @@ function SimpleBarChart({ data, maxValue }) {
 }
 
 /**
- * Stats Card Component
+ * Stats Card Component with Trend Support
  */
-function StatsCard({ icon, label, value, subValue, color = 'sky', onClick }) {
+function StatsCard({ icon, label, value, subValue, color = 'sky', onClick, trend }) {
     const colorClasses = {
         sky: 'from-sky-400 to-sky-600 shadow-sky-500/30',
         purple: 'from-purple-400 to-purple-600 shadow-purple-500/30',
@@ -170,7 +173,10 @@ function StatsCard({ icon, label, value, subValue, color = 'sky', onClick }) {
                 </div>
                 <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{label}</span>
             </div>
-            <h3 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">{value}</h3>
+            <div className="flex items-baseline gap-2 mb-1">
+                <h3 className="text-3xl font-bold text-gray-900 dark:text-white">{value}</h3>
+                {trend !== null && trend !== undefined && <TrendBadge value={trend} />}
+            </div>
             {subValue && (
                 <p className="text-sm text-gray-500 dark:text-gray-400">{subValue}</p>
             )}
@@ -639,7 +645,7 @@ export default function ViewerAnalytics() {
         );
     }
 
-    const { overview, charts, topCameras, deviceBreakdown, topVisitors, recentSessions, peakHours, activeSessions } = analytics || {};
+    const { overview, comparison, retention, charts, topCameras, deviceBreakdown, topVisitors, recentSessions, peakHours, cameraPerformance, activeSessions } = analytics || {};
 
     // Prepare chart data with raw dates for click handling
     const sessionsByDayData = (charts?.sessionsByDay || []).slice(-14).map(d => ({
@@ -718,6 +724,7 @@ export default function ViewerAnalytics() {
                     value={overview?.uniqueVisitors || 0}
                     subValue={`${overview?.totalSessions || 0} total sesi`}
                     color="purple"
+                    trend={comparison?.trends?.uniqueVisitors}
                 />
                 <StatsCard
                     icon={<svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
@@ -725,6 +732,7 @@ export default function ViewerAnalytics() {
                     value={formatWatchTime(overview?.totalWatchTime || 0)}
                     subValue={`Rata-rata ${formatDuration(overview?.avgSessionDuration || 0)}/sesi`}
                     color="sky"
+                    trend={comparison?.trends?.totalWatchTime}
                 />
                 <StatsCard
                     icon={<svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>}
@@ -762,6 +770,16 @@ export default function ViewerAnalytics() {
                         ))}
                     </div>
                 </div>
+            )}
+
+            {/* Retention Metrics Section */}
+            {retention && (
+                <RetentionMetrics data={retention} />
+            )}
+
+            {/* Camera Performance Section */}
+            {cameraPerformance && cameraPerformance.length > 0 && (
+                <CameraPerformanceTable data={cameraPerformance} />
             )}
 
 

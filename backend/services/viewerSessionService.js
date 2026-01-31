@@ -343,6 +343,8 @@ class ViewerSessionService {
         try {
             // Determine date filter using WIB dates
             let dateFilter = '';
+            let previousDateFilter = '';
+            let periodDays = 0;
             const todayDate = getWIBDate();
             
             // Handle custom date format: "date:YYYY-MM-DD"
@@ -351,29 +353,47 @@ class ViewerSessionService {
                 // Validate date format
                 if (/^\d{4}-\d{2}-\d{2}$/.test(customDate)) {
                     dateFilter = `AND date(started_at) = '${customDate}'`;
+                    // Previous period: day before custom date
+                    const prevDate = new Date(customDate);
+                    prevDate.setDate(prevDate.getDate() - 1);
+                    const prevDateStr = prevDate.toISOString().split('T')[0];
+                    previousDateFilter = `AND date(started_at) = '${prevDateStr}'`;
+                    periodDays = 1;
                 } else {
                     dateFilter = `AND date(started_at) >= '${getWIBDateWithOffset(-7)}'`;
+                    previousDateFilter = `AND date(started_at) >= '${getWIBDateWithOffset(-14)}' AND date(started_at) < '${getWIBDateWithOffset(-7)}'`;
+                    periodDays = 7;
                 }
             } else {
                 switch (period) {
                     case 'today':
                         dateFilter = `AND date(started_at) = '${todayDate}'`;
+                        previousDateFilter = `AND date(started_at) = '${getWIBDateWithOffset(-1)}'`;
+                        periodDays = 1;
                         break;
                     case 'yesterday':
                         dateFilter = `AND date(started_at) = '${getWIBDateWithOffset(-1)}'`;
+                        previousDateFilter = `AND date(started_at) = '${getWIBDateWithOffset(-2)}'`;
+                        periodDays = 1;
                         break;
                     case '7days':
                         dateFilter = `AND date(started_at) >= '${getWIBDateWithOffset(-7)}'`;
+                        previousDateFilter = `AND date(started_at) >= '${getWIBDateWithOffset(-14)}' AND date(started_at) < '${getWIBDateWithOffset(-7)}'`;
+                        periodDays = 7;
                         break;
                     case '30days':
                         dateFilter = `AND date(started_at) >= '${getWIBDateWithOffset(-30)}'`;
+                        previousDateFilter = `AND date(started_at) >= '${getWIBDateWithOffset(-60)}' AND date(started_at) < '${getWIBDateWithOffset(-30)}'`;
+                        periodDays = 30;
                         break;
                     default:
                         dateFilter = '';
+                        previousDateFilter = '';
+                        periodDays = 0;
                 }
             }
 
-            // Overview stats
+            // Overview stats - Current period
             const overview = queryOne(`
                 SELECT 
                     COUNT(*) as total_sessions,
@@ -384,6 +404,57 @@ class ViewerSessionService {
                 FROM viewer_session_history
                 WHERE 1=1 ${dateFilter}
             `) || {};
+
+            // Overview stats - Previous period (for comparison)
+            const previousOverview = periodDays > 0 ? (queryOne(`
+                SELECT 
+                    COUNT(*) as total_sessions,
+                    COUNT(DISTINCT ip_address) as unique_visitors,
+                    COALESCE(SUM(duration_seconds), 0) as total_watch_time,
+                    COALESCE(AVG(duration_seconds), 0) as avg_session_duration
+                FROM viewer_session_history
+                WHERE 1=1 ${previousDateFilter}
+            `) || {}) : null;
+
+            // Calculate trends (percentage change)
+            const calculateTrend = (current, previous) => {
+                if (!previous || previous === 0) return 0;
+                return Math.round(((current - previous) / previous) * 100);
+            };
+
+            const trends = previousOverview ? {
+                totalSessions: calculateTrend(overview.total_sessions, previousOverview.total_sessions),
+                uniqueVisitors: calculateTrend(overview.unique_visitors, previousOverview.unique_visitors),
+                totalWatchTime: calculateTrend(overview.total_watch_time, previousOverview.total_watch_time),
+                avgSessionDuration: calculateTrend(overview.avg_session_duration, previousOverview.avg_session_duration)
+            } : null;
+
+            // Retention metrics: New vs Returning visitors
+            const retentionMetrics = queryOne(`
+                SELECT 
+                    COUNT(DISTINCT CASE WHEN visit_count = 1 THEN ip_address END) as new_visitors,
+                    COUNT(DISTINCT CASE WHEN visit_count > 1 THEN ip_address END) as returning_visitors,
+                    COUNT(DISTINCT CASE WHEN duration_seconds < 10 THEN ip_address END) as bounced_visitors,
+                    COUNT(DISTINCT ip_address) as total_unique_visitors
+                FROM (
+                    SELECT 
+                        ip_address,
+                        duration_seconds,
+                        (SELECT COUNT(*) FROM viewer_session_history h2 
+                         WHERE h2.ip_address = h1.ip_address 
+                         AND date(h2.started_at) <= date(h1.started_at)) as visit_count
+                    FROM viewer_session_history h1
+                    WHERE 1=1 ${dateFilter}
+                )
+            `) || {};
+
+            const bounceRate = retentionMetrics.total_unique_visitors > 0 
+                ? Math.round((retentionMetrics.bounced_visitors / retentionMetrics.total_unique_visitors) * 100)
+                : 0;
+
+            const retentionRate = retentionMetrics.total_unique_visitors > 0
+                ? Math.round((retentionMetrics.returning_visitors / retentionMetrics.total_unique_visitors) * 100)
+                : 0;
 
             // Sessions by day (for chart)
             const sessionsByDay = query(`
@@ -486,6 +557,24 @@ class ViewerSessionService {
             const activeViewers = this.getTotalActiveViewers();
             const activeSessions = this.getActiveSessions();
 
+            // Camera performance metrics
+            const cameraPerformance = query(`
+                SELECT 
+                    camera_id,
+                    camera_name,
+                    COUNT(*) as total_sessions,
+                    COUNT(DISTINCT ip_address) as unique_viewers,
+                    COALESCE(AVG(duration_seconds), 0) as avg_watch_time,
+                    COALESCE(SUM(CASE WHEN duration_seconds < 10 THEN 1 ELSE 0 END), 0) as quick_exits,
+                    COALESCE(SUM(CASE WHEN duration_seconds >= 60 THEN 1 ELSE 0 END), 0) as engaged_sessions,
+                    ROUND(COALESCE(SUM(CASE WHEN duration_seconds < 10 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 0), 1) as bounce_rate,
+                    ROUND(COALESCE(SUM(CASE WHEN duration_seconds >= 60 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 0), 1) as engagement_rate
+                FROM viewer_session_history
+                WHERE 1=1 ${dateFilter}
+                GROUP BY camera_id, camera_name
+                ORDER BY total_sessions DESC
+            `);
+
             return {
                 period,
                 overview: {
@@ -496,6 +585,24 @@ class ViewerSessionService {
                     longestSession: overview.longest_session || 0,
                     activeViewers,
                 },
+                // Comparison data with previous period
+                comparison: previousOverview ? {
+                    previous: {
+                        totalSessions: previousOverview.total_sessions || 0,
+                        uniqueVisitors: previousOverview.unique_visitors || 0,
+                        totalWatchTime: previousOverview.total_watch_time || 0,
+                        avgSessionDuration: Math.round(previousOverview.avg_session_duration || 0),
+                    },
+                    trends: trends
+                } : null,
+                // Retention metrics
+                retention: {
+                    newVisitors: retentionMetrics.new_visitors || 0,
+                    returningVisitors: retentionMetrics.returning_visitors || 0,
+                    bouncedVisitors: retentionMetrics.bounced_visitors || 0,
+                    bounceRate: bounceRate,
+                    retentionRate: retentionRate,
+                },
                 charts: {
                     sessionsByDay,
                     sessionsByHour,
@@ -505,6 +612,8 @@ class ViewerSessionService {
                 topVisitors,
                 recentSessions,
                 peakHours,
+                // Camera performance metrics
+                cameraPerformance,
                 activeSessions: activeSessions.map(s => ({
                     sessionId: s.session_id,
                     cameraId: s.camera_id,
@@ -527,12 +636,21 @@ class ViewerSessionService {
                     longestSession: 0,
                     activeViewers: 0,
                 },
+                comparison: null,
+                retention: {
+                    newVisitors: 0,
+                    returningVisitors: 0,
+                    bouncedVisitors: 0,
+                    bounceRate: 0,
+                    retentionRate: 0,
+                },
                 charts: { sessionsByDay: [], sessionsByHour: [] },
                 topCameras: [],
                 deviceBreakdown: [],
                 topVisitors: [],
                 recentSessions: [],
                 peakHours: [],
+                cameraPerformance: [],
                 activeSessions: [],
             };
         }
