@@ -605,10 +605,10 @@ const VideoModal = memo(({ camera, onClose }) => {
             >
                 {/* Header Info - di atas video (hide in fullscreen) */}
                 {!isFullscreen && (
-                    <div className="p-3 border-b border-gray-800">
+                    <div className="p-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
                         <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 flex-1 min-w-0">
-                                <h3 className="text-white font-bold text-sm sm:text-base truncate">{camera.name}</h3>
+                                <h3 className="text-gray-900 dark:text-white font-bold text-sm sm:text-base truncate">{camera.name}</h3>
                                 {camera.video_codec && (
                                     <CodecBadge codec={camera.video_codec} size="sm" showWarning={false} />
                                 )}
@@ -633,7 +633,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                         {(camera.location || camera.area_name) && (
                             <div className="flex items-center gap-2 mt-1.5">
                                 {camera.location && (
-                                    <span className="text-gray-400 text-xs flex items-center gap-1 truncate">
+                                    <span className="text-gray-600 dark:text-gray-400 text-xs flex items-center gap-1 truncate">
                                         <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                             <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/>
                                             <circle cx="12" cy="11" r="3"/>
@@ -642,7 +642,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                                     </span>
                                 )}
                                 {camera.area_name && (
-                                    <span className="px-1.5 py-0.5 bg-sky-500/20 text-sky-400 rounded text-[10px] font-medium shrink-0">
+                                    <span className="px-1.5 py-0.5 bg-sky-500/20 text-sky-600 dark:text-sky-400 rounded text-[10px] font-medium shrink-0">
                                         {camera.area_name}
                                     </span>
                                 )}
@@ -843,15 +843,15 @@ const VideoModal = memo(({ camera, onClose }) => {
                 </div>
 
                 {/* Controls Panel - hide in fullscreen */}
-                <div className={`border-t border-gray-800 ${isFullscreen ? 'hidden' : ''}`}>
+                <div className={`border-t border-gray-200 dark:border-gray-800 ${isFullscreen ? 'hidden' : ''}`}>
                     {/* Controls */}
                     <div className="p-3 flex items-center justify-between">
                         {/* Camera Description - Kiri Bawah */}
-                        <div className="text-xs text-gray-400 flex-1 min-w-0 mr-3">
+                        <div className="text-xs text-gray-600 dark:text-gray-400 flex-1 min-w-0 mr-3">
                             {camera.description ? (
                                 <span className="line-clamp-2">{camera.description}</span>
                             ) : (
-                                <span className="text-gray-500 italic">Tidak ada deskripsi</span>
+                                <span className="text-gray-500 dark:text-gray-500 italic">Tidak ada deskripsi</span>
                             )}
                         </div>
                         
@@ -859,22 +859,22 @@ const VideoModal = memo(({ camera, onClose }) => {
                         {!isMaintenance && status !== 'error' && (
                             <div className="flex items-center gap-1 shrink-0">
                                 {/* Zoom Controls */}
-                                <div className="flex items-center gap-0.5 bg-gray-800 rounded-lg p-0.5">
+                                <div className="flex items-center gap-0.5 bg-gray-200/90 dark:bg-gray-800 rounded-lg p-0.5">
                                     <button
                                         onClick={handleZoomOut}
                                         disabled={zoomDisplay <= MIN_ZOOM}
-                                        className="p-1.5 hover:bg-gray-700 disabled:opacity-30 rounded text-white transition-colors"
+                                        className="p-1.5 hover:bg-gray-300/50 dark:hover:bg-gray-700 disabled:opacity-30 rounded text-gray-900 dark:text-white transition-colors"
                                         title="Zoom Out"
                                     >
                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                             <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"/>
                                         </svg>
                                     </button>
-                                    <span className="text-white text-[10px] font-medium w-8 text-center">{Math.round(zoomDisplay * 100)}%</span>
+                                    <span className="text-gray-900 dark:text-white text-[10px] font-medium w-8 text-center">{Math.round(zoomDisplay * 100)}%</span>
                                     <button
                                         onClick={handleZoomIn}
                                         disabled={zoomDisplay >= MAX_ZOOM}
-                                        className="p-1.5 hover:bg-gray-700 disabled:opacity-30 rounded text-white transition-colors"
+                                        className="p-1.5 hover:bg-gray-300/50 dark:hover:bg-gray-700 disabled:opacity-30 rounded text-gray-900 dark:text-white transition-colors"
                                         title="Zoom In"
                                     >
                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -884,7 +884,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                                     {zoomDisplay > 1 && (
                                         <button
                                             onClick={handleResetZoom}
-                                            className="p-1.5 hover:bg-gray-700 rounded text-white transition-colors"
+                                            className="p-1.5 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-white transition-colors"
                                             title="Reset Zoom"
                                         >
                                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -898,7 +898,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                                 {status === 'playing' && (
                                     <button
                                         onClick={takeSnapshot}
-                                        className="p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-white transition-colors"
+                                        className="p-1.5 bg-gray-200/80 dark:bg-gray-800 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded-lg text-gray-900 dark:text-white transition-colors"
                                         title="Ambil Screenshot"
                                     >
                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -912,7 +912,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                                 {/* Fullscreen Button */}
                                 <button
                                     onClick={toggleFullscreen}
-                                    className="p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-white transition-colors"
+                                    className="p-1.5 bg-gray-200/80 dark:bg-gray-800 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded-lg text-gray-900 dark:text-white transition-colors"
                                     title={isFullscreen ? "Keluar Fullscreen" : "Fullscreen"}
                                 >
                                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -927,7 +927,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                                 {/* Close Button */}
                                 <button
                                     onClick={onClose}
-                                    className="p-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-white transition-colors"
+                                    className="p-1.5 bg-gray-200/80 dark:bg-gray-800 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded-lg text-gray-900 dark:text-white transition-colors"
                                     title="Tutup"
                                 >
                                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
