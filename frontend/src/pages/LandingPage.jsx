@@ -3063,6 +3063,7 @@ function Footer({ cameraCount, areaCount, saweriaEnabled, saweriaLink }) {
                     <span className="text-xs px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">Pasang CCTV</span>
                     <span className="text-xs px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">HD Streaming</span>
                     <span className="text-xs px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">Multi-View</span>
+                    <span className="text-xs px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">Playback</span>
                     <span className="text-xs px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">Gratis Akses</span>
                 </div>
 
@@ -3071,7 +3072,7 @@ function Footer({ cameraCount, areaCount, saweriaEnabled, saweriaLink }) {
                     <div className="flex flex-col items-center gap-3 mb-6">
                         <div className="text-center">
                             <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                                💝 Bantu kami tambah CCTV di lokasi strategis
+                                💝 Dukung kami untuk tambah CCTV di lokasi strategis
                             </p>
                         </div>
                         <a
@@ -3083,11 +3084,8 @@ function Footer({ cameraCount, areaCount, saweriaEnabled, saweriaLink }) {
                             <span className="text-xl">☕</span>
                             <span>Traktir Kopi Yuk!</span>
                         </a>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 text-center max-w-md flex items-center justify-center gap-1.5">
-                            <span>Dukungan kamu akan membantu kami untuk upgrade server, tambah bandwidth, dan pasang CCTV di titik-titik penting lainnya</span>
-                            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-                            </svg>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 text-center max-w-md">
+                            Dukungan Anda sangat berarti untuk upgrade server, tambah bandwidth, dan pasang CCTV di titik-titik penting lainnya. Terima kasih! 🙏
                         </p>
                     </div>
                 )}
@@ -3694,13 +3692,22 @@ export default function LandingPage() {
                             <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
                                 <Icons.Shield />
                             </div>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Secure</span>
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Aman</span>
                         </div>
                         <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
                             <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400">
                                 <Icons.Clock />
                             </div>
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">24/7 Live</span>
+                        </div>
+                        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
+                            <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Playback</span>
                         </div>
                     </div>
                     
