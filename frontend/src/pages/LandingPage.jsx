@@ -1209,7 +1209,7 @@ function VideoPopup({ camera, onClose }) {
                     <div className="p-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
                         <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 flex-1 min-w-0">
-                                <h3 className="text-white font-bold text-sm sm:text-base truncate">{camera.name}</h3>
+                                <h3 className="text-gray-900 dark:text-white font-bold text-sm sm:text-base truncate">{camera.name}</h3>
                                 {camera.video_codec && (
                                     <CodecBadge codec={camera.video_codec} size="sm" showWarning={false} />
                                 )}
@@ -1234,13 +1234,13 @@ function VideoPopup({ camera, onClose }) {
                         {(camera.location || camera.area_name) && (
                             <div className="flex items-center gap-2 mt-1.5">
                                 {camera.location && (
-                                    <span className="text-gray-400 text-xs flex items-center gap-1 truncate">
+                                    <span className="text-gray-600 dark:text-gray-400 text-xs flex items-center gap-1 truncate">
                                         <Icons.MapPin />
                                         <span className="truncate">{camera.location}</span>
                                     </span>
                                 )}
                                 {camera.area_name && (
-                                    <span className="px-1.5 py-0.5 bg-sky-500/20 text-sky-400 rounded text-[10px] font-medium shrink-0">
+                                    <span className="px-1.5 py-0.5 bg-sky-500/20 text-sky-600 dark:text-sky-400 rounded text-[10px] font-medium shrink-0">
                                         {camera.area_name}
                                     </span>
                                 )}
@@ -1269,13 +1269,13 @@ function VideoPopup({ camera, onClose }) {
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        {status === 'live' && <button onClick={takeSnapshot} className="p-2 hover:bg-white/20 active:bg-white/30 rounded-xl text-white bg-white/10"><Icons.Image /></button>}
-                                        <button onClick={toggleFS} className="p-2 hover:bg-white/20 active:bg-white/30 rounded-xl text-white bg-white/10">
+                                        {status === 'live' && <button onClick={takeSnapshot} className="p-2 hover:bg-gray-700/50 dark:hover:bg-white/20 active:bg-gray-700/70 dark:active:bg-white/30 rounded-xl text-gray-900 dark:text-white bg-gray-200/80 dark:bg-white/10"><Icons.Image /></button>}
+                                        <button onClick={toggleFS} className="p-2 hover:bg-gray-700/50 dark:hover:bg-white/20 active:bg-gray-700/70 dark:active:bg-white/30 rounded-xl text-gray-900 dark:text-white bg-gray-200/80 dark:bg-white/10">
                                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25"/>
                                             </svg>
                                         </button>
-                                        <button onClick={handleClose} className="p-2 hover:bg-white/20 active:bg-white/30 rounded-xl text-white bg-white/10"><Icons.X /></button>
+                                        <button onClick={handleClose} className="p-2 hover:bg-gray-700/50 dark:hover:bg-white/20 active:bg-gray-700/70 dark:active:bg-white/30 rounded-xl text-gray-900 dark:text-white bg-gray-200/80 dark:bg-white/10"><Icons.X /></button>
                                     </div>
                                 </div>
                                 {/* Codec info detail - fullscreen mode */}
@@ -1293,11 +1293,11 @@ function VideoPopup({ camera, onClose }) {
                                 )}
                             </div>
                             
-                            <div className="absolute bottom-4 right-4 z-50 flex items-center gap-1 bg-gray-900/80 dark:bg-black/80 rounded-xl p-1 pointer-events-auto">
-                                <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-2 hover:bg-white/20 active:bg-white/30 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomOut /></button>
-                                <span className="text-white text-xs font-medium w-12 text-center">{Math.round(zoom * 100)}%</span>
-                                <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 4} className="p-2 hover:bg-white/20 active:bg-white/30 disabled:opacity-30 rounded-lg text-white"><Icons.ZoomIn /></button>
-                                {zoom > 1 && <button onClick={() => getZoomableWrapper()?._reset?.()} className="p-2 hover:bg-white/20 active:bg-white/30 rounded-lg text-white ml-1"><Icons.Reset /></button>}
+                            <div className="absolute bottom-4 right-4 z-50 flex items-center gap-1 bg-gray-200/90 dark:bg-gray-900/80 rounded-xl p-1 pointer-events-auto">
+                                <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 disabled:opacity-30 rounded-lg text-gray-900 dark:text-white"><Icons.ZoomOut /></button>
+                                <span className="text-gray-900 dark:text-white text-xs font-medium w-12 text-center">{Math.round(zoom * 100)}%</span>
+                                <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 4} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 disabled:opacity-30 rounded-lg text-gray-900 dark:text-white"><Icons.ZoomIn /></button>
+                                {zoom > 1 && <button onClick={() => getZoomableWrapper()?._reset?.()} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 rounded-lg text-gray-900 dark:text-white ml-1"><Icons.Reset /></button>}
                             </div>
                         </>
                     )}
@@ -2046,20 +2046,20 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                                 </span>
                                 <p className="text-white text-sm font-medium">{camera.name}</p>
                             </div>
-                            <button onClick={toggleFS} className="p-2 hover:bg-white/20 active:bg-white/30 rounded-xl text-white bg-white/10"><Icons.Fullscreen /></button>
+                            <button onClick={toggleFS} className="p-2 hover:bg-gray-700/50 dark:hover:bg-white/20 active:bg-gray-700/70 dark:active:bg-white/30 rounded-xl text-gray-900 dark:text-white bg-gray-200/80 dark:bg-white/10"><Icons.Fullscreen /></button>
                         </div>
                     </div>
                     
                     {/* Bottom controls - Always visible on mobile */}
-                    <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-gray-900/80 dark:bg-black/80 rounded-xl p-1 pointer-events-auto">
-                        <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-2 hover:bg-white/20 active:bg-white/30 disabled:opacity-30 rounded text-white"><Icons.ZoomOut /></button>
-                        <span className="text-white text-xs w-12 text-center">{Math.round(zoom * 100)}%</span>
-                        <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 3} className="p-2 hover:bg-white/20 active:bg-white/30 disabled:opacity-30 rounded text-white"><Icons.ZoomIn /></button>
-                        {zoom > 1 && <button onClick={() => getZoomableWrapper()?._reset?.()} className="p-2 hover:bg-white/20 active:bg-white/30 rounded text-white"><Icons.Reset /></button>}
+                    <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-gray-200/90 dark:bg-gray-900/80 rounded-xl p-1 pointer-events-auto">
+                        <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 disabled:opacity-30 rounded text-gray-900 dark:text-white"><Icons.ZoomOut /></button>
+                        <span className="text-gray-900 dark:text-white text-xs w-12 text-center">{Math.round(zoom * 100)}%</span>
+                        <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 3} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 disabled:opacity-30 rounded text-gray-900 dark:text-white"><Icons.ZoomIn /></button>
+                        {zoom > 1 && <button onClick={() => getZoomableWrapper()?._reset?.()} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 rounded text-gray-900 dark:text-white"><Icons.Reset /></button>}
                         {status === 'live' && (
                             <>
-                                <div className="w-px h-4 bg-white/20 mx-1" />
-                                <button onClick={takeSnapshot} className="p-2 hover:bg-white/20 active:bg-white/30 rounded text-white"><Icons.Image /></button>
+                                <div className="w-px h-4 bg-gray-400 dark:bg-white/20 mx-1" />
+                                <button onClick={takeSnapshot} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 rounded text-gray-900 dark:text-white"><Icons.Image /></button>
                             </>
                         )}
                     </div>
@@ -2213,8 +2213,8 @@ function MultiViewLayout({ cameras, onRemove, onClose }) {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button onClick={toggleFS} className="p-2 hover:bg-white/10 rounded-xl text-white"><Icons.Fullscreen /></button>
-                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl text-white"><Icons.X /></button>
+                    <button onClick={toggleFS} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/10 rounded-xl text-gray-900 dark:text-white"><Icons.Fullscreen /></button>
+                    <button onClick={onClose} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/10 rounded-xl text-gray-900 dark:text-white"><Icons.X /></button>
                 </div>
             </div>
             <div ref={containerRef} className="flex-1 p-2 sm:p-3 min-h-0 overflow-hidden">

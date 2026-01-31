@@ -800,21 +800,21 @@ const VideoModal = memo(({ camera, onClose }) => {
                             </div>
                             
                             {/* Bottom controls - Zoom only */}
-                            <div className="absolute bottom-4 right-4 z-50 flex items-center gap-1 bg-gray-900/80 dark:bg-black/80 rounded-xl p-1 pointer-events-auto">
+                            <div className="absolute bottom-4 right-4 z-50 flex items-center gap-1 bg-gray-200/90 dark:bg-gray-900/80 rounded-xl p-1 pointer-events-auto">
                                 <button
                                     onClick={handleZoomOut}
                                     disabled={zoomDisplay <= MIN_ZOOM}
-                                    className="p-2 hover:bg-white/20 active:bg-white/30 disabled:opacity-30 rounded-lg text-white"
+                                    className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 disabled:opacity-30 rounded-lg text-gray-900 dark:text-white"
                                 >
                                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                         <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"/>
                                     </svg>
                                 </button>
-                                <span className="text-white text-xs font-medium w-12 text-center">{Math.round(zoomDisplay * 100)}%</span>
+                                <span className="text-gray-900 dark:text-white text-xs font-medium w-12 text-center">{Math.round(zoomDisplay * 100)}%</span>
                                 <button
                                     onClick={handleZoomIn}
                                     disabled={zoomDisplay >= MAX_ZOOM}
-                                    className="p-2 hover:bg-white/20 active:bg-white/30 disabled:opacity-30 rounded-lg text-white"
+                                    className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 disabled:opacity-30 rounded-lg text-gray-900 dark:text-white"
                                 >
                                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                         <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"/>
@@ -823,7 +823,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                                 {zoomDisplay > 1 && (
                                     <button
                                         onClick={handleResetZoom}
-                                        className="p-2 hover:bg-white/20 active:bg-white/30 rounded-lg text-white ml-1"
+                                        className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 rounded-lg text-gray-900 dark:text-white ml-1"
                                     >
                                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                             <path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/>
@@ -836,7 +836,7 @@ const VideoModal = memo(({ camera, onClose }) => {
 
                     {/* Zoom hint */}
                     {zoomDisplay > 1 && (
-                        <div className="absolute bottom-2 left-2 px-2 py-1 bg-gray-900/60 dark:bg-black/60 text-white text-xs rounded-lg z-20">
+                        <div className="absolute bottom-2 left-2 px-2 py-1 bg-gray-200/80 dark:bg-gray-900/60 text-gray-900 dark:text-white text-xs rounded-lg z-20">
                             Geser untuk pan
                         </div>
                     )}
