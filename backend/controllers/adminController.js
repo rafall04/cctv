@@ -235,27 +235,50 @@ export async function getDashboardStats(request, reply) {
 /**
  * Get today's quick stats with comparison to yesterday
  * For dashboard mini cards
+ * Supports period parameter: 'today', 'yesterday', '7days', '30days'
  */
 export async function getTodayStats(request, reply) {
     try {
+        const { period = 'today' } = request.query;
+        
         const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-        const yesterdayStart = new Date(todayStart);
-        yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+        let startDate, endDate, compareStartDate, compareEndDate;
         
-        // Get today's viewer sessions from database
-        const todaySessions = query(`
-            SELECT 
-                COUNT(DISTINCT session_id) as total_sessions,
-                COUNT(DISTINCT ip_address) as unique_viewers,
-                AVG(duration_seconds) as avg_duration,
-                SUM(duration_seconds) as total_watch_time
-            FROM viewer_sessions
-            WHERE started_at >= datetime(?, 'unixepoch')
-        `, [Math.floor(todayStart.getTime() / 1000)]);
+        // Calculate date ranges based on period
+        switch (period) {
+            case 'yesterday':
+                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0);
+                endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+                compareStartDate = new Date(startDate);
+                compareStartDate.setDate(compareStartDate.getDate() - 1);
+                compareEndDate = startDate;
+                break;
+            case '7days':
+                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7, 0, 0, 0);
+                endDate = now;
+                compareStartDate = new Date(startDate);
+                compareStartDate.setDate(compareStartDate.getDate() - 7);
+                compareEndDate = startDate;
+                break;
+            case '30days':
+                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30, 0, 0, 0);
+                endDate = now;
+                compareStartDate = new Date(startDate);
+                compareStartDate.setDate(compareStartDate.getDate() - 30);
+                compareEndDate = startDate;
+                break;
+            case 'today':
+            default:
+                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+                endDate = now;
+                compareStartDate = new Date(startDate);
+                compareStartDate.setDate(compareStartDate.getDate() - 1);
+                compareEndDate = startDate;
+                break;
+        }
         
-        // Get yesterday's stats for comparison
-        const yesterdaySessions = query(`
+        // Get current period viewer sessions from database
+        const currentSessionsResult = query(`
             SELECT 
                 COUNT(DISTINCT session_id) as total_sessions,
                 COUNT(DISTINCT ip_address) as unique_viewers,
@@ -264,7 +287,19 @@ export async function getTodayStats(request, reply) {
             FROM viewer_sessions
             WHERE started_at >= datetime(?, 'unixepoch')
             AND started_at < datetime(?, 'unixepoch')
-        `, [Math.floor(yesterdayStart.getTime() / 1000), Math.floor(todayStart.getTime() / 1000)]);
+        `, [Math.floor(startDate.getTime() / 1000), Math.floor(endDate.getTime() / 1000)]);
+        
+        // Get comparison period stats
+        const compareSessionsResult = query(`
+            SELECT 
+                COUNT(DISTINCT session_id) as total_sessions,
+                COUNT(DISTINCT ip_address) as unique_viewers,
+                AVG(duration_seconds) as avg_duration,
+                SUM(duration_seconds) as total_watch_time
+            FROM viewer_sessions
+            WHERE started_at >= datetime(?, 'unixepoch')
+            AND started_at < datetime(?, 'unixepoch')
+        `, [Math.floor(compareStartDate.getTime() / 1000), Math.floor(compareEndDate.getTime() / 1000)]);
         
         // Get current active viewers from viewerSessionService
         const viewerStats = viewerSessionService.getViewerStats();
@@ -290,41 +325,42 @@ export async function getTodayStats(request, reply) {
         const offlineCount = cameraStatus.active - onlineCount;
         
         // Calculate percentage changes
-        const calculateChange = (today, yesterday) => {
-            if (!yesterday || yesterday === 0) return today > 0 ? 100 : 0;
-            return Math.round(((today - yesterday) / yesterday) * 100);
+        const calculateChange = (current, compare) => {
+            if (!compare || compare === 0) return current > 0 ? 100 : 0;
+            return Math.round(((current - compare) / compare) * 100);
         };
         
-        const todayData = todaySessions[0] || { total_sessions: 0, unique_viewers: 0, avg_duration: 0, total_watch_time: 0 };
-        const yesterdayData = yesterdaySessions[0] || { total_sessions: 0, unique_viewers: 0, avg_duration: 0, total_watch_time: 0 };
+        const currentData = currentSessionsResult[0] || { total_sessions: 0, unique_viewers: 0, avg_duration: 0, total_watch_time: 0 };
+        const compareData = compareSessionsResult[0] || { total_sessions: 0, unique_viewers: 0, avg_duration: 0, total_watch_time: 0 };
         
         return reply.send({
             success: true,
             data: {
-                today: {
-                    totalSessions: todayData.total_sessions || 0,
-                    uniqueViewers: todayData.unique_viewers || 0,
-                    avgDuration: Math.round(todayData.avg_duration || 0),
-                    totalWatchTime: todayData.total_watch_time || 0,
+                current: {
+                    totalSessions: currentData.total_sessions || 0,
+                    uniqueViewers: currentData.unique_viewers || 0,
+                    avgDuration: Math.round(currentData.avg_duration || 0),
+                    totalWatchTime: currentData.total_watch_time || 0,
                     activeNow: activeNow,
                 },
-                yesterday: {
-                    totalSessions: yesterdayData.total_sessions || 0,
-                    uniqueViewers: yesterdayData.unique_viewers || 0,
-                    avgDuration: Math.round(yesterdayData.avg_duration || 0),
-                    totalWatchTime: yesterdayData.total_watch_time || 0,
+                compare: {
+                    totalSessions: compareData.total_sessions || 0,
+                    uniqueViewers: compareData.unique_viewers || 0,
+                    avgDuration: Math.round(compareData.avg_duration || 0),
+                    totalWatchTime: compareData.total_watch_time || 0,
                 },
                 comparison: {
-                    sessionsChange: calculateChange(todayData.total_sessions, yesterdayData.total_sessions),
-                    viewersChange: calculateChange(todayData.unique_viewers, yesterdayData.unique_viewers),
-                    durationChange: calculateChange(todayData.avg_duration, yesterdayData.avg_duration),
+                    sessionsChange: calculateChange(currentData.total_sessions, compareData.total_sessions),
+                    viewersChange: calculateChange(currentData.unique_viewers, compareData.unique_viewers),
+                    durationChange: calculateChange(currentData.avg_duration, compareData.avg_duration),
                 },
                 cameras: {
                     total: cameraStatus.total,
                     online: onlineCount,
                     offline: offlineCount,
                     maintenance: cameraStatus.maintenance,
-                }
+                },
+                period: period // Include period in response for debugging
             }
         });
     } catch (error) {

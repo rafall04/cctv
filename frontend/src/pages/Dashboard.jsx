@@ -517,7 +517,7 @@ export default function Dashboard() {
             />
 
             {/* Quick Stats Mini Cards - Phase 2 */}
-            <QuickStatsCards />
+            <QuickStatsCards dateRange={dateRange} />
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">

@@ -14,9 +14,9 @@ export const adminService = {
         }
     },
 
-    async getTodayStats() {
+    async getTodayStats(period = 'today') {
         try {
-            const response = await apiClient.get('/api/admin/stats/today');
+            const response = await apiClient.get(`/api/admin/stats/today?period=${period}`);
             return response.data;
         } catch (error) {
             console.error('Get today stats error:', error);

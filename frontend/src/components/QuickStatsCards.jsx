@@ -3,9 +3,9 @@ import { adminService } from '../services/adminService';
 
 /**
  * Quick Stats Mini Cards Component
- * Displays today's key metrics with comparison to yesterday
+ * Displays key metrics with comparison based on selected date range
  */
-export function QuickStatsCards() {
+export function QuickStatsCards({ dateRange = 'today' }) {
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
 
@@ -14,11 +14,11 @@ export function QuickStatsCards() {
         // Refresh every 30 seconds
         const interval = setInterval(loadTodayStats, 30000);
         return () => clearInterval(interval);
-    }, []);
+    }, [dateRange]); // Re-fetch when dateRange changes
 
     const loadTodayStats = async () => {
         try {
-            const response = await adminService.getTodayStats();
+            const response = await adminService.getTodayStats(dateRange);
             if (response.success) {
                 setStats(response.data);
             }
@@ -89,7 +89,7 @@ export function QuickStatsCards() {
                     <span className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Live</span>
                 </div>
                 <div className="flex items-baseline gap-2">
-                    <h3 className="text-3xl font-bold text-purple-900 dark:text-purple-100">{stats.today.activeNow}</h3>
+                    <h3 className="text-3xl font-bold text-purple-900 dark:text-purple-100">{stats.current.activeNow}</h3>
                     <span className="relative flex h-2 w-2">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
@@ -98,7 +98,7 @@ export function QuickStatsCards() {
                 <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">Viewer aktif</p>
             </div>
 
-            {/* Total Sessions Today */}
+            {/* Total Sessions */}
             <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4 hover:shadow-lg transition-all">
                 <div className="flex items-center justify-between mb-2">
                     <div className="w-8 h-8 bg-sky-100 dark:bg-sky-500/20 rounded-lg flex items-center justify-center">
@@ -108,8 +108,8 @@ export function QuickStatsCards() {
                     </div>
                     <TrendBadge value={stats.comparison.sessionsChange} />
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{stats.today.totalSessions}</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Total sesi hari ini</p>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{stats.current.totalSessions}</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Total sesi</p>
             </div>
 
             {/* Unique Viewers */}
@@ -122,7 +122,7 @@ export function QuickStatsCards() {
                     </div>
                     <TrendBadge value={stats.comparison.viewersChange} />
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{stats.today.uniqueViewers}</h3>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{stats.current.uniqueViewers}</h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Unique viewers</p>
             </div>
 
@@ -136,7 +136,7 @@ export function QuickStatsCards() {
                     </div>
                     <TrendBadge value={stats.comparison.durationChange} />
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{formatDuration(stats.today.avgDuration)}</h3>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{formatDuration(stats.current.avgDuration)}</h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Rata-rata durasi</p>
             </div>
 
