@@ -14,6 +14,19 @@ export const adminService = {
         }
     },
 
+    async getTodayStats() {
+        try {
+            const response = await apiClient.get('/api/admin/stats/today');
+            return response.data;
+        } catch (error) {
+            console.error('Get today stats error:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to fetch today statistics'
+            };
+        }
+    },
+
     async getViewerAnalytics(period = '7days') {
         try {
             const response = await apiClient.get(`/api/admin/analytics/viewers?period=${period}`);

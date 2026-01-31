@@ -6,6 +6,9 @@ import { EmptyState, NoStreamsEmptyState, NoActivityEmptyState } from '../compon
 import { Alert } from '../components/ui/Alert';
 import { useNotification } from '../contexts/NotificationContext';
 import { CameraStatusOverview } from '../components/CameraStatusOverview';
+import { QuickStatsCards } from '../components/QuickStatsCards';
+import { TopCamerasWidget } from '../components/TopCamerasWidget';
+import { DateRangeSelector } from '../components/DateRangeSelector';
 
 /**
  * Viewer Sessions Modal - Shows list of viewers with IP addresses
@@ -253,6 +256,7 @@ export default function Dashboard() {
     const [lastSuccessfulUpdate, setLastSuccessfulUpdate] = useState(null);
     const [refreshError, setRefreshError] = useState(false);
     const [isRetrying, setIsRetrying] = useState(false);
+    const [dateRange, setDateRange] = useState('today'); // Date range filter
     const intervalRef = useRef(null);
     const navigate = useNavigate();
     const { warning } = useNotification();
@@ -582,6 +586,19 @@ export default function Dashboard() {
                 </div>
             </div>
 
+            {/* Date Range Selector */}
+            <DateRangeSelector 
+                value={dateRange} 
+                onChange={(range, customDates) => {
+                    setDateRange(range);
+                    // TODO: Implement filtering based on date range
+                    console.log('Date range changed:', range, customDates);
+                }} 
+            />
+
+            {/* Quick Stats Mini Cards - Phase 2 */}
+            <QuickStatsCards />
+
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
                 {/* Cameras */}
@@ -812,9 +829,14 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* Activity Log */}
-                <div className="space-y-4">
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">Activity Log</h2>
+                {/* Sidebar: Top Cameras & Activity Log */}
+                <div className="space-y-6">
+                    {/* Top Cameras Widget - Phase 2 */}
+                    <TopCamerasWidget cameras={stats?.topCameras || []} />
+
+                    {/* Activity Log */}
+                    <div>
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Activity Log</h2>
                     <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6">
                         <div className="space-y-6">
                             {stats?.recentLogs.length === 0 ? (

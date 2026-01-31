@@ -233,6 +233,110 @@ export async function getDashboardStats(request, reply) {
 
 
 /**
+ * Get today's quick stats with comparison to yesterday
+ * For dashboard mini cards
+ */
+export async function getTodayStats(request, reply) {
+    try {
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        const yesterdayStart = new Date(todayStart);
+        yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+        
+        // Get today's viewer sessions from database
+        const todaySessions = query(`
+            SELECT 
+                COUNT(DISTINCT session_id) as total_sessions,
+                COUNT(DISTINCT ip_address) as unique_viewers,
+                AVG(duration_seconds) as avg_duration,
+                SUM(duration_seconds) as total_watch_time
+            FROM viewer_sessions
+            WHERE started_at >= datetime(?, 'unixepoch')
+        `, [Math.floor(todayStart.getTime() / 1000)]);
+        
+        // Get yesterday's stats for comparison
+        const yesterdaySessions = query(`
+            SELECT 
+                COUNT(DISTINCT session_id) as total_sessions,
+                COUNT(DISTINCT ip_address) as unique_viewers,
+                AVG(duration_seconds) as avg_duration,
+                SUM(duration_seconds) as total_watch_time
+            FROM viewer_sessions
+            WHERE started_at >= datetime(?, 'unixepoch')
+            AND started_at < datetime(?, 'unixepoch')
+        `, [Math.floor(yesterdayStart.getTime() / 1000), Math.floor(todayStart.getTime() / 1000)]);
+        
+        // Get current active viewers from viewerSessionService
+        const viewerStats = viewerSessionService.getViewerStats();
+        const activeNow = viewerStats.activeViewers;
+        
+        // Get camera status
+        const cameraStatus = queryOne(`
+            SELECT 
+                COUNT(*) as total,
+                SUM(CASE WHEN enabled = 1 THEN 1 ELSE 0 END) as active,
+                SUM(CASE WHEN status = 'maintenance' THEN 1 ELSE 0 END) as maintenance
+            FROM cameras
+        `);
+        
+        // Calculate offline cameras (need to check MediaMTX)
+        const mtxStats = await mediaMtxService.getStats();
+        const activeCameras = query('SELECT id, stream_key FROM cameras WHERE enabled = 1');
+        let onlineCount = 0;
+        activeCameras.forEach(cam => {
+            const hasStream = mtxStats.paths?.some(p => p.name === cam.stream_key && (p.ready || p.sourceReady));
+            if (hasStream) onlineCount++;
+        });
+        const offlineCount = cameraStatus.active - onlineCount;
+        
+        // Calculate percentage changes
+        const calculateChange = (today, yesterday) => {
+            if (!yesterday || yesterday === 0) return today > 0 ? 100 : 0;
+            return Math.round(((today - yesterday) / yesterday) * 100);
+        };
+        
+        const todayData = todaySessions[0] || { total_sessions: 0, unique_viewers: 0, avg_duration: 0, total_watch_time: 0 };
+        const yesterdayData = yesterdaySessions[0] || { total_sessions: 0, unique_viewers: 0, avg_duration: 0, total_watch_time: 0 };
+        
+        return reply.send({
+            success: true,
+            data: {
+                today: {
+                    totalSessions: todayData.total_sessions || 0,
+                    uniqueViewers: todayData.unique_viewers || 0,
+                    avgDuration: Math.round(todayData.avg_duration || 0),
+                    totalWatchTime: todayData.total_watch_time || 0,
+                    activeNow: activeNow,
+                },
+                yesterday: {
+                    totalSessions: yesterdayData.total_sessions || 0,
+                    uniqueViewers: yesterdayData.unique_viewers || 0,
+                    avgDuration: Math.round(yesterdayData.avg_duration || 0),
+                    totalWatchTime: yesterdayData.total_watch_time || 0,
+                },
+                comparison: {
+                    sessionsChange: calculateChange(todayData.total_sessions, yesterdayData.total_sessions),
+                    viewersChange: calculateChange(todayData.unique_viewers, yesterdayData.unique_viewers),
+                    durationChange: calculateChange(todayData.avg_duration, yesterdayData.avg_duration),
+                },
+                cameras: {
+                    total: cameraStatus.total,
+                    online: onlineCount,
+                    offline: offlineCount,
+                    maintenance: cameraStatus.maintenance,
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Get today stats error:', error);
+        return reply.code(500).send({
+            success: false,
+            message: 'Internal server error',
+        });
+    }
+}
+
+/**
  * Test Telegram notification
  */
 export async function testTelegramNotification(request, reply) {
