@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { areaService } from '../services/areaService';
 import { settingsService } from '../services/settingsService';
 import { useNotification } from '../contexts/NotificationContext';
-import { SkeletonCard, SkeletonStats, NoAreasEmptyState, Alert } from '../components/ui';
+import { StatCardSkeleton, CameraCardSkeleton, NoAreasEmptyState, Alert } from '../components/ui';
 import LocationPicker from '../components/LocationPicker';
 
 export default function AreaManagement() {
@@ -179,9 +179,11 @@ export default function AreaManagement() {
     if (loading) {
         return (
             <div className="space-y-8">
-                <SkeletonStats count={4} />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    {Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)}
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} lines={3} showImage={false} />)}
+                    {Array.from({ length: 6 }).map((_, i) => <CameraCardSkeleton key={i} />)}
                 </div>
             </div>
         );

@@ -4,7 +4,7 @@ import { areaService } from '../services/areaService';
 import { useNotification } from '../contexts/NotificationContext';
 import { useFormValidation } from '../hooks/useFormValidation';
 import { validateRtspUrl, getRtspFormatHint } from '../utils/validators';
-import { SkeletonCard, Skeleton } from '../components/ui/Skeleton';
+import { CameraCardSkeleton, Skeleton } from '../components/ui/Skeleton';
 import { NoCamerasEmptyState } from '../components/ui/EmptyState';
 import { Alert } from '../components/ui/Alert';
 
