@@ -17,7 +17,69 @@ const activeRecordings = new Map();
 const streamHealthMap = new Map();
 
 // Failed re-mux tracking (prevent infinite loop on corrupt files)
-const failedRemuxFiles = new Map(); // key: "cameraId:filename" -> { attempts, lastAttempt }
+// Using database for persistence across restarts
+const initFailedFilesTable = () => {
+    try {
+        execute(`
+            CREATE TABLE IF NOT EXISTS failed_remux_files (
+                camera_id INTEGER NOT NULL,
+                filename TEXT NOT NULL,
+                fail_count INTEGER DEFAULT 1,
+                last_attempt DATETIME DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (camera_id, filename)
+            )
+        `);
+    } catch (error) {
+        console.error('[FailedFiles] Error creating table:', error);
+    }
+};
+
+// Initialize table on module load
+initFailedFilesTable();
+
+// Helper functions for failed files tracking
+const isFileFailed = (cameraId, filename) => {
+    const result = queryOne(
+        'SELECT fail_count FROM failed_remux_files WHERE camera_id = ? AND filename = ?',
+        [cameraId, filename]
+    );
+    return result && result.fail_count >= 3;
+};
+
+const incrementFailCount = (cameraId, filename) => {
+    try {
+        // Try to insert or update
+        const existing = queryOne(
+            'SELECT fail_count FROM failed_remux_files WHERE camera_id = ? AND filename = ?',
+            [cameraId, filename]
+        );
+        
+        if (existing) {
+            execute(
+                'UPDATE failed_remux_files SET fail_count = fail_count + 1, last_attempt = CURRENT_TIMESTAMP WHERE camera_id = ? AND filename = ?',
+                [cameraId, filename]
+            );
+        } else {
+            execute(
+                'INSERT INTO failed_remux_files (camera_id, filename, fail_count) VALUES (?, ?, 1)',
+                [cameraId, filename]
+            );
+        }
+    } catch (error) {
+        console.error('[FailedFiles] Error incrementing fail count:', error);
+    }
+};
+
+const removeFailedFile = (cameraId, filename) => {
+    try {
+        execute(
+            'DELETE FROM failed_remux_files WHERE camera_id = ? AND filename = ?',
+            [cameraId, filename]
+        );
+    } catch (error) {
+        console.error('[FailedFiles] Error removing failed file:', error);
+    }
+};
 
 /**
  * Recording Service
@@ -268,12 +330,8 @@ class RecordingService {
      */
     onSegmentCreated(cameraId, filename) {
         // CRITICAL: Check if this file has failed re-mux before (prevent infinite loop)
-        const failKey = `${cameraId}:${filename}`;
-        const failInfo = failedRemuxFiles.get(failKey);
-        
-        if (failInfo && failInfo.attempts >= 3) {
+        if (isFileFailed(cameraId, filename)) {
             // Skip file that has failed 3+ times (likely corrupt)
-            console.log(`[Segment] Skipping file (failed ${failInfo.attempts}x): ${filename}`);
             return;
         }
 
@@ -359,12 +417,8 @@ class RecordingService {
                     if (!ffprobeOutput || parseFloat(ffprobeOutput) < 1) {
                         console.log(`[Segment] File not ready (duration: ${ffprobeOutput}s), will retry later: ${filename}`);
                         
-                        // Track failed attempt
-                        const current = failedRemuxFiles.get(failKey) || { attempts: 0, lastAttempt: 0 };
-                        failedRemuxFiles.set(failKey, {
-                            attempts: current.attempts + 1,
-                            lastAttempt: Date.now()
-                        });
+                        // Track failed attempt in database
+                        incrementFailCount(cameraId, filename);
                         
                         return;
                     }
@@ -373,12 +427,8 @@ class RecordingService {
                 } catch (error) {
                     console.log(`[Segment] ffprobe check failed, file not ready: ${filename}`);
                     
-                    // Track failed attempt
-                    const current = failedRemuxFiles.get(failKey) || { attempts: 0, lastAttempt: 0 };
-                    failedRemuxFiles.set(failKey, {
-                        attempts: current.attempts + 1,
-                        lastAttempt: Date.now()
-                    });
+                    // Track failed attempt in database
+                    incrementFailCount(cameraId, filename);
                     
                     return;
                 }
@@ -629,12 +679,8 @@ class RecordingService {
 
                     // Check each file
                     files.forEach(filename => {
-                        // CRITICAL: Skip files that have failed re-mux 3+ times
-                        const failKey = `${cameraId}:${filename}`;
-                        const failInfo = failedRemuxFiles.get(failKey);
-                        
-                        if (failInfo && failInfo.attempts >= 3) {
-                            // Skip this file permanently
+                        // CRITICAL: Skip files that have failed re-mux 3+ times (from database)
+                        if (isFileFailed(cameraId, filename)) {
                             return;
                         }
                         
@@ -866,9 +912,8 @@ class RecordingService {
                     console.log(`[Cleanup] Deleting corrupt file: camera${file.cameraId}/${file.filename}`);
                     unlinkSync(file.path);
                     
-                    // Remove from failed tracking (no longer needed)
-                    const failKey = `${file.cameraId}:${file.filename}`;
-                    failedRemuxFiles.delete(failKey);
+                    // Remove from database tracking
+                    removeFailedFile(file.cameraId, file.filename);
                 }
                 
             } catch (error) {
