@@ -58,6 +58,7 @@ Klik "Save Changes" → Refresh landing page → Verify changes
 | company_tagline | Tagline singkat | "CCTV Kota ABC Online" | 200 |
 | company_description | Deskripsi lengkap perusahaan | "CLIENT NET melayani pemasangan WiFi dan CCTV di wilayah Kota ABC..." | 500 |
 | copyright_text | Teks copyright di footer | "Penyedia Internet & CCTV Kota ABC" | 200 |
+| whatsapp_number | Nomor WhatsApp untuk kontak | "628123456789" | 20 |
 
 ### Location Information
 
@@ -108,6 +109,7 @@ Klik "Save Changes" → Refresh landing page → Verify changes
 - Company name & logo
 - Copyright text
 - Company description
+- WhatsApp contact button
 - Meta keywords (SEO footer)
 
 ### Meta Tags (Dynamic)
@@ -305,6 +307,7 @@ Saat setup client baru:
 - [ ] Update company_tagline
 - [ ] Update city_name
 - [ ] Update province_name
+- [ ] Update whatsapp_number (format: 628xxx)
 - [ ] Update hero_title
 - [ ] Update hero_subtitle
 - [ ] Update footer_text
@@ -317,6 +320,7 @@ Saat setup client baru:
 - [ ] Set show_powered_by (true/false)
 - [ ] Save changes
 - [ ] Verify di landing page
+- [ ] Test WhatsApp button
 - [ ] Test SEO dengan Google Search Console
 - [ ] Test Open Graph dengan Facebook Debugger
 

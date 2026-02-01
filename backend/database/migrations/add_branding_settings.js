@@ -53,6 +53,7 @@ try {
             ['logo_text', 'R', 'Teks logo (1 huruf)'],
             ['primary_color', '#0ea5e9', 'Warna primary (hex)'],
             ['show_powered_by', 'true', 'Tampilkan "Powered by" badge'],
+            ['whatsapp_number', '6289685645956', 'Nomor WhatsApp (format: 628xxx)'],
         ];
         
         const stmt = db.prepare(`

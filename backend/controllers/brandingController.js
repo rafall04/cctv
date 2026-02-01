@@ -196,6 +196,7 @@ export async function resetBrandingSettings(request, reply) {
             logo_text: 'R',
             primary_color: '#0ea5e9',
             show_powered_by: 'true',
+            whatsapp_number: '6289685645956',
         };
         
         // Update all settings to defaults
