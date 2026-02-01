@@ -7,13 +7,26 @@ aaPanel mengelola Nginx via UI. **JANGAN edit config file manual** karena akan d
 ## 📋 Prerequisites
 
 - aaPanel installed
-- Nginx installed via aaPanel
+- **Nginx installed via aaPanel** (Apache bisa tetap running di port 80)
 - Domain sudah pointing ke server IP:
   - `sicamdes.semarnet.id` → Server IP
   - `api-sicamdes.semarnet.id` → Server IP
 - Application installed di `/var/www/cctv`
 - Backend running di `localhost:3000`
 - MediaMTX running di `localhost:8888`
+
+## 🔧 Install Nginx via aaPanel
+
+Jika Nginx belum terinstall:
+
+1. **Login to aaPanel:** `http://YOUR_SERVER_IP:7800`
+2. **Go to:** App Store
+3. **Search:** Nginx
+4. **Click:** Install (pilih latest stable version)
+5. **Wait:** ~2-5 minutes
+6. **Verify:** `nginx -v`
+
+**Note:** aaPanel bisa run Apache dan Nginx bersamaan. Nginx akan digunakan untuk aplikasi ini (port 800), Apache bisa tetap di port 80 untuk website lain.
 
 ## 🌐 Setup via aaPanel UI
 

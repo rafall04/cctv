@@ -162,7 +162,18 @@ check_dependencies() {
     
     # Check Nginx
     if ! command -v nginx &> /dev/null; then
-        print_error "Nginx not found. Please install via aaPanel first."
+        print_error "Nginx not found!"
+        echo ""
+        print_info "Please install Nginx via aaPanel first:"
+        echo "  1. Login to aaPanel: http://YOUR_SERVER_IP:7800"
+        echo "  2. Go to: App Store"
+        echo "  3. Search: Nginx"
+        echo "  4. Click: Install"
+        echo "  5. Wait for installation to complete"
+        echo "  6. Re-run this script: bash deployment/aapanel-install.sh"
+        echo ""
+        print_info "Note: aaPanel can run Apache and Nginx together."
+        print_info "Nginx will be used as reverse proxy for this application."
         exit 1
     fi
     print_success "Nginx installed"

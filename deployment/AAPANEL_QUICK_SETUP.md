@@ -3,12 +3,48 @@
 ## Prerequisites
 
 1. **Ubuntu 20.04 server dengan aaPanel**
-2. **Domain sudah pointing:**
+2. **Nginx installed via aaPanel** (Apache bisa tetap running)
+3. **Domain sudah pointing:**
    - `cctv.raf.my.id` → Server IP
    - `api-cctv.raf.my.id` → Server IP
-3. **Nginx installed via aaPanel**
 4. **Root access**
 5. **Cukup disk space untuk recordings** (minimal 50GB recommended)
+
+## Install Nginx via aaPanel
+
+**PENTING:** aaPanel bisa run Apache dan Nginx bersamaan. Nginx akan digunakan sebagai reverse proxy untuk aplikasi ini.
+
+### Steps:
+
+1. **Login to aaPanel**
+   - URL: `http://YOUR_SERVER_IP:7800`
+   - Login dengan credentials aaPanel Anda
+
+2. **Go to App Store**
+   - Click "App Store" di sidebar
+
+3. **Install Nginx**
+   - Search: "Nginx"
+   - Click "Install" pada Nginx
+   - Pilih versi: Latest stable (recommended)
+   - Wait for installation (~2-5 minutes)
+
+4. **Verify Installation**
+   ```bash
+   nginx -v
+   # Should output: nginx version: nginx/x.x.x
+   ```
+
+5. **Check Services**
+   ```bash
+   systemctl status nginx
+   systemctl status apache2  # Apache masih bisa running
+   ```
+
+**Note:** 
+- Apache biasanya di port 80/443
+- Nginx bisa di port berbeda (kita akan gunakan port 800)
+- Atau Apache bisa di-stop jika tidak digunakan: `systemctl stop apache2`
 
 ## Recording Storage
 
