@@ -133,13 +133,15 @@ setup_backend() {
         
         # Generate secrets
         JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
-        CSRF_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+        CSRF_SECRET=$(node -e "console.log(require('crypto').randomBytes(16).toString('hex'))")
+        API_KEY_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
         
         # Update .env
         sed -i "s|NODE_ENV=.*|NODE_ENV=production|g" .env
         sed -i "s|JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|g" .env
         sed -i "s|CSRF_SECRET=.*|CSRF_SECRET=$CSRF_SECRET|g" .env
-        sed -i "s|ALLOWED_ORIGINS=.*|ALLOWED_ORIGINS=https://$DOMAIN_FRONTEND,http://$DOMAIN_FRONTEND,http://172.17.11.12|g" .env
+        sed -i "s|API_KEY_SECRET=.*|API_KEY_SECRET=$API_KEY_SECRET|g" .env
+        sed -i "s|ALLOWED_ORIGINS=.*|ALLOWED_ORIGINS=https://$DOMAIN_FRONTEND,http://$DOMAIN_FRONTEND:$PORT,http://172.17.11.12:$PORT|g" .env
         
         print_success ".env configured"
     else
@@ -172,8 +174,17 @@ setup_frontend() {
     # Setup .env
     print_info "Creating .env file..."
     cat > .env << EOF
-VITE_API_BASE_URL=https://$DOMAIN_BACKEND
-VITE_HLS_BASE_URL=https://$DOMAIN_BACKEND/hls
+# Backend API URL
+VITE_API_URL=https://$DOMAIN_BACKEND
+
+# API Key - MUST be generated from admin panel after installation
+# Steps:
+# 1. Login to admin panel (admin/admin123)
+# 2. Go to Settings > API Keys
+# 3. Generate new key
+# 4. Update this file with the generated key
+# 5. Rebuild frontend: npm run build
+VITE_API_KEY=CHANGE_THIS_AFTER_INSTALLATION
 EOF
     
     # Build
@@ -200,11 +211,20 @@ setup_mediamtx() {
         print_info "MediaMTX already exists"
     fi
     
-    # Verify config
+    # Setup config from example if not exists
     if [ ! -f mediamtx.yml ]; then
-        print_error "mediamtx.yml not found!"
-        exit 1
+        if [ -f mediamtx.yml.example ]; then
+            print_info "Creating mediamtx.yml from example..."
+            cp mediamtx.yml.example mediamtx.yml
+            print_success "MediaMTX config created"
+        else
+            print_error "mediamtx.yml.example not found!"
+            exit 1
+        fi
+    else
+        print_info "mediamtx.yml already exists"
     fi
+    
     print_success "MediaMTX configured"
 }
 
@@ -217,9 +237,9 @@ setup_pm2() {
     # Create logs directory
     mkdir -p logs
     
-    # Stop existing processes
+    # Stop existing processes (match ecosystem.config.cjs names)
     pm2 delete cctv-backend 2>/dev/null || true
-    pm2 delete cctv-mediamtx 2>/dev/null || true
+    pm2 delete mediamtx 2>/dev/null || true
     
     # Start processes
     print_info "Starting PM2 processes..."
@@ -247,9 +267,12 @@ setup_nginx() {
     echo "   6. Add reverse proxy for API:"
     echo "      - Path: /api"
     echo "      - Target: http://localhost:3000"
-    echo "   7. Add reverse proxy for HLS:"
+    echo "   7. Add reverse proxy for HLS (via backend for session tracking):"
     echo "      - Path: /hls"
-    echo "      - Target: http://localhost:8888"
+    echo "      - Target: http://localhost:3000"
+    echo ""
+    echo "   ⚠️  IMPORTANT: HLS must proxy to backend (port 3000), NOT MediaMTX!"
+    echo "   Backend will proxy to MediaMTX while tracking viewer sessions."
     echo ""
     echo "   OR copy config manually:"
     echo "   Config file: $APP_DIR/deployment/nginx.conf"
@@ -279,14 +302,14 @@ verify_installation() {
     echo ""
     echo "🔍 Verifying installation..."
     
-    # Check PM2
+    # Check PM2 (match ecosystem.config.cjs names)
     if pm2 list | grep -q "cctv-backend.*online"; then
         print_success "Backend running"
     else
         print_error "Backend not running"
     fi
     
-    if pm2 list | grep -q "cctv-mediamtx.*online"; then
+    if pm2 list | grep -q "mediamtx.*online"; then
         print_success "MediaMTX running"
     else
         print_error "MediaMTX not running"
@@ -344,12 +367,25 @@ print_summary() {
     echo "      - Add site: $DOMAIN_FRONTEND (port $PORT)"
     echo "      - Root: $APP_DIR/frontend/dist"
     echo "      - Add reverse proxy: /api → http://localhost:3000"
-    echo "      - Add reverse proxy: /hls → http://localhost:8888"
-    echo "   2. Change admin password"
-    echo "   3. Add cameras via admin panel"
-    echo "   4. Test video streaming"
-    echo "   5. Enable recording for cameras"
-    echo "   6. Setup backup cron job"
+    echo "      - Add reverse proxy: /hls → http://localhost:3000 (NOT 8888!)"
+    echo "      See: $APP_DIR/deployment/AAPANEL_NGINX_SETUP.md"
+    echo ""
+    echo "   2. Generate API Key:"
+    echo "      - Login to admin panel: http://$DOMAIN_FRONTEND:$PORT"
+    echo "      - Username: admin, Password: admin123"
+    echo "      - Go to Settings > API Keys > Generate"
+    echo "      - Copy the generated key"
+    echo ""
+    echo "   3. Update Frontend API Key:"
+    echo "      - Edit: $APP_DIR/frontend/.env"
+    echo "      - Replace VITE_API_KEY with generated key"
+    echo "      - Rebuild: cd $APP_DIR/frontend && npm run build"
+    echo ""
+    echo "   4. Change admin password (CRITICAL!)"
+    echo "   5. Add cameras via admin panel"
+    echo "   6. Test video streaming"
+    echo "   7. Enable recording for cameras"
+    echo "   8. Setup backup cron job"
     echo ""
     echo "📁 Important Paths:"
     echo "   App:        $APP_DIR"
