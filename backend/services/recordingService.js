@@ -538,6 +538,9 @@ class RecordingService {
 
                 console.log(`✓ Segment saved: camera${cameraId}/${filename} (${(finalSize / 1024 / 1024).toFixed(2)} MB)`);
 
+                // CRITICAL FIX: Wait 1 second before cleanup to ensure file is fully written
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
                 // Auto-delete old segments
                 this.cleanupOldSegments(cameraId);
 
@@ -561,6 +564,7 @@ class RecordingService {
             let cleanedCount = 0;
             allSegments.forEach(segment => {
                 if (!existsSync(segment.file_path)) {
+                    console.log(`[Cleanup] ⚠️ File not found, deleting DB entry: ${segment.file_path}`);
                     execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
                     cleanedCount++;
                 }
