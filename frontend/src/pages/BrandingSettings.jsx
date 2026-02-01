@@ -90,7 +90,7 @@ export default function BrandingSettings() {
     }
 
     const groupedSettings = {
-        'Company Information': ['company_name', 'company_tagline', 'company_description', 'city_name', 'province_name'],
+        'Company Information': ['company_name', 'company_tagline', 'company_description', 'city_name', 'province_name', 'whatsapp_number'],
         'Hero Section': ['hero_title', 'hero_subtitle'],
         'Footer': ['footer_text', 'copyright_text'],
         'SEO Meta Tags': ['meta_title', 'meta_description', 'meta_keywords'],

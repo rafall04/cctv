@@ -3000,7 +3000,7 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
 // FOOTER - Enhanced with more information
 // ============================================
 function Footer({ cameraCount, areaCount, saweriaEnabled, saweriaLink, branding }) {
-    const whatsappNumber = '6289685645956'; // Format internasional tanpa +
+    const whatsappNumber = branding.whatsapp_number || '6289685645956'; // Format internasional tanpa +
     const whatsappLink = `https://wa.me/${whatsappNumber}?text=Halo%20Admin%20${encodeURIComponent(branding.company_name)}`;
     
     const showPoweredBy = branding.show_powered_by === 'true';
