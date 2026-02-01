@@ -624,11 +624,11 @@ class RecordingService {
 
     /**
      * Cleanup old segments (rolling buffer)
-     * CRITICAL FIX: Add safety buffer to prevent deleting files being processed
+     * CRITICAL FIX: Multiple safety checks to prevent deleting active files
      */
     cleanupOldSegments(cameraId) {
         try {
-            // SAFETY: Don't cleanup if called too frequently (prevent race condition)
+            // SAFETY #1: Don't cleanup if called too frequently (prevent race condition)
             const now = Date.now();
             if (!this.lastCleanupTime) this.lastCleanupTime = {};
             
@@ -644,7 +644,7 @@ class RecordingService {
             this.lastCleanupTime[cameraId] = now;
 
             // First, cleanup database entries for files that don't exist
-            // BUT: Only delete entries older than 5 minutes (safety buffer)
+            // BUT: Only delete entries older than 30 minutes (was 5 minutes)
             const allSegments = query(
                 'SELECT * FROM recording_segments WHERE camera_id = ?',
                 [cameraId]
@@ -652,9 +652,9 @@ class RecordingService {
 
             let cleanedCount = 0;
             allSegments.forEach(segment => {
-                // SAFETY: Only cleanup entries older than 5 minutes
+                // SAFETY #2: Only cleanup entries older than 30 minutes (increased from 5)
                 const segmentAge = Date.now() - new Date(segment.start_time).getTime();
-                const isOldEnough = segmentAge > 5 * 60 * 1000; // 5 minutes
+                const isOldEnough = segmentAge > 30 * 60 * 1000; // 30 minutes
                 
                 if (isOldEnough && !existsSync(segment.file_path)) {
                     console.log(`[Cleanup] ⚠️ File not found (age: ${Math.round(segmentAge/60000)}min), deleting DB entry: ${segment.file_path}`);
@@ -679,9 +679,9 @@ class RecordingService {
                 [cameraId]
             );
 
-            // CRITICAL FIX: Add safety buffer - keep extra 2 segments (20 minutes)
-            // This prevents deleting files that are being processed
-            const safetyBuffer = 2;
+            // CRITICAL FIX: Add safety buffer - keep extra 5 segments (50 minutes)
+            // This prevents deleting files that are being processed or recently created
+            const safetyBuffer = 5; // Increased from 2 to 5
             const effectiveMaxSegments = maxSegments + safetyBuffer;
 
             // Delete oldest segments if exceeds max (with safety buffer)
@@ -690,30 +690,49 @@ class RecordingService {
                 
                 console.log(`[Cleanup] Camera ${cameraId}: ${segments.length} segments, max ${maxSegments} (+ ${safetyBuffer} buffer), deleting ${toDelete.length} oldest`);
                 
+                let deletedCount = 0;
+                let skippedCount = 0;
+                
                 toDelete.forEach(segment => {
-                    // SAFETY: Double-check segment is old enough (at least 15 minutes old)
+                    // SAFETY #3: Double-check segment is old enough (at least 30 minutes old, was 15)
                     const segmentAge = Date.now() - new Date(segment.start_time).getTime();
-                    if (segmentAge < 15 * 60 * 1000) {
+                    if (segmentAge < 30 * 60 * 1000) {
                         console.log(`[Cleanup] ⚠️ Skipping recent segment (age: ${Math.round(segmentAge/60000)}min): ${segment.filename}`);
+                        skippedCount++;
                         return;
                     }
                     
-                    // CRITICAL: Check if file is being processed (remux in progress)
+                    // SAFETY #4: Check if file is being processed (remux in progress)
                     const fileKey = `${cameraId}:${segment.filename}`;
                     if (filesBeingProcessed.has(fileKey)) {
                         console.log(`[Cleanup] ⚠️ Skipping file being processed: ${segment.filename}`);
+                        skippedCount++;
+                        return;
+                    }
+                    
+                    // SAFETY #5: Verify file actually exists before deleting
+                    if (!existsSync(segment.file_path)) {
+                        console.log(`[Cleanup] ⚠️ File already gone, just removing DB entry: ${segment.filename}`);
+                        execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
                         return;
                     }
                     
                     // Delete file
-                    if (existsSync(segment.file_path)) {
+                    try {
                         unlinkSync(segment.file_path);
                         console.log(`✓ Deleted old segment: ${segment.filename} (age: ${Math.round(segmentAge/60000)}min)`);
+                        deletedCount++;
+                    } catch (error) {
+                        console.error(`[Cleanup] Error deleting file ${segment.filename}:`, error);
+                        skippedCount++;
+                        return;
                     }
 
                     // Delete from database
                     execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
                 });
+                
+                console.log(`[Cleanup] Camera ${cameraId}: deleted ${deletedCount} files, skipped ${skippedCount} files`);
             } else {
                 console.log(`[Cleanup] Camera ${cameraId}: ${segments.length} segments, max ${maxSegments} (+ ${safetyBuffer} buffer), no cleanup needed`);
             }
@@ -838,6 +857,8 @@ class RecordingService {
 
     /**
      * Cleanup temp files from failed re-mux attempts
+     * CRITICAL FIX: Only delete .temp.mp4 and .remux.mp4 files
+     * NEVER delete actual recording files (.mp4) - let segment scanner handle registration
      */
     cleanupTempFiles() {
         try {
@@ -860,34 +881,44 @@ class RecordingService {
                 
                 const files = readdirSync(fullPath);
                 files.forEach(file => {
-                    // Delete any .temp.mp4 or .remux.mp4 files
+                    // CRITICAL FIX: ONLY delete .temp.mp4 or .remux.mp4 files
+                    // NEVER delete actual recording files (YYYYMMDD_HHMMSS.mp4)
                     if (file.includes('.temp.mp4') || file.includes('.remux.mp4')) {
                         const filePath = join(fullPath, file);
-                        unlinkSync(filePath);
-                        cleanedCount++;
-                        console.log(`[Cleanup] Deleted temp file: ${cameraDir}/${file}`);
+                        
+                        // Additional safety: check file age (at least 5 minutes old)
+                        const stats = statSync(filePath);
+                        const fileAge = Date.now() - stats.mtimeMs;
+                        
+                        if (fileAge > 5 * 60 * 1000) {
+                            unlinkSync(filePath);
+                            cleanedCount++;
+                            console.log(`[Cleanup] Deleted temp file: ${cameraDir}/${file} (age: ${Math.round(fileAge/60000)}min)`);
+                        }
                     }
                 });
                 
-                // Cleanup database entries for files that don't exist
+                // CRITICAL FIX: Only cleanup database entries for TEMP files or very old missing files
                 const dbSegments = query(
                     'SELECT * FROM recording_segments WHERE camera_id = ?',
                     [cameraId]
                 );
                 
                 dbSegments.forEach(segment => {
-                    // SAFETY: Only cleanup entries older than 5 minutes
+                    // SAFETY: Only cleanup entries older than 30 minutes (was 5 minutes)
                     const segmentAge = Date.now() - new Date(segment.start_time || 0).getTime();
-                    const isOldEnough = segmentAge > 5 * 60 * 1000; // 5 minutes
+                    const isVeryOld = segmentAge > 30 * 60 * 1000; // 30 minutes
                     
-                    // Check if filename contains temp extensions or file doesn't exist
+                    // Only delete DB entries for:
+                    // 1. Temp files (.temp.mp4 or .remux.mp4 in filename)
+                    // 2. Very old entries (30+ minutes) where file doesn't exist
                     if (segment.filename.includes('.temp.mp4') || 
                         segment.filename.includes('.remux.mp4') ||
-                        (isOldEnough && !existsSync(segment.file_path))) {
+                        (isVeryOld && !existsSync(segment.file_path))) {
                         
                         execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
                         dbCleanedCount++;
-                        console.log(`[Cleanup] Deleted DB entry: ${segment.filename} (age: ${Math.round(segmentAge/60000)}min)`);
+                        console.log(`[Cleanup] Deleted DB entry: ${segment.filename} (age: ${Math.round(segmentAge/60000)}min, file exists: ${existsSync(segment.file_path)})`);
                     }
                 });
             });
@@ -949,7 +980,8 @@ class RecordingService {
     /**
      * Background cleanup for corrupt/unregistered files
      * Runs slowly (1 file per 10 seconds) to avoid CPU spike
-     * This prevents accumulation of corrupt files that cause infinite loop
+     * CRITICAL FIX: Don't delete unregistered files - let segment scanner register them
+     * Only delete files that are PROVEN corrupt (ffprobe fails)
      */
     startBackgroundCleanup() {
         console.log('[Cleanup] Starting background cleanup service (1 file per 10s)');
@@ -985,18 +1017,28 @@ class RecordingService {
                             [cameraId, filename]
                         );
                         
+                        // CRITICAL FIX: Only add to queue if file is OLD (30+ minutes)
+                        // Recent files are likely being processed by segment scanner
                         if (!existing) {
-                            unregistered.push({
-                                cameraId,
-                                filename,
-                                path: join(fullPath, filename)
-                            });
+                            const filePath = join(fullPath, filename);
+                            const stats = statSync(filePath);
+                            const fileAge = Date.now() - stats.mtimeMs;
+                            
+                            // Only queue files older than 30 minutes (was immediate)
+                            if (fileAge > 30 * 60 * 1000) {
+                                unregistered.push({
+                                    cameraId,
+                                    filename,
+                                    path: filePath,
+                                    age: fileAge
+                                });
+                            }
                         }
                     });
                 });
                 
                 if (unregistered.length > 0) {
-                    console.log(`[Cleanup] Found ${unregistered.length} unregistered files, adding to cleanup queue`);
+                    console.log(`[Cleanup] Found ${unregistered.length} old unregistered files (30+ min), adding to cleanup queue`);
                     cleanupQueue = unregistered;
                 }
             } catch (error) {
@@ -1025,6 +1067,14 @@ class RecordingService {
                     return;
                 }
                 
+                // CRITICAL FIX: Check if file is being processed (prevent deletion during remux)
+                const fileKey = `${file.cameraId}:${file.filename}`;
+                if (filesBeingProcessed.has(fileKey)) {
+                    console.log(`[Cleanup] File being processed, skipping: ${file.filename}`);
+                    isProcessing = false;
+                    return;
+                }
+                
                 // Check if file is corrupt with ffprobe (3s timeout)
                 const { execSync } = await import('child_process');
                 try {
@@ -1033,13 +1083,16 @@ class RecordingService {
                         stdio: 'ignore' // Suppress output
                     });
                     
-                    // File is valid but unregistered
-                    // Don't delete - let segment scanner handle it
-                    console.log(`[Cleanup] File valid but unregistered, skipping: ${file.filename}`);
+                    // CRITICAL FIX: File is valid but unregistered
+                    // DON'T DELETE - trigger segment scanner to register it
+                    console.log(`[Cleanup] File valid but unregistered (age: ${Math.round(file.age/60000)}min), triggering registration: ${file.filename}`);
+                    
+                    // Trigger segment processing to register this file
+                    this.onSegmentCreated(file.cameraId, file.filename);
                     
                 } catch (error) {
                     // File is corrupt (ffprobe failed)
-                    console.log(`[Cleanup] Deleting corrupt file: camera${file.cameraId}/${file.filename}`);
+                    console.log(`[Cleanup] Deleting corrupt file (age: ${Math.round(file.age/60000)}min): camera${file.cameraId}/${file.filename}`);
                     unlinkSync(file.path);
                     
                     // Remove from database tracking

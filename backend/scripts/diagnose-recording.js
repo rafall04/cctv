@@ -14,10 +14,12 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Detect if running from backend/ or root
-const isInBackend = __dirname.includes('/backend/scripts');
-const rootPath = isInBackend ? join(__dirname, '..', '..') : __dirname;
-const dbPath = join(rootPath, 'backend', 'data', 'cctv.db');
+// Always use absolute path from script location
+// Script is at: backend/scripts/diagnose-recording.js
+// So: __dirname = /path/to/backend/scripts
+const backendPath = join(__dirname, '..');  // Go up to backend/
+const rootPath = join(backendPath, '..');   // Go up to root/
+const dbPath = join(backendPath, 'data', 'cctv.db');
 const recordingsPath = join(rootPath, 'recordings');
 
 console.log('Working directory:', process.cwd());
