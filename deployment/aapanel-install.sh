@@ -66,6 +66,16 @@ check_dependencies() {
     if ! command -v pm2 &> /dev/null; then
         print_info "Installing PM2..."
         npm install -g pm2
+        
+        # Reload PATH to make pm2 available immediately
+        export PATH=$PATH:/usr/local/bin
+        hash -r
+        
+        # Verify installation
+        if ! command -v pm2 &> /dev/null; then
+            print_error "PM2 installation failed. Please run: export PATH=\$PATH:/usr/local/bin"
+            exit 1
+        fi
     fi
     PM2_VERSION=$(pm2 --version)
     print_success "PM2 $PM2_VERSION"
