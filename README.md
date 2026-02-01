@@ -152,43 +152,118 @@ nginx -t && systemctl reload nginx
 
 ## ⚙️ Configuration
 
-### Backend (.env)
+### Environment Variables Setup
+
+**CRITICAL: All domains and IPs are configured via environment variables. No hardcoded values!**
+
+#### Quick Setup (Automated)
+
+```bash
+cd deployment
+chmod +x generate-env-files.sh
+./generate-env-files.sh
+```
+
+This interactive script will:
+- Prompt for your domain, IP, and port
+- Generate secure random secrets
+- Create `backend/.env` and `frontend/.env` files
+- Provide next steps
+
+#### Manual Setup
+
+**1. Backend (`backend/.env`):**
 
 ```env
-NODE_ENV=production
-PORT=3000
-HOST=0.0.0.0
+# ===================================
+# Domain Configuration
+# ===================================
+BACKEND_DOMAIN=api-cctv.raf.my.id
+FRONTEND_DOMAIN=cctv.raf.my.id
+SERVER_IP=172.17.11.12
+PORT_PUBLIC=800
 
-# Database
-DATABASE_PATH=./data/cctv.db
+# ===================================
+# Public Stream URLs
+# ===================================
+PUBLIC_STREAM_BASE_URL=https://api-cctv.raf.my.id
+PUBLIC_HLS_PATH=/hls
+PUBLIC_WEBRTC_PATH=/webrtc
 
-# JWT
-JWT_SECRET=GENERATE_RANDOM_32_CHARS
-JWT_EXPIRES_IN=24h
+# ===================================
+# Security Secrets (GENERATE UNIQUE!)
+# ===================================
+JWT_SECRET=<64-char-hex>
+API_KEY_SECRET=<64-char-hex>
+CSRF_SECRET=<32-char-hex>
 
-# CORS
-ALLOWED_ORIGINS=https://cctv.raf.my.id,http://172.17.11.12
+# ===================================
+# CORS (leave empty for auto-generation)
+# ===================================
+ALLOWED_ORIGINS=
 
-# MediaMTX
+# ===================================
+# MediaMTX (Internal)
+# ===================================
 MEDIAMTX_API_URL=http://localhost:9997
-MEDIAMTX_HLS_URL=http://localhost:8888
+MEDIAMTX_HLS_URL_INTERNAL=http://localhost:8888
+MEDIAMTX_WEBRTC_URL_INTERNAL=http://localhost:8889
 
-# Security
-CSRF_SECRET=GENERATE_RANDOM_32_CHARS
-
-# Admin
-DEFAULT_ADMIN_USERNAME=admin
-DEFAULT_ADMIN_PASSWORD=CHANGE_THIS_NOW
+# ===================================
+# Other Settings
+# ===================================
+PORT=3000
+NODE_ENV=production
+DATABASE_PATH=./data/cctv.db
 ```
 
-### Frontend (.env)
+**2. Frontend (`frontend/.env`):**
 
 ```env
-VITE_API_BASE_URL=https://api-cctv.raf.my.id
-VITE_HLS_BASE_URL=https://api-cctv.raf.my.id/hls
+# Backend API URL
+VITE_API_URL=https://api-cctv.raf.my.id
+
+# Frontend Domain (for meta tags)
+VITE_FRONTEND_DOMAIN=cctv.raf.my.id
 ```
 
-**Note:** No port needed, Nginx forwards to port 800.
+**3. Generate Secrets:**
+
+```bash
+# JWT Secret (64 chars)
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+
+# API Key Secret (64 chars)
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+
+# CSRF Secret (32 chars)
+node -e "console.log(require('crypto').randomBytes(16).toString('hex'))"
+```
+
+#### Auto-Generated ALLOWED_ORIGINS
+
+If `ALLOWED_ORIGINS` is empty, backend auto-generates from domain config:
+
+```javascript
+// Generated from:
+FRONTEND_DOMAIN=cctv.raf.my.id
+SERVER_IP=172.17.11.12
+PORT_PUBLIC=800
+
+// Results in:
+ALLOWED_ORIGINS=
+  https://cctv.raf.my.id,
+  http://cctv.raf.my.id,
+  http://cctv.raf.my.id:800,
+  http://172.17.11.12,
+  http://172.17.11.12:800
+```
+
+**Benefits:**
+- ✅ No hardcoded domains/IPs in code
+- ✅ Easy client setup - just edit .env
+- ✅ Automatic CORS configuration
+- ✅ Dynamic meta tags in HTML
 
 ### MediaMTX (mediamtx.yml)
 

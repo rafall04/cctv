@@ -67,11 +67,9 @@ const fastify = Fastify({
 
 // Allowed origins for CORS
 const allowedOrigins = config.security?.allowedOrigins || [
-    'https://cctv.raf.my.id',
-    'http://cctv.raf.my.id',
-    'http://172.17.11.12',
     'http://localhost:5173',
     'http://localhost:3000',
+    'http://localhost:3001',
     'http://localhost:8080'
 ];
 

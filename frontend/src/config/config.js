@@ -70,6 +70,9 @@ export const config = {
         baseUrl: getApiUrl(),
         key: getApiKey(),
     },
+    frontend: {
+        domain: import.meta.env.VITE_FRONTEND_DOMAIN || 'localhost:5173',
+    },
     env: {
         isDevelopment: isDevelopment(),
         isProduction: isProduction(),

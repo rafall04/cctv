@@ -148,10 +148,10 @@ export async function login(request, reply) {
         );
 
         // Set access token cookie
-        // Detect if request is from IP (HTTP) or domain (HTTPS)
+        // Detect if request is from HTTPS (domain) or HTTP (IP)
         const isHttps = request.headers['x-forwarded-proto'] === 'https' || 
                         request.protocol === 'https' ||
-                        request.headers.host?.includes('api-cctv.raf.my.id');
+                        request.headers.host?.includes(config.security.backendDomain);
         
         // For HTTPS (domain): use secure + sameSite=none for cross-domain
         // For HTTP (IP): use non-secure + sameSite=lax
@@ -359,7 +359,7 @@ export async function refreshTokens(request, reply) {
         // Detect if request is from IP (HTTP) or domain (HTTPS)
         const isHttps = request.headers['x-forwarded-proto'] === 'https' || 
                         request.protocol === 'https' ||
-                        request.headers.host?.includes('api-cctv.raf.my.id');
+                        request.headers.host?.includes(config.security.backendDomain);
         
         reply.setCookie('token', newAccessToken, {
             path: '/',

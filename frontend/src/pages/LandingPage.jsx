@@ -3513,10 +3513,14 @@ export default function LandingPage() {
                 if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) {
                     apiUrl = '/api/health';
                 } else if (protocol === 'https:') {
-                    // HTTPS with domain
-                    if (hostname === 'cctv.raf.my.id') {
-                        apiUrl = 'https://api-cctv.raf.my.id/health';
+                    // HTTPS with domain - construct API URL from frontend domain
+                    const frontendDomain = import.meta.env.VITE_FRONTEND_DOMAIN || hostname;
+                    if (hostname === frontendDomain) {
+                        // Use configured API URL
+                        const baseUrl = getApiUrl();
+                        apiUrl = `${baseUrl.replace(/\/$/, '')}/health`;
                     } else {
+                        // Fallback: replace 'cctv.' with 'api-cctv.'
                         apiUrl = `${protocol}//${hostname.replace('cctv.', 'api-cctv.')}/health`;
                     }
                 } else {

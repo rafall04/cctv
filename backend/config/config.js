@@ -22,21 +22,49 @@ const buildPublicUrl = (path, defaultPath) => {
 
 // Parse allowed origins from environment
 const parseAllowedOrigins = () => {
-  const defaultOrigins = [
+  // If explicitly set, use it
+  if (process.env.ALLOWED_ORIGINS && process.env.ALLOWED_ORIGINS.trim()) {
+    return process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim());
+  }
+  
+  // Auto-generate from domain config
+  const origins = [];
+  
+  // Frontend domain
+  if (process.env.FRONTEND_DOMAIN) {
+    origins.push(`https://${process.env.FRONTEND_DOMAIN}`);
+    origins.push(`http://${process.env.FRONTEND_DOMAIN}`);
+    if (process.env.PORT_PUBLIC && process.env.PORT_PUBLIC !== '80' && process.env.PORT_PUBLIC !== '443') {
+      origins.push(`http://${process.env.FRONTEND_DOMAIN}:${process.env.PORT_PUBLIC}`);
+    }
+  }
+  
+  // Server IP
+  if (process.env.SERVER_IP) {
+    origins.push(`http://${process.env.SERVER_IP}`);
+    if (process.env.PORT_PUBLIC && process.env.PORT_PUBLIC !== '80') {
+      origins.push(`http://${process.env.SERVER_IP}:${process.env.PORT_PUBLIC}`);
+    }
+  }
+  
+  // Development defaults
+  if (process.env.NODE_ENV === 'development') {
+    origins.push('http://localhost:5173');
+    origins.push('http://localhost:3000');
+    origins.push('http://localhost:3001');
+    origins.push('http://localhost:8080');
+  }
+  
+  // Fallback defaults if nothing configured
+  return origins.length > 0 ? origins : [
     'https://sicamdes.semarnet.id',
     'http://sicamdes.semarnet.id',
     'https://api-sicamdes.semarnet.id',
     'http://api-sicamdes.semarnet.id',
-    'http://172.17.11.12',           // IP access without port
-    'http://localhost:5173',         // Vite dev server
-    'http://localhost:3001',         // Backend dev
+    'http://172.17.11.12',
+    'http://localhost:5173',
+    'http://localhost:3001',
   ];
-  
-  if (process.env.ALLOWED_ORIGINS) {
-    return process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim());
-  }
-  
-  return defaultOrigins;
 };
 
 export const config = {
@@ -76,6 +104,11 @@ export const config = {
 
   // Security Configuration
   security: {
+    // Domain Configuration
+    backendDomain: process.env.BACKEND_DOMAIN || 'api-cctv.raf.my.id',
+    frontendDomain: process.env.FRONTEND_DOMAIN || 'cctv.raf.my.id',
+    serverIp: process.env.SERVER_IP || '172.17.11.12',
+    
     // API Key Validation
     apiKeyValidationEnabled: process.env.API_KEY_VALIDATION_ENABLED !== 'false',
     apiKeySecret: process.env.API_KEY_SECRET || '',

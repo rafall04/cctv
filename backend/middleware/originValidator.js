@@ -12,11 +12,9 @@ import { config } from '../config/config.js';
 
 // Default allowed origins (can be overridden via config)
 const DEFAULT_ALLOWED_ORIGINS = [
-    'https://cctv.raf.my.id',
-    'http://cctv.raf.my.id',
-    'http://172.17.11.12',
     'http://localhost:5173',
     'http://localhost:3000',
+    'http://localhost:3001',
     'http://localhost:8080'
 ];
 
