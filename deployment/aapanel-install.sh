@@ -45,6 +45,17 @@ check_dependencies() {
     echo ""
     echo "📋 Checking dependencies..."
     
+    # Source profile to ensure proper environment (important for aaPanel terminal)
+    if [ -f /etc/profile ]; then
+        source /etc/profile
+    fi
+    if [ -f ~/.bashrc ]; then
+        source ~/.bashrc
+    fi
+    if [ -f ~/.bash_profile ]; then
+        source ~/.bash_profile
+    fi
+    
     # Check Node.js
     if ! command -v node &> /dev/null; then
         print_error "Node.js not found. Installing..."
@@ -62,13 +73,15 @@ check_dependencies() {
     NPM_VERSION=$(npm --version)
     print_success "npm $NPM_VERSION"
     
-    # Check PM2 - ROBUST VERSION
+    # Check PM2 - ROBUST VERSION for aaPanel
     if ! command -v pm2 &> /dev/null; then
         print_info "Installing PM2..."
         npm install -g pm2
         
-        print_info "Detecting npm global bin path..."
-        NPM_PREFIX=$(npm config get prefix)
+        print_info "Configuring PM2 path for aaPanel environment..."
+        
+        # Get npm prefix
+        NPM_PREFIX=$(npm config get prefix 2>/dev/null || echo "/usr/local")
         print_info "npm prefix: $NPM_PREFIX"
         
         # Try multiple possible locations
@@ -76,8 +89,9 @@ check_dependencies() {
             "$NPM_PREFIX/bin"
             "/usr/local/bin"
             "/usr/bin"
-            "$(npm root -g)/../bin"
             "/root/.npm-global/bin"
+            "/www/server/nodejs/bin"
+            "$(npm root -g 2>/dev/null)/../bin"
         )
         
         PM2_FOUND=false
@@ -85,6 +99,13 @@ check_dependencies() {
             if [ -f "$PM2_PATH/pm2" ]; then
                 print_info "Found PM2 at: $PM2_PATH/pm2"
                 export PATH="$PM2_PATH:$PATH"
+                
+                # Add to profile for persistence (important for aaPanel)
+                if ! grep -q "$PM2_PATH" ~/.bashrc 2>/dev/null; then
+                    echo "export PATH=\"$PM2_PATH:\$PATH\"" >> ~/.bashrc
+                    print_info "Added PM2 path to ~/.bashrc"
+                fi
+                
                 PM2_FOUND=true
                 break
             fi
@@ -92,32 +113,46 @@ check_dependencies() {
         
         # If still not found, search entire system
         if [ "$PM2_FOUND" = false ]; then
-            print_info "Searching for PM2 in system..."
-            PM2_LOCATION=$(find /usr /root -name pm2 -type f 2>/dev/null | grep -E 'bin/pm2$' | head -n 1)
+            print_info "Searching for PM2 in system (this may take a moment)..."
+            PM2_LOCATION=$(find /usr /root /www -name pm2 -type f 2>/dev/null | grep -E 'bin/pm2$' | head -n 1)
             if [ -n "$PM2_LOCATION" ]; then
                 PM2_DIR=$(dirname "$PM2_LOCATION")
                 export PATH="$PM2_DIR:$PATH"
+                
+                # Add to profile
+                if ! grep -q "$PM2_DIR" ~/.bashrc 2>/dev/null; then
+                    echo "export PATH=\"$PM2_DIR:\$PATH\"" >> ~/.bashrc
+                    print_info "Added PM2 path to ~/.bashrc"
+                fi
+                
                 print_info "Found PM2 at: $PM2_LOCATION"
                 PM2_FOUND=true
             fi
         fi
         
-        # Reload hash table
+        # Reload environment
         hash -r
+        source ~/.bashrc 2>/dev/null || true
         
         # Final verification
         if ! command -v pm2 &> /dev/null; then
             print_error "PM2 installation failed!"
-            print_info "Debug info:"
-            echo "  npm prefix: $(npm config get prefix)"
-            echo "  npm root -g: $(npm root -g)"
-            echo "  PATH: $PATH"
             echo ""
-            print_info "Manual fix:"
-            echo "  1. Find PM2: find /usr /root -name pm2 -type f 2>/dev/null | grep bin"
+            print_info "Debug info:"
+            echo "  npm prefix: $(npm config get prefix 2>/dev/null || echo 'N/A')"
+            echo "  npm root -g: $(npm root -g 2>/dev/null || echo 'N/A')"
+            echo "  Current PATH: $PATH"
+            echo ""
+            print_info "Searching for PM2 manually..."
+            find /usr /root /www -name pm2 -type f 2>/dev/null | grep bin || echo "  PM2 not found"
+            echo ""
+            print_error "Please run these commands manually:"
+            echo "  1. Find PM2: find /usr /root /www -name pm2 -type f 2>/dev/null | grep bin"
             echo "  2. Add to PATH: export PATH=/path/to/pm2/bin:\$PATH"
-            echo "  3. Run: hash -r"
-            echo "  4. Verify: pm2 --version"
+            echo "  3. Add to profile: echo 'export PATH=/path/to/pm2/bin:\$PATH' >> ~/.bashrc"
+            echo "  4. Reload: source ~/.bashrc"
+            echo "  5. Verify: pm2 --version"
+            echo "  6. Re-run: bash deployment/aapanel-install.sh"
             exit 1
         fi
     fi
