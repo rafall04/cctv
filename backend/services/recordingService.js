@@ -344,8 +344,15 @@ class RecordingService {
         const cameraDir = join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
         const filePath = join(cameraDir, filename);
         
-        // CRITICAL: Mark file as being processed (prevent deletion)
+        // CRITICAL: Mark file as being processed (prevent deletion + duplicate processing)
         const fileKey = `${cameraId}:${filename}`;
+        
+        // BUG FIX #2: Prevent duplicate processing
+        if (filesBeingProcessed.has(fileKey)) {
+            console.log(`[Segment] Already processing: ${filename}, skipping duplicate`);
+            return;
+        }
+        
         filesBeingProcessed.add(fileKey);
 
         console.log(`[Segment] Detected new segment: camera${cameraId}/${filename}`);
@@ -354,8 +361,14 @@ class RecordingService {
         // FFmpeg should have closed file by now with proper segment settings
         setTimeout(async () => {
             try {
+                // BUG FIX #1: Ensure cleanup in ALL exit paths
+                const cleanup = () => {
+                    filesBeingProcessed.delete(fileKey);
+                };
+                
                 if (!existsSync(filePath)) {
                     console.warn(`[Segment] File not found: ${filePath}`);
+                    cleanup();
                     return;
                 }
 
@@ -367,6 +380,7 @@ class RecordingService {
                 
                 if (!existsSync(filePath)) {
                     console.warn(`[Segment] File disappeared during check: ${filePath}`);
+                    cleanup();
                     return;
                 }
                 
@@ -376,7 +390,10 @@ class RecordingService {
                 if (fileSize2 > fileSize1) {
                     console.log(`[Segment] File still growing, waiting... (${fileSize1} -> ${fileSize2})`);
                     await new Promise(resolve => setTimeout(resolve, 3000));
-                    if (!existsSync(filePath)) return;
+                    if (!existsSync(filePath)) {
+                        cleanup();
+                        return;
+                    }
                     fileSize2 = statSync(filePath).size;
                 }
 
@@ -389,6 +406,7 @@ class RecordingService {
                 // Reasoning: 1.5Mbps bitrate × 30s = ~5.6MB, but with compression ~500KB minimum
                 if (fileSize < 500 * 1024) {
                     console.warn(`[Segment] File too small (< 500KB), likely corrupt or empty: ${filename} (${(fileSize / 1024).toFixed(2)} KB)`);
+                    cleanup();
                     return;
                 }
                 
@@ -404,12 +422,14 @@ class RecordingService {
                 // Quick final check
                 if (!existsSync(filePath)) {
                     console.warn(`[Segment] File disappeared: ${filePath}`);
+                    cleanup();
                     return;
                 }
                 
                 const finalCheck = statSync(filePath).size;
                 if (Math.abs(finalCheck - fileSize) > 1024 * 100) { // Allow 100KB difference
                     console.log(`[Segment] File still changing (${fileSize} -> ${finalCheck}), will retry later: ${filename}`);
+                    cleanup();
                     return;
                 }
 
@@ -437,6 +457,7 @@ class RecordingService {
                         // Track failed attempt in database
                         incrementFailCount(cameraId, filename);
                         
+                        cleanup();
                         return;
                     }
                     
@@ -447,6 +468,7 @@ class RecordingService {
                     // Track failed attempt in database
                     incrementFailCount(cameraId, filename);
                     
+                    cleanup();
                     return;
                 }
                 
@@ -503,6 +525,7 @@ class RecordingService {
                     console.log(`[Segment] ✓ File replaced with re-muxed version`);
                 } else {
                     console.error(`[Segment] Re-muxed file not found: ${tempPath}`);
+                    cleanup();
                     return;
                 }
 
@@ -510,6 +533,7 @@ class RecordingService {
                 const match = filename.match(/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
                 if (!match) {
                     console.warn(`[Segment] Invalid filename format: ${filename}`);
+                    cleanup();
                     return;
                 }
 
@@ -534,6 +558,7 @@ class RecordingService {
                         'UPDATE recording_segments SET file_size = ? WHERE id = ?',
                         [finalSize, existing.id]
                     );
+                    cleanup();
                     return;
                 }
 
@@ -556,7 +581,7 @@ class RecordingService {
                 console.log(`✓ Segment saved: camera${cameraId}/${filename} (${(finalSize / 1024 / 1024).toFixed(2)} MB)`);
 
                 // CRITICAL: Remove from processing set (allow cleanup)
-                filesBeingProcessed.delete(fileKey);
+                cleanup();
 
                 // CRITICAL FIX: Wait 3 seconds before cleanup to ensure file is fully written
                 // This prevents race condition where cleanup runs before file is saved
@@ -765,6 +790,12 @@ class RecordingService {
                         if (!existing) {
                             const filePath = join(cameraDir, filename);
                             const stats = statSync(filePath);
+                            
+                            // BUG FIX #4: Check if file is being processed (prevent duplicate)
+                            const fileKey = `${cameraId}:${filename}`;
+                            if (filesBeingProcessed.has(fileKey)) {
+                                return; // Skip, already being processed
+                            }
                             
                             // Only process files that are at least 30 seconds old (likely complete)
                             const fileAge = Date.now() - stats.mtimeMs;
