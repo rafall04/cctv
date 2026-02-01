@@ -160,23 +160,46 @@ check_dependencies() {
     PM2_VERSION=$(pm2 --version)
     print_success "PM2 $PM2_VERSION"
     
-    # Check Nginx
-    if ! command -v nginx &> /dev/null; then
-        print_error "Nginx not found!"
+    # Check Nginx or Apache
+    if command -v nginx &> /dev/null; then
+        print_success "Nginx installed"
+        WEB_SERVER="nginx"
+    elif command -v apache2 &> /dev/null || command -v httpd &> /dev/null; then
+        print_success "Apache installed"
+        WEB_SERVER="apache"
+        
+        # Check required Apache modules
+        print_info "Checking Apache modules..."
+        MISSING_MODULES=()
+        
+        for module in proxy proxy_http proxy_wstunnel headers rewrite; do
+            if ! apache2ctl -M 2>/dev/null | grep -q "${module}_module"; then
+                MISSING_MODULES+=($module)
+            fi
+        done
+        
+        if [ ${#MISSING_MODULES[@]} -gt 0 ]; then
+            print_info "Enabling required Apache modules: ${MISSING_MODULES[*]}"
+            for module in "${MISSING_MODULES[@]}"; do
+                a2enmod $module
+            done
+            systemctl restart apache2
+            print_success "Apache modules enabled"
+        else
+            print_success "All required Apache modules enabled"
+        fi
+    else
+        print_error "No web server found!"
         echo ""
-        print_info "Please install Nginx via aaPanel first:"
-        echo "  1. Login to aaPanel: http://YOUR_SERVER_IP:7800"
-        echo "  2. Go to: App Store"
-        echo "  3. Search: Nginx"
-        echo "  4. Click: Install"
-        echo "  5. Wait for installation to complete"
-        echo "  6. Re-run this script: bash deployment/aapanel-install.sh"
+        print_info "Please install Nginx or ensure Apache is running:"
+        echo "  For Nginx: Install via aaPanel App Store"
+        echo "  For Apache: Should be pre-installed with aaPanel"
         echo ""
-        print_info "Note: aaPanel can run Apache and Nginx together."
-        print_info "Nginx will be used as reverse proxy for this application."
+        print_info "Check web server status:"
+        echo "  systemctl status nginx"
+        echo "  systemctl status apache2"
         exit 1
     fi
-    print_success "Nginx installed"
     
     # Check Git
     if ! command -v git &> /dev/null; then
@@ -353,38 +376,62 @@ setup_pm2() {
     print_success "PM2 configured"
 }
 
-setup_nginx() {
+setup_webserver() {
     echo ""
-    echo "🌐 Nginx Configuration..."
+    echo "🌐 Web Server Configuration..."
     
-    print_info "aaPanel manages Nginx via UI"
-    print_info "Manual setup required:"
-    echo ""
-    echo "   1. Login to aaPanel"
-    echo "   2. Go to: Website > Add Site"
-    echo "   3. Domain: $DOMAIN_FRONTEND"
-    echo "   4. Port: $PORT"
-    echo "   5. Root: $APP_DIR/frontend/dist"
-    echo "   6. Add reverse proxy for API:"
-    echo "      - Path: /api"
-    echo "      - Target: http://localhost:3000"
-    echo "   7. Add reverse proxy for HLS (via backend for session tracking):"
-    echo "      - Path: /hls"
-    echo "      - Target: http://localhost:3000"
-    echo ""
-    echo "   ⚠️  IMPORTANT: HLS must proxy to backend (port 3000), NOT MediaMTX!"
-    echo "   Backend will proxy to MediaMTX while tracking viewer sessions."
-    echo ""
-    echo "   OR copy config manually:"
-    echo "   Config file: $APP_DIR/deployment/nginx.conf"
-    echo ""
-    
-    # Just verify Nginx is running
-    if systemctl is-active --quiet nginx; then
-        print_success "Nginx is running (managed by aaPanel)"
-    else
-        print_error "Nginx not running. Start via aaPanel."
+    if [ "$WEB_SERVER" = "nginx" ]; then
+        print_info "Detected: Nginx"
+        print_info "aaPanel manages Nginx via UI"
+        print_info "Manual setup required:"
+        echo ""
+        echo "   See: $APP_DIR/deployment/AAPANEL_NGINX_SETUP.md"
+        echo ""
+        echo "   Quick steps:"
+        echo "   1. Login to aaPanel"
+        echo "   2. Website > Add Site"
+        echo "   3. Domain: $DOMAIN_FRONTEND, Port: $PORT"
+        echo "   4. Root: $APP_DIR/frontend/dist"
+        echo "   5. Add reverse proxy: /api → http://localhost:3000"
+        echo "   6. Add reverse proxy: /hls → http://localhost:3000 (NOT 8888!)"
+        echo ""
+        
+        # Just verify Nginx is running
+        if systemctl is-active --quiet nginx; then
+            print_success "Nginx is running (managed by aaPanel)"
+        else
+            print_error "Nginx not running. Start via aaPanel."
+        fi
+        
+    elif [ "$WEB_SERVER" = "apache" ]; then
+        print_info "Detected: Apache"
+        print_info "aaPanel manages Apache via UI"
+        print_info "Manual setup required:"
+        echo ""
+        echo "   See: $APP_DIR/deployment/AAPANEL_APACHE_SETUP.md"
+        echo ""
+        echo "   Quick steps:"
+        echo "   1. Login to aaPanel"
+        echo "   2. Website > Add Site"
+        echo "   3. Domain: $DOMAIN_FRONTEND, Port: $PORT"
+        echo "   4. Root: $APP_DIR/frontend/dist"
+        echo "   5. Edit config file (Configuration File tab)"
+        echo "   6. Add reverse proxy directives (see AAPANEL_APACHE_SETUP.md)"
+        echo ""
+        echo "   Template config: $APP_DIR/deployment/apache.conf"
+        echo ""
+        
+        # Just verify Apache is running
+        if systemctl is-active --quiet apache2; then
+            print_success "Apache is running (managed by aaPanel)"
+        else
+            print_error "Apache not running. Start via aaPanel."
+        fi
     fi
+    
+    echo ""
+    print_info "⚠️  IMPORTANT: HLS must proxy to backend (port 3000), NOT MediaMTX!"
+    print_info "Backend will proxy to MediaMTX while tracking viewer sessions."
 }
 
 setup_firewall() {
@@ -417,10 +464,12 @@ verify_installation() {
     fi
     
     # Check Nginx (managed by aaPanel)
-    if systemctl is-active --quiet nginx; then
+    if systemctl is-active --quiet nginx 2>/dev/null; then
         print_success "Nginx running (managed by aaPanel)"
+    elif systemctl is-active --quiet apache2 2>/dev/null; then
+        print_success "Apache running (managed by aaPanel)"
     else
-        print_error "Nginx not running"
+        print_error "Web server not running"
     fi
     
     # Check backend health
@@ -464,12 +513,17 @@ print_summary() {
     echo "   cd $APP_DIR && ./deployment/update.sh"
     echo ""
     echo "📝 Next Steps:"
-    echo "   1. Configure Nginx via aaPanel UI:"
+    if [ "$WEB_SERVER" = "nginx" ]; then
+        echo "   1. Configure Nginx via aaPanel UI:"
+        echo "      See: $APP_DIR/deployment/AAPANEL_NGINX_SETUP.md"
+    elif [ "$WEB_SERVER" = "apache" ]; then
+        echo "   1. Configure Apache via aaPanel UI:"
+        echo "      See: $APP_DIR/deployment/AAPANEL_APACHE_SETUP.md"
+    fi
     echo "      - Add site: $DOMAIN_FRONTEND (port $PORT)"
     echo "      - Root: $APP_DIR/frontend/dist"
     echo "      - Add reverse proxy: /api → http://localhost:3000"
     echo "      - Add reverse proxy: /hls → http://localhost:3000 (NOT 8888!)"
-    echo "      See: $APP_DIR/deployment/AAPANEL_NGINX_SETUP.md"
     echo ""
     echo "   2. Generate API Key:"
     echo "      - Login to admin panel: http://$DOMAIN_FRONTEND:$PORT"
@@ -511,7 +565,7 @@ main() {
     setup_frontend
     setup_mediamtx
     setup_pm2
-    setup_nginx
+    setup_webserver
     setup_firewall
     verify_installation
     print_summary
