@@ -1067,8 +1067,8 @@ class RecordingService {
                         retries--;
                         
                         if (retries > 0) {
-                            console.log(`[Recording] Retrying camera ${camera.id} in 5 seconds...`);
-                            await new Promise(resolve => setTimeout(resolve, 5000));
+                            console.log(`[Recording] Retrying camera ${camera.id} in 2 seconds...`);
+                            await new Promise(resolve => setTimeout(resolve, 2000)); // Reduced from 5s to 2s
                         }
                     }
                 }
@@ -1078,8 +1078,8 @@ class RecordingService {
                     failCount++;
                 }
                 
-                // Stagger starts between cameras
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                // Stagger starts between cameras (reduced from 2s to 500ms)
+                await new Promise(resolve => setTimeout(resolve, 500));
             }
             
             console.log(`[Recording] Auto-start complete: ${successCount} succeeded, ${failCount} failed`);

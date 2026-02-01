@@ -334,7 +334,7 @@ const start = async () => {
         
         // Wait for MediaMTX paths to be fully ready before starting recordings
         console.log('[Recording] Waiting for MediaMTX paths to be ready...');
-        await new Promise(resolve => setTimeout(resolve, 10000)); // 10 seconds
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Reduced from 10s to 5s
         
         // Auto-start recordings untuk cameras yang enable_recording = 1
         console.log('[Recording] Auto-starting recordings with retry logic...');
