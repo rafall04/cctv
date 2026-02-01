@@ -16,6 +16,9 @@ const activeRecordings = new Map();
 // Stream health monitoring
 const streamHealthMap = new Map();
 
+// CRITICAL: Track files being processed (prevent deletion during remux)
+const filesBeingProcessed = new Set();
+
 // Failed re-mux tracking (prevent infinite loop on corrupt files)
 // Using database for persistence across restarts
 const initFailedFilesTable = () => {
@@ -340,6 +343,10 @@ class RecordingService {
 
         const cameraDir = join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
         const filePath = join(cameraDir, filename);
+        
+        // CRITICAL: Mark file as being processed (prevent deletion)
+        const fileKey = `${cameraId}:${filename}`;
+        filesBeingProcessed.add(fileKey);
 
         console.log(`[Segment] Detected new segment: camera${cameraId}/${filename}`);
 
@@ -548,6 +555,9 @@ class RecordingService {
 
                 console.log(`✓ Segment saved: camera${cameraId}/${filename} (${(finalSize / 1024 / 1024).toFixed(2)} MB)`);
 
+                // CRITICAL: Remove from processing set (allow cleanup)
+                filesBeingProcessed.delete(fileKey);
+
                 // CRITICAL FIX: Wait 3 seconds before cleanup to ensure file is fully written
                 // This prevents race condition where cleanup runs before file is saved
                 await new Promise(resolve => setTimeout(resolve, 3000));
@@ -557,6 +567,9 @@ class RecordingService {
 
             } catch (error) {
                 console.error(`[Segment] Error handling segment creation:`, error);
+                
+                // CRITICAL: Remove from processing set on error
+                filesBeingProcessed.delete(fileKey);
             }
         }, 3000); // Wait 3 seconds initial delay (optimized from 15s)
     }
@@ -634,6 +647,13 @@ class RecordingService {
                     const segmentAge = Date.now() - new Date(segment.start_time).getTime();
                     if (segmentAge < 15 * 60 * 1000) {
                         console.log(`[Cleanup] ⚠️ Skipping recent segment (age: ${Math.round(segmentAge/60000)}min): ${segment.filename}`);
+                        return;
+                    }
+                    
+                    // CRITICAL: Check if file is being processed (remux in progress)
+                    const fileKey = `${cameraId}:${segment.filename}`;
+                    if (filesBeingProcessed.has(fileKey)) {
+                        console.log(`[Cleanup] ⚠️ Skipping file being processed: ${segment.filename}`);
                         return;
                     }
                     
