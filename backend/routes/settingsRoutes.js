@@ -1,9 +1,10 @@
-import { getAllSettings, getSetting, updateSetting, getMapDefaultCenter } from '../controllers/settingsController.js';
+import { getAllSettings, getSetting, updateSetting, getMapDefaultCenter, getLandingPageSettings } from '../controllers/settingsController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 
 export default async function settingsRoutes(fastify, options) {
-    // Public route - get map default center
+    // Public routes
     fastify.get('/api/settings/map-center', getMapDefaultCenter);
+    fastify.get('/api/settings/landing-page', getLandingPageSettings);
 
     // Protected routes - require authentication
     fastify.get('/api/settings', { onRequest: [authMiddleware] }, getAllSettings);

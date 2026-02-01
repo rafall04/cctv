@@ -2686,7 +2686,7 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                         <div>
                             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-                                CCTV Publik
+                                {landingSettings.section_title}
                             </h2>
                             <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
                                 {cameras.length} kamera tersedia • Streaming langsung 24/7
@@ -3473,6 +3473,13 @@ export default function LandingPage() {
     const [saweriaLeaderboardLink, setSaweriaLeaderboardLink] = useState('');
     const [saweriaEnabled, setSaweriaEnabled] = useState(true);
     
+    // Landing page settings state
+    const [landingSettings, setLandingSettings] = useState({
+        area_coverage: 'Saat ini area coverage kami baru mencakup <strong>Dander</strong> dan <strong>Tanjungharjo</strong>',
+        hero_badge: 'LIVE STREAMING 24 JAM',
+        section_title: 'CCTV Publik'
+    });
+    
     // Device-based stream limit
     const [deviceTier] = useState(() => detectDeviceTier());
     const maxStreams = getMaxConcurrentStreams(deviceTier);
@@ -3550,14 +3557,17 @@ export default function LandingPage() {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                // Fetch cameras, areas, and Saweria config in parallel
-                const [camsRes, areasRes, saweriaRes] = await Promise.all([
+                // Fetch cameras, areas, Saweria config, and landing settings in parallel
+                const [camsRes, areasRes, saweriaRes, landingRes] = await Promise.all([
                     streamService.getAllActiveStreams(),
                     areaService.getPublicAreas().catch(() => ({ success: false, data: [] })),
                     getPublicSaweriaConfig().catch((err) => {
                         console.warn('Saweria config fetch failed, using defaults:', err);
                         return { success: true, data: { enabled: true, saweria_link: 'https://saweria.co/raflialdi' } };
-                    })
+                    }),
+                    fetch(`${getApiUrl()}/api/settings/landing-page`)
+                        .then(res => res.json())
+                        .catch(() => ({ success: false }))
                 ]);
                 
                 setCameras(camsRes.data || []);
@@ -3572,6 +3582,11 @@ export default function LandingPage() {
                     if (saweriaRes.data.leaderboard_link) {
                         setSaweriaLeaderboardLink(saweriaRes.data.leaderboard_link);
                     }
+                }
+                
+                // Set landing page settings
+                if (landingRes && landingRes.success && landingRes.data) {
+                    setLandingSettings(landingRes.data);
                 }
                 
                 // Show welcome toast if cameras loaded
@@ -3687,7 +3702,7 @@ export default function LandingPage() {
                             {!disableHeavyEffects && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
                             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                         </span>
-                        LIVE STREAMING 24 JAM
+                        {landingSettings.hero_badge}
                     </div>
                     <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-4">
                         {branding.hero_title}
@@ -3705,9 +3720,10 @@ export default function LandingPage() {
                             <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/>
                             <circle cx="12" cy="11" r="3"/>
                         </svg>
-                        <span className="text-sm text-amber-700 dark:text-amber-400">
-                            Saat ini area coverage kami baru mencakup <strong>Dander</strong> dan <strong>Tanjungharjo</strong>
-                        </span>
+                        <span 
+                            className="text-sm text-amber-700 dark:text-amber-400"
+                            dangerouslySetInnerHTML={{ __html: landingSettings.area_coverage }}
+                        />
                     </div>
                     
                     {/* Quick Features - Enhanced with Indonesian labels */}

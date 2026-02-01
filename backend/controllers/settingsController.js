@@ -131,3 +131,36 @@ export async function getMapDefaultCenter(request, reply) {
         });
     }
 }
+
+// Get landing page settings (public endpoint)
+export async function getLandingPageSettings(request, reply) {
+    try {
+        const settings = query(
+            'SELECT key, value FROM settings WHERE key IN (?, ?, ?)',
+            ['landing_area_coverage', 'landing_hero_badge', 'landing_section_title']
+        );
+        
+        const result = {
+            area_coverage: 'Saat ini area coverage kami baru mencakup <strong>Dander</strong> dan <strong>Tanjungharjo</strong>',
+            hero_badge: 'LIVE STREAMING 24 JAM',
+            section_title: 'CCTV Publik'
+        };
+        
+        settings.forEach(s => {
+            if (s.key === 'landing_area_coverage') result.area_coverage = s.value;
+            if (s.key === 'landing_hero_badge') result.hero_badge = s.value;
+            if (s.key === 'landing_section_title') result.section_title = s.value;
+        });
+
+        return reply.send({
+            success: true,
+            data: result,
+        });
+    } catch (error) {
+        console.error('Get landing page settings error:', error);
+        return reply.code(500).send({
+            success: false,
+            message: 'Internal server error',
+        });
+    }
+}

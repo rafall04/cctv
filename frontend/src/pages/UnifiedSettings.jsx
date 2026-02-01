@@ -3,8 +3,15 @@ import TelegramSettings from '../components/settings/TelegramSettings';
 import SaweriaSettingsTab from '../components/settings/SaweriaSettingsTab';
 import BrandingSettingsTab from '../components/settings/BrandingSettingsTab';
 import ApiKeySettings from '../components/settings/ApiKeySettings';
+import GeneralSettingsTab from '../components/settings/GeneralSettingsTab';
 
 const Icons = {
+    General: () => (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+    ),
     Telegram: () => (
         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.6.295-.002 0-.003 0-.005 0l.213-3.054 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.941z"/>
@@ -28,9 +35,10 @@ const Icons = {
 };
 
 export default function UnifiedSettings() {
-    const [activeTab, setActiveTab] = useState('telegram');
+    const [activeTab, setActiveTab] = useState('general');
 
     const tabs = [
+        { id: 'general', label: 'General', icon: <Icons.General /> },
         { id: 'telegram', label: 'Telegram Bot', icon: <Icons.Telegram /> },
         { id: 'saweria', label: 'Saweria', icon: <Icons.Saweria /> },
         { id: 'branding', label: 'Branding', icon: <Icons.Branding /> },
@@ -73,6 +81,7 @@ export default function UnifiedSettings() {
 
             {/* Tab Content */}
             <div className="mt-6">
+                {activeTab === 'general' && <GeneralSettingsTab />}
                 {activeTab === 'telegram' && <TelegramSettings />}
                 {activeTab === 'saweria' && <SaweriaSettingsTab />}
                 {activeTab === 'branding' && <BrandingSettingsTab />}
