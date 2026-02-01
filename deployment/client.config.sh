@@ -2,8 +2,8 @@
 # ============================================
 # RAF NET CCTV - Client Configuration
 # ============================================
-# Edit file ini untuk setiap client baru
-# Semua domain, IP, dan port dikonfigurasi di sini
+# EDIT FILE INI UNTUK GANTI DOMAIN/IP
+# Setelah edit, jalankan: bash deployment/generate-env.sh
 
 # ============================================
 # CLIENT INFORMATION
@@ -29,10 +29,10 @@ SERVER_IP="172.17.11.12"
 # Nginx port (gunakan 800 jika port 80 dipakai aaPanel)
 NGINX_PORT="800"
 
-# Backend API port (internal)
+# Backend API port (internal, jangan ubah)
 BACKEND_PORT="3000"
 
-# MediaMTX ports (internal)
+# MediaMTX ports (internal, jangan ubah)
 MEDIAMTX_HLS_PORT="8888"
 MEDIAMTX_WEBRTC_PORT="8889"
 MEDIAMTX_API_PORT="9997"
@@ -42,7 +42,7 @@ MEDIAMTX_API_PORT="9997"
 # ============================================
 # Use 'https' for production with SSL, 'http' for development
 FRONTEND_PROTOCOL="http"
-BACKEND_PROTOCOL="https"
+BACKEND_PROTOCOL="http"
 
 # ============================================
 # PATH CONFIGURATION

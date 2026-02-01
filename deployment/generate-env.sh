@@ -3,6 +3,14 @@
 # RAF NET CCTV - Environment File Generator
 # ============================================
 # Generate .env files dari client.config.sh
+# 
+# Usage:
+#   bash deployment/generate-env.sh
+#
+# Setelah generate:
+#   1. Edit backend/.env untuk update secrets
+#   2. Edit frontend/.env untuk update API key
+#   3. Deploy: bash deployment/deploy.sh
 
 set -e
 
@@ -10,16 +18,31 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/client.config.sh"
 
+# Detect if running in aaPanel (check common paths)
+if [ -d "/www/server/nginx" ]; then
+    echo "🔍 Detected aaPanel environment"
+    NGINX_CONF_DIR="/www/server/panel/vhost/nginx"
+    APP_DIR="/www/rafnet-cctv"
+else
+    echo "🔍 Detected standard Ubuntu environment"
+    NGINX_CONF_DIR="/etc/nginx/sites-available"
+    APP_DIR="/var/www/rafnet-cctv"
+fi
+
 echo "============================================"
 echo "Generating Environment Files"
 echo "============================================"
 echo "Client: $CLIENT_NAME"
+echo "App Dir: $APP_DIR"
 echo ""
 
 # ============================================
 # Generate Backend .env
 # ============================================
 echo "📝 Generating backend/.env..."
+
+# Create backend directory if not exists
+mkdir -p "${APP_DIR}/backend"
 
 cat > "${APP_DIR}/backend/.env" << EOF
 # RAF NET CCTV Backend Configuration
@@ -33,7 +56,7 @@ HOST=0.0.0.0
 NODE_ENV=production
 
 # Database Configuration
-DATABASE_PATH=${DATABASE_PATH}
+DATABASE_PATH=./data/cctv.db
 
 # JWT Configuration
 JWT_SECRET=${JWT_SECRET}
@@ -88,12 +111,15 @@ TELEGRAM_MONITORING_CHAT_ID=
 TELEGRAM_FEEDBACK_CHAT_ID=
 EOF
 
-echo "✅ Backend .env generated"
+echo "✅ Backend .env generated at: ${APP_DIR}/backend/.env"
 
 # ============================================
 # Generate Frontend .env
 # ============================================
 echo "📝 Generating frontend/.env..."
+
+# Create frontend directory if not exists
+mkdir -p "${APP_DIR}/frontend"
 
 cat > "${APP_DIR}/frontend/.env" << EOF
 # RAF NET CCTV Frontend Configuration
@@ -108,7 +134,7 @@ VITE_API_URL=${BACKEND_URL}
 VITE_API_KEY=CHANGE_THIS_TO_YOUR_API_KEY
 EOF
 
-echo "✅ Frontend .env generated"
+echo "✅ Frontend .env generated at: ${APP_DIR}/frontend/.env"
 
 # ============================================
 # Generate Nginx Configuration
@@ -292,24 +318,52 @@ echo "============================================"
 echo "✅ Environment Files Generated Successfully"
 echo "============================================"
 echo ""
-echo "Generated files:"
-echo "  - ${APP_DIR}/backend/.env"
-echo "  - ${APP_DIR}/frontend/.env"
-echo "  - ${APP_DIR}/deployment/nginx.generated.conf"
+echo "📁 Generated files:"
+echo "  ✓ ${APP_DIR}/backend/.env"
+echo "  ✓ ${APP_DIR}/frontend/.env"
+echo "  ✓ ${APP_DIR}/deployment/nginx.generated.conf"
 echo ""
-echo "Next steps:"
-echo "  1. Review generated files"
-echo "  2. Update API_KEY_SECRET and CSRF_SECRET in backend/.env"
-echo "  3. Generate API key from admin panel"
-echo "  4. Update VITE_API_KEY in frontend/.env"
-echo "  5. Copy nginx config: cp deployment/nginx.generated.conf /etc/nginx/sites-available/${CLIENT_CODE}-cctv"
-echo "  6. Test nginx: nginx -t"
-echo "  7. Reload nginx: systemctl reload nginx"
-echo "  8. Restart backend: pm2 restart ${CLIENT_CODE}-cctv-backend"
-echo "  9. Rebuild frontend: cd frontend && npm run build"
+echo "⚠️  IMPORTANT - Update Secrets:"
+echo "  1. Edit ${APP_DIR}/backend/.env"
+echo "     - Update API_KEY_SECRET (generate: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\")"
+echo "     - Update CSRF_SECRET (generate: node -e \"console.log(require('crypto').randomBytes(16).toString('hex'))\")"
 echo ""
-echo "Access URLs:"
+echo "  2. Generate API Key from admin panel"
+echo "     - Login to admin panel"
+echo "     - Go to Settings > API Keys"
+echo "     - Generate new key"
+echo ""
+echo "  3. Edit ${APP_DIR}/frontend/.env"
+echo "     - Update VITE_API_KEY with generated key"
+echo ""
+echo "📋 Next Steps:"
+echo "  1. Copy nginx config:"
+if [ -d "/www/server/nginx" ]; then
+    echo "     cp ${APP_DIR}/deployment/nginx.generated.conf ${NGINX_CONF_DIR}/${CLIENT_CODE}-cctv.conf"
+else
+    echo "     cp ${APP_DIR}/deployment/nginx.generated.conf ${NGINX_CONF_DIR}/${CLIENT_CODE}-cctv"
+    echo "     ln -sf ${NGINX_CONF_DIR}/${CLIENT_CODE}-cctv /etc/nginx/sites-enabled/"
+fi
+echo ""
+echo "  2. Test nginx:"
+echo "     nginx -t"
+echo ""
+echo "  3. Reload nginx:"
+if [ -d "/www/server/nginx" ]; then
+    echo "     /etc/init.d/nginx reload"
+else
+    echo "     systemctl reload nginx"
+fi
+echo ""
+echo "  4. Restart backend:"
+echo "     pm2 restart ${CLIENT_CODE}-cctv-backend"
+echo ""
+echo "  5. Rebuild frontend:"
+echo "     cd ${APP_DIR}/frontend && npm run build"
+echo ""
+echo "🌐 Access URLs:"
 echo "  Frontend: ${FRONTEND_URL}"
 echo "  Backend:  ${BACKEND_URL}"
 echo "  IP:       http://${SERVER_IP}:${NGINX_PORT}"
+echo ""
 echo "============================================"
