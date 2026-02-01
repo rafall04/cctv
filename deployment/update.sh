@@ -1,45 +1,41 @@
 #!/bin/bash
-
-# RAF NET CCTV - Production Update Script
-# This script pulls the latest changes from Git and restarts services.
+# RAF NET CCTV - Update Script
+# Run as root: bash update.sh
 
 set -e
 
-echo "🔄 Starting RAF NET CCTV Update..."
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+APP_DIR="/var/www/rafnet-cctv"
 
-# Navigate to project root (assuming script is in deployment/)
-cd "$(dirname "$0")/.."
+echo "🔄 RAF NET CCTV - Update"
+echo "========================"
 
-# 1. Pull latest changes
-echo "📥 Pulling latest changes from GitHub..."
+cd "$APP_DIR"
+
+# Pull latest code
+echo "📥 Pulling latest code..."
 git pull origin main
 
-# 2. Update Backend
-echo "🛠 Updating Backend..."
+# Update backend
+echo "🔧 Updating backend..."
 cd backend
-npm install --omit=dev
-cd ..
+npm install --production
 
-# 3. Update Frontend
-echo "🏗 Updating Frontend..."
-cd frontend
+# Update frontend
+echo "🎨 Building frontend..."
+cd ../frontend
 npm install
 npm run build
-cd ..
 
-# 4. Sync MediaMTX Config
-echo "⚙️ Syncing MediaMTX Config..."
-cp deployment/mediamtx.yml mediamtx/mediamtx.yml
+# Restart services
+echo "♻️ Restarting services..."
+pm2 restart rafnet-cctv-backend
+pm2 restart rafnet-cctv-mediamtx
 
-# 5. Restart Services
-echo "🚀 Restarting Services with PM2..."
-# Delete old processes to ensure new config is applied
-pm2 delete all || true
-pm2 start deployment/ecosystem.config.cjs --env production
+# Reload Nginx
+echo "🔄 Reloading Nginx..."
+nginx -t && systemctl reload nginx
 
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "✅ Update Completed Successfully!"
-echo "💡 If you see 'PM2 is out-of-date', run: pm2 update"
-pm2 list
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "✅ Update completed!"
+echo ""
+pm2 status
