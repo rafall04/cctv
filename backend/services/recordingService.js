@@ -377,10 +377,17 @@ class RecordingService {
 
                 console.log(`[Segment] Final file size: ${(fileSize / 1024 / 1024).toFixed(2)} MB`);
 
-                // Skip if file is empty or too small (< 5MB = likely incomplete for 10min segment)
-                if (fileSize < 5 * 1024 * 1024) {
-                    console.warn(`[Segment] File too small, skipping: ${filename} (${(fileSize / 1024 / 1024).toFixed(2)} MB)`);
+                // CRITICAL FIX: Lower threshold to 500KB (from 5MB) to handle tunnel reconnect
+                // This allows files as short as 30 seconds to be saved and playable
+                // Reasoning: 1.5Mbps bitrate × 30s = ~5.6MB, but with compression ~500KB minimum
+                if (fileSize < 500 * 1024) {
+                    console.warn(`[Segment] File too small (< 500KB), likely corrupt or empty: ${filename} (${(fileSize / 1024).toFixed(2)} KB)`);
                     return;
+                }
+                
+                // Log if file is smaller than expected (< 5MB for 10min segment)
+                if (fileSize < 5 * 1024 * 1024) {
+                    console.log(`[Segment] ⚠️ File smaller than expected (likely from reconnect): ${filename} (${(fileSize / 1024 / 1024).toFixed(2)} MB)`);
                 }
 
                 // Reduced wait: 3 seconds (optimized from 5s)
