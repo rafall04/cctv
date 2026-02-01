@@ -48,7 +48,7 @@ BACKEND_PROTOCOL="http"
 # PATH CONFIGURATION
 # ============================================
 # Application directory on server
-APP_DIR="/var/www/rafnet-cctv"
+APP_DIR="/var/www/cctv"
 
 # Database path
 DATABASE_PATH="${APP_DIR}/backend/data/cctv.db"

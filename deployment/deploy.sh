@@ -14,12 +14,12 @@ source "${SCRIPT_DIR}/client.config.sh"
 if [ -d "/www/server/nginx" ]; then
     echo "🔍 Detected aaPanel environment"
     NGINX_CONF_DIR="/www/server/panel/vhost/nginx"
-    APP_DIR="/www/rafnet-cctv"
+    APP_DIR="/var/www/cctv"
     NGINX_RELOAD="/etc/init.d/nginx reload"
 else
     echo "🔍 Detected standard Ubuntu environment"
     NGINX_CONF_DIR="/etc/nginx/sites-available"
-    APP_DIR="/var/www/rafnet-cctv"
+    APP_DIR="/var/www/cctv"
     NGINX_RELOAD="systemctl reload nginx"
 fi
 

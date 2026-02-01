@@ -25,9 +25,9 @@ sudo npm install -g pm2
 
 # 4. Setup Project Directory
 echo "📁 Setting up project directory..."
-sudo mkdir -p /var/www/rafnet-cctv
-sudo chown -R $USER:$USER /var/www/rafnet-cctv
-cd /var/www/rafnet-cctv
+sudo mkdir -p /var/www/cctv
+sudo chown -R $USER:$USER /var/www/cctv
+cd /var/www/cctv
 
 # 5. Clone/Copy Project Files
 # (Assuming files are already uploaded or cloned to this directory)
@@ -69,8 +69,8 @@ cp deployment/mediamtx.yml mediamtx/mediamtx.yml
 
 # 9. Configure Nginx
 echo "🌐 Configuring Nginx..."
-sudo cp deployment/nginx.conf /etc/nginx/sites-available/rafnet-cctv
-sudo ln -sf /etc/nginx/sites-available/rafnet-cctv /etc/nginx/sites-enabled/
+sudo cp deployment/nginx.conf /etc/nginx/sites-available/cctv
+sudo ln -sf /etc/nginx/sites-available/cctv /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t
 sudo systemctl restart nginx

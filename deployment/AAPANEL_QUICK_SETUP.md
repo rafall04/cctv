@@ -138,8 +138,8 @@ pm2 save
 pm2 startup
 
 # Configure Nginx
-cp deployment/nginx.conf /etc/nginx/sites-available/rafnet-cctv
-ln -sf /etc/nginx/sites-available/rafnet-cctv /etc/nginx/sites-enabled/rafnet-cctv
+cp deployment/nginx.conf /etc/nginx/sites-available/cctv
+ln -sf /etc/nginx/sites-available/cctv /etc/nginx/sites-enabled/cctv
 nginx -t && systemctl reload nginx
 
 # Firewall

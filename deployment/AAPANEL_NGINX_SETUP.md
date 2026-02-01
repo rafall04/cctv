@@ -9,8 +9,8 @@ aaPanel mengelola Nginx via UI. **JANGAN edit config file manual** karena akan d
 - aaPanel installed
 - Nginx installed via aaPanel
 - Domain sudah pointing ke server IP:
-  - `cctv.raf.my.id` → Server IP
-  - `api-cctv.raf.my.id` → Server IP
+  - `sicamdes.semarnet.id` → Server IP
+  - `api-sicamdes.semarnet.id` → Server IP
 - Application installed di `/var/www/cctv`
 - Backend running di `localhost:3000`
 - MediaMTX running di `localhost:8888`
@@ -46,7 +46,7 @@ aaPanel mengelola Nginx via UI. **JANGAN edit config file manual** karena akan d
 
 2. **Configure Backend Site**
    ```
-   Domain: api-cctv.raf.my.id
+   Domain: api-sicamdes.semarnet.id
    Port: 800
    Root Directory: /var/www/cctv/backend (dummy, not used)
    PHP Version: Pure static
@@ -59,7 +59,7 @@ aaPanel mengelola Nginx via UI. **JANGAN edit config file manual** karena akan d
 ### Step 3: Configure Frontend Reverse Proxy
 
 1. **Select Frontend Site**
-   - Find `cctv.raf.my.id` in website list
+   - Find `sicamdes.semarnet.id` in website list
    - Click "Settings" (gear icon)
 
 2. **Go to "Reverse Proxy" Tab**
@@ -101,7 +101,7 @@ aaPanel mengelola Nginx via UI. **JANGAN edit config file manual** karena akan d
 ### Step 4: Configure Backend Reverse Proxy
 
 1. **Select Backend Site**
-   - Find `api-cctv.raf.my.id` in website list
+   - Find `api-sicamdes.semarnet.id` in website list
    - Click "Settings" (gear icon)
 
 2. **Go to "Reverse Proxy" Tab**
@@ -142,7 +142,7 @@ aaPanel mengelola Nginx via UI. **JANGAN edit config file manual** karena akan d
 
 ### Step 5: Configure Static File Caching (Frontend Only)
 
-1. **Select Frontend Site** (`cctv.raf.my.id`)
+1. **Select Frontend Site** (`sicamdes.semarnet.id`)
    - Click "Settings"
 
 2. **Go to "Configuration File" Tab**
@@ -166,7 +166,7 @@ aaPanel mengelola Nginx via UI. **JANGAN edit config file manual** karena akan d
 
 ### Step 6: Configure CORS Headers (Backend Site)
 
-1. **Select Backend Site** (`api-cctv.raf.my.id`)
+1. **Select Backend Site** (`api-sicamdes.semarnet.id`)
    - Click "Settings"
 
 2. **Go to "Configuration File" Tab**
@@ -239,13 +239,13 @@ aaPanel mengelola Nginx via UI. **JANGAN edit config file manual** karena akan d
 
 4. **Test Backend API**
    ```bash
-   curl http://api-cctv.raf.my.id:800/health
+   curl http://api-sicamdes.semarnet.id:800/health
    # Should return: {"status":"ok",...}
    ```
 
 5. **Test HLS Streaming**
    ```bash
-   curl -I http://api-cctv.raf.my.id:800/hls/camera1/index.m3u8
+   curl -I http://api-sicamdes.semarnet.id:800/hls/camera1/index.m3u8
    # Should return: 200 OK or 404 (if camera not exist)
    ```
 
@@ -270,14 +270,14 @@ aaPanel mengelola Nginx via UI. **JANGAN edit config file manual** karena akan d
 4. **Enable Force HTTPS**
    - Toggle "Force HTTPS" switch
 
-5. **Repeat for Backend Site** (api-cctv.raf.my.id)
+5. **Repeat for Backend Site** (api-sicamdes.semarnet.id)
 
 ### Update Frontend .env
 
 After SSL enabled:
 ```env
-VITE_API_BASE_URL=https://api-cctv.raf.my.id
-VITE_HLS_BASE_URL=https://api-cctv.raf.my.id/hls
+VITE_API_BASE_URL=https://api-sicamdes.semarnet.id
+VITE_HLS_BASE_URL=https://api-sicamdes.semarnet.id/hls
 ```
 
 Rebuild frontend:
@@ -412,8 +412,8 @@ Jika prefer edit config manual (not recommended):
 After setup:
 
 - [ ] Frontend accessible: `http://cctv.raf.my.id:800`
-- [ ] Backend API working: `http://api-cctv.raf.my.id:800/health`
-- [ ] HLS proxy working: `http://api-cctv.raf.my.id:800/hls/`
+- [ ] Backend API working: `http://api-sicamdes.semarnet.id:800/health`
+- [ ] HLS proxy working: `http://api-sicamdes.semarnet.id:800/hls/`
 - [ ] No CORS errors in browser console
 - [ ] Video streaming works
 - [ ] Admin login works
