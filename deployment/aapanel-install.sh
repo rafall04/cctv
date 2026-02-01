@@ -4,14 +4,14 @@
 
 set -e
 
-echo "🚀 RAF NET CCTV - aaPanel Installation"
+echo "🚀 RAF CCTV - aaPanel Installation"
 echo "========================================"
 
 # Configuration
 APP_DIR="/var/www/rafnet-cctv"
-REPO_URL="https://github.com/YOUR_USERNAME/rafnet-cctv.git"
-DOMAIN_FRONTEND="cctv.raf.my.id"
-DOMAIN_BACKEND="api-cctv.raf.my.id"
+REPO_URL="https://github.com/rafall04/cctv.git"
+DOMAIN_FRONTEND="sicamdes.semarnet.id"
+DOMAIN_BACKEND="api-sicamdes.semarnet.id"
 PORT=800
 
 # Colors
