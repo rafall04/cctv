@@ -1,32 +1,12 @@
 import apiClient from './apiClient';
+import { getApiUrl } from '../config/config.js';
 
 /**
- * Get base URL for API/backend
+ * Get base URL for API/backend from central config
  * Used for HLS proxy which routes through backend for session tracking
  */
 const getApiBaseUrl = () => {
-    if (typeof window !== 'undefined') {
-        const hostname = window.location.hostname;
-        const protocol = window.location.protocol;
-        
-        // If accessing via IP address, use relative path (Nginx will proxy)
-        if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) {
-            return ''; // Empty string = relative path, Nginx proxies /api and /hls to backend
-        }
-        
-        // If HTTPS with domain, use HTTPS API domain
-        if (protocol === 'https:' && hostname === 'cctv.raf.my.id') {
-            return 'https://api-cctv.raf.my.id';
-        }
-        
-        // HTTP with domain (development or custom setup)
-        if (hostname === 'cctv.raf.my.id') {
-            return 'http://api-cctv.raf.my.id';
-        }
-    }
-    
-    // Fallback for development
-    return import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    return getApiUrl();
 };
 
 /**

@@ -17,6 +17,7 @@ import { LoadingStage, getStageMessage, createStreamError } from '../utils/strea
 import { createFallbackHandler } from '../utils/fallbackHandler';
 import { shouldDisableAnimations } from '../utils/animationControl';
 import { getGlobalStreamInitQueue, shouldUseQueuedInit } from '../utils/streamInitQueue';
+import { getApiUrl } from '../config/config.js';
 // Skeleton loaders
 import { GridSkeleton, CameraCardSkeleton } from '../components/ui/Skeleton';
 // Empty states
@@ -3520,7 +3521,7 @@ export default function LandingPage() {
                     }
                 } else {
                     // HTTP with domain or development
-                    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+                    const baseUrl = getApiUrl();
                     apiUrl = `${baseUrl.replace(/\/$/, '')}/health`;
                 }
                 

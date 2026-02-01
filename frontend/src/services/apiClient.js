@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getApiUrl, getApiKey } from '../config/config.js';
 import {
     parseApiError,
     getErrorMessage,
@@ -12,34 +13,9 @@ import {
     ERROR_MESSAGES,
 } from '../hooks/useApiError';
 
-// Determine API URL based on environment
-const getApiUrl = () => {
-    if (typeof window !== 'undefined') {
-        const hostname = window.location.hostname;
-        const protocol = window.location.protocol;
-        
-        // If accessing via IP address, use relative path (Nginx will proxy)
-        if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) {
-            return ''; // Empty string = relative path, Nginx proxies /api to backend
-        }
-        
-        // If HTTPS with domain, use HTTPS API domain
-        if (protocol === 'https:' && hostname === 'cctv.raf.my.id') {
-            return 'https://api-cctv.raf.my.id';
-        }
-        
-        // HTTP with domain (development or custom setup)
-        if (hostname === 'cctv.raf.my.id') {
-            return 'http://api-cctv.raf.my.id';
-        }
-    }
-    
-    // Fallback for development
-    return import.meta.env.VITE_API_URL || 'http://localhost:3001';
-};
-
+// Get API URL and Key from central config
 const API_URL = getApiUrl();
-const API_KEY = import.meta.env.VITE_API_KEY || '';
+const API_KEY = getApiKey();
 
 // Default timeout configuration (30 seconds)
 // Requirements: 10.3
