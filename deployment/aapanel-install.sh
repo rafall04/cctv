@@ -291,6 +291,28 @@ setup_backend() {
     npm run setup-db
     print_success "Database initialized"
     
+    # Run all migrations
+    print_info "Running database migrations..."
+    MIGRATION_DIR="database/migrations"
+    if [ -d "$MIGRATION_DIR" ]; then
+        MIGRATION_COUNT=0
+        for migration in "$MIGRATION_DIR"/*.js; do
+            if [ -f "$migration" ]; then
+                MIGRATION_NAME=$(basename "$migration")
+                print_info "Running migration: $MIGRATION_NAME"
+                if node "$migration"; then
+                    MIGRATION_COUNT=$((MIGRATION_COUNT + 1))
+                else
+                    print_error "Migration failed: $MIGRATION_NAME"
+                    exit 1
+                fi
+            fi
+        done
+        print_success "Completed $MIGRATION_COUNT migrations"
+    else
+        print_info "No migrations directory found, skipping"
+    fi
+    
     # Setup recordings directory (CRITICAL for recording feature)
     print_info "Creating recordings directory..."
     mkdir -p "$APP_DIR/recordings"
