@@ -41,6 +41,9 @@ frontend/build/
 *.swo
 *~
 
+# Kiro IDE
+.kiro/
+
 # OS
 .DS_Store
 Thumbs.db
