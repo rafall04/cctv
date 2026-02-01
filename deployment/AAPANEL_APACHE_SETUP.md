@@ -12,7 +12,7 @@ Jika aaPanel tidak mengizinkan install Nginx karena sudah ada Apache, **gunakan 
   - `sicamdes.semarnet.id` → Server IP
   - `api-sicamdes.semarnet.id` → Server IP
 - Application installed di `/var/www/cctv`
-- Backend running di `localhost:3000`
+- Backend running di `localhost:3001`
 - MediaMTX running di `localhost:8888`
 
 ## 🔧 Enable Required Apache Modules
@@ -98,18 +98,18 @@ Find the `<VirtualHost *:800>` block and add this BEFORE the `</VirtualHost>` cl
     ProxyRequests Off
     
     # Backend API Proxy
-    ProxyPass /api http://localhost:3000/api
-    ProxyPassReverse /api http://localhost:3000/api
+    ProxyPass /api http://localhost:3001/api
+    ProxyPassReverse /api http://localhost:3001/api
     
     # HLS Streaming Proxy (via backend for session tracking)
-    ProxyPass /hls http://localhost:3000/hls
-    ProxyPassReverse /hls http://localhost:3000/hls
+    ProxyPass /hls http://localhost:3001/hls
+    ProxyPassReverse /hls http://localhost:3001/hls
     
     # WebSocket support
     RewriteEngine On
     RewriteCond %{HTTP:Upgrade} websocket [NC]
     RewriteCond %{HTTP:Connection} upgrade [NC]
-    RewriteRule ^/?(.*) "ws://localhost:3000/$1" [P,L]
+    RewriteRule ^/?(.*) "ws://localhost:3001/$1" [P,L]
     
     # Static files (React SPA)
     <Directory /var/www/cctv/frontend/dist>
@@ -166,18 +166,18 @@ Find the `<VirtualHost *:800>` block and replace the content with:
     ProxyRequests Off
     
     # Backend API Proxy
-    ProxyPass / http://localhost:3000/
-    ProxyPassReverse / http://localhost:3000/
+    ProxyPass / http://localhost:3001/
+    ProxyPassReverse / http://localhost:3001/
     
     # HLS Streaming Proxy (via backend for session tracking)
-    ProxyPass /hls http://localhost:3000/hls
-    ProxyPassReverse /hls http://localhost:3000/hls
+    ProxyPass /hls http://localhost:3001/hls
+    ProxyPassReverse /hls http://localhost:3001/hls
     
     # WebSocket support
     RewriteEngine On
     RewriteCond %{HTTP:Upgrade} websocket [NC]
     RewriteCond %{HTTP:Connection} upgrade [NC]
-    RewriteRule ^/?(.*) "ws://localhost:3000/$1" [P,L]
+    RewriteRule ^/?(.*) "ws://localhost:3001/$1" [P,L]
     
     # Security headers
     Header always set X-Frame-Options "SAMEORIGIN"

@@ -12,7 +12,7 @@ aaPanel mengelola Nginx via UI. **JANGAN edit config file manual** karena akan d
   - `sicamdes.semarnet.id` → Server IP
   - `api-sicamdes.semarnet.id` → Server IP
 - Application installed di `/var/www/cctv`
-- Backend running di `localhost:3000`
+- Backend running di `localhost:3001`
 - MediaMTX running di `localhost:8888`
 
 ## 🔧 Install Nginx via aaPanel
@@ -82,7 +82,7 @@ Jika Nginx belum terinstall:
    - Configuration:
      ```
      Proxy Name: Backend API
-     Target URL: http://localhost:3000
+     Target URL: http://localhost:3001
      Send Domain: $host
      Proxy Directory: /api
      ```
@@ -124,7 +124,7 @@ Jika Nginx belum terinstall:
    - Configuration:
      ```
      Proxy Name: Backend API
-     Target URL: http://localhost:3000
+     Target URL: http://localhost:3001
      Send Domain: $host
      Proxy Directory: /
      ```
@@ -187,7 +187,7 @@ Jika Nginx belum terinstall:
 3. **Find the `location /` block** and add:
    ```nginx
    location / {
-       proxy_pass http://localhost:3000;
+       proxy_pass http://localhost:3001;
        proxy_http_version 1.1;
        proxy_set_header Upgrade $http_upgrade;
        proxy_set_header Connection 'upgrade';

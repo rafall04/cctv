@@ -16,7 +16,7 @@ pm2 status
 systemctl status apache2
 
 # Check backend
-curl http://localhost:3000/health
+curl http://localhost:3001/health
 # Should return: {"status":"ok",...}
 
 # Check frontend files
@@ -79,14 +79,14 @@ ls -la /var/www/cctv/frontend/dist/
     # ===================================
     # Backend API Proxy
     # ===================================
-    ProxyPass /api http://localhost:3000/api
-    ProxyPassReverse /api http://localhost:3000/api
+    ProxyPass /api http://localhost:3001/api
+    ProxyPassReverse /api http://localhost:3001/api
     
     # ===================================
     # HLS Streaming Proxy (CRITICAL: via backend for session tracking)
     # ===================================
-    ProxyPass /hls http://localhost:3000/hls
-    ProxyPassReverse /hls http://localhost:3000/hls
+    ProxyPass /hls http://localhost:3001/hls
+    ProxyPassReverse /hls http://localhost:3001/hls
     
     # ===================================
     # WebSocket Support
@@ -94,7 +94,7 @@ ls -la /var/www/cctv/frontend/dist/
     RewriteEngine On
     RewriteCond %{HTTP:Upgrade} websocket [NC]
     RewriteCond %{HTTP:Connection} upgrade [NC]
-    RewriteRule ^/?(.*) "ws://localhost:3000/$1" [P,L]
+    RewriteRule ^/?(.*) "ws://localhost:3001/$1" [P,L]
     
     # ===================================
     # Static Files (React SPA)
@@ -211,14 +211,14 @@ ls -la /var/www/cctv/frontend/dist/
     # ===================================
     # Backend API Proxy (Root)
     # ===================================
-    ProxyPass / http://localhost:3000/
-    ProxyPassReverse / http://localhost:3000/
+    ProxyPass / http://localhost:3001/
+    ProxyPassReverse / http://localhost:3001/
     
     # ===================================
     # HLS Streaming Proxy
     # ===================================
-    ProxyPass /hls http://localhost:3000/hls
-    ProxyPassReverse /hls http://localhost:3000/hls
+    ProxyPass /hls http://localhost:3001/hls
+    ProxyPassReverse /hls http://localhost:3001/hls
     
     # ===================================
     # WebSocket Support
@@ -226,7 +226,7 @@ ls -la /var/www/cctv/frontend/dist/
     RewriteEngine On
     RewriteCond %{HTTP:Upgrade} websocket [NC]
     RewriteCond %{HTTP:Connection} upgrade [NC]
-    RewriteRule ^/?(.*) "ws://localhost:3000/$1" [P,L]
+    RewriteRule ^/?(.*) "ws://localhost:3001/$1" [P,L]
     
     # ===================================
     # Security Headers
@@ -376,7 +376,7 @@ netstat -tlnp | grep 3000
 # Should show: LISTEN on port 3000
 
 # Test direct
-curl http://localhost:3000/health
+curl http://localhost:3001/health
 # Should work
 ```
 
@@ -389,7 +389,7 @@ pm2 logs cctv-backend
 ### Issue 3: Proxy not working (404 on /api/)
 
 **Symptoms:**
-- Direct backend works: `curl http://localhost:3000/health` ✓
+- Direct backend works: `curl http://localhost:3001/health` ✓
 - Proxy fails: `curl http://api-sicamdes.semarnet.id:800/health` ✗
 
 **Check:**
@@ -590,7 +590,7 @@ pm2 logs cctv-backend --lines 20 --nostream
    - Static asset caching
 
 2. **Backend API Site** (`api-sicamdes.semarnet.id:800`)
-   - Proxies all requests to `localhost:3000`
+   - Proxies all requests to `localhost:3001`
    - HLS streaming support
    - WebSocket support
    - CORS headers

@@ -229,7 +229,7 @@ pm2 status
 # Should show: cctv-backend (online), cctv-mediamtx (online)
 
 # Check backend
-curl http://localhost:3000/health
+curl http://localhost:3001/health
 # Should return: {"status":"ok",...}
 
 # Check MediaMTX
@@ -343,7 +343,7 @@ curl http://localhost:8888/camera1/index.m3u8
 ```bash
 pm2 status                              # All services online?
 systemctl status nginx                  # Nginx running?
-curl http://localhost:3000/health       # Backend responding?
+curl http://localhost:3001/health       # Backend responding?
 curl http://localhost:9997/v3/config/global/get  # MediaMTX responding?
 ```
 
