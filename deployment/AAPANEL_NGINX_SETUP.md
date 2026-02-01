@@ -11,7 +11,7 @@ aaPanel mengelola Nginx via UI. **JANGAN edit config file manual** karena akan d
 - Domain sudah pointing ke server IP:
   - `cctv.raf.my.id` → Server IP
   - `api-cctv.raf.my.id` → Server IP
-- Application installed di `/var/www/rafnet-cctv`
+- Application installed di `/var/www/cctv`
 - Backend running di `localhost:3000`
 - MediaMTX running di `localhost:8888`
 
@@ -31,7 +31,7 @@ aaPanel mengelola Nginx via UI. **JANGAN edit config file manual** karena akan d
    ```
    Domain: cctv.raf.my.id
    Port: 800
-   Root Directory: /var/www/rafnet-cctv/frontend/dist
+   Root Directory: /var/www/cctv/frontend/dist
    PHP Version: Pure static (no PHP needed)
    Database: None
    FTP: No
@@ -48,7 +48,7 @@ aaPanel mengelola Nginx via UI. **JANGAN edit config file manual** karena akan d
    ```
    Domain: api-cctv.raf.my.id
    Port: 800
-   Root Directory: /var/www/rafnet-cctv/backend (dummy, not used)
+   Root Directory: /var/www/cctv/backend (dummy, not used)
    PHP Version: Pure static
    Database: None
    FTP: No
@@ -282,7 +282,7 @@ VITE_HLS_BASE_URL=https://api-cctv.raf.my.id/hls
 
 Rebuild frontend:
 ```bash
-cd /var/www/rafnet-cctv/frontend
+cd /var/www/cctv/frontend
 npm run build
 ```
 
@@ -294,7 +294,7 @@ ALLOWED_ORIGINS=https://cctv.raf.my.id,http://cctv.raf.my.id,http://172.17.11.12
 
 Restart backend:
 ```bash
-pm2 restart rafnet-cctv-backend
+pm2 restart cctv-backend
 ```
 
 ## 🐛 Troubleshooting
@@ -304,7 +304,7 @@ pm2 restart rafnet-cctv-backend
 **Check:**
 ```bash
 # Verify dist folder exists
-ls -la /var/www/rafnet-cctv/frontend/dist/
+ls -la /var/www/cctv/frontend/dist/
 
 # Check Nginx error log via aaPanel
 # Website > Settings > Log > Error Log
@@ -312,7 +312,7 @@ ls -la /var/www/rafnet-cctv/frontend/dist/
 
 **Fix:**
 ```bash
-cd /var/www/rafnet-cctv/frontend
+cd /var/www/cctv/frontend
 npm run build
 ```
 
@@ -322,7 +322,7 @@ npm run build
 ```bash
 # Backend running?
 pm2 status
-pm2 logs rafnet-cctv-backend
+pm2 logs cctv-backend
 
 # Backend listening on port 3000?
 netstat -tlnp | grep 3000
@@ -330,7 +330,7 @@ netstat -tlnp | grep 3000
 
 **Fix:**
 ```bash
-pm2 restart rafnet-cctv-backend
+pm2 restart cctv-backend
 ```
 
 ### HLS stream not loading
@@ -339,7 +339,7 @@ pm2 restart rafnet-cctv-backend
 ```bash
 # MediaMTX running?
 pm2 status
-pm2 logs rafnet-cctv-mediamtx
+pm2 logs cctv-mediamtx
 
 # MediaMTX listening on port 8888?
 netstat -tlnp | grep 8888
@@ -350,23 +350,23 @@ curl http://localhost:8888/camera1/index.m3u8
 
 **Fix:**
 ```bash
-pm2 restart rafnet-cctv-mediamtx
+pm2 restart cctv-mediamtx
 ```
 
 ### CORS errors in browser console
 
 **Check backend .env:**
 ```bash
-cat /var/www/rafnet-cctv/backend/.env | grep ALLOWED_ORIGINS
+cat /var/www/cctv/backend/.env | grep ALLOWED_ORIGINS
 ```
 
 Should include your frontend domain.
 
 **Fix:**
 ```bash
-nano /var/www/rafnet-cctv/backend/.env
+nano /var/www/cctv/backend/.env
 # Add: ALLOWED_ORIGINS=https://cctv.raf.my.id,...
-pm2 restart rafnet-cctv-backend
+pm2 restart cctv-backend
 ```
 
 ### Port 800 not accessible
@@ -397,7 +397,7 @@ Jika prefer edit config manual (not recommended):
 
 3. **Use template from:**
    ```bash
-   cat /var/www/rafnet-cctv/deployment/nginx.conf
+   cat /var/www/cctv/deployment/nginx.conf
    ```
 
 4. **Test and reload:**

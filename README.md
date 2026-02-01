@@ -76,7 +76,7 @@ For Ubuntu 20.04 with aaPanel:
 ```bash
 # Download and run installation script
 cd /tmp
-wget https://raw.githubusercontent.com/YOUR_USERNAME/rafnet-cctv/main/deployment/aapanel-install.sh
+wget https://raw.githubusercontent.com/YOUR_USERNAME/cctv/main/deployment/aapanel-install.sh
 chmod +x aapanel-install.sh
 bash aapanel-install.sh
 ```
@@ -99,7 +99,7 @@ See [deployment/AAPANEL_QUICK_SETUP.md](deployment/AAPANEL_QUICK_SETUP.md) for d
 #### 1. Clone Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/rafnet-cctv.git
+git clone https://github.com/YOUR_USERNAME/cctv.git
 cd rafnet-cctv
 ```
 
@@ -287,7 +287,7 @@ rafnet-cctv/
 
 ### Storage
 
-- **Path:** `/var/www/rafnet-cctv/recordings/camera{id}/`
+- **Path:** `/var/www/cctv/recordings/camera{id}/`
 - **Format:** `YYYYMMDD_HHMMSS.mp4`
 - **Bitrate:** ~1.5 Mbps (typical H.264)
 - **10 min segment:** ~110 MB
@@ -306,30 +306,30 @@ rafnet-cctv/
 ### Update Application
 
 ```bash
-cd /var/www/rafnet-cctv
+cd /var/www/cctv
 ./deployment/update.sh
 ```
 
 ### View Logs
 
 ```bash
-pm2 logs rafnet-cctv-backend
-pm2 logs rafnet-cctv-mediamtx
-tail -f /var/log/nginx/rafnet-cctv-backend.error.log
+pm2 logs cctv-backend
+pm2 logs cctv-mediamtx
+tail -f /var/log/nginx/cctv-backend.error.log
 ```
 
 ### Restart Services
 
 ```bash
-pm2 restart rafnet-cctv-backend
-pm2 restart rafnet-cctv-mediamtx
+pm2 restart cctv-backend
+pm2 restart cctv-mediamtx
 systemctl reload nginx
 ```
 
 ### Backup Database
 
 ```bash
-cp /var/www/rafnet-cctv/backend/data/cctv.db /backup/cctv_$(date +%Y%m%d).db
+cp /var/www/cctv/backend/data/cctv.db /backup/cctv_$(date +%Y%m%d).db
 ```
 
 ## 📊 API Endpoints
@@ -359,14 +359,14 @@ cp /var/www/rafnet-cctv/backend/data/cctv.db /backup/cctv_$(date +%Y%m%d).db
 ### Backend not starting
 
 ```bash
-pm2 logs rafnet-cctv-backend --lines 100
+pm2 logs cctv-backend --lines 100
 # Check for errors in .env or database
 ```
 
 ### Frontend blank page
 
 ```bash
-cd /var/www/rafnet-cctv/frontend
+cd /var/www/cctv/frontend
 npm run build
 # Check dist/ folder exists
 ```
@@ -375,9 +375,9 @@ npm run build
 
 ```bash
 # Check backend .env
-cat /var/www/rafnet-cctv/backend/.env | grep ALLOWED_ORIGINS
+cat /var/www/cctv/backend/.env | grep ALLOWED_ORIGINS
 # Should include: https://cctv.raf.my.id
-pm2 restart rafnet-cctv-backend
+pm2 restart cctv-backend
 ```
 
 ### Stream not loading
@@ -385,7 +385,7 @@ pm2 restart rafnet-cctv-backend
 ```bash
 # Check MediaMTX
 curl http://localhost:9997/v3/paths/list
-pm2 logs rafnet-cctv-mediamtx
+pm2 logs cctv-mediamtx
 
 # Check HLS proxy
 curl http://localhost:8888/camera1/index.m3u8
@@ -398,10 +398,10 @@ curl http://localhost:8888/camera1/index.m3u8
 ffmpeg -version
 
 # Check recordings directory
-ls -la /var/www/rafnet-cctv/recordings/
+ls -la /var/www/cctv/recordings/
 
 # Check recording status
-sqlite3 /var/www/rafnet-cctv/backend/data/cctv.db "SELECT * FROM cameras WHERE enable_recording = 1"
+sqlite3 /var/www/cctv/backend/data/cctv.db "SELECT * FROM cameras WHERE enable_recording = 1"
 ```
 
 ## 📚 Documentation

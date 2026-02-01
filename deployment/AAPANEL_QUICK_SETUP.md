@@ -12,11 +12,11 @@
 
 ## Recording Storage
 
-**Path:** `/var/www/rafnet-cctv/recordings/`
+**Path:** `/var/www/cctv/recordings/`
 
 **Structure:**
 ```
-/var/www/rafnet-cctv/recordings/
+/var/www/cctv/recordings/
 ├── camera1/
 │   ├── 20240201_120000.mp4  (10 min segment)
 │   ├── 20240201_121000.mp4
@@ -32,7 +32,7 @@
 - 7 days: ~105 GB per camera
 
 **Safety:**
-- ✅ Path di dalam app directory (`/var/www/rafnet-cctv/`)
+- ✅ Path di dalam app directory (`/var/www/cctv/`)
 - ✅ Owned by root (same as app)
 - ✅ Auto-cleanup based on retention period
 - ✅ Atomic file operations (crash-safe)
@@ -50,7 +50,7 @@
 
 Edit file `deployment/aapanel-install.sh` line 9:
 ```bash
-REPO_URL="https://github.com/YOUR_USERNAME/rafnet-cctv.git"
+REPO_URL="https://github.com/YOUR_USERNAME/cctv.git"
 ```
 Ganti dengan URL repository Anda.
 
@@ -61,7 +61,7 @@ Ganti dengan URL repository Anda.
 cd /tmp
 
 # Download script
-wget https://raw.githubusercontent.com/YOUR_USERNAME/rafnet-cctv/main/deployment/aapanel-install.sh
+wget https://raw.githubusercontent.com/YOUR_USERNAME/cctv/main/deployment/aapanel-install.sh
 
 # Make executable
 chmod +x aapanel-install.sh
@@ -95,9 +95,9 @@ Jika prefer manual setup:
 ### 1. Clone Repository
 
 ```bash
-mkdir -p /var/www/rafnet-cctv
-cd /var/www/rafnet-cctv
-git clone https://github.com/YOUR_USERNAME/rafnet-cctv.git .
+mkdir -p /var/www/cctv
+cd /var/www/cctv
+git clone https://github.com/YOUR_USERNAME/cctv.git .
 ```
 
 ### 2. Run Setup Scripts
@@ -108,30 +108,30 @@ npm install -g pm2
 apt install -y ffmpeg  # CRITICAL for recording
 
 # Backend setup
-cd /var/www/rafnet-cctv/backend
+cd /var/www/cctv/backend
 npm install --production
 cp .env.example .env
 nano .env  # Edit configuration
 npm run setup-db
 
 # Create recordings directory
-mkdir -p /var/www/rafnet-cctv/recordings
-chmod 755 /var/www/rafnet-cctv/recordings
+mkdir -p /var/www/cctv/recordings
+chmod 755 /var/www/cctv/recordings
 
 # Frontend setup
-cd /var/www/rafnet-cctv/frontend
+cd /var/www/cctv/frontend
 npm install
 nano .env  # Add VITE_API_BASE_URL and VITE_HLS_BASE_URL
 npm run build
 
 # MediaMTX setup
-cd /var/www/rafnet-cctv/mediamtx
+cd /var/www/cctv/mediamtx
 wget https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_linux_amd64.tar.gz
 tar -xzf mediamtx_v1.9.0_linux_amd64.tar.gz
 chmod +x mediamtx
 
 # Start services
-cd /var/www/rafnet-cctv
+cd /var/www/cctv
 mkdir -p logs
 pm2 start deployment/ecosystem.config.cjs
 pm2 save
@@ -190,7 +190,7 @@ VITE_HLS_BASE_URL=https://api-cctv.raf.my.id/hls
 ```bash
 # Check services
 pm2 status
-# Should show: rafnet-cctv-backend (online), rafnet-cctv-mediamtx (online)
+# Should show: cctv-backend (online), cctv-mediamtx (online)
 
 # Check backend
 curl http://localhost:3000/health
@@ -219,15 +219,15 @@ curl -I http://cctv.raf.my.id:800
 
 ```bash
 # View logs
-pm2 logs rafnet-cctv-backend
-pm2 logs rafnet-cctv-mediamtx
+pm2 logs cctv-backend
+pm2 logs cctv-mediamtx
 
 # Restart services
-pm2 restart rafnet-cctv-backend
-pm2 restart rafnet-cctv-mediamtx
+pm2 restart cctv-backend
+pm2 restart cctv-mediamtx
 
 # Update application
-cd /var/www/rafnet-cctv
+cd /var/www/cctv
 ./deployment/update.sh
 
 # Nginx
@@ -239,16 +239,16 @@ systemctl restart nginx     # Restart
 ## Update Deployment
 
 ```bash
-cd /var/www/rafnet-cctv
+cd /var/www/cctv
 git pull origin main
-pm2 restart rafnet-cctv-backend
+pm2 restart cctv-backend
 cd frontend && npm run build
 systemctl reload nginx
 ```
 
 Or use update script:
 ```bash
-cd /var/www/rafnet-cctv
+cd /var/www/cctv
 ./deployment/update.sh
 ```
 
@@ -256,13 +256,13 @@ cd /var/www/rafnet-cctv
 
 ### Backend not starting
 ```bash
-pm2 logs rafnet-cctv-backend --lines 100
+pm2 logs cctv-backend --lines 100
 # Check for errors in .env or database
 ```
 
 ### Frontend blank page
 ```bash
-cd /var/www/rafnet-cctv/frontend
+cd /var/www/cctv/frontend
 npm run build
 # Check dist/ folder exists
 ```
@@ -270,17 +270,17 @@ npm run build
 ### CORS errors
 ```bash
 # Check backend .env
-cat /var/www/rafnet-cctv/backend/.env | grep ALLOWED_ORIGINS
+cat /var/www/cctv/backend/.env | grep ALLOWED_ORIGINS
 # Should include: https://cctv.raf.my.id
 
-pm2 restart rafnet-cctv-backend
+pm2 restart cctv-backend
 ```
 
 ### Stream not loading
 ```bash
 # Check MediaMTX
 curl http://localhost:9997/v3/paths/list
-pm2 logs rafnet-cctv-mediamtx
+pm2 logs cctv-mediamtx
 
 # Check HLS proxy
 curl http://localhost:8888/camera1/index.m3u8
@@ -292,7 +292,7 @@ curl http://localhost:8888/camera1/index.m3u8
 2. **Setup backup cron:**
    ```bash
    crontab -e
-   # Add: 0 2 * * * /var/www/rafnet-cctv/backup.sh
+   # Add: 0 2 * * * /var/www/cctv/backup.sh
    ```
 3. **Monitor logs:**
    ```bash
@@ -313,8 +313,8 @@ curl http://localhost:9997/v3/config/global/get  # MediaMTX responding?
 
 **Logs:**
 ```bash
-pm2 logs rafnet-cctv-backend --lines 100
-tail -f /var/log/nginx/rafnet-cctv-backend.error.log
+pm2 logs cctv-backend --lines 100
+tail -f /var/log/nginx/cctv-backend.error.log
 ```
 
 ---

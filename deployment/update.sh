@@ -4,7 +4,7 @@
 
 set -e
 
-APP_DIR="/var/www/rafnet-cctv"
+APP_DIR="/var/www/cctv"
 
 echo "🔄 RAF NET CCTV - Update"
 echo "========================"
@@ -28,8 +28,8 @@ npm run build
 
 # Restart services
 echo "♻️ Restarting services..."
-pm2 restart rafnet-cctv-backend
-pm2 restart rafnet-cctv-mediamtx
+pm2 restart cctv-backend
+pm2 restart cctv-mediamtx
 
 # Reload Nginx
 echo "🔄 Reloading Nginx..."

@@ -184,7 +184,7 @@ curl -X POST http://localhost:3000/api/branding/reset \
 ### View Current Settings
 
 ```bash
-sqlite3 /var/www/rafnet-cctv/backend/data/cctv.db
+sqlite3 /var/www/cctv/backend/data/cctv.db
 
 SELECT key, value FROM branding_settings ORDER BY key;
 
@@ -194,7 +194,7 @@ SELECT key, value FROM branding_settings ORDER BY key;
 ### Update via SQL
 
 ```bash
-sqlite3 /var/www/rafnet-cctv/backend/data/cctv.db
+sqlite3 /var/www/cctv/backend/data/cctv.db
 
 UPDATE branding_settings SET value = 'CLIENT NET' WHERE key = 'company_name';
 UPDATE branding_settings SET value = 'Kota ABC' WHERE key = 'city_name';
@@ -205,7 +205,7 @@ UPDATE branding_settings SET value = 'Jawa Tengah' WHERE key = 'province_name';
 
 **IMPORTANT:** Restart backend setelah update manual:
 ```bash
-pm2 restart rafnet-cctv-backend
+pm2 restart cctv-backend
 ```
 
 ## SEO Best Practices
@@ -268,11 +268,11 @@ Meta tags di-update dinamis saat page load via JavaScript.
 **Fix:**
 ```bash
 # Rebuild frontend
-cd /var/www/rafnet-cctv/frontend
+cd /var/www/cctv/frontend
 npm run build
 
 # Restart backend
-pm2 restart rafnet-cctv-backend
+pm2 restart cctv-backend
 
 # Reload Nginx
 systemctl reload nginx
@@ -282,18 +282,18 @@ systemctl reload nginx
 
 **Cek permissions:**
 ```bash
-ls -la /var/www/rafnet-cctv/backend/data/cctv.db
+ls -la /var/www/cctv/backend/data/cctv.db
 # Should be writable by PM2 user
 ```
 
 **Cek logs:**
 ```bash
-pm2 logs rafnet-cctv-backend --lines 50
+pm2 logs cctv-backend --lines 50
 ```
 
 **Verify database:**
 ```bash
-sqlite3 /var/www/rafnet-cctv/backend/data/cctv.db \
+sqlite3 /var/www/cctv/backend/data/cctv.db \
   "SELECT key, value, updated_at FROM branding_settings WHERE key = 'company_name';"
 ```
 

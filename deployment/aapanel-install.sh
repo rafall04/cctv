@@ -8,7 +8,7 @@ echo "🚀 RAF CCTV - aaPanel Installation"
 echo "========================================"
 
 # Configuration
-APP_DIR="/var/www/rafnet-cctv"
+APP_DIR="/var/www/cctv"
 REPO_URL="https://github.com/rafall04/cctv.git"
 DOMAIN_FRONTEND="sicamdes.semarnet.id"
 DOMAIN_BACKEND="api-sicamdes.semarnet.id"
@@ -218,8 +218,8 @@ setup_pm2() {
     mkdir -p logs
     
     # Stop existing processes
-    pm2 delete rafnet-cctv-backend 2>/dev/null || true
-    pm2 delete rafnet-cctv-mediamtx 2>/dev/null || true
+    pm2 delete cctv-backend 2>/dev/null || true
+    pm2 delete cctv-mediamtx 2>/dev/null || true
     
     # Start processes
     print_info "Starting PM2 processes..."
@@ -280,13 +280,13 @@ verify_installation() {
     echo "🔍 Verifying installation..."
     
     # Check PM2
-    if pm2 list | grep -q "rafnet-cctv-backend.*online"; then
+    if pm2 list | grep -q "cctv-backend.*online"; then
         print_success "Backend running"
     else
         print_error "Backend not running"
     fi
     
-    if pm2 list | grep -q "rafnet-cctv-mediamtx.*online"; then
+    if pm2 list | grep -q "cctv-mediamtx.*online"; then
         print_success "MediaMTX running"
     else
         print_error "MediaMTX not running"
@@ -332,7 +332,7 @@ print_summary() {
     echo ""
     echo "📊 Management Commands:"
     echo "   PM2 status:  pm2 status"
-    echo "   PM2 logs:    pm2 logs rafnet-cctv-backend"
+    echo "   PM2 logs:    pm2 logs cctv-backend"
     echo "   Nginx test:  nginx -t"
     echo "   Nginx reload: systemctl reload nginx"
     echo ""

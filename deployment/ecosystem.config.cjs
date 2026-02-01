@@ -17,7 +17,7 @@ module.exports = {
             restart_delay: 3000,
         },
         {
-            name: 'rafnet-cctv-backend',
+            name: 'cctv-backend',
             script: 'server.js',
             cwd: path.join(ROOT_DIR, 'backend'),
             instances: 1,
