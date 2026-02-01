@@ -78,11 +78,15 @@ bash aapanel-install.sh
 - ✅ Download & configure MediaMTX
 - ✅ Create recordings directory
 - ✅ Start PM2 processes
-- ✅ Configure Nginx
+- ⚠️ Nginx setup (manual via aaPanel UI)
 - ✅ Setup firewall
 - ✅ Verify installation
 
-**Durasi: ~5-10 menit**
+**Durasi: ~5-10 menit + Nginx setup manual**
+
+**IMPORTANT:** Nginx harus dikonfigurasi manual via aaPanel UI (tidak bisa otomatis).
+
+See [AAPANEL_NGINX_SETUP.md](AAPANEL_NGINX_SETUP.md) for Nginx configuration.
 
 ## Manual Installation (Alternative)
 

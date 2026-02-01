@@ -234,31 +234,32 @@ setup_pm2() {
 
 setup_nginx() {
     echo ""
-    echo "🌐 Setting up Nginx..."
+    echo "🌐 Nginx Configuration..."
     
-    NGINX_CONF="/etc/nginx/sites-available/rafnet-cctv"
+    print_info "aaPanel manages Nginx via UI"
+    print_info "Manual setup required:"
+    echo ""
+    echo "   1. Login to aaPanel"
+    echo "   2. Go to: Website > Add Site"
+    echo "   3. Domain: $DOMAIN_FRONTEND"
+    echo "   4. Port: $PORT"
+    echo "   5. Root: $APP_DIR/frontend/dist"
+    echo "   6. Add reverse proxy for API:"
+    echo "      - Path: /api"
+    echo "      - Target: http://localhost:3000"
+    echo "   7. Add reverse proxy for HLS:"
+    echo "      - Path: /hls"
+    echo "      - Target: http://localhost:8888"
+    echo ""
+    echo "   OR copy config manually:"
+    echo "   Config file: $APP_DIR/deployment/nginx.conf"
+    echo ""
     
-    # Backup existing config
-    if [ -f "$NGINX_CONF" ]; then
-        print_info "Backing up existing config..."
-        cp "$NGINX_CONF" "${NGINX_CONF}.backup.$(date +%Y%m%d_%H%M%S)"
-    fi
-    
-    # Copy new config
-    print_info "Installing Nginx config..."
-    cp "$APP_DIR/deployment/nginx.conf" "$NGINX_CONF"
-    
-    # Enable site
-    ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/rafnet-cctv
-    
-    # Test config
-    if nginx -t 2>/dev/null; then
-        print_success "Nginx config valid"
-        systemctl reload nginx
-        print_success "Nginx reloaded"
+    # Just verify Nginx is running
+    if systemctl is-active --quiet nginx; then
+        print_success "Nginx is running (managed by aaPanel)"
     else
-        print_error "Nginx config invalid!"
-        exit 1
+        print_error "Nginx not running. Start via aaPanel."
     fi
 }
 
@@ -291,9 +292,9 @@ verify_installation() {
         print_error "MediaMTX not running"
     fi
     
-    # Check Nginx
+    # Check Nginx (managed by aaPanel)
     if systemctl is-active --quiet nginx; then
-        print_success "Nginx running"
+        print_success "Nginx running (managed by aaPanel)"
     else
         print_error "Nginx not running"
     fi
@@ -339,11 +340,16 @@ print_summary() {
     echo "   cd $APP_DIR && ./deployment/update.sh"
     echo ""
     echo "📝 Next Steps:"
-    echo "   1. Change admin password"
-    echo "   2. Add cameras via admin panel"
-    echo "   3. Test video streaming"
-    echo "   4. Enable recording for cameras"
-    echo "   5. Setup backup cron job"
+    echo "   1. Configure Nginx via aaPanel UI:"
+    echo "      - Add site: $DOMAIN_FRONTEND (port $PORT)"
+    echo "      - Root: $APP_DIR/frontend/dist"
+    echo "      - Add reverse proxy: /api → http://localhost:3000"
+    echo "      - Add reverse proxy: /hls → http://localhost:8888"
+    echo "   2. Change admin password"
+    echo "   3. Add cameras via admin panel"
+    echo "   4. Test video streaming"
+    echo "   5. Enable recording for cameras"
+    echo "   6. Setup backup cron job"
     echo ""
     echo "📁 Important Paths:"
     echo "   App:        $APP_DIR"
