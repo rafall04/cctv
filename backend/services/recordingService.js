@@ -1,5 +1,6 @@
 import { spawn } from 'child_process';
 import { existsSync, mkdirSync, unlinkSync, statSync, renameSync, readdirSync } from 'fs';
+import { promises as fsPromises } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { query, queryOne, execute } from '../database/database.js';
@@ -517,16 +518,29 @@ class RecordingService {
                     });
                 });
 
-                // Replace original with re-muxed file
+                // 🛡️ FIX 1: ATOMIC DATA SAFETY - Replace original with re-muxed file
+                // CRITICAL: Use atomic rename instead of delete+rename to prevent data loss
+                // On Linux/Unix, fs.promises.rename() overwrites target atomically (crash-safe)
                 if (existsSync(tempPath)) {
                     const tempStats = statSync(tempPath);
                     console.log(`[Segment] Re-muxed file size: ${(tempStats.size / 1024 / 1024).toFixed(2)} MB`);
                     
-                    // Delete original and rename temp
-                    unlinkSync(filePath);
-                    renameSync(tempPath, filePath);
-                    
-                    console.log(`[Segment] ✓ File replaced with re-muxed version`);
+                    try {
+                        // Atomic rename: overwrites filePath in single operation (no gap)
+                        // If crash occurs during rename, either old or new file exists (never both missing)
+                        await fsPromises.rename(tempPath, filePath);
+                        console.log(`[Segment] ✓ File replaced with re-muxed version (atomic operation)`);
+                    } catch (error) {
+                        // Handle EXDEV error (cross-device rename not supported)
+                        if (error.code === 'EXDEV') {
+                            console.log(`[Segment] Cross-device detected, using copy+delete fallback`);
+                            await fsPromises.copyFile(tempPath, filePath);
+                            await fsPromises.unlink(tempPath);
+                            console.log(`[Segment] ✓ File replaced using copy+delete fallback`);
+                        } else {
+                            throw error;
+                        }
+                    }
                 } else {
                     console.error(`[Segment] Re-muxed file not found: ${tempPath}`);
                     cleanup();
@@ -603,8 +617,10 @@ class RecordingService {
      * Cleanup old segments - AGE-BASED (FINAL FIX)
      * CRITICAL: Delete based on FILE AGE, not segment count
      * This prevents premature deletion of recent files
+     * 
+     * ⚡ FIX 2: NON-BLOCKING CLEANUP - Uses async operations to prevent Event Loop freeze
      */
-    cleanupOldSegments(cameraId) {
+    async cleanupOldSegments(cameraId) {
         try {
             // SAFETY #1: Don't cleanup if called too frequently (prevent race condition)
             const now = Date.now();
@@ -670,10 +686,10 @@ class RecordingService {
                 return;
             }
 
-            // AGE-BASED CLEANUP: Delete segments older than retention period
-            let deletedCount = 0;
+            // ⚡ FIX 2: NON-BLOCKING CLEANUP
+            // Collect files to delete (filter first, delete in parallel)
+            const filesToDelete = [];
             let skippedCount = 0;
-            let totalSize = 0;
             
             segments.forEach(segment => {
                 const segmentAge = Date.now() - new Date(segment.start_time).getTime();
@@ -702,33 +718,66 @@ class RecordingService {
                     return;
                 }
                 
-                // Delete file
-                try {
-                    const stats = statSync(segment.file_path);
-                    const fileSizeMB = (stats.size / (1024 * 1024)).toFixed(2);
-                    
-                    unlinkSync(segment.file_path);
-                    totalSize += stats.size;
-                    
-                    console.log(`[Cleanup] ✓ Deleted: ${segment.filename} (age: ${Math.round(segmentAge/3600000)}h, size: ${fileSizeMB}MB)`);
-                    deletedCount++;
-                } catch (error) {
-                    console.error(`[Cleanup] ✗ Error deleting ${segment.filename}:`, error.message);
-                    skippedCount++;
-                    return;
-                }
-
-                // Delete from database
-                execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
+                // Add to deletion queue
+                filesToDelete.push({
+                    segment,
+                    segmentAge
+                });
             });
             
-            const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
-            const remainingSegments = segments.length - deletedCount - skippedCount;
-            
-            if (deletedCount > 0) {
+            // ⚡ FIX 2: Delete files in parallel using Promise.allSettled
+            // allSettled ensures one failure doesn't stop others
+            if (filesToDelete.length > 0) {
+                console.log(`[Cleanup] Deleting ${filesToDelete.length} old segments in parallel...`);
+                
+                const deletePromises = filesToDelete.map(async ({ segment, segmentAge }) => {
+                    try {
+                        const stats = statSync(segment.file_path);
+                        const fileSizeMB = (stats.size / (1024 * 1024)).toFixed(2);
+                        
+                        // Non-blocking async delete
+                        await fsPromises.unlink(segment.file_path);
+                        
+                        console.log(`[Cleanup] ✓ Deleted: ${segment.filename} (age: ${Math.round(segmentAge/3600000)}h, size: ${fileSizeMB}MB)`);
+                        
+                        // Delete from database
+                        execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
+                        
+                        return { success: true, size: stats.size };
+                    } catch (error) {
+                        console.error(`[Cleanup] ✗ Error deleting ${segment.filename}:`, error.message);
+                        return { success: false, error: error.message };
+                    }
+                });
+                
+                // Wait for all deletions to complete (or fail)
+                const results = await Promise.allSettled(deletePromises);
+                
+                // Calculate statistics
+                let deletedCount = 0;
+                let totalSize = 0;
+                let failedCount = 0;
+                
+                results.forEach((result) => {
+                    if (result.status === 'fulfilled' && result.value.success) {
+                        deletedCount++;
+                        totalSize += result.value.size;
+                    } else {
+                        failedCount++;
+                    }
+                });
+                
+                const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
+                const remainingSegments = segments.length - deletedCount - skippedCount - failedCount;
+                
                 console.log(`[Cleanup] Camera ${cameraId} summary:`);
                 console.log(`  ✓ Deleted: ${deletedCount} segments (${totalSizeMB}MB freed)`);
-                console.log(`  ⚠️ Skipped: ${skippedCount} segments`);
+                if (failedCount > 0) {
+                    console.log(`  ✗ Failed: ${failedCount} segments`);
+                }
+                if (skippedCount > 0) {
+                    console.log(`  ⚠️ Skipped: ${skippedCount} segments`);
+                }
                 console.log(`  ✓ Remaining: ${remainingSegments} segments`);
             } else {
                 console.log(`[Cleanup] Camera ${cameraId}: No segments older than ${Math.round(retentionWithBuffer/3600000)}h, ${segments.length} segments kept`);
@@ -1111,16 +1160,36 @@ class RecordingService {
     startScheduledCleanup() {
         console.log('[Cleanup] Starting scheduled cleanup service (every 30 minutes)');
         
+        // 📋 SOP REMINDER: H.264 Codec Requirement
+        console.log('');
+        console.log('═══════════════════════════════════════════════════════════════');
+        console.log('⚠️  OPERATIONAL REQUIREMENT: H.264 CODEC');
+        console.log('═══════════════════════════════════════════════════════════════');
+        console.log('SYSTEM ASSUMES H.264 INPUT FOR ALL CAMERAS.');
+        console.log('');
+        console.log('ADMIN RESPONSIBILITY:');
+        console.log('  • Configure all cameras to output H.264 codec');
+        console.log('  • H.265/HEVC is NOT supported for playback in most browsers');
+        console.log('  • Verify codec settings in Camera Management panel');
+        console.log('');
+        console.log('PLAYBACK ISSUES?');
+        console.log('  → Check camera codec configuration');
+        console.log('  → Ensure RTSP stream is H.264');
+        console.log('  → Browser compatibility: H.264 = ✓ | H.265 = ✗');
+        console.log('═══════════════════════════════════════════════════════════════');
+        console.log('');
+        
         // Run cleanup for all recording cameras every 30 minutes
-        setInterval(() => {
+        setInterval(async () => {
             try {
                 const cameras = query('SELECT id FROM cameras WHERE enable_recording = 1 AND enabled = 1');
                 
                 console.log(`[Cleanup] Running scheduled cleanup for ${cameras.length} cameras...`);
                 
-                cameras.forEach(camera => {
-                    this.cleanupOldSegments(camera.id);
-                });
+                // Run cleanups sequentially to avoid overwhelming the system
+                for (const camera of cameras) {
+                    await this.cleanupOldSegments(camera.id);
+                }
                 
                 console.log('[Cleanup] Scheduled cleanup complete');
             } catch (error) {
@@ -1129,13 +1198,13 @@ class RecordingService {
         }, 30 * 60 * 1000); // Every 30 minutes
         
         // Run initial cleanup after 5 minutes (let system stabilize first)
-        setTimeout(() => {
+        setTimeout(async () => {
             console.log('[Cleanup] Running initial cleanup...');
             try {
                 const cameras = query('SELECT id FROM cameras WHERE enable_recording = 1 AND enabled = 1');
-                cameras.forEach(camera => {
-                    this.cleanupOldSegments(camera.id);
-                });
+                for (const camera of cameras) {
+                    await this.cleanupOldSegments(camera.id);
+                }
             } catch (error) {
                 console.error('[Cleanup] Initial cleanup error:', error);
             }
