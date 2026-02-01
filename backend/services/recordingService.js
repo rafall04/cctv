@@ -587,31 +587,8 @@ class RecordingService {
                 // CRITICAL: Remove from processing set (allow cleanup)
                 cleanup();
 
-                // BUG FIX: Don't cleanup after every segment!
-                // Only cleanup if significantly over limit (not just 1-2 segments over)
-                // This prevents aggressive deletion when camera reconnects
-                const segments = query(
-                    'SELECT COUNT(*) as count FROM recording_segments WHERE camera_id = ?',
-                    [cameraId]
-                );
-                const segmentCount = segments[0]?.count || 0;
-                
-                const camera = queryOne('SELECT recording_duration_hours FROM cameras WHERE id = ?', [cameraId]);
-                if (camera) {
-                    const maxSegments = camera.recording_duration_hours * 6;
-                    const safetyBuffer = 2;
-                    const effectiveMaxSegments = maxSegments + safetyBuffer;
-                    
-                    // Only cleanup if SIGNIFICANTLY over limit (10+ segments over)
-                    const overLimit = segmentCount - effectiveMaxSegments;
-                    if (overLimit >= 10) {
-                        console.log(`[Segment] Triggering cleanup: ${segmentCount} segments, ${overLimit} over limit`);
-                        await new Promise(resolve => setTimeout(resolve, 3000));
-                        this.cleanupOldSegments(cameraId);
-                    } else {
-                        console.log(`[Segment] No cleanup needed: ${segmentCount} segments, only ${overLimit} over limit`);
-                    }
-                }
+                // NOTE: Cleanup is now handled by scheduled cleanup (every 30 minutes)
+                // No per-segment cleanup to prevent aggressive deletion
 
             } catch (error) {
                 console.error(`[Segment] Error handling segment creation:`, error);
@@ -623,8 +600,9 @@ class RecordingService {
     }
 
     /**
-     * Cleanup old segments (rolling buffer)
-     * CRITICAL FIX: Multiple safety checks to prevent deleting active files
+     * Cleanup old segments - AGE-BASED (FINAL FIX)
+     * CRITICAL: Delete based on FILE AGE, not segment count
+     * This prevents premature deletion of recent files
      */
     cleanupOldSegments(cameraId) {
         try {
@@ -643,102 +621,121 @@ class RecordingService {
             
             this.lastCleanupTime[cameraId] = now;
 
+            // Get camera recording duration (retention period)
+            const camera = queryOne('SELECT recording_duration_hours, name FROM cameras WHERE id = ?', [cameraId]);
+            if (!camera) {
+                console.log(`[Cleanup] Camera ${cameraId} not found, skipping cleanup`);
+                return;
+            }
+
+            // Calculate retention period in milliseconds
+            // Add 10% buffer to retention period for safety
+            const retentionHours = camera.recording_duration_hours;
+            const retentionMs = retentionHours * 60 * 60 * 1000;
+            const retentionWithBuffer = retentionMs * 1.1; // +10% safety buffer
+            
+            console.log(`[Cleanup] Camera ${cameraId} (${camera.name}): retention ${retentionHours}h (${Math.round(retentionWithBuffer/3600000)}h with buffer)`);
+
             // First, cleanup database entries for files that don't exist
-            // BUT: Only delete entries older than 30 minutes (was 5 minutes)
             const allSegments = query(
                 'SELECT * FROM recording_segments WHERE camera_id = ?',
                 [cameraId]
             );
 
-            let cleanedCount = 0;
+            let orphanedCount = 0;
             allSegments.forEach(segment => {
-                // SAFETY #2: Only cleanup entries older than 30 minutes (increased from 5)
+                // Only cleanup orphaned entries older than 30 minutes
                 const segmentAge = Date.now() - new Date(segment.start_time).getTime();
                 const isOldEnough = segmentAge > 30 * 60 * 1000; // 30 minutes
                 
                 if (isOldEnough && !existsSync(segment.file_path)) {
-                    console.log(`[Cleanup] ⚠️ File not found (age: ${Math.round(segmentAge/60000)}min), deleting DB entry: ${segment.file_path}`);
+                    console.log(`[Cleanup] ⚠️ Orphaned DB entry (age: ${Math.round(segmentAge/60000)}min): ${segment.filename}`);
                     execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
-                    cleanedCount++;
+                    orphanedCount++;
                 }
             });
 
-            if (cleanedCount > 0) {
-                console.log(`✓ Cleaned ${cleanedCount} orphaned database entries for camera ${cameraId}`);
+            if (orphanedCount > 0) {
+                console.log(`[Cleanup] ✓ Cleaned ${orphanedCount} orphaned database entries`);
             }
 
-            // Get camera recording duration
-            const camera = queryOne('SELECT recording_duration_hours FROM cameras WHERE id = ?', [cameraId]);
-            if (!camera) return;
-
-            const maxSegments = camera.recording_duration_hours * 6; // 6 segments per jam
-
-            // Get remaining segments (after cleanup)
+            // Get all segments ordered by age (oldest first)
             const segments = query(
                 'SELECT * FROM recording_segments WHERE camera_id = ? ORDER BY start_time ASC',
                 [cameraId]
             );
 
-            // CRITICAL FIX: Add safety buffer - keep extra 5 segments (50 minutes)
-            // This prevents deleting files that are being processed or recently created
-            const safetyBuffer = 5; // Increased from 2 to 5
-            const effectiveMaxSegments = maxSegments + safetyBuffer;
+            if (segments.length === 0) {
+                console.log(`[Cleanup] Camera ${cameraId}: No segments to cleanup`);
+                return;
+            }
 
-            // Delete oldest segments if exceeds max (with safety buffer)
-            if (segments.length > effectiveMaxSegments) {
-                const toDelete = segments.slice(0, segments.length - effectiveMaxSegments);
+            // AGE-BASED CLEANUP: Delete segments older than retention period
+            let deletedCount = 0;
+            let skippedCount = 0;
+            let totalSize = 0;
+            
+            segments.forEach(segment => {
+                const segmentAge = Date.now() - new Date(segment.start_time).getTime();
                 
-                console.log(`[Cleanup] Camera ${cameraId}: ${segments.length} segments, max ${maxSegments} (+ ${safetyBuffer} buffer), deleting ${toDelete.length} oldest`);
+                // CRITICAL: Only delete if OLDER than retention period (with buffer)
+                if (segmentAge <= retentionWithBuffer) {
+                    // Segment is still within retention period - KEEP IT
+                    return;
+                }
                 
-                let deletedCount = 0;
-                let skippedCount = 0;
+                // Segment is older than retention period - candidate for deletion
+                console.log(`[Cleanup] Segment ${segment.filename}: age ${Math.round(segmentAge/3600000)}h (retention: ${Math.round(retentionWithBuffer/3600000)}h)`);
                 
-                toDelete.forEach(segment => {
-                    // SAFETY #3: Double-check segment is old enough (at least 30 minutes old, was 15)
-                    const segmentAge = Date.now() - new Date(segment.start_time).getTime();
-                    if (segmentAge < 30 * 60 * 1000) {
-                        console.log(`[Cleanup] ⚠️ Skipping recent segment (age: ${Math.round(segmentAge/60000)}min): ${segment.filename}`);
-                        skippedCount++;
-                        return;
-                    }
-                    
-                    // SAFETY #4: Check if file is being processed (remux in progress)
-                    const fileKey = `${cameraId}:${segment.filename}`;
-                    if (filesBeingProcessed.has(fileKey)) {
-                        console.log(`[Cleanup] ⚠️ Skipping file being processed: ${segment.filename}`);
-                        skippedCount++;
-                        return;
-                    }
-                    
-                    // SAFETY #5: Verify file actually exists before deleting
-                    if (!existsSync(segment.file_path)) {
-                        console.log(`[Cleanup] ⚠️ File already gone, just removing DB entry: ${segment.filename}`);
-                        execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
-                        return;
-                    }
-                    
-                    // Delete file
-                    try {
-                        unlinkSync(segment.file_path);
-                        console.log(`✓ Deleted old segment: ${segment.filename} (age: ${Math.round(segmentAge/60000)}min)`);
-                        deletedCount++;
-                    } catch (error) {
-                        console.error(`[Cleanup] Error deleting file ${segment.filename}:`, error);
-                        skippedCount++;
-                        return;
-                    }
-
-                    // Delete from database
+                // SAFETY #2: Check if file is being processed (remux in progress)
+                const fileKey = `${cameraId}:${segment.filename}`;
+                if (filesBeingProcessed.has(fileKey)) {
+                    console.log(`[Cleanup] ⚠️ Skipping file being processed: ${segment.filename}`);
+                    skippedCount++;
+                    return;
+                }
+                
+                // SAFETY #3: Verify file actually exists before deleting
+                if (!existsSync(segment.file_path)) {
+                    console.log(`[Cleanup] ⚠️ File already gone, just removing DB entry: ${segment.filename}`);
                     execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
-                });
+                    return;
+                }
                 
-                console.log(`[Cleanup] Camera ${cameraId}: deleted ${deletedCount} files, skipped ${skippedCount} files`);
+                // Delete file
+                try {
+                    const stats = statSync(segment.file_path);
+                    const fileSizeMB = (stats.size / (1024 * 1024)).toFixed(2);
+                    
+                    unlinkSync(segment.file_path);
+                    totalSize += stats.size;
+                    
+                    console.log(`[Cleanup] ✓ Deleted: ${segment.filename} (age: ${Math.round(segmentAge/3600000)}h, size: ${fileSizeMB}MB)`);
+                    deletedCount++;
+                } catch (error) {
+                    console.error(`[Cleanup] ✗ Error deleting ${segment.filename}:`, error.message);
+                    skippedCount++;
+                    return;
+                }
+
+                // Delete from database
+                execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
+            });
+            
+            const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
+            const remainingSegments = segments.length - deletedCount - skippedCount;
+            
+            if (deletedCount > 0) {
+                console.log(`[Cleanup] Camera ${cameraId} summary:`);
+                console.log(`  ✓ Deleted: ${deletedCount} segments (${totalSizeMB}MB freed)`);
+                console.log(`  ⚠️ Skipped: ${skippedCount} segments`);
+                console.log(`  ✓ Remaining: ${remainingSegments} segments`);
             } else {
-                console.log(`[Cleanup] Camera ${cameraId}: ${segments.length} segments, max ${maxSegments} (+ ${safetyBuffer} buffer), no cleanup needed`);
+                console.log(`[Cleanup] Camera ${cameraId}: No segments older than ${Math.round(retentionWithBuffer/3600000)}h, ${segments.length} segments kept`);
             }
 
         } catch (error) {
-            console.error(`Error cleaning up segments for camera ${cameraId}:`, error);
+            console.error(`[Cleanup] Error cleaning up camera ${cameraId}:`, error);
         }
     }
 
