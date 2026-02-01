@@ -610,7 +610,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                                 <h3 className="text-gray-900 dark:text-white font-bold text-sm sm:text-base truncate">{camera.name}</h3>
                                 {camera.video_codec && (
-                                    <CodecBadge codec={camera.video_codec} size="sm" showWarning={false} />
+                                    <CodecBadge codec={camera.video_codec} size="sm" showWarning={true} />
                                 )}
                             </div>
                             {/* Status badges */}
@@ -775,7 +775,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                                     <div className="flex items-center gap-3 flex-wrap">
                                         <h2 className="text-white font-bold text-lg">{camera.name}</h2>
                                         {camera.video_codec && (
-                                            <CodecBadge codec={camera.video_codec} size="sm" showWarning={false} />
+                                            <CodecBadge codec={camera.video_codec} size="sm" showWarning={true} />
                                         )}
                                         <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold text-white shadow bg-emerald-500/20">
                                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
