@@ -106,6 +106,10 @@ class RecordingService {
         
         // Start background cleanup for corrupt files (gradual, non-blocking)
         this.startBackgroundCleanup();
+        
+        // CRITICAL: Start scheduled cleanup (every 30 minutes)
+        // This replaces per-segment cleanup to prevent aggressive deletion
+        this.startScheduledCleanup();
     }
 
     /**
@@ -583,12 +587,31 @@ class RecordingService {
                 // CRITICAL: Remove from processing set (allow cleanup)
                 cleanup();
 
-                // CRITICAL FIX: Wait 3 seconds before cleanup to ensure file is fully written
-                // This prevents race condition where cleanup runs before file is saved
-                await new Promise(resolve => setTimeout(resolve, 3000));
-
-                // Auto-delete old segments (with safety checks inside)
-                this.cleanupOldSegments(cameraId);
+                // BUG FIX: Don't cleanup after every segment!
+                // Only cleanup if significantly over limit (not just 1-2 segments over)
+                // This prevents aggressive deletion when camera reconnects
+                const segments = query(
+                    'SELECT COUNT(*) as count FROM recording_segments WHERE camera_id = ?',
+                    [cameraId]
+                );
+                const segmentCount = segments[0]?.count || 0;
+                
+                const camera = queryOne('SELECT recording_duration_hours FROM cameras WHERE id = ?', [cameraId]);
+                if (camera) {
+                    const maxSegments = camera.recording_duration_hours * 6;
+                    const safetyBuffer = 2;
+                    const effectiveMaxSegments = maxSegments + safetyBuffer;
+                    
+                    // Only cleanup if SIGNIFICANTLY over limit (10+ segments over)
+                    const overLimit = segmentCount - effectiveMaxSegments;
+                    if (overLimit >= 10) {
+                        console.log(`[Segment] Triggering cleanup: ${segmentCount} segments, ${overLimit} over limit`);
+                        await new Promise(resolve => setTimeout(resolve, 3000));
+                        this.cleanupOldSegments(cameraId);
+                    } else {
+                        console.log(`[Segment] No cleanup needed: ${segmentCount} segments, only ${overLimit} over limit`);
+                    }
+                }
 
             } catch (error) {
                 console.error(`[Segment] Error handling segment creation:`, error);
@@ -1029,6 +1052,44 @@ class RecordingService {
                 isProcessing = false;
             }
         }, 10000); // Process 1 file every 10 seconds
+    }
+
+    /**
+     * Scheduled cleanup - runs every 30 minutes
+     * This is the PRIMARY cleanup mechanism (not per-segment cleanup)
+     */
+    startScheduledCleanup() {
+        console.log('[Cleanup] Starting scheduled cleanup service (every 30 minutes)');
+        
+        // Run cleanup for all recording cameras every 30 minutes
+        setInterval(() => {
+            try {
+                const cameras = query('SELECT id FROM cameras WHERE enable_recording = 1 AND enabled = 1');
+                
+                console.log(`[Cleanup] Running scheduled cleanup for ${cameras.length} cameras...`);
+                
+                cameras.forEach(camera => {
+                    this.cleanupOldSegments(camera.id);
+                });
+                
+                console.log('[Cleanup] Scheduled cleanup complete');
+            } catch (error) {
+                console.error('[Cleanup] Scheduled cleanup error:', error);
+            }
+        }, 30 * 60 * 1000); // Every 30 minutes
+        
+        // Run initial cleanup after 5 minutes (let system stabilize first)
+        setTimeout(() => {
+            console.log('[Cleanup] Running initial cleanup...');
+            try {
+                const cameras = query('SELECT id FROM cameras WHERE enable_recording = 1 AND enabled = 1');
+                cameras.forEach(camera => {
+                    this.cleanupOldSegments(camera.id);
+                });
+            } catch (error) {
+                console.error('[Cleanup] Initial cleanup error:', error);
+            }
+        }, 5 * 60 * 1000);
     }
 
     /**
