@@ -167,3 +167,17 @@ if (cameraCount === 0) {
 db.close();
 console.log('\n✅ Database setup completed successfully!');
 console.log(`📁 Database location: ${dbPath}`);
+
+// Run all migrations
+console.log('\n🔄 Running database migrations...');
+try {
+  const { execSync } = await import('child_process');
+  execSync('node database/run-all-migrations.js', {
+    stdio: 'inherit',
+    cwd: join(__dirname, '..')
+  });
+} catch (error) {
+  console.error('⚠️  Migration script failed, but basic setup is complete.');
+  console.error('   You can run migrations manually: npm run migrate');
+}
+
