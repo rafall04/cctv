@@ -59,8 +59,16 @@ try {
     db.exec(`CREATE INDEX IF NOT EXISTS idx_areas_name ON areas(name)`);
     console.log('  ✓ idx_areas_name');
     
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_areas_kecamatan ON areas(kecamatan)`);
-    console.log('  ✓ idx_areas_kecamatan');
+    // Check if kecamatan column exists before creating index
+    const areasColumns = db.prepare("PRAGMA table_info(areas)").all();
+    const hasKecamatan = areasColumns.some(col => col.name === 'kecamatan');
+    
+    if (hasKecamatan) {
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_areas_kecamatan ON areas(kecamatan)`);
+        console.log('  ✓ idx_areas_kecamatan');
+    } else {
+        console.log('  - idx_areas_kecamatan (column does not exist, skipped)');
+    }
     
     // Users table indexes (if not exists)
     console.log('➕ Adding users table indexes...');
