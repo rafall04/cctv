@@ -13,9 +13,7 @@ import AreaManagement from './pages/AreaManagement';
 import UserManagement from './pages/UserManagement';
 import FeedbackManagement from './pages/FeedbackManagement';
 import ViewerAnalytics from './pages/ViewerAnalytics';
-import Settings from './pages/Settings';
-import SaweriaSettings from './pages/SaweriaSettings';
-import BrandingSettings from './pages/BrandingSettings';
+import UnifiedSettings from './pages/UnifiedSettings';
 import Dashboard from './pages/Dashboard';
 import SponsorManagement from './pages/SponsorManagement';
 import RecordingDashboard from './pages/RecordingDashboard';
@@ -103,7 +101,7 @@ function App() {
                     element={
                         <ProtectedRoute>
                             <AdminLayout>
-                                <Settings />
+                                <UnifiedSettings />
                             </AdminLayout>
                         </ProtectedRoute>
                     }
@@ -114,26 +112,6 @@ function App() {
                         <ProtectedRoute>
                             <AdminLayout>
                                 <SponsorManagement />
-                            </AdminLayout>
-                        </ProtectedRoute>
-                    }
-                />
-                <Route
-                    path="/admin/saweria"
-                    element={
-                        <ProtectedRoute>
-                            <AdminLayout>
-                                <SaweriaSettings />
-                            </AdminLayout>
-                        </ProtectedRoute>
-                    }
-                />
-                <Route
-                    path="/admin/branding"
-                    element={
-                        <ProtectedRoute>
-                            <AdminLayout>
-                                <BrandingSettings />
                             </AdminLayout>
                         </ProtectedRoute>
                     }
