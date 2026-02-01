@@ -95,6 +95,7 @@ export default function BrandingSettings() {
         'Footer': ['footer_text', 'copyright_text'],
         'SEO Meta Tags': ['meta_title', 'meta_description', 'meta_keywords'],
         'Visual': ['logo_text', 'primary_color', 'show_powered_by'],
+        'Watermark': ['watermark_enabled', 'watermark_text', 'watermark_position', 'watermark_opacity'],
     };
 
     return (
@@ -141,7 +142,9 @@ export default function BrandingSettings() {
 
                                 const isTextarea = ['company_description', 'hero_subtitle', 'footer_text', 'meta_description', 'meta_keywords'].includes(key);
                                 const isColor = key === 'primary_color';
-                                const isBoolean = key === 'show_powered_by';
+                                const isBoolean = ['show_powered_by', 'watermark_enabled'].includes(key);
+                                const isSelect = key === 'watermark_position';
+                                const isNumber = key === 'watermark_opacity';
 
                                 return (
                                     <div key={key}>
@@ -180,9 +183,37 @@ export default function BrandingSettings() {
                                                     className="rounded border-gray-300 dark:border-gray-600"
                                                 />
                                                 <span className="text-sm text-gray-600 dark:text-gray-400">
-                                                    Show "Powered by {formData.company_name || 'Company'}" badge
+                                                    {key === 'show_powered_by' 
+                                                        ? `Show "Powered by ${formData.company_name || 'Company'}" badge`
+                                                        : 'Enable watermark on snapshots'}
                                                 </span>
                                             </label>
+                                        ) : isSelect ? (
+                                            <select
+                                                value={formData[key] || 'bottom-right'}
+                                                onChange={(e) => handleChange(key, e.target.value)}
+                                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                            >
+                                                <option value="bottom-right">Bottom Right</option>
+                                                <option value="bottom-left">Bottom Left</option>
+                                                <option value="top-right">Top Right</option>
+                                                <option value="top-left">Top Left</option>
+                                            </select>
+                                        ) : isNumber ? (
+                                            <div className="flex gap-3 items-center">
+                                                <input
+                                                    type="range"
+                                                    min="0.1"
+                                                    max="1"
+                                                    step="0.1"
+                                                    value={formData[key] || '0.9'}
+                                                    onChange={(e) => handleChange(key, e.target.value)}
+                                                    className="flex-1"
+                                                />
+                                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 w-12">
+                                                    {(parseFloat(formData[key] || 0.9) * 100).toFixed(0)}%
+                                                </span>
+                                            </div>
                                         ) : (
                                             <input
                                                 type="text"

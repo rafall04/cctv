@@ -1,8 +1,3 @@
-/**
- * MapView Component - Desain Modern CCTV Publik
- * Optimasi untuk device low-end
- */
-
 import { useEffect, useRef, useState, memo, useCallback, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, useMap, ZoomControl, LayersControl } from 'react-leaflet';
 import L from 'leaflet';
@@ -14,6 +9,8 @@ import { getHLSConfig } from '../utils/hlsConfig';
 import { viewerService } from '../services/viewerService';
 import { createTransformThrottle } from '../utils/rafThrottle';
 import CodecBadge from './CodecBadge';
+import { useBranding } from '../contexts/BrandingContext';
+import { takeSnapshot as takeSnapshotUtil } from '../utils/snapshotHelper';
 
 // Fix Leaflet icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -176,12 +173,14 @@ const VideoModal = memo(({ camera, onClose }) => {
     const hlsRef = useRef(null);
     const transformThrottleRef = useRef(null);
     const playbackCheckRef = useRef(null);
+    const { branding } = useBranding();
     
     // Status: 'connecting' | 'loading' | 'buffering' | 'playing' | 'maintenance' | 'offline' | 'error'
     const [status, setStatus] = useState('connecting');
     const [loadingStage, setLoadingStage] = useState(LoadingStage.CONNECTING);
     const [errorType, setErrorType] = useState(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [snapshotNotification, setSnapshotNotification] = useState(null);
     
     // Zoom state - hanya untuk UI display
     const [zoomDisplay, setZoomDisplay] = useState(1);
@@ -280,18 +279,26 @@ const VideoModal = memo(({ camera, onClose }) => {
         }
     }, []);
 
-    // Screenshot/snapshot
-    const takeSnapshot = useCallback(() => {
+    // Screenshot/snapshot with watermark
+    const takeSnapshot = useCallback(async () => {
         if (!videoRef.current || status !== 'playing') return;
-        const canvas = document.createElement('canvas');
-        canvas.width = videoRef.current.videoWidth;
-        canvas.height = videoRef.current.videoHeight;
-        canvas.getContext('2d').drawImage(videoRef.current, 0, 0);
-        const link = document.createElement('a');
-        link.download = `${camera.name}-${Date.now()}.png`;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-    }, [camera.name, status]);
+        
+        const result = await takeSnapshotUtil(videoRef.current, {
+            branding,
+            cameraName: camera.name,
+            watermarkEnabled: branding.watermark_enabled === 'true',
+            watermarkText: branding.watermark_text,
+            watermarkPosition: branding.watermark_position || 'bottom-right',
+            watermarkOpacity: parseFloat(branding.watermark_opacity || 0.9)
+        });
+        
+        setSnapshotNotification({
+            type: result.success ? 'success' : 'error',
+            message: result.message
+        });
+        
+        setTimeout(() => setSnapshotNotification(null), 3000);
+    }, [camera.name, status, branding]);
 
     // Track fullscreen state and unlock orientation on exit
     useEffect(() => {
@@ -763,6 +770,30 @@ const VideoModal = memo(({ camera, onClose }) => {
                             }}
                         >
                             <video ref={videoRef} className={`w-full h-full pointer-events-none ${isFullscreen ? 'object-contain' : 'object-contain'}`} muted playsInline autoPlay />
+                        </div>
+                    )}
+
+                    {/* Snapshot Notification */}
+                    {snapshotNotification && (
+                        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+                            <div className={`px-5 py-3 rounded-xl shadow-2xl border-2 ${
+                                snapshotNotification.type === 'success'
+                                    ? 'bg-green-500 border-green-400'
+                                    : 'bg-red-500 border-red-400'
+                            } text-white animate-slide-down`}>
+                                <div className="flex items-center gap-3">
+                                    {snapshotNotification.type === 'success' ? (
+                                        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                        </svg>
+                                    ) : (
+                                        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                        </svg>
+                                    )}
+                                    <p className="font-semibold text-sm">{snapshotNotification.message}</p>
+                                </div>
+                            </div>
                         </div>
                     )}
 

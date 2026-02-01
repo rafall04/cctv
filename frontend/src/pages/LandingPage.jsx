@@ -18,6 +18,7 @@ import { createFallbackHandler } from '../utils/fallbackHandler';
 import { shouldDisableAnimations } from '../utils/animationControl';
 import { getGlobalStreamInitQueue, shouldUseQueuedInit } from '../utils/streamInitQueue';
 import { getApiUrl } from '../config/config.js';
+import { takeSnapshot as takeSnapshotUtil } from '../utils/snapshotHelper';
 // Skeleton loaders
 import { GridSkeleton, CameraCardSkeleton } from '../components/ui/Skeleton';
 // Empty states
@@ -647,6 +648,7 @@ function VideoPopup({ camera, onClose }) {
     const [status, setStatus] = useState(getInitialStatus);
     const [loadingStage, setLoadingStage] = useState(LoadingStage.CONNECTING);
     const [errorType, setErrorType] = useState(null); // 'codec', 'network', 'timeout', 'media', 'unknown'
+    const [snapshotNotification, setSnapshotNotification] = useState(null);
     const [zoom, setZoom] = useState(1);
     const [retryKey, setRetryKey] = useState(0);
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -1170,16 +1172,24 @@ function VideoPopup({ camera, onClose }) {
         }
     };
 
-    const takeSnapshot = () => {
+    const takeSnapshot = async () => {
         if (!videoRef.current || status !== 'live') return;
-        const canvas = document.createElement('canvas');
-        canvas.width = videoRef.current.videoWidth;
-        canvas.height = videoRef.current.videoHeight;
-        canvas.getContext('2d').drawImage(videoRef.current, 0, 0);
-        const link = document.createElement('a');
-        link.download = `${camera.name}-${Date.now()}.png`;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
+        
+        const result = await takeSnapshotUtil(videoRef.current, {
+            branding,
+            cameraName: camera.name,
+            watermarkEnabled: branding.watermark_enabled === 'true',
+            watermarkText: branding.watermark_text,
+            watermarkPosition: branding.watermark_position || 'bottom-right',
+            watermarkOpacity: parseFloat(branding.watermark_opacity || 0.9)
+        });
+        
+        setSnapshotNotification({
+            type: result.success ? 'success' : 'error',
+            message: result.message
+        });
+        
+        setTimeout(() => setSnapshotNotification(null), 3000);
     };
 
     // Get wrapper ref for zoom controls - directly access ZoomableVideo wrapper
@@ -1256,6 +1266,30 @@ function VideoPopup({ camera, onClose }) {
                 {/* Video - expand to full screen in fullscreen mode */}
                 <div ref={wrapperRef} className={`relative bg-gray-100 dark:bg-black overflow-hidden ${isFullscreen ? 'flex-1' : 'flex-1 min-h-0'}`} onDoubleClick={toggleFS}>
                     <ZoomableVideo videoRef={videoRef} maxZoom={4} onZoomChange={setZoom} isFullscreen={isFullscreen} />
+                    
+                    {/* Snapshot Notification */}
+                    {snapshotNotification && (
+                        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+                            <div className={`px-5 py-3 rounded-xl shadow-2xl border-2 ${
+                                snapshotNotification.type === 'success'
+                                    ? 'bg-green-500 border-green-400'
+                                    : 'bg-red-500 border-red-400'
+                            } text-white animate-slide-down`}>
+                                <div className="flex items-center gap-3">
+                                    {snapshotNotification.type === 'success' ? (
+                                        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                        </svg>
+                                    ) : (
+                                        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                        </svg>
+                                    )}
+                                    <p className="font-semibold text-sm">{snapshotNotification.message}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     
                     {/* Floating controls for fullscreen mode - Always visible on mobile */}
                     {isFullscreen && (
@@ -1509,6 +1543,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
     const [status, setStatus] = useState(getInitialStatus);
     const [loadingStage, setLoadingStage] = useState(LoadingStage.CONNECTING);
     const [zoom, setZoom] = useState(1);
+    const [snapshotNotification, setSnapshotNotification] = useState(null);
     const [retryKey, setRetryKey] = useState(0);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [autoRetryCount, setAutoRetryCount] = useState(0);
@@ -1971,16 +2006,24 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         }
     };
 
-    const takeSnapshot = () => {
+    const takeSnapshot = async () => {
         if (!videoRef.current || status !== 'live') return;
-        const canvas = document.createElement('canvas');
-        canvas.width = videoRef.current.videoWidth;
-        canvas.height = videoRef.current.videoHeight;
-        canvas.getContext('2d').drawImage(videoRef.current, 0, 0);
-        const link = document.createElement('a');
-        link.download = `${camera.name}-${Date.now()}.png`;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
+        
+        const result = await takeSnapshotUtil(videoRef.current, {
+            branding,
+            cameraName: camera.name,
+            watermarkEnabled: branding.watermark_enabled === 'true',
+            watermarkText: branding.watermark_text,
+            watermarkPosition: branding.watermark_position || 'bottom-right',
+            watermarkOpacity: parseFloat(branding.watermark_opacity || 0.9)
+        });
+        
+        setSnapshotNotification({
+            type: result.success ? 'success' : 'error',
+            message: result.message
+        });
+        
+        setTimeout(() => setSnapshotNotification(null), 3000);
     };
 
     // Get wrapper ref for zoom controls - directly access ZoomableVideo wrapper
@@ -2010,6 +2053,20 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             <div ref={wrapperRef} className="w-full h-full">
                 <ZoomableVideo videoRef={videoRef} status={status} maxZoom={3} onZoomChange={setZoom} isFullscreen={isFullscreen} />
             </div>
+            
+            {/* Snapshot Notification */}
+            {snapshotNotification && (
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+                    <div className={`px-4 py-2 rounded-lg shadow-xl border ${
+                        snapshotNotification.type === 'success'
+                            ? 'bg-green-500 border-green-400'
+                            : 'bg-red-500 border-red-400'
+                    } text-white text-xs font-semibold`}>
+                        {snapshotNotification.message}
+                    </div>
+                </div>
+            )}
+            
             {/* Status badge - disable pulse animation in fullscreen and on low-end devices */}
             <div className="absolute top-2 left-2 z-10 pointer-events-none">
                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold text-white shadow ${statusBadge.color}`}>

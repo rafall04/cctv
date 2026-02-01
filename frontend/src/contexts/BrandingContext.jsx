@@ -20,6 +20,10 @@ export function BrandingProvider({ children }) {
         logo_text: 'R',
         primary_color: '#0ea5e9',
         show_powered_by: 'true',
+        watermark_enabled: 'true',
+        watermark_text: '',
+        watermark_position: 'bottom-right',
+        watermark_opacity: '0.9',
     });
     const [loading, setLoading] = useState(true);
 
