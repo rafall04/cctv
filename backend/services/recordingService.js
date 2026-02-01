@@ -267,11 +267,6 @@ class RecordingService {
      * Handle segment creation
      */
     onSegmentCreated(cameraId, filename) {
-        const cameraDir = join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
-        const filePath = join(cameraDir, filename);
-
-        console.log(`[Segment] Detected new segment: camera${cameraId}/${filename}`);
-
         // CRITICAL: Check if this file has failed re-mux before (prevent infinite loop)
         const failKey = `${cameraId}:${filename}`;
         const failInfo = failedRemuxFiles.get(failKey);
@@ -281,6 +276,11 @@ class RecordingService {
             console.log(`[Segment] Skipping file (failed ${failInfo.attempts}x): ${filename}`);
             return;
         }
+
+        const cameraDir = join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
+        const filePath = join(cameraDir, filename);
+
+        console.log(`[Segment] Detected new segment: camera${cameraId}/${filename}`);
 
         // Optimized wait: 3 seconds (reduced from 15s)
         // FFmpeg should have closed file by now with proper segment settings
