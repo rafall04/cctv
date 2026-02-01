@@ -1160,25 +1160,6 @@ class RecordingService {
     startScheduledCleanup() {
         console.log('[Cleanup] Starting scheduled cleanup service (every 30 minutes)');
         
-        // 📋 SOP REMINDER: H.264 Codec Requirement
-        console.log('');
-        console.log('═══════════════════════════════════════════════════════════════');
-        console.log('⚠️  OPERATIONAL REQUIREMENT: H.264 CODEC');
-        console.log('═══════════════════════════════════════════════════════════════');
-        console.log('SYSTEM ASSUMES H.264 INPUT FOR ALL CAMERAS.');
-        console.log('');
-        console.log('ADMIN RESPONSIBILITY:');
-        console.log('  • Configure all cameras to output H.264 codec');
-        console.log('  • H.265/HEVC is NOT supported for playback in most browsers');
-        console.log('  • Verify codec settings in Camera Management panel');
-        console.log('');
-        console.log('PLAYBACK ISSUES?');
-        console.log('  → Check camera codec configuration');
-        console.log('  → Ensure RTSP stream is H.264');
-        console.log('  → Browser compatibility: H.264 = ✓ | H.265 = ✗');
-        console.log('═══════════════════════════════════════════════════════════════');
-        console.log('');
-        
         // Run cleanup for all recording cameras every 30 minutes
         setInterval(async () => {
             try {
