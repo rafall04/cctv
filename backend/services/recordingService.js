@@ -57,7 +57,7 @@ const incrementFailCount = (cameraId, filename) => {
             'SELECT fail_count FROM failed_remux_files WHERE camera_id = ? AND filename = ?',
             [cameraId, filename]
         );
-        
+
         if (existing) {
             execute(
                 'UPDATE failed_remux_files SET fail_count = fail_count + 1, last_attempt = CURRENT_TIMESTAMP WHERE camera_id = ? AND filename = ?',
@@ -101,13 +101,13 @@ class RecordingService {
 
         // Start health monitoring
         this.startHealthMonitoring();
-        
+
         // Start periodic segment scanner (fallback if FFmpeg output detection fails)
         this.startSegmentScanner();
-        
+
         // Start background cleanup for corrupt files (gradual, non-blocking)
         this.startBackgroundCleanup();
-        
+
         // CRITICAL: Start scheduled cleanup (every 30 minutes)
         // This replaces per-segment cleanup to prevent aggressive deletion
         this.startScheduledCleanup();
@@ -198,7 +198,7 @@ class RecordingService {
 
             // Handle ffmpeg output
             let ffmpegOutput = '';
-            
+
             ffmpeg.stdout.on('data', () => {
                 // Update last data time
                 const health = streamHealthMap.get(cameraId);
@@ -210,7 +210,7 @@ class RecordingService {
             ffmpeg.stderr.on('data', (data) => {
                 const output = data.toString();
                 ffmpegOutput += output;
-                
+
                 // Update last data time
                 const health = streamHealthMap.get(cameraId);
                 if (health) {
@@ -229,7 +229,7 @@ class RecordingService {
                         this.onSegmentCreated(cameraId, filename);
                     }
                 }
-                
+
                 // Additional detection: Look for segment completion messages
                 if (output.includes('Closing') && output.includes('.mp4')) {
                     const match = output.match(/(\d{8}_\d{6}\.mp4)/);
@@ -239,12 +239,12 @@ class RecordingService {
                         // Don't call onSegmentCreated here, it's already called on Opening
                     }
                 }
-                
+
                 // Log all segment-related messages for debugging
                 if (output.includes('.mp4') && (output.includes('segment') || output.includes('Opening') || output.includes('Closing'))) {
                     console.log(`[FFmpeg Segment Debug] ${output.trim()}`);
                 }
-                
+
                 // Log errors
                 if (output.includes('error') || output.includes('Error') || output.includes('failed')) {
                     console.error(`[FFmpeg Camera ${cameraId}] ${output.trim()}`);
@@ -317,22 +317,22 @@ class RecordingService {
      */
     async restartRecording(cameraId, reason = 'manual') {
         console.log(`Restarting recording for camera ${cameraId}, reason: ${reason}`);
-        
+
         const restartTime = new Date();
-        
+
         // Stop current recording
         await this.stopRecording(cameraId);
-        
+
         // Wait 3 seconds
         await new Promise(resolve => setTimeout(resolve, 3000));
-        
+
         // Start recording again
         const result = await this.startRecording(cameraId);
-        
+
         // Log restart event
         const recoveryTime = new Date();
         this.logRestart(cameraId, reason, result.success, restartTime, recoveryTime);
-        
+
         return result;
     }
 
@@ -348,16 +348,16 @@ class RecordingService {
 
         const cameraDir = join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
         const filePath = join(cameraDir, filename);
-        
+
         // CRITICAL: Mark file as being processed (prevent deletion + duplicate processing)
         const fileKey = `${cameraId}:${filename}`;
-        
+
         // BUG FIX #2: Prevent duplicate processing
         if (filesBeingProcessed.has(fileKey)) {
             console.log(`[Segment] Already processing: ${filename}, skipping duplicate`);
             return;
         }
-        
+
         filesBeingProcessed.add(fileKey);
 
         console.log(`[Segment] Detected new segment: camera${cameraId}/${filename}`);
@@ -370,7 +370,7 @@ class RecordingService {
                 const cleanup = () => {
                     filesBeingProcessed.delete(fileKey);
                 };
-                
+
                 if (!existsSync(filePath)) {
                     console.warn(`[Segment] File not found: ${filePath}`);
                     cleanup();
@@ -379,16 +379,16 @@ class RecordingService {
 
                 // Quick file size check - 2 times with 2s gaps (reduced from 3x3s)
                 console.log(`[Segment] Checking file stability: ${filename}`);
-                
+
                 let fileSize1 = statSync(filePath).size;
                 await new Promise(resolve => setTimeout(resolve, 2000));
-                
+
                 if (!existsSync(filePath)) {
                     console.warn(`[Segment] File disappeared during check: ${filePath}`);
                     cleanup();
                     return;
                 }
-                
+
                 let fileSize2 = statSync(filePath).size;
 
                 // If still growing, wait 3s more (reduced from 5s)
@@ -414,7 +414,7 @@ class RecordingService {
                     cleanup();
                     return;
                 }
-                
+
                 // Log if file is smaller than expected (< 5MB for 10min segment)
                 if (fileSize < 5 * 1024 * 1024) {
                     console.log(`[Segment] ⚠️ File smaller than expected (likely from reconnect): ${filename} (${(fileSize / 1024 / 1024).toFixed(2)} MB)`);
@@ -423,14 +423,14 @@ class RecordingService {
                 // Reduced wait: 3 seconds (optimized from 5s)
                 console.log(`[Segment] Final wait to ensure file is complete: ${filename}`);
                 await new Promise(resolve => setTimeout(resolve, 3000));
-                
+
                 // Quick final check
                 if (!existsSync(filePath)) {
                     console.warn(`[Segment] File disappeared: ${filePath}`);
                     cleanup();
                     return;
                 }
-                
+
                 const finalCheck = statSync(filePath).size;
                 if (Math.abs(finalCheck - fileSize) > 1024 * 100) { // Allow 100KB difference
                     console.log(`[Segment] File still changing (${fileSize} -> ${finalCheck}), will retry later: ${filename}`);
@@ -441,42 +441,47 @@ class RecordingService {
                 // CRITICAL FIX: Re-mux file to create proper MP4 index for seeking
                 console.log(`[Segment] Re-muxing file to fix MP4 index: ${filename}`);
                 const tempPath = filePath + '.remux.mp4';
-                
+
                 // Clean up any existing temp files first
                 if (existsSync(tempPath)) {
                     console.log(`[Segment] Cleaning up existing temp file: ${tempPath}`);
                     unlinkSync(tempPath);
                 }
-                
+
                 // Quick ffprobe check (with shorter timeout)
+                // CRITICAL: Store actual duration for accurate database entry
+                let actualDuration = 600; // Default 10 minutes, will be updated by ffprobe
+
                 try {
                     const { execSync } = await import('child_process');
                     const ffprobeOutput = execSync(
                         `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`,
                         { encoding: 'utf8', timeout: 3000 } // Reduced from 5s to 3s
                     ).trim();
-                    
+
                     if (!ffprobeOutput || parseFloat(ffprobeOutput) < 1) {
                         console.log(`[Segment] File not ready (duration: ${ffprobeOutput}s), will retry later: ${filename}`);
-                        
+
                         // Track failed attempt in database
                         incrementFailCount(cameraId, filename);
-                        
+
                         cleanup();
                         return;
                     }
-                    
-                    console.log(`[Segment] File is complete, duration: ${ffprobeOutput}s`);
+
+                    // Store actual duration from ffprobe
+                    actualDuration = Math.round(parseFloat(ffprobeOutput));
+                    console.log(`[Segment] File is complete, duration: ${actualDuration}s`);
                 } catch (error) {
                     console.log(`[Segment] ffprobe check failed, file not ready: ${filename}`);
-                    
+
                     // Track failed attempt in database
                     incrementFailCount(cameraId, filename);
-                    
+
                     cleanup();
                     return;
                 }
-                
+
                 // Perform re-mux with optimized settings for seeking
                 await new Promise((resolve, reject) => {
                     const ffmpeg = spawn('ffmpeg', [
@@ -524,7 +529,7 @@ class RecordingService {
                 if (existsSync(tempPath)) {
                     const tempStats = statSync(tempPath);
                     console.log(`[Segment] Re-muxed file size: ${(tempStats.size / 1024 / 1024).toFixed(2)} MB`);
-                    
+
                     try {
                         // Atomic rename: overwrites filePath in single operation (no gap)
                         // If crash occurs during rename, either old or new file exists (never both missing)
@@ -557,7 +562,8 @@ class RecordingService {
 
                 const [, year, month, day, hour, minute, second] = match;
                 const startTime = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
-                const endTime = new Date(startTime.getTime() + 10 * 60 * 1000); // +10 menit
+                // Use actual duration from ffprobe (not hardcoded 10 minutes)
+                const endTime = new Date(startTime.getTime() + actualDuration * 1000);
 
                 // Get final file size after re-mux
                 const finalStats = statSync(filePath);
@@ -591,7 +597,7 @@ class RecordingService {
                         startTime.toISOString(),
                         endTime.toISOString(),
                         finalSize,
-                        600, // 10 menit
+                        actualDuration, // Use actual duration from ffprobe
                         filePath
                     ]
                 );
@@ -606,7 +612,7 @@ class RecordingService {
 
             } catch (error) {
                 console.error(`[Segment] Error handling segment creation:`, error);
-                
+
                 // CRITICAL: Remove from processing set on error
                 filesBeingProcessed.delete(fileKey);
             }
@@ -625,16 +631,16 @@ class RecordingService {
             // SAFETY #1: Don't cleanup if called too frequently (prevent race condition)
             const now = Date.now();
             if (!this.lastCleanupTime) this.lastCleanupTime = {};
-            
+
             const lastCleanup = this.lastCleanupTime[cameraId] || 0;
             const timeSinceLastCleanup = now - lastCleanup;
-            
+
             // Only cleanup once per 60 seconds (prevent race condition with new segments)
             if (timeSinceLastCleanup < 60000) {
-                console.log(`[Cleanup] Skipping cleanup for camera ${cameraId} (last cleanup ${Math.round(timeSinceLastCleanup/1000)}s ago)`);
+                console.log(`[Cleanup] Skipping cleanup for camera ${cameraId} (last cleanup ${Math.round(timeSinceLastCleanup / 1000)}s ago)`);
                 return;
             }
-            
+
             this.lastCleanupTime[cameraId] = now;
 
             // Get camera recording duration (retention period)
@@ -649,8 +655,8 @@ class RecordingService {
             const retentionHours = camera.recording_duration_hours;
             const retentionMs = retentionHours * 60 * 60 * 1000;
             const retentionWithBuffer = retentionMs * 1.1; // +10% safety buffer
-            
-            console.log(`[Cleanup] Camera ${cameraId} (${camera.name}): retention ${retentionHours}h (${Math.round(retentionWithBuffer/3600000)}h with buffer)`);
+
+            console.log(`[Cleanup] Camera ${cameraId} (${camera.name}): retention ${retentionHours}h (${Math.round(retentionWithBuffer / 3600000)}h with buffer)`);
 
             // First, cleanup database entries for files that don't exist
             const allSegments = query(
@@ -663,9 +669,9 @@ class RecordingService {
                 // Only cleanup orphaned entries older than 30 minutes
                 const segmentAge = Date.now() - new Date(segment.start_time).getTime();
                 const isOldEnough = segmentAge > 30 * 60 * 1000; // 30 minutes
-                
+
                 if (isOldEnough && !existsSync(segment.file_path)) {
-                    console.log(`[Cleanup] ⚠️ Orphaned DB entry (age: ${Math.round(segmentAge/60000)}min): ${segment.filename}`);
+                    console.log(`[Cleanup] ⚠️ Orphaned DB entry (age: ${Math.round(segmentAge / 60000)}min): ${segment.filename}`);
                     execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
                     orphanedCount++;
                 }
@@ -690,19 +696,19 @@ class RecordingService {
             // Collect files to delete (filter first, delete in parallel)
             const filesToDelete = [];
             let skippedCount = 0;
-            
+
             segments.forEach(segment => {
                 const segmentAge = Date.now() - new Date(segment.start_time).getTime();
-                
+
                 // CRITICAL: Only delete if OLDER than retention period (with buffer)
                 if (segmentAge <= retentionWithBuffer) {
                     // Segment is still within retention period - KEEP IT
                     return;
                 }
-                
+
                 // Segment is older than retention period - candidate for deletion
-                console.log(`[Cleanup] Segment ${segment.filename}: age ${Math.round(segmentAge/3600000)}h (retention: ${Math.round(retentionWithBuffer/3600000)}h)`);
-                
+                console.log(`[Cleanup] Segment ${segment.filename}: age ${Math.round(segmentAge / 3600000)}h (retention: ${Math.round(retentionWithBuffer / 3600000)}h)`);
+
                 // SAFETY #2: Check if file is being processed (remux in progress)
                 const fileKey = `${cameraId}:${segment.filename}`;
                 if (filesBeingProcessed.has(fileKey)) {
@@ -710,54 +716,54 @@ class RecordingService {
                     skippedCount++;
                     return;
                 }
-                
+
                 // SAFETY #3: Verify file actually exists before deleting
                 if (!existsSync(segment.file_path)) {
                     console.log(`[Cleanup] ⚠️ File already gone, just removing DB entry: ${segment.filename}`);
                     execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
                     return;
                 }
-                
+
                 // Add to deletion queue
                 filesToDelete.push({
                     segment,
                     segmentAge
                 });
             });
-            
+
             // ⚡ FIX 2: Delete files in parallel using Promise.allSettled
             // allSettled ensures one failure doesn't stop others
             if (filesToDelete.length > 0) {
                 console.log(`[Cleanup] Deleting ${filesToDelete.length} old segments in parallel...`);
-                
+
                 const deletePromises = filesToDelete.map(async ({ segment, segmentAge }) => {
                     try {
                         const stats = statSync(segment.file_path);
                         const fileSizeMB = (stats.size / (1024 * 1024)).toFixed(2);
-                        
+
                         // Non-blocking async delete
                         await fsPromises.unlink(segment.file_path);
-                        
-                        console.log(`[Cleanup] ✓ Deleted: ${segment.filename} (age: ${Math.round(segmentAge/3600000)}h, size: ${fileSizeMB}MB)`);
-                        
+
+                        console.log(`[Cleanup] ✓ Deleted: ${segment.filename} (age: ${Math.round(segmentAge / 3600000)}h, size: ${fileSizeMB}MB)`);
+
                         // Delete from database
                         execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
-                        
+
                         return { success: true, size: stats.size };
                     } catch (error) {
                         console.error(`[Cleanup] ✗ Error deleting ${segment.filename}:`, error.message);
                         return { success: false, error: error.message };
                     }
                 });
-                
+
                 // Wait for all deletions to complete (or fail)
                 const results = await Promise.allSettled(deletePromises);
-                
+
                 // Calculate statistics
                 let deletedCount = 0;
                 let totalSize = 0;
                 let failedCount = 0;
-                
+
                 results.forEach((result) => {
                     if (result.status === 'fulfilled' && result.value.success) {
                         deletedCount++;
@@ -766,10 +772,10 @@ class RecordingService {
                         failedCount++;
                     }
                 });
-                
+
                 const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
                 const remainingSegments = segments.length - deletedCount - skippedCount - failedCount;
-                
+
                 console.log(`[Cleanup] Camera ${cameraId} summary:`);
                 console.log(`  ✓ Deleted: ${deletedCount} segments (${totalSizeMB}MB freed)`);
                 if (failedCount > 0) {
@@ -780,7 +786,7 @@ class RecordingService {
                 }
                 console.log(`  ✓ Remaining: ${remainingSegments} segments`);
             } else {
-                console.log(`[Cleanup] Camera ${cameraId}: No segments older than ${Math.round(retentionWithBuffer/3600000)}h, ${segments.length} segments kept`);
+                console.log(`[Cleanup] Camera ${cameraId}: No segments older than ${Math.round(retentionWithBuffer / 3600000)}h, ${segments.length} segments kept`);
             }
 
         } catch (error) {
@@ -817,7 +823,7 @@ class RecordingService {
         setInterval(() => {
             streamHealthMap.forEach((health, cameraId) => {
                 const timeSinceData = Date.now() - health.lastDataTime;
-                
+
                 // Get camera info
                 const camera = queryOne('SELECT is_tunnel FROM cameras WHERE id = ?', [cameraId]);
                 if (!camera) return;
@@ -828,10 +834,10 @@ class RecordingService {
                 // Check if stream frozen
                 if (timeSinceData > timeout) {
                     console.log(`⚠️ Camera ${cameraId} stream frozen (${timeSinceData}ms), restarting...`);
-                    
+
                     // Increment restart count
                     health.restartCount++;
-                    
+
                     // Restart recording
                     this.restartRecording(cameraId, 'stream_frozen');
                 }
@@ -846,12 +852,12 @@ class RecordingService {
     startSegmentScanner() {
         // Initial cleanup of temp files
         this.cleanupTempFiles();
-        
+
         setInterval(() => {
             // Get all active recordings
             activeRecordings.forEach((recording, cameraId) => {
                 const cameraDir = join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
-                
+
                 if (!existsSync(cameraDir)) return;
 
                 try {
@@ -868,7 +874,7 @@ class RecordingService {
                         if (isFileFailed(cameraId, filename)) {
                             return;
                         }
-                        
+
                         // Check if already in database
                         const existing = queryOne(
                             'SELECT id FROM recording_segments WHERE camera_id = ? AND filename = ?',
@@ -878,17 +884,17 @@ class RecordingService {
                         if (!existing) {
                             const filePath = join(cameraDir, filename);
                             const stats = statSync(filePath);
-                            
+
                             // BUG FIX #4: Check if file is being processed (prevent duplicate)
                             const fileKey = `${cameraId}:${filename}`;
                             if (filesBeingProcessed.has(fileKey)) {
                                 return; // Skip, already being processed
                             }
-                            
+
                             // Only process files that are at least 30 seconds old (likely complete)
                             const fileAge = Date.now() - stats.mtimeMs;
                             if (fileAge > 30000) {
-                                console.log(`[Scanner] Found unregistered segment: ${filename} (age: ${Math.round(fileAge/1000)}s)`);
+                                console.log(`[Scanner] Found unregistered segment: ${filename} (age: ${Math.round(fileAge / 1000)}s)`);
                                 // Trigger segment processing
                                 this.onSegmentCreated(cameraId, filename);
                             }
@@ -909,66 +915,66 @@ class RecordingService {
     cleanupTempFiles() {
         try {
             console.log('[Cleanup] Scanning for temp files...');
-            
+
             if (!existsSync(RECORDINGS_BASE_PATH)) return;
-            
+
             const cameraDirs = readdirSync(RECORDINGS_BASE_PATH);
             let cleanedCount = 0;
             let dbCleanedCount = 0;
-            
+
             cameraDirs.forEach(cameraDir => {
                 const fullPath = join(RECORDINGS_BASE_PATH, cameraDir);
                 if (!statSync(fullPath).isDirectory()) return;
-                
+
                 // Extract camera ID from directory name (e.g., "camera1" -> 1)
                 const cameraIdMatch = cameraDir.match(/camera(\d+)/);
                 if (!cameraIdMatch) return;
                 const cameraId = parseInt(cameraIdMatch[1]);
-                
+
                 const files = readdirSync(fullPath);
                 files.forEach(file => {
                     // CRITICAL FIX: ONLY delete .temp.mp4 or .remux.mp4 files
                     // NEVER delete actual recording files (YYYYMMDD_HHMMSS.mp4)
                     if (file.includes('.temp.mp4') || file.includes('.remux.mp4')) {
                         const filePath = join(fullPath, file);
-                        
+
                         // Additional safety: check file age (at least 5 minutes old)
                         const stats = statSync(filePath);
                         const fileAge = Date.now() - stats.mtimeMs;
-                        
+
                         if (fileAge > 5 * 60 * 1000) {
                             unlinkSync(filePath);
                             cleanedCount++;
-                            console.log(`[Cleanup] Deleted temp file: ${cameraDir}/${file} (age: ${Math.round(fileAge/60000)}min)`);
+                            console.log(`[Cleanup] Deleted temp file: ${cameraDir}/${file} (age: ${Math.round(fileAge / 60000)}min)`);
                         }
                     }
                 });
-                
+
                 // CRITICAL FIX: Only cleanup database entries for TEMP files or very old missing files
                 const dbSegments = query(
                     'SELECT * FROM recording_segments WHERE camera_id = ?',
                     [cameraId]
                 );
-                
+
                 dbSegments.forEach(segment => {
                     // SAFETY: Only cleanup entries older than 30 minutes (was 5 minutes)
                     const segmentAge = Date.now() - new Date(segment.start_time || 0).getTime();
                     const isVeryOld = segmentAge > 30 * 60 * 1000; // 30 minutes
-                    
+
                     // Only delete DB entries for:
                     // 1. Temp files (.temp.mp4 or .remux.mp4 in filename)
                     // 2. Very old entries (30+ minutes) where file doesn't exist
-                    if (segment.filename.includes('.temp.mp4') || 
+                    if (segment.filename.includes('.temp.mp4') ||
                         segment.filename.includes('.remux.mp4') ||
                         (isVeryOld && !existsSync(segment.file_path))) {
-                        
+
                         execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
                         dbCleanedCount++;
-                        console.log(`[Cleanup] Deleted DB entry: ${segment.filename} (age: ${Math.round(segmentAge/60000)}min, file exists: ${existsSync(segment.file_path)})`);
+                        console.log(`[Cleanup] Deleted DB entry: ${segment.filename} (age: ${Math.round(segmentAge / 60000)}min, file exists: ${existsSync(segment.file_path)})`);
                     }
                 });
             });
-            
+
             if (cleanedCount > 0 || dbCleanedCount > 0) {
                 console.log(`[Cleanup] ✓ Cleaned up ${cleanedCount} temp files and ${dbCleanedCount} DB entries`);
             } else {
@@ -1031,45 +1037,45 @@ class RecordingService {
      */
     startBackgroundCleanup() {
         console.log('[Cleanup] Starting background cleanup service (1 file per 10s)');
-        
+
         let cleanupQueue = [];
         let isProcessing = false;
-        
+
         // Build cleanup queue every 5 minutes
         const buildQueue = () => {
             try {
                 if (!existsSync(RECORDINGS_BASE_PATH)) return;
-                
+
                 const cameraDirs = readdirSync(RECORDINGS_BASE_PATH);
                 const unregistered = [];
-                
+
                 cameraDirs.forEach(cameraDir => {
                     const fullPath = join(RECORDINGS_BASE_PATH, cameraDir);
                     if (!statSync(fullPath).isDirectory()) return;
-                    
+
                     // Extract camera ID
                     const cameraIdMatch = cameraDir.match(/camera(\d+)/);
                     if (!cameraIdMatch) return;
                     const cameraId = parseInt(cameraIdMatch[1]);
-                    
+
                     // Get all MP4 files
                     const files = readdirSync(fullPath)
                         .filter(f => /^\d{8}_\d{6}\.mp4$/.test(f));
-                    
+
                     files.forEach(filename => {
                         // Check if in database
                         const existing = queryOne(
                             'SELECT id FROM recording_segments WHERE camera_id = ? AND filename = ?',
                             [cameraId, filename]
                         );
-                        
+
                         // CRITICAL FIX: Only add to queue if file is OLD (30+ minutes)
                         // Recent files are likely being processed by segment scanner
                         if (!existing) {
                             const filePath = join(fullPath, filename);
                             const stats = statSync(filePath);
                             const fileAge = Date.now() - stats.mtimeMs;
-                            
+
                             // Only queue files older than 30 minutes (was immediate)
                             if (fileAge > 30 * 60 * 1000) {
                                 unregistered.push({
@@ -1082,7 +1088,7 @@ class RecordingService {
                         }
                     });
                 });
-                
+
                 if (unregistered.length > 0) {
                     console.log(`[Cleanup] Found ${unregistered.length} old unregistered files (30+ min), adding to cleanup queue`);
                     cleanupQueue = unregistered;
@@ -1091,28 +1097,28 @@ class RecordingService {
                 console.error('[Cleanup] Error building queue:', error);
             }
         };
-        
+
         // Build initial queue after 30 seconds (let system stabilize first)
         setTimeout(buildQueue, 30000);
-        
+
         // Rebuild queue every 5 minutes
         setInterval(buildQueue, 5 * 60 * 1000);
-        
+
         // Process queue: 1 file per 10 seconds
         setInterval(async () => {
             if (isProcessing || cleanupQueue.length === 0) return;
-            
+
             isProcessing = true;
-            
+
             try {
                 const file = cleanupQueue.shift();
-                
+
                 // Double-check file still exists
                 if (!existsSync(file.path)) {
                     isProcessing = false;
                     return;
                 }
-                
+
                 // CRITICAL FIX: Check if file is being processed (prevent deletion during remux)
                 const fileKey = `${file.cameraId}:${file.filename}`;
                 if (filesBeingProcessed.has(fileKey)) {
@@ -1120,31 +1126,31 @@ class RecordingService {
                     isProcessing = false;
                     return;
                 }
-                
+
                 // Check if file is corrupt with ffprobe (3s timeout)
                 const { execSync } = await import('child_process');
                 try {
-                    execSync(`ffprobe -v error "${file.path}"`, { 
+                    execSync(`ffprobe -v error "${file.path}"`, {
                         timeout: 3000,
                         stdio: 'ignore' // Suppress output
                     });
-                    
+
                     // CRITICAL FIX: File is valid but unregistered
                     // DON'T DELETE - trigger segment scanner to register it
-                    console.log(`[Cleanup] File valid but unregistered (age: ${Math.round(file.age/60000)}min), triggering registration: ${file.filename}`);
-                    
+                    console.log(`[Cleanup] File valid but unregistered (age: ${Math.round(file.age / 60000)}min), triggering registration: ${file.filename}`);
+
                     // Trigger segment processing to register this file
                     this.onSegmentCreated(file.cameraId, file.filename);
-                    
+
                 } catch (error) {
                     // File is corrupt (ffprobe failed)
-                    console.log(`[Cleanup] Deleting corrupt file (age: ${Math.round(file.age/60000)}min): camera${file.cameraId}/${file.filename}`);
+                    console.log(`[Cleanup] Deleting corrupt file (age: ${Math.round(file.age / 60000)}min): camera${file.cameraId}/${file.filename}`);
                     unlinkSync(file.path);
-                    
+
                     // Remove from database tracking
                     removeFailedFile(file.cameraId, file.filename);
                 }
-                
+
             } catch (error) {
                 console.error('[Cleanup] Error processing file:', error);
             } finally {
@@ -1159,25 +1165,25 @@ class RecordingService {
      */
     startScheduledCleanup() {
         console.log('[Cleanup] Starting scheduled cleanup service (every 30 minutes)');
-        
+
         // Run cleanup for all recording cameras every 30 minutes
         setInterval(async () => {
             try {
                 const cameras = query('SELECT id FROM cameras WHERE enable_recording = 1 AND enabled = 1');
-                
+
                 console.log(`[Cleanup] Running scheduled cleanup for ${cameras.length} cameras...`);
-                
+
                 // Run cleanups sequentially to avoid overwhelming the system
                 for (const camera of cameras) {
                     await this.cleanupOldSegments(camera.id);
                 }
-                
+
                 console.log('[Cleanup] Scheduled cleanup complete');
             } catch (error) {
                 console.error('[Cleanup] Scheduled cleanup error:', error);
             }
         }, 30 * 60 * 1000); // Every 30 minutes
-        
+
         // Run initial cleanup after 5 minutes (let system stabilize first)
         setTimeout(async () => {
             console.log('[Cleanup] Running initial cleanup...');
@@ -1198,27 +1204,27 @@ class RecordingService {
     async autoStartRecordings() {
         try {
             const cameras = query('SELECT id FROM cameras WHERE enable_recording = 1 AND enabled = 1');
-            
+
             console.log(`[Recording] Found ${cameras.length} cameras with recording enabled`);
-            
+
             if (cameras.length === 0) {
                 console.log('[Recording] No cameras configured for recording');
                 return;
             }
-            
+
             let successCount = 0;
             let failCount = 0;
-            
+
             for (const camera of cameras) {
                 let retries = 3;
                 let success = false;
-                
+
                 while (retries > 0 && !success) {
                     const attemptNum = 4 - retries;
                     console.log(`[Recording] Starting camera ${camera.id} (attempt ${attemptNum}/3)...`);
-                    
+
                     const result = await this.startRecording(camera.id);
-                    
+
                     if (result.success) {
                         console.log(`[Recording] ✓ Camera ${camera.id} recording started successfully`);
                         successCount++;
@@ -1226,25 +1232,25 @@ class RecordingService {
                     } else {
                         console.error(`[Recording] ✗ Camera ${camera.id} failed: ${result.message}`);
                         retries--;
-                        
+
                         if (retries > 0) {
                             console.log(`[Recording] Retrying camera ${camera.id} in 2 seconds...`);
                             await new Promise(resolve => setTimeout(resolve, 2000)); // Reduced from 5s to 2s
                         }
                     }
                 }
-                
+
                 if (!success) {
                     console.error(`[Recording] ✗ Camera ${camera.id} failed after 3 attempts - skipping`);
                     failCount++;
                 }
-                
+
                 // Stagger starts between cameras (reduced from 2s to 500ms)
                 await new Promise(resolve => setTimeout(resolve, 500));
             }
-            
+
             console.log(`[Recording] Auto-start complete: ${successCount} succeeded, ${failCount} failed`);
-            
+
         } catch (error) {
             console.error('[Recording] Error in auto-starting recordings:', error);
         }
