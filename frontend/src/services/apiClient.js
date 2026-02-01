@@ -13,10 +13,6 @@ import {
     ERROR_MESSAGES,
 } from '../hooks/useApiError';
 
-// Get API URL and Key from central config
-const API_URL = getApiUrl();
-const API_KEY = getApiKey();
-
 // Default timeout configuration (30 seconds)
 // Requirements: 10.3
 const DEFAULT_TIMEOUT = 30000;
@@ -71,12 +67,18 @@ function showWarningNotification(title, message) {
     }
 }
 
+// Create axios instance with config from central config
+// Get API URL and Key from central config
+const API_URL = getApiUrl();
+const API_KEY = getApiKey();
+
 const apiClient = axios.create({
     baseURL: API_URL,
     headers: {
         'Content-Type': 'application/json',
+        ...(API_KEY && { 'X-API-Key': API_KEY }),
     },
-    withCredentials: true, // Required for CSRF cookie
+    withCredentials: true, // CRITICAL: Required for CSRF cookie and session
     timeout: DEFAULT_TIMEOUT, // Default timeout for all requests
 });
 
