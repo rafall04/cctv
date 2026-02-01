@@ -4,6 +4,8 @@ import { areaService } from '../services/areaService';
 import { viewerService } from '../services/viewerService';
 import { getPublicSaweriaConfig } from '../services/saweriaService';
 import { useTheme } from '../contexts/ThemeContext';
+import { useBranding } from '../contexts/BrandingContext';
+import { updateMetaTags } from '../utils/metaUpdater';
 import { createTransformThrottle } from '../utils/rafThrottle';
 import { detectDeviceTier, getMaxConcurrentStreams, isMobileDevice, getMobileDeviceType } from '../utils/deviceDetector';
 import { getHLSConfig } from '../utils/hlsConfig';
@@ -2302,7 +2304,7 @@ function MultiViewLayout({ cameras, onRemove, onClose }) {
 // Disables animations on low-end devices - **Validates: Requirements 5.2**
 // Clock update interval optimized: 10s on low-end, 1s on high-end
 // ============================================
-function Navbar({ cameraCount }) {
+function Navbar({ cameraCount, branding }) {
     const { isDark, toggleTheme } = useTheme();
     const [currentTime, setCurrentTime] = useState(new Date());
     const disableAnimations = shouldDisableAnimations();
@@ -2319,18 +2321,18 @@ function Navbar({ cameraCount }) {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16">
                     {/* Logo - SEO optimized with proper heading structure */}
-                    <a href="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity" title="CCTV Bojonegoro Online - RAF NET">
+                    <a href="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity" title={`${branding.company_tagline} - ${branding.company_name}`}>
                         <div className="relative">
                             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-sky-500/30">
-                                <Icons.Camera />
+                                <span className="text-lg font-bold">{branding.logo_text}</span>
                             </div>
                             {cameraCount > 0 && (
                                 <span className={`absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white dark:border-gray-900 ${disableAnimations ? '' : 'animate-pulse'}`}></span>
                             )}
                         </div>
                         <div>
-                            <span className="text-lg font-bold text-gray-900 dark:text-white">RAF NET</span>
-                            <p className="text-[10px] text-gray-500 dark:text-gray-400 -mt-0.5">CCTV Bojonegoro Online</p>
+                            <span className="text-lg font-bold text-gray-900 dark:text-white">{branding.company_name}</span>
+                            <p className="text-[10px] text-gray-500 dark:text-gray-400 -mt-0.5">{branding.company_tagline}</p>
                         </div>
                     </a>
                     
@@ -2341,7 +2343,7 @@ function Navbar({ cameraCount }) {
                             <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">LIVE</span>
                         </div>
                         <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">Bojonegoro</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">{branding.city_name}</span>
                         <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
                         <span className="text-sm font-mono text-gray-600 dark:text-gray-300">
                             {currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: disableAnimations ? undefined : '2-digit' })}
@@ -2997,37 +2999,29 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
 // ============================================
 // FOOTER - Enhanced with more information
 // ============================================
-function Footer({ cameraCount, areaCount, saweriaEnabled, saweriaLink }) {
+function Footer({ cameraCount, areaCount, saweriaEnabled, saweriaLink, branding }) {
     const whatsappNumber = '6289685645956'; // Format internasional tanpa +
-    const whatsappLink = `https://wa.me/${whatsappNumber}?text=Halo%20Admin%20RAF%20NET`;
+    const whatsappLink = `https://wa.me/${whatsappNumber}?text=Halo%20Admin%20${encodeURIComponent(branding.company_name)}`;
+    
+    const showPoweredBy = branding.show_powered_by === 'true';
     
     return (
         <footer className="py-10 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                {/* About RAF NET Section */}
+                {/* About Company Section */}
                 <div className="mb-8 text-center">
                     <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-sky-50 dark:bg-sky-500/10 mb-4">
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white">
-                            <Icons.Camera />
+                            <span className="text-sm font-bold">{branding.logo_text}</span>
                         </div>
-                        <span className="font-bold text-sky-600 dark:text-sky-400">RAF NET</span>
+                        <span className="font-bold text-sky-600 dark:text-sky-400">{branding.company_name}</span>
                     </div>
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
-                        Penyedia Internet & Jasa Pasang CCTV Bojonegoro
+                        {branding.copyright_text}
                     </h3>
                     <p className="text-sm text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mb-4">
-                        RAF NET melayani pemasangan WiFi dan CCTV di wilayah Bojonegoro. 
-                        Pantau CCTV publik secara gratis melalui website ini.
+                        {branding.company_description}
                     </p>
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20">
-                        <svg className="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/>
-                            <circle cx="12" cy="11" r="3"/>
-                        </svg>
-                        <span className="text-sm text-emerald-700 dark:text-emerald-400">
-                            Area layanan: <strong>Dander</strong> & <strong>Tanjungharjo</strong>
-                        </span>
-                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
@@ -3116,14 +3110,19 @@ function Footer({ cameraCount, areaCount, saweriaEnabled, saweriaLink }) {
                 {/* SEO Keywords Section */}
                 <div className="text-center mb-4">
                     <p className="text-[10px] text-gray-400 dark:text-gray-600">
-                        Pasang WiFi Bojonegoro • Jasa CCTV Bojonegoro • Internet Dander • Internet Tanjungharjo • CCTV Online Bojonegoro • RAF NET
+                        {branding.meta_keywords}
                     </p>
                 </div>
                 
                 <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
                     <p className="text-center text-gray-400 dark:text-gray-500 text-xs">
-                        © {new Date().getFullYear()} RAF NET • Penyedia Internet & CCTV Bojonegoro
+                        © {new Date().getFullYear()} {branding.company_name} • {branding.copyright_text}
                     </p>
+                    {showPoweredBy && (
+                        <p className="text-center text-gray-400 dark:text-gray-600 text-[10px] mt-1">
+                            Powered by RAF NET CCTV System
+                        </p>
+                    )}
                 </div>
             </div>
         </footer>
@@ -3457,6 +3456,7 @@ function StatsBar({ cameras, areas, onCameraClick }) {
 // MAIN LANDING PAGE
 // ============================================
 export default function LandingPage() {
+    const { branding } = useBranding();
     const [cameras, setCameras] = useState([]);
     const [areas, setAreas] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -3582,6 +3582,13 @@ export default function LandingPage() {
         };
         fetchData();
     }, [addToast]);
+    
+    // Update meta tags when branding changes
+    useEffect(() => {
+        if (branding) {
+            updateMetaTags(branding);
+        }
+    }, [branding]);
 
     const handleAddMulti = useCallback((camera) => {
         setMultiCameras(prev => {
@@ -3649,7 +3656,7 @@ export default function LandingPage() {
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
-            <Navbar cameraCount={cameras.length} />
+            <Navbar cameraCount={cameras.length} branding={branding} />
             
             {/* Hero Section - SEO optimized with Indonesian content */}
             <header className="relative overflow-hidden bg-gradient-to-br from-sky-500/10 via-transparent to-purple-500/10 dark:from-sky-500/5 dark:to-purple-500/5">
@@ -3662,11 +3669,13 @@ export default function LandingPage() {
                 )}
                 
                 <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 text-center">
-                    {/* RAF NET Badge */}
-                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 text-xs font-semibold mb-3 shadow-sm">
-                        <div className="w-5 h-5 rounded bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white text-[10px] font-bold">R</div>
-                        <span>Powered by RAF NET</span>
-                    </div>
+                    {/* Company Badge */}
+                    {branding.show_powered_by === 'true' && (
+                        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 text-xs font-semibold mb-3 shadow-sm">
+                            <div className="w-5 h-5 rounded bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white text-[10px] font-bold">{branding.logo_text}</div>
+                            <span>Powered by {branding.company_name}</span>
+                        </div>
+                    )}
                     
                     <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold mb-4 shadow-sm">
                         <span className="relative flex h-2 w-2">
@@ -3676,14 +3685,13 @@ export default function LandingPage() {
                         LIVE STREAMING 24 JAM
                     </div>
                     <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-4">
-                        CCTV <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-500 to-blue-600">Bojonegoro</span> Online
+                        {branding.hero_title}
                     </h1>
                     <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mb-3 text-sm sm:text-base">
-                        Pantau keamanan wilayah Bojonegoro secara real-time dengan sistem CCTV <strong className="text-sky-600 dark:text-sky-400">RAF NET</strong>. 
-                        Akses gratis 24 jam untuk memantau berbagai lokasi di Bojonegoro, Jawa Timur.
+                        {branding.hero_subtitle}
                     </p>
                     <p className="text-gray-500 dark:text-gray-500 max-w-xl mx-auto mb-6 text-xs">
-                        Layanan pemantauan CCTV publik oleh RAF NET untuk keamanan dan kenyamanan warga Bojonegoro
+                        {branding.footer_text}
                     </p>
                     
                     {/* Area Coverage Info */}
@@ -3845,6 +3853,7 @@ export default function LandingPage() {
                 areaCount={areas.length}
                 saweriaEnabled={saweriaEnabled}
                 saweriaLink={saweriaLink}
+                branding={branding}
             />
 
             <MultiViewButton 
