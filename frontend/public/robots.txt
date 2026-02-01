@@ -3,4 +3,5 @@ Allow: /
 Disallow: /admin/
 Disallow: /api/
 
-Sitemap: https://cctv.raf.my.id/sitemap.xml
+# Sitemap location (update with your domain after deployment)
+# Sitemap: https://your-domain.com/sitemap.xml

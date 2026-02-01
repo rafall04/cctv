@@ -56,15 +56,25 @@ const parseAllowedOrigins = () => {
   }
   
   // Fallback defaults if nothing configured
-  return origins.length > 0 ? origins : [
-    'https://sicamdes.semarnet.id',
-    'http://sicamdes.semarnet.id',
-    'https://api-sicamdes.semarnet.id',
-    'http://api-sicamdes.semarnet.id',
-    'http://172.17.11.12',
-    'http://localhost:5173',
-    'http://localhost:3001',
-  ];
+  // CRITICAL: These should only be used in development
+  // Production MUST set environment variables!
+  if (origins.length > 0) {
+    return origins;
+  }
+  
+  // Development-only fallback
+  if (process.env.NODE_ENV === 'development') {
+    return [
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:8080',
+    ];
+  }
+  
+  // Production without config - log warning
+  console.warn('⚠️  WARNING: No ALLOWED_ORIGINS configured! Set FRONTEND_DOMAIN, SERVER_IP in .env');
+  return [];
 };
 
 export const config = {
@@ -105,9 +115,9 @@ export const config = {
   // Security Configuration
   security: {
     // Domain Configuration
-    backendDomain: process.env.BACKEND_DOMAIN || 'api-cctv.raf.my.id',
-    frontendDomain: process.env.FRONTEND_DOMAIN || 'cctv.raf.my.id',
-    serverIp: process.env.SERVER_IP || '172.17.11.12',
+    backendDomain: process.env.BACKEND_DOMAIN || '',
+    frontendDomain: process.env.FRONTEND_DOMAIN || '',
+    serverIp: process.env.SERVER_IP || '',
     
     // API Key Validation
     apiKeyValidationEnabled: process.env.API_KEY_VALIDATION_ENABLED !== 'false',

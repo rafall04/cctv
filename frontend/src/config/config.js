@@ -7,7 +7,7 @@
  * 
  * CRITICAL: All API URLs must be configured in .env file
  * - Development: VITE_API_URL=http://localhost:3001
- * - Production: VITE_API_URL=https://api-sicamdes.semarnet.id
+ * - Production: VITE_API_URL=https://api.your-domain.com
  */
 
 /**
@@ -22,7 +22,7 @@ export const getApiUrl = () => {
         console.error('❌ VITE_API_URL not configured in .env file!');
         console.error('Please create frontend/.env file with:');
         console.error('  VITE_API_URL=http://localhost:3001  (development)');
-        console.error('  VITE_API_URL=https://api-sicamdes.semarnet.id  (production)');
+        console.error('  VITE_API_URL=https://api.your-domain.com  (production)');
         throw new Error('API URL not configured. Please set VITE_API_URL in .env file.');
     }
     

@@ -14,7 +14,7 @@ const getApiBaseUrl = () => {
  * This ensures ALL viewers (frontend, VLC, direct URL) are tracked
  * 
  * Format: /hls/{uuid}/index.m3u8
- * Example: https://api-cctv.raf.my.id/hls/04bd5387-9db4-4cf0-9f8d-7fb42cc76263/index.m3u8
+ * Example: https://api.your-domain.com/hls/04bd5387-9db4-4cf0-9f8d-7fb42cc76263/index.m3u8
  */
 const convertToProxyHlsUrl = (hlsUrl) => {
     if (!hlsUrl) return hlsUrl;
