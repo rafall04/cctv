@@ -629,6 +629,15 @@ class RecordingService {
 
                     // Check each file
                     files.forEach(filename => {
+                        // CRITICAL: Skip files that have failed re-mux 3+ times
+                        const failKey = `${cameraId}:${filename}`;
+                        const failInfo = failedRemuxFiles.get(failKey);
+                        
+                        if (failInfo && failInfo.attempts >= 3) {
+                            // Skip this file permanently
+                            return;
+                        }
+                        
                         // Check if already in database
                         const existing = queryOne(
                             'SELECT id FROM recording_segments WHERE camera_id = ? AND filename = ?',
