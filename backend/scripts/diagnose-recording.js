@@ -2,15 +2,37 @@
 
 /**
  * Diagnostic script untuk recording issue
- * Jalankan: node backend/scripts/diagnose-recording.js
+ * Jalankan dari root project: node backend/scripts/diagnose-recording.js
+ * Atau dari backend: node scripts/diagnose-recording.js
  */
 
 import Database from 'better-sqlite3';
 import { existsSync, readdirSync, statSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
-const db = new Database('./backend/data/cctv.db');
-const RECORDINGS_BASE_PATH = './recordings';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Detect if running from backend/ or root
+const isInBackend = __dirname.includes('/backend/scripts');
+const rootPath = isInBackend ? join(__dirname, '..', '..') : __dirname;
+const dbPath = join(rootPath, 'backend', 'data', 'cctv.db');
+const recordingsPath = join(rootPath, 'recordings');
+
+console.log('Working directory:', process.cwd());
+console.log('Root path:', rootPath);
+console.log('DB path:', dbPath);
+console.log('Recordings path:', recordingsPath);
+console.log('');
+
+if (!existsSync(dbPath)) {
+    console.error('❌ Database not found at:', dbPath);
+    console.error('Please run this script from project root or backend directory');
+    process.exit(1);
+}
+
+const db = new Database(dbPath);
 
 console.log('='.repeat(80));
 console.log('DIAGNOSTIC: Recording System');
@@ -65,11 +87,11 @@ cameras.forEach(cam => {
 // 3. Check filesystem
 console.log('3. FILESYSTEM CHECK:');
 console.log('-'.repeat(80));
-if (existsSync(RECORDINGS_BASE_PATH)) {
-    const dirs = readdirSync(RECORDINGS_BASE_PATH);
+if (existsSync(recordingsPath)) {
+    const dirs = readdirSync(recordingsPath);
     
     dirs.forEach(dir => {
-        const dirPath = join(RECORDINGS_BASE_PATH, dir);
+        const dirPath = join(recordingsPath, dir);
         if (statSync(dirPath).isDirectory()) {
             const files = readdirSync(dirPath).filter(f => f.endsWith('.mp4') && !f.includes('.temp') && !f.includes('.remux'));
             
@@ -90,20 +112,21 @@ if (existsSync(RECORDINGS_BASE_PATH)) {
     });
 } else {
     console.log('  ⚠️ Recordings directory not found!');
+    console.log(`     Expected at: ${recordingsPath}`);
 }
 
 // 4. Check for orphaned files (in filesystem but not in DB)
 console.log('4. ORPHANED FILES CHECK:');
 console.log('-'.repeat(80));
-if (existsSync(RECORDINGS_BASE_PATH)) {
-    const dirs = readdirSync(RECORDINGS_BASE_PATH);
+if (existsSync(recordingsPath)) {
+    const dirs = readdirSync(recordingsPath);
     
     dirs.forEach(dir => {
         const match = dir.match(/camera(\d+)/);
         if (!match) return;
         
         const cameraId = parseInt(match[1]);
-        const dirPath = join(RECORDINGS_BASE_PATH, dir);
+        const dirPath = join(recordingsPath, dir);
         
         if (statSync(dirPath).isDirectory()) {
             const files = readdirSync(dirPath).filter(f => f.endsWith('.mp4') && !f.includes('.temp') && !f.includes('.remux'));
