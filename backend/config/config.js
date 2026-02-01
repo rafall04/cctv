@@ -23,13 +23,13 @@ const buildPublicUrl = (path, defaultPath) => {
 // Parse allowed origins from environment
 const parseAllowedOrigins = () => {
   const defaultOrigins = [
-    'https://cctv.raf.my.id',
-    'http://cctv.raf.my.id',
-    'http://172.17.11.12:800',      // IP access with port
-    'http://172.17.11.12',           // IP access without port (fallback)
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'http://localhost:8080'
+    'https://sicamdes.semarnet.id',
+    'http://sicamdes.semarnet.id',
+    'https://api-sicamdes.semarnet.id',
+    'http://api-sicamdes.semarnet.id',
+    'http://172.17.11.12',           // IP access without port
+    'http://localhost:5173',         // Vite dev server
+    'http://localhost:3001',         // Backend dev
   ];
   
   if (process.env.ALLOWED_ORIGINS) {
