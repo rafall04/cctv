@@ -709,7 +709,7 @@ export default function ViewerAnalytics() {
             <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
                 <div>
                     <p className="text-sm font-semibold text-sky-500 mb-1">Viewer Analytics</p>
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Statistik Penonton</h1>
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Statistik Penonton</h1>
                     <p className="text-gray-500 dark:text-gray-400 mt-1">
                         Analisis pengunjung dan aktivitas streaming • Klik bar chart untuk detail
                     </p>
