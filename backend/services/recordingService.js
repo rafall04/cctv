@@ -981,20 +981,60 @@ class RecordingService {
     }
 
     /**
-     * Auto-start recordings on service init
+     * Auto-start recordings on service init with retry logic
      */
     async autoStartRecordings() {
         try {
             const cameras = query('SELECT id FROM cameras WHERE enable_recording = 1 AND enabled = 1');
             
+            console.log(`[Recording] Found ${cameras.length} cameras with recording enabled`);
+            
+            if (cameras.length === 0) {
+                console.log('[Recording] No cameras configured for recording');
+                return;
+            }
+            
+            let successCount = 0;
+            let failCount = 0;
+            
             for (const camera of cameras) {
-                console.log(`Auto-starting recording for camera ${camera.id}...`);
-                await this.startRecording(camera.id);
-                // Stagger starts
+                let retries = 3;
+                let success = false;
+                
+                while (retries > 0 && !success) {
+                    const attemptNum = 4 - retries;
+                    console.log(`[Recording] Starting camera ${camera.id} (attempt ${attemptNum}/3)...`);
+                    
+                    const result = await this.startRecording(camera.id);
+                    
+                    if (result.success) {
+                        console.log(`[Recording] ✓ Camera ${camera.id} recording started successfully`);
+                        successCount++;
+                        success = true;
+                    } else {
+                        console.error(`[Recording] ✗ Camera ${camera.id} failed: ${result.message}`);
+                        retries--;
+                        
+                        if (retries > 0) {
+                            console.log(`[Recording] Retrying camera ${camera.id} in 5 seconds...`);
+                            await new Promise(resolve => setTimeout(resolve, 5000));
+                        }
+                    }
+                }
+                
+                if (!success) {
+                    console.error(`[Recording] ✗ Camera ${camera.id} failed after 3 attempts - skipping`);
+                    failCount++;
+                }
+                
+                // Stagger starts between cameras
                 await new Promise(resolve => setTimeout(resolve, 2000));
             }
+            
+            console.log(`[Recording] Auto-start complete: ${successCount} succeeded, ${failCount} failed`);
+            
         } catch (error) {
-            console.error('Error auto-starting recordings:', error);
+            console.error('[Recording] Error in auto-starting recordings:', error);
         }
     }
 }

@@ -332,8 +332,12 @@ const start = async () => {
         viewerSessionService.startCleanup();
         console.log('[ViewerSession] Session cleanup service started (15s interval)');
         
+        // Wait for MediaMTX paths to be fully ready before starting recordings
+        console.log('[Recording] Waiting for MediaMTX paths to be ready...');
+        await new Promise(resolve => setTimeout(resolve, 10000)); // 10 seconds
+        
         // Auto-start recordings untuk cameras yang enable_recording = 1
-        console.log('[Recording] Auto-starting recordings...');
+        console.log('[Recording] Auto-starting recordings with retry logic...');
         await recordingService.autoStartRecordings();
         console.log('[Recording] Recording service initialized');
     } catch (err) {
