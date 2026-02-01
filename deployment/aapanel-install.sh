@@ -67,16 +67,46 @@ check_dependencies() {
         print_info "Installing PM2..."
         npm install -g pm2
         
-        # Reload PATH to make pm2 available immediately
-        export PATH=$PATH:/usr/local/bin
+        # Find where npm installs global packages
+        NPM_GLOBAL_PATH=$(npm root -g)
+        NPM_BIN_PATH=$(dirname "$NPM_GLOBAL_PATH")/bin
+        
+        # Add to PATH
+        export PATH=$PATH:$NPM_BIN_PATH:/usr/local/bin:/usr/bin
+        
+        # Also try common PM2 locations
+        if [ -f "$NPM_BIN_PATH/pm2" ]; then
+            export PATH=$NPM_BIN_PATH:$PATH
+        elif [ -f "/usr/local/bin/pm2" ]; then
+            export PATH=/usr/local/bin:$PATH
+        elif [ -f "/usr/bin/pm2" ]; then
+            export PATH=/usr/bin:$PATH
+        fi
+        
+        # Reload shell hash table
         hash -r
         
         # Verify installation
         if ! command -v pm2 &> /dev/null; then
-            print_error "PM2 installation failed. Please run: export PATH=\$PATH:/usr/local/bin"
-            exit 1
+            print_error "PM2 installation failed."
+            print_info "Trying to locate PM2..."
+            
+            # Try to find pm2 manually
+            PM2_PATH=$(find /usr -name pm2 -type f 2>/dev/null | grep -E 'bin/pm2$' | head -n 1)
+            if [ -n "$PM2_PATH" ]; then
+                PM2_DIR=$(dirname "$PM2_PATH")
+                export PATH=$PM2_DIR:$PATH
+                hash -r
+                print_success "Found PM2 at: $PM2_PATH"
+            else
+                print_error "Cannot find PM2. Please run manually:"
+                echo "  export PATH=\$PATH:\$(npm root -g)/../bin"
+                echo "  hash -r"
+                exit 1
+            fi
         fi
     fi
+    
     PM2_VERSION=$(pm2 --version)
     print_success "PM2 $PM2_VERSION"
     
