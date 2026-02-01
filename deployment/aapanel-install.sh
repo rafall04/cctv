@@ -168,25 +168,38 @@ check_dependencies() {
         print_success "Apache installed"
         WEB_SERVER="apache"
         
-        # Check required Apache modules
+        # For aaPanel Apache, modules are usually compiled-in or managed via aaPanel UI
+        # We'll verify modules are available but won't try to enable them
         print_info "Checking Apache modules..."
-        MISSING_MODULES=()
         
-        for module in proxy proxy_http proxy_wstunnel headers rewrite; do
-            if ! apache2ctl -M 2>/dev/null | grep -q "${module}_module"; then
+        APACHE_CMD="apache2"
+        if ! command -v apache2 &> /dev/null; then
+            APACHE_CMD="httpd"
+        fi
+        
+        # Check if modules are loaded
+        MISSING_MODULES=()
+        for module in proxy proxy_http headers; do
+            if ! $APACHE_CMD -M 2>/dev/null | grep -q "${module}_module"; then
                 MISSING_MODULES+=($module)
             fi
         done
         
         if [ ${#MISSING_MODULES[@]} -gt 0 ]; then
-            print_info "Enabling required Apache modules: ${MISSING_MODULES[*]}"
+            print_info "Some modules may need to be enabled: ${MISSING_MODULES[*]}"
+            print_info "aaPanel manages Apache modules via UI or config files"
+            echo ""
+            print_info "To enable modules in aaPanel Apache:"
+            echo "  1. Edit: /www/server/apache/conf/httpd.conf"
+            echo "  2. Uncomment (remove #) from these lines:"
             for module in "${MISSING_MODULES[@]}"; do
-                a2enmod $module
+                echo "     LoadModule ${module}_module modules/mod_${module}.so"
             done
-            systemctl restart apache2
-            print_success "Apache modules enabled"
+            echo "  3. Restart Apache: systemctl restart apache2"
+            echo ""
+            print_info "Or modules may already be compiled-in (check with: apache2 -M)"
         else
-            print_success "All required Apache modules enabled"
+            print_success "Required Apache modules are loaded"
         fi
     else
         print_error "No web server found!"
