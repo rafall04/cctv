@@ -1,260 +1,438 @@
 # RAF NET Secure CCTV Hub
 
-A secure, high-performance video streaming system that isolates private IP cameras from public exposure while providing public web access to camera streams via MediaMTX, Fastify, and React.
+A secure, high-performance video streaming system that isolates private IP cameras from public exposure while providing public web access to camera streams.
 
-## 🎯 Features
+## 🎯 Key Features
 
-- **Public Camera Viewing**: Anyone can view all CCTV streams on the landing page without authentication
-- **Admin Panel**: Secure JWT-based authentication for camera management (add/edit/delete cameras, configure RTSP URLs)
-- **Private IP Protection**: Camera RTSP URLs never exposed to client browsers
-- **Low Latency Streaming**: WebRTC for real-time viewing with HLS fallback
-- **Modern UI**: Dark mode, glassmorphism effects, and responsive design
-- **Auto-Reconnect**: Intelligent stream reconnection on network interruptions
+### Public Features
+- **Live Camera Viewing** - Real-time HLS streaming without authentication
+- **Interactive Map** - Leaflet map with camera markers
+- **Feedback System** - Public feedback submission
+- **Responsive Design** - Works on all devices (mobile, tablet, desktop)
+- **Dark Mode** - Eye-friendly dark theme
+
+### Admin Features
+- **Camera Management** - CRUD operations for cameras
+- **Area Management** - Organize cameras by location (RT/RW/Kelurahan/Kecamatan)
+- **User Management** - Multi-user admin access with roles
+- **Viewer Analytics** - Real-time viewer tracking
+- **Recording Management** - FFmpeg-based recording with playback
+- **Feedback Management** - Review and respond to feedback
+- **Audit Logging** - Track all admin actions
+- **Security** - JWT auth, brute force protection, CSRF protection
+
+### Technical Features
+- **Zero CPU Recording** - FFmpeg stream copy (no re-encoding)
+- **Tunnel-Optimized** - Handles unstable connections (10s timeout, auto-restart)
+- **Web-Compatible MP4** - Optimized for HTTP Range requests and seeking
+- **Device-Adaptive** - Optimized for low-end devices ("HP kentang")
+- **Auto-Reconnect** - Intelligent stream recovery
+- **Health Monitoring** - Auto-restart frozen streams
 
 ## 🏗️ Architecture
 
 ```
-End User → [Public Landing Page] → MediaMTX (WebRTC/HLS) → Private RTSP Cameras
-Admin → [Login] → [Admin Panel] → Fastify API → SQLite → MediaMTX Management
+Public User → Frontend (React) → Backend (Fastify) → MediaMTX → Private RTSP Cameras
+Admin User → Admin Panel → JWT Auth → API → SQLite Database
+Recording → FFmpeg → MP4 Segments → Playback API → Video Player
 ```
 
-### Components
+### Tech Stack
 
-1. **MediaMTX**: RTSP to WebRTC/HLS transcoding (public streams)
-2. **Fastify Backend**: REST API for camera management (admin-only) and public camera listing
-3. **SQLite Database**: Admin users, camera configurations, audit logs
-4. **React Frontend**: Public landing page + admin panel
+**Backend:**
+- Node.js 20+ with ES modules
+- Fastify 4.28.1 (REST API)
+- SQLite with better-sqlite3 (database)
+- JWT authentication
+- FFmpeg (recording)
+
+**Frontend:**
+- React 18.3.1
+- Vite 5.3.1 (build tool)
+- Tailwind CSS 3.4.4 (styling)
+- HLS.js 1.5.15 (video streaming)
+- Leaflet 1.9.4 (maps)
+
+**Streaming:**
+- MediaMTX v1.9.0 (RTSP to HLS)
+- HLS streaming (HTTP Live Streaming)
+- WebRTC support (optional)
 
 ## 📋 Prerequisites
 
-- **Node.js** 20+ (for backend and frontend)
-- **MediaMTX** v1.x ([Download](https://github.com/bluenviron/mediamtx/releases))
-- **Private Network**: Cameras on isolated VLAN accessible only to MediaMTX host
+- **Ubuntu 20.04** (or compatible Linux)
+- **Node.js 20+**
+- **FFmpeg** (for recording)
+- **Nginx** (reverse proxy)
+- **Domain** (optional, for HTTPS)
+- **Disk Space** (50GB+ recommended for recordings)
 
-## 🚀 Installation
+## 🚀 Quick Start
 
-### 1. Clone Repository
+### Option 1: One-Command Installation (aaPanel)
+
+For Ubuntu 20.04 with aaPanel:
 
 ```bash
-git clone <repository-url>
-cd cctv
+# Download and run installation script
+cd /tmp
+wget https://raw.githubusercontent.com/YOUR_USERNAME/rafnet-cctv/main/deployment/aapanel-install.sh
+chmod +x aapanel-install.sh
+bash aapanel-install.sh
 ```
 
-### 2. Backend Setup
+**What it does:**
+- Installs Node.js 20, PM2, FFmpeg
+- Clones repository
+- Sets up backend (database, .env)
+- Builds frontend
+- Downloads MediaMTX
+- Configures Nginx
+- Starts all services
+
+**Duration:** ~5-10 minutes
+
+See [deployment/AAPANEL_QUICK_SETUP.md](deployment/AAPANEL_QUICK_SETUP.md) for details.
+
+### Option 2: Manual Installation
+
+#### 1. Clone Repository
+
+```bash
+git clone https://github.com/YOUR_USERNAME/rafnet-cctv.git
+cd rafnet-cctv
+```
+
+#### 2. Backend Setup
 
 ```bash
 cd backend
 npm install
 cp .env.example .env
-# Edit .env with your configuration
-npm run setup-db  # Initialize SQLite database
-npm run dev       # Start development server
+nano .env  # Edit configuration
+npm run setup-db
 ```
 
-### 3. Frontend Setup
+#### 3. Frontend Setup
 
 ```bash
 cd frontend
 npm install
-cp .env.example .env
-# Edit .env with backend API URL
-npm run dev       # Start development server
+npm run build
 ```
 
-### 4. MediaMTX Setup
-
-Download MediaMTX binary and place in `mediamtx/` directory:
+#### 4. MediaMTX Setup
 
 ```bash
 cd mediamtx
-# Copy mediamtx binary here
-cp mediamtx.yml.example mediamtx.yml
-# Edit mediamtx.yml with your camera RTSP URLs
-./mediamtx mediamtx.yml
+wget https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_linux_amd64.tar.gz
+tar -xzf mediamtx_v1.9.0_linux_amd64.tar.gz
+chmod +x mediamtx
+```
+
+#### 5. Start Services
+
+```bash
+# Install PM2
+npm install -g pm2
+
+# Start services
+pm2 start deployment/ecosystem.config.cjs
+pm2 save
+pm2 startup
+```
+
+#### 6. Configure Nginx
+
+```bash
+cp deployment/nginx.conf /etc/nginx/sites-available/rafnet-cctv
+ln -s /etc/nginx/sites-available/rafnet-cctv /etc/nginx/sites-enabled/
+nginx -t && systemctl reload nginx
 ```
 
 ## ⚙️ Configuration
 
-### Backend Environment Variables
+### Backend (.env)
 
 ```env
+NODE_ENV=production
 PORT=3000
 HOST=0.0.0.0
-JWT_SECRET=your-secret-key-change-this
-JWT_EXPIRATION=24h
-MEDIAMTX_API_URL=http://localhost:9997
+
+# Database
 DATABASE_PATH=./data/cctv.db
+
+# JWT
+JWT_SECRET=GENERATE_RANDOM_32_CHARS
+JWT_EXPIRES_IN=24h
+
+# CORS
+ALLOWED_ORIGINS=https://cctv.raf.my.id,http://172.17.11.12
+
+# MediaMTX
+MEDIAMTX_API_URL=http://localhost:9997
+MEDIAMTX_HLS_URL=http://localhost:8888
+
+# Security
+CSRF_SECRET=GENERATE_RANDOM_32_CHARS
+
+# Admin
+DEFAULT_ADMIN_USERNAME=admin
+DEFAULT_ADMIN_PASSWORD=CHANGE_THIS_NOW
 ```
 
-### Frontend Environment Variables
+### Frontend (.env)
 
 ```env
-VITE_API_URL=http://localhost:3000
+VITE_API_BASE_URL=https://api-cctv.raf.my.id
+VITE_HLS_BASE_URL=https://api-cctv.raf.my.id/hls
 ```
 
-### MediaMTX Configuration
+**Note:** No port needed, Nginx forwards to port 800.
 
-Edit `mediamtx/mediamtx.yml` to add your cameras:
+### MediaMTX (mediamtx.yml)
 
 ```yaml
+logLevel: info
+api: yes
+apiAddress: :9997
+
+hls: yes
+hlsAddress: :8888
+hlsAlwaysRemux: yes
+hlsAllowOrigin: '*'
+hlsDirectory: /dev/shm/mediamtx-live  # RAM disk for performance
+
+webrtc: yes
+webrtcAddress: :8889
+webrtcAllowOrigin: '*'
+
 paths:
-  camera1:
-    source: rtsp://192.168.1.100:554/stream
-  camera2:
-    source: rtsp://192.168.1.101:554/stream
+  all_others:
+    source: publisher
+    sourceOnDemand: yes
 ```
 
 ## 🔐 Security
 
+### Default Credentials
+
+- **Username:** `admin`
+- **Password:** `admin123`
+- **⚠️ CHANGE IMMEDIATELY IN PRODUCTION!**
+
+### Security Features
+
+- JWT-based authentication (24h expiration)
+- Password hashing with bcrypt
+- Brute force protection (max 5 attempts, 15min lockout)
+- CSRF protection
+- Rate limiting
+- Input sanitization
+- Security headers (helmet)
+- Audit logging
+- Session management
+
 ### Camera IP Isolation
 
-- Camera RTSP URLs are stored **server-side only** in SQLite
-- Frontend **never** receives RTSP URLs
-- MediaMTX ingests from private network, exposes only WebRTC/HLS
+- RTSP URLs stored server-side only
+- Frontend never receives RTSP URLs
+- MediaMTX ingests from private network
+- Only HLS streams exposed publicly
 
-### Admin Access
-
-- Admin panel requires JWT authentication
-- Passwords hashed with bcrypt
-- Audit logging for all admin actions
-
-### Public Access
-
-- Camera streams are publicly accessible (no authentication)
-- Only **enabled** cameras appear on public landing page
-- Admins can disable cameras to hide from public view
-
-## 📱 Usage
-
-### Public Users
-
-1. Visit `http://localhost:5173` (or your domain)
-2. View all enabled cameras on the landing page
-3. Click any camera to view stream
-
-### Administrators
-
-1. Visit `http://localhost:5173/admin/login`
-2. Login with admin credentials
-3. Manage cameras (add/edit/delete)
-4. Enable/disable camera visibility
-
-## 🛠️ Development
-
-### Project Structure
+## 📁 Project Structure
 
 ```
-cctv/
+rafnet-cctv/
 ├── backend/              # Fastify API server
-│   ├── config/          # Configuration files
-│   ├── controllers/     # Route controllers
-│   ├── database/        # SQLite setup and queries
-│   ├── middleware/      # Auth and validation middleware
-│   ├── routes/          # API routes
-│   ├── services/        # Business logic (MediaMTX integration)
-│   └── server.js        # Entry point
-├── frontend/            # React SPA
+│   ├── controllers/      # Route handlers
+│   ├── services/         # Business logic (MediaMTX, recording)
+│   ├── middleware/       # Auth, validation, security
+│   ├── routes/           # API routes
+│   ├── database/         # SQLite setup & migrations
+│   └── data/             # cctv.db file
+├── frontend/             # React SPA
 │   ├── src/
-│   │   ├── components/  # Reusable components
-│   │   ├── pages/       # Page components
-│   │   ├── services/    # API clients
-│   │   └── App.jsx      # Main app component
-│   └── vite.config.js
-├── mediamtx/            # MediaMTX configuration
-│   └── mediamtx.yml     # Stream configuration
+│   │   ├── components/   # Reusable components
+│   │   ├── pages/        # Page components
+│   │   ├── services/     # API clients
+│   │   └── utils/        # Video player utilities
+│   └── dist/             # Build output
+├── mediamtx/             # Streaming server
+│   ├── mediamtx          # Binary
+│   └── mediamtx.yml      # Configuration
+├── deployment/           # Deployment configs
+│   ├── AAPANEL_QUICK_SETUP.md  # Deployment guide
+│   ├── aapanel-install.sh      # Installation script
+│   ├── update.sh               # Update script
+│   ├── nginx.conf              # Nginx config
+│   └── ecosystem.config.cjs    # PM2 config
+├── recordings/           # Recording storage (auto-created)
+│   ├── camera1/
+│   ├── camera2/
+│   └── ...
 └── README.md
 ```
 
-### API Endpoints
+## 📺 Recording & Playback
 
-#### Public Endpoints (No Auth)
+### Recording Features
 
-- `GET /api/cameras/active` - List all enabled cameras
-- `GET /api/stream/:cameraId` - Get stream URLs for a camera
+- **FFmpeg stream copy** - 0% CPU overhead (no re-encoding)
+- **10-minute segments** - MP4 format with web optimization
+- **Auto-start** - Recordings start on server boot
+- **Health monitoring** - Auto-restart frozen streams
+- **Tunnel-optimized** - Handles unstable connections
+- **Age-based cleanup** - Retention period with 10% buffer
 
-#### Admin Endpoints (JWT Required)
+### Storage
 
-- `POST /api/auth/login` - Admin login
-- `POST /api/auth/logout` - Admin logout
-- `GET /api/cameras` - List all cameras (including disabled)
-- `POST /api/cameras` - Add new camera
+- **Path:** `/var/www/rafnet-cctv/recordings/camera{id}/`
+- **Format:** `YYYYMMDD_HHMMSS.mp4`
+- **Bitrate:** ~1.5 Mbps (typical H.264)
+- **10 min segment:** ~110 MB
+- **24 hours:** ~15 GB per camera
+- **7 days:** ~105 GB per camera
+
+### Playback
+
+- **HTTP Range requests** - Smooth seeking
+- **Speed control** - 0.5x to 2x
+- **Timeline navigation** - Precise seeking
+- **Download support** - Full segment download
+
+## 🔄 Management
+
+### Update Application
+
+```bash
+cd /var/www/rafnet-cctv
+./deployment/update.sh
+```
+
+### View Logs
+
+```bash
+pm2 logs rafnet-cctv-backend
+pm2 logs rafnet-cctv-mediamtx
+tail -f /var/log/nginx/rafnet-cctv-backend.error.log
+```
+
+### Restart Services
+
+```bash
+pm2 restart rafnet-cctv-backend
+pm2 restart rafnet-cctv-mediamtx
+systemctl reload nginx
+```
+
+### Backup Database
+
+```bash
+cp /var/www/rafnet-cctv/backend/data/cctv.db /backup/cctv_$(date +%Y%m%d).db
+```
+
+## 📊 API Endpoints
+
+### Public (No Auth)
+
+- `GET /health` - Health check
+- `GET /api/cameras/active` - List enabled cameras
+- `GET /api/stream/:cameraId` - Get stream URLs
+- `POST /api/feedback` - Submit feedback
+- `GET /hls/:cameraPath/*` - HLS streaming
+
+### Admin (JWT Required)
+
+- `POST /api/auth/login` - Login
+- `POST /api/auth/logout` - Logout
+- `GET /api/cameras` - List all cameras
+- `POST /api/cameras` - Create camera
 - `PUT /api/cameras/:id` - Update camera
 - `DELETE /api/cameras/:id` - Delete camera
+- `GET /api/admin/dashboard` - Dashboard stats
+- `GET /api/users` - List users
+- `GET /api/playback/recordings/:cameraId` - List recordings
 
-## 🧪 Testing
+## 🐛 Troubleshooting
+
+### Backend not starting
 
 ```bash
-# Backend tests
-cd backend
-npm test
-
-# Frontend tests
-cd frontend
-npm test
+pm2 logs rafnet-cctv-backend --lines 100
+# Check for errors in .env or database
 ```
 
-## 📦 Production Deployment
-
-### Build Frontend
+### Frontend blank page
 
 ```bash
-cd frontend
+cd /var/www/rafnet-cctv/frontend
 npm run build
-# Serve dist/ folder with nginx or serve via Fastify static
+# Check dist/ folder exists
 ```
 
-### Run Backend
+### CORS errors
 
 ```bash
-cd backend
-npm start
+# Check backend .env
+cat /var/www/rafnet-cctv/backend/.env | grep ALLOWED_ORIGINS
+# Should include: https://cctv.raf.my.id
+pm2 restart rafnet-cctv-backend
 ```
 
-### MediaMTX
+### Stream not loading
 
 ```bash
-cd mediamtx
-./mediamtx mediamtx.yml
+# Check MediaMTX
+curl http://localhost:9997/v3/paths/list
+pm2 logs rafnet-cctv-mediamtx
+
+# Check HLS proxy
+curl http://localhost:8888/camera1/index.m3u8
 ```
 
-### Reverse Proxy (Nginx)
+### Recording not working
 
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
+```bash
+# Check FFmpeg installed
+ffmpeg -version
 
-    # Frontend
-    location / {
-        root /path/to/frontend/dist;
-        try_files $uri $uri/ /index.html;
-    }
+# Check recordings directory
+ls -la /var/www/rafnet-cctv/recordings/
 
-    # Backend API
-    location /api {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
-
-    # MediaMTX WebRTC
-    location /camera {
-        proxy_pass http://localhost:8889;
-    }
-}
+# Check recording status
+sqlite3 /var/www/rafnet-cctv/backend/data/cctv.db "SELECT * FROM cameras WHERE enable_recording = 1"
 ```
 
-## 📄 License
+## 📚 Documentation
 
-MIT License
+- **Deployment:** [deployment/AAPANEL_QUICK_SETUP.md](deployment/AAPANEL_QUICK_SETUP.md)
+- **Security:** [SECURITY.md](SECURITY.md)
+- **Steering Rules:** [.kiro/steering/](. kiro/steering/)
 
 ## 🤝 Contributing
 
-Contributions welcome! Please open an issue or submit a pull request.
+Contributions welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## 📄 License
+
+MIT License - See LICENSE file for details
 
 ## 📞 Support
 
-For issues and questions, please open a GitHub issue.
+- **Issues:** Open a GitHub issue
+- **Documentation:** See docs in `deployment/` folder
+- **Security:** See SECURITY.md for security policy
+
+---
+
+**Made with ❤️ by RAF NET**
+
+**Version:** 1.0.0  
+**Last Updated:** 2025-02-01
