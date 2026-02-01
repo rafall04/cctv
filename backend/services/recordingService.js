@@ -16,6 +16,9 @@ const activeRecordings = new Map();
 // Stream health monitoring
 const streamHealthMap = new Map();
 
+// Failed re-mux tracking (prevent infinite loop on corrupt files)
+const failedRemuxFiles = new Map(); // key: "cameraId:filename" -> { attempts, lastAttempt }
+
 /**
  * Recording Service
  * Handles CCTV recording dengan stream copy (no re-encoding)
@@ -32,6 +35,9 @@ class RecordingService {
         
         // Start periodic segment scanner (fallback if FFmpeg output detection fails)
         this.startSegmentScanner();
+        
+        // Start background cleanup for corrupt files (gradual, non-blocking)
+        this.startBackgroundCleanup();
     }
 
     /**
@@ -266,6 +272,16 @@ class RecordingService {
 
         console.log(`[Segment] Detected new segment: camera${cameraId}/${filename}`);
 
+        // CRITICAL: Check if this file has failed re-mux before (prevent infinite loop)
+        const failKey = `${cameraId}:${filename}`;
+        const failInfo = failedRemuxFiles.get(failKey);
+        
+        if (failInfo && failInfo.attempts >= 3) {
+            // Skip file that has failed 3+ times (likely corrupt)
+            console.log(`[Segment] Skipping file (failed ${failInfo.attempts}x): ${filename}`);
+            return;
+        }
+
         // Optimized wait: 3 seconds (reduced from 15s)
         // FFmpeg should have closed file by now with proper segment settings
         setTimeout(async () => {
@@ -342,12 +358,28 @@ class RecordingService {
                     
                     if (!ffprobeOutput || parseFloat(ffprobeOutput) < 1) {
                         console.log(`[Segment] File not ready (duration: ${ffprobeOutput}s), will retry later: ${filename}`);
+                        
+                        // Track failed attempt
+                        const current = failedRemuxFiles.get(failKey) || { attempts: 0, lastAttempt: 0 };
+                        failedRemuxFiles.set(failKey, {
+                            attempts: current.attempts + 1,
+                            lastAttempt: Date.now()
+                        });
+                        
                         return;
                     }
                     
                     console.log(`[Segment] File is complete, duration: ${ffprobeOutput}s`);
                 } catch (error) {
                     console.log(`[Segment] ffprobe check failed, file not ready: ${filename}`);
+                    
+                    // Track failed attempt
+                    const current = failedRemuxFiles.get(failKey) || { attempts: 0, lastAttempt: 0 };
+                    failedRemuxFiles.set(failKey, {
+                        attempts: current.attempts + 1,
+                        lastAttempt: Date.now()
+                    });
+                    
                     return;
                 }
                 
@@ -727,6 +759,115 @@ class RecordingService {
             console.error('Error getting storage usage:', error);
             return { totalSize: 0, segmentCount: 0, totalSizeGB: '0.00' };
         }
+    }
+
+    /**
+     * Background cleanup for corrupt/unregistered files
+     * Runs slowly (1 file per 10 seconds) to avoid CPU spike
+     * This prevents accumulation of corrupt files that cause infinite loop
+     */
+    startBackgroundCleanup() {
+        console.log('[Cleanup] Starting background cleanup service (1 file per 10s)');
+        
+        let cleanupQueue = [];
+        let isProcessing = false;
+        
+        // Build cleanup queue every 5 minutes
+        const buildQueue = () => {
+            try {
+                if (!existsSync(RECORDINGS_BASE_PATH)) return;
+                
+                const cameraDirs = readdirSync(RECORDINGS_BASE_PATH);
+                const unregistered = [];
+                
+                cameraDirs.forEach(cameraDir => {
+                    const fullPath = join(RECORDINGS_BASE_PATH, cameraDir);
+                    if (!statSync(fullPath).isDirectory()) return;
+                    
+                    // Extract camera ID
+                    const cameraIdMatch = cameraDir.match(/camera(\d+)/);
+                    if (!cameraIdMatch) return;
+                    const cameraId = parseInt(cameraIdMatch[1]);
+                    
+                    // Get all MP4 files
+                    const files = readdirSync(fullPath)
+                        .filter(f => /^\d{8}_\d{6}\.mp4$/.test(f));
+                    
+                    files.forEach(filename => {
+                        // Check if in database
+                        const existing = queryOne(
+                            'SELECT id FROM recording_segments WHERE camera_id = ? AND filename = ?',
+                            [cameraId, filename]
+                        );
+                        
+                        if (!existing) {
+                            unregistered.push({
+                                cameraId,
+                                filename,
+                                path: join(fullPath, filename)
+                            });
+                        }
+                    });
+                });
+                
+                if (unregistered.length > 0) {
+                    console.log(`[Cleanup] Found ${unregistered.length} unregistered files, adding to cleanup queue`);
+                    cleanupQueue = unregistered;
+                }
+            } catch (error) {
+                console.error('[Cleanup] Error building queue:', error);
+            }
+        };
+        
+        // Build initial queue after 30 seconds (let system stabilize first)
+        setTimeout(buildQueue, 30000);
+        
+        // Rebuild queue every 5 minutes
+        setInterval(buildQueue, 5 * 60 * 1000);
+        
+        // Process queue: 1 file per 10 seconds
+        setInterval(async () => {
+            if (isProcessing || cleanupQueue.length === 0) return;
+            
+            isProcessing = true;
+            
+            try {
+                const file = cleanupQueue.shift();
+                
+                // Double-check file still exists
+                if (!existsSync(file.path)) {
+                    isProcessing = false;
+                    return;
+                }
+                
+                // Check if file is corrupt with ffprobe (3s timeout)
+                const { execSync } = await import('child_process');
+                try {
+                    execSync(`ffprobe -v error "${file.path}"`, { 
+                        timeout: 3000,
+                        stdio: 'ignore' // Suppress output
+                    });
+                    
+                    // File is valid but unregistered
+                    // Don't delete - let segment scanner handle it
+                    console.log(`[Cleanup] File valid but unregistered, skipping: ${file.filename}`);
+                    
+                } catch (error) {
+                    // File is corrupt (ffprobe failed)
+                    console.log(`[Cleanup] Deleting corrupt file: camera${file.cameraId}/${file.filename}`);
+                    unlinkSync(file.path);
+                    
+                    // Remove from failed tracking (no longer needed)
+                    const failKey = `${file.cameraId}:${file.filename}`;
+                    failedRemuxFiles.delete(failKey);
+                }
+                
+            } catch (error) {
+                console.error('[Cleanup] Error processing file:', error);
+            } finally {
+                isProcessing = false;
+            }
+        }, 10000); // Process 1 file every 10 seconds
     }
 
     /**
