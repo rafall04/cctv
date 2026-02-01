@@ -148,12 +148,18 @@ export async function login(request, reply) {
         );
 
         // Set access token cookie
-        // Use 'none' for cross-domain (cctv.raf.my.id -> api-cctv.raf.my.id)
+        // Detect if request is from IP (HTTP) or domain (HTTPS)
+        const isHttps = request.headers['x-forwarded-proto'] === 'https' || 
+                        request.protocol === 'https' ||
+                        request.headers.host?.includes('api-cctv.raf.my.id');
+        
+        // For HTTPS (domain): use secure + sameSite=none for cross-domain
+        // For HTTP (IP): use non-secure + sameSite=lax
         reply.setCookie('token', accessToken, {
             path: '/',
             httpOnly: true,
-            secure: config.server.env === 'production',
-            sameSite: config.server.env === 'production' ? 'none' : 'lax',
+            secure: isHttps,
+            sameSite: isHttps ? 'none' : 'lax',
             maxAge: 60 * 60, // 1 hour (matches access token expiry)
         });
 
@@ -161,8 +167,8 @@ export async function login(request, reply) {
         reply.setCookie('refreshToken', refreshToken, {
             path: '/api/auth/refresh',
             httpOnly: true,
-            secure: config.server.env === 'production',
-            sameSite: config.server.env === 'production' ? 'none' : 'lax',
+            secure: isHttps,
+            sameSite: isHttps ? 'none' : 'lax',
             maxAge: 7 * 24 * 60 * 60, // 7 days
         });
 
@@ -350,12 +356,16 @@ export async function refreshTokens(request, reply) {
         }, request);
 
         // Set new access token cookie
-        // Use 'none' for cross-domain (cctv.raf.my.id -> api-cctv.raf.my.id)
+        // Detect if request is from IP (HTTP) or domain (HTTPS)
+        const isHttps = request.headers['x-forwarded-proto'] === 'https' || 
+                        request.protocol === 'https' ||
+                        request.headers.host?.includes('api-cctv.raf.my.id');
+        
         reply.setCookie('token', newAccessToken, {
             path: '/',
             httpOnly: true,
-            secure: config.server.env === 'production',
-            sameSite: config.server.env === 'production' ? 'none' : 'lax',
+            secure: isHttps,
+            sameSite: isHttps ? 'none' : 'lax',
             maxAge: 60 * 60, // 1 hour
         });
 
@@ -363,8 +373,8 @@ export async function refreshTokens(request, reply) {
         reply.setCookie('refreshToken', newRefreshToken, {
             path: '/api/auth/refresh',
             httpOnly: true,
-            secure: config.server.env === 'production',
-            sameSite: config.server.env === 'production' ? 'none' : 'lax',
+            secure: isHttps,
+            sameSite: isHttps ? 'none' : 'lax',
             maxAge: 7 * 24 * 60 * 60, // 7 days
         });
 
