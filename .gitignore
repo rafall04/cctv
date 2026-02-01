@@ -43,6 +43,7 @@ frontend/build/
 
 # Kiro IDE
 .kiro/
+.agent/
 
 # OS
 .DS_Store
