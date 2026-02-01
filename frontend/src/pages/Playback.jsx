@@ -4,6 +4,7 @@ import { cameraService } from '../services/cameraService';
 import recordingService from '../services/recordingService';
 import CodecBadge from '../components/CodecBadge';
 import { getCodecWarning, getCodecDescription } from '../utils/codecSupport';
+import { useBranding } from '../contexts/BrandingContext';
 
 // CRITICAL: Maximum safe seek distance (3 minutes = 180 seconds)
 // Seeking beyond this may cause buffering issues due to keyframe intervals
@@ -12,6 +13,7 @@ const MAX_SEEK_DISTANCE = 180;
 function Playback() {
     const [searchParams] = useSearchParams();
     const cameraIdFromUrl = searchParams.get('camera');
+    const { branding } = useBranding();
     
     const [cameras, setCameras] = useState([]);
     const [selectedCamera, setSelectedCamera] = useState(null);
@@ -25,6 +27,8 @@ function Playback() {
     const [errorType, setErrorType] = useState(null);
     const [isSeeking, setIsSeeking] = useState(false);
     const [isBuffering, setIsBuffering] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [snapshotNotification, setSnapshotNotification] = useState(null);
 
     // Error message mapping - konsisten dengan MapView/GridView
     const getErrorInfo = () => {
@@ -101,6 +105,7 @@ function Playback() {
     
     const videoRef = useRef(null);
     const timelineRef = useRef(null);
+    const containerRef = useRef(null);
     const isInitialLoadRef = useRef(true); // Track initial load
     const lastSeekTimeRef = useRef(0); // Track last seek position for smart limiting
     const bufferingTimeoutRef = useRef(null); // Track buffering timeout
@@ -817,6 +822,152 @@ function Playback() {
         return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
     };
 
+    // Fullscreen handling
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            setIsFullscreen(!!document.fullscreenElement);
+        };
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    }, []);
+
+    const toggleFullscreen = async () => {
+        try {
+            if (!document.fullscreenElement) {
+                await containerRef.current?.requestFullscreen?.();
+            } else {
+                await document.exitFullscreen?.();
+            }
+        } catch (err) {
+            console.error('Fullscreen error:', err);
+        }
+    };
+
+    // Snapshot with watermark (client-side Canvas API)
+    const takeSnapshot = async () => {
+        if (!videoRef.current || videoRef.current.paused || videoRef.current.readyState < 2) {
+            setSnapshotNotification({ type: 'error', message: 'Video belum siap untuk snapshot' });
+            setTimeout(() => setSnapshotNotification(null), 3000);
+            return;
+        }
+
+        try {
+            const video = videoRef.current;
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+
+            // Draw video frame
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Add watermark (bottom-right corner)
+            const watermarkHeight = Math.max(40, canvas.height * 0.08);
+            const padding = watermarkHeight * 0.3;
+            const fontSize = watermarkHeight * 0.4;
+            
+            // Semi-transparent background
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.fillRect(
+                canvas.width - (watermarkHeight * 4) - padding,
+                canvas.height - watermarkHeight - padding,
+                watermarkHeight * 4,
+                watermarkHeight
+            );
+
+            // Logo circle
+            const logoSize = watermarkHeight * 0.6;
+            const logoX = canvas.width - (watermarkHeight * 3.5) - padding;
+            const logoY = canvas.height - (watermarkHeight / 2) - padding;
+            
+            ctx.fillStyle = '#0ea5e9';
+            ctx.beginPath();
+            ctx.arc(logoX, logoY, logoSize / 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Logo text
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${logoSize * 0.6}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(branding.logo_text || 'R', logoX, logoY);
+
+            // Company name
+            ctx.font = `bold ${fontSize}px Arial`;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(
+                branding.company_name || 'RAF NET',
+                logoX + logoSize / 2 + padding / 2,
+                logoY - fontSize / 3
+            );
+
+            // Timestamp
+            ctx.font = `${fontSize * 0.7}px Arial`;
+            ctx.fillStyle = '#94a3b8';
+            const timestamp = new Date().toLocaleString('id-ID', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            ctx.fillText(
+                timestamp,
+                logoX + logoSize / 2 + padding / 2,
+                logoY + fontSize / 2
+            );
+
+            // Convert to blob
+            canvas.toBlob(async (blob) => {
+                if (!blob) {
+                    setSnapshotNotification({ type: 'error', message: 'Gagal membuat snapshot' });
+                    setTimeout(() => setSnapshotNotification(null), 3000);
+                    return;
+                }
+
+                const filename = `${selectedCamera?.name || 'camera'}-${Date.now()}.png`;
+
+                // Try Web Share API first (mobile-friendly)
+                if (navigator.share && navigator.canShare) {
+                    try {
+                        const file = new File([blob], filename, { type: 'image/png' });
+                        if (navigator.canShare({ files: [file] })) {
+                            await navigator.share({
+                                files: [file],
+                                title: `Snapshot - ${selectedCamera?.name || 'Camera'}`,
+                                text: `Snapshot dari ${branding.company_name} CCTV`
+                            });
+                            setSnapshotNotification({ type: 'success', message: 'Snapshot berhasil dibagikan!' });
+                            setTimeout(() => setSnapshotNotification(null), 3000);
+                            return;
+                        }
+                    } catch (err) {
+                        if (err.name !== 'AbortError') {
+                            console.log('Share cancelled or failed:', err);
+                        }
+                    }
+                }
+
+                // Fallback: Download
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename;
+                link.click();
+                URL.revokeObjectURL(url);
+
+                setSnapshotNotification({ type: 'success', message: 'Snapshot berhasil diunduh!' });
+                setTimeout(() => setSnapshotNotification(null), 3000);
+            }, 'image/png', 0.95);
+
+        } catch (error) {
+            console.error('Snapshot error:', error);
+            setSnapshotNotification({ type: 'error', message: 'Gagal mengambil snapshot' });
+            setTimeout(() => setSnapshotNotification(null), 3000);
+        }
+    };
+
     // Get timeline data
     const getTimelineData = () => {
         if (segments.length === 0) return { start: null, end: null, duration: 0, gaps: [] };
@@ -1056,7 +1207,7 @@ function Playback() {
                         </div>
                     )}
                     
-                    <div className="aspect-video bg-black relative">
+                    <div className="aspect-video bg-black relative" ref={containerRef}>
                         <video
                             ref={videoRef}
                             className="w-full h-full object-contain"
@@ -1134,6 +1285,96 @@ function Playback() {
                                 </button>
                             ))}
                         </div>
+
+                        {/* Snapshot & Fullscreen Controls - Bottom Right */}
+                        {!isFullscreen && (
+                            <div className="absolute bottom-16 sm:bottom-20 right-2 sm:right-4 flex flex-col gap-2 z-30">
+                                {/* Snapshot Button */}
+                                <button
+                                    onClick={takeSnapshot}
+                                    disabled={!videoRef.current || videoRef.current.paused || videoRef.current.readyState < 2}
+                                    className="p-2 sm:p-2.5 bg-black/70 hover:bg-black/90 disabled:bg-black/40 disabled:cursor-not-allowed text-white rounded-lg transition-all shadow-lg hover:scale-110 disabled:scale-100"
+                                    title="Ambil Snapshot & Share"
+                                >
+                                    <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                </button>
+                                
+                                {/* Fullscreen Button */}
+                                <button
+                                    onClick={toggleFullscreen}
+                                    className="p-2 sm:p-2.5 bg-black/70 hover:bg-black/90 text-white rounded-lg transition-all shadow-lg hover:scale-110"
+                                    title="Fullscreen"
+                                >
+                                    <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                                    </svg>
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Fullscreen Mode Controls */}
+                        {isFullscreen && (
+                            <div className="absolute inset-0 z-50 pointer-events-none">
+                                {/* Top bar with camera name and exit */}
+                                <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/80 to-transparent pointer-events-auto">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <h2 className="text-white font-bold text-lg">{selectedCamera?.name}</h2>
+                                            {selectedCamera?.video_codec && (
+                                                <CodecBadge codec={selectedCamera.video_codec} size="sm" showWarning={false} />
+                                            )}
+                                        </div>
+                                        <button onClick={toggleFullscreen} className="p-2 hover:bg-white/20 rounded-xl text-white bg-white/10">
+                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Bottom right controls */}
+                                <div className="absolute bottom-20 right-4 flex flex-col gap-2 pointer-events-auto">
+                                    <button
+                                        onClick={takeSnapshot}
+                                        disabled={!videoRef.current || videoRef.current.paused || videoRef.current.readyState < 2}
+                                        className="p-3 bg-white/10 hover:bg-white/20 disabled:bg-white/5 disabled:cursor-not-allowed text-white rounded-xl transition-all shadow-lg"
+                                        title="Ambil Snapshot & Share"
+                                    >
+                                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Snapshot Notification */}
+                        {snapshotNotification && (
+                            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+                                <div className={`px-5 py-3 rounded-xl shadow-2xl border-2 ${
+                                    snapshotNotification.type === 'success'
+                                        ? 'bg-green-500 border-green-400'
+                                        : 'bg-red-500 border-red-400'
+                                } text-white animate-slide-down`}>
+                                    <div className="flex items-center gap-3">
+                                        {snapshotNotification.type === 'success' ? (
+                                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                            </svg>
+                                        ) : (
+                                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                            </svg>
+                                        )}
+                                        <p className="font-semibold text-sm">{snapshotNotification.message}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Current Segment Info - Hidden on mobile to not block controls */}
                         {selectedSegment && (
