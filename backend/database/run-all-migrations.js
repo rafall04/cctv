@@ -1,22 +1,25 @@
 #!/usr/bin/env node
-
 /**
  * Run All Database Migrations
  * 
- * Script ini menjalankan SEMUA migration yang ada di folder migrations/
- * Digunakan untuk setup awal client baru atau update database ke versi terbaru
+ * This script runs all migration files in the migrations directory
+ * in alphabetical order. Each migration is idempotent (safe to run multiple times).
+ * 
+ * Usage:
+ *   node backend/database/run-all-migrations.js
  */
 
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { readdirSync } from 'fs';
-import { execSync } from 'child_process';
+import { spawn } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const migrationsDir = join(__dirname, 'migrations');
 
-console.log('🔄 Running all database migrations...\n');
+console.log('🚀 Running All Database Migrations');
+console.log('=====================================\n');
 
 // Get all migration files
 const migrationFiles = readdirSync(migrationsDir)
@@ -24,51 +27,80 @@ const migrationFiles = readdirSync(migrationsDir)
     .sort(); // Run in alphabetical order
 
 console.log(`Found ${migrationFiles.length} migration files:\n`);
+migrationFiles.forEach((file, index) => {
+    console.log(`  ${index + 1}. ${file}`);
+});
+console.log('');
 
-let successCount = 0;
-let skipCount = 0;
-let errorCount = 0;
+// Run migrations sequentially
+async function runMigrations() {
+    let successCount = 0;
+    let failCount = 0;
+    const failed = [];
 
-for (const file of migrationFiles) {
-    const migrationPath = join(migrationsDir, file);
-    console.log(`\n${'='.repeat(60)}`);
-    console.log(`📄 Running: ${file}`);
-    console.log('='.repeat(60));
-    
-    try {
-        // Run migration using node
-        execSync(`node "${migrationPath}"`, {
-            stdio: 'inherit',
-            cwd: __dirname
-        });
+    for (const file of migrationFiles) {
+        const migrationPath = join(migrationsDir, file);
         
-        successCount++;
-    } catch (error) {
-        // Check if error is because table/column already exists (not a real error)
-        const errorOutput = error.message || '';
-        if (errorOutput.includes('already exists') || errorOutput.includes('✓')) {
-            console.log(`⏭️  Skipped (already applied)`);
-            skipCount++;
-        } else {
+        console.log(`\n📦 Running: ${file}`);
+        console.log('─'.repeat(60));
+        
+        try {
+            await runMigration(migrationPath);
+            successCount++;
+            console.log(`✅ Success: ${file}\n`);
+        } catch (error) {
+            failCount++;
+            failed.push({ file, error: error.message });
             console.error(`❌ Failed: ${file}`);
-            console.error(error.message);
-            errorCount++;
+            console.error(`   Error: ${error.message}\n`);
+            // Continue with next migration even if one fails
         }
+    }
+
+    // Summary
+    console.log('\n=====================================');
+    console.log('📊 Migration Summary');
+    console.log('=====================================');
+    console.log(`✅ Successful: ${successCount}`);
+    console.log(`❌ Failed: ${failCount}`);
+    
+    if (failed.length > 0) {
+        console.log('\n❌ Failed Migrations:');
+        failed.forEach(({ file, error }) => {
+            console.log(`   - ${file}: ${error}`);
+        });
+        console.log('\n⚠️  Some migrations failed. Please check the errors above.');
+        process.exit(1);
+    } else {
+        console.log('\n✅ All migrations completed successfully!');
+        process.exit(0);
     }
 }
 
-console.log(`\n${'='.repeat(60)}`);
-console.log('📊 Migration Summary:');
-console.log('='.repeat(60));
-console.log(`✅ Success: ${successCount}`);
-console.log(`⏭️  Skipped: ${skipCount}`);
-console.log(`❌ Errors: ${errorCount}`);
-console.log(`📁 Total: ${migrationFiles.length}`);
+// Run a single migration file
+function runMigration(migrationPath) {
+    return new Promise((resolve, reject) => {
+        const child = spawn('node', [migrationPath], {
+            stdio: 'inherit',
+            shell: true
+        });
 
-if (errorCount > 0) {
-    console.log('\n⚠️  Some migrations failed. Please check the errors above.');
-    process.exit(1);
-} else {
-    console.log('\n✅ All migrations completed successfully!');
-    process.exit(0);
+        child.on('close', (code) => {
+            if (code === 0) {
+                resolve();
+            } else {
+                reject(new Error(`Migration exited with code ${code}`));
+            }
+        });
+
+        child.on('error', (error) => {
+            reject(error);
+        });
+    });
 }
+
+// Run all migrations
+runMigrations().catch(error => {
+    console.error('\n❌ Fatal error running migrations:', error);
+    process.exit(1);
+});
