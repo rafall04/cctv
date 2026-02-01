@@ -32,11 +32,12 @@ class StreamWarmer {
         // Initial trigger to start RTSP connection
         await this.triggerStream(pathName);
 
-        // Keep stream alive by triggering every 5 seconds
+        // Keep stream alive by triggering every 30 seconds
         // This prevents sourceOnDemandCloseAfter from closing the connection
+        // Reduced from 5s to 30s to lower CPU usage
         const intervalId = setInterval(async () => {
             await this.triggerStream(pathName);
-        }, 5000);
+        }, 30000);
 
         this.warmStreams.set(pathName, intervalId);
     }
@@ -126,8 +127,8 @@ class StreamWarmer {
             // Start warming without waiting for result
             this.warmStream(pathName);
             
-            // Stagger by 2 seconds to avoid overwhelming cameras
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Stagger by 5 seconds to avoid overwhelming cameras and CPU
+            await new Promise(resolve => setTimeout(resolve, 5000));
         }
         
         console.log(`[StreamWarmer] All streams warming started`);
