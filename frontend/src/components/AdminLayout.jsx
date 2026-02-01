@@ -75,6 +75,7 @@ export default function AdminLayout({ children }) {
         { label: 'Users', path: '/admin/users', icon: <Icons.Users />, color: 'amber' },
         { label: 'Feedback', path: '/admin/feedback', icon: <Icons.Feedback />, color: 'rose' },
         { label: 'Saweria', path: '/admin/saweria', icon: <Icons.Saweria />, color: 'orange' },
+        { label: 'Branding', path: '/admin/branding', icon: <Icons.Settings />, color: 'pink' },
         { label: 'Settings', path: '/admin/settings', icon: <Icons.Settings />, color: 'gray' },
     ];
 

@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { SecurityProvider } from './contexts/SecurityContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { BrandingProvider } from './contexts/BrandingContext';
 import { ToastContainer } from './components/ui/ToastContainer';
 import { ApiClientInitializer } from './components/ApiClientInitializer';
 import ErrorBoundary, { InlineErrorBoundary } from './components/ui/ErrorBoundary';
@@ -14,6 +15,7 @@ import FeedbackManagement from './pages/FeedbackManagement';
 import ViewerAnalytics from './pages/ViewerAnalytics';
 import Settings from './pages/Settings';
 import SaweriaSettings from './pages/SaweriaSettings';
+import BrandingSettings from './pages/BrandingSettings';
 import Dashboard from './pages/Dashboard';
 import SponsorManagement from './pages/SponsorManagement';
 import RecordingDashboard from './pages/RecordingDashboard';
@@ -24,6 +26,7 @@ function App() {
     return (
         <ErrorBoundary>
         <ThemeProvider>
+        <BrandingProvider>
         <SecurityProvider>
         <NotificationProvider>
         <ApiClientInitializer>
@@ -126,6 +129,16 @@ function App() {
                     }
                 />
                 <Route
+                    path="/admin/branding"
+                    element={
+                        <ProtectedRoute>
+                            <AdminLayout>
+                                <BrandingSettings />
+                            </AdminLayout>
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
                     path="/admin/recordings"
                     element={
                         <ProtectedRoute>
@@ -146,6 +159,7 @@ function App() {
         </ApiClientInitializer>
         </NotificationProvider>
         </SecurityProvider>
+        </BrandingProvider>
         </ThemeProvider>
         </ErrorBoundary>
     );
