@@ -535,9 +535,9 @@ export default function Dashboard() {
                     <div className="flex items-center gap-3">
                         <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2.5 py-1 rounded-lg">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                            {stats?.summary.activeCameras} Active
+                            {stats?.cameraStatusBreakdown?.online || 0} Online
                         </span>
-                        <span className="text-xs text-gray-400 dark:text-gray-500">{stats?.summary.disabledCameras} Off</span>
+                        <span className="text-xs text-gray-400 dark:text-gray-500">{stats?.cameraStatusBreakdown?.offline || 0} Offline</span>
                     </div>
                 </div>
 

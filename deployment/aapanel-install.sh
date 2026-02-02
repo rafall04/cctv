@@ -427,8 +427,8 @@ setup_webserver() {
         echo "   2. Website > Add Site"
         echo "   3. Domain: $DOMAIN_FRONTEND, Port: $PORT"
         echo "   4. Root: $APP_DIR/frontend/dist"
-        echo "   5. Add reverse proxy: /api → http://localhost:3001"
-        echo "   6. Add reverse proxy: /hls → http://localhost:3001 (NOT 8888!)"
+        echo "   5. Add reverse proxy: /api → http://localhost:3000"
+        echo "   6. Add reverse proxy: /hls → http://localhost:3000 (NOT 8888!)"
         echo ""
         
         # Just verify Nginx is running
@@ -509,7 +509,7 @@ verify_installation() {
     
     # Check backend health
     sleep 2
-    if curl -s http://localhost:3001/health | grep -q "ok"; then
+    if curl -s http://localhost:3000/health | grep -q "ok"; then
         print_success "Backend health check passed"
     else
         print_error "Backend health check failed"
@@ -557,8 +557,8 @@ print_summary() {
     fi
     echo "      - Add site: $DOMAIN_FRONTEND (port $PORT)"
     echo "      - Root: $APP_DIR/frontend/dist"
-    echo "      - Add reverse proxy: /api → http://localhost:3001"
-    echo "      - Add reverse proxy: /hls → http://localhost:3001 (NOT 8888!)"
+    echo "      - Add reverse proxy: /api → http://localhost:3000"
+    echo "      - Add reverse proxy: /hls → http://localhost:3000 (NOT 8888!)"
     echo ""
     echo "   2. Generate API Key:"
     echo "      - Login to admin panel: http://$DOMAIN_FRONTEND:$PORT"

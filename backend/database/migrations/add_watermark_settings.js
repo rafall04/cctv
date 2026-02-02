@@ -12,7 +12,29 @@ console.log('Database path:', dbPath);
 const db = new Database(dbPath);
 
 try {
-    // Check existing branding_settings
+    // Check if branding_settings table exists
+    const tableExists = db.prepare(`
+        SELECT name FROM sqlite_master 
+        WHERE type='table' AND name='branding_settings'
+    `).get();
+    
+    if (!tableExists) {
+        console.log('❌ Error: branding_settings table does not exist');
+        console.log('⚠️  Please run add_branding_settings.js migration first');
+        process.exit(1);
+    }
+    
+    // Check if category column exists
+    const tableInfo = db.prepare('PRAGMA table_info(branding_settings)').all();
+    const hasCategory = tableInfo.some(col => col.name === 'category');
+    
+    if (!hasCategory) {
+        console.log('➕ Adding category column to branding_settings...');
+        db.exec('ALTER TABLE branding_settings ADD COLUMN category TEXT');
+        console.log('✅ Category column added');
+    }
+    
+    // Check existing settings
     const existingSettings = db.prepare('SELECT key FROM branding_settings').all();
     const existingKeys = existingSettings.map(s => s.key);
     
