@@ -241,39 +241,43 @@ export async function getTodayStats(request, reply) {
     try {
         const { period = 'today' } = request.query;
         
-        const now = new Date();
-        let startDate, endDate, compareStartDate, compareEndDate;
+        // Helper function to get WIB date
+        const getWIBDate = () => {
+            return new Date().toLocaleDateString('sv-SE', { 
+                timeZone: 'Asia/Jakarta'
+            });
+        };
         
-        // Calculate date ranges based on period
+        const getWIBDateWithOffset = (days) => {
+            const date = new Date();
+            date.setDate(date.getDate() + days);
+            return date.toLocaleDateString('sv-SE', { 
+                timeZone: 'Asia/Jakarta'
+            });
+        };
+        
+        // Determine date filters using WIB dates (consistent with Analytics)
+        let dateFilter = '';
+        let previousDateFilter = '';
+        const todayDate = getWIBDate();
+        
         switch (period) {
             case 'yesterday':
-                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0);
-                endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-                compareStartDate = new Date(startDate);
-                compareStartDate.setDate(compareStartDate.getDate() - 1);
-                compareEndDate = startDate;
+                dateFilter = `AND date(started_at) = '${getWIBDateWithOffset(-1)}'`;
+                previousDateFilter = `AND date(started_at) = '${getWIBDateWithOffset(-2)}'`;
                 break;
             case '7days':
-                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7, 0, 0, 0);
-                endDate = now;
-                compareStartDate = new Date(startDate);
-                compareStartDate.setDate(compareStartDate.getDate() - 7);
-                compareEndDate = startDate;
+                dateFilter = `AND date(started_at) >= '${getWIBDateWithOffset(-7)}'`;
+                previousDateFilter = `AND date(started_at) >= '${getWIBDateWithOffset(-14)}' AND date(started_at) < '${getWIBDateWithOffset(-7)}'`;
                 break;
             case '30days':
-                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30, 0, 0, 0);
-                endDate = now;
-                compareStartDate = new Date(startDate);
-                compareStartDate.setDate(compareStartDate.getDate() - 30);
-                compareEndDate = startDate;
+                dateFilter = `AND date(started_at) >= '${getWIBDateWithOffset(-30)}'`;
+                previousDateFilter = `AND date(started_at) >= '${getWIBDateWithOffset(-60)}' AND date(started_at) < '${getWIBDateWithOffset(-30)}'`;
                 break;
             case 'today':
             default:
-                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-                endDate = now;
-                compareStartDate = new Date(startDate);
-                compareStartDate.setDate(compareStartDate.getDate() - 1);
-                compareEndDate = startDate;
+                dateFilter = `AND date(started_at) = '${todayDate}'`;
+                previousDateFilter = `AND date(started_at) = '${getWIBDateWithOffset(-1)}'`;
                 break;
         }
         
@@ -285,9 +289,8 @@ export async function getTodayStats(request, reply) {
                 AVG(duration_seconds) as avg_duration,
                 SUM(duration_seconds) as total_watch_time
             FROM viewer_session_history
-            WHERE date(started_at) >= date(?, 'unixepoch')
-            AND date(started_at) <= date(?, 'unixepoch')
-        `, [Math.floor(startDate.getTime() / 1000), Math.floor(endDate.getTime() / 1000)]);
+            WHERE 1=1 ${dateFilter}
+        `);
         
         // Get comparison period stats
         const compareSessionsResult = query(`
@@ -297,9 +300,8 @@ export async function getTodayStats(request, reply) {
                 AVG(duration_seconds) as avg_duration,
                 SUM(duration_seconds) as total_watch_time
             FROM viewer_session_history
-            WHERE date(started_at) >= date(?, 'unixepoch')
-            AND date(started_at) < date(?, 'unixepoch')
-        `, [Math.floor(compareStartDate.getTime() / 1000), Math.floor(compareEndDate.getTime() / 1000)]);
+            WHERE 1=1 ${previousDateFilter}
+        `);
         
         // Get current active viewers from viewerSessionService
         const viewerStats = viewerSessionService.getViewerStats();
