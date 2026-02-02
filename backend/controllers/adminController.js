@@ -6,11 +6,10 @@ import {
     sendTestNotification, 
     getTelegramStatus, 
     isTelegramConfigured,
-    saveTelegramSettings,
-    clearSettingsCache 
+    saveTelegramSettings
 } from '../services/telegramService.js';
 import cache from '../services/cacheService.js';
-import { getTimezone, setTimezone, TIMEZONE_MAP } from '../services/timezoneService.js';
+import { getTimezone, setTimezone, TIMEZONE_MAP, formatDateTime } from '../services/timezoneService.js';
 import { logAdminAction } from '../services/securityAuditLogger.js';
 
 export async function getDashboardStats(request, reply) {
@@ -173,25 +172,9 @@ export async function getDashboardStats(request, reply) {
             ORDER BY l.created_at DESC
             LIMIT 10
         `).map(log => {
-            // Parse the timestamp - if it's already in WIB format (no Z suffix), use directly
-            // Otherwise convert from UTC
-            let logDate;
-            if (log.created_at.includes('Z') || log.created_at.includes('+')) {
-                logDate = new Date(log.created_at);
-            } else {
-                // Assume stored in local/WIB format
-                logDate = new Date(log.created_at);
-            }
-            
             return {
                 ...log,
-                created_at_wib: new Intl.DateTimeFormat('id-ID', {
-                    timeZone: 'Asia/Jakarta',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                    hour12: false
-                }).format(logDate)
+                created_at_wib: formatDateTime(log.created_at).split(' ')[1] // Get time part only
             };
         });
 
@@ -243,43 +226,38 @@ export async function getTodayStats(request, reply) {
     try {
         const { period = 'today' } = request.query;
         
-        // Helper function to get WIB date
-        const getWIBDate = () => {
-            return new Date().toLocaleDateString('sv-SE', { 
-                timeZone: 'Asia/Jakarta'
-            });
-        };
-        
-        const getWIBDateWithOffset = (days) => {
+        // Helper function to get date with offset in configured timezone
+        const getDateWithOffset = (days) => {
+            const timezone = getTimezone();
             const date = new Date();
             date.setDate(date.getDate() + days);
             return date.toLocaleDateString('sv-SE', { 
-                timeZone: 'Asia/Jakarta'
+                timeZone: timezone
             });
         };
         
-        // Determine date filters using WIB dates (consistent with Analytics)
+        // Determine date filters using configured timezone dates (consistent with Analytics)
         let dateFilter = '';
         let previousDateFilter = '';
-        const todayDate = getWIBDate();
+        const todayDate = getDateWithOffset(0);
         
         switch (period) {
             case 'yesterday':
-                dateFilter = `AND date(started_at) = '${getWIBDateWithOffset(-1)}'`;
-                previousDateFilter = `AND date(started_at) = '${getWIBDateWithOffset(-2)}'`;
+                dateFilter = `AND date(started_at) = '${getDateWithOffset(-1)}'`;
+                previousDateFilter = `AND date(started_at) = '${getDateWithOffset(-2)}'`;
                 break;
             case '7days':
-                dateFilter = `AND date(started_at) >= '${getWIBDateWithOffset(-7)}'`;
-                previousDateFilter = `AND date(started_at) >= '${getWIBDateWithOffset(-14)}' AND date(started_at) < '${getWIBDateWithOffset(-7)}'`;
+                dateFilter = `AND date(started_at) >= '${getDateWithOffset(-7)}'`;
+                previousDateFilter = `AND date(started_at) >= '${getDateWithOffset(-14)}' AND date(started_at) < '${getDateWithOffset(-7)}'`;
                 break;
             case '30days':
-                dateFilter = `AND date(started_at) >= '${getWIBDateWithOffset(-30)}'`;
-                previousDateFilter = `AND date(started_at) >= '${getWIBDateWithOffset(-60)}' AND date(started_at) < '${getWIBDateWithOffset(-30)}'`;
+                dateFilter = `AND date(started_at) >= '${getDateWithOffset(-30)}'`;
+                previousDateFilter = `AND date(started_at) >= '${getDateWithOffset(-60)}' AND date(started_at) < '${getDateWithOffset(-30)}'`;
                 break;
             case 'today':
             default:
                 dateFilter = `AND date(started_at) = '${todayDate}'`;
-                previousDateFilter = `AND date(started_at) = '${getWIBDateWithOffset(-1)}'`;
+                previousDateFilter = `AND date(started_at) = '${getDateWithOffset(-1)}'`;
                 break;
         }
         

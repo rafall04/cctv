@@ -15,6 +15,7 @@ import {
     sendCameraOnlineNotification,
     isTelegramConfigured 
 } from './telegramService.js';
+import { getTimezone } from './timezoneService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -26,11 +27,12 @@ const dbPath = config.database.path.startsWith('/')
 const mediaMtxApiBaseUrl = 'http://localhost:9997/v3';
 
 /**
- * Get current timestamp in WIB (Asia/Jakarta) format for SQLite
+ * Get current timestamp in configured timezone format for SQLite
  */
-function getWIBTimestamp() {
+function getTimestamp() {
+    const timezone = getTimezone();
     return new Date().toLocaleString('sv-SE', { 
-        timeZone: 'Asia/Jakarta',
+        timeZone: timezone,
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
@@ -168,7 +170,7 @@ class CameraHealthService {
             let onlineCount = 0;
             let offlineCount = 0;
             let changedCount = 0;
-            const wibTimestamp = getWIBTimestamp();
+            const timestamp = getTimestamp();
 
             for (const camera of cameras) {
                 // Use stream_key if available, fallback to legacy camera{id} format
@@ -186,7 +188,7 @@ class CameraHealthService {
                 
                 // Only update if status changed
                 if (camera.is_online !== isOnline) {
-                    updateStmt.run(isOnline, wibTimestamp, camera.id);
+                    updateStmt.run(isOnline, timestamp, camera.id);
                     changedCount++;
                     
                     // Send Telegram notification on status change
@@ -310,13 +312,13 @@ class CameraHealthService {
             
             const isOnline = pathInfo?.isOnline ? 1 : 0;
             
-            // Update database with WIB timestamp
-            const wibTimestamp = getWIBTimestamp();
+            // Update database with configured timezone timestamp
+            const timestamp = getTimestamp();
             db.prepare(`
                 UPDATE cameras 
                 SET is_online = ?, last_online_check = ? 
                 WHERE id = ?
-            `).run(isOnline, wibTimestamp, cameraId);
+            `).run(isOnline, timestamp, cameraId);
             db.close();
 
             return isOnline === 1;

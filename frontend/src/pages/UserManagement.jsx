@@ -358,7 +358,6 @@ export default function UserManagement() {
 
     const formatDate = (dateString) => {
         return new Intl.DateTimeFormat('id-ID', {
-            timeZone: 'Asia/Jakarta',
             year: 'numeric',
             month: 'short',
             day: 'numeric',

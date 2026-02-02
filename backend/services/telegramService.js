@@ -5,6 +5,7 @@
  */
 
 import { queryOne, execute } from '../database/database.js';
+import { formatDateTime } from './timezoneService.js';
 
 // Cooldown tracking to prevent spam
 const notificationCooldowns = new Map();
@@ -95,19 +96,6 @@ function setCooldown(key) {
     notificationCooldowns.set(key, Date.now());
 }
 
-function formatTimeWIB(date = new Date()) {
-    return new Intl.DateTimeFormat('id-ID', {
-        timeZone: 'Asia/Jakarta',
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-    }).format(date);
-}
-
 /**
  * Send message to Telegram bot
  */
@@ -170,7 +158,7 @@ export async function sendCameraOfflineNotification(camera) {
 ━━━━━━━━━━━━━━━━━━━━
 📹 <b>${camera.name}</b>
 ${camera.location ? `📍 ${camera.location}` : ''}
-⏰ ${formatTimeWIB()}
+⏰ ${formatDateTime(new Date())}
 ━━━━━━━━━━━━━━━━━━━━
 <i>Segera periksa koneksi kamera!</i>
     `.trim();
@@ -203,7 +191,7 @@ export async function sendCameraOnlineNotification(camera, downtime = null) {
 ━━━━━━━━━━━━━━━━━━━━
 📹 <b>${camera.name}</b>
 ${camera.location ? `📍 ${camera.location}` : ''}
-⏰ ${formatTimeWIB()}${downtimeText}
+⏰ ${formatDateTime(new Date())}${downtimeText}
 ━━━━━━━━━━━━━━━━━━━━
 <i>Kamera kembali normal.</i>
     `.trim();
@@ -227,7 +215,7 @@ export async function sendMultipleCamerasOfflineNotification(cameras) {
 ━━━━━━━━━━━━━━━━━━━━
 ${cameraList}
 ━━━━━━━━━━━━━━━━━━━━
-⏰ ${formatTimeWIB()}
+⏰ ${formatDateTime(new Date())}
 <i>Segera periksa koneksi!</i>
     `.trim();
 
@@ -240,7 +228,7 @@ export async function sendFeedbackNotification(feedback) {
 ━━━━━━━━━━━━━━━━━━━━
 👤 <b>Nama:</b> ${feedback.name || 'Anonim'}
 📧 <b>Email:</b> ${feedback.email || '-'}
-⏰ <b>Waktu:</b> ${formatTimeWIB(new Date(feedback.created_at))}
+⏰ <b>Waktu:</b> ${formatDateTime(new Date(feedback.created_at))}
 ━━━━━━━━━━━━━━━━━━━━
 💬 <b>Pesan:</b>
 ${feedback.message}
@@ -257,7 +245,7 @@ export async function sendTestNotification(type = 'monitoring') {
 ━━━━━━━━━━━━━━━━━━━━
 Bot Telegram terhubung dengan baik.
 Tipe: ${type === 'monitoring' ? 'Monitoring Kamera' : 'Kritik & Saran'}
-⏰ ${formatTimeWIB()}
+⏰ ${formatDateTime(new Date())}
 ━━━━━━━━━━━━━━━━━━━━
     `.trim();
 

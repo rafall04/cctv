@@ -14,19 +14,21 @@
  * - Backend cleanup interval: every 5 seconds
  * - Max staleness: ~20 seconds (15s timeout + 5s cleanup)
  * 
- * Timezone: All timestamps stored in WIB (Asia/Jakarta, UTC+7)
+ * Timezone: All timestamps use configured timezone from system settings
  */
 
 import { query, queryOne, execute } from '../database/database.js';
 import { v4 as uuidv4 } from 'uuid';
+import { getTimezone } from './timezoneService.js';
 
 /**
- * Get current timestamp in WIB (Asia/Jakarta) format for SQLite
+ * Get current timestamp in configured timezone format for SQLite
  * Format: YYYY-MM-DD HH:MM:SS
  */
-function getWIBTimestamp() {
+function getTimestamp() {
+    const timezone = getTimezone();
     return new Date().toLocaleString('sv-SE', { 
-        timeZone: 'Asia/Jakarta',
+        timeZone: timezone,
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
@@ -38,24 +40,26 @@ function getWIBTimestamp() {
 }
 
 /**
- * Get current date in WIB for date comparisons
+ * Get current date in configured timezone for date comparisons
  * Format: YYYY-MM-DD
  */
-function getWIBDate() {
+function getDate() {
+    const timezone = getTimezone();
     return new Date().toLocaleDateString('sv-SE', { 
-        timeZone: 'Asia/Jakarta'
+        timeZone: timezone
     });
 }
 
 /**
- * Get WIB date with offset (e.g., -7 days)
+ * Get date with offset (e.g., -7 days) in configured timezone
  * Format: YYYY-MM-DD
  */
-function getWIBDateWithOffset(days) {
+function getDateWithOffset(days) {
+    const timezone = getTimezone();
     const date = new Date();
     date.setDate(date.getDate() + days);
     return date.toLocaleDateString('sv-SE', { 
-        timeZone: 'Asia/Jakarta'
+        timeZone: timezone
     });
 }
 
@@ -115,15 +119,15 @@ class ViewerSessionService {
         const ipAddress = this.getRealIP(request);
         const userAgent = request.headers['user-agent'] || '';
         const deviceType = this.getDeviceType(userAgent);
-        const wibTimestamp = getWIBTimestamp();
+        const timestamp = getTimestamp();
 
         try {
             execute(`
                 INSERT INTO viewer_sessions (session_id, camera_id, ip_address, user_agent, device_type, started_at, last_heartbeat)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            `, [sessionId, cameraId, ipAddress, userAgent, deviceType, wibTimestamp, wibTimestamp]);
+            `, [sessionId, cameraId, ipAddress, userAgent, deviceType, timestamp, timestamp]);
 
-            console.log(`[ViewerSession] Started: ${sessionId} for camera ${cameraId} from ${ipAddress} at ${wibTimestamp} WIB`);
+            console.log(`[ViewerSession] Started: ${sessionId} for camera ${cameraId} from ${ipAddress} at ${timestamp}`);
             return sessionId;
         } catch (error) {
             console.error('[ViewerSession] Error starting session:', error);
@@ -133,12 +137,12 @@ class ViewerSessionService {
 
     heartbeat(sessionId) {
         try {
-            const wibTimestamp = getWIBTimestamp();
+            const timestamp = getTimestamp();
             const result = execute(`
                 UPDATE viewer_sessions 
                 SET last_heartbeat = ?
                 WHERE session_id = ? AND is_active = 1
-            `, [wibTimestamp, sessionId]);
+            `, [timestamp, sessionId]);
             return result.changes > 0;
         } catch (error) {
             console.error('[ViewerSession] Error updating heartbeat:', error);
@@ -157,13 +161,13 @@ class ViewerSessionService {
             const startedAt = new Date(session.started_at);
             const endedAt = new Date();
             const durationSeconds = Math.floor((endedAt - startedAt) / 1000);
-            const wibTimestamp = getWIBTimestamp();
+            const timestamp = getTimestamp();
 
             execute(`
                 UPDATE viewer_sessions 
                 SET is_active = 0, ended_at = ?, duration_seconds = ?
                 WHERE session_id = ?
-            `, [wibTimestamp, durationSeconds, sessionId]);
+            `, [timestamp, durationSeconds, sessionId]);
 
             const camera = queryOne('SELECT name FROM cameras WHERE id = ?', [session.camera_id]);
 
@@ -178,7 +182,7 @@ class ViewerSessionService {
                 session.user_agent,
                 session.device_type,
                 session.started_at,
-                wibTimestamp,
+                timestamp,
                 durationSeconds
             ]);
 
@@ -192,12 +196,12 @@ class ViewerSessionService {
 
     cleanupStaleSessions() {
         try {
-            const wibTimestamp = getWIBTimestamp();
+            const timestamp = getTimestamp();
             const staleSessions = query(`
                 SELECT session_id FROM viewer_sessions 
                 WHERE is_active = 1 
                 AND datetime(last_heartbeat) < datetime(?, '-${SESSION_TIMEOUT} seconds')
-            `, [wibTimestamp]);
+            `, [timestamp]);
 
             for (const session of staleSessions) {
                 this.endSession(session.session_id);
@@ -213,7 +217,7 @@ class ViewerSessionService {
 
     getActiveSessions() {
         try {
-            const wibTimestamp = getWIBTimestamp();
+            const timestamp = getTimestamp();
             return query(`
                 SELECT 
                     vs.session_id,
@@ -228,7 +232,7 @@ class ViewerSessionService {
                 LEFT JOIN cameras c ON vs.camera_id = c.id
                 WHERE vs.is_active = 1
                 ORDER BY vs.started_at DESC
-            `, [wibTimestamp]);
+            `, [timestamp]);
         } catch (error) {
             console.error('[ViewerSession] Error getting active sessions:', error);
             return [];
@@ -237,7 +241,7 @@ class ViewerSessionService {
 
     getActiveSessionsByCamera(cameraId) {
         try {
-            const wibTimestamp = getWIBTimestamp();
+            const timestamp = getTimestamp();
             return query(`
                 SELECT 
                     session_id,
@@ -249,7 +253,7 @@ class ViewerSessionService {
                 FROM viewer_sessions
                 WHERE camera_id = ? AND is_active = 1
                 ORDER BY started_at DESC
-            `, [wibTimestamp, cameraId]);
+            `, [timestamp, cameraId]);
         } catch (error) {
             console.error('[ViewerSession] Error getting camera sessions:', error);
             return [];
@@ -301,7 +305,7 @@ class ViewerSessionService {
             const activeViewers = this.getTotalActiveViewers();
             const activeSessions = this.getActiveSessions();
             const viewersByCamera = this.getViewerCountByCamera();
-            const todayDate = getWIBDate();
+            const todayDate = getDate();
 
             const todayStats = queryOne(`
                 SELECT 
@@ -341,11 +345,11 @@ class ViewerSessionService {
      */
     getAnalytics(period = '7days') {
         try {
-            // Determine date filter using WIB dates
+            // Determine date filter using configured timezone dates
             let dateFilter = '';
             let previousDateFilter = '';
             let periodDays = 0;
-            const todayDate = getWIBDate();
+            const todayDate = getDate();
             
             // Handle custom date format: "date:YYYY-MM-DD"
             if (period.startsWith('date:')) {
@@ -368,22 +372,22 @@ class ViewerSessionService {
                 switch (period) {
                     case 'today':
                         dateFilter = `AND date(started_at) = '${todayDate}'`;
-                        previousDateFilter = `AND date(started_at) = '${getWIBDateWithOffset(-1)}'`;
+                        previousDateFilter = `AND date(started_at) = '${getDateWithOffset(-1)}'`;
                         periodDays = 1;
                         break;
                     case 'yesterday':
-                        dateFilter = `AND date(started_at) = '${getWIBDateWithOffset(-1)}'`;
-                        previousDateFilter = `AND date(started_at) = '${getWIBDateWithOffset(-2)}'`;
+                        dateFilter = `AND date(started_at) = '${getDateWithOffset(-1)}'`;
+                        previousDateFilter = `AND date(started_at) = '${getDateWithOffset(-2)}'`;
                         periodDays = 1;
                         break;
                     case '7days':
-                        dateFilter = `AND date(started_at) >= '${getWIBDateWithOffset(-7)}'`;
-                        previousDateFilter = `AND date(started_at) >= '${getWIBDateWithOffset(-14)}' AND date(started_at) < '${getWIBDateWithOffset(-7)}'`;
+                        dateFilter = `AND date(started_at) >= '${getDateWithOffset(-7)}'`;
+                        previousDateFilter = `AND date(started_at) >= '${getDateWithOffset(-14)}' AND date(started_at) < '${getDateWithOffset(-7)}'`;
                         periodDays = 7;
                         break;
                     case '30days':
-                        dateFilter = `AND date(started_at) >= '${getWIBDateWithOffset(-30)}'`;
-                        previousDateFilter = `AND date(started_at) >= '${getWIBDateWithOffset(-60)}' AND date(started_at) < '${getWIBDateWithOffset(-30)}'`;
+                        dateFilter = `AND date(started_at) >= '${getDateWithOffset(-30)}'`;
+                        previousDateFilter = `AND date(started_at) >= '${getDateWithOffset(-60)}' AND date(started_at) < '${getDateWithOffset(-30)}'`;
                         periodDays = 30;
                         break;
                     default:
@@ -678,9 +682,9 @@ class ViewerSessionService {
             const activeViewers = this.getTotalActiveViewers();
             const activeSessions = this.getActiveSessions();
             const viewersByCamera = this.getViewerCountByCamera();
-            const wibTimestamp = getWIBTimestamp();
+            const timestamp = getTimestamp();
 
-            // Get last 5 minutes activity (using WIB time)
+            // Get last 5 minutes activity (using configured timezone)
             const recentActivity = query(`
                 SELECT 
                     camera_name,
@@ -691,7 +695,7 @@ class ViewerSessionService {
                 WHERE datetime(started_at) >= datetime(?, '-5 minutes')
                 ORDER BY started_at DESC
                 LIMIT 10
-            `, [wibTimestamp]);
+            `, [timestamp]);
 
             return {
                 activeViewers,
@@ -709,7 +713,7 @@ class ViewerSessionService {
                     viewerCount: v.viewer_count
                 })),
                 recentActivity,
-                timestamp: wibTimestamp,
+                timestamp: timestamp,
             };
         } catch (error) {
             console.error('[ViewerSession] Error getting real-time data:', error);
@@ -718,7 +722,7 @@ class ViewerSessionService {
                 activeSessions: [],
                 viewersByCamera: [],
                 recentActivity: [],
-                timestamp: getWIBTimestamp(),
+                timestamp: getTimestamp(),
             };
         }
     }

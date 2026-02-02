@@ -777,7 +777,7 @@ export default function Dashboard() {
                                             <div className="flex items-center gap-2 mt-1">
                                                 <span className="text-xs text-gray-500 dark:text-gray-400">{log.username}</span>
                                                 <span className="text-xs text-gray-300 dark:text-gray-600">•</span>
-                                                <span className="text-xs text-sky-500 font-medium">{log.created_at_wib} WIB</span>
+                                                <span className="text-xs text-sky-500 font-medium">{log.created_at_wib}</span>
                                             </div>
                                         </div>
                                     </div>
