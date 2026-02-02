@@ -277,16 +277,16 @@ export async function getTodayStats(request, reply) {
                 break;
         }
         
-        // Get current period viewer sessions from database
+        // Get current period viewer sessions from database (use history table for consistency)
         const currentSessionsResult = query(`
             SELECT 
                 COUNT(DISTINCT session_id) as total_sessions,
                 COUNT(DISTINCT ip_address) as unique_viewers,
                 AVG(duration_seconds) as avg_duration,
                 SUM(duration_seconds) as total_watch_time
-            FROM viewer_sessions
-            WHERE started_at >= datetime(?, 'unixepoch')
-            AND started_at < datetime(?, 'unixepoch')
+            FROM viewer_session_history
+            WHERE date(started_at) >= date(?, 'unixepoch')
+            AND date(started_at) <= date(?, 'unixepoch')
         `, [Math.floor(startDate.getTime() / 1000), Math.floor(endDate.getTime() / 1000)]);
         
         // Get comparison period stats
@@ -296,9 +296,9 @@ export async function getTodayStats(request, reply) {
                 COUNT(DISTINCT ip_address) as unique_viewers,
                 AVG(duration_seconds) as avg_duration,
                 SUM(duration_seconds) as total_watch_time
-            FROM viewer_sessions
-            WHERE started_at >= datetime(?, 'unixepoch')
-            AND started_at < datetime(?, 'unixepoch')
+            FROM viewer_session_history
+            WHERE date(started_at) >= date(?, 'unixepoch')
+            AND date(started_at) < date(?, 'unixepoch')
         `, [Math.floor(compareStartDate.getTime() / 1000), Math.floor(compareEndDate.getTime() / 1000)]);
         
         // Get current active viewers from viewerSessionService
