@@ -1,4 +1,4 @@
-import { getDashboardStats, getTodayStats, testTelegramNotification, getTelegramConfig, updateTelegramConfig, getViewerAnalytics, getRealTimeViewers, getCacheStats, clearCache } from '../controllers/adminController.js';
+import { getDashboardStats, getTodayStats, testTelegramNotification, getTelegramConfig, updateTelegramConfig, getViewerAnalytics, getRealTimeViewers, getCacheStats, clearCache, getTimezoneConfig, updateTimezoneConfig } from '../controllers/adminController.js';
 import { generateApiKey, listApiKeys, deleteApiKey } from '../controllers/apiKeyController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 import { createApiKeySchema, apiKeyIdParamSchema } from '../middleware/schemaValidators.js';
@@ -192,5 +192,30 @@ export default async function adminRoutes(fastify, options) {
     fastify.post('/cache/clear', {
         onRequest: [authMiddleware],
         handler: clearCache,
+    });
+
+    // Timezone Configuration Endpoints
+    // GET /api/admin/settings/timezone - Get timezone configuration
+    fastify.get('/settings/timezone', {
+        onRequest: [authMiddleware],
+        handler: getTimezoneConfig,
+    });
+
+    // PUT /api/admin/settings/timezone - Update timezone configuration
+    fastify.put('/settings/timezone', {
+        onRequest: [authMiddleware],
+        schema: {
+            body: {
+                type: 'object',
+                required: ['timezone'],
+                properties: {
+                    timezone: { 
+                        type: 'string',
+                        enum: ['WIB', 'WITA', 'WIT']
+                    }
+                }
+            }
+        },
+        handler: updateTimezoneConfig,
     });
 }

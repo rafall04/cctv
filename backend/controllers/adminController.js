@@ -10,6 +10,8 @@ import {
     clearSettingsCache 
 } from '../services/telegramService.js';
 import cache from '../services/cacheService.js';
+import { getTimezone, setTimezone, TIMEZONE_MAP } from '../services/timezoneService.js';
+import { logAdminAction } from '../services/securityAuditLogger.js';
 
 export async function getDashboardStats(request, reply) {
     try {
@@ -556,6 +558,68 @@ export async function clearCache(request, reply) {
         });
     } catch (error) {
         console.error('Clear cache error:', error);
+        return reply.code(500).send({
+            success: false,
+            message: 'Internal server error',
+        });
+    }
+}
+
+/**
+ * Get timezone configuration
+ */
+export async function getTimezoneConfig(request, reply) {
+    try {
+        const timezone = getTimezone();
+        const shortName = Object.keys(TIMEZONE_MAP).find(
+            key => TIMEZONE_MAP[key] === timezone
+        ) || 'WIB';
+        
+        return reply.send({
+            success: true,
+            data: {
+                timezone,
+                shortName
+            }
+        });
+    } catch (error) {
+        console.error('Get timezone config error:', error);
+        return reply.code(500).send({
+            success: false,
+            message: 'Internal server error',
+        });
+    }
+}
+
+/**
+ * Update timezone configuration
+ */
+export async function updateTimezoneConfig(request, reply) {
+    try {
+        const { timezone } = request.body;
+        
+        if (!['WIB', 'WITA', 'WIT'].includes(timezone)) {
+            return reply.code(400).send({
+                success: false,
+                message: 'Invalid timezone. Use: WIB, WITA, or WIT',
+            });
+        }
+        
+        setTimezone(timezone);
+        
+        logAdminAction({
+            action: 'timezone_updated',
+            details: { timezone },
+            userId: request.user?.id
+        }, request);
+        
+        return reply.send({
+            success: true,
+            message: 'Timezone berhasil diupdate',
+            data: { timezone }
+        });
+    } catch (error) {
+        console.error('Update timezone config error:', error);
         return reply.code(500).send({
             success: false,
             message: 'Internal server error',
