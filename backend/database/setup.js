@@ -4,6 +4,12 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { mkdirSync, existsSync } from 'fs';
 import { config } from '../config/config.js';
+import { 
+  generateStrongPassword, 
+  generateInstallationId, 
+  sendInstallationNotification,
+  saveInstallationMetadata 
+} from '../services/setupNotificationService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -110,8 +116,10 @@ console.log('✓ Created feedbacks table');
 const existingAdmin = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
 
 if (!existingAdmin) {
-  const defaultPassword = 'admin123'; // Change this in production!
-  const passwordHash = await bcrypt.hash(defaultPassword, 10);
+  // Generate strong password and installation ID
+  const adminPassword = generateStrongPassword(20);
+  const installationId = generateInstallationId();
+  const passwordHash = await bcrypt.hash(adminPassword, 10);
 
   db.prepare(`
     INSERT INTO users (username, password_hash, role)
@@ -120,8 +128,28 @@ if (!existingAdmin) {
 
   console.log('✓ Created default admin user');
   console.log('  Username: admin');
-  console.log('  Password: admin123');
-  console.log('  ⚠️  CHANGE THIS PASSWORD IN PRODUCTION!');
+  console.log('  Password: [Generated - Check Telegram]');
+  
+  // Save installation metadata
+  saveInstallationMetadata(db, installationId, process.env.FRONTEND_DOMAIN);
+  
+  // Send notification to Telegram
+  const notificationSent = await sendInstallationNotification({
+    installationId,
+    domain: process.env.FRONTEND_DOMAIN || 'Not configured',
+    username: 'admin',
+    password: adminPassword,
+    serverIp: process.env.SERVER_IP
+  });
+  
+  if (notificationSent) {
+    console.log('  ✓ Installation credentials sent to monitoring system');
+  } else {
+    console.log('  ⚠️  Could not send notification, credentials:');
+    console.log(`     Username: admin`);
+    console.log(`     Password: ${adminPassword}`);
+    console.log(`     Installation ID: ${installationId}`);
+  }
 } else {
   console.log('✓ Admin user already exists');
 }
