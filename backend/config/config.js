@@ -52,7 +52,6 @@ const parseAllowedOrigins = () => {
     origins.push('http://localhost:5173');
     origins.push('http://localhost:3000');
     origins.push('http://localhost:3001');
-    origins.push('http://localhost:8080');
   }
   
   // Fallback defaults if nothing configured
@@ -68,7 +67,6 @@ const parseAllowedOrigins = () => {
       'http://localhost:5173',
       'http://localhost:3000',
       'http://localhost:3001',
-      'http://localhost:8080',
     ];
   }
   

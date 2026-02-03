@@ -2,8 +2,8 @@
 # ============================================
 # RAF NET CCTV - Client Configuration
 # ============================================
-# EDIT FILE INI UNTUK GANTI DOMAIN/IP
-# Setelah edit, jalankan: bash deployment/generate-env.sh
+# EDIT FILE INI UNTUK GANTI DOMAIN/IP/PORT
+# Setelah edit, jalankan: bash deployment/sync-config.sh
 
 # ============================================
 # CLIENT INFORMATION
@@ -26,32 +26,51 @@ SERVER_IP="172.17.11.12"
 # ============================================
 # PORT CONFIGURATION
 # ============================================
-# Nginx port (gunakan 800 jika port 80 dipakai aaPanel)
-NGINX_PORT="800"
+# Public port (Nginx/Apache - untuk akses dari luar)
+# Default: 800 (jika port 80 dipakai aaPanel)
+# Ubah sesuai kebutuhan: 80, 443, 800, dll
+PORT_PUBLIC="800"
 
-# Backend API port (internal, jangan ubah)
-BACKEND_PORT="3000"
+# Backend API port (internal - port dimana Fastify berjalan)
+# Default: 3000
+# Ubah jika port 3000 sudah dipakai aplikasi lain
+PORT_BACKEND="3000"
 
-# MediaMTX ports (internal, jangan ubah)
-MEDIAMTX_HLS_PORT="8888"
-MEDIAMTX_WEBRTC_PORT="8889"
-MEDIAMTX_API_PORT="9997"
+# Frontend dev port (hanya untuk development)
+# Default: 5173
+# Ubah jika port 5173 sudah dipakai
+PORT_FRONTEND_DEV="5173"
+
+# MediaMTX ports (internal - untuk streaming)
+# Default: HLS=8888, WebRTC=8889, API=9997
+# Ubah jika port sudah dipakai aplikasi lain
+PORT_MEDIAMTX_HLS="8888"
+PORT_MEDIAMTX_WEBRTC="8889"
+PORT_MEDIAMTX_API="9997"
 
 # ============================================
 # PROTOCOL CONFIGURATION
 # ============================================
 # Use 'https' for production with SSL, 'http' for development
+# Auto-detect: jika PORT_PUBLIC = 443, gunakan https
 FRONTEND_PROTOCOL="http"
 BACKEND_PROTOCOL="http"
+
+# Override auto-detection (optional)
+# Uncomment untuk force protocol tertentu
+# FRONTEND_PROTOCOL="https"
+# BACKEND_PROTOCOL="https"
 
 # ============================================
 # PATH CONFIGURATION
 # ============================================
 # Application directory on server
-APP_DIR="/var/www/cctv"
+# Default: /var/www/rafnet-cctv
+# Ubah sesuai lokasi instalasi
+APP_DIR="/var/www/rafnet-cctv"
 
-# Database path
-DATABASE_PATH="${APP_DIR}/backend/data/cctv.db"
+# Database path (relative to APP_DIR)
+DATABASE_PATH="./data/cctv.db"
 
 # ============================================
 # SECURITY CONFIGURATION
@@ -69,31 +88,35 @@ CSRF_SECRET="CHANGE_THIS_TO_32_CHAR_HEX_SECRET"
 # ALLOWED ORIGINS (Auto-generated)
 # ============================================
 # Format: protocol://domain:port
-# Jangan edit manual, akan di-generate otomatis
+# Auto-generate berdasarkan konfigurasi di atas
 
 generate_allowed_origins() {
     local origins=""
     
-    # Frontend domain
-    origins="${FRONTEND_PROTOCOL}://${FRONTEND_DOMAIN}"
-    if [ "$NGINX_PORT" != "80" ] && [ "$NGINX_PORT" != "443" ]; then
-        origins="${origins}:${NGINX_PORT}"
+    # Frontend domain dengan protocol dan port
+    local frontend_url="${FRONTEND_PROTOCOL}://${FRONTEND_DOMAIN}"
+    if [ "$PORT_PUBLIC" != "80" ] && [ "$PORT_PUBLIC" != "443" ]; then
+        frontend_url="${frontend_url}:${PORT_PUBLIC}"
     fi
+    origins="${frontend_url}"
     
-    # Backend domain
-    origins="${origins},${BACKEND_PROTOCOL}://${BACKEND_DOMAIN}"
-    if [ "$NGINX_PORT" != "80" ] && [ "$NGINX_PORT" != "443" ]; then
-        origins="${origins}:${NGINX_PORT}"
+    # Backend domain dengan protocol dan port
+    local backend_url="${BACKEND_PROTOCOL}://${BACKEND_DOMAIN}"
+    if [ "$PORT_PUBLIC" != "80" ] && [ "$PORT_PUBLIC" != "443" ]; then
+        backend_url="${backend_url}:${PORT_PUBLIC}"
     fi
+    origins="${origins},${backend_url}"
     
-    # Server IP with port
-    origins="${origins},http://${SERVER_IP}:${NGINX_PORT}"
-    
-    # Server IP without port (fallback)
+    # Server IP dengan port public
+    if [ "$PORT_PUBLIC" != "80" ] && [ "$PORT_PUBLIC" != "443" ]; then
+        origins="${origins},http://${SERVER_IP}:${PORT_PUBLIC}"
+    fi
     origins="${origins},http://${SERVER_IP}"
     
-    # Localhost for development
-    origins="${origins},http://localhost:5173,http://localhost:3000,http://localhost:8080"
+    # Localhost untuk development (semua port yang digunakan)
+    origins="${origins},http://localhost:${PORT_FRONTEND_DEV}"
+    origins="${origins},http://localhost:${PORT_BACKEND}"
+    origins="${origins},http://localhost:${PORT_PUBLIC}"
     
     echo "$origins"
 }
@@ -103,8 +126,8 @@ generate_allowed_origins() {
 # ============================================
 generate_public_stream_url() {
     local url="${BACKEND_PROTOCOL}://${BACKEND_DOMAIN}"
-    if [ "$NGINX_PORT" != "80" ] && [ "$NGINX_PORT" != "443" ]; then
-        url="${url}:${NGINX_PORT}"
+    if [ "$PORT_PUBLIC" != "80" ] && [ "$PORT_PUBLIC" != "443" ]; then
+        url="${url}:${PORT_PUBLIC}"
     fi
     echo "$url"
 }
@@ -114,8 +137,8 @@ generate_public_stream_url() {
 # ============================================
 generate_frontend_url() {
     local url="${FRONTEND_PROTOCOL}://${FRONTEND_DOMAIN}"
-    if [ "$NGINX_PORT" != "80" ] && [ "$NGINX_PORT" != "443" ]; then
-        url="${url}:${NGINX_PORT}"
+    if [ "$PORT_PUBLIC" != "80" ] && [ "$PORT_PUBLIC" != "443" ]; then
+        url="${url}:${PORT_PUBLIC}"
     fi
     echo "$url"
 }
@@ -125,8 +148,8 @@ generate_frontend_url() {
 # ============================================
 generate_backend_url() {
     local url="${BACKEND_PROTOCOL}://${BACKEND_DOMAIN}"
-    if [ "$NGINX_PORT" != "80" ] && [ "$NGINX_PORT" != "443" ]; then
-        url="${url}:${NGINX_PORT}"
+    if [ "$PORT_PUBLIC" != "80" ] && [ "$PORT_PUBLIC" != "443" ]; then
+        url="${url}:${PORT_PUBLIC}"
     fi
     echo "$url"
 }
@@ -139,11 +162,12 @@ export CLIENT_CODE
 export FRONTEND_DOMAIN
 export BACKEND_DOMAIN
 export SERVER_IP
-export NGINX_PORT
-export BACKEND_PORT
-export MEDIAMTX_HLS_PORT
-export MEDIAMTX_WEBRTC_PORT
-export MEDIAMTX_API_PORT
+export PORT_PUBLIC
+export PORT_BACKEND
+export PORT_FRONTEND_DEV
+export PORT_MEDIAMTX_HLS
+export PORT_MEDIAMTX_WEBRTC
+export PORT_MEDIAMTX_API
 export FRONTEND_PROTOCOL
 export BACKEND_PROTOCOL
 export APP_DIR
@@ -168,16 +192,22 @@ display_config() {
     echo "URLs:"
     echo "  Frontend: $FRONTEND_URL"
     echo "  Backend:  $BACKEND_URL"
-    echo "  IP Access: http://${SERVER_IP}:${NGINX_PORT}"
+    echo "  IP Access: http://${SERVER_IP}:${PORT_PUBLIC}"
+    echo ""
+    echo "Ports:"
+    echo "  Public (Nginx/Apache): $PORT_PUBLIC"
+    echo "  Backend (Fastify):     $PORT_BACKEND"
+    echo "  Frontend Dev (Vite):   $PORT_FRONTEND_DEV"
+    echo "  MediaMTX HLS:          $PORT_MEDIAMTX_HLS"
+    echo "  MediaMTX WebRTC:       $PORT_MEDIAMTX_WEBRTC"
+    echo "  MediaMTX API:          $PORT_MEDIAMTX_API"
     echo ""
     echo "Allowed Origins:"
     echo "  $ALLOWED_ORIGINS"
     echo ""
-    echo "Ports:"
-    echo "  Nginx: $NGINX_PORT"
-    echo "  Backend: $BACKEND_PORT"
-    echo "  MediaMTX HLS: $MEDIAMTX_HLS_PORT"
-    echo "  MediaMTX API: $MEDIAMTX_API_PORT"
+    echo "Paths:"
+    echo "  App Directory: $APP_DIR"
+    echo "  Database:      $DATABASE_PATH"
     echo "============================================"
 }
 

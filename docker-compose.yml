@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  cctv-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rafnet-cctv
+    restart: unless-stopped
+    ports:
+      - "3000:3000"    # Backend API
+      - "8888:8888"    # MediaMTX HLS
+      - "8889:8889"    # MediaMTX WebRTC
+      - "9997:9997"    # MediaMTX API
+    volumes:
+      # Persistent data
+      - ./backend/data:/app/backend/data
+      - ./recordings:/app/recordings
+      - ./logs:/app/logs
+      # Configuration (can be edited without rebuild)
+      - ./backend/.env:/app/backend/.env:ro
+      - ./mediamtx/mediamtx.yml:/app/mediamtx/mediamtx.yml:ro
+    environment:
+      - NODE_ENV=production
+      - TZ=Asia/Jakarta
+    networks:
+      - cctv-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  nginx:
+    image: nginx:alpine
+    container_name: rafnet-cctv-nginx
+    restart: unless-stopped
+    ports:
+      - "800:80"       # Public HTTP
+      - "443:443"      # Public HTTPS (if SSL enabled)
+    volumes:
+      - ./frontend/dist:/usr/share/nginx/html:ro
+      - ./deployment/nginx-docker.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro  # Optional SSL certificates
+    depends_on:
+      - cctv-app
+    networks:
+      - cctv-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  cctv-network:
+    driver: bridge
+
+volumes:
+  cctv-data:
+  cctv-recordings:
