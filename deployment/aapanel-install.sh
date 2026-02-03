@@ -115,13 +115,9 @@ JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('he
 API_KEY_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" 2>/dev/null || openssl rand -hex 32)
 CSRF_SECRET=$(node -e "console.log(require('crypto').randomBytes(16).toString('hex'))" 2>/dev/null || openssl rand -hex 16)
 
-# Generate URLs (primary domain)
+# Generate URLs (primary domain - always without port)
 FRONTEND_URL="${FRONTEND_PROTOCOL}://${FRONTEND_DOMAIN}"
 BACKEND_URL="${BACKEND_PROTOCOL}://${BACKEND_DOMAIN}"
-if [ "$PORT_PUBLIC" != "80" ] && [ "$PORT_PUBLIC" != "443" ]; then
-    FRONTEND_URL="${FRONTEND_URL}:${PORT_PUBLIC}"
-    BACKEND_URL="${BACKEND_URL}:${PORT_PUBLIC}"
-fi
 
 # ============================================
 # GENERATE ALLOWED ORIGINS (HTTP + HTTPS)
