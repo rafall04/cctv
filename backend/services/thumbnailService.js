@@ -23,12 +23,41 @@ class ThumbnailService {
     constructor() {
         this.isGenerating = false;
         this.generationInterval = null;
+        this.ffmpegAvailable = null;
+    }
+
+    /**
+     * Check if FFmpeg is available
+     */
+    async checkFFmpeg() {
+        if (this.ffmpegAvailable !== null) {
+            return this.ffmpegAvailable;
+        }
+
+        try {
+            await execAsync('ffmpeg -version', { timeout: 3000 });
+            this.ffmpegAvailable = true;
+            console.log('[Thumbnail] FFmpeg detected ✓');
+            return true;
+        } catch (error) {
+            this.ffmpegAvailable = false;
+            console.warn('[Thumbnail] FFmpeg not found - thumbnail generation disabled');
+            console.warn('[Thumbnail] Install FFmpeg: https://ffmpeg.org/download.html');
+            return false;
+        }
     }
 
     /**
      * Start periodic thumbnail generation (every 5 minutes)
      */
-    start() {
+    async start() {
+        // Check FFmpeg availability first
+        const hasFFmpeg = await this.checkFFmpeg();
+        if (!hasFFmpeg) {
+            console.log('[Thumbnail] Service disabled (FFmpeg not available)');
+            return;
+        }
+
         console.log('[Thumbnail] Service started - generating every 5 minutes');
         
         // Initial generation after 10 seconds
@@ -55,6 +84,11 @@ class ThumbnailService {
      * Generate thumbnails for all enabled cameras
      */
     async generateAllThumbnails() {
+        // Skip if FFmpeg not available
+        if (this.ffmpegAvailable === false) {
+            return;
+        }
+
         if (this.isGenerating) {
             console.log('[Thumbnail] Generation already in progress, skipping...');
             return;
