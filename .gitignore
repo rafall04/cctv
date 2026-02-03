@@ -89,3 +89,6 @@ id_rsa.pub
 *.cer
 *.p12
 *.pfx
+
+# Generated client configuration (per-installation)
+deployment/client.config.sh

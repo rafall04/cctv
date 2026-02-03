@@ -1,98 +1,421 @@
 #!/bin/bash
-
-# RAF NET CCTV - Ubuntu 20.04 Production Installer
-# Domains: cctv.raf.my.id (Frontend), api-cctv.raf.my.id (Backend)
-# IP: 172.17.11.12
+# RAF NET CCTV - Ubuntu Interactive Installer
+# Run as root: sudo bash deployment/install.sh
 
 set -e
 
-echo "🚀 Starting RAF NET CCTV Production Installation..."
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
 
-# 1. Update System
-echo "📦 Updating system packages..."
-sudo apt update && sudo apt upgrade -y
-sudo apt install -y curl wget git build-essential nginx sqlite3 certbot python3-certbot-nginx
+print_success() { echo -e "${GREEN}✓ $1${NC}"; }
+print_error() { echo -e "${RED}✗ $1${NC}"; }
+print_info() { echo -e "${YELLOW}ℹ $1${NC}"; }
+print_header() { echo -e "${BLUE}$1${NC}"; }
 
-# 2. Install Node.js 20
-echo "🟢 Installing Node.js 20..."
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs
+echo ""
+print_header "🚀 RAF NET CCTV - Interactive Installation"
+print_header "============================================"
+echo ""
 
-# 3. Install PM2
-echo "🔄 Installing PM2..."
-sudo npm install -g pm2
+# Check root
+if [ "$EUID" -ne 0 ]; then 
+    print_error "Please run as root: sudo bash deployment/install.sh"
+    exit 1
+fi
 
-# 4. Setup Project Directory
-echo "📁 Setting up project directory..."
-sudo mkdir -p /var/www/cctv
-sudo chown -R $USER:$USER /var/www/cctv
-cd /var/www/cctv
+# ============================================
+# INTERACTIVE CONFIGURATION
+# ============================================
+print_header "📝 Installation Configuration"
+echo ""
 
-# 5. Clone/Copy Project Files
-# (Assuming files are already uploaded or cloned to this directory)
-# If cloning: git clone <repo_url> .
+# Auto-detect IP
+DETECTED_IP=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "")
 
-# 6. Install Backend Dependencies
-echo "🛠 Setting up Backend..."
-cd backend
+# Client Name
+read -p "Client Name [RAF NET]: " CLIENT_NAME
+CLIENT_NAME=${CLIENT_NAME:-"RAF NET"}
+CLIENT_CODE=$(echo "$CLIENT_NAME" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+
+# Frontend Domain
+read -p "Frontend Domain (e.g., cctv.client.com): " FRONTEND_DOMAIN
+while [ -z "$FRONTEND_DOMAIN" ]; do
+    print_error "Frontend domain is required!"
+    read -p "Frontend Domain: " FRONTEND_DOMAIN
+done
+
+# Backend Domain
+read -p "Backend Domain (e.g., api-cctv.client.com): " BACKEND_DOMAIN
+while [ -z "$BACKEND_DOMAIN" ]; then
+    print_error "Backend domain is required!"
+    read -p "Backend Domain: " BACKEND_DOMAIN
+done
+
+# Server IP
+read -p "Server IP [$DETECTED_IP]: " SERVER_IP
+SERVER_IP=${SERVER_IP:-$DETECTED_IP}
+
+# Ports
+read -p "Public Port [800]: " PORT_PUBLIC
+PORT_PUBLIC=${PORT_PUBLIC:-800}
+
+read -p "Backend Port [3000]: " PORT_BACKEND
+PORT_BACKEND=${PORT_BACKEND:-3000}
+
+read -p "MediaMTX HLS Port [8888]: " PORT_MEDIAMTX_HLS
+PORT_MEDIAMTX_HLS=${PORT_MEDIAMTX_HLS:-8888}
+
+read -p "MediaMTX WebRTC Port [8889]: " PORT_MEDIAMTX_WEBRTC
+PORT_MEDIAMTX_WEBRTC=${PORT_MEDIAMTX_WEBRTC:-8889}
+
+read -p "MediaMTX API Port [9997]: " PORT_MEDIAMTX_API
+PORT_MEDIAMTX_API=${PORT_MEDIAMTX_API:-9997}
+
+# App Directory
+read -p "Installation Directory [/var/www/cctv]: " APP_DIR
+APP_DIR=${APP_DIR:-"/var/www/cctv"}
+
+# Protocol (auto-detect from port)
+if [ "$PORT_PUBLIC" = "443" ]; then
+    FRONTEND_PROTOCOL="https"
+    BACKEND_PROTOCOL="https"
+else
+    FRONTEND_PROTOCOL="http"
+    BACKEND_PROTOCOL="http"
+fi
+
+# Generate secrets
+print_info "Generating security secrets..."
+JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" 2>/dev/null || openssl rand -hex 32)
+API_KEY_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" 2>/dev/null || openssl rand -hex 32)
+CSRF_SECRET=$(node -e "console.log(require('crypto').randomBytes(16).toString('hex'))" 2>/dev/null || openssl rand -hex 16)
+
+# Generate URLs
+FRONTEND_URL="${FRONTEND_PROTOCOL}://${FRONTEND_DOMAIN}"
+BACKEND_URL="${BACKEND_PROTOCOL}://${BACKEND_DOMAIN}"
+if [ "$PORT_PUBLIC" != "80" ] && [ "$PORT_PUBLIC" != "443" ]; then
+    FRONTEND_URL="${FRONTEND_URL}:${PORT_PUBLIC}"
+    BACKEND_URL="${BACKEND_URL}:${PORT_PUBLIC}"
+fi
+
+# Generate allowed origins
+ALLOWED_ORIGINS="${FRONTEND_URL},${BACKEND_URL}"
+if [ "$PORT_PUBLIC" != "80" ] && [ "$PORT_PUBLIC" != "443" ]; then
+    ALLOWED_ORIGINS="${ALLOWED_ORIGINS},http://${SERVER_IP}:${PORT_PUBLIC}"
+fi
+ALLOWED_ORIGINS="${ALLOWED_ORIGINS},http://${SERVER_IP}"
+ALLOWED_ORIGINS="${ALLOWED_ORIGINS},http://localhost:${PORT_BACKEND}"
+
+# ============================================
+# CONFIRMATION
+# ============================================
+echo ""
+print_header "============================================"
+print_header "📋 Configuration Summary"
+print_header "============================================"
+echo ""
+echo "Client:        $CLIENT_NAME ($CLIENT_CODE)"
+echo "Frontend URL:  $FRONTEND_URL"
+echo "Backend URL:   $BACKEND_URL"
+echo "Server IP:     $SERVER_IP"
+echo "App Directory: $APP_DIR"
+echo ""
+echo "Ports:"
+echo "  Public:         $PORT_PUBLIC"
+echo "  Backend:        $PORT_BACKEND"
+echo "  MediaMTX HLS:   $PORT_MEDIAMTX_HLS"
+echo "  MediaMTX WebRTC: $PORT_MEDIAMTX_WEBRTC"
+echo "  MediaMTX API:   $PORT_MEDIAMTX_API"
+echo ""
+read -p "Continue with installation? [Y/n]: " CONFIRM
+CONFIRM=${CONFIRM:-Y}
+if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
+    print_info "Installation cancelled"
+    exit 0
+fi
+
+# ============================================
+# GENERATE CLIENT CONFIG
+# ============================================
+echo ""
+print_info "Generating client configuration..."
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+cat > "${SCRIPT_DIR}/client.config.sh" << EOF
+#!/bin/bash
+# RAF NET CCTV - Client Configuration
+# Auto-generated by installer
+# Generated: $(date)
+# DO NOT EDIT MANUALLY - Regenerate with installer
+
+# Client Information
+CLIENT_NAME="$CLIENT_NAME"
+CLIENT_CODE="$CLIENT_CODE"
+
+# Domain Configuration
+FRONTEND_DOMAIN="$FRONTEND_DOMAIN"
+BACKEND_DOMAIN="$BACKEND_DOMAIN"
+SERVER_IP="$SERVER_IP"
+
+# Port Configuration
+PORT_PUBLIC="$PORT_PUBLIC"
+PORT_BACKEND="$PORT_BACKEND"
+PORT_FRONTEND_DEV="5173"
+PORT_MEDIAMTX_HLS="$PORT_MEDIAMTX_HLS"
+PORT_MEDIAMTX_WEBRTC="$PORT_MEDIAMTX_WEBRTC"
+PORT_MEDIAMTX_API="$PORT_MEDIAMTX_API"
+
+# Protocol Configuration
+FRONTEND_PROTOCOL="$FRONTEND_PROTOCOL"
+BACKEND_PROTOCOL="$BACKEND_PROTOCOL"
+
+# Path Configuration
+APP_DIR="$APP_DIR"
+DATABASE_PATH="./data/cctv.db"
+
+# Security Configuration
+JWT_SECRET="$JWT_SECRET"
+API_KEY_SECRET="$API_KEY_SECRET"
+CSRF_SECRET="$CSRF_SECRET"
+
+# Generated URLs
+FRONTEND_URL="$FRONTEND_URL"
+BACKEND_URL="$BACKEND_URL"
+ALLOWED_ORIGINS="$ALLOWED_ORIGINS"
+PUBLIC_STREAM_BASE_URL="$BACKEND_URL"
+
+# Nginx Configuration
+NGINX_PORT="$PORT_PUBLIC"
+BACKEND_PORT="$PORT_BACKEND"
+MEDIAMTX_HLS_PORT="$PORT_MEDIAMTX_HLS"
+MEDIAMTX_WEBRTC_PORT="$PORT_MEDIAMTX_WEBRTC"
+MEDIAMTX_API_PORT="$PORT_MEDIAMTX_API"
+
+# Export all variables
+export CLIENT_NAME CLIENT_CODE
+export FRONTEND_DOMAIN BACKEND_DOMAIN SERVER_IP
+export PORT_PUBLIC PORT_BACKEND PORT_FRONTEND_DEV
+export PORT_MEDIAMTX_HLS PORT_MEDIAMTX_WEBRTC PORT_MEDIAMTX_API
+export FRONTEND_PROTOCOL BACKEND_PROTOCOL
+export APP_DIR DATABASE_PATH
+export JWT_SECRET API_KEY_SECRET CSRF_SECRET
+export FRONTEND_URL BACKEND_URL ALLOWED_ORIGINS PUBLIC_STREAM_BASE_URL
+export NGINX_PORT BACKEND_PORT
+export MEDIAMTX_HLS_PORT MEDIAMTX_WEBRTC_PORT MEDIAMTX_API_PORT
+EOF
+
+chmod +x "${SCRIPT_DIR}/client.config.sh"
+print_success "Client configuration generated"
+
+# Load configuration
+source "${SCRIPT_DIR}/client.config.sh"
+
+# ============================================
+# UPDATE SYSTEM
+# ============================================
+echo ""
+print_info "Updating system packages..."
+apt update && apt upgrade -y
+apt install -y curl wget git build-essential nginx sqlite3 certbot python3-certbot-nginx
+
+# ============================================
+# INSTALL NODE.JS
+# ============================================
+echo ""
+print_info "Installing Node.js 20..."
+if ! command -v node &> /dev/null; then
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    apt install -y nodejs
+fi
+print_success "Node.js $(node --version)"
+
+# ============================================
+# INSTALL PM2
+# ============================================
+echo ""
+print_info "Installing PM2..."
+if ! command -v pm2 &> /dev/null; then
+    npm install -g pm2
+fi
+print_success "PM2 $(pm2 --version)"
+
+# ============================================
+# INSTALL FFMPEG
+# ============================================
+echo ""
+print_info "Installing FFmpeg..."
+if ! command -v ffmpeg &> /dev/null; then
+    apt install -y ffmpeg
+fi
+print_success "FFmpeg installed"
+
+# ============================================
+# SETUP PROJECT
+# ============================================
+echo ""
+print_info "Setting up project directory..."
+
+if [ -d "$APP_DIR" ]; then
+    print_info "Directory exists, backing up..."
+    mv "$APP_DIR" "${APP_DIR}.backup.$(date +%Y%m%d_%H%M%S)"
+fi
+
+mkdir -p "$APP_DIR"
+chown -R $USER:$USER "$APP_DIR"
+git clone https://github.com/rafall04/cctv.git "$APP_DIR"
+cd "$APP_DIR"
+
+# Copy client config
+cp "${SCRIPT_DIR}/client.config.sh" "$APP_DIR/deployment/"
+
+print_success "Repository cloned"
+
+# ============================================
+# GENERATE ENVIRONMENT FILES
+# ============================================
+echo ""
+print_info "Generating environment files..."
+bash "$APP_DIR/deployment/generate-env.sh"
+print_success "Environment files generated"
+
+# ============================================
+# SETUP BACKEND
+# ============================================
+echo ""
+print_info "Setting up backend..."
+cd "$APP_DIR/backend"
 npm install --production
 mkdir -p data
-# Copy production env
-cp ../deployment/backend.env.prod .env
-# Setup Database
+
+print_info "Initializing database..."
 npm run setup-db
-cd ..
 
-# 7. Install Frontend Dependencies & Build
-echo "🏗 Setting up Frontend..."
-cd frontend
+print_info "Running migrations..."
+if [ -d "database/migrations" ]; then
+    for migration in database/migrations/*.js; do
+        if [ -f "$migration" ]; then
+            node "$migration" || true
+        fi
+    done
+fi
+
+mkdir -p "$APP_DIR/recordings"
+chmod 755 "$APP_DIR/recordings"
+
+print_success "Backend setup complete"
+
+# ============================================
+# SETUP FRONTEND
+# ============================================
+echo ""
+print_info "Setting up frontend..."
+cd "$APP_DIR/frontend"
 npm install
-# Copy production env
-cp ../deployment/frontend.env.prod .env.production
 npm run build
-# Install a simple static server for PM2 visibility (optional but helpful for 'automatic' feel)
-sudo npm install -g serve
-cd ..
+print_success "Frontend built"
 
-# 8. Install MediaMTX
-echo "📹 Installing MediaMTX..."
-MEDIAMTX_VERSION="v1.9.3"
-wget https://github.com/bluenviron/mediamtx/releases/download/${MEDIAMTX_VERSION}/mediamtx_${MEDIAMTX_VERSION}_linux_amd64.tar.gz
+# ============================================
+# SETUP MEDIAMTX
+# ============================================
+echo ""
+print_info "Setting up MediaMTX..."
+cd "$APP_DIR"
 mkdir -p mediamtx
-tar -xf mediamtx_${MEDIAMTX_VERSION}_linux_amd64.tar.gz -C mediamtx
+cd mediamtx
+
+MEDIAMTX_VERSION="v1.9.0"
+wget -q https://github.com/bluenviron/mediamtx/releases/download/${MEDIAMTX_VERSION}/mediamtx_${MEDIAMTX_VERSION}_linux_amd64.tar.gz
+tar -xzf mediamtx_${MEDIAMTX_VERSION}_linux_amd64.tar.gz
 rm mediamtx_${MEDIAMTX_VERSION}_linux_amd64.tar.gz
-# Ensure binary is executable
-chmod +x mediamtx/mediamtx
-# Copy production config
-cp deployment/mediamtx.yml mediamtx/mediamtx.yml
+chmod +x mediamtx
 
-# 9. Configure Nginx
-echo "🌐 Configuring Nginx..."
-sudo cp deployment/nginx.conf /etc/nginx/sites-available/cctv
-sudo ln -sf /etc/nginx/sites-available/cctv /etc/nginx/sites-enabled/
-sudo rm -f /etc/nginx/sites-enabled/default
-sudo nginx -t
-sudo systemctl restart nginx
+if [ -f "$APP_DIR/deployment/mediamtx.yml" ]; then
+    cp "$APP_DIR/deployment/mediamtx.yml" mediamtx.yml
+fi
 
-# 10. Start Services with PM2
-echo "🚀 Starting Services..."
-# Start everything (Backend, Frontend, MediaMTX) via ecosystem config
-pm2 start deployment/ecosystem.config.cjs --env production
+print_success "MediaMTX configured"
 
-# Save PM2 state
+# ============================================
+# CONFIGURE NGINX
+# ============================================
+echo ""
+print_info "Configuring Nginx..."
+
+# Generate nginx config
+bash "$APP_DIR/deployment/generate-env.sh"
+
+cp "$APP_DIR/deployment/nginx.generated.conf" /etc/nginx/sites-available/${CLIENT_CODE}-cctv
+ln -sf /etc/nginx/sites-available/${CLIENT_CODE}-cctv /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+
+nginx -t
+systemctl restart nginx
+
+print_success "Nginx configured"
+
+# ============================================
+# START SERVICES
+# ============================================
+echo ""
+print_info "Starting services with PM2..."
+cd "$APP_DIR"
+mkdir -p logs
+
+pm2 delete ${CLIENT_CODE}-cctv-backend 2>/dev/null || true
+pm2 delete ${CLIENT_CODE}-mediamtx 2>/dev/null || true
+
+pm2 start deployment/ecosystem.config.cjs
 pm2 save
-sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u $USER --hp /home/$USER
+pm2 startup | tail -n 1 | bash || true
 
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "✅ Installation Completed Successfully!"
-echo "🌍 Frontend: https://cctv.raf.my.id (Proxied via Nginx)"
-echo "📡 Backend:  https://api-cctv.raf.my.id"
-echo "📊 PM2 Status:"
+print_success "Services started"
+
+# ============================================
+# FIREWALL
+# ============================================
+echo ""
+print_info "Configuring firewall..."
+if command -v ufw &> /dev/null; then
+    ufw allow ${PORT_PUBLIC}/tcp
+    ufw allow 443/tcp
+    print_success "Firewall configured"
+fi
+
+# ============================================
+# SUMMARY
+# ============================================
+echo ""
+print_header "============================================"
+print_header "✅ Installation Complete!"
+print_header "============================================"
+echo ""
+echo "🌐 Access URLs:"
+echo "   Frontend: $FRONTEND_URL"
+echo "   Backend:  $BACKEND_URL"
+echo ""
+echo "🔑 Admin Credentials:"
+echo "   Username: admin"
+echo "   Password: [Check Telegram]"
+echo "   ⚠️  Credentials sent to your Telegram"
+echo ""
+echo "📊 Service Status:"
 pm2 list
 echo ""
-echo "⚠️  Next Steps:"
-echo "1. Run 'sudo certbot --nginx' to enable SSL for both domains."
-echo "2. Ensure ports 800, 443, 1935 (RTMP), 8888 (HLS), 8889 (WebRTC) are open in your firewall."
-echo "3. Update your DNS A records to point to 172.17.11.12."
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📝 Next Steps:"
+echo "   1. Setup SSL: sudo certbot --nginx"
+echo "   2. Generate API Key from admin panel"
+echo "   3. Update frontend/.env with API key"
+echo "   4. Rebuild frontend: cd $APP_DIR/frontend && npm run build"
+echo ""
+echo "📁 Important Paths:"
+echo "   App:        $APP_DIR"
+echo "   Config:     $APP_DIR/deployment/client.config.sh"
+echo "   Recordings: $APP_DIR/recordings"
+echo "   Database:   $APP_DIR/backend/data/cctv.db"
+echo ""
+print_header "============================================"

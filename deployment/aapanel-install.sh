@@ -1,610 +1,447 @@
 #!/bin/bash
-# RAF NET CCTV - aaPanel Quick Install Script
-# Run as root: bash aapanel-install.sh
+# RAF NET CCTV - aaPanel Interactive Installer
+# Run as root: bash deployment/aapanel-install.sh
 
 set -e
-
-echo "🚀 RAF CCTV - aaPanel Installation"
-echo "========================================"
-
-# Configuration
-APP_DIR="/var/www/cctv"
-REPO_URL="https://github.com/rafall04/cctv.git"
-DOMAIN_FRONTEND="sicamdes.semarnet.id"
-DOMAIN_BACKEND="api-sicamdes.semarnet.id"
-PORT=800
 
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+BLUE='\033[0;34m'
+NC='\033[0m'
 
-# Functions
-print_success() {
-    echo -e "${GREEN}✓ $1${NC}"
-}
+print_success() { echo -e "${GREEN}✓ $1${NC}"; }
+print_error() { echo -e "${RED}✗ $1${NC}"; }
+print_info() { echo -e "${YELLOW}ℹ $1${NC}"; }
+print_header() { echo -e "${BLUE}$1${NC}"; }
 
-print_error() {
-    echo -e "${RED}✗ $1${NC}"
-}
+echo ""
+print_header "🚀 RAF NET CCTV - Interactive Installation"
+print_header "============================================"
+echo ""
 
-print_info() {
-    echo -e "${YELLOW}ℹ $1${NC}"
-}
+# Check root
+if [ "$EUID" -ne 0 ]; then 
+    print_error "Please run as root: sudo bash deployment/aapanel-install.sh"
+    exit 1
+fi
 
-check_root() {
-    if [ "$EUID" -ne 0 ]; then 
-        print_error "Please run as root"
-        exit 1
-    fi
-    print_success "Running as root"
-}
+# ============================================
+# INTERACTIVE CONFIGURATION
+# ============================================
+print_header "📝 Installation Configuration"
+echo ""
 
-check_dependencies() {
-    echo ""
-    echo "📋 Checking dependencies..."
-    
-    # Source profile to ensure proper environment (important for aaPanel terminal)
-    if [ -f /etc/profile ]; then
-        source /etc/profile
-    fi
-    if [ -f ~/.bashrc ]; then
-        source ~/.bashrc
-    fi
-    if [ -f ~/.bash_profile ]; then
-        source ~/.bash_profile
-    fi
-    
-    # Check Node.js
-    if ! command -v node &> /dev/null; then
-        print_error "Node.js not found. Installing..."
-        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-        apt install -y nodejs
-    fi
-    NODE_VERSION=$(node --version)
-    print_success "Node.js $NODE_VERSION"
-    
-    # Check npm
-    if ! command -v npm &> /dev/null; then
-        print_error "npm not found"
-        exit 1
-    fi
-    NPM_VERSION=$(npm --version)
-    print_success "npm $NPM_VERSION"
-    
-    # Check PM2 - ROBUST VERSION for aaPanel
-    if ! command -v pm2 &> /dev/null; then
-        print_info "Installing PM2..."
-        npm install -g pm2
-        
-        print_info "Configuring PM2 path for aaPanel environment..."
-        
-        # Get npm prefix
-        NPM_PREFIX=$(npm config get prefix 2>/dev/null || echo "/usr/local")
-        print_info "npm prefix: $NPM_PREFIX"
-        
-        # Try multiple possible locations
-        POSSIBLE_PATHS=(
-            "$NPM_PREFIX/bin"
-            "/usr/local/bin"
-            "/usr/bin"
-            "/root/.npm-global/bin"
-            "/www/server/nodejs/bin"
-            "$(npm root -g 2>/dev/null)/../bin"
-        )
-        
-        PM2_FOUND=false
-        for PM2_PATH in "${POSSIBLE_PATHS[@]}"; do
-            if [ -f "$PM2_PATH/pm2" ]; then
-                print_info "Found PM2 at: $PM2_PATH/pm2"
-                export PATH="$PM2_PATH:$PATH"
-                
-                # Add to profile for persistence (important for aaPanel)
-                if ! grep -q "$PM2_PATH" ~/.bashrc 2>/dev/null; then
-                    echo "export PATH=\"$PM2_PATH:\$PATH\"" >> ~/.bashrc
-                    print_info "Added PM2 path to ~/.bashrc"
-                fi
-                
-                PM2_FOUND=true
-                break
-            fi
-        done
-        
-        # If still not found, search entire system
-        if [ "$PM2_FOUND" = false ]; then
-            print_info "Searching for PM2 in system (this may take a moment)..."
-            PM2_LOCATION=$(find /usr /root /www -name pm2 -type f 2>/dev/null | grep -E 'bin/pm2$' | head -n 1)
-            if [ -n "$PM2_LOCATION" ]; then
-                PM2_DIR=$(dirname "$PM2_LOCATION")
-                export PATH="$PM2_DIR:$PATH"
-                
-                # Add to profile
-                if ! grep -q "$PM2_DIR" ~/.bashrc 2>/dev/null; then
-                    echo "export PATH=\"$PM2_DIR:\$PATH\"" >> ~/.bashrc
-                    print_info "Added PM2 path to ~/.bashrc"
-                fi
-                
-                print_info "Found PM2 at: $PM2_LOCATION"
-                PM2_FOUND=true
-            fi
-        fi
-        
-        # Reload environment
-        hash -r
-        source ~/.bashrc 2>/dev/null || true
-        
-        # Final verification
-        if ! command -v pm2 &> /dev/null; then
-            print_error "PM2 installation failed!"
-            echo ""
-            print_info "Debug info:"
-            echo "  npm prefix: $(npm config get prefix 2>/dev/null || echo 'N/A')"
-            echo "  npm root -g: $(npm root -g 2>/dev/null || echo 'N/A')"
-            echo "  Current PATH: $PATH"
-            echo ""
-            print_info "Searching for PM2 manually..."
-            find /usr /root /www -name pm2 -type f 2>/dev/null | grep bin || echo "  PM2 not found"
-            echo ""
-            print_error "Please run these commands manually:"
-            echo "  1. Find PM2: find /usr /root /www -name pm2 -type f 2>/dev/null | grep bin"
-            echo "  2. Add to PATH: export PATH=/path/to/pm2/bin:\$PATH"
-            echo "  3. Add to profile: echo 'export PATH=/path/to/pm2/bin:\$PATH' >> ~/.bashrc"
-            echo "  4. Reload: source ~/.bashrc"
-            echo "  5. Verify: pm2 --version"
-            echo "  6. Re-run: bash deployment/aapanel-install.sh"
-            exit 1
-        fi
-    fi
-    
-    PM2_VERSION=$(pm2 --version)
-    print_success "PM2 $PM2_VERSION"
-    
-    # Check Nginx or Apache
-    if command -v nginx &> /dev/null; then
-        print_success "Nginx installed"
-        WEB_SERVER="nginx"
-    elif command -v apache2 &> /dev/null || command -v httpd &> /dev/null; then
-        print_success "Apache installed"
-        WEB_SERVER="apache"
-        
-        # For aaPanel Apache, modules are usually compiled-in or managed via aaPanel UI
-        # We'll verify modules are available but won't try to enable them
-        print_info "Checking Apache modules..."
-        
-        APACHE_CMD="apache2"
-        if ! command -v apache2 &> /dev/null; then
-            APACHE_CMD="httpd"
-        fi
-        
-        # Check if modules are loaded
-        MISSING_MODULES=()
-        for module in proxy proxy_http headers; do
-            if ! $APACHE_CMD -M 2>/dev/null | grep -q "${module}_module"; then
-                MISSING_MODULES+=($module)
-            fi
-        done
-        
-        if [ ${#MISSING_MODULES[@]} -gt 0 ]; then
-            print_info "Some modules may need to be enabled: ${MISSING_MODULES[*]}"
-            print_info "aaPanel manages Apache modules via UI or config files"
-            echo ""
-            print_info "To enable modules in aaPanel Apache:"
-            echo "  1. Edit: /www/server/apache/conf/httpd.conf"
-            echo "  2. Uncomment (remove #) from these lines:"
-            for module in "${MISSING_MODULES[@]}"; do
-                echo "     LoadModule ${module}_module modules/mod_${module}.so"
-            done
-            echo "  3. Restart Apache: systemctl restart apache2"
-            echo ""
-            print_info "Or modules may already be compiled-in (check with: apache2 -M)"
-        else
-            print_success "Required Apache modules are loaded"
-        fi
-    else
-        print_error "No web server found!"
-        echo ""
-        print_info "Please install Nginx or ensure Apache is running:"
-        echo "  For Nginx: Install via aaPanel App Store"
-        echo "  For Apache: Should be pre-installed with aaPanel"
-        echo ""
-        print_info "Check web server status:"
-        echo "  systemctl status nginx"
-        echo "  systemctl status apache2"
-        exit 1
-    fi
-    
-    # Check Git
-    if ! command -v git &> /dev/null; then
-        print_info "Installing Git..."
-        apt install -y git
-    fi
-    print_success "Git installed"
-    
-    # Check FFmpeg (CRITICAL for recording)
-    if ! command -v ffmpeg &> /dev/null; then
-        print_info "Installing FFmpeg..."
-        apt update
-        apt install -y ffmpeg
-    fi
-    FFMPEG_VERSION=$(ffmpeg -version | head -n1 | cut -d' ' -f3)
-    print_success "FFmpeg $FFMPEG_VERSION"
-    
-    # Check ffprobe (comes with FFmpeg)
-    if ! command -v ffprobe &> /dev/null; then
-        print_error "ffprobe not found (should come with FFmpeg)"
-        exit 1
-    fi
-    print_success "ffprobe installed"
-}
+# Auto-detect IP
+DETECTED_IP=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "")
 
-clone_repository() {
-    echo ""
-    echo "📥 Cloning repository..."
-    
-    if [ -d "$APP_DIR" ]; then
-        print_info "Directory exists. Backing up..."
-        mv "$APP_DIR" "${APP_DIR}.backup.$(date +%Y%m%d_%H%M%S)"
-    fi
-    
-    mkdir -p "$APP_DIR"
-    git clone "$REPO_URL" "$APP_DIR"
-    cd "$APP_DIR"
-    print_success "Repository cloned"
-}
+# Client Name
+read -p "Client Name [RAF NET]: " CLIENT_NAME
+CLIENT_NAME=${CLIENT_NAME:-"RAF NET"}
+CLIENT_CODE=$(echo "$CLIENT_NAME" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
 
-setup_backend() {
-    echo ""
-    echo "🔧 Setting up backend..."
-    
-    cd "$APP_DIR/backend"
-    
-    # Install dependencies
-    print_info "Installing dependencies..."
-    npm install --production
-    
-    # Setup .env
-    if [ ! -f .env ]; then
-        print_info "Creating .env file..."
-        cp .env.example .env
-        
-        # Generate secrets
-        JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
-        CSRF_SECRET=$(node -e "console.log(require('crypto').randomBytes(16).toString('hex'))")
-        API_KEY_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
-        
-        # Update .env
-        sed -i "s|NODE_ENV=.*|NODE_ENV=production|g" .env
-        sed -i "s|JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|g" .env
-        sed -i "s|CSRF_SECRET=.*|CSRF_SECRET=$CSRF_SECRET|g" .env
-        sed -i "s|API_KEY_SECRET=.*|API_KEY_SECRET=$API_KEY_SECRET|g" .env
-        sed -i "s|ALLOWED_ORIGINS=.*|ALLOWED_ORIGINS=https://$DOMAIN_FRONTEND,http://$DOMAIN_FRONTEND:$PORT,http://172.17.11.12:$PORT|g" .env
-        
-        print_success ".env configured"
-    else
-        print_info ".env already exists, skipping"
-    fi
-    
-    # Setup database
-    print_info "Initializing database..."
-    mkdir -p data
-    npm run setup-db
-    print_success "Database initialized"
-    
-    # Run all migrations
-    print_info "Running database migrations..."
-    MIGRATION_DIR="database/migrations"
-    if [ -d "$MIGRATION_DIR" ]; then
-        MIGRATION_COUNT=0
-        for migration in "$MIGRATION_DIR"/*.js; do
-            if [ -f "$migration" ]; then
-                MIGRATION_NAME=$(basename "$migration")
-                print_info "Running migration: $MIGRATION_NAME"
-                if node "$migration"; then
-                    MIGRATION_COUNT=$((MIGRATION_COUNT + 1))
-                else
-                    print_error "Migration failed: $MIGRATION_NAME"
-                    exit 1
-                fi
-            fi
-        done
-        print_success "Completed $MIGRATION_COUNT migrations"
-    else
-        print_info "No migrations directory found, skipping"
-    fi
-    
-    # Setup recordings directory (CRITICAL for recording feature)
-    print_info "Creating recordings directory..."
-    mkdir -p "$APP_DIR/recordings"
-    chmod 755 "$APP_DIR/recordings"
-    print_success "Recordings directory created: $APP_DIR/recordings"
-}
+# Frontend Domain
+read -p "Frontend Domain (e.g., cctv.client.com): " FRONTEND_DOMAIN
+while [ -z "$FRONTEND_DOMAIN" ]; do
+    print_error "Frontend domain is required!"
+    read -p "Frontend Domain: " FRONTEND_DOMAIN
+done
 
-setup_frontend() {
-    echo ""
-    echo "🎨 Setting up frontend..."
-    
-    cd "$APP_DIR/frontend"
-    
-    # Install dependencies
-    print_info "Installing dependencies..."
-    npm install
-    
-    # Setup .env
-    print_info "Creating .env file..."
-    cat > .env << EOF
-# Backend API URL
-VITE_API_URL=https://$DOMAIN_BACKEND
+# Backend Domain
+read -p "Backend Domain (e.g., api-cctv.client.com): " BACKEND_DOMAIN
+while [ -z "$BACKEND_DOMAIN" ]; do
+    print_error "Backend domain is required!"
+    read -p "Backend Domain: " BACKEND_DOMAIN
+done
 
-# API Key - MUST be generated from admin panel after installation
-# Steps:
-# 1. Login to admin panel (admin/admin123)
-# 2. Go to Settings > API Keys
-# 3. Generate new key
-# 4. Update this file with the generated key
-# 5. Rebuild frontend: npm run build
-VITE_API_KEY=CHANGE_THIS_AFTER_INSTALLATION
+# Server IP
+read -p "Server IP [$DETECTED_IP]: " SERVER_IP
+SERVER_IP=${SERVER_IP:-$DETECTED_IP}
+
+# Ports
+read -p "Public Port [800]: " PORT_PUBLIC
+PORT_PUBLIC=${PORT_PUBLIC:-800}
+
+read -p "Backend Port [3000]: " PORT_BACKEND
+PORT_BACKEND=${PORT_BACKEND:-3000}
+
+read -p "MediaMTX HLS Port [8888]: " PORT_MEDIAMTX_HLS
+PORT_MEDIAMTX_HLS=${PORT_MEDIAMTX_HLS:-8888}
+
+read -p "MediaMTX WebRTC Port [8889]: " PORT_MEDIAMTX_WEBRTC
+PORT_MEDIAMTX_WEBRTC=${PORT_MEDIAMTX_WEBRTC:-8889}
+
+read -p "MediaMTX API Port [9997]: " PORT_MEDIAMTX_API
+PORT_MEDIAMTX_API=${PORT_MEDIAMTX_API:-9997}
+
+# App Directory
+read -p "Installation Directory [/var/www/cctv]: " APP_DIR
+APP_DIR=${APP_DIR:-"/var/www/cctv"}
+
+# Protocol (auto-detect from port)
+if [ "$PORT_PUBLIC" = "443" ]; then
+    FRONTEND_PROTOCOL="https"
+    BACKEND_PROTOCOL="https"
+else
+    FRONTEND_PROTOCOL="http"
+    BACKEND_PROTOCOL="http"
+fi
+
+# Generate secrets
+print_info "Generating security secrets..."
+JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" 2>/dev/null || openssl rand -hex 32)
+API_KEY_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" 2>/dev/null || openssl rand -hex 32)
+CSRF_SECRET=$(node -e "console.log(require('crypto').randomBytes(16).toString('hex'))" 2>/dev/null || openssl rand -hex 16)
+
+# Generate URLs
+FRONTEND_URL="${FRONTEND_PROTOCOL}://${FRONTEND_DOMAIN}"
+BACKEND_URL="${BACKEND_PROTOCOL}://${BACKEND_DOMAIN}"
+if [ "$PORT_PUBLIC" != "80" ] && [ "$PORT_PUBLIC" != "443" ]; then
+    FRONTEND_URL="${FRONTEND_URL}:${PORT_PUBLIC}"
+    BACKEND_URL="${BACKEND_URL}:${PORT_PUBLIC}"
+fi
+
+# Generate allowed origins
+ALLOWED_ORIGINS="${FRONTEND_URL},${BACKEND_URL}"
+if [ "$PORT_PUBLIC" != "80" ] && [ "$PORT_PUBLIC" != "443" ]; then
+    ALLOWED_ORIGINS="${ALLOWED_ORIGINS},http://${SERVER_IP}:${PORT_PUBLIC}"
+fi
+ALLOWED_ORIGINS="${ALLOWED_ORIGINS},http://${SERVER_IP}"
+ALLOWED_ORIGINS="${ALLOWED_ORIGINS},http://localhost:${PORT_BACKEND}"
+
+# ============================================
+# CONFIRMATION
+# ============================================
+echo ""
+print_header "============================================"
+print_header "📋 Configuration Summary"
+print_header "============================================"
+echo ""
+echo "Client:        $CLIENT_NAME ($CLIENT_CODE)"
+echo "Frontend URL:  $FRONTEND_URL"
+echo "Backend URL:   $BACKEND_URL"
+echo "Server IP:     $SERVER_IP"
+echo "App Directory: $APP_DIR"
+echo ""
+echo "Ports:"
+echo "  Public:         $PORT_PUBLIC"
+echo "  Backend:        $PORT_BACKEND"
+echo "  MediaMTX HLS:   $PORT_MEDIAMTX_HLS"
+echo "  MediaMTX WebRTC: $PORT_MEDIAMTX_WEBRTC"
+echo "  MediaMTX API:   $PORT_MEDIAMTX_API"
+echo ""
+read -p "Continue with installation? [Y/n]: " CONFIRM
+CONFIRM=${CONFIRM:-Y}
+if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
+    print_info "Installation cancelled"
+    exit 0
+fi
+
+# ============================================
+# GENERATE CLIENT CONFIG
+# ============================================
+echo ""
+print_info "Generating client configuration..."
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+cat > "${SCRIPT_DIR}/client.config.sh" << EOF
+#!/bin/bash
+# RAF NET CCTV - Client Configuration
+# Auto-generated by installer
+# Generated: $(date)
+# DO NOT EDIT MANUALLY - Regenerate with installer
+
+# Client Information
+CLIENT_NAME="$CLIENT_NAME"
+CLIENT_CODE="$CLIENT_CODE"
+
+# Domain Configuration
+FRONTEND_DOMAIN="$FRONTEND_DOMAIN"
+BACKEND_DOMAIN="$BACKEND_DOMAIN"
+SERVER_IP="$SERVER_IP"
+
+# Port Configuration
+PORT_PUBLIC="$PORT_PUBLIC"
+PORT_BACKEND="$PORT_BACKEND"
+PORT_FRONTEND_DEV="5173"
+PORT_MEDIAMTX_HLS="$PORT_MEDIAMTX_HLS"
+PORT_MEDIAMTX_WEBRTC="$PORT_MEDIAMTX_WEBRTC"
+PORT_MEDIAMTX_API="$PORT_MEDIAMTX_API"
+
+# Protocol Configuration
+FRONTEND_PROTOCOL="$FRONTEND_PROTOCOL"
+BACKEND_PROTOCOL="$BACKEND_PROTOCOL"
+
+# Path Configuration
+APP_DIR="$APP_DIR"
+DATABASE_PATH="./data/cctv.db"
+
+# Security Configuration
+JWT_SECRET="$JWT_SECRET"
+API_KEY_SECRET="$API_KEY_SECRET"
+CSRF_SECRET="$CSRF_SECRET"
+
+# Generated URLs
+FRONTEND_URL="$FRONTEND_URL"
+BACKEND_URL="$BACKEND_URL"
+ALLOWED_ORIGINS="$ALLOWED_ORIGINS"
+PUBLIC_STREAM_BASE_URL="$BACKEND_URL"
+
+# Nginx Configuration
+NGINX_PORT="$PORT_PUBLIC"
+BACKEND_PORT="$PORT_BACKEND"
+MEDIAMTX_HLS_PORT="$PORT_MEDIAMTX_HLS"
+MEDIAMTX_WEBRTC_PORT="$PORT_MEDIAMTX_WEBRTC"
+MEDIAMTX_API_PORT="$PORT_MEDIAMTX_API"
+
+# Export all variables
+export CLIENT_NAME CLIENT_CODE
+export FRONTEND_DOMAIN BACKEND_DOMAIN SERVER_IP
+export PORT_PUBLIC PORT_BACKEND PORT_FRONTEND_DEV
+export PORT_MEDIAMTX_HLS PORT_MEDIAMTX_WEBRTC PORT_MEDIAMTX_API
+export FRONTEND_PROTOCOL BACKEND_PROTOCOL
+export APP_DIR DATABASE_PATH
+export JWT_SECRET API_KEY_SECRET CSRF_SECRET
+export FRONTEND_URL BACKEND_URL ALLOWED_ORIGINS PUBLIC_STREAM_BASE_URL
+export NGINX_PORT BACKEND_PORT
+export MEDIAMTX_HLS_PORT MEDIAMTX_WEBRTC_PORT MEDIAMTX_API_PORT
 EOF
-    
-    # Build
-    print_info "Building frontend..."
-    npm run build
-    print_success "Frontend built"
-}
 
-setup_mediamtx() {
-    echo ""
-    echo "📡 Setting up MediaMTX..."
+chmod +x "${SCRIPT_DIR}/client.config.sh"
+print_success "Client configuration generated"
+
+# Load configuration
+source "${SCRIPT_DIR}/client.config.sh"
+
+# ============================================
+# CHECK DEPENDENCIES
+# ============================================
+echo ""
+print_info "Checking dependencies..."
+
+# Source profile
+[ -f /etc/profile ] && source /etc/profile
+[ -f ~/.bashrc ] && source ~/.bashrc
+[ -f ~/.bash_profile ] && source ~/.bash_profile
+
+# Node.js
+if ! command -v node &> /dev/null; then
+    print_info "Installing Node.js 20..."
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    apt install -y nodejs
+fi
+print_success "Node.js $(node --version)"
+
+# npm
+if ! command -v npm &> /dev/null; then
+    print_error "npm not found"
+    exit 1
+fi
+print_success "npm $(npm --version)"
+
+# PM2
+if ! command -v pm2 &> /dev/null; then
+    print_info "Installing PM2..."
+    npm install -g pm2
     
-    cd "$APP_DIR/mediamtx"
+    # Configure PATH
+    NPM_PREFIX=$(npm config get prefix 2>/dev/null || echo "/usr/local")
+    export PATH="$NPM_PREFIX/bin:$PATH"
     
-    # Download MediaMTX
-    if [ ! -f mediamtx ]; then
-        print_info "Downloading MediaMTX..."
-        wget -q https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_linux_amd64.tar.gz
-        tar -xzf mediamtx_v1.9.0_linux_amd64.tar.gz
-        rm mediamtx_v1.9.0_linux_amd64.tar.gz
-        chmod +x mediamtx
-        print_success "MediaMTX downloaded"
-    else
-        print_info "MediaMTX already exists"
+    if ! grep -q "$NPM_PREFIX/bin" ~/.bashrc 2>/dev/null; then
+        echo "export PATH=\"$NPM_PREFIX/bin:\$PATH\"" >> ~/.bashrc
     fi
     
-    # Setup config from example if not exists
-    if [ ! -f mediamtx.yml ]; then
-        if [ -f mediamtx.yml.example ]; then
-            print_info "Creating mediamtx.yml from example..."
-            cp mediamtx.yml.example mediamtx.yml
-            print_success "MediaMTX config created"
-        else
-            print_error "mediamtx.yml.example not found!"
-            exit 1
+    hash -r
+fi
+print_success "PM2 $(pm2 --version)"
+
+# Git
+if ! command -v git &> /dev/null; then
+    print_info "Installing Git..."
+    apt install -y git
+fi
+print_success "Git installed"
+
+# FFmpeg
+if ! command -v ffmpeg &> /dev/null; then
+    print_info "Installing FFmpeg..."
+    apt update
+    apt install -y ffmpeg
+fi
+print_success "FFmpeg installed"
+
+# ============================================
+# CLONE REPOSITORY
+# ============================================
+echo ""
+print_info "Setting up application directory..."
+
+if [ -d "$APP_DIR" ]; then
+    print_info "Directory exists, backing up..."
+    mv "$APP_DIR" "${APP_DIR}.backup.$(date +%Y%m%d_%H%M%S)"
+fi
+
+mkdir -p "$APP_DIR"
+git clone https://github.com/rafall04/cctv.git "$APP_DIR"
+cd "$APP_DIR"
+
+# Copy client config to app directory
+cp "${SCRIPT_DIR}/client.config.sh" "$APP_DIR/deployment/"
+
+print_success "Repository cloned"
+
+# ============================================
+# GENERATE ENVIRONMENT FILES
+# ============================================
+echo ""
+print_info "Generating environment files..."
+
+# Generate .env files using generate-env.sh
+bash "$APP_DIR/deployment/generate-env.sh"
+
+print_success "Environment files generated"
+
+# ============================================
+# SETUP BACKEND
+# ============================================
+echo ""
+print_info "Setting up backend..."
+
+cd "$APP_DIR/backend"
+npm install --production
+
+# Create data directory
+mkdir -p data
+
+# Setup database (will send Telegram notification)
+print_info "Initializing database..."
+npm run setup-db
+
+# Run migrations
+print_info "Running migrations..."
+if [ -d "database/migrations" ]; then
+    for migration in database/migrations/*.js; do
+        if [ -f "$migration" ]; then
+            node "$migration" || true
         fi
-    else
-        print_info "mediamtx.yml already exists"
-    fi
-    
-    print_success "MediaMTX configured"
-}
+    done
+fi
 
-setup_pm2() {
-    echo ""
-    echo "⚙️ Setting up PM2..."
-    
-    cd "$APP_DIR"
-    
-    # Create logs directory
-    mkdir -p logs
-    
-    # Stop existing processes (match ecosystem.config.cjs names)
-    pm2 delete cctv-backend 2>/dev/null || true
-    pm2 delete mediamtx 2>/dev/null || true
-    
-    # Start processes
-    print_info "Starting PM2 processes..."
-    pm2 start deployment/ecosystem.config.cjs
-    
-    # Save and setup startup
-    pm2 save
-    pm2 startup | tail -n 1 | bash
-    
-    print_success "PM2 configured"
-}
+# Create recordings directory
+mkdir -p "$APP_DIR/recordings"
+chmod 755 "$APP_DIR/recordings"
 
-setup_webserver() {
-    echo ""
-    echo "🌐 Web Server Configuration..."
-    
-    if [ "$WEB_SERVER" = "nginx" ]; then
-        print_info "Detected: Nginx"
-        print_info "aaPanel manages Nginx via UI"
-        print_info "Manual setup required:"
-        echo ""
-        echo "   See: $APP_DIR/deployment/AAPANEL_NGINX_SETUP.md"
-        echo ""
-        echo "   Quick steps:"
-        echo "   1. Login to aaPanel"
-        echo "   2. Website > Add Site"
-        echo "   3. Domain: $DOMAIN_FRONTEND, Port: $PORT"
-        echo "   4. Root: $APP_DIR/frontend/dist"
-        echo "   5. Add reverse proxy: /api → http://localhost:3000"
-        echo "   6. Add reverse proxy: /hls → http://localhost:3000 (NOT 8888!)"
-        echo ""
-        
-        # Just verify Nginx is running
-        if systemctl is-active --quiet nginx; then
-            print_success "Nginx is running (managed by aaPanel)"
-        else
-            print_error "Nginx not running. Start via aaPanel."
-        fi
-        
-    elif [ "$WEB_SERVER" = "apache" ]; then
-        print_info "Detected: Apache"
-        print_info "aaPanel manages Apache via UI"
-        print_info "Manual setup required:"
-        echo ""
-        echo "   See: $APP_DIR/deployment/AAPANEL_APACHE_SETUP.md"
-        echo ""
-        echo "   Quick steps:"
-        echo "   1. Login to aaPanel"
-        echo "   2. Website > Add Site"
-        echo "   3. Domain: $DOMAIN_FRONTEND, Port: $PORT"
-        echo "   4. Root: $APP_DIR/frontend/dist"
-        echo "   5. Edit config file (Configuration File tab)"
-        echo "   6. Add reverse proxy directives (see AAPANEL_APACHE_SETUP.md)"
-        echo ""
-        echo "   Template config: $APP_DIR/deployment/apache.conf"
-        echo ""
-        
-        # Just verify Apache is running
-        if systemctl is-active --quiet apache2; then
-            print_success "Apache is running (managed by aaPanel)"
-        else
-            print_error "Apache not running. Start via aaPanel."
-        fi
-    fi
-    
-    echo ""
-    print_info "⚠️  IMPORTANT: HLS must proxy to backend (port 3000), NOT MediaMTX!"
-    print_info "Backend will proxy to MediaMTX while tracking viewer sessions."
-}
+print_success "Backend setup complete"
 
-setup_firewall() {
-    echo ""
-    echo "🔥 Configuring firewall..."
-    
-    if command -v ufw &> /dev/null; then
-        ufw allow $PORT/tcp 2>/dev/null || true
-        print_success "Firewall configured (port $PORT)"
-    else
-        print_info "UFW not found, skipping firewall config"
-    fi
-}
+# ============================================
+# SETUP FRONTEND
+# ============================================
+echo ""
+print_info "Setting up frontend..."
 
-verify_installation() {
-    echo ""
-    echo "🔍 Verifying installation..."
-    
-    # Check PM2 (match ecosystem.config.cjs names)
-    if pm2 list | grep -q "cctv-backend.*online"; then
-        print_success "Backend running"
-    else
-        print_error "Backend not running"
-    fi
-    
-    if pm2 list | grep -q "mediamtx.*online"; then
-        print_success "MediaMTX running"
-    else
-        print_error "MediaMTX not running"
-    fi
-    
-    # Check Nginx (managed by aaPanel)
-    if systemctl is-active --quiet nginx 2>/dev/null; then
-        print_success "Nginx running (managed by aaPanel)"
-    elif systemctl is-active --quiet apache2 2>/dev/null; then
-        print_success "Apache running (managed by aaPanel)"
-    else
-        print_error "Web server not running"
-    fi
-    
-    # Check backend health
-    sleep 2
-    if curl -s http://localhost:3000/health | grep -q "ok"; then
-        print_success "Backend health check passed"
-    else
-        print_error "Backend health check failed"
-    fi
-    
-    # Check MediaMTX
-    if curl -s http://localhost:9997/v3/config/global/get | grep -q "logLevel"; then
-        print_success "MediaMTX API responding"
-    else
-        print_error "MediaMTX API not responding"
-    fi
-}
+cd "$APP_DIR/frontend"
+npm install
+npm run build
 
-print_summary() {
-    echo ""
-    echo "========================================"
-    echo "✅ Installation Complete!"
-    echo "========================================"
-    echo ""
-    echo "📍 Access URLs:"
-    echo "   Frontend: http://$DOMAIN_FRONTEND:$PORT"
-    echo "   Backend:  http://$DOMAIN_BACKEND:$PORT"
-    echo ""
-    echo "🔑 Default Credentials:"
-    echo "   Username: admin"
-    echo "   Password: admin123"
-    echo "   ⚠️  CHANGE PASSWORD IMMEDIATELY!"
-    echo ""
-    echo "📊 Management Commands:"
-    echo "   PM2 status:  pm2 status"
-    echo "   PM2 logs:    pm2 logs cctv-backend"
-    echo "   Nginx test:  nginx -t"
-    echo "   Nginx reload: systemctl reload nginx"
-    echo ""
-    echo "🔄 Update Command:"
-    echo "   cd $APP_DIR && ./deployment/update.sh"
-    echo ""
-    echo "📝 Next Steps:"
-    if [ "$WEB_SERVER" = "nginx" ]; then
-        echo "   1. Configure Nginx via aaPanel UI:"
-        echo "      See: $APP_DIR/deployment/AAPANEL_NGINX_SETUP.md"
-    elif [ "$WEB_SERVER" = "apache" ]; then
-        echo "   1. Configure Apache via aaPanel UI:"
-        echo "      See: $APP_DIR/deployment/AAPANEL_APACHE_SETUP.md"
-    fi
-    echo "      - Add site: $DOMAIN_FRONTEND (port $PORT)"
-    echo "      - Root: $APP_DIR/frontend/dist"
-    echo "      - Add reverse proxy: /api → http://localhost:3000"
-    echo "      - Add reverse proxy: /hls → http://localhost:3000 (NOT 8888!)"
-    echo ""
-    echo "   2. Generate API Key:"
-    echo "      - Login to admin panel: http://$DOMAIN_FRONTEND:$PORT"
-    echo "      - Username: admin, Password: admin123"
-    echo "      - Go to Settings > API Keys > Generate"
-    echo "      - Copy the generated key"
-    echo ""
-    echo "   3. Update Frontend API Key:"
-    echo "      - Edit: $APP_DIR/frontend/.env"
-    echo "      - Replace VITE_API_KEY with generated key"
-    echo "      - Rebuild: cd $APP_DIR/frontend && npm run build"
-    echo ""
-    echo "   4. Change admin password (CRITICAL!)"
-    echo "   5. Add cameras via admin panel"
-    echo "   6. Test video streaming"
-    echo "   7. Enable recording for cameras"
-    echo "   8. Setup backup cron job"
-    echo ""
-    echo "📁 Important Paths:"
-    echo "   App:        $APP_DIR"
-    echo "   Recordings: $APP_DIR/recordings"
-    echo "   Database:   $APP_DIR/backend/data/cctv.db"
-    echo "   Logs:       $APP_DIR/logs"
-    echo ""
-    echo "⚠️  Recording Notes:"
-    echo "   - Recordings stored in: $APP_DIR/recordings/camera{id}/"
-    echo "   - Each segment is ~10 minutes (600s)"
-    echo "   - Auto-cleanup based on retention period"
-    echo "   - Requires FFmpeg (already installed)"
-    echo ""
-}
+print_success "Frontend built"
 
-# Main execution
-main() {
-    check_root
-    check_dependencies
-    clone_repository
-    setup_backend
-    setup_frontend
-    setup_mediamtx
-    setup_pm2
-    setup_webserver
-    setup_firewall
-    verify_installation
-    print_summary
-}
+# ============================================
+# SETUP MEDIAMTX
+# ============================================
+echo ""
+print_info "Setting up MediaMTX..."
 
-# Run main function
-main
+cd "$APP_DIR/mediamtx"
+
+if [ ! -f mediamtx ]; then
+    wget -q https://github.com/bluenviron/mediamtx/releases/download/v1.9.0/mediamtx_v1.9.0_linux_amd64.tar.gz
+    tar -xzf mediamtx_v1.9.0_linux_amd64.tar.gz
+    rm mediamtx_v1.9.0_linux_amd64.tar.gz
+    chmod +x mediamtx
+fi
+
+if [ ! -f mediamtx.yml ] && [ -f mediamtx.yml.example ]; then
+    cp mediamtx.yml.example mediamtx.yml
+fi
+
+print_success "MediaMTX configured"
+
+# ============================================
+# SETUP PM2
+# ============================================
+echo ""
+print_info "Starting services with PM2..."
+
+cd "$APP_DIR"
+mkdir -p logs
+
+# Stop existing
+pm2 delete ${CLIENT_CODE}-cctv-backend 2>/dev/null || true
+pm2 delete ${CLIENT_CODE}-mediamtx 2>/dev/null || true
+
+# Start services
+pm2 start deployment/ecosystem.config.cjs
+
+# Save and startup
+pm2 save
+pm2 startup | tail -n 1 | bash || true
+
+print_success "Services started"
+
+# ============================================
+# FIREWALL
+# ============================================
+echo ""
+print_info "Configuring firewall..."
+
+if command -v ufw &> /dev/null; then
+    ufw allow ${PORT_PUBLIC}/tcp 2>/dev/null || true
+    print_success "Firewall configured"
+else
+    print_info "UFW not found, skipping"
+fi
+
+# ============================================
+# SUMMARY
+# ============================================
+echo ""
+print_header "============================================"
+print_header "✅ Installation Complete!"
+print_header "============================================"
+echo ""
+echo "🌐 Access URLs:"
+echo "   Frontend: $FRONTEND_URL"
+echo "   Backend:  $BACKEND_URL"
+echo ""
+echo "🔑 Admin Credentials:"
+echo "   Username: admin"
+echo "   Password: [Check Telegram]"
+echo "   ⚠️  Credentials sent to your Telegram"
+echo ""
+echo "📊 Service Status:"
+pm2 list | grep ${CLIENT_CODE} || pm2 list
+echo ""
+echo "📝 Next Steps:"
+echo "   1. Configure web server (Nginx/Apache) via aaPanel UI"
+echo "   2. Add site: $FRONTEND_DOMAIN (port $PORT_PUBLIC)"
+echo "   3. Root directory: $APP_DIR/frontend/dist"
+echo "   4. Add reverse proxy:"
+echo "      /api → http://localhost:${PORT_BACKEND}"
+echo "      /hls → http://localhost:${PORT_BACKEND}"
+echo ""
+echo "   5. Generate API Key from admin panel"
+echo "   6. Update frontend/.env with API key"
+echo "   7. Rebuild frontend: cd $APP_DIR/frontend && npm run build"
+echo ""
+echo "📁 Important Paths:"
+echo "   App:        $APP_DIR"
+echo "   Config:     $APP_DIR/deployment/client.config.sh"
+echo "   Backend:    $APP_DIR/backend"
+echo "   Frontend:   $APP_DIR/frontend"
+echo "   Recordings: $APP_DIR/recordings"
+echo "   Database:   $APP_DIR/backend/data/cctv.db"
+echo ""
+print_header "============================================"

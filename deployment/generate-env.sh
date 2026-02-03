@@ -8,7 +8,7 @@
 #   bash deployment/generate-env.sh
 #
 # Setelah generate:
-#   1. Edit backend/.env untuk update secrets
+#   1. Edit backend/.env untuk update secrets (optional)
 #   2. Edit frontend/.env untuk update API key
 #   3. Deploy: bash deployment/deploy.sh
 
@@ -16,6 +16,19 @@ set -e
 
 # Load client configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [ ! -f "${SCRIPT_DIR}/client.config.sh" ]; then
+    echo "❌ Error: client.config.sh not found!"
+    echo ""
+    echo "Please run installation script first:"
+    echo "  bash deployment/install.sh"
+    echo "  or"
+    echo "  bash deployment/aapanel-install.sh"
+    echo ""
+    echo "This will generate client.config.sh with your domain and IP configuration."
+    exit 1
+fi
+
 source "${SCRIPT_DIR}/client.config.sh"
 
 # Detect if running in aaPanel (check common paths)
