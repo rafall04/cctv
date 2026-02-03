@@ -35,8 +35,8 @@ export default function CameraThumbnail({
         return <FallbackIcon />;
     }
     
-    // Get API base URL from env or default
-    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+    // Get API base URL from env (VITE_API_URL is the correct env var)
+    const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
     const thumbnailUrl = `${apiBaseUrl}${thumbnailPath}`;
     
     return (

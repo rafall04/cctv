@@ -8,7 +8,8 @@ const __dirname = dirname(__filename);
 const THUMBNAIL_DIR = join(__dirname, '..', 'data', 'thumbnails');
 
 export default async function thumbnailRoutes(fastify, options) {
-    // Serve static thumbnail
+    // Serve static thumbnail - handled by @fastify/static
+    // This route is for validation and custom headers only
     fastify.get('/:cameraId.jpg', async (request, reply) => {
         const { cameraId } = request.params;
         
@@ -23,11 +24,11 @@ export default async function thumbnailRoutes(fastify, options) {
             return reply.code(404).send({ error: 'Thumbnail not found' });
         }
 
-        // Cache 5 menit (sync dengan generation interval)
+        // Set custom headers (CORS handled by @fastify/cors plugin)
         reply.header('Content-Type', 'image/jpeg');
-        reply.header('Cache-Control', 'public, max-age=300');
-        reply.header('Access-Control-Allow-Origin', '*');
+        reply.header('Cache-Control', 'public, max-age=300'); // 5 minutes
 
-        return reply.sendFile(`${cameraId}.jpg`, THUMBNAIL_DIR);
+        // Send file (fastify-static will handle this)
+        return reply.sendFile(`${cameraId}.jpg`);
     });
 }

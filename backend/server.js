@@ -2,7 +2,13 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import cookie from '@fastify/cookie';
+import fastifyStatic from '@fastify/static';
 import { config } from './config/config.js';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Import security middleware (in order of execution)
 import { securityHeadersMiddleware } from './middleware/securityHeaders.js';
@@ -100,6 +106,13 @@ await fastify.register(cors, {
 await fastify.register(cookie, {
     secret: config.jwt.secret,
     parseOptions: {},
+});
+
+// Register Static File Serving for thumbnails
+await fastify.register(fastifyStatic, {
+    root: join(__dirname, 'data', 'thumbnails'),
+    prefix: '/api/thumbnails/',
+    decorateReply: false // Don't override reply.sendFile
 });
 
 // ============================================
