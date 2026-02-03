@@ -2761,6 +2761,43 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                                 {cameras.length} kamera tersedia • Streaming langsung 24/7
                             </p>
                         </div>
+                        
+                        {/* View Mode Toggle - Maps, Grid, Playback */}
+                        <div className="flex items-center p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
+                            <button
+                                onClick={() => setViewMode('map')}
+                                className={`p-2.5 rounded-lg transition-colors ${
+                                    viewMode === 'map'
+                                        ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-sky-400 shadow-sm'
+                                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                                }`}
+                                title="Map View"
+                            >
+                                <Icons.Map />
+                            </button>
+                            <button
+                                onClick={() => setViewMode('grid')}
+                                className={`p-2.5 rounded-lg transition-colors ${
+                                    viewMode === 'grid'
+                                        ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-sky-400 shadow-sm'
+                                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                                }`}
+                                title="Grid View (Multi-View)"
+                            >
+                                <Icons.Grid />
+                            </button>
+                            <button
+                                onClick={() => setViewMode('playback')}
+                                className={`p-2.5 rounded-lg transition-colors ${
+                                    viewMode === 'playback'
+                                        ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-sky-400 shadow-sm'
+                                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                                }`}
+                                title="Playback Rekaman"
+                            >
+                                <Icons.Clock />
+                            </button>
+                        </div>
                     </div>
 
                     {/* Search Bar - Responsive with Dropdown */}
