@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef, memo, lazy, Suspense, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { streamService } from '../services/streamService';
 import { areaService } from '../services/areaService';
 import { viewerService } from '../services/viewerService';
@@ -34,6 +35,9 @@ import CodecBadge from '../components/CodecBadge';
 import { canPlayCodec } from '../utils/codecSupport';
 // Camera Thumbnail
 import CameraThumbnail from '../components/CameraThumbnail';
+// Layout components
+import LandingPageSimple from '../components/LandingPageSimple';
+import LayoutToggleFAB from '../components/LayoutToggleFAB';
 // Map view - lazy loaded for performance
 const MapView = lazy(() => import('../components/MapView'));
 // Playback - lazy loaded for performance
@@ -3509,10 +3513,78 @@ function StatsBar({ cameras, areas, onCameraClick }) {
 }
 
 // ============================================
-// MAIN LANDING PAGE
+// MAIN LANDING PAGE - With layout mode switching
 // ============================================
 export default function LandingPage() {
     const { branding } = useBranding();
+    const [searchParams, setSearchParams] = useSearchParams();
+    
+    // ============================================
+    // LAYOUT MODE MANAGEMENT
+    // Priority: URL query param > localStorage > default 'full'
+    // ============================================
+    const getInitialMode = useCallback(() => {
+        const queryMode = searchParams.get('mode');
+        
+        // Priority 1: URL query param
+        if (queryMode === 'simple' || queryMode === 'full') {
+            return queryMode;
+        }
+        
+        // Priority 2: localStorage
+        try {
+            const savedMode = localStorage.getItem('landing_layout_mode');
+            if (savedMode === 'simple' || savedMode === 'full') {
+                return savedMode;
+            }
+        } catch (err) {
+            console.warn('Failed to read localStorage:', err);
+        }
+        
+        // Priority 3: Default
+        return 'full';
+    }, [searchParams]);
+    
+    const [layoutMode, setLayoutMode] = useState(getInitialMode);
+    
+    // Sync URL and localStorage when mode changes
+    useEffect(() => {
+        const currentMode = getInitialMode();
+        
+        // Update state if different
+        if (currentMode !== layoutMode) {
+            setLayoutMode(currentMode);
+        }
+        
+        // Update URL if query param is different (without reload)
+        const queryMode = searchParams.get('mode');
+        if (queryMode !== currentMode) {
+            setSearchParams({ mode: currentMode }, { replace: true });
+        }
+        
+        // Save to localStorage
+        try {
+            localStorage.setItem('landing_layout_mode', currentMode);
+        } catch (err) {
+            console.warn('Failed to save to localStorage:', err);
+        }
+    }, [searchParams, layoutMode, getInitialMode, setSearchParams]);
+    
+    // Toggle function for FAB
+    const toggleLayoutMode = useCallback(() => {
+        const newMode = layoutMode === 'full' ? 'simple' : 'full';
+        setLayoutMode(newMode);
+        setSearchParams({ mode: newMode });
+        try {
+            localStorage.setItem('landing_layout_mode', newMode);
+        } catch (err) {
+            console.warn('Failed to save to localStorage:', err);
+        }
+    }, [layoutMode, setSearchParams]);
+    
+    // ============================================
+    // SHARED STATE FOR BOTH LAYOUTS
+    // ============================================
     const [cameras, setCameras] = useState([]);
     const [areas, setAreas] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -3729,149 +3801,200 @@ export default function LandingPage() {
     // Check if heavy effects should be disabled
     const disableHeavyEffects = deviceTier === 'low';
 
-    return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
-            <Navbar cameraCount={cameras.length} branding={branding} />
-            
-            {/* Hero Section - SEO optimized with Indonesian content */}
-            <header className="relative overflow-hidden bg-gradient-to-br from-sky-500/10 via-transparent to-purple-500/10 dark:from-sky-500/5 dark:to-purple-500/5">
-                {/* Decorative elements - hidden on low-end devices */}
-                {!disableHeavyEffects && (
-                    <>
-                        <div className="absolute top-0 left-1/4 w-64 h-64 bg-sky-500/10 rounded-full blur-3xl pointer-events-none"></div>
-                        <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
-                    </>
+    // ============================================
+    // CONDITIONAL RENDERING - Full vs Simple Layout
+    // ============================================
+    if (layoutMode === 'simple') {
+        return (
+            <>
+                <LandingPageSimple
+                    cameras={cameras}
+                    areas={areas}
+                    loading={loading}
+                    onCameraClick={setPopup}
+                    onAddMulti={handleAddMulti}
+                    multiCameras={multiCameras}
+                    saweriaEnabled={saweriaEnabled}
+                    saweriaLink={saweriaLink}
+                    CamerasSection={CamerasSection}
+                />
+                
+                {/* Shared Components */}
+                <MultiViewButton 
+                    count={multiCameras.length} 
+                    onClick={() => setShowMulti(true)} 
+                    maxReached={maxReached}
+                    maxStreams={maxStreams}
+                />
+                
+                <ToastContainer toasts={toasts} removeToast={removeToast} />
+                
+                {popup && <VideoPopup camera={popup} onClose={() => setPopup(null)} />}
+                {showMulti && multiCameras.length > 0 && (
+                    <MultiViewLayout
+                        cameras={multiCameras}
+                        onRemove={handleRemoveMulti}
+                        onClose={() => setShowMulti(false)}
+                    />
                 )}
                 
-                <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 text-center">
-                    {/* Company Badge */}
-                    {branding.show_powered_by === 'true' && (
-                        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 text-xs font-semibold mb-3 shadow-sm">
-                            <div className="w-5 h-5 rounded bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white text-[10px] font-bold">{branding.logo_text}</div>
-                            <span>Powered by {branding.company_name}</span>
-                        </div>
+                {/* Layout Toggle FAB */}
+                <LayoutToggleFAB mode={layoutMode} onToggle={toggleLayoutMode} />
+            </>
+        );
+    }
+
+    // ============================================
+    // FULL LAYOUT (Default)
+    // ============================================
+    return (
+        <>
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
+                <Navbar cameraCount={cameras.length} branding={branding} />
+                
+                {/* Hero Section - SEO optimized with Indonesian content */}
+                <header className="relative overflow-hidden bg-gradient-to-br from-sky-500/10 via-transparent to-purple-500/10 dark:from-sky-500/5 dark:to-purple-500/5">
+                    {/* Decorative elements - hidden on low-end devices */}
+                    {!disableHeavyEffects && (
+                        <>
+                            <div className="absolute top-0 left-1/4 w-64 h-64 bg-sky-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                            <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                        </>
                     )}
                     
-                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold mb-4 shadow-sm">
-                        <span className="relative flex h-2 w-2">
-                            {!disableHeavyEffects && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                        </span>
-                        {landingSettings.hero_badge}
+                    <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 text-center">
+                        {/* Company Badge */}
+                        {branding.show_powered_by === 'true' && (
+                            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 text-xs font-semibold mb-3 shadow-sm">
+                                <div className="w-5 h-5 rounded bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white text-[10px] font-bold">{branding.logo_text}</div>
+                                <span>Powered by {branding.company_name}</span>
+                            </div>
+                        )}
+                        
+                        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold mb-4 shadow-sm">
+                            <span className="relative flex h-2 w-2">
+                                {!disableHeavyEffects && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                            </span>
+                            {landingSettings.hero_badge}
+                        </div>
+                        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-4">
+                            {branding.hero_title}
+                        </h1>
+                        <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mb-3 text-sm sm:text-base">
+                            {branding.hero_subtitle}
+                        </p>
+                        <p className="text-gray-500 dark:text-gray-500 max-w-xl mx-auto mb-6 text-xs">
+                            {branding.footer_text}
+                        </p>
+                        
+                        {/* Area Coverage Info */}
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 mb-6">
+                            <svg className="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/>
+                                <circle cx="12" cy="11" r="3"/>
+                            </svg>
+                            <span 
+                                className="text-sm text-amber-700 dark:text-amber-400"
+                                dangerouslySetInnerHTML={{ __html: landingSettings.area_coverage }}
+                            />
+                        </div>
+                        
+                        {/* Quick Features - Enhanced with Indonesian labels */}
+                        <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
+                            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
+                                <div className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-500/20 flex items-center justify-center text-sky-600 dark:text-sky-400">
+                                    <Icons.Eye />
+                                </div>
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">HD Streaming</span>
+                            </div>
+                            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
+                                <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center text-purple-600 dark:text-purple-400">
+                                    <Icons.Grid />
+                                </div>
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Multi-View</span>
+                            </div>
+                            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
+                                <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                                    <Icons.Shield />
+                                </div>
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Aman</span>
+                            </div>
+                            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
+                                <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400">
+                                    <Icons.Clock />
+                                </div>
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">24/7 Live</span>
+                            </div>
+                            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
+                                <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Playback</span>
+                            </div>
+                        </div>
+                        
+                        {/* Stats Bar - Integrated into Hero */}
+                        <StatsBar cameras={cameras} areas={areas} onCameraClick={setPopup} />
                     </div>
-                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-4">
-                        {branding.hero_title}
-                    </h1>
-                    <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mb-3 text-sm sm:text-base">
-                        {branding.hero_subtitle}
-                    </p>
-                    <p className="text-gray-500 dark:text-gray-500 max-w-xl mx-auto mb-6 text-xs">
-                        {branding.footer_text}
-                    </p>
-                    
-                    {/* Area Coverage Info */}
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 mb-6">
-                        <svg className="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/>
-                            <circle cx="12" cy="11" r="3"/>
-                        </svg>
-                        <span 
-                            className="text-sm text-amber-700 dark:text-amber-400"
-                            dangerouslySetInnerHTML={{ __html: landingSettings.area_coverage }}
-                        />
-                    </div>
-                    
-                    {/* Quick Features - Enhanced with Indonesian labels */}
-                    <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
-                        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
-                            <div className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-500/20 flex items-center justify-center text-sky-600 dark:text-sky-400">
-                                <Icons.Eye />
-                            </div>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">HD Streaming</span>
-                        </div>
-                        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
-                            <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center text-purple-600 dark:text-purple-400">
-                                <Icons.Grid />
-                            </div>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Multi-View</span>
-                        </div>
-                        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
-                            <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                                <Icons.Shield />
-                            </div>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Aman</span>
-                        </div>
-                        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
-                            <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400">
-                                <Icons.Clock />
-                            </div>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">24/7 Live</span>
-                        </div>
-                        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
-                            <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </div>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Playback</span>
-                        </div>
-                    </div>
-                    
-                    {/* Stats Bar - Integrated into Hero */}
-                    <StatsBar cameras={cameras} areas={areas} onCameraClick={setPopup} />
-                </div>
-            </header>
+                </header>
 
-            <CamerasSection
-                cameras={cameras}
-                loading={loading}
-                areas={areas}
-                onCameraClick={setPopup}
-                onAddMulti={handleAddMulti}
-                multiCameras={multiCameras}
-                viewMode={viewMode}
-                setViewMode={setViewMode}
-            />
-
-            {/* Saweria Leaderboard - Placed after cameras section */}
-            {saweriaEnabled && saweriaLeaderboardLink && (
-                <SaweriaLeaderboard leaderboardLink={saweriaLeaderboardLink} />
-            )}
-
-            <div className="flex-1" />
-            <Footer 
-                cameraCount={cameras.length} 
-                areaCount={areas.length}
-                saweriaEnabled={saweriaEnabled}
-                saweriaLink={saweriaLink}
-                branding={branding}
-            />
-
-            <MultiViewButton 
-                count={multiCameras.length} 
-                onClick={() => setShowMulti(true)} 
-                maxReached={maxReached}
-                maxStreams={maxStreams}
-            />
-
-            {/* Toast Notifications */}
-            <ToastContainer toasts={toasts} removeToast={removeToast} />
-
-            {popup && <VideoPopup camera={popup} onClose={() => setPopup(null)} />}
-            {showMulti && multiCameras.length > 0 && (
-                <MultiViewLayout
-                    cameras={multiCameras}
-                    onRemove={handleRemoveMulti}
-                    onClose={() => setShowMulti(false)}
+                <CamerasSection
+                    cameras={cameras}
+                    loading={loading}
+                    areas={areas}
+                    onCameraClick={setPopup}
+                    onAddMulti={handleAddMulti}
+                    multiCameras={multiCameras}
+                    viewMode={viewMode}
+                    setViewMode={setViewMode}
                 />
-            )}
+
+                {/* Saweria Leaderboard - Placed after cameras section */}
+                {saweriaEnabled && saweriaLeaderboardLink && (
+                    <SaweriaLeaderboard leaderboardLink={saweriaLeaderboardLink} />
+                )}
+
+                <div className="flex-1" />
+                <Footer 
+                    cameraCount={cameras.length} 
+                    areaCount={areas.length}
+                    saweriaEnabled={saweriaEnabled}
+                    saweriaLink={saweriaLink}
+                    branding={branding}
+                />
+
+                <MultiViewButton 
+                    count={multiCameras.length} 
+                    onClick={() => setShowMulti(true)} 
+                    maxReached={maxReached}
+                    maxStreams={maxStreams}
+                />
+
+                {/* Toast Notifications */}
+                <ToastContainer toasts={toasts} removeToast={removeToast} />
+
+                {popup && <VideoPopup camera={popup} onClose={() => setPopup(null)} />}
+                {showMulti && multiCameras.length > 0 && (
+                    <MultiViewLayout
+                        cameras={multiCameras}
+                        onRemove={handleRemoveMulti}
+                        onClose={() => setShowMulti(false)}
+                    />
+                )}
+                
+                {/* Feedback Widget */}
+                <FeedbackWidget />
+                
+                {/* Saweria Support - Modal + Floating Banner */}
+                <SaweriaSupport />
+            </div>
             
-            {/* Feedback Widget */}
-            <FeedbackWidget />
-            
-            {/* Saweria Support - Modal + Floating Banner */}
-            <SaweriaSupport />
-        </div>
+            {/* Layout Toggle FAB */}
+            <LayoutToggleFAB mode={layoutMode} onToggle={toggleLayoutMode} />
+        </>
     );
 }
