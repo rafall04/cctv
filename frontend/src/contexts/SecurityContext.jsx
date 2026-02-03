@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { fetchCsrfToken, clearCsrfToken } from '../services/apiClient';
 
 /**
@@ -15,11 +15,19 @@ const SecurityContext = createContext(null);
 export function SecurityProvider({ children }) {
     const [csrfReady, setCsrfReady] = useState(false);
     const [csrfError, setCsrfError] = useState(null);
+    const initializingRef = useRef(false);
 
     /**
      * Initialize CSRF token on app load
      */
     const initializeCsrf = useCallback(async () => {
+        // Prevent double initialization (React StrictMode causes double mount)
+        if (initializingRef.current) {
+            return;
+        }
+        
+        initializingRef.current = true;
+        
         try {
             setCsrfError(null);
             const token = await fetchCsrfToken();
@@ -36,6 +44,8 @@ export function SecurityProvider({ children }) {
             setCsrfError(error.message);
             // Still mark as ready to not block the app
             setCsrfReady(true);
+        } finally {
+            initializingRef.current = false;
         }
     }, []);
 
