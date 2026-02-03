@@ -1,13 +1,9 @@
-import { useState, lazy, Suspense } from 'react';
+import { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useBranding } from '../contexts/BrandingContext';
 import { shouldDisableAnimations } from '../utils/animationControl';
 import FeedbackWidget from './FeedbackWidget';
 import SaweriaSupport from './SaweriaSupport';
-
-// Lazy load heavy components
-const MapView = lazy(() => import('./MapView'));
-const Playback = lazy(() => import('../pages/Playback'));
 
 // ============================================
 // ICONS
@@ -136,9 +132,9 @@ export default function LandingPageSimple({
                 onLayoutToggle={onLayoutToggle}
             />
             
-            {/* Main Content - Full height */}
+            {/* Main Content - CamerasSection handles all view modes */}
             <main className="flex-1 min-h-0">
-                {viewMode === 'grid' && CamerasSection && (
+                {CamerasSection && (
                     <CamerasSection
                         cameras={cameras}
                         areas={areas}
@@ -149,36 +145,6 @@ export default function LandingPageSimple({
                         viewMode={viewMode}
                         setViewMode={setViewMode}
                     />
-                )}
-                
-                {viewMode === 'map' && (
-                    <Suspense fallback={
-                        <div className="h-full flex items-center justify-center">
-                            <div className="text-center">
-                                <div className="w-12 h-12 border-4 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-                                <p className="text-sm text-gray-500">Loading map...</p>
-                            </div>
-                        </div>
-                    }>
-                        <MapView 
-                            cameras={cameras}
-                            areas={areas}
-                            onCameraClick={onCameraClick}
-                        />
-                    </Suspense>
-                )}
-                
-                {viewMode === 'playback' && (
-                    <Suspense fallback={
-                        <div className="h-full flex items-center justify-center">
-                            <div className="text-center">
-                                <div className="w-12 h-12 border-4 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-                                <p className="text-sm text-gray-500">Loading playback...</p>
-                            </div>
-                        </div>
-                    }>
-                        <Playback />
-                    </Suspense>
                 )}
             </main>
             
