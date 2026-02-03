@@ -37,12 +37,12 @@ export function SecurityProvider({ children }) {
                 // CSRF fetch failed but don't block the app
                 // The apiClient will retry on state-changing requests
                 setCsrfReady(true);
-                // Don't log warning - it's expected on first load
-                // The token will be fetched automatically on first POST/PUT/DELETE request
+                console.warn('CSRF token not available, will retry on requests');
             }
         } catch (error) {
-            // Silently handle error - CSRF will be fetched on demand
-            setCsrfError(null); // Don't set error to avoid blocking UI
+            console.error('Failed to initialize CSRF:', error);
+            setCsrfError(error.message);
+            // Still mark as ready to not block the app
             setCsrfReady(true);
         } finally {
             initializingRef.current = false;
