@@ -37,7 +37,7 @@ import sponsorRoutes from './routes/sponsorRoutes.js';
 import saweriaRoutes from './routes/saweriaRoutes.js';
 import recordingRoutes from './routes/recordingRoutes.js';
 import brandingRoutes from './routes/brandingRoutes.js';
-import thumbnailRoutes from './routes/thumbnailRoutes.js';
+// thumbnailRoutes removed - @fastify/static handles thumbnails
 import mediaMtxService from './services/mediaMtxService.js';
 import streamWarmer from './services/streamWarmer.js';
 import cameraHealthService from './services/cameraHealthService.js';
@@ -237,7 +237,7 @@ await fastify.register(sponsorRoutes, { prefix: '/api/sponsors' });
 await fastify.register(saweriaRoutes, { prefix: '/api/saweria' });
 await fastify.register(recordingRoutes, { prefix: '/api' });
 await fastify.register(brandingRoutes, { prefix: '/api/branding' });
-await fastify.register(thumbnailRoutes, { prefix: '/api/thumbnails' });
+// thumbnailRoutes removed - @fastify/static handles /api/thumbnails/* automatically
 
 // ============================================
 // GLOBAL ERROR HANDLER

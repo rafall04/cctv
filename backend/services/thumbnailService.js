@@ -137,10 +137,10 @@ class ThumbnailService {
                 throw new Error('Temp file not created');
             }
 
-            // Update database
+            // Update database (path must match static server prefix)
             execute(
                 'UPDATE cameras SET thumbnail_path = ?, thumbnail_updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                [`/thumbnails/${cameraId}.jpg`, cameraId]
+                [`/api/thumbnails/${cameraId}.jpg`, cameraId]
             );
 
             console.log(`[Thumbnail] Generated for camera ${cameraId}`);
