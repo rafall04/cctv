@@ -32,6 +32,8 @@ import SaweriaLeaderboard from '../components/SaweriaLeaderboard';
 // Codec Badge
 import CodecBadge from '../components/CodecBadge';
 import { canPlayCodec } from '../utils/codecSupport';
+// Camera Thumbnail
+import CameraThumbnail from '../components/CameraThumbnail';
 // Map view - lazy loaded for performance
 const MapView = lazy(() => import('../components/MapView'));
 // Playback - lazy loaded for performance
@@ -343,19 +345,15 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
             </button>
             
             {/* Video thumbnail area */}
-            <div onClick={onClick} className={`aspect-video relative cursor-pointer ${bgStyle}`}>
-                {/* Center icon - simplified SVG */}
-                <div className={`absolute inset-0 flex items-center justify-center ${iconStyle}`}>
-                    <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={0.5}>
-                        {isMaintenance ? (
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63" />
-                        ) : isOffline ? (
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414"/>
-                        ) : (
-                            <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-                        )}
-                    </svg>
-                </div>
+            <div onClick={onClick} className={`aspect-video relative cursor-pointer overflow-hidden ${bgStyle}`}>
+                {/* Thumbnail image */}
+                <CameraThumbnail
+                    cameraId={camera.id}
+                    thumbnailPath={camera.thumbnail_path}
+                    cameraName={camera.name}
+                    isMaintenance={isMaintenance}
+                    isOffline={isOffline}
+                />
                 
                 {/* Play overlay - only for online cameras, disabled on low-end */}
                 {!isMaintenance && !isOffline && !disableAnimations && (

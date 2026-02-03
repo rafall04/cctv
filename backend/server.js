@@ -31,11 +31,13 @@ import sponsorRoutes from './routes/sponsorRoutes.js';
 import saweriaRoutes from './routes/saweriaRoutes.js';
 import recordingRoutes from './routes/recordingRoutes.js';
 import brandingRoutes from './routes/brandingRoutes.js';
+import thumbnailRoutes from './routes/thumbnailRoutes.js';
 import mediaMtxService from './services/mediaMtxService.js';
 import streamWarmer from './services/streamWarmer.js';
 import cameraHealthService from './services/cameraHealthService.js';
 import viewerSessionService from './services/viewerSessionService.js';
 import { recordingService } from './services/recordingService.js';
+import thumbnailService from './services/thumbnailService.js';
 
 const fastify = Fastify({
     logger: config.server.env === 'production' 
@@ -222,6 +224,7 @@ await fastify.register(sponsorRoutes, { prefix: '/api/sponsors' });
 await fastify.register(saweriaRoutes, { prefix: '/api/saweria' });
 await fastify.register(recordingRoutes, { prefix: '/api' });
 await fastify.register(brandingRoutes, { prefix: '/api/branding' });
+await fastify.register(thumbnailRoutes, { prefix: '/api/thumbnails' });
 
 // ============================================
 // GLOBAL ERROR HANDLER
@@ -339,6 +342,10 @@ const start = async () => {
         console.log('[Recording] Auto-starting recordings with retry logic...');
         await recordingService.autoStartRecordings();
         console.log('[Recording] Recording service initialized');
+        
+        // Start thumbnail generation service
+        thumbnailService.start();
+        console.log('[Thumbnail] Thumbnail generation service started (5min interval)');
     } catch (err) {
         fastify.log.error(err);
         process.exit(1);
@@ -358,6 +365,7 @@ const shutdown = async () => {
         streamWarmer.stopAll();
         cameraHealthService.stop();
         viewerSessionService.stopCleanup();
+        thumbnailService.stop();
         stopDailyCleanup();
         
         // Cleanup MediaMTX paths to prevent zombie connections

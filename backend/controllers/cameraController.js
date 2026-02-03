@@ -72,7 +72,8 @@ export async function getActiveCameras(request, reply) {
 
         const cameras = query(
             `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel, 
-                    c.latitude, c.longitude, c.status, c.enable_recording, c.video_codec, c.stream_key, a.name as area_name 
+                    c.latitude, c.longitude, c.status, c.enable_recording, c.video_codec, c.stream_key, 
+                    c.thumbnail_path, c.thumbnail_updated_at, a.name as area_name 
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 
              WHERE c.enabled = 1 
