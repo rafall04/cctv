@@ -3522,10 +3522,11 @@ export default function LandingPage() {
     // ============================================
     // LAYOUT MODE MANAGEMENT
     // Priority: URL query param > localStorage > default 'full'
-    // Fixed: Race condition by simplifying state initialization and sync logic
+    // ============================================
+    // LAYOUT MODE STATE - Fixed race condition
     // ============================================
     
-    // Initialize mode from URL or localStorage (runs once on mount)
+    // Initialize mode from URL or localStorage (runs ONCE on mount)
     const getInitialMode = () => {
         const queryMode = searchParams.get('mode');
         
@@ -3549,18 +3550,31 @@ export default function LandingPage() {
     };
     
     const [layoutMode, setLayoutMode] = useState(getInitialMode);
+    const isInitialMount = useRef(true);
     
-    // Sync URL and localStorage when searchParams changes (not when layoutMode changes)
-    // This prevents infinite loop by only reacting to external URL changes
+    // Sync URL with initial state on mount ONLY
     useEffect(() => {
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            
+            const queryMode = searchParams.get('mode');
+            // If no query param on mount, set it to current state
+            if (!queryMode) {
+                setSearchParams({ mode: layoutMode }, { replace: true });
+            }
+        }
+    }, []); // Empty deps - runs ONCE on mount
+    
+    // Handle external URL changes (browser back/forward, manual URL edit)
+    useEffect(() => {
+        // Skip initial mount (already handled above)
+        if (isInitialMount.current) return;
+        
         const queryMode = searchParams.get('mode');
         
-        // Only process if URL has a valid mode parameter
-        if (queryMode === 'simple' || queryMode === 'full') {
-            // Update state if different from current
-            if (queryMode !== layoutMode) {
-                setLayoutMode(queryMode);
-            }
+        // Only update state if URL has valid mode AND it's different from current
+        if ((queryMode === 'simple' || queryMode === 'full') && queryMode !== layoutMode) {
+            setLayoutMode(queryMode);
             
             // Save to localStorage
             try {
@@ -3568,19 +3582,20 @@ export default function LandingPage() {
             } catch (err) {
                 console.warn('Failed to save to localStorage:', err);
             }
-        } else if (queryMode === null) {
-            // No query param: sync URL with current state
-            // This handles browser back/forward without query param
-            setSearchParams({ mode: layoutMode }, { replace: true });
         }
-        // If queryMode is invalid (not 'simple', 'full', or null), ignore it
-    }, [searchParams]); // Only depend on searchParams, not layoutMode or setSearchParams
+    }, [searchParams]); // Only searchParams - no layoutMode!
     
     // Toggle function for FAB
     const toggleLayoutMode = useCallback(() => {
         const newMode = layoutMode === 'full' ? 'simple' : 'full';
+        
+        // Update state
         setLayoutMode(newMode);
-        setSearchParams({ mode: newMode });
+        
+        // Update URL
+        setSearchParams({ mode: newMode }, { replace: true });
+        
+        // Save to localStorage
         try {
             localStorage.setItem('landing_layout_mode', newMode);
         } catch (err) {
