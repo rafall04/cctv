@@ -136,53 +136,6 @@ export default function LandingPageSimple({
                 onLayoutToggle={onLayoutToggle}
             />
             
-            {/* View Mode Selector - Below header */}
-            <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-                    <div className="flex items-center justify-center gap-1 p-1 rounded-lg bg-gray-100 dark:bg-gray-800 w-fit mx-auto">
-                        <button
-                            onClick={() => setViewMode('grid')}
-                            className={`px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
-                                viewMode === 'grid'
-                                    ? 'bg-white dark:bg-gray-700 text-sky-500 shadow-sm'
-                                    : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-                            }`}
-                        >
-                            <div className="flex items-center gap-2">
-                                <Icons.Grid />
-                                <span>Grid</span>
-                            </div>
-                        </button>
-                        <button
-                            onClick={() => setViewMode('map')}
-                            className={`px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
-                                viewMode === 'map'
-                                    ? 'bg-white dark:bg-gray-700 text-sky-500 shadow-sm'
-                                    : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-                            }`}
-                        >
-                            <div className="flex items-center gap-2">
-                                <Icons.Map />
-                                <span>Map</span>
-                            </div>
-                        </button>
-                        <button
-                            onClick={() => setViewMode('playback')}
-                            className={`px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
-                                viewMode === 'playback'
-                                    ? 'bg-white dark:bg-gray-700 text-sky-500 shadow-sm'
-                                    : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-                            }`}
-                        >
-                            <div className="flex items-center gap-2">
-                                <Icons.Playback />
-                                <span>Playback</span>
-                            </div>
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
             {/* Main Content - Full height */}
             <main className="flex-1 min-h-0">
                 {viewMode === 'grid' && CamerasSection && (
@@ -193,8 +146,8 @@ export default function LandingPageSimple({
                         onCameraClick={onCameraClick}
                         onAddMulti={onAddMulti}
                         multiCameras={multiCameras}
-                        viewMode="grid"
-                        setViewMode={() => {}}
+                        viewMode={viewMode}
+                        setViewMode={setViewMode}
                     />
                 )}
                 
