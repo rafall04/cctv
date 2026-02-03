@@ -37,7 +37,6 @@ import { canPlayCodec } from '../utils/codecSupport';
 import CameraThumbnail from '../components/CameraThumbnail';
 // Layout components
 import LandingPageSimple from '../components/LandingPageSimple';
-import LayoutToggleFAB from '../components/LayoutToggleFAB';
 // Map view - lazy loaded for performance
 const MapView = lazy(() => import('../components/MapView'));
 // Playback - lazy loaded for performance
@@ -2364,7 +2363,7 @@ function MultiViewLayout({ cameras, onRemove, onClose }) {
 // Disables animations on low-end devices - **Validates: Requirements 5.2**
 // Clock update interval optimized: 10s on low-end, 1s on high-end
 // ============================================
-function Navbar({ cameraCount, branding }) {
+function Navbar({ cameraCount, branding, layoutMode, onLayoutToggle }) {
     const { isDark, toggleTheme } = useTheme();
     const [currentTime, setCurrentTime] = useState(new Date());
     const disableAnimations = shouldDisableAnimations();
@@ -2410,8 +2409,19 @@ function Navbar({ cameraCount, branding }) {
                         </span>
                     </div>
                     
-                    {/* Right - Theme Toggle */}
+                    {/* Right - Layout Mode & Theme Toggle */}
                     <div className="flex items-center gap-2">
+                        {/* Layout Mode Toggle */}
+                        <button
+                            onClick={onLayoutToggle}
+                            className="p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                            title={layoutMode === 'simple' ? 'Switch to Full Layout' : 'Switch to Simple Layout'}
+                            aria-label={layoutMode === 'simple' ? 'Beralih ke Tampilan Lengkap' : 'Beralih ke Tampilan Sederhana'}
+                        >
+                            {layoutMode === 'simple' ? <Icons.Layout /> : <Icons.Grid />}
+                        </button>
+                        
+                        {/* Theme Toggle */}
                         <button
                             onClick={toggleTheme}
                             className="p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
@@ -2750,43 +2760,6 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                             <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
                                 {cameras.length} kamera tersedia • Streaming langsung 24/7
                             </p>
-                        </div>
-                        
-                        {/* View Mode Toggle - Maps, Grid, Playback */}
-                        <div className="flex items-center p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
-                            <button
-                                onClick={() => setViewMode('map')}
-                                className={`p-2.5 rounded-lg transition-colors ${
-                                    viewMode === 'map'
-                                        ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-sky-400 shadow-sm'
-                                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                                }`}
-                                title="Map View"
-                            >
-                                <Icons.Map />
-                            </button>
-                            <button
-                                onClick={() => setViewMode('grid')}
-                                className={`p-2.5 rounded-lg transition-colors ${
-                                    viewMode === 'grid'
-                                        ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-sky-400 shadow-sm'
-                                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                                }`}
-                                title="Grid View (Multi-View)"
-                            >
-                                <Icons.Grid />
-                            </button>
-                            <button
-                                onClick={() => setViewMode('playback')}
-                                className={`p-2.5 rounded-lg transition-colors ${
-                                    viewMode === 'playback'
-                                        ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-sky-400 shadow-sm'
-                                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                                }`}
-                                title="Playback Rekaman"
-                            >
-                                <Icons.Clock />
-                            </button>
                         </div>
                     </div>
 
@@ -3858,9 +3831,6 @@ export default function LandingPage() {
                         onClose={() => setShowMulti(false)}
                     />
                 )}
-                
-                {/* Layout Toggle FAB */}
-                <LayoutToggleFAB mode={layoutMode} onToggle={toggleLayoutMode} />
             </>
         );
     }
@@ -3871,7 +3841,7 @@ export default function LandingPage() {
     return (
         <>
             <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
-                <Navbar cameraCount={cameras.length} branding={branding} />
+                <Navbar cameraCount={cameras.length} branding={branding} layoutMode={layoutMode} onLayoutToggle={toggleLayoutMode} />
                 
                 {/* Hero Section - SEO optimized with Indonesian content */}
                 <header className="relative overflow-hidden bg-gradient-to-br from-sky-500/10 via-transparent to-purple-500/10 dark:from-sky-500/5 dark:to-purple-500/5">
@@ -4014,9 +3984,6 @@ export default function LandingPage() {
                 {/* Saweria Support - Modal + Floating Banner */}
                 <SaweriaSupport />
             </div>
-            
-            {/* Layout Toggle FAB */}
-            <LayoutToggleFAB mode={layoutMode} onToggle={toggleLayoutMode} />
         </>
     );
 }
