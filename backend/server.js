@@ -357,7 +357,7 @@ const start = async () => {
         console.log('[Recording] Recording service initialized');
         
         // Start thumbnail generation service
-        thumbnailService.start();
+        await thumbnailService.start();
         console.log('[Thumbnail] Thumbnail generation service started (5min interval)');
     } catch (err) {
         fastify.log.error(err);

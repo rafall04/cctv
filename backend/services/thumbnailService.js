@@ -121,10 +121,12 @@ class ThumbnailService {
                 }
 
                 try {
+                    console.log(`[Thumbnail] Processing camera ${camera.id} (${camera.name})...`);
                     await this.generateThumbnail(camera.id, camera.stream_key);
                     success++;
+                    console.log(`[Thumbnail] ✓ Camera ${camera.id} success`);
                 } catch (error) {
-                    console.error(`[Thumbnail] Failed for camera ${camera.id} (${camera.name}):`, error.message);
+                    console.error(`[Thumbnail] ✗ Camera ${camera.id} (${camera.name}) failed:`, error.message);
                     failed++;
                 }
             }
@@ -153,10 +155,11 @@ class ThumbnailService {
             // -vframes 1: ambil 1 frame saja
             // -s 320x180: tiny resolution (16:9 ratio)
             // -q:v 8: JPEG quality ~60% (scale 2-31, lower=better)
-            const command = `ffmpeg -i "${hlsUrl}" -vframes 1 -s 320x180 -q:v 8 "${tempPath}" -y`;
+            // -loglevel error: suppress verbose output
+            const command = `ffmpeg -loglevel error -i "${hlsUrl}" -vframes 1 -s 320x180 -q:v 8 "${tempPath}" -y`;
 
             await execAsync(command, {
-                timeout: 8000, // 8 detik timeout
+                timeout: 15000, // 15 detik timeout (increased for slow streams)
                 maxBuffer: 1024 * 1024 // 1MB buffer
             });
 
