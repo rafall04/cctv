@@ -16,6 +16,19 @@ const db = new Database(dbPath);
 try {
     console.log('🔄 Adding landing page settings...');
     
+    // Check if settings table exists
+    const tableExists = db.prepare(`
+        SELECT name FROM sqlite_master 
+        WHERE type='table' AND name='settings'
+    `).get();
+    
+    if (!tableExists) {
+        console.log('⚠️  Table settings does not exist yet');
+        console.log('   This migration will be skipped and should run after add_settings_table.js');
+        console.log('✅ Migration skipped (will auto-run on next migration cycle)');
+        process.exit(0);
+    }
+    
     const insertSetting = db.prepare(`
         INSERT OR IGNORE INTO settings (key, value, description) 
         VALUES (?, ?, ?)

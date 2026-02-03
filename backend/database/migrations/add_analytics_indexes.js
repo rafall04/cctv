@@ -23,6 +23,19 @@ const db = new Database(dbPath);
 try {
     console.log('🔄 Starting migration: add analytics indexes...');
     
+    // Check if viewer_session_history table exists
+    const tableExists = db.prepare(`
+        SELECT name FROM sqlite_master 
+        WHERE type='table' AND name='viewer_session_history'
+    `).get();
+    
+    if (!tableExists) {
+        console.log('⚠️  Table viewer_session_history does not exist yet');
+        console.log('   This migration will be skipped and should run after add_viewer_sessions.js');
+        console.log('✅ Migration skipped (will auto-run on next migration cycle)');
+        process.exit(0);
+    }
+    
     // Check existing indexes
     const existingIndexes = db.prepare(`
         SELECT name FROM sqlite_master 

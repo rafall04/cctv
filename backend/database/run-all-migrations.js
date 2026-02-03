@@ -37,6 +37,7 @@ async function runMigrations() {
     let successCount = 0;
     let failCount = 0;
     const failed = [];
+    const skipped = [];
 
     for (const file of migrationFiles) {
         const migrationPath = join(migrationsDir, file);
@@ -45,15 +46,44 @@ async function runMigrations() {
         console.log('─'.repeat(60));
         
         try {
-            await runMigration(migrationPath);
-            successCount++;
-            console.log(`✅ Success: ${file}\n`);
+            const exitCode = await runMigration(migrationPath);
+            if (exitCode === 0) {
+                successCount++;
+                console.log(`✅ Success: ${file}\n`);
+            } else {
+                // Exit code 0 = success, anything else = failure
+                // But we continue with next migration
+                skipped.push(file);
+                console.log(`⚠️  Skipped: ${file} (will retry after dependencies)\n`);
+            }
         } catch (error) {
             failCount++;
             failed.push({ file, error: error.message });
             console.error(`❌ Failed: ${file}`);
             console.error(`   Error: ${error.message}\n`);
             // Continue with next migration even if one fails
+        }
+    }
+
+    // Retry skipped migrations (for dependency issues)
+    if (skipped.length > 0) {
+        console.log('\n🔄 Retrying skipped migrations...');
+        console.log('─'.repeat(60));
+        
+        for (const file of skipped) {
+            const migrationPath = join(migrationsDir, file);
+            console.log(`\n📦 Retry: ${file}`);
+            
+            try {
+                await runMigration(migrationPath);
+                successCount++;
+                console.log(`✅ Success: ${file}\n`);
+            } catch (error) {
+                failCount++;
+                failed.push({ file, error: error.message });
+                console.error(`❌ Still failed: ${file}`);
+                console.error(`   Error: ${error.message}\n`);
+            }
         }
     }
 
