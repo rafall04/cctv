@@ -2632,7 +2632,7 @@ function FilterDropdown({ areas, selected, onChange, cameras, kecamatans = [], k
 // ============================================
 // CAMERAS SECTION - Connection filter only for Grid view
 // ============================================
-function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, multiCameras, viewMode, setViewMode }) {
+function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, multiCameras, viewMode, setViewMode, landingSettings = { section_title: 'CCTV Publik' } }) {
     const [connectionTab, setConnectionTab] = useState('all'); // 'all', 'stable', 'tunnel'
     // viewMode now controlled by parent
     const [searchQuery, setSearchQuery] = useState('');
@@ -3972,6 +3972,7 @@ export default function LandingPage() {
                     multiCameras={multiCameras}
                     viewMode={viewMode}
                     setViewMode={setViewMode}
+                    landingSettings={landingSettings}
                 />
 
                 {/* Saweria Leaderboard - Placed after cameras section */}
