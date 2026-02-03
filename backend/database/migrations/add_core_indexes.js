@@ -30,8 +30,8 @@ try {
     db.exec(`CREATE INDEX IF NOT EXISTS idx_cameras_created_at ON cameras(created_at DESC)`);
     console.log('  ✓ idx_cameras_created_at');
     
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_cameras_stream_key ON cameras(stream_key)`);
-    console.log('  ✓ idx_cameras_stream_key');
+    // Note: stream_key index is created by add_stream_key.js migration (UNIQUE index)
+    // Skipping duplicate index creation here
     
     // Composite index for common query pattern: enabled cameras by area
     db.exec(`CREATE INDEX IF NOT EXISTS idx_cameras_enabled_area ON cameras(enabled, area_id)`);
