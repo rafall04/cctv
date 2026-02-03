@@ -220,8 +220,8 @@ print_success "Frontend rebuilt"
 print_header "Restarting Services"
 
 if command -v pm2 &> /dev/null; then
-    if pm2 list | grep -q "rafnet-cctv-backend"; then
-        pm2 restart rafnet-cctv-backend
+    if pm2 list | grep -q "${CLIENT_CODE}-cctv-backend"; then
+        pm2 restart ${CLIENT_CODE}-cctv-backend
         print_success "Backend restarted"
     else
         print_warning "Backend not running in PM2"

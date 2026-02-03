@@ -1,11 +1,28 @@
 const path = require('path');
+const fs = require('fs');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
+
+// Load client configuration
+let CLIENT_CODE = 'rafnet';
+const configPath = path.join(__dirname, 'client.config.sh');
+
+if (fs.existsSync(configPath)) {
+    try {
+        const configContent = fs.readFileSync(configPath, 'utf8');
+        const match = configContent.match(/CLIENT_CODE="([^"]+)"/);
+        if (match) {
+            CLIENT_CODE = match[1];
+        }
+    } catch (error) {
+        console.warn('⚠️  Could not read client.config.sh, using default CLIENT_CODE');
+    }
+}
 
 module.exports = {
     apps: [
         {
-            name: 'mediamtx',
+            name: `${CLIENT_CODE}-mediamtx`,
             script: './mediamtx',
             cwd: path.join(ROOT_DIR, 'mediamtx'),
             args: ['mediamtx.yml'],
@@ -17,7 +34,7 @@ module.exports = {
             restart_delay: 3000,
         },
         {
-            name: 'cctv-backend',
+            name: `${CLIENT_CODE}-cctv-backend`,
             script: 'server.js',
             cwd: path.join(ROOT_DIR, 'backend'),
             instances: 1,
