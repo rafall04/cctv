@@ -3,7 +3,6 @@ import bcrypt from 'bcrypt';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { mkdirSync, existsSync } from 'fs';
-import { config } from '../config/config.js';
 import { 
   generateStrongPassword, 
   generateInstallationId, 
@@ -23,12 +22,10 @@ if (!existsSync(dataDir)) {
   console.log('✓ Data directory exists:', dataDir);
 }
 
-const dbPath = config.database.path.startsWith('/') 
-  ? config.database.path 
-  : join(__dirname, '..', config.database.path);
+// Use hardcoded relative path to avoid .env dependency during initial setup
+const dbPath = join(__dirname, '..', 'data', 'cctv.db');
 
 console.log('Database configuration:');
-console.log('  Config path:', config.database.path);
 console.log('  Resolved path:', dbPath);
 console.log('  Data directory:', dataDir);
 
