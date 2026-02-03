@@ -3848,6 +3848,8 @@ export default function LandingPage() {
                     saweriaEnabled={saweriaEnabled}
                     saweriaLink={saweriaLink}
                     CamerasSection={CamerasSection}
+                    layoutMode={layoutMode}
+                    onLayoutToggle={toggleLayoutMode}
                 />
                 
                 {/* Shared Components */}
