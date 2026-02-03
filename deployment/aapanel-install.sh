@@ -48,6 +48,13 @@ while [ -z "$FRONTEND_DOMAIN" ]; do
     read -p "Frontend Domain: " FRONTEND_DOMAIN
 done
 
+# Additional Frontend Domains (optional)
+ADDITIONAL_FRONTEND_DOMAINS=""
+read -p "Add more frontend domains? [y/N]: " ADD_MORE_FRONTEND
+if [[ "$ADD_MORE_FRONTEND" =~ ^[Yy]$ ]]; then
+    read -p "Additional frontend domains (comma-separated): " ADDITIONAL_FRONTEND_DOMAINS
+fi
+
 # Backend Domain
 read -p "Backend Domain (e.g., api-cctv.client.com): " BACKEND_DOMAIN
 while [ -z "$BACKEND_DOMAIN" ]; do
@@ -55,9 +62,23 @@ while [ -z "$BACKEND_DOMAIN" ]; do
     read -p "Backend Domain: " BACKEND_DOMAIN
 done
 
+# Additional Backend Domains (optional)
+ADDITIONAL_BACKEND_DOMAINS=""
+read -p "Add more backend domains? [y/N]: " ADD_MORE_BACKEND
+if [[ "$ADD_MORE_BACKEND" =~ ^[Yy]$ ]]; then
+    read -p "Additional backend domains (comma-separated): " ADDITIONAL_BACKEND_DOMAINS
+fi
+
 # Server IP
 read -p "Server IP [$DETECTED_IP]: " SERVER_IP
 SERVER_IP=${SERVER_IP:-$DETECTED_IP}
+
+# Additional Server IPs (optional)
+ADDITIONAL_SERVER_IPS=""
+read -p "Add more server IPs? [y/N]: " ADD_MORE_IPS
+if [[ "$ADD_MORE_IPS" =~ ^[Yy]$ ]]; then
+    read -p "Additional server IPs (comma-separated): " ADDITIONAL_SERVER_IPS
+fi
 
 # Ports
 read -p "Public Port [800]: " PORT_PUBLIC
@@ -94,7 +115,7 @@ JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('he
 API_KEY_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" 2>/dev/null || openssl rand -hex 32)
 CSRF_SECRET=$(node -e "console.log(require('crypto').randomBytes(16).toString('hex'))" 2>/dev/null || openssl rand -hex 16)
 
-# Generate URLs
+# Generate URLs (primary domain)
 FRONTEND_URL="${FRONTEND_PROTOCOL}://${FRONTEND_DOMAIN}"
 BACKEND_URL="${BACKEND_PROTOCOL}://${BACKEND_DOMAIN}"
 if [ "$PORT_PUBLIC" != "80" ] && [ "$PORT_PUBLIC" != "443" ]; then
@@ -102,13 +123,91 @@ if [ "$PORT_PUBLIC" != "80" ] && [ "$PORT_PUBLIC" != "443" ]; then
     BACKEND_URL="${BACKEND_URL}:${PORT_PUBLIC}"
 fi
 
-# Generate allowed origins
-ALLOWED_ORIGINS="${FRONTEND_URL},${BACKEND_URL}"
-if [ "$PORT_PUBLIC" != "80" ] && [ "$PORT_PUBLIC" != "443" ]; then
-    ALLOWED_ORIGINS="${ALLOWED_ORIGINS},http://${SERVER_IP}:${PORT_PUBLIC}"
+# ============================================
+# GENERATE ALLOWED ORIGINS (HTTP + HTTPS)
+# ============================================
+ALLOWED_ORIGINS=""
+
+# Function to add domain to ALLOWED_ORIGINS (both HTTP and HTTPS)
+add_domain_to_origins() {
+    local domain=$1
+    local port=$2
+    
+    # HTTPS without port (always add)
+    ALLOWED_ORIGINS="${ALLOWED_ORIGINS},https://${domain}"
+    
+    # HTTP without port (always add)
+    ALLOWED_ORIGINS="${ALLOWED_ORIGINS},http://${domain}"
+    
+    # With port (if not 80/443)
+    if [ "$port" != "80" ] && [ "$port" != "443" ]; then
+        ALLOWED_ORIGINS="${ALLOWED_ORIGINS},https://${domain}:${port}"
+        ALLOWED_ORIGINS="${ALLOWED_ORIGINS},http://${domain}:${port}"
+    fi
+}
+
+# Function to add IP to ALLOWED_ORIGINS
+add_ip_to_origins() {
+    local ip=$1
+    local port=$2
+    
+    # HTTP without port
+    ALLOWED_ORIGINS="${ALLOWED_ORIGINS},http://${ip}"
+    
+    # With port (if not 80/443)
+    if [ "$port" != "80" ] && [ "$port" != "443" ]; then
+        ALLOWED_ORIGINS="${ALLOWED_ORIGINS},http://${ip}:${port}"
+    fi
+}
+
+# Add primary frontend domain
+add_domain_to_origins "$FRONTEND_DOMAIN" "$PORT_PUBLIC"
+
+# Add additional frontend domains
+if [ -n "$ADDITIONAL_FRONTEND_DOMAINS" ]; then
+    IFS=',' read -ra FRONTEND_ARRAY <<< "$ADDITIONAL_FRONTEND_DOMAINS"
+    for domain in "${FRONTEND_ARRAY[@]}"; do
+        domain=$(echo "$domain" | xargs)  # trim whitespace
+        if [ -n "$domain" ]; then
+            add_domain_to_origins "$domain" "$PORT_PUBLIC"
+        fi
+    done
 fi
-ALLOWED_ORIGINS="${ALLOWED_ORIGINS},http://${SERVER_IP}"
+
+# Add primary backend domain
+add_domain_to_origins "$BACKEND_DOMAIN" "$PORT_PUBLIC"
+
+# Add additional backend domains
+if [ -n "$ADDITIONAL_BACKEND_DOMAINS" ]; then
+    IFS=',' read -ra BACKEND_ARRAY <<< "$ADDITIONAL_BACKEND_DOMAINS"
+    for domain in "${BACKEND_ARRAY[@]}"; do
+        domain=$(echo "$domain" | xargs)
+        if [ -n "$domain" ]; then
+            add_domain_to_origins "$domain" "$PORT_PUBLIC"
+        fi
+    done
+fi
+
+# Add primary server IP
+add_ip_to_origins "$SERVER_IP" "$PORT_PUBLIC"
+
+# Add additional server IPs
+if [ -n "$ADDITIONAL_SERVER_IPS" ]; then
+    IFS=',' read -ra IP_ARRAY <<< "$ADDITIONAL_SERVER_IPS"
+    for ip in "${IP_ARRAY[@]}"; do
+        ip=$(echo "$ip" | xargs)
+        if [ -n "$ip" ]; then
+            add_ip_to_origins "$ip" "$PORT_PUBLIC"
+        fi
+    done
+fi
+
+# Add localhost for development
 ALLOWED_ORIGINS="${ALLOWED_ORIGINS},http://localhost:${PORT_BACKEND}"
+ALLOWED_ORIGINS="${ALLOWED_ORIGINS},http://localhost:5173"
+
+# Remove leading comma
+ALLOWED_ORIGINS="${ALLOWED_ORIGINS:1}"
 
 # ============================================
 # CONFIRMATION
@@ -120,8 +219,17 @@ print_header "============================================"
 echo ""
 echo "Client:        $CLIENT_NAME ($CLIENT_CODE)"
 echo "Frontend URL:  $FRONTEND_URL"
+if [ -n "$ADDITIONAL_FRONTEND_DOMAINS" ]; then
+    echo "               + Additional: $ADDITIONAL_FRONTEND_DOMAINS"
+fi
 echo "Backend URL:   $BACKEND_URL"
+if [ -n "$ADDITIONAL_BACKEND_DOMAINS" ]; then
+    echo "               + Additional: $ADDITIONAL_BACKEND_DOMAINS"
+fi
 echo "Server IP:     $SERVER_IP"
+if [ -n "$ADDITIONAL_SERVER_IPS" ]; then
+    echo "               + Additional: $ADDITIONAL_SERVER_IPS"
+fi
 echo "App Directory: $APP_DIR"
 echo ""
 echo "Ports:"
@@ -130,6 +238,9 @@ echo "  Backend:        $PORT_BACKEND"
 echo "  MediaMTX HLS:   $PORT_MEDIAMTX_HLS"
 echo "  MediaMTX WebRTC: $PORT_MEDIAMTX_WEBRTC"
 echo "  MediaMTX API:   $PORT_MEDIAMTX_API"
+echo ""
+echo "CORS Origins (HTTP + HTTPS auto-generated):"
+echo "  Total origins: $(echo "$ALLOWED_ORIGINS" | tr ',' '\n' | wc -l)"
 echo ""
 read -p "Continue with installation? [Y/n]: " CONFIRM
 CONFIRM=${CONFIRM:-Y}
@@ -161,6 +272,11 @@ CLIENT_CODE="$CLIENT_CODE"
 FRONTEND_DOMAIN="$FRONTEND_DOMAIN"
 BACKEND_DOMAIN="$BACKEND_DOMAIN"
 SERVER_IP="$SERVER_IP"
+
+# Additional Domains/IPs (optional)
+ADDITIONAL_FRONTEND_DOMAINS="$ADDITIONAL_FRONTEND_DOMAINS"
+ADDITIONAL_BACKEND_DOMAINS="$ADDITIONAL_BACKEND_DOMAINS"
+ADDITIONAL_SERVER_IPS="$ADDITIONAL_SERVER_IPS"
 
 # Port Configuration
 PORT_PUBLIC="$PORT_PUBLIC"
