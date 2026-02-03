@@ -8,7 +8,82 @@
 
 ## 🔴 CRITICAL BUGS FOUND & FIXED
 
-### 1. **Hardcoded Application Names in PM2 Config**
+### 1. **Race Condition in Layout Mode Sync**
+
+**File:** `frontend/src/pages/LandingPage.jsx`
+
+**Problem:**
+```jsx
+// ❌ BEFORE - Potential infinite loop
+useEffect(() => {
+    // ... complex logic with layoutMode in dependency
+}, [searchParams, setSearchParams]); // layoutMode removed but still risky
+
+const getInitialMode = useCallback(() => {
+    // ... logic
+}, [searchParams]); // useCallback adds overhead
+```
+
+**Impact:**
+- Potential infinite re-renders
+- useEffect could trigger state updates causing re-renders
+- getInitialMode wrapped in useCallback unnecessarily
+- Complex logic duplicated between initialization and sync
+
+**Fix Applied:**
+```jsx
+// ✅ AFTER - Clean, no race condition
+const getInitialMode = () => {
+    // Simple function, no useCallback needed
+    const queryMode = searchParams.get('mode');
+    if (queryMode === 'simple' || queryMode === 'full') return queryMode;
+    
+    try {
+        const savedMode = localStorage.getItem('landing_layout_mode');
+        if (savedMode === 'simple' || savedMode === 'full') return savedMode;
+    } catch (err) {
+        console.warn('Failed to read localStorage:', err);
+    }
+    
+    return 'full';
+};
+
+const [layoutMode, setLayoutMode] = useState(getInitialMode);
+
+// Only react to URL changes, not state changes
+useEffect(() => {
+    const queryMode = searchParams.get('mode');
+    
+    if (queryMode === 'simple' || queryMode === 'full') {
+        if (queryMode !== layoutMode) {
+            setLayoutMode(queryMode);
+        }
+        try {
+            localStorage.setItem('landing_layout_mode', queryMode);
+        } catch (err) {
+            console.warn('Failed to save to localStorage:', err);
+        }
+    } else if (queryMode === null) {
+        // Sync URL with current state
+        setSearchParams({ mode: layoutMode }, { replace: true });
+    }
+}, [searchParams]); // Only depend on searchParams
+```
+
+**Key Improvements:**
+- ✅ Removed useCallback (unnecessary overhead)
+- ✅ Simplified dependency array (only searchParams)
+- ✅ Clear separation: initialization vs sync
+- ✅ No circular dependencies
+- ✅ Handles browser back/forward correctly
+
+**Severity:** 🔴 CRITICAL  
+**Status:** ✅ FIXED  
+**Commit:** `178c7d5` - "Fix: race condition in layout mode sync - prevent infinite loop"
+
+---
+
+### 2. **Hardcoded Application Names in PM2 Config**
 
 **File:** `deployment/ecosystem.config.cjs`
 
@@ -47,7 +122,7 @@ name: `${CLIENT_CODE}-cctv-backend`,
 
 ---
 
-### 2. **Hardcoded Process Name in sync-config.sh**
+### 3. **Hardcoded Process Name in sync-config.sh**
 
 **File:** `deployment/sync-config.sh`
 
@@ -75,7 +150,7 @@ if pm2 list | grep -q "${CLIENT_CODE}-cctv-backend"; then
 
 ---
 
-### 3. **Missing Client Config Loading in stop.sh**
+### 4. **Missing Client Config Loading in stop.sh**
 
 **File:** `deployment/stop.sh`
 
