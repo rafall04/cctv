@@ -381,20 +381,26 @@ print_success "Environment files generated"
 echo ""
 print_info "Setting up backend..."
 cd "$APP_DIR/backend"
-npm install --production
+
+print_info "Installing backend dependencies..."
+npm install --production || {
+    print_error "Failed to install backend dependencies"
+    exit 1
+}
+
+print_info "Creating data directory..."
 mkdir -p data
+chmod 755 data
 
 print_info "Initializing database..."
-npm run setup-db
+npm run setup-db || {
+    print_error "Failed to initialize database"
+    print_info "Check if better-sqlite3 is properly installed"
+    exit 1
+}
 
-print_info "Running migrations..."
-if [ -d "database/migrations" ]; then
-    for migration in database/migrations/*.js; do
-        if [ -f "$migration" ]; then
-            node "$migration" || true
-        fi
-    done
-fi
+# Migrations already run by setup-db script
+# No need to run manually to avoid duplicate execution
 
 mkdir -p "$APP_DIR/recordings"
 chmod 755 "$APP_DIR/recordings"

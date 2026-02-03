@@ -423,24 +423,26 @@ echo ""
 print_info "Setting up backend..."
 
 cd "$APP_DIR/backend"
-npm install --production
 
-# Create data directory
+print_info "Installing backend dependencies..."
+npm install --production || {
+    print_error "Failed to install backend dependencies"
+    exit 1
+}
+
+print_info "Creating data directory..."
 mkdir -p data
+chmod 755 data
 
-# Setup database (will send Telegram notification)
 print_info "Initializing database..."
-npm run setup-db
+npm run setup-db || {
+    print_error "Failed to initialize database"
+    print_info "Check if better-sqlite3 is properly installed"
+    exit 1
+}
 
-# Run migrations
-print_info "Running migrations..."
-if [ -d "database/migrations" ]; then
-    for migration in database/migrations/*.js; do
-        if [ -f "$migration" ]; then
-            node "$migration" || true
-        fi
-    done
-fi
+# Migrations already run by setup-db script
+# No need to run manually to avoid duplicate execution
 
 # Create recordings directory
 mkdir -p "$APP_DIR/recordings"
