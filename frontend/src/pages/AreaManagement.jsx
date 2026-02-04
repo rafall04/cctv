@@ -437,7 +437,6 @@ export default function AreaManagement() {
                                     latitude={mapCenter.latitude} 
                                     longitude={mapCenter.longitude} 
                                     onLocationChange={handleMapCenterChange}
-                                    defaultCenter={[mapCenter.latitude || -7.1507, mapCenter.longitude || 111.8815]}
                                 />
                             </div>
 
