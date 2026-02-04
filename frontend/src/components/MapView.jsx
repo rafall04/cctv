@@ -281,14 +281,8 @@ const VideoModal = memo(({ camera, onClose }) => {
 
     // Screenshot/snapshot with watermark
     const takeSnapshot = useCallback(async () => {
-        console.log('[MapView] takeSnapshot called, status:', status, 'videoRef:', !!videoRef.current);
+        if (!videoRef.current || status !== 'playing') return;
         
-        if (!videoRef.current || status !== 'playing') {
-            console.log('[MapView] takeSnapshot blocked - video not ready or not playing');
-            return;
-        }
-        
-        console.log('[MapView] Executing snapshot...');
         const result = await takeSnapshotUtil(videoRef.current, {
             branding,
             cameraName: camera.name,
@@ -298,7 +292,6 @@ const VideoModal = memo(({ camera, onClose }) => {
             watermarkOpacity: parseFloat(branding.watermark_opacity || 0.9)
         });
         
-        console.log('[MapView] Snapshot result:', result);
         setSnapshotNotification({
             type: result.success ? 'success' : 'error',
             message: result.message
@@ -935,11 +928,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                                 {/* Screenshot Button */}
                                 {status === 'playing' && (
                                     <button
-                                        onClick={(e) => {
-                                            console.log('[MapView] Screenshot button clicked!', e);
-                                            e.stopPropagation();
-                                            takeSnapshot();
-                                        }}
+                                        onClick={takeSnapshot}
                                         className="p-1.5 bg-gray-200/80 dark:bg-gray-800 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded-lg text-gray-900 dark:text-white transition-colors"
                                         title="Ambil Screenshot"
                                     >
