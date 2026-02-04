@@ -621,6 +621,8 @@ function VideoPopup({ camera, onClose }) {
     const loadingTimeoutHandlerRef = useRef(null);
     const fallbackHandlerRef = useRef(null);
     const abortControllerRef = useRef(null);
+    const { branding } = useBranding(); // ← FIX: Add branding context
+    
     // Handle close with fullscreen exit
     const handleClose = async () => {
         if (document.fullscreenElement) {
