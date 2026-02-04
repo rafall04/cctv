@@ -5,6 +5,7 @@ import BrandingSettingsTab from '../components/settings/BrandingSettingsTab';
 import ApiKeySettings from '../components/settings/ApiKeySettings';
 import GeneralSettingsTab from '../components/settings/GeneralSettingsTab';
 import TimezoneSettingsTab from '../components/settings/TimezoneSettingsTab';
+import BackupSettingsTab from '../components/settings/BackupSettingsTab';
 
 const Icons = {
     General: () => (
@@ -38,6 +39,11 @@ const Icons = {
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
     ),
+    Backup: () => (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+        </svg>
+    ),
 };
 
 export default function UnifiedSettings() {
@@ -46,6 +52,7 @@ export default function UnifiedSettings() {
     const tabs = [
         { id: 'general', label: 'General', icon: <Icons.General /> },
         { id: 'timezone', label: 'Timezone', icon: <Icons.Timezone /> },
+        { id: 'backup', label: 'Backup', icon: <Icons.Backup /> },
         { id: 'telegram', label: 'Telegram Bot', icon: <Icons.Telegram /> },
         { id: 'saweria', label: 'Saweria', icon: <Icons.Saweria /> },
         { id: 'branding', label: 'Branding', icon: <Icons.Branding /> },
@@ -90,6 +97,7 @@ export default function UnifiedSettings() {
             <div className="mt-6">
                 {activeTab === 'general' && <GeneralSettingsTab />}
                 {activeTab === 'timezone' && <TimezoneSettingsTab />}
+                {activeTab === 'backup' && <BackupSettingsTab />}
                 {activeTab === 'telegram' && <TelegramSettings />}
                 {activeTab === 'saweria' && <SaweriaSettingsTab />}
                 {activeTab === 'branding' && <BrandingSettingsTab />}
