@@ -1,4 +1,4 @@
-import { getDashboardStats, getTodayStats, testTelegramNotification, getTelegramConfig, updateTelegramConfig, getViewerAnalytics, getRealTimeViewers, getCacheStats, clearCache, getTimezoneConfig, updateTimezoneConfig } from '../controllers/adminController.js';
+import { getDashboardStats, getTodayStats, testTelegramNotification, getTelegramConfig, updateTelegramConfig, getViewerAnalytics, getRealTimeViewers, getCacheStats, clearCache, getTimezoneConfig, updateTimezoneConfig, exportDatabaseBackup, importDatabaseBackup, getBackupPreview } from '../controllers/adminController.js';
 import { generateApiKey, listApiKeys, deleteApiKey } from '../controllers/apiKeyController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 import { createApiKeySchema, apiKeyIdParamSchema } from '../middleware/schemaValidators.js';
@@ -217,5 +217,24 @@ export default async function adminRoutes(fastify, options) {
             }
         },
         handler: updateTimezoneConfig,
+    });
+
+    // Backup/Restore Endpoints
+    // GET /api/admin/backup/export - Export database backup
+    fastify.get('/backup/export', {
+        onRequest: [authMiddleware],
+        handler: exportDatabaseBackup,
+    });
+
+    // POST /api/admin/backup/import - Import database backup
+    fastify.post('/backup/import', {
+        onRequest: [authMiddleware],
+        handler: importDatabaseBackup,
+    });
+
+    // POST /api/admin/backup/preview - Preview backup stats
+    fastify.post('/backup/preview', {
+        onRequest: [authMiddleware],
+        handler: getBackupPreview,
     });
 }

@@ -11,6 +11,7 @@ import {
 import cache from '../services/cacheService.js';
 import { getTimezone, setTimezone, TIMEZONE_MAP, formatDateTime } from '../services/timezoneService.js';
 import { logAdminAction } from '../services/securityAuditLogger.js';
+import backupService from '../services/backupService.js';
 
 export async function getDashboardStats(request, reply) {
     try {
@@ -598,6 +599,119 @@ export async function updateTimezoneConfig(request, reply) {
         });
     } catch (error) {
         console.error('Update timezone config error:', error);
+        return reply.code(500).send({
+            success: false,
+            message: 'Internal server error',
+        });
+    }
+}
+
+/**
+ * Export database backup
+ */
+export async function exportDatabaseBackup(request, reply) {
+    try {
+        const result = backupService.exportBackup();
+        
+        if (!result.success) {
+            return reply.code(500).send({
+                success: false,
+                message: 'Gagal export backup: ' + result.error,
+            });
+        }
+
+        const stats = backupService.getBackupStats(result.backup);
+        
+        logAdminAction({
+            action: 'backup_exported',
+            details: { stats },
+            userId: request.user?.id
+        }, request);
+
+        // Return as downloadable JSON
+        reply.header('Content-Type', 'application/json');
+        reply.header('Content-Disposition', `attachment; filename="rafnet-cctv-backup-${new Date().toISOString().split('T')[0]}.json"`);
+        
+        return reply.send(result.backup);
+    } catch (error) {
+        console.error('Export database backup error:', error);
+        return reply.code(500).send({
+            success: false,
+            message: 'Internal server error',
+        });
+    }
+}
+
+/**
+ * Import database backup
+ */
+export async function importDatabaseBackup(request, reply) {
+    try {
+        const { backup, mode = 'merge', tables = null } = request.body;
+        
+        if (!backup || !backup.version || !backup.data) {
+            return reply.code(400).send({
+                success: false,
+                message: 'Invalid backup format',
+            });
+        }
+
+        const result = backupService.importBackup(backup, { mode, tables });
+        
+        if (!result.success) {
+            return reply.code(500).send({
+                success: false,
+                message: 'Gagal import backup: ' + result.error,
+            });
+        }
+
+        logAdminAction({
+            action: 'backup_imported',
+            details: { 
+                mode,
+                imported: result.imported,
+                skipped: result.skipped,
+                errors: result.errors
+            },
+            userId: request.user?.id
+        }, request);
+
+        return reply.send({
+            success: true,
+            message: 'Backup berhasil diimport',
+            data: result
+        });
+    } catch (error) {
+        console.error('Import database backup error:', error);
+        return reply.code(500).send({
+            success: false,
+            message: 'Internal server error',
+        });
+    }
+}
+
+/**
+ * Get backup preview/stats
+ */
+export async function getBackupPreview(request, reply) {
+    try {
+        const { backup } = request.body;
+        
+        if (!backup || !backup.version || !backup.data) {
+            return reply.code(400).send({
+                success: false,
+                message: 'Invalid backup format',
+            });
+        }
+
+        const stats = backupService.getBackupStats(backup);
+
+        return reply.send({
+            success: true,
+            data: stats
+        });
+    } catch (error) {
+        console.error('Get backup preview error:', error);
         return reply.code(500).send({
             success: false,
             message: 'Internal server error',
