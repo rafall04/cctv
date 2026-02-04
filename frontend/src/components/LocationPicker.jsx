@@ -2,9 +2,11 @@
  * LocationPicker Component
  * Interactive map for selecting camera location coordinates
  * Optimized for low-end devices - map only loads when user clicks button
+ * Features: Search, GPS detection, drag marker
  */
 
 import { useEffect, useRef, useState, useCallback, memo } from 'react';
+import { settingsService } from '../services/settingsService';
 import 'leaflet/dist/leaflet.css';
 
 // Simple search box - debounced
@@ -229,7 +231,7 @@ const LocationPicker = ({
     latitude, 
     longitude, 
     onLocationChange,
-    defaultCenter = [-7.1507, 111.8815], // Default: Bojonegoro
+    defaultCenter = null, // Will load from backend
     defaultZoom = 13,
 }) => {
     const [showMap, setShowMap] = useState(false);
@@ -237,8 +239,30 @@ const LocationPicker = ({
         latitude && longitude ? [parseFloat(latitude), parseFloat(longitude)] : null
     );
     const [mapCenter, setMapCenter] = useState(
-        latitude && longitude ? [parseFloat(latitude), parseFloat(longitude)] : defaultCenter
+        latitude && longitude ? [parseFloat(latitude), parseFloat(longitude)] : [-7.1507, 111.8815]
     );
+    const [loadingGPS, setLoadingGPS] = useState(false);
+    const [gpsError, setGpsError] = useState(null);
+
+    // Load map center from backend on mount
+    useEffect(() => {
+        if (!defaultCenter) {
+            settingsService.getMapCenter().then(res => {
+                if (res.success && res.data) {
+                    const center = [res.data.latitude, res.data.longitude];
+                    // Only update if no position set yet
+                    if (!position) {
+                        setMapCenter(center);
+                    }
+                }
+            }).catch(() => {
+                // Fallback to Bojonegoro if backend fails
+                setMapCenter([-7.1507, 111.8815]);
+            });
+        } else {
+            setMapCenter(defaultCenter);
+        }
+    }, [defaultCenter, position]);
 
     // Update position when props change
     useEffect(() => {
@@ -269,42 +293,122 @@ const LocationPicker = ({
         onLocationChange('', '');
     }, [onLocationChange]);
 
+    // GPS detection - get current location from device
+    const handleUseGPS = useCallback(() => {
+        if (!navigator.geolocation) {
+            setGpsError('GPS tidak didukung di browser ini');
+            setTimeout(() => setGpsError(null), 3000);
+            return;
+        }
+
+        setLoadingGPS(true);
+        setGpsError(null);
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                const newPos = [lat, lng];
+                setPosition(newPos);
+                setMapCenter(newPos);
+                onLocationChange(lat.toFixed(6), lng.toFixed(6));
+                setLoadingGPS(false);
+                setShowMap(true); // Auto-expand map to show location
+            },
+            (error) => {
+                setLoadingGPS(false);
+                let errorMsg = 'Gagal mendapatkan lokasi GPS';
+                if (error.code === error.PERMISSION_DENIED) {
+                    errorMsg = 'Akses GPS ditolak. Izinkan akses lokasi di browser.';
+                } else if (error.code === error.POSITION_UNAVAILABLE) {
+                    errorMsg = 'Lokasi tidak tersedia';
+                } else if (error.code === error.TIMEOUT) {
+                    errorMsg = 'Timeout mendapatkan lokasi';
+                }
+                setGpsError(errorMsg);
+                setTimeout(() => setGpsError(null), 5000);
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            }
+        );
+    }, [onLocationChange]);
+
     // Collapsed view - just show coordinates and expand button
     if (!showMap) {
         return (
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 text-sm">
-                    {position ? (
-                        <>
-                            <span className="text-gray-500 dark:text-gray-400">
-                                <span className="font-medium text-gray-700 dark:text-gray-200">Lat:</span> {position[0].toFixed(6)}
-                            </span>
-                            <span className="text-gray-500 dark:text-gray-400">
-                                <span className="font-medium text-gray-700 dark:text-gray-200">Lng:</span> {position[1].toFixed(6)}
-                            </span>
-                        </>
-                    ) : (
-                        <span className="text-gray-400 dark:text-gray-500 italic text-xs">Belum ada koordinat</span>
-                    )}
-                </div>
-                <div className="flex items-center gap-2">
-                    {position && (
+            <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 text-sm">
+                        {position ? (
+                            <>
+                                <span className="text-gray-500 dark:text-gray-400">
+                                    <span className="font-medium text-gray-700 dark:text-gray-200">Lat:</span> {position[0].toFixed(6)}
+                                </span>
+                                <span className="text-gray-500 dark:text-gray-400">
+                                    <span className="font-medium text-gray-700 dark:text-gray-200">Lng:</span> {position[1].toFixed(6)}
+                                </span>
+                            </>
+                        ) : (
+                            <span className="text-gray-400 dark:text-gray-500 italic text-xs">Belum ada koordinat</span>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {position && (
+                            <button
+                                type="button"
+                                onClick={handleClear}
+                                className="text-xs text-red-500 hover:text-red-600 font-medium"
+                            >
+                                Hapus
+                            </button>
+                        )}
                         <button
                             type="button"
-                            onClick={handleClear}
-                            className="text-xs text-red-500 hover:text-red-600 font-medium"
+                            onClick={handleUseGPS}
+                            disabled={loadingGPS}
+                            className="px-3 py-1.5 text-xs font-medium bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-lg hover:bg-emerald-200 dark:hover:bg-emerald-500/30 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                            title="Gunakan lokasi GPS device"
                         >
-                            Hapus
+                            {loadingGPS ? (
+                                <>
+                                    <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                                    </svg>
+                                    <span>GPS...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/>
+                                        <circle cx="12" cy="11" r="3"/>
+                                    </svg>
+                                    <span>GPS</span>
+                                </>
+                            )}
                         </button>
-                    )}
-                    <button
-                        type="button"
-                        onClick={() => setShowMap(true)}
-                        className="px-3 py-1.5 text-xs font-medium bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 rounded-lg hover:bg-sky-200 dark:hover:bg-sky-500/30 transition-colors"
-                    >
-                        {position ? 'Edit Peta' : 'Pilih di Peta'}
-                    </button>
+                        <button
+                            type="button"
+                            onClick={() => setShowMap(true)}
+                            className="px-3 py-1.5 text-xs font-medium bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 rounded-lg hover:bg-sky-200 dark:hover:bg-sky-500/30 transition-colors"
+                        >
+                            {position ? 'Edit Peta' : 'Pilih di Peta'}
+                        </button>
+                    </div>
                 </div>
+                
+                {/* GPS Error Message */}
+                {gpsError && (
+                    <div className="flex items-start gap-2 px-3 py-2 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg">
+                        <svg className="w-4 h-4 text-red-500 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        </svg>
+                        <p className="text-xs text-red-600 dark:text-red-400">{gpsError}</p>
+                    </div>
+                )}
             </div>
         );
     }
@@ -312,7 +416,46 @@ const LocationPicker = ({
     // Expanded view with map
     return (
         <div className="space-y-2">
-            <SearchBox onSearch={handleSearch} />
+            <div className="flex items-center gap-2">
+                <div className="flex-1">
+                    <SearchBox onSearch={handleSearch} />
+                </div>
+                <button
+                    type="button"
+                    onClick={handleUseGPS}
+                    disabled={loadingGPS}
+                    className="px-3 py-2 text-xs font-medium bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-lg hover:bg-emerald-200 dark:hover:bg-emerald-500/30 transition-colors disabled:opacity-50 flex items-center gap-1.5 shrink-0"
+                    title="Gunakan lokasi GPS device"
+                >
+                    {loadingGPS ? (
+                        <>
+                            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                            </svg>
+                            <span>GPS...</span>
+                        </>
+                    ) : (
+                        <>
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/>
+                                <circle cx="12" cy="11" r="3"/>
+                            </svg>
+                            <span>GPS</span>
+                        </>
+                    )}
+                </button>
+            </div>
+            
+            {/* GPS Error Message */}
+            {gpsError && (
+                <div className="flex items-start gap-2 px-3 py-2 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg">
+                    <svg className="w-4 h-4 text-red-500 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    <p className="text-xs text-red-600 dark:text-red-400">{gpsError}</p>
+                </div>
+            )}
             
             <LazyMap
                 position={position}
