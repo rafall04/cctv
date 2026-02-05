@@ -13,7 +13,7 @@ export function TimezoneProvider({ children }) {
 
     const loadTimezone = async () => {
         try {
-            const { data } = await adminAPI.get('/admin/settings/timezone');
+            const { data } = await adminAPI.get('/api/admin/settings/timezone');
             setTimezone(data.data.timezone);
         } catch (error) {
             console.error('Failed to load timezone:', error);

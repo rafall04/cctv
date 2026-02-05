@@ -17,7 +17,7 @@ export default function TimezoneSettingsTab() {
         setLoading(true);
         setError(null);
         try {
-            const { data } = await adminAPI.get('/admin/settings/timezone');
+            const { data } = await adminAPI.get('/api/admin/settings/timezone');
             setTimezone(data.data.shortName);
         } catch (error) {
             console.error('Failed to load timezone:', error);
@@ -32,7 +32,7 @@ export default function TimezoneSettingsTab() {
         setError(null);
         setSuccess(false);
         try {
-            await adminAPI.put('/admin/settings/timezone', { timezone });
+            await adminAPI.put('/api/admin/settings/timezone', { timezone });
             setSuccess(true);
             setTimeout(() => setSuccess(false), 3000);
         } catch (error) {
