@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNotification } from '../../contexts/NotificationContext';
+import { adminAPI } from '../../services/api';
 import axios from 'axios';
 
 const getApiUrl = () => {
@@ -25,16 +26,14 @@ export default function GeneralSettingsTab() {
             setLoading(true);
             const baseUrl = getApiUrl();
             
-            const [areaCoverage, heroBadge, sectionTitle] = await Promise.all([
-                axios.get(`${baseUrl}/api/settings/landing_area_coverage`),
-                axios.get(`${baseUrl}/api/settings/landing_hero_badge`),
-                axios.get(`${baseUrl}/api/settings/landing_section_title`)
-            ]);
+            // Use public endpoint that returns all landing page settings
+            const response = await axios.get(`${baseUrl}/api/settings/landing-page`);
+            const data = response.data.data;
 
             setSettings({
-                landing_area_coverage: areaCoverage.data.data.value || '',
-                landing_hero_badge: heroBadge.data.data.value || '',
-                landing_section_title: sectionTitle.data.data.value || ''
+                landing_area_coverage: data.area_coverage || '',
+                landing_hero_badge: data.hero_badge || '',
+                landing_section_title: data.section_title || ''
             });
         } catch (error) {
             console.error('Error fetching settings:', error);
@@ -49,18 +48,17 @@ export default function GeneralSettingsTab() {
         
         try {
             setSaving(true);
-            const baseUrl = getApiUrl();
             
             await Promise.all([
-                axios.put(`${baseUrl}/api/settings/landing_area_coverage`, {
+                adminAPI.put('/api/settings/landing_area_coverage', {
                     value: settings.landing_area_coverage,
                     description: 'Area coverage text displayed on landing page hero section'
                 }),
-                axios.put(`${baseUrl}/api/settings/landing_hero_badge`, {
+                adminAPI.put('/api/settings/landing_hero_badge', {
                     value: settings.landing_hero_badge,
                     description: 'Badge text displayed above hero title'
                 }),
-                axios.put(`${baseUrl}/api/settings/landing_section_title`, {
+                adminAPI.put('/api/settings/landing_section_title', {
                     value: settings.landing_section_title,
                     description: 'Main section title for camera list'
                 })
