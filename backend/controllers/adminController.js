@@ -237,6 +237,72 @@ export async function getTodayStats(request, reply) {
             });
         };
         
+        // Check if viewer_session_history table exists
+        const tableExists = queryOne(`
+            SELECT name FROM sqlite_master 
+            WHERE type='table' AND name='viewer_session_history'
+        `);
+        
+        if (!tableExists) {
+            // Table doesn't exist yet - return empty stats
+            console.warn('viewer_session_history table does not exist - returning empty stats');
+            
+            // Get current active viewers from viewerSessionService
+            const viewerStats = viewerSessionService.getViewerStats();
+            const activeNow = viewerStats.activeViewers;
+            
+            // Get camera status
+            const cameraStatus = queryOne(`
+                SELECT 
+                    COUNT(*) as total,
+                    SUM(CASE WHEN enabled = 1 THEN 1 ELSE 0 END) as active,
+                    SUM(CASE WHEN status = 'maintenance' THEN 1 ELSE 0 END) as maintenance
+                FROM cameras
+            `);
+            
+            // Calculate offline cameras
+            const mtxStats = await mediaMtxService.getStats();
+            const activeCameras = query('SELECT id, stream_key FROM cameras WHERE enabled = 1');
+            let onlineCount = 0;
+            activeCameras.forEach(cam => {
+                const hasStream = mtxStats.paths?.some(p => p.name === cam.stream_key && (p.ready || p.sourceReady));
+                if (hasStream) onlineCount++;
+            });
+            const offlineCount = cameraStatus.active - onlineCount;
+            
+            return reply.send({
+                success: true,
+                data: {
+                    current: {
+                        totalSessions: 0,
+                        uniqueViewers: 0,
+                        avgDuration: 0,
+                        totalWatchTime: 0,
+                        activeNow: activeNow,
+                    },
+                    compare: {
+                        totalSessions: 0,
+                        uniqueViewers: 0,
+                        avgDuration: 0,
+                        totalWatchTime: 0,
+                    },
+                    comparison: {
+                        sessionsChange: 0,
+                        viewersChange: 0,
+                        durationChange: 0,
+                    },
+                    cameras: {
+                        total: cameraStatus.total,
+                        online: onlineCount,
+                        offline: offlineCount,
+                        maintenance: cameraStatus.maintenance,
+                    },
+                    period: period,
+                    warning: 'Analytics table not initialized - run migration: add_viewer_sessions.js'
+                }
+            });
+        }
+        
         // Determine date filters using configured timezone dates (consistent with Analytics)
         let dateFilter = '';
         let previousDateFilter = '';
