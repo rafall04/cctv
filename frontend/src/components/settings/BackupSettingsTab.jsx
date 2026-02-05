@@ -17,7 +17,7 @@ export default function BackupSettingsTab() {
         setError(null);
         try {
             // Get JSON data directly (not blob)
-            const { data } = await adminAPI.get('/admin/backup/export');
+            const { data } = await adminAPI.get('/api/admin/backup/export');
             
             // Convert to blob for download
             const jsonString = JSON.stringify(data, null, 2);
@@ -53,7 +53,7 @@ export default function BackupSettingsTab() {
             const backup = JSON.parse(text);
             
             // Get preview
-            const { data } = await adminAPI.post('/admin/backup/preview', { backup });
+            const { data } = await adminAPI.post('/api/admin/backup/preview', { backup });
             setBackupPreview(data.data);
             setBackupFile(backup);
         } catch (error) {
@@ -81,7 +81,7 @@ export default function BackupSettingsTab() {
         setImporting(true);
         setError(null);
         try {
-            const { data } = await adminAPI.post('/admin/backup/import', {
+            const { data } = await adminAPI.post('/api/admin/backup/import', {
                 backup: backupFile,
                 mode: importMode
             });

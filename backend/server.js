@@ -80,9 +80,6 @@ const allowedOrigins = config.security?.allowedOrigins || [
     'http://localhost:3001',
 ];
 
-// Log allowed origins for debugging
-console.log('🔒 CORS Allowed Origins:', allowedOrigins);
-
 // Register CORS with logging for rejected origins
 await fastify.register(cors, {
     origin: (origin, callback) => {
