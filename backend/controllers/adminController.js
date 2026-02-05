@@ -331,7 +331,7 @@ export async function getTodayStats(request, reply) {
         // Get current period viewer sessions from database (use history table for consistency)
         const currentSessionsResult = query(`
             SELECT 
-                COUNT(DISTINCT session_id) as total_sessions,
+                COUNT(*) as total_sessions,
                 COUNT(DISTINCT ip_address) as unique_viewers,
                 AVG(duration_seconds) as avg_duration,
                 SUM(duration_seconds) as total_watch_time
@@ -342,7 +342,7 @@ export async function getTodayStats(request, reply) {
         // Get comparison period stats
         const compareSessionsResult = query(`
             SELECT 
-                COUNT(DISTINCT session_id) as total_sessions,
+                COUNT(*) as total_sessions,
                 COUNT(DISTINCT ip_address) as unique_viewers,
                 AVG(duration_seconds) as avg_duration,
                 SUM(duration_seconds) as total_watch_time
