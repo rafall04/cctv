@@ -16,11 +16,12 @@ export default function BackupSettingsTab() {
         setExporting(true);
         setError(null);
         try {
-            const response = await adminAPI.get('/admin/backup/export', {
-                responseType: 'blob'
-            });
+            // Get JSON data directly (not blob)
+            const { data } = await adminAPI.get('/admin/backup/export');
             
-            const blob = new Blob([response.data], { type: 'application/json' });
+            // Convert to blob for download
+            const jsonString = JSON.stringify(data, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
@@ -34,7 +35,7 @@ export default function BackupSettingsTab() {
             setTimeout(() => setSuccess(false), 3000);
         } catch (error) {
             console.error('Failed to export backup:', error);
-            setError('Gagal export backup');
+            setError('Gagal export backup: ' + (error.response?.data?.message || error.message));
         } finally {
             setExporting(false);
         }
