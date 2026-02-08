@@ -3192,7 +3192,7 @@ function Footer({ cameraCount, areaCount, saweriaEnabled, saweriaLink, branding 
                     </p>
                     {showPoweredBy && (
                         <p className="text-center text-gray-400 dark:text-gray-600 text-[10px] mt-1">
-                            Powered by RAF NET CCTV System
+                            Powered by {branding.company_name || 'CCTV System'}
                         </p>
                     )}
                 </div>

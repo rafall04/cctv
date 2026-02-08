@@ -4,6 +4,7 @@ import { authService } from '../services/authService';
 import { useTheme } from '../contexts/ThemeContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { NetworkStatusBanner } from './ui/NetworkStatusBanner';
+import { useBranding } from '../contexts/BrandingContext';
 
 // Icons
 const Icons = {
@@ -29,6 +30,7 @@ export default function AdminLayout({ children }) {
     const navigate = useNavigate();
     const { isDark, toggleTheme } = useTheme();
     const { success: showSuccess } = useNotification();
+    const { branding } = useBranding();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [user, setUser] = useState(null);
     const [isOffline, setIsOffline] = useState(false);
@@ -95,7 +97,7 @@ export default function AdminLayout({ children }) {
                         <div className="w-9 h-9 bg-gradient-to-br from-sky-500 to-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-sky-500/30">
                             <Icons.Camera />
                         </div>
-                        <span className="text-lg font-bold text-gray-900 dark:text-white">RAF NET</span>
+                        <span className="text-lg font-bold text-gray-900 dark:text-white">{branding.company_name || 'CCTV System'}</span>
                     </Link>
                     <div className="flex items-center gap-2">
                         <button
@@ -129,7 +131,7 @@ export default function AdminLayout({ children }) {
                             <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white dark:border-gray-900"></span>
                         </div>
                         <div>
-                            <h1 className="text-xl font-bold text-gray-900 dark:text-white">RAF NET</h1>
+                            <h1 className="text-xl font-bold text-gray-900 dark:text-white">{branding.company_name || 'CCTV System'}</h1>
                             <p className="text-xs text-gray-500 dark:text-gray-400">Admin Panel</p>
                         </div>
                     </Link>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { useTheme } from '../contexts/ThemeContext';
 import { useNotification } from '../contexts/NotificationContext';
+import { useBranding } from '../contexts/BrandingContext';
 
 // Icons
 const Icons = {
@@ -91,6 +92,7 @@ export default function LoginPage() {
     const navigate = useNavigate();
     const { isDark, toggleTheme } = useTheme();
     const { success: showSuccess } = useNotification();
+    const { branding } = useBranding();
     const [formData, setFormData] = useState({ username: '', password: '' });
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -326,7 +328,7 @@ export default function LoginPage() {
                         Welcome Back
                     </h1>
                     <p className="text-gray-500 dark:text-gray-400">
-                        Sign in to RAF NET Admin Panel
+                        Sign in to {branding.company_name || 'CCTV System'} Admin Panel
                     </p>
                 </div>
 

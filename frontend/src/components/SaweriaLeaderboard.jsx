@@ -1,4 +1,8 @@
+import { useBranding } from '../contexts/BrandingContext';
+
 export default function SaweriaLeaderboard({ leaderboardLink }) {
+    const { branding } = useBranding();
+    
     // Don't render if no leaderboard link
     if (!leaderboardLink) {
         return null;
@@ -19,7 +23,7 @@ export default function SaweriaLeaderboard({ leaderboardLink }) {
                         Daftar Donatur Terbaik
                     </h2>
                     <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto text-sm sm:text-base mb-6">
-                        Terima kasih kepada para donatur yang telah berkontribusi mendukung operasional RAF NET CCTV. 
+                        Terima kasih kepada para donatur yang telah berkontribusi mendukung operasional {branding.company_name || 'CCTV System'}. 
                         Donasi Anda membantu kami menyediakan layanan monitoring gratis untuk masyarakat.
                     </p>
                 </div>
