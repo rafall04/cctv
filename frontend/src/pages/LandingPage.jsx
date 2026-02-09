@@ -130,7 +130,7 @@ const VideoSkeleton = memo(function VideoSkeleton({ size = 'large' }) {
             <div className="relative z-10 flex flex-col items-center gap-3">
                 {/* Play button skeleton */}
                 <div className={`${isSmall ? 'w-10 h-10' : 'w-16 h-16'} rounded-full bg-white/10 flex items-center justify-center ${pulseClass}`}>
-                    <div className={`${isSmall ? 'w-4 h-4' : 'w-6 h-6'} border-2 border-white/30 border-t-sky-500 rounded-full ${spinClass}`} />
+                    <div className={`${isSmall ? 'w-4 h-4' : 'w-6 h-6'} border-2 border-white/30 border-t-primary rounded-full ${spinClass}`} />
                 </div>
                 
                 {/* Loading text */}
@@ -173,7 +173,7 @@ function Toast({ message, type = 'info', onClose }) {
 
     const styles = {
         info: {
-            bg: 'bg-gradient-to-r from-sky-500 to-blue-600',
+            bg: 'bg-gradient-to-r from-primary to-primary-600',
             icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
         },
         success: {
@@ -314,7 +314,7 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
         ? 'ring-red-500/50 hover:ring-red-500' 
         : isOffline 
             ? 'ring-gray-400/50 hover:ring-gray-500' 
-            : 'ring-gray-200 dark:ring-gray-800 hover:ring-sky-500/50';
+            : 'ring-gray-200 dark:ring-gray-800 hover:ring-primary/50';
     
     const bgStyle = isMaintenance 
         ? 'bg-red-100 dark:bg-red-900/30' 
@@ -341,7 +341,7 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
                     inMulti 
                         ? 'bg-emerald-500 text-white' 
                         : 'bg-white/90 dark:bg-gray-800/90 text-gray-600 dark:text-gray-300'
-                } ${disableAnimations ? '' : 'transition-colors hover:bg-sky-500 hover:text-white'}`}
+                } ${disableAnimations ? '' : 'transition-colors hover:bg-primary hover:text-white'}`}
                 title={inMulti ? 'Hapus dari Multi-View' : 'Tambah ke Multi-View'}
             >
                 {inMulti ? <Icons.Check /> : <Icons.Plus />}
@@ -361,7 +361,7 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
                 {/* Play overlay - only for online cameras, disabled on low-end */}
                 {!isMaintenance && !isOffline && !disableAnimations && (
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/card:opacity-100 bg-black/40 transition-opacity">
-                        <div className="w-14 h-14 rounded-full bg-white/95 flex items-center justify-center text-sky-500 shadow-xl">
+                        <div className="w-14 h-14 rounded-full bg-white/95 flex items-center justify-center text-primary shadow-xl">
                             <Icons.Play />
                         </div>
                     </div>
@@ -442,7 +442,7 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
                         isMaintenance 
                             ? 'text-red-600 dark:text-red-400' 
                             : 'text-gray-900 dark:text-white'
-                    } ${!disableAnimations ? 'group-hover/card:text-sky-500 transition-colors' : ''}`}>
+                    } ${!disableAnimations ? 'group-hover/card:text-primary transition-colors' : ''}`}>
                         {camera.name}
                     </h3>
                     {camera.video_codec && (
@@ -1257,7 +1257,7 @@ function VideoPopup({ camera, onClose }) {
                                     </span>
                                 )}
                                 {camera.area_name && (
-                                    <span className="px-1.5 py-0.5 bg-sky-500/20 text-sky-600 dark:text-sky-400 rounded text-[10px] font-medium shrink-0">
+                                    <span className="px-1.5 py-0.5 bg-primary/20 text-primary-600 dark:text-primary-400 rounded text-[10px] font-medium shrink-0">
                                         {camera.area_name}
                                     </span>
                                 )}
@@ -1373,7 +1373,7 @@ function VideoPopup({ camera, onClose }) {
                     {status === 'connecting' && (
                         <div className="absolute inset-0 bg-gradient-to-br from-gray-800 via-gray-900 to-gray-800 flex flex-col items-center justify-center">
                             <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mb-4">
-                                <div className={`w-8 h-8 border-2 border-white/30 border-t-sky-500 rounded-full ${disableAnimations ? '' : 'animate-spin'}`} />
+                                <div className={`w-8 h-8 border-2 border-white/30 border-t-primary rounded-full ${disableAnimations ? '' : 'animate-spin'}`} />
                             </div>
                             <p className="text-white font-medium mb-1">{getStageMessage(loadingStage)}</p>
                             <p className="text-gray-400 text-sm">Please wait...</p>
@@ -1401,7 +1401,7 @@ function VideoPopup({ camera, onClose }) {
                                 )}
                                 <button
                                     onClick={handleRetry}
-                                    className="inline-flex items-center gap-2 px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg font-medium transition-colors"
+                                    className="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-600 text-white rounded-lg font-medium transition-colors"
                                 >
                                     <Icons.Reset />
                                     Coba Lagi
@@ -1429,7 +1429,7 @@ function VideoPopup({ camera, onClose }) {
                                 })()}
                                 <button
                                     onClick={handleRetry}
-                                    className="inline-flex items-center gap-2 px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg font-medium transition-colors"
+                                    className="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-600 text-white rounded-lg font-medium transition-colors"
                                 >
                                     <Icons.Reset />
                                     Coba Lagi
@@ -2134,7 +2134,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             {status === 'connecting' && (
                 <div className="absolute inset-0 bg-gradient-to-br from-gray-800 via-gray-900 to-gray-800 flex flex-col items-center justify-center">
                     <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center mb-2">
-                        <div className={`w-5 h-5 border-2 border-white/30 border-t-sky-500 rounded-full ${disableAnimations ? '' : 'animate-spin'}`} />
+                        <div className={`w-5 h-5 border-2 border-white/30 border-t-primary rounded-full ${disableAnimations ? '' : 'animate-spin'}`} />
                     </div>
                     <p className="text-white text-xs font-medium">{getStageMessage(loadingStage)}</p>
                 </div>
@@ -2151,7 +2151,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                         <p className="text-gray-400 text-[10px] mb-3">Loading terlalu lama</p>
                         <button
                             onClick={handleRetry}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-xs font-medium transition-colors"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary-600 text-white rounded-lg text-xs font-medium transition-colors"
                         >
                             <Icons.Reset />
                             Coba Lagi
@@ -2195,7 +2195,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                         )}
                         <button
                             onClick={handleRetry}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-xs font-medium transition-colors"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary-600 text-white rounded-lg text-xs font-medium transition-colors"
                         >
                             <Icons.Reset />
                             Coba Lagi
@@ -2292,7 +2292,7 @@ function MultiViewLayout({ cameras, onRemove, onClose }) {
         <div className="fixed inset-0 z-50 bg-gray-50 dark:bg-gray-950 flex flex-col">
             <div className="shrink-0 flex items-center justify-between p-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10">
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-sky-500/20 flex items-center justify-center text-sky-400"><Icons.Layout /></div>
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary-400"><Icons.Layout /></div>
                     <div>
                         <h2 className="text-white font-bold text-sm sm:text-base">Multi-View</h2>
                         <p className="text-gray-500 text-[10px] sm:text-xs">{count} camera{count !== 1 ? 's' : ''}</p>
@@ -2384,7 +2384,7 @@ function Navbar({ cameraCount, branding, layoutMode, onLayoutToggle }) {
                     {/* Logo - SEO optimized with proper heading structure */}
                     <a href="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity" title={`${branding.company_tagline} - ${branding.company_name}`}>
                         <div className="relative">
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-sky-500/30">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center text-white shadow-lg shadow-primary/30">
                                 <span className="text-lg font-bold">{branding.logo_text}</span>
                             </div>
                             {cameraCount > 0 && (
@@ -2493,11 +2493,11 @@ function FilterDropdown({ areas, selected, onChange, cameras, kecamatans = [], k
         <div ref={ref} className="relative">
             <button
                 onClick={() => setOpen(!open)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-sky-500 transition-colors shadow-sm"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-primary transition-colors shadow-sm"
             >
                 <Icons.Filter />
                 <span className="text-sm font-medium max-w-[150px] truncate">{getSelectedLabel()}</span>
-                <span className="text-xs px-1.5 py-0.5 rounded-full bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-semibold">
+                <span className="text-xs px-1.5 py-0.5 rounded-full bg-sky-100 dark:bg-primary/20 text-primary-600 dark:text-primary-400 font-semibold">
                     {selected ? getCameraCount(selected.type, selected.value) : cameras.length}
                 </span>
                 <Icons.ChevronDown />
@@ -2511,7 +2511,7 @@ function FilterDropdown({ areas, selected, onChange, cameras, kecamatans = [], k
                                 onClick={() => setFilterType('area')}
                                 className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                                     filterType === 'area' 
-                                        ? 'bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400' 
+                                        ? 'bg-sky-100 dark:bg-primary/20 text-primary-600 dark:text-primary-400' 
                                         : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
                                 }`}
                             >
@@ -2523,7 +2523,7 @@ function FilterDropdown({ areas, selected, onChange, cameras, kecamatans = [], k
                                 onClick={() => setFilterType('kecamatan')}
                                 className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                                     filterType === 'kecamatan' 
-                                        ? 'bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400' 
+                                        ? 'bg-sky-100 dark:bg-primary/20 text-primary-600 dark:text-primary-400' 
                                         : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
                                 }`}
                             >
@@ -2535,7 +2535,7 @@ function FilterDropdown({ areas, selected, onChange, cameras, kecamatans = [], k
                                 onClick={() => setFilterType('kelurahan')}
                                 className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                                     filterType === 'kelurahan' 
-                                        ? 'bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400' 
+                                        ? 'bg-sky-100 dark:bg-primary/20 text-primary-600 dark:text-primary-400' 
                                         : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'
                                 }`}
                             >
@@ -2549,7 +2549,7 @@ function FilterDropdown({ areas, selected, onChange, cameras, kecamatans = [], k
                         {/* All option */}
                         <button
                             onClick={() => handleSelect(null, null)}
-                            className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center justify-between transition-colors ${!selected ? 'bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 font-medium' : 'text-gray-700 dark:text-gray-200'}`}
+                            className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center justify-between transition-colors ${!selected ? 'bg-sky-50 dark:bg-primary/10 text-primary-600 dark:text-primary-400 font-medium' : 'text-gray-700 dark:text-gray-200'}`}
                         >
                             <span className="flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-gray-400"></span>
@@ -2568,11 +2568,11 @@ function FilterDropdown({ areas, selected, onChange, cameras, kecamatans = [], k
                                 <button
                                     key={area.id}
                                     onClick={() => handleSelect('area', area.id)}
-                                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center justify-between transition-colors ${isSelected ? 'bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 font-medium' : 'text-gray-700 dark:text-gray-200'}`}
+                                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center justify-between transition-colors ${isSelected ? 'bg-sky-50 dark:bg-primary/10 text-primary-600 dark:text-primary-400 font-medium' : 'text-gray-700 dark:text-gray-200'}`}
                                 >
                                     <div className="flex-1 min-w-0">
                                         <span className="flex items-center gap-2">
-                                            <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-sky-500' : 'bg-purple-500'}`}></span>
+                                            <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-primary' : 'bg-purple-500'}`}></span>
                                             <span className="truncate">{area.name}</span>
                                         </span>
                                         {(area.kelurahan || area.kecamatan) && (
@@ -2596,10 +2596,10 @@ function FilterDropdown({ areas, selected, onChange, cameras, kecamatans = [], k
                                 <button
                                     key={kec}
                                     onClick={() => handleSelect('kecamatan', kec)}
-                                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center justify-between transition-colors ${isSelected ? 'bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 font-medium' : 'text-gray-700 dark:text-gray-200'}`}
+                                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center justify-between transition-colors ${isSelected ? 'bg-sky-50 dark:bg-primary/10 text-primary-600 dark:text-primary-400 font-medium' : 'text-gray-700 dark:text-gray-200'}`}
                                 >
                                     <span className="flex items-center gap-2">
-                                        <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-sky-500' : 'bg-blue-500'}`}></span>
+                                        <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-primary' : 'bg-primary'}`}></span>
                                         <span className="truncate">{kec}</span>
                                     </span>
                                     <span className={`text-xs px-2 py-0.5 rounded-full ${count > 0 ? 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300' : 'bg-gray-50 dark:bg-gray-800 text-gray-400'}`}>
@@ -2619,11 +2619,11 @@ function FilterDropdown({ areas, selected, onChange, cameras, kecamatans = [], k
                                 <button
                                     key={kel}
                                     onClick={() => handleSelect('kelurahan', kel)}
-                                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center justify-between transition-colors ${isSelected ? 'bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 font-medium' : 'text-gray-700 dark:text-gray-200'}`}
+                                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center justify-between transition-colors ${isSelected ? 'bg-sky-50 dark:bg-primary/10 text-primary-600 dark:text-primary-400 font-medium' : 'text-gray-700 dark:text-gray-200'}`}
                                 >
                                     <div className="flex-1 min-w-0">
                                         <span className="flex items-center gap-2">
-                                            <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-sky-500' : 'bg-green-500'}`}></span>
+                                            <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-primary' : 'bg-green-500'}`}></span>
                                             <span className="truncate">{kel}</span>
                                         </span>
                                         {kec && <span className="text-[10px] text-gray-400 ml-4 block">{kec}</span>}
@@ -2770,7 +2770,7 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                                 onClick={() => setViewMode('map')}
                                 className={`p-2.5 rounded-lg transition-colors ${
                                     viewMode === 'map'
-                                        ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-sky-400 shadow-sm'
+                                        ? 'bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm'
                                         : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                                 }`}
                                 title="Map View"
@@ -2781,7 +2781,7 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                                 onClick={() => setViewMode('grid')}
                                 className={`p-2.5 rounded-lg transition-colors ${
                                     viewMode === 'grid'
-                                        ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-sky-400 shadow-sm'
+                                        ? 'bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm'
                                         : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                                 }`}
                                 title="Grid View (Multi-View)"
@@ -2792,7 +2792,7 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                                 onClick={() => setViewMode('playback')}
                                 className={`p-2.5 rounded-lg transition-colors ${
                                     viewMode === 'playback'
-                                        ? 'bg-white dark:bg-gray-700 text-sky-600 dark:text-sky-400 shadow-sm'
+                                        ? 'bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm'
                                         : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                                 }`}
                                 title="Playback Rekaman"
@@ -2815,7 +2815,7 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 onFocus={() => searchQuery.trim() && setShowSearchDropdown(true)}
                                 placeholder="Cari kamera berdasarkan nama, lokasi, atau area..."
-                                className="w-full pl-10 pr-20 sm:pr-24 py-2.5 sm:py-3 bg-gray-100 dark:bg-gray-800 border border-transparent focus:border-sky-500 dark:focus:border-sky-500 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm sm:text-base outline-none transition-colors"
+                                className="w-full pl-10 pr-20 sm:pr-24 py-2.5 sm:py-3 bg-gray-100 dark:bg-gray-800 border border-transparent focus:border-primary dark:focus:border-primary rounded-xl text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm sm:text-base outline-none transition-colors"
                             />
                             {/* Clear button & Keyboard shortcut hint */}
                             <div className="absolute right-2 flex items-center gap-1.5">
@@ -2860,7 +2860,7 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                                             disabled={isDisabled}
                                             className={`w-full px-4 py-3 flex items-center gap-3 text-left transition-colors border-b border-gray-100 dark:border-gray-700/50 last:border-b-0 ${
                                                 !isDisabled 
-                                                    ? 'hover:bg-sky-50 dark:hover:bg-sky-500/10 cursor-pointer' 
+                                                    ? 'hover:bg-sky-50 dark:hover:bg-primary/10 cursor-pointer' 
                                                     : 'opacity-50 cursor-not-allowed'
                                             }`}
                                         >
@@ -3031,7 +3031,7 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                 ) : viewMode === 'playback' ? (
                     <Suspense fallback={
                         <div className="h-[600px] bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center">
-                            <div className="w-6 h-6 border-2 border-gray-300 border-t-sky-500 rounded-full animate-spin"/>
+                            <div className="w-6 h-6 border-2 border-gray-300 border-t-primary rounded-full animate-spin"/>
                         </div>
                     }>
                         <Playback />
@@ -3039,7 +3039,7 @@ function CamerasSection({ cameras, loading, areas, onCameraClick, onAddMulti, mu
                 ) : viewMode === 'map' ? (
                     <Suspense fallback={
                         <div className="h-[450px] bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center">
-                            <div className="w-6 h-6 border-2 border-gray-300 border-t-sky-500 rounded-full animate-spin"/>
+                            <div className="w-6 h-6 border-2 border-gray-300 border-t-primary rounded-full animate-spin"/>
                         </div>
                     }>
                         <MapView
@@ -3082,11 +3082,11 @@ function Footer({ cameraCount, areaCount, saweriaEnabled, saweriaLink, branding 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* About Company Section */}
                 <div className="mb-8 text-center">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-sky-50 dark:bg-sky-500/10 mb-4">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-sky-50 dark:bg-primary/10 mb-4">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center text-white">
                             <span className="text-sm font-bold">{branding.logo_text}</span>
                         </div>
-                        <span className="font-bold text-sky-600 dark:text-sky-400">{branding.company_name}</span>
+                        <span className="font-bold text-primary-600 dark:text-primary-400">{branding.company_name}</span>
                     </div>
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
                         {branding.copyright_text}
@@ -3112,7 +3112,7 @@ function Footer({ cameraCount, areaCount, saweriaEnabled, saweriaLink, branding 
                         <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Statistik</h4>
                         <div className="flex justify-center gap-6">
                             <div>
-                                <p className="text-2xl font-bold text-sky-500">{cameraCount}</p>
+                                <p className="text-2xl font-bold text-primary">{cameraCount}</p>
                                 <p className="text-xs text-gray-500 dark:text-gray-400">Kamera</p>
                             </div>
                             <div>
@@ -3224,7 +3224,7 @@ function MultiViewButton({ count, onClick, maxReached, maxStreams = 3 }) {
             
             <button
                 onClick={onClick}
-                className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-sky-500 to-blue-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-105 transition-all"
+                className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-primary to-primary-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-105 transition-all"
             >
                 <Icons.Layout />
                 <span className="font-bold">Multi-View</span>
@@ -3301,7 +3301,7 @@ function StatsBar({ cameras, areas, onCameraClick }) {
                 case 'offline': return 'from-gray-500 to-gray-600';
                 case 'maintenance': return 'from-red-500 to-red-600';
                 case 'areas': return 'from-purple-500 to-purple-600';
-                default: return 'from-sky-500 to-sky-600';
+                default: return 'from-primary to-primary-600';
             }
         };
         
@@ -3328,7 +3328,7 @@ function StatsBar({ cameras, areas, onCameraClick }) {
                 case 'online': return 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400';
                 case 'offline': return 'bg-gray-100 dark:bg-gray-500/20 text-gray-600 dark:text-gray-400';
                 case 'maintenance': return 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400';
-                default: return 'bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400';
+                default: return 'bg-sky-100 dark:bg-primary/20 text-primary-600 dark:text-primary-400';
             }
         };
         
@@ -3885,11 +3885,11 @@ export default function LandingPage() {
                 <Navbar cameraCount={cameras.length} branding={branding} layoutMode={layoutMode} onLayoutToggle={toggleLayoutMode} />
                 
                 {/* Hero Section - SEO optimized with Indonesian content */}
-                <header className="relative overflow-hidden bg-gradient-to-br from-sky-500/10 via-transparent to-purple-500/10 dark:from-sky-500/5 dark:to-purple-500/5">
+                <header className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-transparent to-purple-500/10 dark:from-primary/5 dark:to-purple-500/5">
                     {/* Decorative elements - hidden on low-end devices */}
                     {!disableHeavyEffects && (
                         <>
-                            <div className="absolute top-0 left-1/4 w-64 h-64 bg-sky-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                            <div className="absolute top-0 left-1/4 w-64 h-64 bg-primary/10 rounded-full blur-3xl pointer-events-none"></div>
                             <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
                         </>
                     )}
@@ -3897,8 +3897,8 @@ export default function LandingPage() {
                     <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 text-center">
                         {/* Company Badge */}
                         {branding.show_powered_by === 'true' && (
-                            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 text-xs font-semibold mb-3 shadow-sm">
-                                <div className="w-5 h-5 rounded bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white text-[10px] font-bold">{branding.logo_text}</div>
+                            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-sky-100 dark:bg-primary/20 text-primary-600 dark:text-primary-400 text-xs font-semibold mb-3 shadow-sm">
+                                <div className="w-5 h-5 rounded bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center text-white text-[10px] font-bold">{branding.logo_text}</div>
                                 <span>Powered by {branding.company_name}</span>
                             </div>
                         )}
@@ -3935,7 +3935,7 @@ export default function LandingPage() {
                         {/* Quick Features - Enhanced with Indonesian labels */}
                         <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
                             <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
-                                <div className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-500/20 flex items-center justify-center text-sky-600 dark:text-sky-400">
+                                <div className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-primary/20 flex items-center justify-center text-primary-600 dark:text-primary-400">
                                     <Icons.Eye />
                                 </div>
                                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">HD Streaming</span>
