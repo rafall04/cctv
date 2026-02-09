@@ -21,6 +21,7 @@ import { schemaErrorHandler } from './middleware/schemaValidators.js';
 
 // Import services
 import { startDailyCleanup, stopDailyCleanup, logSecurityEvent, SECURITY_EVENTS } from './services/securityAuditLogger.js';
+import { getTimezone } from './services/timezoneService.js';
 
 // Import routes
 import authRoutes from './routes/authRoutes.js';
@@ -199,16 +200,31 @@ await fastify.register(jwt, {
 // Whitelisted from rate limiting and API key validation
 fastify.get('/health', async (request, reply) => {
     const now = new Date();
+    const timezone = getTimezone();
     
-    // Convert to WIB (UTC+7)
-    const wibOffset = 7 * 60; // 7 hours in minutes
-    const wibTime = new Date(now.getTime() + wibOffset * 60 * 1000);
+    // Get timezone offset
+    const timezoneOffsets = {
+        'Asia/Jakarta': 7,   // WIB UTC+7
+        'Asia/Makassar': 8,  // WITA UTC+8
+        'Asia/Jayapura': 9   // WIT UTC+9
+    };
+    const offset = timezoneOffsets[timezone] || 7;
+    const offsetMinutes = offset * 60;
+    const localTime = new Date(now.getTime() + offsetMinutes * 60 * 1000);
+    
+    // Get timezone short name
+    const timezoneNames = {
+        'Asia/Jakarta': 'WIB',
+        'Asia/Makassar': 'WITA',
+        'Asia/Jayapura': 'WIT'
+    };
+    const timezoneName = timezoneNames[timezone] || 'WIB';
     
     return { 
         status: 'ok', 
         timestamp: now.toISOString(),
-        timestampWIB: wibTime.toISOString().replace('Z', '+07:00'),
-        timezone: 'Asia/Jakarta (WIB, UTC+7)',
+        timestampLocal: localTime.toISOString().replace('Z', `+0${offset}:00`),
+        timezone: `${timezone} (${timezoneName}, UTC+${offset})`,
         security: {
             rateLimiting: true,
             apiKeyValidation: config.security?.apiKeyValidationEnabled !== false,

@@ -364,8 +364,8 @@ class ViewerSessionService {
                     previousDateFilter = `AND date(started_at) = '${prevDateStr}'`;
                     periodDays = 1;
                 } else {
-                    dateFilter = `AND date(started_at) >= '${getWIBDateWithOffset(-7)}'`;
-                    previousDateFilter = `AND date(started_at) >= '${getWIBDateWithOffset(-14)}' AND date(started_at) < '${getWIBDateWithOffset(-7)}'`;
+                    dateFilter = `AND date(started_at) >= '${getDateWithOffset(-7)}'`;
+                    previousDateFilter = `AND date(started_at) >= '${getDateWithOffset(-14)}' AND date(started_at) < '${getDateWithOffset(-7)}'`;
                     periodDays = 7;
                 }
             } else {
