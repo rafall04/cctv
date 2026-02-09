@@ -379,13 +379,13 @@ export default function UserManagement() {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
-                    <p className="text-sm font-semibold text-sky-500 mb-1">Access Control</p>
+                    <p className="text-sm font-semibold text-primary mb-1">Access Control</p>
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white">User Management</h1>
                     <p className="text-gray-500 dark:text-gray-400 mt-1">Manage administrator accounts</p>
                 </div>
                 <button
                     onClick={openAddModal}
-                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-sky-500/25 transition-all"
+                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-primary/25 transition-all"
                 >
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -407,7 +407,7 @@ export default function UserManagement() {
                     />
                     <button
                         onClick={loadUsers}
-                        className="flex items-center gap-2 px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white font-medium rounded-lg transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-600 text-white font-medium rounded-lg transition-colors"
                     >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -436,14 +436,14 @@ export default function UserManagement() {
                                     <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-sky-500/20">
+                                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-primary/20">
                                                     {user.username.charAt(0).toUpperCase()}
                                                 </div>
                                                 <div>
                                                     <p className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                                                         {user.username}
                                                         {user.id === currentUser?.id && (
-                                                            <span className="text-[10px] px-1.5 py-0.5 bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 rounded font-bold">YOU</span>
+                                                            <span className="text-[10px] px-1.5 py-0.5 bg-sky-100 dark:bg-primary/20 text-primary-600 dark:text-primary-400 rounded font-bold">YOU</span>
                                                         )}
                                                     </p>
                                                     <p className="text-xs text-gray-500 dark:text-gray-400">ID: {user.id}</p>
@@ -454,7 +454,7 @@ export default function UserManagement() {
                                             <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
                                                 user.role === 'admin'
                                                     ? 'bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400'
-                                                    : 'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400'
+                                                    : 'bg-blue-100 dark:bg-primary/20 text-primary-600 dark:text-blue-400'
                                             }`}>
                                                 {user.role}
                                             </span>
@@ -464,7 +464,7 @@ export default function UserManagement() {
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center justify-end gap-1">
-                                                <button onClick={() => openEditModal(user)} className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 hover:text-sky-500 hover:bg-sky-50 dark:hover:bg-sky-500/10 transition-all" title="Edit">
+                                                <button onClick={() => openEditModal(user)} className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 hover:text-primary hover:bg-sky-50 dark:hover:bg-primary/10 transition-all" title="Edit">
                                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                                         <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                                     </svg>
@@ -555,7 +555,7 @@ export default function UserManagement() {
                                     name="username" 
                                     value={formData.username} 
                                     onChange={handleChange} 
-                                    className={`w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 ${
+                                    className={`w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary ${
                                         fieldErrors.username 
                                             ? 'border-red-500 dark:border-red-500' 
                                             : 'border-gray-200 dark:border-gray-700/50'
@@ -578,7 +578,7 @@ export default function UserManagement() {
                                         name="password" 
                                         value={formData.password} 
                                         onChange={handleChange} 
-                                        className={`w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 ${
+                                        className={`w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary ${
                                             fieldErrors.password 
                                                 ? 'border-red-500 dark:border-red-500' 
                                                 : 'border-gray-200 dark:border-gray-700/50'
@@ -595,7 +595,7 @@ export default function UserManagement() {
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Role</label>
-                                <select name="role" value={formData.role} onChange={handleChange} className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500">
+                                <select name="role" value={formData.role} onChange={handleChange} className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary">
                                     <option value="admin">Admin</option>
                                     <option value="viewer">Viewer</option>
                                 </select>
@@ -603,7 +603,7 @@ export default function UserManagement() {
 
                             <div className="flex gap-3 pt-2">
                                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" disabled={submitting}>Cancel</button>
-                                <button type="submit" className="flex-[2] px-4 py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 text-white font-medium rounded-xl shadow-lg shadow-sky-500/30 hover:from-sky-600 hover:to-blue-700 disabled:opacity-50 transition-all" disabled={submitting}>
+                                <button type="submit" className="flex-[2] px-4 py-2.5 bg-gradient-to-r from-primary to-primary-600 text-white font-medium rounded-xl shadow-lg shadow-primary/30 hover:from-primary-600 hover:to-blue-700 disabled:opacity-50 transition-all" disabled={submitting}>
                                     {submitting ? 'Saving...' : (editingUser ? 'Update' : 'Create')}
                                 </button>
                             </div>
@@ -640,7 +640,7 @@ export default function UserManagement() {
                                     name="password" 
                                     value={passwordData.password} 
                                     onChange={handlePasswordChange} 
-                                    className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500" 
+                                    className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary" 
                                     placeholder="Enter new password" 
                                     required 
                                 />
@@ -654,7 +654,7 @@ export default function UserManagement() {
                                     name="confirmPassword" 
                                     value={passwordData.confirmPassword} 
                                     onChange={handlePasswordChange} 
-                                    className={`w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 ${
+                                    className={`w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary ${
                                         passwordData.confirmPassword && passwordData.password !== passwordData.confirmPassword
                                             ? 'border-red-500 dark:border-red-500'
                                             : 'border-gray-200 dark:border-gray-700/50'

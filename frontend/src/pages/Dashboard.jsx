@@ -90,7 +90,7 @@ function ViewerSessionsModal({ title, sessions, onClose }) {
                                     <div className="flex items-start gap-3">
                                         {/* Device Icon */}
                                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                                            session.deviceType === 'mobile' ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-500' :
+                                            session.deviceType === 'mobile' ? 'bg-blue-100 dark:bg-primary/20 text-primary' :
                                             session.deviceType === 'tablet' ? 'bg-purple-100 dark:bg-purple-500/20 text-purple-500' :
                                             'bg-gray-100 dark:bg-gray-700 text-gray-500'
                                         }`}>
@@ -104,7 +104,7 @@ function ViewerSessionsModal({ title, sessions, onClose }) {
                                                     {session.ipAddress}
                                                 </span>
                                                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                                                    session.deviceType === 'mobile' ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400' :
+                                                    session.deviceType === 'mobile' ? 'bg-blue-100 dark:bg-primary/20 text-primary-600 dark:text-blue-400' :
                                                     session.deviceType === 'tablet' ? 'bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400' :
                                                     'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
                                                 }`}>
@@ -356,7 +356,7 @@ export default function Dashboard() {
                 <button
                     onClick={handleRetry}
                     disabled={isRetrying}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-sky-500 hover:bg-sky-600 disabled:bg-sky-400 text-white font-medium rounded-lg transition-colors"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-600 disabled:bg-primary-400 text-white font-medium rounded-lg transition-colors"
                 >
                     {isRetrying ? (
                         <>
@@ -448,7 +448,7 @@ export default function Dashboard() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                         <div className="flex items-center gap-3 mb-2">
-                            <p className="text-sm font-semibold text-sky-500">System Overview</p>
+                            <p className="text-sm font-semibold text-primary">System Overview</p>
                             {lastSuccessfulUpdate && (
                                 <span className="text-xs text-gray-400 dark:text-gray-500">
                                     • Updated {formatLastUpdate(lastSuccessfulUpdate)}
@@ -479,7 +479,7 @@ export default function Dashboard() {
                 <div className="flex flex-wrap items-center gap-3">
                     <button
                         onClick={() => navigate('/admin/cameras')}
-                        className="inline-flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-sky-500/25 hover:shadow-xl hover:shadow-sky-500/30 transition-all"
+                        className="inline-flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all"
                     >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -522,9 +522,9 @@ export default function Dashboard() {
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
                 {/* Cameras */}
-                <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6 hover:shadow-lg hover:border-sky-500/30 transition-all group">
+                <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6 hover:shadow-lg hover:border-primary/30 transition-all group">
                     <div className="flex items-center justify-between mb-4">
-                        <div className="w-12 h-12 bg-gradient-to-br from-sky-400 to-sky-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-sky-500/30 group-hover:scale-110 transition-transform">
+                        <div className="w-12 h-12 bg-gradient-to-br from-primary-400 to-primary-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/30 group-hover:scale-110 transition-transform">
                             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                             </svg>
@@ -563,9 +563,9 @@ export default function Dashboard() {
                 </div>
 
                 {/* Memory */}
-                <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6 hover:shadow-lg hover:border-blue-500/30 transition-all group">
+                <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6 hover:shadow-lg hover:border-primary/30 transition-all group">
                     <div className="flex items-center justify-between mb-4">
-                        <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/30 group-hover:scale-110 transition-transform">
+                        <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-primary-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/30 group-hover:scale-110 transition-transform">
                             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
                             </svg>
@@ -577,7 +577,7 @@ export default function Dashboard() {
                         <span className="text-xs text-gray-400 dark:text-gray-500">Used</span>
                     </div>
                     <div className="w-full h-2 bg-gray-100 dark:bg-gray-700/50 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full transition-all" style={{ width: `${memPercent}%` }}></div>
+                        <div className="h-full bg-gradient-to-r from-blue-400 to-primary-600 rounded-full transition-all" style={{ width: `${memPercent}%` }}></div>
                     </div>
                     <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">{formatBytes(memUsed)} / {formatBytes(stats?.system.totalMem)}</p>
                 </div>
@@ -619,7 +619,7 @@ export default function Dashboard() {
                             <span className="text-xs text-gray-400 dark:text-gray-500">
                                 Sorted by viewers
                             </span>
-                            <Link to="/admin/cameras" className="text-sm font-semibold text-sky-500 hover:text-sky-600 transition-colors flex items-center gap-1">
+                            <Link to="/admin/cameras" className="text-sm font-semibold text-primary hover:text-primary-600 transition-colors flex items-center gap-1">
                                 Manage All
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
@@ -652,7 +652,7 @@ export default function Dashboard() {
                                                     <p className="text-sm text-gray-500 dark:text-gray-400">Unable to fetch stream statistics</p>
                                                     <button
                                                         onClick={handleRetry}
-                                                        className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300 transition-colors"
+                                                        className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-primary-600 hover:text-sky-700 dark:text-primary-400 dark:hover:text-sky-300 transition-colors"
                                                     >
                                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                                             <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -736,7 +736,7 @@ export default function Dashboard() {
                                                             </button>
                                                         </td>
                                                         <td className="px-6 py-4 text-right">
-                                                            <p className="text-sm font-semibold text-sky-500">↑ {formatBytes(stream.bytesSent)}</p>
+                                                            <p className="text-sm font-semibold text-primary">↑ {formatBytes(stream.bytesSent)}</p>
                                                             <p className="text-xs text-gray-400 dark:text-gray-500">↓ {formatBytes(stream.bytesReceived)}</p>
                                                         </td>
                                                     </tr>
@@ -770,14 +770,14 @@ export default function Dashboard() {
                                         )}
                                         <div className={`relative z-10 w-[18px] h-[18px] rounded-full mt-0.5 border-4 border-white dark:border-gray-800 ${
                                             log.action.includes('CREATE') ? 'bg-emerald-500' :
-                                            log.action.includes('DELETE') ? 'bg-red-500' : 'bg-sky-500'
+                                            log.action.includes('DELETE') ? 'bg-red-500' : 'bg-primary'
                                         }`}></div>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm font-medium text-gray-900 dark:text-white">{log.details}</p>
                                             <div className="flex items-center gap-2 mt-1">
                                                 <span className="text-xs text-gray-500 dark:text-gray-400">{log.username}</span>
                                                 <span className="text-xs text-gray-300 dark:text-gray-600">•</span>
-                                                <span className="text-xs text-sky-500 font-medium">{log.created_at_wib}</span>
+                                                <span className="text-xs text-primary font-medium">{log.created_at_wib}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -787,8 +787,8 @@ export default function Dashboard() {
                     </div>
 
                     {/* System Health */}
-                    <div className="bg-gradient-to-br from-sky-50 to-blue-50 dark:from-sky-500/5 dark:to-blue-500/5 border border-sky-200/50 dark:border-sky-500/20 rounded-2xl p-6">
-                        <h4 className="text-sm font-bold text-sky-600 dark:text-sky-400 mb-4 flex items-center gap-2">
+                    <div className="bg-gradient-to-br from-sky-50 to-blue-50 dark:from-primary/5 dark:to-primary/5 border border-sky-200/50 dark:border-primary/20 rounded-2xl p-6">
+                        <h4 className="text-sm font-bold text-primary-600 dark:text-primary-400 mb-4 flex items-center gap-2">
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                             </svg>

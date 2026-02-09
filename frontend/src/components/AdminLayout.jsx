@@ -94,7 +94,7 @@ export default function AdminLayout({ children }) {
             <header className={`lg:hidden fixed left-0 right-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800 transition-all ${isOffline ? 'top-12' : 'top-0'}`}>
                 <div className="flex items-center justify-between px-4 h-16">
                     <Link to="/" className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-gradient-to-br from-sky-500 to-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-sky-500/30">
+                        <div className="w-9 h-9 bg-gradient-to-br from-primary to-primary-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/30">
                             <Icons.Camera />
                         </div>
                         <span className="text-lg font-bold text-gray-900 dark:text-white">{branding.company_name || 'CCTV System'}</span>
@@ -125,7 +125,7 @@ export default function AdminLayout({ children }) {
                 <div className="p-6 border-b border-gray-200 dark:border-gray-800">
                     <Link to="/" className="flex items-center gap-3">
                         <div className="relative">
-                            <div className="w-11 h-11 bg-gradient-to-br from-sky-500 to-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-sky-500/30">
+                            <div className="w-11 h-11 bg-gradient-to-br from-primary to-primary-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/30">
                                 <Icons.Camera />
                             </div>
                             <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white dark:border-gray-900"></span>
@@ -147,7 +147,7 @@ export default function AdminLayout({ children }) {
                             onClick={() => setIsMobileMenuOpen(false)}
                             className={`group flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${
                                 isActive(item.path)
-                                    ? 'bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-lg shadow-sky-500/30'
+                                    ? 'bg-gradient-to-r from-primary to-primary-600 text-white shadow-lg shadow-primary/30'
                                     : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/80 hover:text-gray-900 dark:hover:text-white'
                             }`}
                         >
@@ -193,7 +193,7 @@ export default function AdminLayout({ children }) {
 
                     {/* User Info */}
                     <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-sky-500/20">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-primary/20">
                             {user?.username?.charAt(0).toUpperCase() || 'A'}
                         </div>
                         <div className="flex-1 min-w-0">

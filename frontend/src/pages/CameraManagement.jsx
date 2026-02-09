@@ -395,7 +395,7 @@ export default function CameraManagement() {
             <p className="text-gray-500 dark:text-gray-400 mb-6">{loadError}</p>
             <button 
                 onClick={loadCameras}
-                className="px-6 py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-sky-500/25 transition-all"
+                className="px-6 py-2.5 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-primary/25 transition-all"
             >
                 Try Again
             </button>
@@ -412,13 +412,13 @@ export default function CameraManagement() {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
-                    <p className="text-sm font-semibold text-sky-500 mb-1">Hardware Management</p>
+                    <p className="text-sm font-semibold text-primary mb-1">Hardware Management</p>
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Cameras</h1>
                     <p className="text-gray-500 dark:text-gray-400 mt-1">Configure and monitor your CCTV endpoints</p>
                 </div>
                 <button
                     onClick={openAddModal}
-                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-sky-500/25 transition-all"
+                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-primary/25 transition-all"
                 >
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -439,7 +439,7 @@ export default function CameraManagement() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {cameras.map((camera) => (
-                        <div key={camera.id} className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl overflow-hidden hover:shadow-xl hover:border-sky-500/30 transition-all group">
+                        <div key={camera.id} className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl overflow-hidden hover:shadow-xl hover:border-primary/30 transition-all group">
                             {/* Preview */}
                             <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 relative">
                                 <div className="absolute inset-0 flex items-center justify-center text-gray-300 dark:text-gray-600">
@@ -482,7 +482,7 @@ export default function CameraManagement() {
                                     <div className="flex gap-1">
                                         <button 
                                             onClick={() => openEditModal(camera)} 
-                                            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 hover:text-sky-500 hover:bg-sky-50 dark:hover:bg-sky-500/10 transition-all"
+                                            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 hover:text-primary hover:bg-sky-50 dark:hover:bg-primary/10 transition-all"
                                             title="Edit camera"
                                         >
                                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -515,7 +515,7 @@ export default function CameraManagement() {
                                         <button
                                             onClick={() => toggleStatus(camera)}
                                             disabled={togglingId === camera.id}
-                                            className={`relative w-10 h-5 rounded-full transition-colors disabled:opacity-50 ${camera.enabled ? 'bg-sky-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+                                            className={`relative w-10 h-5 rounded-full transition-colors disabled:opacity-50 ${camera.enabled ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'}`}
                                         >
                                             <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${camera.enabled ? 'left-5' : 'left-0.5'}`}></div>
                                         </button>
@@ -594,7 +594,7 @@ export default function CameraManagement() {
                                         onChange={handleFormChange}
                                         onBlur={handleBlur}
                                         disabled={isSubmitting}
-                                        className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50 text-sm ${
+                                        className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 text-sm ${
                                             getFieldError('name') 
                                                 ? 'border-red-500 focus:ring-red-500' 
                                                 : 'border-gray-200 dark:border-gray-700/50'
@@ -614,7 +614,7 @@ export default function CameraManagement() {
                                         value={formData.area_id} 
                                         onChange={handleFormChange}
                                         disabled={isSubmitting}
-                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50 text-sm"
+                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 text-sm"
                                     >
                                         <option value="">Select Area</option>
                                         {areas.map(area => <option key={area.id} value={area.id}>{area.name}</option>)}
@@ -634,7 +634,7 @@ export default function CameraManagement() {
                                     onChange={handleFormChange}
                                     onBlur={handleBlur}
                                     disabled={isSubmitting}
-                                    className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white font-mono text-xs placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50 ${
+                                    className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white font-mono text-xs placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 ${
                                         getFieldError('private_rtsp_url') 
                                             ? 'border-red-500 focus:ring-red-500' 
                                             : 'border-gray-200 dark:border-gray-700/50'
@@ -662,9 +662,9 @@ export default function CameraManagement() {
                                             checked={formData.video_codec === 'h264'}
                                             onChange={handleFormChange}
                                             disabled={isSubmitting}
-                                            className="w-4 h-4 text-sky-600 focus:ring-sky-500 focus:ring-2 disabled:opacity-50"
+                                            className="w-4 h-4 text-primary-600 focus:ring-primary focus:ring-2 disabled:opacity-50"
                                         />
-                                        <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-sky-600 dark:group-hover:text-sky-400">
+                                        <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-primary-600 dark:group-hover:text-primary-400">
                                             H.264 (Universal)
                                         </span>
                                     </label>
@@ -698,7 +698,7 @@ export default function CameraManagement() {
                                         value={formData.location} 
                                         onChange={handleFormChange}
                                         disabled={isSubmitting}
-                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50 text-sm" 
+                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 text-sm" 
                                         placeholder="Building A" 
                                     />
                                 </div>
@@ -712,7 +712,7 @@ export default function CameraManagement() {
                                         value={formData.group_name} 
                                         onChange={handleFormChange}
                                         disabled={isSubmitting}
-                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50 text-sm" 
+                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 text-sm" 
                                         placeholder="Security" 
                                     />
                                 </div>
@@ -727,15 +727,15 @@ export default function CameraManagement() {
                                     onChange={handleFormChange}
                                     disabled={isSubmitting}
                                     rows="2" 
-                                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none disabled:opacity-50 text-sm" 
+                                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary resize-none disabled:opacity-50 text-sm" 
                                     placeholder="Optional notes..." 
                                 />
                             </div>
 
                             {/* Location Picker Map */}
-                            <div className="p-3 bg-sky-50 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/20 rounded-xl">
+                            <div className="p-3 bg-sky-50 dark:bg-primary/10 border border-sky-200 dark:border-primary/20 rounded-xl">
                                 <div className="flex items-center gap-2 mb-2">
-                                    <div className="w-7 h-7 rounded-lg bg-sky-100 dark:bg-sky-500/20 flex items-center justify-center text-sky-600 dark:text-sky-400 shrink-0">
+                                    <div className="w-7 h-7 rounded-lg bg-sky-100 dark:bg-primary/20 flex items-center justify-center text-primary-600 dark:text-primary-400 shrink-0">
                                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                             <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/>
                                             <circle cx="12" cy="11" r="3"/>
@@ -879,7 +879,7 @@ export default function CameraManagement() {
                                 </button>
                                 <button 
                                     type="submit" 
-                                    className="flex-[2] px-4 py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 text-white font-medium rounded-xl shadow-lg shadow-sky-500/30 hover:from-sky-600 hover:to-blue-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2 text-sm" 
+                                    className="flex-[2] px-4 py-2.5 bg-gradient-to-r from-primary to-primary-600 text-white font-medium rounded-xl shadow-lg shadow-primary/30 hover:from-primary-600 hover:to-blue-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2 text-sm" 
                                     disabled={isSubmitting}
                                 >
                                     {isSubmitting && (

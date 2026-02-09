@@ -89,7 +89,7 @@ function InteractiveBarChart({ data, maxValue, onBarClick, selectedDate }) {
                 <div 
                     key={idx} 
                     className={`flex items-center gap-3 p-1 rounded-lg cursor-pointer transition-all hover:bg-gray-50 dark:hover:bg-gray-800/50 ${
-                        selectedDate === item.rawDate ? 'bg-sky-50 dark:bg-sky-500/10 ring-1 ring-sky-500/30' : ''
+                        selectedDate === item.rawDate ? 'bg-sky-50 dark:bg-primary/10 ring-1 ring-primary/30' : ''
                     }`}
                     onClick={() => onBarClick && onBarClick(item)}
                 >
@@ -100,8 +100,8 @@ function InteractiveBarChart({ data, maxValue, onBarClick, selectedDate }) {
                         <div 
                             className={`h-full rounded-lg transition-all duration-500 ${
                                 selectedDate === item.rawDate 
-                                    ? 'bg-gradient-to-r from-sky-400 to-sky-500' 
-                                    : 'bg-gradient-to-r from-sky-500 to-blue-600'
+                                    ? 'bg-gradient-to-r from-primary-400 to-primary' 
+                                    : 'bg-gradient-to-r from-primary to-primary-600'
                             }`}
                             style={{ width: `${Math.max((item.value / max) * 100, 2)}%` }}
                         />
@@ -139,7 +139,7 @@ function SimpleBarChart({ data, maxValue }) {
                     </span>
                     <div className="flex-1 h-6 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
                         <div 
-                            className="h-full bg-gradient-to-r from-sky-500 to-blue-600 rounded-lg transition-all duration-500"
+                            className="h-full bg-gradient-to-r from-primary to-primary-600 rounded-lg transition-all duration-500"
                             style={{ width: `${Math.max((item.value / max) * 100, 2)}%` }}
                         />
                     </div>
@@ -157,7 +157,7 @@ function SimpleBarChart({ data, maxValue }) {
  */
 function StatsCard({ icon, label, value, subValue, color = 'sky', onClick, trend }) {
     const colorClasses = {
-        sky: 'from-sky-400 to-sky-600 shadow-sky-500/30',
+        sky: 'from-primary-400 to-primary-600 shadow-primary/30',
         purple: 'from-purple-400 to-purple-600 shadow-purple-500/30',
         emerald: 'from-emerald-400 to-emerald-600 shadow-emerald-500/30',
         amber: 'from-amber-400 to-amber-600 shadow-amber-500/30',
@@ -166,7 +166,7 @@ function StatsCard({ icon, label, value, subValue, color = 'sky', onClick, trend
 
     return (
         <div 
-            className={`bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6 hover:shadow-lg transition-all group ${onClick ? 'cursor-pointer hover:border-sky-500/30' : ''}`}
+            className={`bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6 hover:shadow-lg transition-all group ${onClick ? 'cursor-pointer hover:border-primary/30' : ''}`}
             onClick={onClick}
         >
             <div className="flex items-center justify-between mb-4">
@@ -233,7 +233,7 @@ function PeriodSelector({ value, onChange, customDate, onCustomDateChange }) {
                         onChange('custom');
                     }}
                     max={new Date().toISOString().split('T')[0]}
-                    className="px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                    className="px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
             )}
         </div>
@@ -248,7 +248,7 @@ function CameraFilter({ cameras, value, onChange }) {
         <select
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+            className="px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
         >
             <option value="">Semua Kamera</option>
             {cameras.map(cam => (
@@ -268,7 +268,7 @@ function ActiveViewerCard({ session }) {
     return (
         <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                session.deviceType === 'mobile' ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-500' :
+                session.deviceType === 'mobile' ? 'bg-blue-100 dark:bg-primary/20 text-primary' :
                 session.deviceType === 'tablet' ? 'bg-purple-100 dark:bg-purple-500/20 text-purple-500' :
                 'bg-gray-100 dark:bg-gray-700 text-gray-500'
             }`}>
@@ -355,7 +355,7 @@ function DailyDetailModal({ date, sessions, onClose }) {
                                         <td className="py-3 pr-4 font-mono text-gray-600 dark:text-gray-400">{session.ip_address}</td>
                                         <td className="py-3 pr-4">
                                             <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium ${
-                                                session.device_type === 'mobile' ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400' :
+                                                session.device_type === 'mobile' ? 'bg-blue-100 dark:bg-primary/20 text-primary-600 dark:text-blue-400' :
                                                 session.device_type === 'tablet' ? 'bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400' :
                                                 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
                                             }`}>
@@ -492,7 +492,7 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
                     onClick={() => onPageChange(page)}
                     className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
                         page === currentPage
-                            ? 'bg-sky-500 text-white'
+                            ? 'bg-primary text-white'
                             : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
                     }`}
                 >
@@ -647,7 +647,7 @@ export default function ViewerAnalytics() {
                 </div>
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Gagal Memuat Analytics</h2>
                 <p className="text-gray-500 dark:text-gray-400 mb-6">{error}</p>
-                <button onClick={handleRetry} className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white font-medium rounded-lg transition-colors">
+                <button onClick={handleRetry} className="px-4 py-2 bg-primary hover:bg-primary-600 text-white font-medium rounded-lg transition-colors">
                     Coba Lagi
                 </button>
             </div>
@@ -708,7 +708,7 @@ export default function ViewerAnalytics() {
             {/* Header */}
             <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
                 <div>
-                    <p className="text-sm font-semibold text-sky-500 mb-1">Viewer Analytics</p>
+                    <p className="text-sm font-semibold text-primary mb-1">Viewer Analytics</p>
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Statistik Penonton</h1>
                     <p className="text-gray-500 dark:text-gray-400 mt-1">
                         Analisis pengunjung dan aktivitas streaming • Klik bar chart untuk detail
@@ -899,7 +899,7 @@ export default function ViewerAnalytics() {
                             {deviceBreakdown.map(device => (
                                 <div key={device.device_type} className="flex items-center gap-4">
                                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                                        device.device_type === 'mobile' ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-500' :
+                                        device.device_type === 'mobile' ? 'bg-blue-100 dark:bg-primary/20 text-primary' :
                                         device.device_type === 'tablet' ? 'bg-purple-100 dark:bg-purple-500/20 text-purple-500' :
                                         'bg-gray-100 dark:bg-gray-700 text-gray-500'
                                     }`}>
@@ -917,7 +917,7 @@ export default function ViewerAnalytics() {
                                         <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
                                             <div 
                                                 className={`h-full rounded-full transition-all duration-500 ${
-                                                    device.device_type === 'mobile' ? 'bg-blue-500' :
+                                                    device.device_type === 'mobile' ? 'bg-primary' :
                                                     device.device_type === 'tablet' ? 'bg-purple-500' :
                                                     'bg-gray-500'
                                                 }`}
@@ -948,7 +948,7 @@ export default function ViewerAnalytics() {
                         {topVisitors && topVisitors.length > 0 && (
                             <button
                                 onClick={handleExportVisitors}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-sky-500 dark:hover:text-sky-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
                             >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -1007,7 +1007,7 @@ export default function ViewerAnalytics() {
                             {peakHours.map((peak, idx) => (
                                 <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
                                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${
-                                        idx === 0 ? 'bg-gradient-to-br from-sky-400 to-sky-600 text-white' :
+                                        idx === 0 ? 'bg-gradient-to-br from-primary-400 to-primary-600 text-white' :
                                         'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
                                     }`}>
                                         {peak.hour}:00
@@ -1021,7 +1021,7 @@ export default function ViewerAnalytics() {
                                         </p>
                                     </div>
                                     {idx === 0 && (
-                                        <span className="px-2 py-1 bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 text-xs font-medium rounded-lg">
+                                        <span className="px-2 py-1 bg-sky-100 dark:bg-primary/20 text-primary-600 dark:text-primary-400 text-xs font-medium rounded-lg">
                                             Peak
                                         </span>
                                     )}
@@ -1057,7 +1057,7 @@ export default function ViewerAnalytics() {
                         {filteredSessions.length > 0 && (
                             <button
                                 onClick={handleExportSessions}
-                                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-sky-500 dark:hover:text-sky-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors border border-gray-200 dark:border-gray-700"
+                                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors border border-gray-200 dark:border-gray-700"
                             >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -1104,7 +1104,7 @@ export default function ViewerAnalytics() {
                                             </td>
                                             <td className="py-3 pr-4">
                                                 <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium ${
-                                                    session.device_type === 'mobile' ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400' :
+                                                    session.device_type === 'mobile' ? 'bg-blue-100 dark:bg-primary/20 text-primary-600 dark:text-blue-400' :
                                                     session.device_type === 'tablet' ? 'bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400' :
                                                     'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
                                                 }`}>

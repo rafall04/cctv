@@ -289,7 +289,7 @@ export default function LoginPage() {
         if (fieldErrors[fieldName]) {
             return `${baseClass} border-red-500 dark:border-red-500 focus:ring-red-500`;
         }
-        return `${baseClass} border-gray-200 dark:border-gray-700/50 focus:ring-sky-500`;
+        return `${baseClass} border-gray-200 dark:border-gray-700/50 focus:ring-primary`;
     };
 
     // Password field needs different padding for the eye button
@@ -299,14 +299,14 @@ export default function LoginPage() {
         if (fieldErrors.password) {
             return `${baseClass} border-red-500 dark:border-red-500 focus:ring-red-500`;
         }
-        return `${baseClass} border-gray-200 dark:border-gray-700/50 focus:ring-sky-500`;
+        return `${baseClass} border-gray-200 dark:border-gray-700/50 focus:ring-primary`;
     };
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 via-gray-50 to-gray-100 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 px-4 py-8 transition-colors">
             {/* Background decoration */}
             <div className="fixed inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl"></div>
+                <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl"></div>
                 <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"></div>
             </div>
             
@@ -321,7 +321,7 @@ export default function LoginPage() {
             <div className="relative w-full max-w-md">
                 {/* Logo & Header */}
                 <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-sky-500 to-blue-600 rounded-2xl shadow-2xl shadow-sky-500/30 mb-6 text-white">
+                    <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-primary to-primary-600 rounded-2xl shadow-2xl shadow-primary/30 mb-6 text-white">
                         <Icons.Lock />
                     </div>
                     <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
@@ -462,7 +462,7 @@ export default function LoginPage() {
                         <button
                             type="submit"
                             disabled={isSubmitDisabled}
-                            className="w-full flex items-center justify-center gap-2 py-4 px-4 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-sky-500/30 hover:shadow-xl hover:shadow-sky-500/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-sky-500 disabled:hover:to-blue-600 transition-all"
+                            className="w-full flex items-center justify-center gap-2 py-4 px-4 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-primary/30 hover:shadow-xl hover:shadow-primary/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-primary disabled:hover:to-primary-600 transition-all"
                         >
                             {loading ? (
                                 <>
@@ -489,7 +489,7 @@ export default function LoginPage() {
                     <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700/50">
                         <a
                             href="/"
-                            className="flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-sky-500 dark:hover:text-sky-400 transition-colors"
+                            className="flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-sky-400 transition-colors"
                         >
                             <Icons.ArrowLeft />
                             <span>Back to public view</span>

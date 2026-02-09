@@ -117,7 +117,7 @@ export default function Settings() {
         <div className="space-y-8">
             {/* Header */}
             <div>
-                <p className="text-sm font-semibold text-sky-500 mb-1">Pengaturan</p>
+                <p className="text-sm font-semibold text-primary mb-1">Pengaturan</p>
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Konfigurasi Sistem</h1>
                 <p className="text-gray-500 dark:text-gray-400 mt-1">
                     Kelola pengaturan notifikasi dan integrasi
@@ -146,7 +146,7 @@ export default function Settings() {
                 <div className="p-6 border-b border-gray-200 dark:border-gray-700/50">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
+                            <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-primary-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/30">
                                 <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
                                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
                                 </svg>
@@ -183,7 +183,7 @@ export default function Settings() {
                                     value={formData.botToken}
                                     onChange={(e) => setFormData(prev => ({ ...prev, botToken: e.target.value }))}
                                     placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
-                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                                 />
                                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                                     Dapatkan dari @BotFather di Telegram
@@ -199,7 +199,7 @@ export default function Settings() {
                                     value={formData.monitoringChatId}
                                     onChange={(e) => setFormData(prev => ({ ...prev, monitoringChatId: e.target.value }))}
                                     placeholder="-1001234567890"
-                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                                 />
                                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                                     Untuk notifikasi kamera offline/online
@@ -215,7 +215,7 @@ export default function Settings() {
                                     value={formData.feedbackChatId}
                                     onChange={(e) => setFormData(prev => ({ ...prev, feedbackChatId: e.target.value }))}
                                     placeholder="-1009876543210"
-                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
                                 />
                                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                                     Untuk notifikasi feedback baru (bisa sama dengan monitoring)
@@ -226,7 +226,7 @@ export default function Settings() {
                                 <button
                                     onClick={handleSave}
                                     disabled={saving}
-                                    className="px-6 py-2.5 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-400 text-white font-medium rounded-xl transition-colors flex items-center gap-2"
+                                    className="px-6 py-2.5 bg-primary hover:bg-primary-600 disabled:bg-blue-400 text-white font-medium rounded-xl transition-colors flex items-center gap-2"
                                 >
                                     {saving ? (
                                         <>

@@ -124,7 +124,7 @@ export default function FeedbackManagement() {
                     <div className="text-sm text-gray-500 dark:text-gray-400">Belum Dibaca</div>
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-                    <div className="text-2xl font-bold text-blue-500">{stats.read}</div>
+                    <div className="text-2xl font-bold text-primary">{stats.read}</div>
                     <div className="text-sm text-gray-500 dark:text-gray-400">Sudah Dibaca</div>
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
@@ -141,7 +141,7 @@ export default function FeedbackManagement() {
                         onClick={() => { setFilter(status); setPagination(prev => ({ ...prev, page: 1 })); }}
                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                             filter === status
-                                ? 'bg-sky-500 text-white'
+                                ? 'bg-primary text-white'
                                 : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
                         }`}
                     >
