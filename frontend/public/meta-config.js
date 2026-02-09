@@ -183,9 +183,23 @@
     .then(data => {
       if (data) {
         updateMetaTags(data);
+        
+        // Update theme color if primary_color is set
+        if (data.primary_color) {
+          const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+          if (themeColorMeta) {
+            themeColorMeta.content = data.primary_color;
+          }
+        }
       }
     })
     .catch(error => {
       console.warn('Failed to load branding data:', error);
     });
+  
+  // Update manifest link to use dynamic endpoint
+  const manifestLink = document.querySelector('link[rel="manifest"]');
+  if (manifestLink) {
+    manifestLink.href = `${apiUrl}/api/config/manifest`;
+  }
 })();

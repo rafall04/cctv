@@ -1,7 +1,7 @@
 {
-  "name": "RAF NET CCTV Bojonegoro",
-  "short_name": "CCTV Bojonegoro",
-  "description": "Pantau CCTV Bojonegoro secara online dan live streaming 24 jam",
+  "name": "CCTV System",
+  "short_name": "CCTV",
+  "description": "Pantau CCTV secara online dan live streaming 24 jam",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",

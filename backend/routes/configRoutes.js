@@ -76,4 +76,65 @@ export default async function configRoutes(fastify) {
             timestamp: new Date().toISOString(),
         };
     });
+
+    /**
+     * GET /api/config/manifest
+     * 
+     * Returns dynamic PWA manifest based on branding settings
+     * No authentication required
+     * 
+     * Response: Web App Manifest JSON
+     */
+    fastify.get('/api/config/manifest', async (request, reply) => {
+        try {
+            // Get branding settings
+            const db = fastify.db;
+            const settings = db.prepare('SELECT key, value FROM settings WHERE key LIKE "company_%" OR key LIKE "meta_%"').all();
+            
+            const branding = {};
+            settings.forEach(setting => {
+                branding[setting.key] = setting.value;
+            });
+            
+            // Build manifest
+            const manifest = {
+                name: branding.meta_title || branding.company_name || 'CCTV System',
+                short_name: branding.company_name || 'CCTV',
+                description: branding.meta_description || 'Pantau CCTV secara online dan live streaming 24 jam',
+                start_url: '/',
+                display: 'standalone',
+                background_color: '#0f172a',
+                theme_color: branding.primary_color || '#0ea5e9',
+                orientation: 'any',
+                icons: [
+                    {
+                        src: '/favicon.svg',
+                        sizes: 'any',
+                        type: 'image/svg+xml',
+                        purpose: 'any maskable'
+                    },
+                    {
+                        src: '/favicon-192x192.png',
+                        sizes: '192x192',
+                        type: 'image/png'
+                    },
+                    {
+                        src: '/favicon-512x512.png',
+                        sizes: '512x512',
+                        type: 'image/png'
+                    }
+                ],
+                categories: ['security', 'utilities'],
+                lang: 'id',
+                dir: 'ltr'
+            };
+            
+            reply.header('Content-Type', 'application/manifest+json');
+            reply.header('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+            return manifest;
+        } catch (error) {
+            fastify.log.error('Error generating manifest:', error);
+            reply.code(500).send({ error: 'Failed to generate manifest' });
+        }
+    });
 }
