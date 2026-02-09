@@ -12,10 +12,15 @@ export default {
             },
             colors: {
                 primary: {
-                    400: '#38bdf8',
-                    500: '#0ea5e9',
-                    600: '#0284c7',
-                    700: '#0369a1',
+                    DEFAULT: 'var(--primary-color)',
+                    50: 'rgba(var(--primary-color-rgb), 0.05)',
+                    100: 'rgba(var(--primary-color-rgb), 0.1)',
+                    200: 'rgba(var(--primary-color-rgb), 0.2)',
+                    300: 'rgba(var(--primary-color-rgb), 0.3)',
+                    400: 'rgba(var(--primary-color-rgb), 0.4)',
+                    500: 'var(--primary-color)',
+                    600: 'rgba(var(--primary-color-rgb), 0.8)',
+                    700: 'rgba(var(--primary-color-rgb), 0.9)',
                 },
                 dark: {
                     200: '#e5e7eb',

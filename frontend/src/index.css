@@ -4,6 +4,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* CSS Variables for Dynamic Branding */
+:root {
+    --primary-color: #0ea5e9;
+    --primary-color-rgb: 14, 165, 233;
+}
+
 /* Leaflet Map Styles */
 .leaflet-container {
     font-family: inherit;
