@@ -10,10 +10,12 @@ Saat play CCTV, bandwidth yang terpakai sangat besar karena:
 - Setiap segment = 2 detik video penuh
 - Total buffer awal = 30 detik × bitrate kamera
 
-**Sesudah**: `hlsSegmentCount: 5` (10 detik buffer)
-- Client hanya download 5 segment
-- Total buffer awal = 10 detik × bitrate kamera
-- **Penghematan: ~67% bandwidth awal**
+**Sesudah**: `hlsSegmentCount: 7` (14 detik buffer)
+- Client hanya download 7 segment
+- Total buffer awal = 14 detik × bitrate kamera
+- **Penghematan: ~53% bandwidth awal**
+
+**Note**: Awalnya dicoba 5 segments, tapi MediaMTX error "Low-Latency HLS requires at least 7 segments" karena ada `hlsPartDuration` setting. Solusi: naikkan ke 7 dan disable `hlsPartDuration`.
 
 ### 2. Buffer Size Frontend Terlalu Besar
 
@@ -39,9 +41,11 @@ Saat play CCTV, bandwidth yang terpakai sangat besar karena:
 ```yaml
 # SEBELUM
 hlsSegmentCount: 15  # 30s buffer
+hlsPartDuration: 1s  # Enables LL-HLS
 
 # SESUDAH
-hlsSegmentCount: 5   # 10s buffer (optimal)
+hlsSegmentCount: 7   # 14s buffer (optimal, minimum for LL-HLS)
+# hlsPartDuration: 1s  # DISABLED - not needed
 ```
 
 ### 2. Frontend HLS Config (`frontend/src/utils/hlsConfig.js`)
@@ -112,7 +116,7 @@ Contoh dengan kamera 2 Mbps bitrate:
 - Total: 30s × 2 Mbps = **60 Mbit = 7.5 MB**
 
 **Sesudah**:
-- MediaMTX buffer: 5 segments × 2s = 10s
+- MediaMTX buffer: 7 segments × 2s = 14s
 - Frontend buffer: 20s (high tier)
 - Total: 20s × 2 Mbps = **40 Mbit = 5 MB**
 
@@ -201,7 +205,7 @@ Jika user experience menurun (terlalu sering buffering):
 ### Option 1: Naikkan Segment Count
 ```yaml
 # mediamtx/mediamtx.yml
-hlsSegmentCount: 7  # Compromise: 14s buffer
+hlsSegmentCount: 10  # Compromise: 20s buffer
 ```
 
 ### Option 2: Naikkan Frontend Buffer
@@ -217,8 +221,10 @@ hlsSegmentCount: 7  # Compromise: 14s buffer
 - Bandwidth hemat, playback smooth
 
 ### Untuk Koneksi Tidak Stabil (<5 Mbps)
-- Pertimbangkan naikkan `hlsSegmentCount: 7`
+- Pertimbangkan naikkan `hlsSegmentCount: 10`
 - Atau gunakan bitrate kamera lebih rendah
+
+**PENTING**: Jangan turunkan `hlsSegmentCount` di bawah 7 jika `hlsPartDuration` aktif (Low-Latency HLS mode). MediaMTX akan error: "Low-Latency HLS requires at least 7 segments".
 
 ### Untuk Mobile/Kuota Terbatas
 - Setting saat ini sangat cocok
@@ -232,4 +238,19 @@ Optimasi ini mengurangi bandwidth usage hingga **60-70%** dengan trade-off minim
 - Server dengan bandwidth terbatas
 - Multi-camera viewing (bandwidth per camera lebih kecil)
 
-Jika ada masalah buffering, bisa disesuaikan dengan menaikkan `hlsSegmentCount` secara bertahap (5 → 7 → 10).
+Jika ada masalah buffering, bisa disesuaikan dengan menaikkan `hlsSegmentCount` secara bertahap (7 → 10 → 12).
+
+## Troubleshooting
+
+### Error: "Low-Latency HLS requires at least 7 segments"
+
+**Penyebab**: Setting `hlsPartDuration` di MediaMTX mengaktifkan Low-Latency HLS mode yang membutuhkan minimal 7 segments.
+
+**Solusi**:
+1. Naikkan `hlsSegmentCount` ke 7 atau lebih
+2. Atau disable `hlsPartDuration` dengan comment out:
+   ```yaml
+   # hlsPartDuration: 1s  # DISABLED
+   ```
+
+**Rekomendasi**: Untuk bandwidth optimization, gunakan standard HLS (tanpa `hlsPartDuration`) dengan `hlsSegmentCount: 7`.
