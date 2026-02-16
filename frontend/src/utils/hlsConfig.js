@@ -20,12 +20,12 @@ const HLS_CONFIGS = {
         enableWorker: false,
         // STANDARD HLS: Stability over latency
         lowLatencyMode: false,
-        // SAFE buffers for smooth playback
-        backBufferLength: 10,
-        maxBufferLength: 15,
-        maxMaxBufferLength: 30,
-        // 30MB max buffer size
-        maxBufferSize: 30 * 1000 * 1000,
+        // OPTIMIZED buffers for bandwidth efficiency
+        backBufferLength: 5,
+        maxBufferLength: 10,
+        maxMaxBufferLength: 15,
+        // 10MB max buffer size (reduced for bandwidth)
+        maxBufferSize: 10 * 1000 * 1000,
         maxBufferHole: 0.5,
         // AUTO quality - let HLS.js decide
         startLevel: -1,
@@ -46,11 +46,11 @@ const HLS_CONFIGS = {
     medium: {
         enableWorker: true,
         lowLatencyMode: false,
-        // BALANCED buffers for smooth playback
-        backBufferLength: 20,
-        maxBufferLength: 25,
-        maxMaxBufferLength: 45,
-        maxBufferSize: 45 * 1000 * 1000,
+        // OPTIMIZED buffers for bandwidth efficiency
+        backBufferLength: 10,
+        maxBufferLength: 15,
+        maxMaxBufferLength: 20,
+        maxBufferSize: 15 * 1000 * 1000,
         maxBufferHole: 0.5,
         startLevel: -1,
         // SMOOTH PLAYBACK: 2 segments buffer (4s) - eliminates freeze, maintains sync
@@ -69,11 +69,11 @@ const HLS_CONFIGS = {
     high: {
         enableWorker: true,
         lowLatencyMode: false,
-        // OPTIMAL buffers for smooth playback
-        backBufferLength: 30,
-        maxBufferLength: 30,
-        maxMaxBufferLength: 60,
-        maxBufferSize: 60 * 1000 * 1000,
+        // OPTIMIZED buffers for bandwidth efficiency
+        backBufferLength: 15,
+        maxBufferLength: 20,
+        maxMaxBufferLength: 30,
+        maxBufferSize: 20 * 1000 * 1000,
         maxBufferHole: 0.5,
         startLevel: -1,
         // SMOOTH PLAYBACK: 2 segments buffer (4s) - eliminates freeze, maintains sync
@@ -96,16 +96,16 @@ const HLS_CONFIGS = {
  * SIMPLIFIED: Only adjust buffer sizes for mobile
  */
 const MOBILE_OVERRIDES = {
-    maxBufferLength: (tierValue) => Math.min(tierValue, 20),
+    maxBufferLength: (tierValue) => Math.min(tierValue, 12),
 };
 
 /**
- * Mobile phone config - SMOOTH PLAYBACK optimized
+ * Mobile phone config - BANDWIDTH optimized
  */
 const MOBILE_PHONE_CONFIG = {
-    maxBufferLength: 15,
-    maxMaxBufferLength: 30,
-    maxBufferSize: 25 * 1000 * 1000,
+    maxBufferLength: 8,
+    maxMaxBufferLength: 12,
+    maxBufferSize: 8 * 1000 * 1000,
     startLevel: -1,
     liveSyncDurationCount: 2,
     liveMaxLatencyDurationCount: 5,
@@ -116,12 +116,12 @@ const MOBILE_PHONE_CONFIG = {
 };
 
 /**
- * Mobile tablet config - SMOOTH PLAYBACK optimized
+ * Mobile tablet config - BANDWIDTH optimized
  */
 const MOBILE_TABLET_CONFIG = {
-    maxBufferLength: 20,
-    maxMaxBufferLength: 40,
-    maxBufferSize: 35 * 1000 * 1000,
+    maxBufferLength: 12,
+    maxMaxBufferLength: 18,
+    maxBufferSize: 12 * 1000 * 1000,
     startLevel: -1,
     liveSyncDurationCount: 2,
     liveMaxLatencyDurationCount: 5,
