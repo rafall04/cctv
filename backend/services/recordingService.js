@@ -210,6 +210,11 @@ class RecordingService {
             ffmpeg.stderr.on('data', (data) => {
                 const output = data.toString();
                 ffmpegOutput += output;
+                // MEMORY SAFETY: Cap ffmpegOutput to prevent unbounded memory growth
+                // FFmpeg can run for days; without this, the string grows indefinitely
+                if (ffmpegOutput.length > 5000) {
+                    ffmpegOutput = ffmpegOutput.slice(-5000);
+                }
 
                 // Update last data time
                 const health = streamHealthMap.get(cameraId);
@@ -342,7 +347,19 @@ class RecordingService {
     onSegmentCreated(cameraId, filename) {
         // CRITICAL: Check if this file has failed re-mux before (prevent infinite loop)
         if (isFileFailed(cameraId, filename)) {
-            // Skip file that has failed 3+ times (likely corrupt)
+            // File has failed 3+ times (likely corrupt) - delete it from disk
+            const cameraDir = join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
+            const failedPath = join(cameraDir, filename);
+            if (existsSync(failedPath)) {
+                try {
+                    unlinkSync(failedPath);
+                    console.log(`[Segment] ✓ Deleted permanently failed file (3+ remux failures): ${filename}`);
+                } catch (err) {
+                    console.error(`[Segment] Failed to delete permanently failed file ${filename}:`, err.message);
+                }
+            }
+            // Also clean up the failed_remux_files tracking entry
+            removeFailedFile(cameraId, filename);
             return;
         }
 
@@ -405,12 +422,19 @@ class RecordingService {
                 const fileSize = fileSize2;
 
                 console.log(`[Segment] Final file size: ${(fileSize / 1024 / 1024).toFixed(2)} MB`);
-
                 // CRITICAL FIX: Lower threshold to 500KB (from 5MB) to handle tunnel reconnect
                 // This allows files as short as 30 seconds to be saved and playable
                 // Reasoning: 1.5Mbps bitrate × 30s = ~5.6MB, but with compression ~500KB minimum
                 if (fileSize < 500 * 1024) {
                     console.warn(`[Segment] File too small (< 500KB), likely corrupt or empty: ${filename} (${(fileSize / 1024).toFixed(2)} KB)`);
+                    // BUG FIX: Delete the corrupt/empty file from disk instead of just skipping
+                    // Previously this file was left on disk forever since it's not in DB
+                    try {
+                        await fsPromises.unlink(filePath);
+                        console.log(`[Segment] ✓ Deleted corrupt/empty file: ${filename}`);
+                    } catch (delErr) {
+                        console.error(`[Segment] Failed to delete corrupt file ${filename}:`, delErr.message);
+                    }
                     cleanup();
                     return;
                 }
@@ -625,6 +649,7 @@ class RecordingService {
      * This prevents premature deletion of recent files
      * 
      * ⚡ FIX 2: NON-BLOCKING CLEANUP - Uses async operations to prevent Event Loop freeze
+     * ⚡ FIX 6: Also cleans FILESYSTEM ORPHANS (files on disk but not in DB)
      */
     async cleanupOldSegments(cameraId) {
         try {
@@ -652,7 +677,8 @@ class RecordingService {
 
             // Calculate retention period in milliseconds
             // Add 10% buffer to retention period for safety
-            const retentionHours = camera.recording_duration_hours;
+            // SAFETY: Default to 5 hours if recording_duration_hours is NULL/undefined/0
+            const retentionHours = camera.recording_duration_hours || 5;
             const retentionMs = retentionHours * 60 * 60 * 1000;
             const retentionWithBuffer = retentionMs * 1.1; // +10% safety buffer
 
@@ -686,11 +712,6 @@ class RecordingService {
                 'SELECT * FROM recording_segments WHERE camera_id = ? ORDER BY start_time ASC',
                 [cameraId]
             );
-
-            if (segments.length === 0) {
-                console.log(`[Cleanup] Camera ${cameraId}: No segments to cleanup`);
-                return;
-            }
 
             // ⚡ FIX 2: NON-BLOCKING CLEANUP
             // Collect files to delete (filter first, delete in parallel)
@@ -733,8 +754,11 @@ class RecordingService {
 
             // ⚡ FIX 2: Delete files in parallel using Promise.allSettled
             // allSettled ensures one failure doesn't stop others
+            let dbDeletedCount = 0;
+            let dbDeletedSize = 0;
+
             if (filesToDelete.length > 0) {
-                console.log(`[Cleanup] Deleting ${filesToDelete.length} old segments in parallel...`);
+                console.log(`[Cleanup] Deleting ${filesToDelete.length} old DB-tracked segments in parallel...`);
 
                 const deletePromises = filesToDelete.map(async ({ segment, segmentAge }) => {
                     try {
@@ -752,6 +776,10 @@ class RecordingService {
                         return { success: true, size: stats.size };
                     } catch (error) {
                         console.error(`[Cleanup] ✗ Error deleting ${segment.filename}:`, error.message);
+                        // If file doesn't exist anymore, still clean DB
+                        if (error.code === 'ENOENT') {
+                            execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
+                        }
                         return { success: false, error: error.message };
                     }
                 });
@@ -760,24 +788,22 @@ class RecordingService {
                 const results = await Promise.allSettled(deletePromises);
 
                 // Calculate statistics
-                let deletedCount = 0;
-                let totalSize = 0;
                 let failedCount = 0;
 
                 results.forEach((result) => {
                     if (result.status === 'fulfilled' && result.value.success) {
-                        deletedCount++;
-                        totalSize += result.value.size;
+                        dbDeletedCount++;
+                        dbDeletedSize += result.value.size;
                     } else {
                         failedCount++;
                     }
                 });
 
-                const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
-                const remainingSegments = segments.length - deletedCount - skippedCount - failedCount;
+                const totalSizeMB = (dbDeletedSize / (1024 * 1024)).toFixed(2);
+                const remainingSegments = segments.length - dbDeletedCount - skippedCount - failedCount;
 
-                console.log(`[Cleanup] Camera ${cameraId} summary:`);
-                console.log(`  ✓ Deleted: ${deletedCount} segments (${totalSizeMB}MB freed)`);
+                console.log(`[Cleanup] Camera ${cameraId} DB segments summary:`);
+                console.log(`  ✓ Deleted: ${dbDeletedCount} segments (${totalSizeMB}MB freed)`);
                 if (failedCount > 0) {
                     console.log(`  ✗ Failed: ${failedCount} segments`);
                 }
@@ -786,7 +812,91 @@ class RecordingService {
                 }
                 console.log(`  ✓ Remaining: ${remainingSegments} segments`);
             } else {
-                console.log(`[Cleanup] Camera ${cameraId}: No segments older than ${Math.round(retentionWithBuffer / 3600000)}h, ${segments.length} segments kept`);
+                console.log(`[Cleanup] Camera ${cameraId}: No DB segments older than ${Math.round(retentionWithBuffer / 3600000)}h, ${segments.length} segments kept`);
+            }
+
+            // ⚡ FIX 6: FILESYSTEM ORPHAN CLEANUP
+            // Scan actual directory for .mp4 files that are NOT in the database
+            // These are files that were never registered (remux failed, process crashed, etc.)
+            const cameraDir = join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
+            if (existsSync(cameraDir)) {
+                let fsOrphanDeletedCount = 0;
+                let fsOrphanDeletedSize = 0;
+
+                try {
+                    const allFiles = readdirSync(cameraDir);
+                    const mp4Files = allFiles.filter(f => /^\d{8}_\d{6}\.mp4$/.test(f));
+
+                    // Build a Set of DB-tracked filenames for fast lookup
+                    const dbFilenames = new Set(
+                        query('SELECT filename FROM recording_segments WHERE camera_id = ?', [cameraId])
+                            .map(s => s.filename)
+                    );
+
+                    for (const filename of mp4Files) {
+                        // Skip if tracked in DB (already handled above)
+                        if (dbFilenames.has(filename)) continue;
+
+                        // Skip if being processed
+                        const fileKey = `${cameraId}:${filename}`;
+                        if (filesBeingProcessed.has(fileKey)) continue;
+
+                        const filePath = join(cameraDir, filename);
+
+                        try {
+                            const stats = statSync(filePath);
+                            const fileAge = now - stats.mtimeMs;
+
+                            // Parse filename to get timestamp-based age (more reliable than mtime)
+                            const match = filename.match(/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
+                            let ageToUse = fileAge;
+                            if (match) {
+                                const [, year, month, day, hour, minute, second] = match;
+                                const fileTimestamp = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`).getTime();
+                                ageToUse = Math.max(fileAge, now - fileTimestamp);
+                            }
+
+                            // Only delete if older than retention period
+                            if (ageToUse > retentionWithBuffer) {
+                                const fileSizeMB = (stats.size / (1024 * 1024)).toFixed(2);
+                                await fsPromises.unlink(filePath);
+                                fsOrphanDeletedCount++;
+                                fsOrphanDeletedSize += stats.size;
+                                console.log(`[Cleanup] ✓ Deleted filesystem orphan: ${filename} (age: ${Math.round(ageToUse / 3600000)}h, size: ${fileSizeMB}MB)`);
+
+                                // Also clean up any failed_remux_files entry
+                                removeFailedFile(cameraId, filename);
+                            }
+                        } catch (err) {
+                            console.error(`[Cleanup] Error checking orphan file ${filename}:`, err.message);
+                        }
+                    }
+
+                    // Also clean up any stale temp files (.remux.mp4, .temp.mp4)
+                    const tempFiles = allFiles.filter(f => f.includes('.remux.mp4') || f.includes('.temp.mp4'));
+                    for (const tempFile of tempFiles) {
+                        const tempPath = join(cameraDir, tempFile);
+                        try {
+                            const stats = statSync(tempPath);
+                            const tempAge = now - stats.mtimeMs;
+                            // Delete temp files older than 10 minutes
+                            if (tempAge > 10 * 60 * 1000) {
+                                await fsPromises.unlink(tempPath);
+                                fsOrphanDeletedCount++;
+                                fsOrphanDeletedSize += stats.size;
+                                console.log(`[Cleanup] ✓ Deleted stale temp file: ${tempFile} (age: ${Math.round(tempAge / 60000)}min)`);
+                            }
+                        } catch (err) {
+                            // File may have been deleted by another process
+                        }
+                    }
+
+                    if (fsOrphanDeletedCount > 0) {
+                        console.log(`[Cleanup] Camera ${cameraId} filesystem orphans: deleted ${fsOrphanDeletedCount} files (${(fsOrphanDeletedSize / 1024 / 1024).toFixed(2)}MB freed)`);
+                    }
+                } catch (err) {
+                    console.error(`[Cleanup] Error scanning camera dir for orphans:`, err.message);
+                }
             }
 
         } catch (error) {
@@ -848,62 +958,98 @@ class RecordingService {
     /**
      * Periodic segment scanner - fallback if FFmpeg output detection fails
      * Scans recording folders every 60 seconds for new MP4 files
+     * FIX: Now scans ALL camera directories, not just active recordings
      */
     startSegmentScanner() {
         // Initial cleanup of temp files
         this.cleanupTempFiles();
 
         setInterval(() => {
-            // Get all active recordings
-            activeRecordings.forEach((recording, cameraId) => {
-                const cameraDir = join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
+            try {
+                // FIX: Scan ALL camera directories on disk, not just active recordings
+                // This ensures stopped cameras with orphaned files are also processed
+                if (!existsSync(RECORDINGS_BASE_PATH)) return;
 
-                if (!existsSync(cameraDir)) return;
+                const cameraDirs = readdirSync(RECORDINGS_BASE_PATH);
 
-                try {
-                    // Get all MP4 files in directory (exclude temp files)
-                    const files = readdirSync(cameraDir)
-                        .filter(f => {
-                            // Only match: YYYYMMDD_HHMMSS.mp4 (exactly)
-                            return /^\d{8}_\d{6}\.mp4$/.test(f);
+                cameraDirs.forEach(dirName => {
+                    const cameraDir = join(RECORDINGS_BASE_PATH, dirName);
+
+                    // Skip non-directories
+                    try {
+                        if (!statSync(cameraDir).isDirectory()) return;
+                    } catch { return; }
+
+                    // Extract camera ID
+                    const cameraIdMatch = dirName.match(/camera(\d+)/);
+                    if (!cameraIdMatch) return;
+                    const cameraId = parseInt(cameraIdMatch[1]);
+
+                    // Verify camera exists and has recording enabled
+                    const camera = queryOne('SELECT id, enable_recording FROM cameras WHERE id = ?', [cameraId]);
+                    if (!camera || !camera.enable_recording) return;
+
+                    try {
+                        // Get all MP4 files in directory (exclude temp files)
+                        const files = readdirSync(cameraDir)
+                            .filter(f => {
+                                // Only match: YYYYMMDD_HHMMSS.mp4 (exactly)
+                                return /^\d{8}_\d{6}\.mp4$/.test(f);
+                            });
+
+                        // Check each file
+                        files.forEach(filename => {
+                            // CRITICAL: Delete files that have failed re-mux 3+ times
+                            if (isFileFailed(cameraId, filename)) {
+                                const failedPath = join(cameraDir, filename);
+                                try {
+                                    if (existsSync(failedPath)) {
+                                        unlinkSync(failedPath);
+                                        console.log(`[Scanner] ✓ Deleted permanently failed file: ${filename}`);
+                                    }
+                                    removeFailedFile(cameraId, filename);
+                                } catch (delErr) {
+                                    console.error(`[Scanner] Failed to delete failed file ${filename}:`, delErr.message);
+                                }
+                                return;
+                            }
+
+                            // Check if already in database
+                            const existing = queryOne(
+                                'SELECT id FROM recording_segments WHERE camera_id = ? AND filename = ?',
+                                [cameraId, filename]
+                            );
+
+                            if (!existing) {
+                                const filePath = join(cameraDir, filename);
+                                try {
+                                    const stats = statSync(filePath);
+
+                                    // BUG FIX #4: Check if file is being processed (prevent duplicate)
+                                    const fileKey = `${cameraId}:${filename}`;
+                                    if (filesBeingProcessed.has(fileKey)) {
+                                        return; // Skip, already being processed
+                                    }
+
+                                    // Only process files that are at least 30 seconds old (likely complete)
+                                    const fileAge = Date.now() - stats.mtimeMs;
+                                    if (fileAge > 30000) {
+                                        console.log(`[Scanner] Found unregistered segment: ${filename} (age: ${Math.round(fileAge / 1000)}s)`);
+                                        // Trigger segment processing
+                                        this.onSegmentCreated(cameraId, filename);
+                                    }
+                                } catch (statErr) {
+                                    // File may have been deleted
+                                }
+                            }
                         });
-
-                    // Check each file
-                    files.forEach(filename => {
-                        // CRITICAL: Skip files that have failed re-mux 3+ times (from database)
-                        if (isFileFailed(cameraId, filename)) {
-                            return;
-                        }
-
-                        // Check if already in database
-                        const existing = queryOne(
-                            'SELECT id FROM recording_segments WHERE camera_id = ? AND filename = ?',
-                            [cameraId, filename]
-                        );
-
-                        if (!existing) {
-                            const filePath = join(cameraDir, filename);
-                            const stats = statSync(filePath);
-
-                            // BUG FIX #4: Check if file is being processed (prevent duplicate)
-                            const fileKey = `${cameraId}:${filename}`;
-                            if (filesBeingProcessed.has(fileKey)) {
-                                return; // Skip, already being processed
-                            }
-
-                            // Only process files that are at least 30 seconds old (likely complete)
-                            const fileAge = Date.now() - stats.mtimeMs;
-                            if (fileAge > 30000) {
-                                console.log(`[Scanner] Found unregistered segment: ${filename} (age: ${Math.round(fileAge / 1000)}s)`);
-                                // Trigger segment processing
-                                this.onSegmentCreated(cameraId, filename);
-                            }
-                        }
-                    });
-                } catch (error) {
-                    console.error(`[Scanner] Error scanning camera ${cameraId}:`, error);
-                }
-            });
+                    } catch (error) {
+                        console.error(`[Scanner] Error scanning camera ${cameraId}:`, error);
+                    }
+                });
+            } catch (error) {
+                console.error(`[Scanner] Error in segment scanner:`, error);
+            }
         }, 60000); // Scan every 60 seconds
     }
 
@@ -924,7 +1070,9 @@ class RecordingService {
 
             cameraDirs.forEach(cameraDir => {
                 const fullPath = join(RECORDINGS_BASE_PATH, cameraDir);
-                if (!statSync(fullPath).isDirectory()) return;
+                try {
+                    if (!statSync(fullPath).isDirectory()) return;
+                } catch { return; }
 
                 // Extract camera ID from directory name (e.g., "camera1" -> 1)
                 const cameraIdMatch = cameraDir.match(/camera(\d+)/);
@@ -938,14 +1086,18 @@ class RecordingService {
                     if (file.includes('.temp.mp4') || file.includes('.remux.mp4')) {
                         const filePath = join(fullPath, file);
 
-                        // Additional safety: check file age (at least 5 minutes old)
-                        const stats = statSync(filePath);
-                        const fileAge = Date.now() - stats.mtimeMs;
+                        try {
+                            // Additional safety: check file age (at least 5 minutes old)
+                            const stats = statSync(filePath);
+                            const fileAge = Date.now() - stats.mtimeMs;
 
-                        if (fileAge > 5 * 60 * 1000) {
-                            unlinkSync(filePath);
-                            cleanedCount++;
-                            console.log(`[Cleanup] Deleted temp file: ${cameraDir}/${file} (age: ${Math.round(fileAge / 60000)}min)`);
+                            if (fileAge > 5 * 60 * 1000) {
+                                unlinkSync(filePath);
+                                cleanedCount++;
+                                console.log(`[Cleanup] Deleted temp file: ${cameraDir}/${file} (age: ${Math.round(fileAge / 60000)}min)`);
+                            }
+                        } catch (statErr) {
+                            // File may have been deleted by another process
                         }
                     }
                 });
@@ -1032,8 +1184,8 @@ class RecordingService {
     /**
      * Background cleanup for corrupt/unregistered files
      * Runs slowly (1 file per 10 seconds) to avoid CPU spike
-     * CRITICAL FIX: Don't delete unregistered files - let segment scanner register them
-     * Only delete files that are PROVEN corrupt (ffprobe fails)
+     * FIX: Now respects retention period - deletes old files instead of re-registering
+     * Only attempts registration for files within retention period
      */
     startBackgroundCleanup() {
         console.log('[Cleanup] Starting background cleanup service (1 file per 10s)');
@@ -1051,12 +1203,19 @@ class RecordingService {
 
                 cameraDirs.forEach(cameraDir => {
                     const fullPath = join(RECORDINGS_BASE_PATH, cameraDir);
-                    if (!statSync(fullPath).isDirectory()) return;
+                    try {
+                        if (!statSync(fullPath).isDirectory()) return;
+                    } catch { return; }
 
                     // Extract camera ID
                     const cameraIdMatch = cameraDir.match(/camera(\d+)/);
                     if (!cameraIdMatch) return;
                     const cameraId = parseInt(cameraIdMatch[1]);
+
+                    // Get camera retention period
+                    const camera = queryOne('SELECT recording_duration_hours FROM cameras WHERE id = ?', [cameraId]);
+                    // SAFETY: Default to 5 hours if camera not found OR recording_duration_hours is NULL/0
+                    const retentionMs = ((camera && camera.recording_duration_hours) ? camera.recording_duration_hours : 5) * 60 * 60 * 1000;
 
                     // Get all MP4 files
                     const files = readdirSync(fullPath)
@@ -1069,32 +1228,51 @@ class RecordingService {
                             [cameraId, filename]
                         );
 
-                        // CRITICAL FIX: Only add to queue if file is OLD (30+ minutes)
-                        // Recent files are likely being processed by segment scanner
                         if (!existing) {
                             const filePath = join(fullPath, filename);
-                            const stats = statSync(filePath);
-                            const fileAge = Date.now() - stats.mtimeMs;
+                            try {
+                                const stats = statSync(filePath);
+                                const fileAge = Date.now() - stats.mtimeMs;
 
-                            // Only queue files older than 30 minutes (was immediate)
-                            if (fileAge > 30 * 60 * 1000) {
-                                unregistered.push({
-                                    cameraId,
-                                    filename,
-                                    path: filePath,
-                                    age: fileAge
-                                });
+                                // Also check filename-based age (more reliable)
+                                const match = filename.match(/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
+                                let ageToUse = fileAge;
+                                if (match) {
+                                    const [, year, month, day, hour, minute, second] = match;
+                                    const fileTimestamp = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`).getTime();
+                                    ageToUse = Math.max(fileAge, Date.now() - fileTimestamp);
+                                }
+
+                                // Only queue files older than 30 minutes
+                                if (ageToUse > 30 * 60 * 1000) {
+                                    unregistered.push({
+                                        cameraId,
+                                        filename,
+                                        path: filePath,
+                                        age: ageToUse,
+                                        fileSize: stats.size,
+                                        retentionMs,
+                                        beyondRetention: ageToUse > retentionMs * 1.1
+                                    });
+                                }
+                            } catch {
+                                // File may have been deleted
                             }
                         }
                     });
                 });
 
                 if (unregistered.length > 0) {
-                    console.log(`[Cleanup] Found ${unregistered.length} old unregistered files (30+ min), adding to cleanup queue`);
-                    cleanupQueue = unregistered;
+                    console.log(`[BGCleanup] Found ${unregistered.length} old unregistered files (30+ min), adding to cleanup queue`);
+                    // Prioritize: files beyond retention first (delete), then newer ones (register)
+                    cleanupQueue = unregistered.sort((a, b) => {
+                        if (a.beyondRetention && !b.beyondRetention) return -1;
+                        if (!a.beyondRetention && b.beyondRetention) return 1;
+                        return b.age - a.age; // Oldest first
+                    });
                 }
             } catch (error) {
-                console.error('[Cleanup] Error building queue:', error);
+                console.error('[BGCleanup] Error building queue:', error);
             }
         };
 
@@ -1122,37 +1300,52 @@ class RecordingService {
                 // CRITICAL FIX: Check if file is being processed (prevent deletion during remux)
                 const fileKey = `${file.cameraId}:${file.filename}`;
                 if (filesBeingProcessed.has(fileKey)) {
-                    console.log(`[Cleanup] File being processed, skipping: ${file.filename}`);
+                    console.log(`[BGCleanup] File being processed, skipping: ${file.filename}`);
                     isProcessing = false;
                     return;
                 }
 
-                // Check if file is corrupt with ffprobe (3s timeout)
+                // FIX: If file is BEYOND retention, delete immediately regardless of validity
+                // Previously this would try to re-register valid old files in an infinite loop
+                if (file.beyondRetention) {
+                    try {
+                        const fileSizeMB = (file.fileSize / (1024 * 1024)).toFixed(2);
+                        await fsPromises.unlink(file.path);
+                        console.log(`[BGCleanup] ✓ Deleted old unregistered file beyond retention: camera${file.cameraId}/${file.filename} (age: ${Math.round(file.age / 3600000)}h, size: ${fileSizeMB}MB)`);
+                        removeFailedFile(file.cameraId, file.filename);
+                    } catch (err) {
+                        console.error(`[BGCleanup] Error deleting old file ${file.filename}:`, err.message);
+                    }
+                    isProcessing = false;
+                    return;
+                }
+
+                // File is within retention period - check if corrupt or valid
                 const { execSync } = await import('child_process');
                 try {
                     execSync(`ffprobe -v error "${file.path}"`, {
                         timeout: 3000,
-                        stdio: 'ignore' // Suppress output
+                        stdio: 'ignore'
                     });
 
-                    // CRITICAL FIX: File is valid but unregistered
-                    // DON'T DELETE - trigger segment scanner to register it
-                    console.log(`[Cleanup] File valid but unregistered (age: ${Math.round(file.age / 60000)}min), triggering registration: ${file.filename}`);
-
-                    // Trigger segment processing to register this file
+                    // File is valid but unregistered and within retention
+                    // Trigger segment scanner to register it
+                    console.log(`[BGCleanup] File valid but unregistered (age: ${Math.round(file.age / 60000)}min), triggering registration: ${file.filename}`);
                     this.onSegmentCreated(file.cameraId, file.filename);
 
                 } catch (error) {
                     // File is corrupt (ffprobe failed)
-                    console.log(`[Cleanup] Deleting corrupt file (age: ${Math.round(file.age / 60000)}min): camera${file.cameraId}/${file.filename}`);
-                    unlinkSync(file.path);
-
-                    // Remove from database tracking
+                    console.log(`[BGCleanup] Deleting corrupt file (age: ${Math.round(file.age / 60000)}min): camera${file.cameraId}/${file.filename}`);
+                    try {
+                        await fsPromises.unlink(file.path);
+                    } catch (unlinkErr) {
+                        // Ignore - file may already be deleted
+                    }
                     removeFailedFile(file.cameraId, file.filename);
                 }
 
             } catch (error) {
-                console.error('[Cleanup] Error processing file:', error);
+                console.error('[BGCleanup] Error processing file:', error);
             } finally {
                 isProcessing = false;
             }
@@ -1162,6 +1355,7 @@ class RecordingService {
     /**
      * Scheduled cleanup - runs every 30 minutes
      * This is the PRIMARY cleanup mechanism (not per-segment cleanup)
+     * FIX: Also includes emergency disk space check
      */
     startScheduledCleanup() {
         console.log('[Cleanup] Starting scheduled cleanup service (every 30 minutes)');
@@ -1169,14 +1363,31 @@ class RecordingService {
         // Run cleanup for all recording cameras every 30 minutes
         setInterval(async () => {
             try {
-                const cameras = query('SELECT id FROM cameras WHERE enable_recording = 1 AND enabled = 1');
+                // FIX: Clean ALL camera directories, not just enabled ones
+                // This catches orphans from cameras that were disabled after recording
+                const enabledCameras = query('SELECT id FROM cameras WHERE enable_recording = 1 AND enabled = 1');
+                const allCameraIds = new Set(enabledCameras.map(c => c.id));
 
-                console.log(`[Cleanup] Running scheduled cleanup for ${cameras.length} cameras...`);
+                // Also find camera dirs on disk that might have orphaned files
+                if (existsSync(RECORDINGS_BASE_PATH)) {
+                    try {
+                        const dirs = readdirSync(RECORDINGS_BASE_PATH);
+                        dirs.forEach(d => {
+                            const match = d.match(/camera(\d+)/);
+                            if (match) allCameraIds.add(parseInt(match[1]));
+                        });
+                    } catch { }
+                }
+
+                console.log(`[Cleanup] Running scheduled cleanup for ${allCameraIds.size} cameras (${enabledCameras.length} enabled + orphaned dirs)...`);
 
                 // Run cleanups sequentially to avoid overwhelming the system
-                for (const camera of cameras) {
-                    await this.cleanupOldSegments(camera.id);
+                for (const cameraId of allCameraIds) {
+                    await this.cleanupOldSegments(cameraId);
                 }
+
+                // Emergency disk space check
+                await this.emergencyDiskSpaceCheck();
 
                 console.log('[Cleanup] Scheduled cleanup complete');
             } catch (error) {
@@ -1184,18 +1395,156 @@ class RecordingService {
             }
         }, 30 * 60 * 1000); // Every 30 minutes
 
-        // Run initial cleanup after 5 minutes (let system stabilize first)
+        // Run initial cleanup after 2 minutes (reduced from 5 min for faster orphan removal)
         setTimeout(async () => {
             console.log('[Cleanup] Running initial cleanup...');
             try {
+                const allCameraIds = new Set();
+
                 const cameras = query('SELECT id FROM cameras WHERE enable_recording = 1 AND enabled = 1');
-                for (const camera of cameras) {
-                    await this.cleanupOldSegments(camera.id);
+                cameras.forEach(c => allCameraIds.add(c.id));
+
+                // Also find camera dirs on disk
+                if (existsSync(RECORDINGS_BASE_PATH)) {
+                    try {
+                        const dirs = readdirSync(RECORDINGS_BASE_PATH);
+                        dirs.forEach(d => {
+                            const match = d.match(/camera(\d+)/);
+                            if (match) allCameraIds.add(parseInt(match[1]));
+                        });
+                    } catch { }
                 }
+
+                for (const cameraId of allCameraIds) {
+                    await this.cleanupOldSegments(cameraId);
+                }
+
+                await this.emergencyDiskSpaceCheck();
             } catch (error) {
                 console.error('[Cleanup] Initial cleanup error:', error);
             }
-        }, 5 * 60 * 1000);
+        }, 2 * 60 * 1000);
+    }
+
+    /**
+     * Emergency disk space check
+     * If available space is below 1GB, aggressively delete oldest files
+     */
+    async emergencyDiskSpaceCheck() {
+        try {
+            const { execSync } = await import('child_process');
+            let freeBytes = 0;
+
+            try {
+                // Windows: use wmic or PowerShell
+                const drive = RECORDINGS_BASE_PATH.charAt(0);
+                const output = execSync(
+                    `powershell -Command "(Get-PSDrive ${drive}).Free"`,
+                    { encoding: 'utf8', timeout: 5000 }
+                ).trim();
+                freeBytes = parseInt(output) || 0;
+            } catch {
+                try {
+                    // Linux/Mac fallback: use df
+                    const output = execSync(
+                        `df -B1 "${RECORDINGS_BASE_PATH}" | tail -1 | awk '{print $4}'`,
+                        { encoding: 'utf8', timeout: 5000 }
+                    ).trim();
+                    freeBytes = parseInt(output) || 0;
+                } catch {
+                    // Can't determine free space, skip emergency check
+                    return;
+                }
+            }
+
+            const freeGB = (freeBytes / (1024 * 1024 * 1024)).toFixed(2);
+            console.log(`[DiskCheck] Free disk space: ${freeGB}GB`);
+
+            // Emergency threshold: 1GB
+            const EMERGENCY_THRESHOLD = 1 * 1024 * 1024 * 1024; // 1GB
+
+            if (freeBytes > EMERGENCY_THRESHOLD) {
+                return; // Enough space
+            }
+
+            console.warn(`[DiskCheck] ⚠️ LOW DISK SPACE: ${freeGB}GB free. Starting emergency cleanup...`);
+
+            // Get ALL recording files across all cameras, sorted by age (oldest first)
+            const allSegments = query(
+                'SELECT rs.*, c.recording_duration_hours FROM recording_segments rs LEFT JOIN cameras c ON rs.camera_id = c.id ORDER BY rs.start_time ASC'
+            );
+
+            let freedBytes = 0;
+            let deletedCount = 0;
+
+            for (const segment of allSegments) {
+                // Stop if we've freed enough space (target: 2GB free)
+                if (freeBytes + freedBytes > 2 * 1024 * 1024 * 1024) {
+                    break;
+                }
+
+                // Skip files being processed
+                const fileKey = `${segment.camera_id}:${segment.filename}`;
+                if (filesBeingProcessed.has(fileKey)) continue;
+
+                if (existsSync(segment.file_path)) {
+                    try {
+                        const stats = statSync(segment.file_path);
+                        await fsPromises.unlink(segment.file_path);
+                        freedBytes += stats.size;
+                        deletedCount++;
+                        // Only delete DB entry if file was successfully deleted
+                        execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
+                    } catch (err) {
+                        // File locked or permission error - DON'T delete DB entry
+                        // so it can be retried next cycle
+                    }
+                } else {
+                    // File doesn't exist on disk - clean up orphaned DB entry
+                    execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
+                }
+            }
+
+            // Also scan for filesystem orphans
+            if (existsSync(RECORDINGS_BASE_PATH) && (freeBytes + freedBytes) < 2 * 1024 * 1024 * 1024) {
+                const cameraDirs = readdirSync(RECORDINGS_BASE_PATH);
+                for (const dir of cameraDirs) {
+                    const fullDirPath = join(RECORDINGS_BASE_PATH, dir);
+                    try {
+                        if (!statSync(fullDirPath).isDirectory()) continue;
+                    } catch { continue; }
+
+                    const files = readdirSync(fullDirPath)
+                        .filter(f => /^\d{8}_\d{6}\.mp4$/.test(f) || f.includes('.remux.mp4') || f.includes('.temp.mp4'))
+                        .map(f => {
+                            const fp = join(fullDirPath, f);
+                            try {
+                                const st = statSync(fp);
+                                return { name: f, path: fp, mtime: st.mtimeMs, size: st.size };
+                            } catch { return null; }
+                        })
+                        .filter(f => f !== null)
+                        .sort((a, b) => a.mtime - b.mtime); // Oldest first
+
+                    for (const file of files) {
+                        if ((freeBytes + freedBytes) > 2 * 1024 * 1024 * 1024) break;
+
+                        try {
+                            await fsPromises.unlink(file.path);
+                            freedBytes += file.size;
+                            deletedCount++;
+                        } catch { }
+                    }
+                }
+            }
+
+            if (deletedCount > 0) {
+                console.warn(`[DiskCheck] 🚨 Emergency cleanup: deleted ${deletedCount} files, freed ${(freedBytes / 1024 / 1024).toFixed(2)}MB`);
+            }
+
+        } catch (error) {
+            console.error('[DiskCheck] Error checking disk space:', error.message);
+        }
     }
 
     /**
