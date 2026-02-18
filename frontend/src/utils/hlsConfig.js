@@ -20,12 +20,12 @@ const HLS_CONFIGS = {
         enableWorker: false,
         // STANDARD HLS: Stability over latency
         lowLatencyMode: false,
-        // OPTIMIZED buffers for bandwidth efficiency
+        // BALANCED buffers - increased from aggressive optimization for stability
         backBufferLength: 5,
-        maxBufferLength: 10,
-        maxMaxBufferLength: 15,
-        // 10MB max buffer size (reduced for bandwidth)
-        maxBufferSize: 10 * 1000 * 1000,
+        maxBufferLength: 12,
+        maxMaxBufferLength: 18,
+        // 12MB max buffer size (increased from 10MB for better stability)
+        maxBufferSize: 12 * 1000 * 1000,
         maxBufferHole: 0.5,
         // AUTO quality - let HLS.js decide
         startLevel: -1,
@@ -46,11 +46,11 @@ const HLS_CONFIGS = {
     medium: {
         enableWorker: true,
         lowLatencyMode: false,
-        // OPTIMIZED buffers for bandwidth efficiency
+        // BALANCED buffers - increased from aggressive optimization for stability
         backBufferLength: 10,
-        maxBufferLength: 15,
-        maxMaxBufferLength: 20,
-        maxBufferSize: 15 * 1000 * 1000,
+        maxBufferLength: 18,
+        maxMaxBufferLength: 25,
+        maxBufferSize: 18 * 1000 * 1000,
         maxBufferHole: 0.5,
         startLevel: -1,
         // SMOOTH PLAYBACK: 2 segments buffer (4s) - eliminates freeze, maintains sync
@@ -69,11 +69,11 @@ const HLS_CONFIGS = {
     high: {
         enableWorker: true,
         lowLatencyMode: false,
-        // OPTIMIZED buffers for bandwidth efficiency
+        // BALANCED buffers - increased from aggressive optimization for stability
         backBufferLength: 15,
-        maxBufferLength: 20,
-        maxMaxBufferLength: 30,
-        maxBufferSize: 20 * 1000 * 1000,
+        maxBufferLength: 25,
+        maxMaxBufferLength: 35,
+        maxBufferSize: 25 * 1000 * 1000,
         maxBufferHole: 0.5,
         startLevel: -1,
         // SMOOTH PLAYBACK: 2 segments buffer (4s) - eliminates freeze, maintains sync
@@ -100,12 +100,12 @@ const MOBILE_OVERRIDES = {
 };
 
 /**
- * Mobile phone config - BANDWIDTH optimized
+ * Mobile phone config - BALANCED for stability
  */
 const MOBILE_PHONE_CONFIG = {
-    maxBufferLength: 8,
-    maxMaxBufferLength: 12,
-    maxBufferSize: 8 * 1000 * 1000,
+    maxBufferLength: 10,
+    maxMaxBufferLength: 15,
+    maxBufferSize: 10 * 1000 * 1000,
     startLevel: -1,
     liveSyncDurationCount: 2,
     liveMaxLatencyDurationCount: 5,
@@ -116,12 +116,12 @@ const MOBILE_PHONE_CONFIG = {
 };
 
 /**
- * Mobile tablet config - BANDWIDTH optimized
+ * Mobile tablet config - BALANCED for stability
  */
 const MOBILE_TABLET_CONFIG = {
-    maxBufferLength: 12,
-    maxMaxBufferLength: 18,
-    maxBufferSize: 12 * 1000 * 1000,
+    maxBufferLength: 15,
+    maxMaxBufferLength: 22,
+    maxBufferSize: 15 * 1000 * 1000,
     startLevel: -1,
     liveSyncDurationCount: 2,
     liveMaxLatencyDurationCount: 5,
