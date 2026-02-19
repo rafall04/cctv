@@ -23,7 +23,8 @@ module.exports = {
     apps: [
         {
             name: `${CLIENT_CODE}-mediamtx`,
-            script: './mediamtx',
+            script: path.join(ROOT_DIR, 'mediamtx', 'mediamtx'),
+            args: [path.join(ROOT_DIR, 'mediamtx', 'mediamtx.yml')],
             cwd: path.join(ROOT_DIR, 'mediamtx'),
             interpreter: 'none',
             instances: 1,
@@ -31,9 +32,6 @@ module.exports = {
             watch: false,
             max_restarts: 10,
             restart_delay: 3000,
-            env: {
-                MEDIAMTX_CONFPATH: 'mediamtx.yml'
-            }
         },
         {
             name: `${CLIENT_CODE}-cctv-backend`,
