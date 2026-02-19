@@ -39,8 +39,6 @@ rtspAddress: :8554
 # Default path settings (applied to all camera paths)
 paths:
   all_others:
-    # RTSP source settings - OPTIMIZED
-    sourceProtocol: tcp
-    sourceOnDemand: yes
-    sourceOnDemandStartTimeout: 5s      # Faster timeout (was 10s)
-    sourceOnDemandCloseAfter: 60s       # Keep alive longer (was 30s)
+    # Default settings for paths without explicit config
+    # Note: sourceOnDemand settings are applied per-path by backend API
+    # when adding camera paths with RTSP sources
