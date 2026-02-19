@@ -46,6 +46,3 @@ paths:
     sourceOnDemand: yes
     sourceOnDemandStartTimeout: 5s      # Faster timeout (was 10s)
     sourceOnDemandCloseAfter: 60s       # Keep alive longer (was 30s)
-    # Connection timeouts - prevent hanging
-    readTimeout: 10s
-    writeTimeout: 10s
