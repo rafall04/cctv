@@ -18,8 +18,6 @@ hlsSegmentDuration: 2s
 # Segment count: 7 (optimized - 14s buffer, 30% less RAM usage)
 # History: 7 segments × 2s = 14s (sufficient for stable playback, saves RAM)
 hlsSegmentCount: 7
-# Segment max age: auto-cleanup old segments to prevent RAM leak
-hlsSegmentMaxAge: 30s
 # RAM Disk storage for instant access
 hlsDirectory: /dev/shm/mediamtx-live
 # NOTE: hlsPartDuration REMOVED - No LL-HLS (reduces CPU load)
