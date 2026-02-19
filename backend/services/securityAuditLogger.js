@@ -17,7 +17,7 @@
  */
 
 import crypto from 'crypto';
-import { execute, query } from '../database/database.js';
+import { execute, query } from '../database/connectionPool.js';
 
 /**
  * Security event types

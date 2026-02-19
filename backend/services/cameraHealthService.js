@@ -1,28 +1,12 @@
-/**
- * Camera Health Service
- * Monitors camera online/offline status via MediaMTX API
- * Updates database with status every 30-60 seconds
- * Sends Telegram notifications on status changes
- */
-
 import axios from 'axios';
-import Database from 'better-sqlite3';
 import { config } from '../config/config.js';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { query, queryOne, execute } from '../database/connectionPool.js';
 import { 
     sendCameraOfflineNotification, 
     sendCameraOnlineNotification,
     isTelegramConfigured 
 } from './telegramService.js';
 import { getTimezone } from './timezoneService.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const dbPath = config.database.path.startsWith('/') 
-    ? config.database.path 
-    : join(__dirname, '..', config.database.path);
 
 const mediaMtxApiBaseUrl = 'http://localhost:9997/v3';
 
@@ -149,28 +133,23 @@ class CameraHealthService {
     async checkAllCameras() {
         try {
             const activePaths = await this.getActivePaths();
-            const db = new Database(dbPath);
             
             // Get all enabled cameras (include stream_key for path lookup)
-            const cameras = db.prepare(`
+            // Use connection pool for better performance
+            const cameras = query(`
                 SELECT id, name, location, is_online, stream_key 
                 FROM cameras 
                 WHERE enabled = 1
-            `).all();
+            `);
 
             // Debug: log what paths we found
             console.log(`[CameraHealth] Found ${activePaths.size} configured paths in MediaMTX`);
 
-            const updateStmt = db.prepare(`
-                UPDATE cameras 
-                SET is_online = ?, last_online_check = ? 
-                WHERE id = ?
-            `);
+            const timestamp = getTimestamp();
 
             let onlineCount = 0;
             let offlineCount = 0;
             let changedCount = 0;
-            const timestamp = getTimestamp();
 
             for (const camera of cameras) {
                 // Use stream_key if available, fallback to legacy camera{id} format
@@ -188,7 +167,11 @@ class CameraHealthService {
                 
                 // Only update if status changed
                 if (camera.is_online !== isOnline) {
-                    updateStmt.run(isOnline, timestamp, camera.id);
+                    // Use connection pool for better performance
+                    execute(
+                        'UPDATE cameras SET is_online = ?, last_online_check = ? WHERE id = ?',
+                        [isOnline, timestamp, camera.id]
+                    );
                     changedCount++;
                     
                     // Send Telegram notification on status change
@@ -244,7 +227,6 @@ class CameraHealthService {
                 }
             }
 
-            db.close();
             this.lastCheck = new Date();
 
             // Always log status for debugging
@@ -261,18 +243,15 @@ class CameraHealthService {
      */
     async getStatus() {
         try {
-            const db = new Database(dbPath, { readonly: true });
-            
-            const stats = db.prepare(`
+            // Use connection pool for better performance
+            const stats = queryOne(`
                 SELECT 
                     COUNT(*) as total,
                     SUM(CASE WHEN is_online = 1 THEN 1 ELSE 0 END) as online,
                     SUM(CASE WHEN is_online = 0 OR is_online IS NULL THEN 1 ELSE 0 END) as offline
                 FROM cameras 
                 WHERE enabled = 1
-            `).get();
-
-            db.close();
+            `);
 
             return {
                 total: stats.total || 0,
@@ -302,9 +281,8 @@ class CameraHealthService {
         try {
             const activePaths = await this.getActivePaths();
             
-            // Get camera's stream_key from database
-            const db = new Database(dbPath);
-            const camera = db.prepare('SELECT stream_key FROM cameras WHERE id = ?').get(cameraId);
+            // Get camera's stream_key from database using connection pool
+            const camera = queryOne('SELECT stream_key FROM cameras WHERE id = ?', [cameraId]);
             
             // Use stream_key if available, fallback to legacy format
             const pathName = camera?.stream_key || `camera${cameraId}`;
@@ -314,12 +292,10 @@ class CameraHealthService {
             
             // Update database with configured timezone timestamp
             const timestamp = getTimestamp();
-            db.prepare(`
-                UPDATE cameras 
-                SET is_online = ?, last_online_check = ? 
-                WHERE id = ?
-            `).run(isOnline, timestamp, cameraId);
-            db.close();
+            execute(
+                'UPDATE cameras SET is_online = ?, last_online_check = ? WHERE id = ?',
+                [isOnline, timestamp, cameraId]
+            );
 
             return isOnline === 1;
         } catch (error) {

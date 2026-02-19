@@ -1,5 +1,5 @@
 import bcrypt from 'bcrypt';
-import { queryOne, execute } from '../database/database.js';
+import { queryOne, execute } from '../database/connectionPool.js';
 import { config } from '../config/config.js';
 import {
     checkLockout,

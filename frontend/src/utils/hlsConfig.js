@@ -16,8 +16,9 @@
  */
 const HLS_CONFIGS = {
     low: {
-        // Worker disabled for CPU savings on low-end devices
-        enableWorker: false,
+        // Worker ENABLED for all tiers (offload parsing to background thread)
+        // This prevents UI freeze on low-end devices
+        enableWorker: true,
         // STANDARD HLS: Stability over latency
         lowLatencyMode: false,
         // BALANCED buffers - increased from aggressive optimization for stability

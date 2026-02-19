@@ -1,4 +1,4 @@
-import { query, queryOne, execute, transaction } from '../database/database.js';
+import { query, queryOne, execute, transaction } from '../database/connectionPool.js';
 import cache, { CacheTTL, CacheNamespace, cacheKey } from '../services/cacheService.js';
 
 // Cache keys

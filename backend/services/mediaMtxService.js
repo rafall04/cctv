@@ -1,16 +1,7 @@
 import axios from 'axios';
-import Database from 'better-sqlite3';
 import { config } from '../config/config.js';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { query, queryOne } from '../database/connectionPool.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-// Configuration - use same path resolution as database.js
-const dbPath = config.database.path.startsWith('/') 
-  ? config.database.path 
-  : join(__dirname, '..', config.database.path);
 const mediaMtxApiBaseUrl = 'http://localhost:9997/v3';
 
 class MediaMtxService {
@@ -140,10 +131,10 @@ class MediaMtxService {
      */
     getDatabaseCameras() {
         try {
-            const db = new Database(dbPath, { readonly: true });
+            // Use connection pool for better performance
             // Use stream_key as path_name for security (unpredictable URLs)
             // Fallback to 'camera' + id if stream_key is not set
-            const stmt = db.prepare(`
+            const cameras = query(`
                 SELECT 
                     id, 
                     name, 
@@ -153,8 +144,6 @@ class MediaMtxService {
                 FROM cameras 
                 WHERE enabled = 1
             `);
-            const cameras = stmt.all();
-            db.close();
             return cameras;
         } catch (error) {
             console.error('[MediaMTX Service] Error fetching cameras from database:', error.message);

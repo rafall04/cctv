@@ -1,4 +1,4 @@
-import { query, queryOne, execute } from '../database/database.js';
+import { query, queryOne, execute } from '../database/connectionPool.js';
 import { v4 as uuidv4 } from 'uuid';
 import mediaMtxService from '../services/mediaMtxService.js';
 import { 
@@ -6,43 +6,27 @@ import {
     logCameraUpdated, 
     logCameraDeleted 
 } from '../services/securityAuditLogger.js';
-import cache, { CacheTTL, CacheNamespace, cacheKey } from '../services/cacheService.js';
-
-// Cache keys
-const CACHE_ALL_CAMERAS = cacheKey(CacheNamespace.CAMERAS, 'all');
-const CACHE_ACTIVE_CAMERAS = cacheKey(CacheNamespace.CAMERAS, 'active');
+import { invalidateCache } from '../middleware/cacheMiddleware.js';
 
 /**
  * Invalidate all camera-related caches
  */
 function invalidateCameraCache() {
-    cache.invalidate(`${CacheNamespace.CAMERAS}:`);
-    cache.invalidate(`${CacheNamespace.STREAMS}:`);
+    invalidateCache('/api/cameras');
+    invalidateCache('/api/stream');
     console.log('[Cache] Camera cache invalidated');
 }
 
 // Get all cameras (admin only - includes disabled cameras)
 export async function getAllCameras(request, reply) {
     try {
-        // Try cache first
-        const cached = cache.get(CACHE_ALL_CAMERAS);
-        if (cached) {
-            return reply.send({
-                success: true,
-                data: cached,
-                cached: true
-            });
-        }
-
+        // Use connection pool for better performance
         const cameras = query(
             `SELECT c.*, a.name as area_name 
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 
              ORDER BY c.id ASC`
         );
-
-        // Cache for 30 seconds (admin data, shorter TTL)
-        cache.set(CACHE_ALL_CAMERAS, cameras, CacheTTL.SHORT);
 
         return reply.send({
             success: true,
@@ -60,16 +44,7 @@ export async function getAllCameras(request, reply) {
 // Get active cameras (public - only enabled cameras, no RTSP URLs)
 export async function getActiveCameras(request, reply) {
     try {
-        // Try cache first (public endpoint, longer TTL)
-        const cached = cache.get(CACHE_ACTIVE_CAMERAS);
-        if (cached) {
-            return reply.send({
-                success: true,
-                data: cached,
-                cached: true
-            });
-        }
-
+        // Cache handled by middleware (cacheMiddleware)
         const cameras = query(
             `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel, 
                     c.latitude, c.longitude, c.status, c.enable_recording, c.video_codec, c.stream_key, 
@@ -79,9 +54,6 @@ export async function getActiveCameras(request, reply) {
              WHERE c.enabled = 1 
              ORDER BY c.is_tunnel ASC, c.id ASC`
         );
-
-        // Cache for 2 minutes (public data, can be longer)
-        cache.set(CACHE_ACTIVE_CAMERAS, cameras, CacheTTL.MEDIUM);
 
         return reply.send({
             success: true,

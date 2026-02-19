@@ -8,16 +8,18 @@ logDestinations: [stdout]
 api: yes
 apiAddress: :9997
 
-# HLS settings - STANDARD MODE (Stability Priority)
+# HLS settings - OPTIMIZED MODE (Stability + Memory Efficiency)
 hls: yes
 hlsAddress: :8888
 hlsAlwaysRemux: yes
 hlsAllowOrigin: '*'
 # Segment duration: 2s (sweet spot for stability + reasonable latency)
 hlsSegmentDuration: 2s
-# Segment count: 10 (balanced for stability - 20s buffer)
-# History: 10 segments × 2s = 20s (increased from 7 for better stability on unstable connections)
-hlsSegmentCount: 10
+# Segment count: 7 (optimized - 14s buffer, 30% less RAM usage)
+# History: 7 segments × 2s = 14s (sufficient for stable playback, saves RAM)
+hlsSegmentCount: 7
+# Segment max age: auto-cleanup old segments to prevent RAM leak
+hlsSegmentMaxAge: 30s
 # RAM Disk storage for instant access
 hlsDirectory: /dev/shm/mediamtx-live
 # NOTE: hlsPartDuration REMOVED - No LL-HLS (reduces CPU load)
@@ -36,5 +38,14 @@ rtsp: yes
 rtspAddress: :8554
 
 # Path configurations managed by backend
+# Default path settings (applied to all camera paths)
 paths:
-  all_others: {}
+  all_others:
+    # RTSP source settings - OPTIMIZED
+    sourceProtocol: tcp
+    sourceOnDemand: yes
+    sourceOnDemandStartTimeout: 5s      # Faster timeout (was 10s)
+    sourceOnDemandCloseAfter: 60s       # Keep alive longer (was 30s)
+    # Connection timeouts - prevent hanging
+    readTimeout: 10s
+    writeTimeout: 10s

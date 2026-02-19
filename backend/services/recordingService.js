@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, unlinkSync, statSync, renameSync, readdirSync } 
 import { promises as fsPromises } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { query, queryOne, execute } from '../database/database.js';
+import { query, queryOne, execute } from '../database/connectionPool.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

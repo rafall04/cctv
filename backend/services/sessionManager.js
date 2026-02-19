@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { query, queryOne, execute } from '../database/database.js';
+import { query, queryOne, execute } from '../database/connectionPool.js';
 import { config } from '../config/config.js';
 import { 
     logSessionInvalidated, 

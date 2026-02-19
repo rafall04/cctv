@@ -17,7 +17,7 @@
  * Timezone: All timestamps use configured timezone from system settings
  */
 
-import { query, queryOne, execute } from '../database/database.js';
+import { query, queryOne, execute } from '../database/connectionPool.js';
 import { v4 as uuidv4 } from 'uuid';
 import { getTimezone } from './timezoneService.js';
 
@@ -66,8 +66,9 @@ function getDateWithOffset(days) {
 // Session timeout in seconds (if no heartbeat received)
 const SESSION_TIMEOUT = 15;
 
-// Cleanup interval in milliseconds
-const CLEANUP_INTERVAL = 5000;
+// Cleanup interval in milliseconds - OPTIMIZED (reduced from 5s to 60s)
+// Less frequent cleanup reduces database writes while maintaining effectiveness
+const CLEANUP_INTERVAL = 60000;
 
 class ViewerSessionService {
     constructor() {

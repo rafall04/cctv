@@ -1,4 +1,4 @@
-import { query, queryOne } from '../database/database.js';
+import { query, queryOne } from '../database/connectionPool.js';
 import { config } from '../config/config.js';
 import jwt from 'jsonwebtoken';
 

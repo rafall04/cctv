@@ -22,6 +22,8 @@ import { schemaErrorHandler } from './middleware/schemaValidators.js';
 // Import services
 import { startDailyCleanup, stopDailyCleanup, logSecurityEvent, SECURITY_EVENTS } from './services/securityAuditLogger.js';
 import { getTimezone } from './services/timezoneService.js';
+import { closeAll as closeDbConnections, getStats as getDbStats } from './database/connectionPool.js';
+import { cachePlugin, getCacheStats } from './middleware/cacheMiddleware.js';
 
 // Import routes
 import authRoutes from './routes/authRoutes.js';
@@ -256,6 +258,13 @@ await fastify.register(brandingRoutes, { prefix: '/api/branding' });
 // thumbnailRoutes removed - @fastify/static handles /api/thumbnails/* automatically
 
 // ============================================
+// CACHE MANAGEMENT ROUTES (Admin Only)
+// ============================================
+// Register cache plugin for cache management endpoints
+// Provides /api/cache/stats, /api/cache/invalidate, /api/cache/clear
+await fastify.register(cachePlugin, { prefix: '/api/cache' });
+
+// ============================================
 // GLOBAL ERROR HANDLER
 // ============================================
 // Handles schema validation errors and general errors
@@ -335,6 +344,17 @@ const start = async () => {
         console.log('    GET    /api/admin/api-keys');
         console.log('    POST   /api/admin/api-keys');
         console.log('    DELETE /api/admin/api-keys/:id');
+        console.log('');
+        console.log('  Cache Management (admin only):');
+        console.log('    GET    /api/cache/stats');
+        console.log('    POST   /api/cache/invalidate');
+        console.log('    POST   /api/cache/clear');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('');
+        console.log('⚡ Performance Optimizations:');
+        console.log('  • Database Connection Pool: Enabled (max 5 read connections)');
+        console.log('  • API Response Cache: Enabled (30s TTL for public endpoints)');
+        console.log('  • Session Cleanup: Optimized (60s interval)');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         console.log('');
 
@@ -421,6 +441,17 @@ const shutdown = async () => {
             console.log(`[Shutdown] Closed ${activeSessions.length} viewer sessions`);
         } catch (error) {
             console.error('[Shutdown] Session cleanup error:', error.message);
+        }
+        
+        // Close database connections
+        console.log('[Shutdown] Closing database connections...');
+        try {
+            const dbStats = getDbStats();
+            console.log(`[Shutdown] DB Stats: ${dbStats.readPoolSize} read connections, ${dbStats.totalQueries} total queries, ${dbStats.hitRate} hit rate`);
+            closeDbConnections();
+            console.log('[Shutdown] Database connections closed');
+        } catch (error) {
+            console.error('[Shutdown] Database cleanup error:', error.message);
         }
         
         // Close Fastify server

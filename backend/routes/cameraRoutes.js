@@ -12,10 +12,14 @@ import {
     updateCameraSchema, 
     cameraIdParamSchema 
 } from '../middleware/schemaValidators.js';
+import { cacheMiddleware } from '../middleware/cacheMiddleware.js';
 
 export default async function cameraRoutes(fastify, options) {
-    // Public endpoints
-    fastify.get('/active', getActiveCameras);
+    // Public endpoints - with caching
+    fastify.get('/active', {
+        preHandler: cacheMiddleware(30000),  // Cache for 30 seconds
+        handler: getActiveCameras,
+    });
 
     // Admin endpoints (protected)
     fastify.get('/', {

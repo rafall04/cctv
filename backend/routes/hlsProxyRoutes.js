@@ -16,7 +16,7 @@ import axios from 'axios';
 import jwt from 'jsonwebtoken';
 import { config } from '../config/config.js';
 import viewerSessionService from '../services/viewerSessionService.js';
-import { queryOne } from '../database/database.js';
+import { queryOne } from '../database/connectionPool.js';
 
 // Session cache to avoid creating duplicate sessions for same IP+camera
 // Key: `${ip}_${cameraId}`, Value: { sessionId, lastAccess }
