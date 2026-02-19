@@ -25,13 +25,15 @@ module.exports = {
             name: `${CLIENT_CODE}-mediamtx`,
             script: './mediamtx',
             cwd: path.join(ROOT_DIR, 'mediamtx'),
-            args: ['mediamtx.yml'],
             interpreter: 'none',
             instances: 1,
             autorestart: true,
             watch: false,
             max_restarts: 10,
             restart_delay: 3000,
+            env: {
+                MEDIAMTX_CONFPATH: 'mediamtx.yml'
+            }
         },
         {
             name: `${CLIENT_CODE}-cctv-backend`,
