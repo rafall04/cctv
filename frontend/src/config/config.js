@@ -16,8 +16,40 @@
  * @throws {Error} If VITE_API_URL is not configured
  */
 export const getApiUrl = () => {
-    const url = import.meta.env.VITE_API_URL;
-    
+    let url = import.meta.env.VITE_API_URL;
+
+    // Feature: Dynamic API URL for Local IP Access
+    // If user accesses via IP (e.g., 192.168.x.x), automatically switch API to that IP
+    // This fixes issues where accessing via IP still tries to hit the domain (CORS errors)
+    if (typeof window !== 'undefined') {
+        const hostname = window.location.hostname;
+        const isIp = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname.includes(':'); // simple IPv4/IPv6 check
+
+        if (isIp && url) {
+            try {
+                // Parse the configured URL to get the port
+                const configuredUrl = new URL(import.meta.env.VITE_API_URL || 'http://localhost:3000');
+                let port = configuredUrl.port;
+
+                // If port is empty (80/443) or we are switching to IP, 
+                // we should prefer the standard backend port (3000) over 80/443
+                // unless the user explicitly configured a different non-standard port
+                if (!port || port === '80' || port === '443') {
+                    port = '3000';
+                }
+
+                // Construct new URL using the current IP
+                // Force HTTP for IP access (usually no SSL on local IPs)
+                url = `http://${hostname}:${port}`;
+                console.debug(`[Config] access via IP detected, switched API URL to: ${url}`);
+            } catch (e) {
+                // Fallback to default port 3000 if parsing fails
+                url = `http://${hostname}:3000`;
+                console.warn('[Config] Failed to parse API URL, using default port 3000:', e);
+            }
+        }
+    }
+
     if (!url) {
         console.error('❌ VITE_API_URL not configured in .env file!');
         console.error('Please create frontend/.env file with:');
@@ -25,7 +57,7 @@ export const getApiUrl = () => {
         console.error('  VITE_API_URL=https://api.your-domain.com  (production)');
         throw new Error('API URL not configured. Please set VITE_API_URL in .env file.');
     }
-    
+
     return url;
 };
 

@@ -67,6 +67,22 @@ function showWarningNotification(title, message) {
     }
 }
 
+/**
+ * Handle session expiration logic
+ * Clears tokens and redirects to login if in admin area
+ * @param {Error} error - Error to reject with
+ * @returns {Promise<never>} Rejected promise
+ */
+function handleSessionExpired(error) {
+    localStorage.removeItem('user');
+    clearCsrfToken();
+    showErrorNotification('Session Expired', 'Your session has expired. Please log in again.');
+    if (window.location.pathname.startsWith('/admin')) {
+        window.location.href = '/admin/login?expired=true';
+    }
+    return Promise.reject(error);
+}
+
 // Create axios instance with config from central config
 // Get API URL and Key from central config
 const API_URL = getApiUrl();
@@ -94,7 +110,7 @@ export async function fetchCsrfToken() {
                 'X-API-Key': API_KEY,
             },
         });
-        
+
         if (response.data.success) {
             csrfToken = response.data.data.token;
             // Set expiry time (subtract 60 seconds for safety margin)
@@ -146,10 +162,10 @@ apiClient.interceptors.request.use(
         if (API_KEY) {
             config.headers['X-API-Key'] = API_KEY;
         }
-        
+
         // JWT tokens are in HttpOnly cookies - automatically sent by browser
         // No need to manually attach Authorization header
-        
+
         // Add CSRF token for state-changing requests
         if (isStateChangingMethod(config.method)) {
             const csrf = await getCsrfToken();
@@ -157,7 +173,7 @@ apiClient.interceptors.request.use(
                 config.headers['X-CSRF-Token'] = csrf;
             }
         }
-        
+
         return config;
     },
     (error) => {
@@ -172,34 +188,34 @@ apiClient.interceptors.response.use(
     },
     async (error) => {
         const originalRequest = error.config;
-        
+
         // Parse the error for structured handling
         const parsedError = parseApiError(error);
-        
+
         // Handle timeout errors
         // Requirements: 10.3
         if (isTimeoutError(error)) {
             showErrorNotification('Request Timeout', ERROR_MESSAGES.TIMEOUT_ERROR);
-            
+
             // Offer retry option if callback is set
             if (timeoutRetryCallback && originalRequest && !originalRequest._timeoutRetry) {
                 originalRequest._timeoutRetry = true;
                 const retryFn = () => apiClient(originalRequest);
                 timeoutRetryCallback(retryFn, originalRequest);
             }
-            
+
             // Attach parsed error info
             error.parsedError = parsedError;
             return Promise.reject(error);
         }
-        
+
         // Handle network errors (not timeout)
         if (isNetworkError(error) && !isTimeoutError(error)) {
             showErrorNotification('Connection Error', ERROR_MESSAGES.NETWORK_ERROR);
             error.parsedError = parsedError;
             return Promise.reject(error);
         }
-        
+
         // Handle 401 Unauthorized - Redirect to login
         // Requirements: 10.4
         // Skip redirect for login endpoint - it handles its own 401 errors (invalid credentials)
@@ -207,65 +223,46 @@ apiClient.interceptors.response.use(
             // Check if this is a token refresh failure
             if (originalRequest.url?.includes('/api/auth/refresh')) {
                 // Refresh failed, clear auth and redirect
-                localStorage.removeItem('user');
-                clearCsrfToken();
-                
-                // Show session expired notification
-                showErrorNotification('Session Expired', 'Your session has expired. Please log in again.');
-                
-                if (window.location.pathname.startsWith('/admin')) {
-                    window.location.href = '/admin/login?expired=true';
-                }
-                return Promise.reject(error);
+                return handleSessionExpired(error);
             }
-            
+
             // Try to refresh token automatically (refresh token in HttpOnly cookie)
             if (!originalRequest._retry) {
                 originalRequest._retry = true;
-                
+
                 try {
                     const response = await apiClient.post('/api/auth/refresh');
-                    
+
                     if (response.data.success) {
                         // Tokens refreshed in cookies, retry original request
                         return apiClient(originalRequest);
                     }
                 } catch (refreshError) {
-                    // Refresh failed, clear auth
-                    localStorage.removeItem('user');
-                    clearCsrfToken();
-                    
-                    // Show session expired notification
-                    showErrorNotification('Session Expired', 'Your session has expired. Please log in again.');
-                    
-                    if (window.location.pathname.startsWith('/admin')) {
-                        window.location.href = '/admin/login?expired=true';
+                    // Only logout if it's an auth error (401/403) indicating invalid refresh token
+                    // For network/timeout errors, keep the session (user can retry)
+                    if (refreshError.response?.status === 401 || refreshError.response?.status === 403) {
+                        // Refresh failed with auth error, clear auth and redirect
+                        return handleSessionExpired(refreshError);
                     }
+                    // For other errors (network, timeout), just reject so the app can handle it (e.g. show toast)
+                    // but stay logged in
                     return Promise.reject(refreshError);
                 }
             }
-            
+
             // No retry or retry failed
-            localStorage.removeItem('user');
-            clearCsrfToken();
-            
-            // Show session expired notification
-            showErrorNotification('Session Expired', 'Your session has expired. Please log in again.');
-            
-            if (window.location.pathname.startsWith('/admin')) {
-                window.location.href = '/admin/login?expired=true';
-            }
+            return handleSessionExpired(error);
         }
-        
+
         // Handle 403 Forbidden (API key or CSRF issues)
         if (error.response?.status === 403) {
             const message = error.response?.data?.message || '';
-            
+
             // If CSRF token is invalid, try to refresh it
             if (message.toLowerCase().includes('csrf') && !originalRequest._csrfRetry) {
                 originalRequest._csrfRetry = true;
                 clearCsrfToken();
-                
+
                 // Fetch new CSRF token and retry
                 const newCsrf = await fetchCsrfToken();
                 if (newCsrf) {
@@ -274,10 +271,10 @@ apiClient.interceptors.response.use(
                 }
             }
         }
-        
+
         // Attach parsed error info to the error object for consumers
         error.parsedError = parsedError;
-        
+
         return Promise.reject(error);
     }
 );

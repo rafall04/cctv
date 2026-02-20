@@ -2,8 +2,11 @@ import axios from 'axios';
 import { config } from '../config/config.js';
 import { query, queryOne } from '../database/connectionPool.js';
 
-const mediaMtxApiBaseUrl = 'http://localhost:9997/v3';
-
+// Centralized Axios instance for MediaMTX API to avoid repetition and enforce standard timeouts
+const mtxApi = axios.create({
+    baseURL: `${config.mediamtx?.apiUrl || 'http://localhost:9997'}/v3`,
+    timeout: 5000
+});
 class MediaMtxService {
     constructor() {
         this.isOnline = false;
@@ -25,7 +28,7 @@ class MediaMtxService {
 
         // Initial health check after 5 seconds
         setTimeout(() => this.healthCheck(), 5000);
-        
+
         console.log('[MediaMTX] Auto-sync enabled (health check every 30s)');
     }
 
@@ -46,7 +49,7 @@ class MediaMtxService {
     async healthCheck() {
         try {
             const status = await this.getStatus();
-            
+
             if (!status.online) {
                 // MediaMTX is offline
                 if (this.isOnline) {
@@ -72,12 +75,12 @@ class MediaMtxService {
             // Check if paths need re-sync (only if paths are completely missing)
             const configPaths = await this.getConfiguredPaths();
             const dbCameras = this.getDatabaseCameras();
-            
+
             // Count how many DB cameras have their path configured
-            const configuredCameraCount = dbCameras.filter(cam => 
+            const configuredCameraCount = dbCameras.filter(cam =>
                 configPaths.includes(cam.path_name)
             ).length;
-            
+
             // Only sync if NO cameras are configured (complete loss)
             // Don't sync if some cameras are missing - that's handled by camera CRUD operations
             if (dbCameras.length > 0 && configuredCameraCount === 0) {
@@ -98,7 +101,7 @@ class MediaMtxService {
      */
     async getConfiguredPaths() {
         try {
-            const response = await axios.get(`${mediaMtxApiBaseUrl}/config/paths/list`, { timeout: 5000 });
+            const response = await mtxApi.get('/config/paths/list');
             const items = response.data?.items || [];
             return items.map(item => item.name);
         } catch {
@@ -112,7 +115,7 @@ class MediaMtxService {
      */
     async getMediaMtxPaths() {
         try {
-            const response = await axios.get(`${mediaMtxApiBaseUrl}/paths/list`, { timeout: 5000 });
+            const response = await mtxApi.get('/paths/list');
             if (response.data && response.data.items) {
                 return response.data.items.map(item => item.name);
             }
@@ -172,7 +175,7 @@ class MediaMtxService {
      */
     async pathConfigExists(pathName) {
         try {
-            const response = await axios.get(`${mediaMtxApiBaseUrl}/config/paths/list`, { timeout: 5000 });
+            const response = await mtxApi.get('/config/paths/list');
             const items = response.data?.items || [];
             return items.some(item => item.name === pathName);
         } catch {
@@ -189,14 +192,14 @@ class MediaMtxService {
         try {
             // Check if path config exists using list endpoint (avoids error logs)
             const exists = await this.pathConfigExists(pathName);
-            
+
             if (exists) {
                 // Path exists, update it
-                await axios.patch(`${mediaMtxApiBaseUrl}/config/paths/patch/${pathName}`, pathConfig, { timeout: 5000 });
+                await mtxApi.patch(`/config/paths/patch/${pathName}`, pathConfig);
                 return { success: true, action: 'updated' };
             } else {
                 // Path doesn't exist, add it
-                await axios.post(`${mediaMtxApiBaseUrl}/config/paths/add/${pathName}`, pathConfig, { timeout: 5000 });
+                await mtxApi.post(`/config/paths/add/${pathName}`, pathConfig);
                 return { success: true, action: 'added' };
             }
         } catch (error) {
@@ -211,7 +214,7 @@ class MediaMtxService {
      */
     async removePath(pathName) {
         try {
-            await axios.delete(`${mediaMtxApiBaseUrl}/config/paths/delete/${pathName}`, { timeout: 5000 });
+            await mtxApi.delete(`/config/paths/delete/${pathName}`);
             return { success: true };
         } catch (error) {
             console.error(`[MediaMTX Service] Error removing path ${pathName}:`, error.message);
@@ -226,7 +229,7 @@ class MediaMtxService {
      */
     async getPathConfig(pathName) {
         try {
-            const response = await axios.get(`${mediaMtxApiBaseUrl}/config/paths/get/${pathName}`, { timeout: 5000 });
+            const response = await mtxApi.get(`/config/paths/get/${pathName}`);
             return response.data;
         } catch {
             return null;
@@ -270,7 +273,7 @@ class MediaMtxService {
         const configuredPathsSet = new Set(configuredPaths);
         let added = 0;
         let updated = 0;
-        
+
         for (const camera of dbCameras) {
             if (!camera.path_name || !camera.rtsp_url?.startsWith('rtsp://')) {
                 console.log(`[MediaMTX] Skipping camera ${camera.id}: invalid path_name or rtsp_url`);
@@ -287,13 +290,17 @@ class MediaMtxService {
 
             try {
                 if (!configuredPathsSet.has(camera.path_name)) {
-                    await axios.post(`${mediaMtxApiBaseUrl}/config/paths/add/${camera.path_name}`, pathConfig, { timeout: 5000 });
+                    await mtxApi.post(`/config/paths/add/${camera.path_name}`, pathConfig);
                     console.log(`[MediaMTX] Added path: ${camera.path_name}`);
                     added++;
-                } else if (forceUpdate) {
+                } else {
+                    // Always check for config drift (e.g. timeout changes)
                     const currentConfig = await this.getPathConfig(camera.path_name);
-                    if (currentConfig && currentConfig.source !== camera.rtsp_url) {
-                        await axios.patch(`${mediaMtxApiBaseUrl}/config/paths/patch/${camera.path_name}`, pathConfig, { timeout: 5000 });
+                    if (currentConfig && (
+                        currentConfig.source !== camera.rtsp_url ||
+                        currentConfig.sourceOnDemandStartTimeout !== pathConfig.sourceOnDemandStartTimeout
+                    )) {
+                        await mtxApi.patch(`/config/paths/patch/${camera.path_name}`, pathConfig);
                         console.log(`[MediaMTX] Updated path: ${camera.path_name}`);
                         updated++;
                     }
@@ -317,13 +324,13 @@ class MediaMtxService {
      */
     async updateCameraPath(streamKey, rtspUrl) {
         const pathName = streamKey;
-        
+
         // Validate inputs
         if (!streamKey) {
             console.error(`[MediaMTX] Missing stream key`);
             return { success: false, error: 'Missing stream key' };
         }
-        
+
         if (!rtspUrl || !rtspUrl.startsWith('rtsp://')) {
             console.error(`[MediaMTX] Invalid RTSP URL for ${pathName}: ${rtspUrl}`);
             return { success: false, error: 'Invalid RTSP URL' };
@@ -346,12 +353,12 @@ class MediaMtxService {
                     console.log(`[MediaMTX] Path ${pathName} already has correct source, skipping update`);
                     return { success: true, action: 'unchanged' };
                 }
-                
-                await axios.patch(`${mediaMtxApiBaseUrl}/config/paths/patch/${pathName}`, pathConfig, { timeout: 5000 });
+
+                await mtxApi.patch(`/config/paths/patch/${pathName}`, pathConfig);
                 console.log(`[MediaMTX] Updated path: ${pathName}`);
                 return { success: true, action: 'updated' };
             } else {
-                await axios.post(`${mediaMtxApiBaseUrl}/config/paths/add/${pathName}`, pathConfig, { timeout: 5000 });
+                await mtxApi.post(`/config/paths/add/${pathName}`, pathConfig);
                 console.log(`[MediaMTX] Added path: ${pathName}`);
                 return { success: true, action: 'added' };
             }
@@ -378,14 +385,14 @@ class MediaMtxService {
     async getStats(debug = false) {
         try {
             const [pathsRes, configRes] = await Promise.all([
-                axios.get(`${mediaMtxApiBaseUrl}/paths/list`, { timeout: 5000 }),
-                axios.get(`${mediaMtxApiBaseUrl}/config/global/get`, { timeout: 5000 }),
+                mtxApi.get('/paths/list'),
+                mtxApi.get('/config/global/get'),
             ]);
-            
+
             // Get sessions/readers count from paths data
             const paths = pathsRes.data?.items || [];
             const sessions = [];
-            
+
             // Filter function to exclude internal/preload readers
             // Real viewers have remoteAddr populated, internal muxers don't
             const isRealViewer = (reader) => {
@@ -397,15 +404,15 @@ class MediaMtxService {
                     }
                     return false;
                 }
-                
+
                 // Check remoteAddr if available - filter localhost
                 if (reader.remoteAddr) {
                     const addr = reader.remoteAddr.toLowerCase();
                     // Exclude localhost readers (these are from preload/warming service)
                     // Handle various formats: 127.0.0.1, localhost, ::1, ::ffff:127.0.0.1
                     if (
-                        addr.includes('127.0.0.1') || 
-                        addr.includes('localhost') || 
+                        addr.includes('127.0.0.1') ||
+                        addr.includes('localhost') ||
                         addr.startsWith('[::1]') ||
                         addr.includes('::1]') ||
                         addr === '::1' ||
@@ -417,12 +424,12 @@ class MediaMtxService {
                         return false;
                     }
                 }
-                
+
                 // Also check id field which may contain IP info in some MediaMTX versions
                 if (reader.id) {
                     const id = reader.id.toLowerCase();
                     if (
-                        id.includes('127.0.0.1') || 
+                        id.includes('127.0.0.1') ||
                         id.includes('localhost') ||
                         id.includes('::1')
                     ) {
@@ -432,10 +439,10 @@ class MediaMtxService {
                         return false;
                     }
                 }
-                
+
                 return true;
             };
-            
+
             // Process paths and filter readers
             const processedPaths = paths.map(path => {
                 const realReaders = (path.readers || []).filter(isRealViewer);
@@ -446,7 +453,7 @@ class MediaMtxService {
                     _filteredReaderCount: realReaders.length
                 };
             });
-            
+
             // Extract real readers from each path as sessions
             processedPaths.forEach(path => {
                 if (path.readers && path.readers.length > 0) {
@@ -459,7 +466,7 @@ class MediaMtxService {
                     });
                 }
             });
-            
+
             return {
                 paths: processedPaths,
                 sessions: sessions,
@@ -486,7 +493,7 @@ class MediaMtxService {
      */
     async getStatus() {
         try {
-            const response = await axios.get(`${mediaMtxApiBaseUrl}/config/global/get`, { timeout: 5000 });
+            const response = await mtxApi.get('/config/global/get');
             return {
                 online: true,
                 config: response.data

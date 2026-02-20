@@ -5,7 +5,7 @@ import { createErrorRecoveryHandler } from '../utils/errorRecovery';
 import { createVisibilityObserver } from '../utils/visibilityObserver';
 import { createOrientationObserver, getCurrentOrientation } from '../utils/orientationObserver';
 import { preloadHls } from '../utils/preloadManager';
-import { createLoadingTimeoutHandler } from '../utils/loadingTimeoutHandler';
+import { useStreamTimeout } from '../hooks/useStreamTimeout';
 import { LoadingStage, getStageMessage, createStreamError } from '../utils/streamLoaderTypes';
 import { createFallbackHandler } from '../utils/fallbackHandler';
 
@@ -24,14 +24,36 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
     const pauseTimeoutRef = useRef(null);
     const bufferSpinnerTimeoutRef = useRef(null);
     // New refs for stream loading fix
-    const loadingTimeoutHandlerRef = useRef(null);
     const fallbackHandlerRef = useRef(null);
     const abortControllerRef = useRef(null);
-    
+
     // Device capabilities - detected once on mount
     const [deviceTier, setDeviceTier] = useState('medium');
     const [deviceCapabilities, setDeviceCapabilities] = useState(null);
-    
+
+    // Stream Timeout Hook
+    const {
+        startTimeout,
+        clearTimeout: clearStreamTimeout,
+        updateStage: updateStreamStage,
+        resetFailures,
+        getConsecutiveFailures,
+    } = useStreamTimeout({
+        deviceTier: deviceTier,
+        onTimeout: (stage) => {
+            cleanupResources();
+            setStatus('timeout');
+            setLoadingStage(LoadingStage.TIMEOUT);
+            setError(`Loading timeout at ${stage} stage`);
+            setShowSpinner(false);
+            setConsecutiveFailures(getConsecutiveFailures());
+        },
+        onMaxFailures: (failures) => {
+            setShowTroubleshooting(true);
+            setConsecutiveFailures(failures);
+        }
+    });
+
     // Stream status - now using LoadingStage for progressive feedback
     const [status, setStatus] = useState('loading'); // loading, playing, paused, error, timeout
     const [loadingStage, setLoadingStage] = useState(LoadingStage.CONNECTING);
@@ -81,7 +103,7 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
             onOrientationChange: ({ orientation: newOrientation }) => {
                 // Update orientation state without reloading stream
                 setOrientation(newOrientation);
-                
+
                 // Reset zoom/pan on orientation change for better UX
                 if (zoom !== 1) {
                     setZoom(1);
@@ -131,42 +153,7 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
         };
     }, []);
 
-    // Initialize LoadingTimeoutHandler - **Validates: Requirements 1.1, 1.2, 1.3, 1.4, 5.3**
-    useEffect(() => {
-        if (!deviceCapabilities) return;
-
-        loadingTimeoutHandlerRef.current = createLoadingTimeoutHandler({
-            deviceTier: deviceCapabilities.tier,
-            onTimeout: (stage) => {
-                // Handle timeout - cleanup and show error
-                // **Validates: Requirements 1.2, 1.3, 7.1, 7.2, 7.3**
-                cleanupResources();
-                setStatus('timeout');
-                setLoadingStage(LoadingStage.TIMEOUT);
-                setError(`Loading timeout at ${stage} stage`);
-                setShowSpinner(false);
-                
-                // Track consecutive failures
-                const failures = loadingTimeoutHandlerRef.current?.getConsecutiveFailures() || 0;
-                setConsecutiveFailures(failures);
-            },
-            onMaxFailures: (failures) => {
-                // Show troubleshooting after 3 consecutive failures
-                // **Validates: Requirements 1.4**
-                setShowTroubleshooting(true);
-                setConsecutiveFailures(failures);
-            },
-        });
-
-        return () => {
-            if (loadingTimeoutHandlerRef.current) {
-                loadingTimeoutHandlerRef.current.destroy();
-                loadingTimeoutHandlerRef.current = null;
-            }
-        };
-    }, [deviceCapabilities]);
-
-    // Initialize FallbackHandler for auto-retry - **Validates: Requirements 6.1, 6.2, 6.3, 6.4, 6.5**
+    // Initialize error recovery handler
     useEffect(() => {
         fallbackHandlerRef.current = createFallbackHandler({
             maxAutoRetries: 3,
@@ -226,9 +213,7 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
         }
 
         // Clear loading timeout
-        if (loadingTimeoutHandlerRef.current) {
-            loadingTimeoutHandlerRef.current.clearTimeout();
-        }
+        clearStreamTimeout();
 
         // Clear fallback handler pending retry
         if (fallbackHandlerRef.current) {
@@ -268,7 +253,7 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
 
                 // Resume if was paused by visibility
                 if (isPausedByVisibility && videoRef.current && hlsRef.current) {
-                    videoRef.current.play().catch(() => {});
+                    videoRef.current.play().catch(() => { });
                     setIsPausedByVisibility(false);
                     setStatus('playing');
                     setLoadingStage(LoadingStage.PLAYING);
@@ -323,13 +308,11 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
         if (fallbackHandlerRef.current) {
             fallbackHandlerRef.current.reset();
         }
-        if (loadingTimeoutHandlerRef.current) {
-            loadingTimeoutHandlerRef.current.resetFailures();
-        }
+        resetFailures();
 
         // Cleanup and reinitialize
         cleanupResources();
-        
+
         // Force re-render to trigger initPlayer
         setDeviceCapabilities(prev => ({ ...prev }));
     }, [cleanupResources]);
@@ -353,22 +336,18 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
             setShowSpinner(true);
 
             // Start loading timeout - **Validates: Requirements 1.1, 5.3**
-            if (loadingTimeoutHandlerRef.current) {
-                loadingTimeoutHandlerRef.current.startTimeout(LoadingStage.CONNECTING);
-            }
+            startTimeout(LoadingStage.CONNECTING);
 
             try {
                 // Use preloaded HLS.js instead of direct import
                 // **Validates: Requirements 2.3**
                 const Hls = await preloadHls();
-                
+
                 if (isDestroyed) return;
 
                 // Update loading stage - **Validates: Requirements 4.1**
                 setLoadingStage(LoadingStage.LOADING);
-                if (loadingTimeoutHandlerRef.current) {
-                    loadingTimeoutHandlerRef.current.updateStage(LoadingStage.LOADING);
-                }
+                updateStreamStage(LoadingStage.LOADING);
 
                 // Get device-adaptive HLS configuration
                 // **Property 2: Device-based HLS Configuration**
@@ -387,46 +366,40 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
 
                     hls.on(Hls.Events.MANIFEST_PARSED, () => {
                         if (isDestroyed) return;
-                        
+
                         // Update to buffering stage - **Validates: Requirements 4.3**
                         setLoadingStage(LoadingStage.BUFFERING);
-                        if (loadingTimeoutHandlerRef.current) {
-                            loadingTimeoutHandlerRef.current.updateStage(LoadingStage.BUFFERING);
-                        }
+                        updateStreamStage(LoadingStage.BUFFERING);
                     });
 
                     hls.on(Hls.Events.FRAG_BUFFERED, () => {
                         if (isDestroyed) return;
-                        
+
                         // Update to starting stage - **Validates: Requirements 4.4**
                         if (loadingStage === LoadingStage.BUFFERING) {
                             setLoadingStage(LoadingStage.STARTING);
-                            if (loadingTimeoutHandlerRef.current) {
-                                loadingTimeoutHandlerRef.current.updateStage(LoadingStage.STARTING);
-                            }
-                            
+                            updateStreamStage(LoadingStage.STARTING);
+
                             // Attempt playback
                             video.play().then(() => {
                                 if (isDestroyed) return;
-                                
+
                                 setStatus('playing');
                                 setLoadingStage(LoadingStage.PLAYING);
                                 setRetryCount(0);
                                 setAutoRetryCount(0);
                                 setShowSpinner(false);
                                 setConsecutiveFailures(0);
-                                
+
                                 // Clear timeout on success
-                                if (loadingTimeoutHandlerRef.current) {
-                                    loadingTimeoutHandlerRef.current.clearTimeout();
-                                    loadingTimeoutHandlerRef.current.resetFailures();
-                                }
-                                
+                                clearStreamTimeout();
+                                resetFailures();
+
                                 // Reset fallback handler on success
                                 if (fallbackHandlerRef.current) {
                                     fallbackHandlerRef.current.reset();
                                 }
-                                
+
                                 if (errorRecoveryRef.current) {
                                     errorRecoveryRef.current.reset();
                                 }
@@ -450,12 +423,10 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
 
                         if (data.fatal) {
                             // Clear loading timeout
-                            if (loadingTimeoutHandlerRef.current) {
-                                loadingTimeoutHandlerRef.current.clearTimeout();
-                            }
+                            clearStreamTimeout();
 
                             const errorType = data.type === Hls.ErrorTypes.NETWORK_ERROR ? 'network' :
-                                              data.type === Hls.ErrorTypes.MEDIA_ERROR ? 'media' : 'unknown';
+                                data.type === Hls.ErrorTypes.MEDIA_ERROR ? 'media' : 'unknown';
 
                             // Create stream error for diagnostic
                             const streamError = createStreamError({
@@ -491,7 +462,7 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                                     await errorRecoveryRef.current.handleError(hls, {
                                         fatal: true,
                                         type: data.type === Hls.ErrorTypes.NETWORK_ERROR ? 'networkError' :
-                                              data.type === Hls.ErrorTypes.MEDIA_ERROR ? 'mediaError' : 'fatalError',
+                                            data.type === Hls.ErrorTypes.MEDIA_ERROR ? 'mediaError' : 'fatalError',
                                     });
                                 } else {
                                     setStatus('error');
@@ -506,7 +477,7 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                 } else if (video.canPlayType('application/vnd.apple.mpegurl') && streams.hls) {
                     // Native HLS support (Safari)
                     video.src = streams.hls;
-                    
+
                     video.addEventListener('loadedmetadata', () => {
                         if (isDestroyed) return;
                         setLoadingStage(LoadingStage.BUFFERING);
@@ -515,17 +486,15 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                     video.addEventListener('canplay', () => {
                         if (isDestroyed) return;
                         setLoadingStage(LoadingStage.STARTING);
-                        
+
                         video.play().then(() => {
                             if (isDestroyed) return;
                             setStatus('playing');
                             setLoadingStage(LoadingStage.PLAYING);
                             setShowSpinner(false);
-                            
-                            if (loadingTimeoutHandlerRef.current) {
-                                loadingTimeoutHandlerRef.current.clearTimeout();
-                                loadingTimeoutHandlerRef.current.resetFailures();
-                            }
+
+                            clearStreamTimeout();
+                            resetFailures();
                         }).catch((err) => {
                             if (isDestroyed) return;
                             console.error('Play error:', err);
@@ -834,14 +803,14 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                         }`}>
                         <div className={`w-1.5 h-1.5 rounded-full ${status === 'playing' ? `bg-green-500 ${!disableAnimations ? 'animate-pulse' : ''}` :
                             status === 'loading' ? `bg-yellow-500 ${!disableAnimations ? 'animate-bounce' : ''}` :
-                            status === 'paused' ? 'bg-blue-500' : 
-                            status === 'timeout' ? 'bg-orange-500' : 'bg-red-500'
+                                status === 'paused' ? 'bg-blue-500' :
+                                    status === 'timeout' ? 'bg-orange-500' : 'bg-red-500'
                             }`} />
                         <span className="text-[10px] font-bold tracking-wider uppercase">
-                            {status === 'playing' ? 'LIVE' : 
-                             status === 'loading' ? 'CONNECTING' : 
-                             status === 'paused' ? 'PAUSED' : 
-                             status === 'timeout' ? 'TIMEOUT' : 'OFFLINE'}
+                            {status === 'playing' ? 'LIVE' :
+                                status === 'loading' ? 'CONNECTING' :
+                                    status === 'paused' ? 'PAUSED' :
+                                        status === 'timeout' ? 'TIMEOUT' : 'OFFLINE'}
                         </span>
                     </div>
                 </div>
@@ -961,7 +930,7 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                         </div>
                         <p className="text-orange-400 font-bold text-sm mb-1">Loading Timeout</p>
                         <p className="text-dark-400 text-xs mb-4 line-clamp-2">{error}</p>
-                        
+
                         {/* Troubleshooting suggestion after 3 failures - **Validates: Requirements 1.4** */}
                         {showTroubleshooting && (
                             <div className="bg-dark-800/50 rounded-lg p-3 mb-4 text-left">
@@ -973,12 +942,12 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                                 </ul>
                             </div>
                         )}
-                        
+
                         {/* Diagnostic info - **Validates: Requirements 8.1, 8.2, 8.3** */}
                         <div className="text-dark-500 text-[9px] mb-3">
                             Device: {deviceTier} | Failures: {consecutiveFailures}
                         </div>
-                        
+
                         <button
                             onClick={handleRetry}
                             className="w-full py-2 px-4 bg-orange-600 hover:bg-orange-700 text-white text-xs font-medium rounded-lg transition-colors"
@@ -1001,19 +970,19 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                         </div>
                         <p className="text-red-400 font-bold text-sm mb-1">Signal Lost</p>
                         <p className="text-dark-400 text-xs mb-4 line-clamp-2">{error}</p>
-                        
+
                         {/* Auto-retry status */}
                         {isAutoRetrying && (
                             <p className="text-yellow-400 text-[10px] mb-3">
                                 Auto-retry {autoRetryCount}/3 in {Math.ceil(retryDelay / 1000)}s...
                             </p>
                         )}
-                        
+
                         {/* Diagnostic info - **Validates: Requirements 8.1, 8.2, 8.3** */}
                         <div className="text-dark-500 text-[9px] mb-3">
                             Stage: {loadingStage} | Device: {deviceTier}
                         </div>
-                        
+
                         {!isAutoRetrying && (
                             <button
                                 onClick={handleRetry}
