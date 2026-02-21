@@ -277,6 +277,9 @@ function LandingPageContent() {
                     CamerasSection={LandingCamerasSection}
                     layoutMode={layoutMode}
                     onLayoutToggle={toggleLayoutMode}
+                    favorites={favorites}
+                    onToggleFavorite={toggleFavorite}
+                    isFavorite={isFavorite}
                 />
 
                 <MultiViewButton

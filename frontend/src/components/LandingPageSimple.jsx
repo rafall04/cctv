@@ -120,6 +120,9 @@ export default function LandingPageSimple({
     CamerasSection,
     layoutMode,
     onLayoutToggle,
+    favorites,
+    onToggleFavorite,
+    isFavorite,
 }) {
     const { branding } = useBranding();
     const { cameras, areas, loading } = useCameras();
@@ -142,6 +145,9 @@ export default function LandingPageSimple({
                         multiCameras={multiCameras}
                         viewMode={viewMode}
                         setViewMode={setViewMode}
+                        favorites={favorites}
+                        onToggleFavorite={onToggleFavorite}
+                        isFavorite={isFavorite}
                     />
                 )}
             </main>
