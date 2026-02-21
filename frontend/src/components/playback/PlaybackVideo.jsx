@@ -157,6 +157,7 @@ export default function PlaybackVideo({
                     playsInline
                     preload="metadata"
                     crossOrigin="anonymous"
+                    muted
                 />
                 
                 {(isBuffering || isSeeking) && !videoError && (

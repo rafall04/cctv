@@ -14,7 +14,7 @@ const MAX_SEEK_DISTANCE = 180;
 function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, onBackToLive }) {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
-    const cameraIdFromUrl = searchParams.get('camera');
+    const cameraIdFromUrl = searchParams.get('cam');
     const { branding } = useBranding();
     
     const [cameras, setCameras] = useState(propCameras || []);
@@ -333,7 +333,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, on
                 setSelectedSegment(nextSegment);
                 const timestamp = new Date(nextSegment.start_time).getTime();
                 setSearchParams({ 
-                    camera: selectedCameraRef.current?.id.toString(), 
+                    cam: selectedCameraRef.current?.id.toString(), 
                     t: timestamp.toString() 
                 }, { replace: false });
             } else {
@@ -431,7 +431,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, on
     const handleSegmentClick = (segment) => {
         const timestamp = new Date(segment.start_time).getTime();
         setSearchParams({ 
-            camera: selectedCamera?.id.toString(), 
+            cam: selectedCamera?.id.toString(), 
             t: timestamp.toString() 
         }, { replace: false });
         setSelectedSegment(segment);
@@ -598,7 +598,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, on
         if (camera) {
             const timestamp = selectedSegment ? new Date(selectedSegment.start_time).getTime().toString() : '';
             setSearchParams({ 
-                camera: camera.id.toString(),
+                cam: camera.id.toString(),
                 t: timestamp || '' 
             }, { replace: false });
         }
@@ -608,7 +608,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, on
     const handleShare = useCallback(async () => {
         const baseUrl = `${window.location.origin}/playback`;
         const params = new URLSearchParams();
-        if (selectedCamera?.id) params.set('camera', selectedCamera.id.toString());
+        if (selectedCamera?.id) params.set('cam', selectedCamera.id.toString());
         if (selectedSegment?.start_time) {
             const timestamp = new Date(selectedSegment.start_time).getTime();
             params.set('t', timestamp.toString());
