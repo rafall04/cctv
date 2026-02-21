@@ -1,9 +1,16 @@
+const DEBUG_MODE = true;
+function log(...args) {
+    if (DEBUG_MODE) console.log('[PlaybackSegmentList]', ...args);
+}
+
 export default function PlaybackSegmentList({
     segments,
     selectedSegment,
     onSegmentClick,
     formatTimestamp,
 }) {
+    log('📋 Render', { segmentsCount: segments.length, segmentIds: segments.map(s => s.id), selectedSegmentId: selectedSegment?.id });
+    
     const formatFileSize = (bytes) => {
         if (bytes === 0) return '0 B';
         const k = 1024;

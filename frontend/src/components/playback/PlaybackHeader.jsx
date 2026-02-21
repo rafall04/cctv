@@ -1,5 +1,10 @@
 import CodecBadge from '../CodecBadge';
 
+const DEBUG_MODE = true;
+function log(...args) {
+    if (DEBUG_MODE) console.log('[PlaybackHeader]', ...args);
+}
+
 export default function PlaybackHeader({
     cameras,
     selectedCamera,
@@ -7,6 +12,12 @@ export default function PlaybackHeader({
     autoPlayEnabled,
     onAutoPlayToggle,
 }) {
+    log('🎬 Render', { 
+        camerasCount: cameras.length, 
+        cameraIds: cameras.map(c => c.id),
+        selectedCameraId: selectedCamera?.id 
+    });
+    
     return (
         <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-6 shadow-lg space-y-3 sm:space-y-4">
             <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Playback Recording</h1>

@@ -11,6 +11,26 @@ import PlaybackSegmentList from '../components/playback/PlaybackSegmentList';
 
 const MAX_SEEK_DISTANCE = 180;
 
+const DEBUG_MODE = true;
+
+function log(...args) {
+    if (DEBUG_MODE) {
+        console.log('[Playback]', ...args);
+    }
+}
+
+function warn(...args) {
+    if (DEBUG_MODE) {
+        console.warn('[Playback]', ...args);
+    }
+}
+
+function error(...args) {
+    if (DEBUG_MODE) {
+        console.error('[Playback]', ...args);
+    }
+}
+
 function Playback() {
     const [searchParams, setSearchParams] = useSearchParams();
     const cameraIdFromUrl = searchParams.get('camera');
@@ -43,6 +63,11 @@ function Playback() {
     const lastSeekTimeRef = useRef(0);
     const bufferingTimeoutRef = useRef(null);
     
+    // Debug: Render counter
+    const renderCountRef = useRef(0);
+    renderCountRef.current++;
+    log(`🔄 Render #${renderCountRef.current}`, { cameraIdFromUrl, camerasCount: cameras.length, selectedCameraId: selectedCamera?.id, segmentsCount: segments.length, selectedSegmentId: selectedSegment?.id });
+    
     // Refs to avoid stale closures in event handlers
     const selectedSegmentRef = useRef(selectedSegment);
     const segmentsRef = useRef(segments);
@@ -66,6 +91,8 @@ function Playback() {
         selectedCameraRef.current = selectedCamera;
     }, [selectedCamera]);
 
+    log('📊 State before effects:', { cameras: cameras.map(c => c.id), selectedCamera: selectedCamera?.id, segments: segments.map(s => s.id) });
+
     const handleAutoPlayToggle = useCallback(() => {
         const newValue = !autoPlayEnabled;
         setAutoPlayEnabled(newValue);
@@ -85,7 +112,9 @@ function Playback() {
 
     const isInitialMountRef = useRef(true);
 
+    // Fetch cameras effect
     useEffect(() => {
+        log('🎥 useEffect: fetchCameras', { cameraIdFromUrl });
         const fetchCameras = async () => {
             try {
                 const response = await cameraService.getActiveCameras();
@@ -94,17 +123,32 @@ function Playback() {
                     const uniqueCameras = recordingCameras.filter((cam, index, self) => 
                         index === self.findIndex(c => c.id === cam.id)
                     );
+                    log('📷 Cameras fetched:', { total: response.data.length, recording: recordingCameras.length, unique: uniqueCameras.length, ids: uniqueCameras.map(c => c.id) });
+                    
+                    // Check for duplicates
+                    const ids = uniqueCameras.map(c => c.id);
+                    const duplicates = ids.filter((id, idx) => ids.indexOf(id) !== idx);
+                    if (duplicates.length > 0) {
+                        warn('⚠️ Duplicate camera IDs found:', duplicates);
+                    }
+                    
                     setCameras(uniqueCameras);
                     
                     if (cameraIdFromUrl) {
                         const camera = uniqueCameras.find(c => c.id === parseInt(cameraIdFromUrl));
-                        if (camera) setSelectedCamera(camera);
+                        if (camera) {
+                            log('🎯 Camera from URL:', camera.id, camera.name);
+                            setSelectedCamera(camera);
+                        } else {
+                            warn('⚠️ Camera not found for ID:', cameraIdFromUrl);
+                        }
                     } else if (uniqueCameras.length > 0) {
+                        log('🎯 Auto-select first camera:', uniqueCameras[0].id);
                         setSelectedCamera(uniqueCameras[0]);
                     }
                 }
             } catch (error) {
-                console.error('Failed to fetch cameras:', error);
+                error('❌ Failed to fetch cameras:', error);
             } finally {
                 setLoading(false);
             }
@@ -113,18 +157,27 @@ function Playback() {
         fetchCameras();
     }, []);
 
+    // URL camera change effect
     useEffect(() => {
+        log('🔗 useEffect: URL change', { cameraIdFromUrl, camerasLength: cameras.length, selectedCameraId: selectedCamera?.id });
         if (!isInitialMountRef.current && cameraIdFromUrl && cameras.length > 0) {
             const camera = cameras.find(c => c.id === parseInt(cameraIdFromUrl));
             if (camera && camera.id !== selectedCamera?.id) {
+                log('🔄 Changing camera due to URL:', camera.id);
                 setSelectedCamera(camera);
             }
         }
         isInitialMountRef.current = false;
     }, [cameraIdFromUrl, cameras, selectedCamera]);
 
+    // Fetch segments effect
     useEffect(() => {
-        if (!selectedCamera) return;
+        if (!selectedCamera) {
+            log('⏭️ Skipping segments fetch - no camera selected');
+            return;
+        }
+
+        log('📼 useEffect: fetchSegments', { cameraId: selectedCamera.id, cameraName: selectedCamera.name });
 
         setSelectedSegment(null);
         setSegments([]);
@@ -141,18 +194,37 @@ function Playback() {
 
         const fetchSegments = async () => {
             try {
+                log('📡 Calling getSegments API:', selectedCamera.id);
                 const response = await recordingService.getSegments(selectedCamera.id);
                 if (response.success && response.data) {
                     const segmentsArray = response.data.segments || [];
+                    log('📹 Segments received:', { count: segmentsArray.length, ids: segmentsArray.map(s => s.id) });
+                    
+                    // Check for duplicates
+                    const ids = segmentsArray.map(s => s.id);
+                    const duplicates = ids.filter((id, idx) => ids.indexOf(id) !== idx);
+                    if (duplicates.length > 0) {
+                        warn('⚠️ Duplicate segment IDs found:', duplicates);
+                    }
+                    
+                    // Check for undefined/null IDs
+                    const undefinedIds = segmentsArray.filter(s => s.id === undefined || s.id === null);
+                    if (undefinedIds.length > 0) {
+                        warn('⚠️ Segments with undefined IDs:', undefinedIds.length);
+                    }
+                    
                     setSegments(segmentsArray);
                     
                     if (segmentsArray.length > 0 && isInitialLoadRef.current) {
+                        log('▶️ Auto-select first segment:', segmentsArray[0].id);
                         setSelectedSegment(segmentsArray[0]);
                         isInitialLoadRef.current = false;
                     }
+                } else {
+                    warn('⚠️ API response not successful:', response);
                 }
             } catch (error) {
-                console.error('Failed to fetch segments:', error);
+                error('❌ Failed to fetch segments:', error);
                 setSegments([]);
                 setSelectedSegment(null);
             }
