@@ -124,6 +124,11 @@ frontend/src/
 │   │   ├── LandingCamerasSection.jsx
 │   │   ├── LandingFilterDropdown.jsx
 │   │   └── LandingStatsBar.jsx
+│   │   └── playback/           # Playback page components
+│   │       ├── PlaybackHeader.jsx
+│   │       ├── PlaybackVideo.jsx
+│   │       ├── PlaybackTimeline.jsx
+│   │       └── PlaybackSegmentList.jsx
 │   ├── admin/                 # Admin-specific components
 │   │   ├── CameraCard.jsx
 │   │   ├── StatsWidget.jsx
@@ -138,6 +143,9 @@ frontend/src/
 │           └── MapView.jsx
 ├── contexts/                  # React Context (global state)
 ├── hooks/                     # Custom hooks
+│   ├── useCameraHistory.js   # Favorites & recent cameras (localStorage)
+│   ├── useCameraStatusTracker.js
+│   └── ...
 ├── services/                  # API services
 ├── utils/                     # Utility functions
 └── config/                   # Configuration
@@ -146,16 +154,13 @@ frontend/src/
 ### Current Issues to Fix
 
 1. **Pages yang perlu dipecah** (>500 baris):
-   - `Playback.jsx` (1607 baris) - pecah ke video components
-   - `ViewerAnalytics.jsx` (1146 baris) - pecah ke charts/widgets
-   - `CameraManagement.jsx` (900 baris) - gunakan pattern CRUD
-   - `Dashboard.jsx` (837 baris) - pecah ke widgets
+   - `ViewerAnalytics.jsx` - pecah ke charts/widgets
+   - `CameraManagement.jsx` - gunakan pattern CRUD
+   - `Dashboard.jsx` - pecah ke widgets
 
 2. **Components yang perlu dipindahkan**:
    - `components/LandingPageSimple.jsx` → `components/landing/`
    - `components/AdminLayout.jsx` → `layouts/`
-   - `components/QuickStatsCards.jsx` → `components/admin/`
-   - `components/TopCamerasWidget.jsx` → `components/admin/`
    - `components/settings/*` → `components/admin/settings/`
 
 ---
@@ -401,6 +406,176 @@ export function useCRUD(endpoint) {
   return { data, loading, error, fetchAll, create, update, remove };
 }
 ```
+
+---
+
+## React Hooks Best Practices & Race Condition Prevention
+
+### Critical Rules for React Hooks
+
+1. **ALWAYS place ALL hooks (useState, useEffect, useCallback, useRef) BEFORE any conditional returns**
+   - React Error #310 occurs when hooks are called inconsistently between renders
+   - Example of WRONG code:
+   ```javascript
+   function Component() {
+       const [value, setValue] = useState(0);
+       
+       if (value === 0) {
+           return <div>Zero</div>; // WRONG - hooks called after conditional return
+       }
+       
+       useEffect(() => { ... }, [value]); // This will cause Error #310
+       return <div>{value}</div>;
+   }
+   ```
+
+2. **Use `useRef` to avoid stale closures in async operations**
+   ```javascript
+   function Component() {
+       const [data, setData] = useState(null);
+       const dataRef = useRef(null);
+       
+       useEffect(() => {
+           dataRef.current = data;
+       }, [data]);
+       
+       const handleAsync = async () => {
+           // Use dataRef.current instead of data to avoid stale closure
+           const currentData = dataRef.current;
+       };
+   }
+   ```
+
+### Mode Switching (LandingPage View Modes)
+
+When switching between view modes (map/grid/playback), follow these patterns:
+
+1. **Use separate route params for different modes**
+   - Live stream: `/?camera=1` (map/grid mode)
+   - Playback: `/?cam=1&t=timestamp` (playback mode)
+   - DON'T use same param (`camera`) for both - it causes popup to open unexpectedly
+
+2. **Check current mode before updating URL**
+   ```javascript
+   useEffect(() => {
+       if (viewMode === 'playback') return; // Don't run in playback mode
+       // ... handle camera URL param
+   }, [cameras, searchParams, viewMode]);
+   ```
+
+3. **Always add cleanup in useEffect for async operations**
+   ```javascript
+   useEffect(() => {
+       let isMounted = true;
+       
+       fetchData().then(result => {
+           if (isMounted) {
+               setData(result);
+           }
+       });
+       
+       return () => { isMounted = false; };
+   }, [dependency]);
+   ```
+
+### URL Parameter Best Practices
+
+1. **Use distinct parameter names for different features**
+   - Don't reuse `camera` param for both live stream and playback
+   - Use `cam` for playback, `camera` for live stream
+
+2. **Parse URL params in correct order**
+   ```javascript
+   // First: parse camera from URL
+   const cameraIdFromUrl = searchParams.get('cam');
+   
+   // Second: fetch data based on camera
+   useEffect(() => {
+       if (cameraIdFromUrl) {
+           fetchSegments(cameraIdFromUrl);
+       }
+   }, [cameraIdFromUrl]);
+   
+   // Third: select segment from URL after data loads
+   useEffect(() => {
+       if (segments.length > 0) {
+           const segmentId = searchParams.get('t');
+           // find and select segment
+       }
+   }, [segments, searchParams]);
+   ```
+
+3. **Avoid race condition between URL update and state selection**
+   - Update URL FIRST, then set state
+   ```javascript
+   const handleSegmentClick = (segment) => {
+       // Update URL first
+       setSearchParams({ cam: cameraId, t: timestamp }, { replace: false });
+       // Then update state
+       setSelectedSegment(segment);
+   };
+   ```
+
+### Share Link Best Practices
+
+1. **Use stable identifiers (timestamps) instead of IDs**
+   - Segment IDs can change when new segments are created
+   - Use `start_time` timestamp as stable identifier
+   - URL: `?cam=1&t=1708483200` (timestamp) instead of `?cam=1&segment=5`
+
+2. **Handle missing data gracefully**
+   ```javascript
+   const targetSegment = segments.find(s => 
+       s.start_time <= targetTime && s.end_time >= targetTime
+   );
+   if (!targetSegment) {
+       // Fallback to closest segment
+       const closest = findClosestSegment(targetTime);
+       setSelectedSegment(closest);
+   }
+   ```
+
+### Performance Optimizations
+
+1. **Extract clock/time updates to separate component**
+   ```javascript
+   function ClockDisplay() {
+       const timeRef = useRef(null);
+       
+       useEffect(() => {
+           const updateTime = () => {
+               if (timeRef.current) {
+                   timeRef.current.textContent = new Date().toLocaleTimeString();
+               }
+           };
+           updateTime();
+           const interval = setInterval(updateTime, 1000);
+           return () => clearInterval(interval);
+       }, []);
+       
+       return <span ref={timeRef} />;
+   }
+   ```
+
+2. **Use `useMemo` for filtered/computed lists**
+   ```javascript
+   const filteredCameras = useMemo(() => {
+       return cameras.filter(c => c.is_tunnel === 1);
+   }, [cameras]);
+   ```
+
+3. **Memoize components that re-render frequently**
+   ```javascript
+   const Hero = memo(function Hero({ title }) {
+       return <h1>{title}</h1>;
+   });
+   ```
+
+4. **Lazy load heavy components**
+   ```javascript
+   const MapView = lazy(() => import('../MapView'));
+   const Playback = lazy(() => import('../../pages/Playback'));
+   ```
 
 ---
 
