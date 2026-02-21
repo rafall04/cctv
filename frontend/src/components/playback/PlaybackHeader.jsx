@@ -1,26 +1,30 @@
 import CodecBadge from '../CodecBadge';
 
-const DEBUG_MODE = true;
-function log(...args) {
-    if (DEBUG_MODE) console.log('[PlaybackHeader]', ...args);
-}
-
 export default function PlaybackHeader({
     cameras,
     selectedCamera,
     onCameraChange,
     autoPlayEnabled,
     onAutoPlayToggle,
+    onShare,
 }) {
-    log('🎬 Render', { 
-        camerasCount: cameras.length, 
-        cameraIds: cameras.map(c => c.id),
-        selectedCameraId: selectedCamera?.id 
-    });
-    
     return (
         <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-6 shadow-lg space-y-3 sm:space-y-4">
-            <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Playback Recording</h1>
+            <div className="flex items-center justify-between">
+                <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Playback Recording</h1>
+                {onShare && (
+                    <button
+                        onClick={onShare}
+                        className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                        title="Bagikan tautan playback"
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                        </svg>
+                        <span className="hidden sm:inline">Bagikan</span>
+                    </button>
+                )}
+            </div>
             
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
