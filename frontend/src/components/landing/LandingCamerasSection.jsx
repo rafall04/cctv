@@ -25,9 +25,9 @@ export default function CamerasSection({
     const searchInputRef = useRef(null);
     const searchContainerRef = useRef(null);
 
-    const tunnelCameras = cameras.filter(c => c.is_tunnel === 1);
-    const stableCameras = cameras.filter(c => c.is_tunnel !== 1);
-    const hasTunnelCameras = tunnelCameras.length > 0;
+    const tunnelCameras = useMemo(() => cameras.filter(c => c.is_tunnel === 1), [cameras]);
+    const stableCameras = useMemo(() => cameras.filter(c => c.is_tunnel !== 1), [cameras]);
+    const hasTunnelCameras = useMemo(() => tunnelCameras.length > 0, [tunnelCameras]);
 
     const searchFilteredCameras = useMemo(() => {
         if (!searchQuery.trim()) return cameras;

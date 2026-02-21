@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, memo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { getPublicSaweriaConfig } from '../services/saweriaService';
 import { useBranding } from '../contexts/BrandingContext';
@@ -337,7 +337,7 @@ function LandingPageContent() {
     );
 }
 
-function Hero({ branding, landingSettings, disableHeavyEffects, onCameraClick }) {
+const Hero = memo(function Hero({ branding, landingSettings, disableHeavyEffects, onCameraClick }) {
     return (
         <>
             <header className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-transparent to-purple-500/10 dark:from-primary/5 dark:to-purple-500/5">
@@ -422,7 +422,7 @@ function Hero({ branding, landingSettings, disableHeavyEffects, onCameraClick })
             </header>
         </>
     );
-}
+});
 
 export default function LandingPage() {
     return (
