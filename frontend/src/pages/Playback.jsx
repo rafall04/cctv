@@ -42,6 +42,24 @@ function Playback() {
     const isInitialLoadRef = useRef(true);
     const lastSeekTimeRef = useRef(0);
     const bufferingTimeoutRef = useRef(null);
+    
+    // Refs to avoid stale closures in event handlers
+    const selectedSegmentRef = useRef(selectedSegment);
+    const segmentsRef = useRef(segments);
+    const autoPlayEnabledRef = useRef(autoPlayEnabled);
+    
+    // Keep refs in sync
+    useEffect(() => {
+        selectedSegmentRef.current = selectedSegment;
+    }, [selectedSegment]);
+    
+    useEffect(() => {
+        segmentsRef.current = segments;
+    }, [segments]);
+    
+    useEffect(() => {
+        autoPlayEnabledRef.current = autoPlayEnabled;
+    }, [autoPlayEnabled]);
 
     const handleAutoPlayToggle = useCallback(() => {
         const newValue = !autoPlayEnabled;
@@ -221,21 +239,24 @@ function Playback() {
         const handleLoadedMetadata = () => setDuration(video.duration);
         
         const handleEnded = () => {
-            if (!autoPlayEnabled) {
+            if (!autoPlayEnabledRef.current) {
                 setAutoPlayNotification({ type: 'stopped', message: 'Video selesai - Auto-play dinonaktifkan' });
                 setTimeout(() => setAutoPlayNotification(null), 5000);
                 return;
             }
             
-            if (!selectedSegment || segments.length === 0) return;
+            const currentSegment = selectedSegmentRef.current;
+            const currentSegments = segmentsRef.current;
             
-            const currentIndex = segments.findIndex(s => s.id === selectedSegment.id);
+            if (!currentSegment || currentSegments.length === 0) return;
+            
+            const currentIndex = currentSegments.findIndex(s => s.id === currentSegment.id);
             if (currentIndex === -1) return;
             
-            const nextSegment = segments[currentIndex - 1];
+            const nextSegment = currentSegments[currentIndex - 1];
             
             if (nextSegment) {
-                const currentEnd = new Date(selectedSegment.end_time);
+                const currentEnd = new Date(currentSegment.end_time);
                 const nextStart = new Date(nextSegment.start_time);
                 const gapSeconds = (nextStart - currentEnd) / 1000;
                 
@@ -331,7 +352,7 @@ function Playback() {
                 clearTimeout(bufferingTimeoutRef.current);
             }
         };
-    }, [selectedSegment, autoPlayEnabled, segments]);
+    }, []);
 
     const handleSpeedChange = (speed) => {
         setPlaybackSpeed(speed);
