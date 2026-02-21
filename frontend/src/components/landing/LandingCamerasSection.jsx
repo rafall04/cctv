@@ -339,7 +339,6 @@ export default function CamerasSection({
                         <Playback 
                             cameras={cameras.filter(c => c.enable_recording)}
                             selectedCamera={selectedCamera}
-                            onBackToLive={() => setViewMode('map')}
                         />
                     </Suspense>
                 ) : viewMode === 'map' ? (

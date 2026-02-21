@@ -7,26 +7,11 @@ export default function PlaybackHeader({
     autoPlayEnabled,
     onAutoPlayToggle,
     onShare,
-    onBackToLive,
 }) {
     return (
         <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-6 shadow-lg space-y-3 sm:space-y-4">
             <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    {onBackToLive && (
-                        <button
-                            onClick={onBackToLive}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                            title="Kembali ke Live Stream"
-                        >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                            </svg>
-                            <span className="hidden sm:inline">Live</span>
-                        </button>
-                    )}
-                    <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Playback Recording</h1>
-                </div>
+                <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Playback Recording</h1>
                 {onShare && (
                     <button
                         onClick={onShare}
