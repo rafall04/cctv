@@ -82,6 +82,84 @@ npm test -- CameraManagement.test.jsx -t "test name"
 
 ---
 
+## Project Structure
+
+### Frontend Structure (Target)
+
+```
+frontend/src/
+├── pages/
+│   ├── public/
+│   │   ├── LandingPage.jsx
+│   │   └── LoginPage.jsx
+│   ├── admin/
+│   │   ├── Dashboard.jsx
+│   │   ├── CameraManagement.jsx
+│   │   ├── AreaManagement.jsx
+│   │   ├── UserManagement.jsx
+│   │   └── Playback.jsx
+│   └── settings/
+│       └── UnifiedSettings.jsx
+├── components/
+│   ├── ui/                    # Base UI components (Button, Input, Modal)
+│   │   ├── Alert.jsx
+│   │   ├── Button.jsx
+│   │   ├── EmptyState.jsx
+│   │   ├── ErrorBoundary.jsx
+│   │   ├── FormField.jsx
+│   │   ├── Icons.jsx
+│   │   ├── Skeleton.jsx
+│   │   ├── ThemeSwitcher.jsx
+│   │   └── Toast.jsx
+│   ├── common/                # Reusable business components
+│   │   ├── DataTable.jsx     # CRUD tables with sorting/filtering
+│   │   ├── SearchBar.jsx
+│   │   ├── FilterBar.jsx
+│   │   └── ConfirmDialog.jsx
+│   ├── landing/               # Landing page components
+│   │   ├── LandingNavbar.jsx
+│   │   ├── LandingFooter.jsx
+│   │   ├── LandingHero.jsx
+│   │   ├── LandingCameraCard.jsx
+│   │   ├── LandingCamerasSection.jsx
+│   │   ├── LandingFilterDropdown.jsx
+│   │   └── LandingStatsBar.jsx
+│   ├── admin/                 # Admin-specific components
+│   │   ├── CameraCard.jsx
+│   │   ├── StatsWidget.jsx
+│   │   └── ...
+│   └── features/              # Feature-based components
+│       ├── video/
+│       │   ├── VideoPlayer.jsx
+│       │   ├── VideoPopup.jsx
+│       │   ├── ZoomableVideo.jsx
+│       │   └── MultiView/
+│       └── maps/
+│           └── MapView.jsx
+├── contexts/                  # React Context (global state)
+├── hooks/                     # Custom hooks
+├── services/                  # API services
+├── utils/                     # Utility functions
+└── config/                   # Configuration
+```
+
+### Current Issues to Fix
+
+1. **Pages yang perlu dipecah** (>500 baris):
+   - `Playback.jsx` (1607 baris) - pecah ke video components
+   - `ViewerAnalytics.jsx` (1146 baris) - pecah ke charts/widgets
+   - `CameraManagement.jsx` (900 baris) - gunakan pattern CRUD
+   - `Dashboard.jsx` (837 baris) - pecah ke widgets
+
+2. **Components yang perlu dipindahkan**:
+   - `components/LandingPageSimple.jsx` → `components/landing/`
+   - `components/AdminLayout.jsx` → `layouts/`
+   - `components/QuickStatsCards.jsx` → `components/admin/`
+   - `components/TopCamerasWidget.jsx` → `components/admin/`
+   - `components/settings/*` → `components/admin/settings/`
+
+---
+
 ## Code Style Guidelines
 
 ### General Principles
@@ -305,6 +383,24 @@ logCameraCreated(userId, cameraId, cameraName, request);
 ### File Paths
 - Use path.resolve for file operations
 - Store paths relative to project root
+
+### CRUD Pattern for Admin Pages
+Use consistent pattern for admin CRUD pages:
+```javascript
+// hooks/useCRUD.js - create reusable hook
+export function useCRUD(endpoint) {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const fetchAll = async () => { /* ... */ };
+  const create = async (item) => { /* ... */ };
+  const update = async (id, item) => { /* ... */ };
+  const remove = async (id) => { /* ... */ };
+
+  return { data, loading, error, fetchAll, create, update, remove };
+}
+```
 
 ---
 
