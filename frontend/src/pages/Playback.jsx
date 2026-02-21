@@ -83,6 +83,8 @@ function Playback() {
         }, 3000);
     }, [autoPlayEnabled]);
 
+    const isInitialMountRef = useRef(true);
+
     useEffect(() => {
         const fetchCameras = async () => {
             try {
@@ -106,7 +108,17 @@ function Playback() {
         };
 
         fetchCameras();
-    }, [cameraIdFromUrl]);
+    }, []);
+
+    useEffect(() => {
+        if (!isInitialMountRef.current && cameraIdFromUrl && cameras.length > 0) {
+            const camera = cameras.find(c => c.id === parseInt(cameraIdFromUrl));
+            if (camera && camera.id !== selectedCamera?.id) {
+                setSelectedCamera(camera);
+            }
+        }
+        isInitialMountRef.current = false;
+    }, [cameraIdFromUrl, cameras, selectedCamera]);
 
     useEffect(() => {
         if (!selectedCamera) return;
