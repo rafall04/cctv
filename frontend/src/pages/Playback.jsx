@@ -48,11 +48,6 @@ function Playback() {
     const segmentsRef = useRef(segments);
     const autoPlayEnabledRef = useRef(autoPlayEnabled);
     const selectedCameraRef = useRef(selectedCamera);
-    const searchParamsRef = useRef(searchParams);
-    
-    useEffect(() => {
-        searchParamsRef.current = searchParams;
-    }, [searchParams]);
     
     // Keep refs in sync
     useEffect(() => {
@@ -133,6 +128,19 @@ function Playback() {
         isInitialMountRef.current = false;
     }, [cameraIdFromUrl, cameras, selectedCamera]);
 
+    // Effect to select segment from URL when segments are loaded
+    useEffect(() => {
+        if (segments.length === 0) return;
+        
+        const segmentIdFromUrl = searchParams.get('segment');
+        if (segmentIdFromUrl && !selectedSegment) {
+            const segmentFromUrl = segments.find(s => s.id === parseInt(segmentIdFromUrl));
+            if (segmentFromUrl) {
+                setSelectedSegment(segmentFromUrl);
+            }
+        }
+    }, [segments, selectedSegment, searchParams]);
+
     // Fetch segments effect
     useEffect(() => {
         if (!selectedCamera) {
@@ -141,7 +149,6 @@ function Playback() {
 
         setSelectedSegment(null);
         setSegments([]);
-        isInitialLoadRef.current = true;
         setIsSeeking(false);
         setIsBuffering(false);
         setSeekWarning(null);
@@ -157,23 +164,7 @@ function Playback() {
                 const response = await recordingService.getSegments(selectedCamera.id);
                 if (response.success && response.data) {
                     const segmentsArray = response.data.segments || [];
-                    
                     setSegments(segmentsArray);
-                    
-                    if (segmentsArray.length > 0 && isInitialLoadRef.current) {
-                        const segmentIdFromUrl = searchParamsRef.current.get('segment');
-                        if (segmentIdFromUrl) {
-                            const segmentFromUrl = segmentsArray.find(s => s.id === parseInt(segmentIdFromUrl));
-                            if (segmentFromUrl) {
-                                setSelectedSegment(segmentFromUrl);
-                            } else {
-                                setSelectedSegment(segmentsArray[0]);
-                            }
-                        } else {
-                            setSelectedSegment(segmentsArray[0]);
-                        }
-                        isInitialLoadRef.current = false;
-                    }
                 } else {
                     console.warn('API response not successful:', response);
                 }
@@ -191,7 +182,6 @@ function Playback() {
             clearInterval(interval);
             setSegments([]);
             setSelectedSegment(null);
-            isInitialLoadRef.current = true;
         };
     }, [selectedCamera]);
 

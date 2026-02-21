@@ -1,10 +1,5 @@
 import { useRef } from 'react';
 
-const DEBUG_MODE = true;
-function log(...args) {
-    if (DEBUG_MODE) console.log('[PlaybackTimeline]', ...args);
-}
-
 export default function PlaybackTimeline({
     segments,
     selectedSegment,
@@ -12,8 +7,6 @@ export default function PlaybackTimeline({
     onTimelineClick,
     formatTimestamp,
 }) {
-    log('⏱️ Render', { segmentsCount: segments.length, segmentIds: segments.map(s => s.id), selectedSegmentId: selectedSegment?.id });
-    
     const timelineRef = useRef(null);
 
     const getTimelineData = () => {
@@ -22,12 +15,6 @@ export default function PlaybackTimeline({
         const sortedSegments = [...segments].sort((a, b) => 
             new Date(a.start_time) - new Date(b.start_time)
         );
-        
-        log('🗂️ Sorted segments:', { 
-            originalLength: segments.length, 
-            sortedLength: sortedSegments.length,
-            sortedIds: sortedSegments.map(s => s.id)
-        });
 
         const start = new Date(sortedSegments[0].start_time);
         const end = new Date(sortedSegments[sortedSegments.length - 1].end_time);

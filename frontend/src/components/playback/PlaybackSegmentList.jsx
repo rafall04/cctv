@@ -1,22 +1,31 @@
-const DEBUG_MODE = true;
-function log(...args) {
-    if (DEBUG_MODE) console.log('[PlaybackSegmentList]', ...args);
-}
-
 export default function PlaybackSegmentList({
     segments,
     selectedSegment,
     onSegmentClick,
     formatTimestamp,
 }) {
-    log('📋 Render', { segmentsCount: segments.length, segmentIds: segments.map(s => s.id), selectedSegmentId: selectedSegment?.id });
-    
     const formatFileSize = (bytes) => {
         if (bytes === 0) return '0 B';
         const k = 1024;
         const sizes = ['B', 'KB', 'MB', 'GB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+    };
+
+    const formatSegmentDate = (timestamp) => {
+        return new Date(timestamp).toLocaleDateString('id-ID', {
+            weekday: 'short',
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric'
+        });
+    };
+
+    const formatSegmentTime = (timestamp) => {
+        return new Date(timestamp).toLocaleTimeString('id-ID', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
     };
 
     return (
@@ -56,7 +65,10 @@ export default function PlaybackSegmentList({
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <div className="font-medium text-sm sm:text-base text-gray-900 dark:text-white truncate">
-                                                    {formatTimestamp(segment.start_time)} - {formatTimestamp(segment.end_time)}
+                                                    {formatSegmentDate(segment.start_time)}
+                                                </div>
+                                                <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                                                    {formatSegmentTime(segment.start_time)} - {formatSegmentTime(segment.end_time)}
                                                 </div>
                                                 {!isLikelyCompatible && (
                                                     <span className="px-1.5 sm:px-2 py-0.5 text-xs bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 rounded flex-shrink-0">
@@ -64,8 +76,8 @@ export default function PlaybackSegmentList({
                                                     </span>
                                                 )}
                                             </div>
-                                            <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">
-                                                Duration: {Math.round(segment.duration / 60)} min • Size: {formatFileSize(segment.file_size)}
+                                            <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-500 truncate">
+                                                Durasi: {Math.round(segment.duration / 60)} menit • Size: {formatFileSize(segment.file_size)}
                                             </div>
                                         </div>
                                     </div>
