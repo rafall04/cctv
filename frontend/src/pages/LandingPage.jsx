@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, memo } from 'react';
+import { useEffect, useState, useCallback, useRef, memo, lazy, Suspense, startTransition } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { getPublicSaweriaConfig } from '../services/saweriaService';
 import { useBranding } from '../contexts/BrandingContext';
@@ -21,11 +21,10 @@ import LandingPageSimple from '../components/LandingPageSimple';
 import MultiViewButton from '../components/MultiView/MultiViewButton';
 import MultiViewLayout from '../components/MultiView/MultiViewLayout';
 import VideoPopup from '../components/MultiView/VideoPopup';
-import { lazy, Suspense } from 'react';
+import SaweriaLeaderboard from '../components/SaweriaLeaderboard';
 
 const FeedbackWidget = lazy(() => import('../components/FeedbackWidget'));
 const SaweriaSupport = lazy(() => import('../components/SaweriaSupport'));
-import SaweriaLeaderboard from '../components/SaweriaLeaderboard';
 
 function LandingPageContent() {
     const { branding } = useBranding();
@@ -69,8 +68,13 @@ function LandingPageContent() {
 
     const toggleLayoutMode = useCallback(() => {
         const newMode = layoutMode === 'full' ? 'simple' : 'full';
-        setLayoutMode(newMode);
-        setSearchParams({ mode: newMode }, { replace: true });
+        
+        // Use startTransition to avoid Suspense hydration errors
+        startTransition(() => {
+            setLayoutMode(newMode);
+            setSearchParams({ mode: newMode }, { replace: true });
+        });
+        
         try {
             localStorage.setItem('landing_layout_mode', newMode);
         } catch (err) {
@@ -263,7 +267,7 @@ function LandingPageContent() {
 
     if (layoutMode === 'simple') {
         return (
-            <>
+            <div key="simple-mode">
                 <LandingPageSimple
                     onCameraClick={handleCameraClick}
                     onAddMulti={handleAddMulti}
@@ -290,12 +294,12 @@ function LandingPageContent() {
                         onClose={() => setShowMulti(false)}
                     />
                 )}
-            </>
+            </div>
         );
     }
 
     return (
-        <>
+        <div key="full-mode">
             <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
                 <LandingNavbar branding={branding} layoutMode={layoutMode} onLayoutToggle={toggleLayoutMode} />
 
@@ -346,10 +350,14 @@ function LandingPageContent() {
                     />
                 )}
 
-                <FeedbackWidget />
-                <SaweriaSupport />
+                <Suspense fallback={null}>
+                    <FeedbackWidget />
+                </Suspense>
+                <Suspense fallback={null}>
+                    <SaweriaSupport />
+                </Suspense>
             </div>
-        </>
+        </div>
     );
 }
 
