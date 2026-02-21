@@ -8,6 +8,7 @@ import { getApiUrl } from '../config/config.js';
 import { useCameras, CameraProvider } from '../contexts/CameraContext';
 import { ToastProvider, useToast } from '../contexts/ToastContext';
 import { useCameraStatusTracker } from '../hooks/useCameraStatusTracker';
+import { useCameraHistory } from '../hooks/useCameraHistory';
 import { Icons } from '../components/ui/Icons';
 
 import LandingNavbar from '../components/landing/LandingNavbar';
@@ -222,6 +223,7 @@ function LandingPageContent() {
     }, [addToast]);
 
     useCameraStatusTracker(cameras, addToast);
+    const { favorites, recentCameras, toggleFavorite, isFavorite, addRecentCamera } = useCameraHistory();
 
     const disableHeavyEffects = deviceTier === 'low';
 
@@ -245,10 +247,11 @@ function LandingPageContent() {
     // Handle camera selection and update URL
     const handleCameraClick = useCallback((camera) => {
         setPopup(camera);
+        addRecentCamera(camera);
         // Update URL for shareable links
         const currentMode = searchParams.get('mode') || layoutMode;
         setSearchParams({ camera: camera.id.toString(), mode: currentMode }, { replace: false });
-    }, [searchParams, layoutMode, setSearchParams]);
+    }, [searchParams, layoutMode, setSearchParams, addRecentCamera]);
 
     // Handle popup close - reset URL to remove camera param
     const handlePopupClose = useCallback(() => {
@@ -311,6 +314,9 @@ function LandingPageContent() {
                     setViewMode={setViewMode}
                     landingSettings={landingSettings}
                     selectedCamera={popup}
+                    favorites={favorites}
+                    onToggleFavorite={toggleFavorite}
+                    isFavorite={isFavorite}
                 />
 
                 {saweriaEnabled && saweriaLeaderboardLink && (
