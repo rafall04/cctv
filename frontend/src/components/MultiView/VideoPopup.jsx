@@ -32,7 +32,6 @@ function VideoPopup({ camera, onClose }) {
         if (document.fullscreenElement) {
             try {
                 await document.exitFullscreen?.();
-                // Wait for fullscreen transition to complete
                 await new Promise(resolve => setTimeout(resolve, 100));
             } catch (error) {
                 console.error('Error exiting fullscreen:', error);
@@ -40,6 +39,35 @@ function VideoPopup({ camera, onClose }) {
         }
         onClose();
     };
+
+    // Share camera URL
+    const handleShare = useCallback(async () => {
+        const url = `${window.location.origin}/?camera=${camera.id}`;
+        
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: `${camera.name} - Live CCTV`,
+                    text: `Lihat live streaming CCTV ${camera.name}`,
+                    url: url
+                });
+                return;
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    console.log('Share cancelled or failed:', err);
+                }
+            }
+        }
+        
+        // Fallback: Copy to clipboard
+        try {
+            await navigator.clipboard.writeText(url);
+            alert('Link kamera berhasil disalin!\n\n' + url);
+        } catch (err) {
+            console.error('Failed to copy:', err);
+            prompt('Salin link ini:', url);
+        }
+    }, [camera]);
 
     // Check camera status first
     const isMaintenance = camera.status === 'maintenance';
@@ -623,6 +651,15 @@ function VideoPopup({ camera, onClose }) {
                             </div>
                             {/* Status badges */}
                             <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                    onClick={handleShare}
+                                    className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg"
+                                    title="Bagikan link kamera"
+                                >
+                                    <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                                    </svg>
+                                </button>
                                 {isMaintenance ? (
                                     <span className="px-1.5 py-0.5 rounded bg-red-500 text-white text-[10px] font-bold">Perbaikan</span>
                                 ) : isOffline ? (
@@ -699,6 +736,15 @@ function VideoPopup({ camera, onClose }) {
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={handleShare}
+                                            className="p-2 hover:bg-gray-700/50 dark:hover:bg-white/20 rounded-xl text-white"
+                                            title="Bagikan link kamera"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                                            </svg>
+                                        </button>
                                         {status === 'live' && <button onClick={takeSnapshot} className="p-2 hover:bg-gray-700/50 dark:hover:bg-white/20 active:bg-gray-700/70 dark:active:bg-white/30 rounded-xl text-gray-900 dark:text-white bg-gray-200/80 dark:bg-white/10"><Icons.Image /></button>}
                                         <button onClick={toggleFS} className="p-2 hover:bg-gray-700/50 dark:hover:bg-white/20 active:bg-gray-700/70 dark:active:bg-white/30 rounded-xl text-gray-900 dark:text-white bg-gray-200/80 dark:bg-white/10">
                                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
