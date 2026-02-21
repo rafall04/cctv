@@ -101,11 +101,6 @@ function LandingPageContent() {
 
     useEffect(() => {
         let isMounted = true;
-        const timeoutId = setTimeout(() => {
-            if (isMounted) {
-                setServerStatus('offline');
-            }
-        }, 3000);
 
         const checkServerConnectivity = async () => {
             try {
@@ -131,7 +126,6 @@ function LandingPageContent() {
                 const result = await testMediaMTXConnection(apiUrl);
 
                 if (isMounted) {
-                    clearTimeout(timeoutId);
                     if (result.reachable) {
                         setServerStatus('online');
                         setServerLatency(result.latency);
@@ -141,7 +135,6 @@ function LandingPageContent() {
                 }
             } catch (err) {
                 if (isMounted) {
-                    clearTimeout(timeoutId);
                     setServerStatus('offline');
                 }
             }
@@ -151,7 +144,6 @@ function LandingPageContent() {
 
         return () => {
             isMounted = false;
-            clearTimeout(timeoutId);
         };
     }, []);
 
