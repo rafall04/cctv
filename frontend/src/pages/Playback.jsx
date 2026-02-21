@@ -94,7 +94,6 @@ function Playback() {
         setIsSeeking(false);
         setIsBuffering(false);
         setSeekWarning(null);
-        setSeekProgress(null);
         setAutoPlayNotification(null);
         lastSeekTimeRef.current = 0;
         if (bufferingTimeoutRef.current) {
