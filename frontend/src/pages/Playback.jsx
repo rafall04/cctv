@@ -47,6 +47,7 @@ function Playback() {
     const selectedSegmentRef = useRef(selectedSegment);
     const segmentsRef = useRef(segments);
     const autoPlayEnabledRef = useRef(autoPlayEnabled);
+    const selectedCameraRef = useRef(selectedCamera);
     
     // Keep refs in sync
     useEffect(() => {
@@ -60,6 +61,10 @@ function Playback() {
     useEffect(() => {
         autoPlayEnabledRef.current = autoPlayEnabled;
     }, [autoPlayEnabled]);
+    
+    useEffect(() => {
+        selectedCameraRef.current = selectedCamera;
+    }, [selectedCamera]);
 
     const handleAutoPlayToggle = useCallback(() => {
         const newValue = !autoPlayEnabled;
@@ -196,12 +201,7 @@ function Playback() {
                 }
             });
 
-        const handleLoadedMetadataForSpeed = () => {
-            video.playbackRate = playbackSpeed;
-        };
-        
-        video.addEventListener('loadedmetadata', handleLoadedMetadataForSpeed);
-        
+        // Remove the handler here since we have a separate useEffect for playback speed
         const playTimeout = setTimeout(() => {
             if (video.readyState >= 2) {
                 const playPromise = video.play();
@@ -218,7 +218,6 @@ function Playback() {
         return () => {
             abortController.abort();
             clearTimeout(playTimeout);
-            video.removeEventListener('loadedmetadata', handleLoadedMetadataForSpeed);
             video.pause();
             video.removeAttribute('src');
             video.load();
@@ -416,6 +415,8 @@ function Playback() {
             return;
         }
 
+        const cameraName = selectedCameraRef.current?.name || 'camera';
+        
         try {
             const video = videoRef.current;
             const canvas = document.createElement('canvas');
@@ -466,13 +467,13 @@ function Playback() {
                     return;
                 }
 
-                const filename = `${selectedCamera?.name || 'camera'}-${Date.now()}.png`;
+                const filename = `${cameraName}-${Date.now()}.png`;
 
                 if (navigator.share && navigator.canShare) {
                     try {
                         const file = new File([blob], filename, { type: 'image/png' });
                         if (navigator.canShare({ files: [file] })) {
-                            await navigator.share({ files: [file], title: `Snapshot - ${selectedCamera?.name || 'Camera'}` });
+                            await navigator.share({ files: [file], title: `Snapshot - ${cameraName}` });
                             setSnapshotNotification({ type: 'success', message: 'Snapshot berhasil dibagikan!' });
                             setTimeout(() => setSnapshotNotification(null), 3000);
                             return;
