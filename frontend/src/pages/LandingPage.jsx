@@ -238,10 +238,13 @@ function LandingPageContent() {
         setSearchParams({ camera: camera.id.toString(), mode: currentMode }, { replace: false });
     }, [searchParams, layoutMode, setSearchParams]);
 
-    // Handle popup close - optionally keep camera in URL or remove it
+    // Handle popup close - reset URL to remove camera param
     const handlePopupClose = useCallback(() => {
         setPopup(null);
-    }, []);
+        // Reset URL by removing camera param but keep mode
+        const currentMode = searchParams.get('mode') || layoutMode;
+        setSearchParams({ mode: currentMode }, { replace: false });
+    }, [searchParams, layoutMode, setSearchParams]);
 
     if (layoutMode === 'simple') {
         return (
@@ -264,7 +267,7 @@ function LandingPageContent() {
                     maxStreams={maxStreams}
                 />
 
-                {popup && <VideoPopup camera={popup} onClose={() => setPopup(null)} />}
+                {popup && <VideoPopup camera={popup} onClose={handlePopupClose} />}
                 {showMulti && multiCameras.length > 0 && (
                     <MultiViewLayout
                         cameras={multiCameras}
@@ -315,7 +318,7 @@ function LandingPageContent() {
                     maxStreams={maxStreams}
                 />
 
-                {popup && <VideoPopup camera={popup} onClose={() => setPopup(null)} />}
+                {popup && <VideoPopup camera={popup} onClose={handlePopupClose} />}
                 {showMulti && multiCameras.length > 0 && (
                     <MultiViewLayout
                         cameras={multiCameras}
