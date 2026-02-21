@@ -91,13 +91,16 @@ function Playback() {
                 const response = await cameraService.getActiveCameras();
                 if (response.success) {
                     const recordingCameras = response.data.filter(cam => cam.enable_recording);
-                    setCameras(recordingCameras);
+                    const uniqueCameras = recordingCameras.filter((cam, index, self) => 
+                        index === self.findIndex(c => c.id === cam.id)
+                    );
+                    setCameras(uniqueCameras);
                     
                     if (cameraIdFromUrl) {
-                        const camera = recordingCameras.find(c => c.id === parseInt(cameraIdFromUrl));
+                        const camera = uniqueCameras.find(c => c.id === parseInt(cameraIdFromUrl));
                         if (camera) setSelectedCamera(camera);
-                    } else if (recordingCameras.length > 0) {
-                        setSelectedCamera(recordingCameras[0]);
+                    } else if (uniqueCameras.length > 0) {
+                        setSelectedCamera(uniqueCameras[0]);
                     }
                 }
             } catch (error) {

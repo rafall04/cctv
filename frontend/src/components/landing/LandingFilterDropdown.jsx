@@ -112,12 +112,12 @@ export default function FilterDropdown({ selected, onChange, kecamatans = [], ke
                             </span>
                         </button>
 
-                        {filterType === 'area' && areas.map(area => {
+                        {filterType === 'area' && areas.map((area, idx) => {
                             const count = getCameraCount('area', area.id);
                             const isSelected = selected?.type === 'area' && selected?.value === area.id;
                             return (
                                 <button
-                                    key={area.id}
+                                    key={area.id ?? `area-${idx}`}
                                     onClick={() => handleSelect('area', area.id)}
                                     className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center justify-between transition-colors ${isSelected ? 'bg-sky-50 dark:bg-primary/10 text-primary-600 dark:text-primary-400 font-medium' : 'text-gray-700 dark:text-gray-200'}`}
                                 >
@@ -139,12 +139,12 @@ export default function FilterDropdown({ selected, onChange, kecamatans = [], ke
                             );
                         })}
 
-                        {filterType === 'kecamatan' && kecamatans.map(kec => {
+                        {filterType === 'kecamatan' && kecamatans.map((kec, idx) => {
                             const count = getCameraCount('kecamatan', kec);
                             const isSelected = selected?.type === 'kecamatan' && selected?.value === kec;
                             return (
                                 <button
-                                    key={kec}
+                                    key={kec ?? `kec-${idx}`}
                                     onClick={() => handleSelect('kecamatan', kec)}
                                     className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center justify-between transition-colors ${isSelected ? 'bg-sky-50 dark:bg-primary/10 text-primary-600 dark:text-primary-400 font-medium' : 'text-gray-700 dark:text-gray-200'}`}
                                 >
@@ -159,13 +159,13 @@ export default function FilterDropdown({ selected, onChange, kecamatans = [], ke
                             );
                         })}
 
-                        {filterType === 'kelurahan' && kelurahans.map(kel => {
+                        {filterType === 'kelurahan' && kelurahans.map((kel, idx) => {
                             const count = getCameraCount('kelurahan', kel);
                             const isSelected = selected?.type === 'kelurahan' && selected?.value === kel;
                             const kec = cameras.find(c => c.kelurahan === kel)?.kecamatan || areas.find(a => a.kelurahan === kel)?.kecamatan;
                             return (
                                 <button
-                                    key={kel}
+                                    key={kel ?? `kel-${idx}`}
                                     onClick={() => handleSelect('kelurahan', kel)}
                                     className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center justify-between transition-colors ${isSelected ? 'bg-sky-50 dark:bg-primary/10 text-primary-600 dark:text-primary-400 font-medium' : 'text-gray-700 dark:text-gray-200'}`}
                                 >

@@ -23,8 +23,8 @@ export default function PlaybackHeader({
                     }}
                     className="flex-1 px-4 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 >
-                    {cameras.map(camera => (
-                        <option key={camera.id} value={camera.id}>
+                    {cameras.map((camera, idx) => (
+                        <option key={camera.id ?? `cam-${idx}`} value={camera.id}>
                             {camera.name} - {camera.location || 'No location'}
                         </option>
                     ))}

@@ -160,7 +160,7 @@ export default function CamerasSection({
                                         {searchFilteredCameras.length} kamera ditemukan • Klik untuk {viewMode === 'map' ? 'lihat di peta' : 'putar video'}
                                     </span>
                                 </div>
-                                {searchFilteredCameras.map((camera) => {
+                                {searchFilteredCameras.map((camera, idx) => {
                                     const isMaintenance = camera.status === 'maintenance';
                                     const isTunnel = camera.is_tunnel === 1;
                                     const hasCoords = camera.latitude && camera.longitude;
@@ -168,7 +168,7 @@ export default function CamerasSection({
 
                                     return (
                                         <button
-                                            key={camera.id}
+                                            key={camera.id ?? `search-${idx}`}
                                             onClick={() => handleCameraSelect(camera)}
                                             disabled={isDisabled}
                                             className={`w-full px-4 py-3 flex items-center gap-3 text-left transition-colors border-b border-gray-100 dark:border-gray-700/50 last:border-b-0 ${!isDisabled
@@ -353,9 +353,9 @@ export default function CamerasSection({
                     </Suspense>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                        {filteredForGrid.map(camera => (
+                        {filteredForGrid.map((camera, idx) => (
                             <CameraCard
-                                key={camera.id}
+                                key={camera.id ?? `grid-${idx}`}
                                 camera={camera}
                                 onClick={() => onCameraClick(camera)}
                                 onAddMulti={() => onAddMulti(camera)}
