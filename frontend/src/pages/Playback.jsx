@@ -11,14 +11,14 @@ import PlaybackSegmentList from '../components/playback/PlaybackSegmentList';
 
 const MAX_SEEK_DISTANCE = 180;
 
-function Playback() {
+function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, onBackToLive }) {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const cameraIdFromUrl = searchParams.get('camera');
     const { branding } = useBranding();
     
-    const [cameras, setCameras] = useState([]);
-    const [selectedCamera, setSelectedCamera] = useState(null);
+    const [cameras, setCameras] = useState(propCameras || []);
+    const [selectedCamera, setSelectedCamera] = useState(propSelectedCamera || null);
     const [segments, setSegments] = useState([]);
     const [selectedSegment, setSelectedSegment] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -86,8 +86,20 @@ function Playback() {
 
     const isInitialMountRef = useRef(true);
 
-    // Fetch cameras effect
+    // Fetch cameras effect - only if no propCameras provided
     useEffect(() => {
+        if (propCameras && propCameras.length > 0) {
+            setCameras(propCameras);
+            if (propSelectedCamera) {
+                setSelectedCamera(propSelectedCamera);
+            } else if (cameraIdFromUrl) {
+                const camera = propCameras.find(c => c.id === parseInt(cameraIdFromUrl));
+                if (camera) setSelectedCamera(camera);
+            }
+            setLoading(false);
+            return;
+        }
+
         const fetchCameras = async () => {
             try {
                 const response = await cameraService.getActiveCameras();
@@ -117,6 +129,13 @@ function Playback() {
 
         fetchCameras();
     }, []);
+
+    // Sync selectedCamera from props when it changes
+    useEffect(() => {
+        if (propSelectedCamera) {
+            setSelectedCamera(propSelectedCamera);
+        }
+    }, [propSelectedCamera]);
 
     // URL camera change effect
     useEffect(() => {
@@ -625,13 +644,15 @@ function Playback() {
     }, [selectedCamera, selectedSegment]);
 
     // Handle back to live stream
-    const handleBackToLive = useCallback(() => {
-        if (selectedCamera) {
+    const handleBackToLiveClick = useCallback(() => {
+        if (onBackToLive) {
+            onBackToLive();
+        } else if (selectedCamera) {
             navigate(`/?camera=${selectedCamera.id}`);
         } else {
             navigate('/');
         }
-    }, [navigate, selectedCamera]);
+    }, [navigate, selectedCamera, onBackToLive]);
 
     if (loading) {
         return (
@@ -675,7 +696,7 @@ function Playback() {
                     autoPlayEnabled={autoPlayEnabled}
                     onAutoPlayToggle={handleAutoPlayToggle}
                     onShare={handleShare}
-                    onBackToLive={handleBackToLive}
+                    onBackToLive={handleBackToLiveClick}
                 />
 
                 <PlaybackVideo

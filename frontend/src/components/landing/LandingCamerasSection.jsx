@@ -1,5 +1,4 @@
 import { useState, useCallback, useRef, useMemo, lazy, Suspense } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useCameras } from '../../contexts/CameraContext';
 import { Icons } from '../ui/Icons';
 import { GridSkeleton, CameraCardSkeleton } from '../ui/Skeleton';
@@ -18,7 +17,6 @@ export default function CamerasSection({
     landingSettings = { section_title: 'CCTV Publik' },
     selectedCamera
 }) {
-    const navigate = useNavigate();
     const { cameras, areas, loading } = useCameras();
     const [connectionTab, setConnectionTab] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
@@ -111,14 +109,11 @@ export default function CamerasSection({
                                 <Icons.Grid />
                             </button>
                             <button
-                                onClick={() => {
-                                    if (selectedCamera) {
-                                        navigate(`/playback?camera=${selectedCamera.id}`);
-                                    } else {
-                                        navigate('/playback');
-                                    }
-                                }}
-                                className="p-2.5 rounded-lg transition-colors text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                                onClick={() => setViewMode('playback')}
+                                className={`p-2.5 rounded-lg transition-colors ${viewMode === 'playback'
+                                    ? 'bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm'
+                                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                                    }`}
                                 title="Playback Rekaman"
                             >
                                 <Icons.Clock />
@@ -341,7 +336,11 @@ export default function CamerasSection({
                             <div className="w-6 h-6 border-2 border-gray-300 border-t-primary rounded-full animate-spin" />
                         </div>
                     }>
-                        <Playback />
+                        <Playback 
+                            cameras={cameras.filter(c => c.enable_recording)}
+                            selectedCamera={selectedCamera}
+                            onBackToLive={() => setViewMode('map')}
+                        />
                     </Suspense>
                 ) : viewMode === 'map' ? (
                     <Suspense fallback={
