@@ -1,10 +1,12 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { areaService } from '../services/areaService';
 import { settingsService } from '../services/settingsService';
 import { useNotification } from '../contexts/NotificationContext';
 import { StatCardSkeleton, CameraCardSkeleton, NoAreasEmptyState, Alert } from '../components/ui';
-import LocationPicker from '../components/LocationPicker';
+
+// Lazy load LocationPicker to avoid conflicts with CameraManagement
+const LocationPicker = lazy(() => import('../components/LocationPicker'));
 
 export default function AreaManagement() {
     const [areas, setAreas] = useState([]);
@@ -380,7 +382,9 @@ export default function AreaManagement() {
                             {/* Koordinat dengan LocationPicker */}
                             <div className="pt-4 border-t border-gray-200 dark:border-gray-700/50">
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Koordinat Area (untuk Map View)</label>
-                                <LocationPicker latitude={formData.latitude} longitude={formData.longitude} onLocationChange={handleLocationChange} />
+                                <Suspense fallback={<div className="text-sm text-gray-500">Loading map...</div>}>
+                                    <LocationPicker latitude={formData.latitude} longitude={formData.longitude} onLocationChange={handleLocationChange} />
+                                </Suspense>
                                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">Koordinat digunakan untuk memindahkan peta saat filter area dipilih</p>
                             </div>
 
@@ -433,11 +437,13 @@ export default function AreaManagement() {
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Pilih Titik Tengah</label>
-                                <LocationPicker 
-                                    latitude={mapCenter.latitude} 
-                                    longitude={mapCenter.longitude} 
-                                    onLocationChange={handleMapCenterChange}
-                                />
+                                <Suspense fallback={<div className="text-sm text-gray-500">Loading map...</div>}>
+                                    <LocationPicker 
+                                        latitude={mapCenter.latitude} 
+                                        longitude={mapCenter.longitude} 
+                                        onLocationChange={handleMapCenterChange}
+                                    />
+                                </Suspense>
                             </div>
 
                             <div className="flex gap-3 pt-2">

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { SecurityProvider } from './contexts/SecurityContext';
@@ -8,18 +9,20 @@ import { ApiClientInitializer } from './components/ApiClientInitializer';
 import ErrorBoundary, { InlineErrorBoundary } from './components/ui/ErrorBoundary';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
-import CameraManagement from './pages/CameraManagement';
-import AreaManagement from './pages/AreaManagement';
-import UserManagement from './pages/UserManagement';
-import FeedbackManagement from './pages/FeedbackManagement';
-import ViewerAnalytics from './pages/ViewerAnalytics';
-import UnifiedSettings from './pages/UnifiedSettings';
-import Dashboard from './pages/Dashboard';
-import SponsorManagement from './pages/SponsorManagement';
-import RecordingDashboard from './pages/RecordingDashboard';
-import Playback from './pages/Playback';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminLayout from './components/AdminLayout';
+
+// Lazy load admin pages for better code splitting
+const CameraManagement = lazy(() => import('./pages/CameraManagement'));
+const AreaManagement = lazy(() => import('./pages/AreaManagement'));
+const UserManagement = lazy(() => import('./pages/UserManagement'));
+const FeedbackManagement = lazy(() => import('./pages/FeedbackManagement'));
+const ViewerAnalytics = lazy(() => import('./pages/ViewerAnalytics'));
+const UnifiedSettings = lazy(() => import('./pages/UnifiedSettings'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const SponsorManagement = lazy(() => import('./pages/SponsorManagement'));
+const RecordingDashboard = lazy(() => import('./pages/RecordingDashboard'));
+const Playback = lazy(() => import('./pages/Playback'));
 
 function App() {
     return (
@@ -34,7 +37,11 @@ function App() {
             <Routes>
                 {/* Public routes */}
                 <Route path="/" element={<LandingPage />} />
-                <Route path="/playback" element={<Playback />} />
+                <Route path="/playback" element={
+                    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+                        <Playback />
+                    </Suspense>
+                } />
                 <Route path="/admin/login" element={<LoginPage />} />
 
                 {/* Protected admin routes */}
@@ -43,7 +50,9 @@ function App() {
                     element={
                         <ProtectedRoute>
                             <AdminLayout>
-                                <Dashboard />
+                                <Suspense fallback={<div className="p-6">Loading...</div>}>
+                                    <Dashboard />
+                                </Suspense>
                             </AdminLayout>
                         </ProtectedRoute>
                     }
@@ -53,7 +62,9 @@ function App() {
                     element={
                         <ProtectedRoute>
                             <AdminLayout>
-                                <CameraManagement />
+                                <Suspense fallback={<div className="p-6">Loading...</div>}>
+                                    <CameraManagement />
+                                </Suspense>
                             </AdminLayout>
                         </ProtectedRoute>
                     }
@@ -63,7 +74,9 @@ function App() {
                     element={
                         <ProtectedRoute>
                             <AdminLayout>
-                                <AreaManagement />
+                                <Suspense fallback={<div className="p-6">Loading...</div>}>
+                                    <AreaManagement />
+                                </Suspense>
                             </AdminLayout>
                         </ProtectedRoute>
                     }
@@ -73,7 +86,9 @@ function App() {
                     element={
                         <ProtectedRoute>
                             <AdminLayout>
-                                <UserManagement />
+                                <Suspense fallback={<div className="p-6">Loading...</div>}>
+                                    <UserManagement />
+                                </Suspense>
                             </AdminLayout>
                         </ProtectedRoute>
                     }
@@ -83,7 +98,9 @@ function App() {
                     element={
                         <ProtectedRoute>
                             <AdminLayout>
-                                <FeedbackManagement />
+                                <Suspense fallback={<div className="p-6">Loading...</div>}>
+                                    <FeedbackManagement />
+                                </Suspense>
                             </AdminLayout>
                         </ProtectedRoute>
                     }
@@ -93,7 +110,9 @@ function App() {
                     element={
                         <ProtectedRoute>
                             <AdminLayout>
-                                <ViewerAnalytics />
+                                <Suspense fallback={<div className="p-6">Loading...</div>}>
+                                    <ViewerAnalytics />
+                                </Suspense>
                             </AdminLayout>
                         </ProtectedRoute>
                     }
@@ -103,7 +122,9 @@ function App() {
                     element={
                         <ProtectedRoute>
                             <AdminLayout>
-                                <UnifiedSettings />
+                                <Suspense fallback={<div className="p-6">Loading...</div>}>
+                                    <UnifiedSettings />
+                                </Suspense>
                             </AdminLayout>
                         </ProtectedRoute>
                     }
@@ -113,7 +134,9 @@ function App() {
                     element={
                         <ProtectedRoute>
                             <AdminLayout>
-                                <SponsorManagement />
+                                <Suspense fallback={<div className="p-6">Loading...</div>}>
+                                    <SponsorManagement />
+                                </Suspense>
                             </AdminLayout>
                         </ProtectedRoute>
                     }
@@ -123,7 +146,9 @@ function App() {
                     element={
                         <ProtectedRoute>
                             <AdminLayout>
-                                <RecordingDashboard />
+                                <Suspense fallback={<div className="p-6">Loading...</div>}>
+                                    <RecordingDashboard />
+                                </Suspense>
                             </AdminLayout>
                         </ProtectedRoute>
                     }

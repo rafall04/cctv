@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useBranding } from '../contexts/BrandingContext';
 import { shouldDisableAnimations } from '../utils/animationControl';
-import FeedbackWidget from './FeedbackWidget';
-import SaweriaSupport from './SaweriaSupport';
 import { useCameras } from '../contexts/CameraContext';
+
+// Lazy load widgets to avoid conflicts with LandingPage
+const FeedbackWidget = lazy(() => import('./FeedbackWidget'));
+const SaweriaSupport = lazy(() => import('./SaweriaSupport'));
 
 // ============================================
 // ICONS
@@ -151,10 +153,14 @@ export default function LandingPageSimple({
             />
 
             {/* Feedback Widget */}
-            <FeedbackWidget />
+            <Suspense fallback={null}>
+                <FeedbackWidget />
+            </Suspense>
 
             {/* Saweria Support */}
-            <SaweriaSupport />
+            <Suspense fallback={null}>
+                <SaweriaSupport />
+            </Suspense>
         </div>
     );
 }
