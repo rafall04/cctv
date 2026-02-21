@@ -15,7 +15,8 @@ export default function CamerasSection({
     multiCameras, 
     viewMode, 
     setViewMode, 
-    landingSettings = { section_title: 'CCTV Publik' } 
+    landingSettings = { section_title: 'CCTV Publik' },
+    selectedCamera
 }) {
     const navigate = useNavigate();
     const { cameras, areas, loading } = useCameras();
@@ -110,7 +111,13 @@ export default function CamerasSection({
                                 <Icons.Grid />
                             </button>
                             <button
-                                onClick={() => navigate('/playback')}
+                                onClick={() => {
+                                    if (selectedCamera) {
+                                        navigate(`/playback?camera=${selectedCamera.id}`);
+                                    } else {
+                                        navigate('/playback');
+                                    }
+                                }}
                                 className="p-2.5 rounded-lg transition-colors text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                                 title="Playback Rekaman"
                             >

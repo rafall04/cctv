@@ -298,6 +298,7 @@ function LandingPageContent() {
                     viewMode={viewMode}
                     setViewMode={setViewMode}
                     landingSettings={landingSettings}
+                    selectedCamera={popup}
                 />
 
                 {saweriaEnabled && saweriaLeaderboardLink && (

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { cameraService } from '../services/cameraService';
 import recordingService from '../services/recordingService';
 import { useBranding } from '../contexts/BrandingContext';
@@ -12,6 +12,7 @@ import PlaybackSegmentList from '../components/playback/PlaybackSegmentList';
 const MAX_SEEK_DISTANCE = 180;
 
 function Playback() {
+    const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const cameraIdFromUrl = searchParams.get('camera');
     const { branding } = useBranding();
@@ -623,6 +624,15 @@ function Playback() {
         }
     }, [selectedCamera, selectedSegment]);
 
+    // Handle back to live stream
+    const handleBackToLive = useCallback(() => {
+        if (selectedCamera) {
+            navigate(`/?camera=${selectedCamera.id}`);
+        } else {
+            navigate('/');
+        }
+    }, [navigate, selectedCamera]);
+
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -665,6 +675,7 @@ function Playback() {
                     autoPlayEnabled={autoPlayEnabled}
                     onAutoPlayToggle={handleAutoPlayToggle}
                     onShare={handleShare}
+                    onBackToLive={handleBackToLive}
                 />
 
                 <PlaybackVideo
