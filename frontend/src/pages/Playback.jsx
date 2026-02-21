@@ -606,6 +606,15 @@ function Playback() {
         }
     };
 
+    // ✅ PINDAHKAN useCallback SEBELUM early returns
+    // Handle camera change and update URL for shareable links
+    const handleCameraChange = useCallback((camera) => {
+        setSelectedCamera(camera);
+        if (camera) {
+            setSearchParams({ camera: camera.id.toString() }, { replace: false });
+        }
+    }, [setSearchParams]);
+
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -637,14 +646,6 @@ function Playback() {
             </div>
         );
     }
-
-    // Handle camera change and update URL for shareable links
-    const handleCameraChange = useCallback((camera) => {
-        setSelectedCamera(camera);
-        if (camera) {
-            setSearchParams({ camera: camera.id.toString() }, { replace: false });
-        }
-    }, [setSearchParams]);
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-2 sm:py-6 md:py-8 px-2 sm:px-4">
