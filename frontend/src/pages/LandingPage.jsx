@@ -215,8 +215,10 @@ function LandingPageContent() {
 
     const disableHeavyEffects = deviceTier === 'low';
 
-    // Handle camera URL param - auto open popup when camera param exists
+    // Handle camera URL param - auto open popup when camera param exists (only in map/grid mode)
     useEffect(() => {
+        if (viewMode === 'playback') return; // Don't open popup in playback mode
+        
         const cameraIdFromUrl = searchParams.get('camera');
         if (cameraIdFromUrl && cameras.length > 0) {
             const camera = cameras.find(c => c.id === parseInt(cameraIdFromUrl));
@@ -228,7 +230,7 @@ function LandingPageContent() {
                 }
             }
         }
-    }, [cameras, searchParams]);
+    }, [cameras, searchParams, viewMode]);
 
     // Handle camera selection and update URL
     const handleCameraClick = useCallback((camera) => {
