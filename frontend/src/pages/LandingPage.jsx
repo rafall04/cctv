@@ -20,8 +20,10 @@ import LandingPageSimple from '../components/LandingPageSimple';
 import MultiViewButton from '../components/MultiView/MultiViewButton';
 import MultiViewLayout from '../components/MultiView/MultiViewLayout';
 import VideoPopup from '../components/MultiView/VideoPopup';
-import FeedbackWidget from '../components/FeedbackWidget';
-import SaweriaSupport from '../components/SaweriaSupport';
+import { lazy, Suspense } from 'react';
+
+const FeedbackWidget = lazy(() => import('../components/FeedbackWidget'));
+const SaweriaSupport = lazy(() => import('../components/SaweriaSupport'));
 import SaweriaLeaderboard from '../components/SaweriaLeaderboard';
 
 function LandingPageContent() {
@@ -98,6 +100,13 @@ function LandingPageContent() {
     const [serverLatency, setServerLatency] = useState(-1);
 
     useEffect(() => {
+        let isMounted = true;
+        const timeoutId = setTimeout(() => {
+            if (isMounted) {
+                setServerStatus('offline');
+            }
+        }, 3000);
+
         const checkServerConnectivity = async () => {
             try {
                 let apiUrl;
@@ -121,20 +130,29 @@ function LandingPageContent() {
 
                 const result = await testMediaMTXConnection(apiUrl);
 
-                if (result.reachable) {
-                    setServerStatus('online');
-                    setServerLatency(result.latency);
-                } else {
-                    setServerStatus('offline');
-                    console.warn('MediaMTX server unreachable:', result.error);
+                if (isMounted) {
+                    clearTimeout(timeoutId);
+                    if (result.reachable) {
+                        setServerStatus('online');
+                        setServerLatency(result.latency);
+                    } else {
+                        setServerStatus('offline');
+                    }
                 }
             } catch (err) {
-                setServerStatus('offline');
-                console.error('Server connectivity check failed:', err);
+                if (isMounted) {
+                    clearTimeout(timeoutId);
+                    setServerStatus('offline');
+                }
             }
         };
 
         checkServerConnectivity();
+
+        return () => {
+            isMounted = false;
+            clearTimeout(timeoutId);
+        };
     }, []);
 
     useEffect(() => {
