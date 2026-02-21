@@ -137,7 +137,7 @@ const SaweriaSupport = memo(function SaweriaSupport() {
         <>
             {/* Modal - Simplified, no animations */}
             {showModal && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70">
+                <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-black/70">
                     <div className="absolute inset-0" onClick={handleModalClose} />
                     
                     <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-sm w-full max-h-[90vh] overflow-y-auto">
@@ -183,7 +183,7 @@ const SaweriaSupport = memo(function SaweriaSupport() {
 
             {/* Banner - Simplified */}
             {showBanner && (
-                <div className={`fixed bottom-6 right-6 z-[9998] ${bannerMinimized ? 'w-14' : 'w-64'}`}>
+                <div className={`fixed bottom-6 right-6 z-[999998] ${bannerMinimized ? 'w-14' : 'w-64'}`}>
                     {bannerMinimized ? (
                         <button
                             onClick={handleBannerMaximize}
