@@ -12,6 +12,7 @@ import { shouldUseQueuedInit, getGlobalStreamInitQueue } from '../../utils/strea
 import { viewerService } from '../../services/viewerService';
 import { takeSnapshot as takeSnapshotUtil } from '../../utils/snapshotHelper';
 import { useBranding } from '../../contexts/BrandingContext';
+import { useStreamTimeout } from '../../hooks/useStreamTimeout';
 
 // Now handles offline/maintenance cameras properly
 // **Validates: Requirements 1.1, 1.2, 1.3, 2.3, 4.1, 4.2, 4.3, 4.4, 6.1, 6.2, 6.3, 6.4, 7.1, 7.2, 7.3**
@@ -21,7 +22,6 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
     const wrapperRef = useRef(null);
     const containerRef = useRef(null);
     const hlsRef = useRef(null);
-    const loadingTimeoutHandlerRef = useRef(null);
     const fallbackHandlerRef = useRef(null);
     const abortControllerRef = useRef(null);
 
@@ -129,29 +129,24 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         onStatusChange?.(camera.id, status);
     }, [status, camera.id, onStatusChange]);
 
-    // Initialize LoadingTimeoutHandler - **Validates: Requirements 1.1, 1.2, 1.3**
-    useEffect(() => {
-        loadingTimeoutHandlerRef.current = createLoadingTimeoutHandler({
-            deviceTier,
-            onTimeout: (stage) => {
-                cleanupResources();
-                setStatus('timeout');
-                setLoadingStage(LoadingStage.TIMEOUT);
-                onError?.(camera.id, new Error(`Loading timeout at ${stage} stage`));
-            },
-            onMaxFailures: () => {
-                // In multi-view, just notify parent
-                onError?.(camera.id, new Error('Max consecutive failures reached'));
-            },
-        });
-
-        return () => {
-            if (loadingTimeoutHandlerRef.current) {
-                loadingTimeoutHandlerRef.current.destroy();
-                loadingTimeoutHandlerRef.current = null;
-            }
-        };
-    }, [deviceTier, camera.id, onError]);
+    // Stream Timeout Hook - **Validates: Requirements 1.1, 1.2, 1.3**
+    const {
+        startTimeout,
+        clearTimeout: clearStreamTimeout,
+        updateStage: updateStreamStage,
+        resetFailures,
+    } = useStreamTimeout({
+        deviceTier,
+        onTimeout: (stage) => {
+            cleanupResources();
+            setStatus('timeout');
+            setLoadingStage(LoadingStage.TIMEOUT);
+            onError?.(camera.id, new Error(`Loading timeout at ${stage} stage`));
+        },
+        onMaxFailures: () => {
+            onError?.(camera.id, new Error('Max consecutive failures reached'));
+        },
+    });
 
     // Initialize FallbackHandler for auto-retry - **Validates: Requirements 6.1, 6.2, 6.3, 6.4**
     useEffect(() => {
@@ -197,9 +192,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             videoRef.current.src = '';
             videoRef.current.load();
         }
-        if (loadingTimeoutHandlerRef.current) {
-            loadingTimeoutHandlerRef.current.clearTimeout();
-        }
+        clearStreamTimeout();
         if (fallbackHandlerRef.current) {
             fallbackHandlerRef.current.clearPendingRetry();
         }
@@ -230,10 +223,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             setStatus('live');
             setLoadingStage(LoadingStage.PLAYING);
             // Clear timeout on success
-            if (loadingTimeoutHandlerRef.current) {
-                loadingTimeoutHandlerRef.current.clearTimeout();
-                loadingTimeoutHandlerRef.current.resetFailures();
-            }
+            clearStreamTimeout();
             if (fallbackHandlerRef.current) {
                 fallbackHandlerRef.current.reset();
             }
@@ -276,9 +266,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             if (cancelled) return;
 
             // Start loading timeout - **Validates: Requirements 1.1**
-            if (loadingTimeoutHandlerRef.current) {
-                loadingTimeoutHandlerRef.current.startTimeout(LoadingStage.CONNECTING);
-            }
+            startTimeout(LoadingStage.CONNECTING);
 
             // HLS.js already imported directly
 
@@ -286,8 +274,8 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
 
             // Update loading stage - **Validates: Requirements 4.2**
             setLoadingStage(LoadingStage.LOADING);
-            if (loadingTimeoutHandlerRef.current) {
-                loadingTimeoutHandlerRef.current.updateStage(LoadingStage.LOADING);
+            if (hlsRef.current) {
+                startTimeout(LoadingStage.LOADING);
             }
 
             if (Hls.isSupported()) {
@@ -311,9 +299,9 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
                     if (cancelled || isLive) return; // Skip if already live
                     setLoadingStage(LoadingStage.BUFFERING);
-                    if (loadingTimeoutHandlerRef.current) {
-                        loadingTimeoutHandlerRef.current.updateStage(LoadingStage.BUFFERING);
-                    }
+                if (hlsRef.current) {
+                    updateStreamStage(LoadingStage.BUFFERING);
+                }
                     video.play().catch(() => { });
                 });
 
@@ -322,9 +310,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                     if (cancelled || isLive) return; // Skip if already live
                     setLoadingStage(prev => {
                         if (prev === LoadingStage.LOADING || prev === LoadingStage.CONNECTING) {
-                            if (loadingTimeoutHandlerRef.current) {
-                                loadingTimeoutHandlerRef.current.updateStage(LoadingStage.BUFFERING);
-                            }
+                            updateStreamStage(LoadingStage.BUFFERING);
                             return LoadingStage.BUFFERING;
                         }
                         return prev;
@@ -347,9 +333,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                     if (!d.fatal) return;
 
                     // Clear loading timeout
-                    if (loadingTimeoutHandlerRef.current) {
-                        loadingTimeoutHandlerRef.current.clearTimeout();
-                    }
+                    clearStreamTimeout();
 
                     // Check for codec incompatibility - NOT recoverable
                     if (d.details === 'manifestIncompatibleCodecsError') {
@@ -464,9 +448,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         setLoadingStage(LoadingStage.CONNECTING);
         setAutoRetryCount(0);
         setIsAutoRetrying(false);
-        if (loadingTimeoutHandlerRef.current) {
-            loadingTimeoutHandlerRef.current.resetFailures();
-        }
+        resetFailures();
         if (fallbackHandlerRef.current) {
             fallbackHandlerRef.current.reset();
         }
