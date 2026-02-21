@@ -263,7 +263,7 @@ export default function CamerasSection({
                     </div>
                 </div>
 
-                {viewMode === 'grid' && hasTunnelCameras && (
+                {viewMode === 'grid' && (
                     <div className="mb-6">
                         <div className="flex flex-wrap gap-2 p-1.5 bg-gray-100 dark:bg-gray-800 rounded-xl w-fit">
                             <button
