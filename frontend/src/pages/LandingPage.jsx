@@ -215,11 +215,39 @@ function LandingPageContent() {
 
     const disableHeavyEffects = deviceTier === 'low';
 
+    // Handle camera URL param - auto open popup when camera param exists
+    useEffect(() => {
+        const cameraIdFromUrl = searchParams.get('camera');
+        if (cameraIdFromUrl && cameras.length > 0) {
+            const camera = cameras.find(c => c.id === parseInt(cameraIdFromUrl));
+            if (camera) {
+                // Check if camera is available (not offline/maintenance)
+                const isAvailable = camera.status !== 'maintenance' && camera.is_online !== 0;
+                if (isAvailable) {
+                    setPopup(camera);
+                }
+            }
+        }
+    }, [cameras, searchParams]);
+
+    // Handle camera selection and update URL
+    const handleCameraClick = useCallback((camera) => {
+        setPopup(camera);
+        // Update URL for shareable links
+        const currentMode = searchParams.get('mode') || layoutMode;
+        setSearchParams({ camera: camera.id.toString(), mode: currentMode }, { replace: false });
+    }, [searchParams, layoutMode, setSearchParams]);
+
+    // Handle popup close - optionally keep camera in URL or remove it
+    const handlePopupClose = useCallback(() => {
+        setPopup(null);
+    }, []);
+
     if (layoutMode === 'simple') {
         return (
             <>
                 <LandingPageSimple
-                    onCameraClick={setPopup}
+                    onCameraClick={handleCameraClick}
                     onAddMulti={handleAddMulti}
                     multiCameras={multiCameras}
                     saweriaEnabled={saweriaEnabled}
@@ -261,7 +289,7 @@ function LandingPageContent() {
                 />
 
                 <LandingCamerasSection
-                    onCameraClick={setPopup}
+                    onCameraClick={handleCameraClick}
                     onAddMulti={handleAddMulti}
                     multiCameras={multiCameras}
                     viewMode={viewMode}

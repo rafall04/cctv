@@ -12,7 +12,7 @@ import PlaybackSegmentList from '../components/playback/PlaybackSegmentList';
 const MAX_SEEK_DISTANCE = 180;
 
 function Playback() {
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const cameraIdFromUrl = searchParams.get('camera');
     const { branding } = useBranding();
     
@@ -529,13 +529,21 @@ function Playback() {
         );
     }
 
+    // Handle camera change and update URL for shareable links
+    const handleCameraChange = useCallback((camera) => {
+        setSelectedCamera(camera);
+        if (camera) {
+            setSearchParams({ camera: camera.id.toString() }, { replace: false });
+        }
+    }, [setSearchParams]);
+
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-2 sm:py-6 md:py-8 px-2 sm:px-4">
             <div className="max-w-7xl mx-auto space-y-3 sm:space-y-4 md:space-y-6">
                 <PlaybackHeader
                     cameras={cameras}
                     selectedCamera={selectedCamera}
-                    onCameraChange={setSelectedCamera}
+                    onCameraChange={handleCameraChange}
                     autoPlayEnabled={autoPlayEnabled}
                     onAutoPlayToggle={handleAutoPlayToggle}
                 />
