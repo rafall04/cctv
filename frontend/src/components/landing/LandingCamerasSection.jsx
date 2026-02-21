@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useMemo, lazy, Suspense } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCameras } from '../../contexts/CameraContext';
 import { Icons } from '../ui/Icons';
 import { GridSkeleton, CameraCardSkeleton } from '../ui/Skeleton';
@@ -16,6 +17,7 @@ export default function CamerasSection({
     setViewMode, 
     landingSettings = { section_title: 'CCTV Publik' } 
 }) {
+    const navigate = useNavigate();
     const { cameras, areas, loading } = useCameras();
     const [connectionTab, setConnectionTab] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
@@ -108,11 +110,8 @@ export default function CamerasSection({
                                 <Icons.Grid />
                             </button>
                             <button
-                                onClick={() => setViewMode('playback')}
-                                className={`p-2.5 rounded-lg transition-colors ${viewMode === 'playback'
-                                    ? 'bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm'
-                                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                                    }`}
+                                onClick={() => navigate('/playback')}
+                                className="p-2.5 rounded-lg transition-colors text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                                 title="Playback Rekaman"
                             >
                                 <Icons.Clock />

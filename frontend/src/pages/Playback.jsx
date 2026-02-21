@@ -581,10 +581,16 @@ function Playback() {
 
     // Handle share playback link
     const handleShare = useCallback(async () => {
+        const baseUrl = `${window.location.origin}/playback`;
+        const params = new URLSearchParams();
+        if (selectedCamera?.id) params.set('camera', selectedCamera.id.toString());
+        if (selectedSegment?.id) params.set('segment', selectedSegment.id.toString());
+        const shareUrl = `${baseUrl}?${params.toString()}`;
+
         const shareData = {
             title: `Playback - ${selectedCamera?.name || 'CCTV'}`,
             text: `Lihat rekaman dari kamera ${selectedCamera?.name || 'CCTV'}`,
-            url: window.location.href
+            url: shareUrl
         };
 
         if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
@@ -592,14 +598,14 @@ function Playback() {
                 await navigator.share(shareData);
             } catch (err) {
                 if (err.name !== 'AbortError') {
-                    await navigator.clipboard.writeText(window.location.href);
+                    await navigator.clipboard.writeText(shareUrl);
                     setSnapshotNotification({ type: 'success', message: 'Tautan disalin ke clipboard!' });
                     setTimeout(() => setSnapshotNotification(null), 3000);
                 }
             }
         } else {
             try {
-                await navigator.clipboard.writeText(window.location.href);
+                await navigator.clipboard.writeText(shareUrl);
                 setSnapshotNotification({ type: 'success', message: 'Tautan disalin ke clipboard!' });
                 setTimeout(() => setSnapshotNotification(null), 3000);
             } catch (err) {

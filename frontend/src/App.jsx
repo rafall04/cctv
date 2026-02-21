@@ -17,6 +17,7 @@ import UnifiedSettings from './pages/UnifiedSettings';
 import Dashboard from './pages/Dashboard';
 import SponsorManagement from './pages/SponsorManagement';
 import RecordingDashboard from './pages/RecordingDashboard';
+import Playback from './pages/Playback';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminLayout from './components/AdminLayout';
 
@@ -33,6 +34,7 @@ function App() {
             <Routes>
                 {/* Public routes */}
                 <Route path="/" element={<LandingPage />} />
+                <Route path="/playback" element={<Playback />} />
                 <Route path="/admin/login" element={<LoginPage />} />
 
                 {/* Protected admin routes */}
