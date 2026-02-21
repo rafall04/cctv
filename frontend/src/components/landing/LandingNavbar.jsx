@@ -1,21 +1,51 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useCameras } from '../../contexts/CameraContext';
 import { Icons } from '../ui/Icons';
 import { shouldDisableAnimations } from '../../utils/animationControl';
 
+function ClockDisplay({ disableAnimations }) {
+    const timeRef = useRef(null);
+    const intervalRef = useRef(null);
+
+    useEffect(() => {
+        const updateTime = () => {
+            if (timeRef.current) {
+                const now = new Date();
+                timeRef.current.textContent = now.toLocaleTimeString('id-ID', { 
+                    hour: '2-digit', 
+                    minute: '2-digit', 
+                    second: disableAnimations ? undefined : '2-digit' 
+                });
+            }
+        };
+
+        updateTime();
+        
+        const interval = disableAnimations ? 10000 : 1000;
+        intervalRef.current = setInterval(updateTime, interval);
+
+        return () => {
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+            }
+        };
+    }, [disableAnimations]);
+
+    return (
+        <span 
+            ref={timeRef} 
+            className="text-sm font-mono text-gray-600 dark:text-gray-300"
+        />
+    );
+}
+
 export default function Navbar({ branding, layoutMode, onLayoutToggle }) {
     const { isDark, toggleTheme } = useTheme();
     const { cameras } = useCameras();
-    const cameraCount = cameras?.length || 0;
-    const [currentTime, setCurrentTime] = useState(new Date());
     const disableAnimations = shouldDisableAnimations();
 
-    useEffect(() => {
-        const clockInterval = disableAnimations ? 10000 : 1000;
-        const timer = setInterval(() => setCurrentTime(new Date()), clockInterval);
-        return () => clearInterval(timer);
-    }, [disableAnimations]);
+    const cameraCount = useMemo(() => cameras?.length || 0, [cameras]);
 
     return (
         <nav className={`sticky top-0 z-[1001] bg-white/90 dark:bg-gray-900/90 ${disableAnimations ? '' : 'backdrop-blur-xl'} border-b border-gray-200/50 dark:border-gray-800/50`}>
@@ -44,9 +74,7 @@ export default function Navbar({ branding, layoutMode, onLayoutToggle }) {
                         <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
                         <span className="text-xs text-gray-500 dark:text-gray-400">{branding.city_name}</span>
                         <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
-                        <span className="text-sm font-mono text-gray-600 dark:text-gray-300">
-                            {currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: disableAnimations ? undefined : '2-digit' })}
-                        </span>
+                        <ClockDisplay disableAnimations={disableAnimations} />
                     </div>
 
                     <div className="flex items-center gap-2">
