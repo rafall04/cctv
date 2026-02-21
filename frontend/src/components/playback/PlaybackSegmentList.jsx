@@ -22,12 +22,12 @@ export default function PlaybackSegmentList({
                 <div className="space-y-2 max-h-64 sm:max-h-80 md:max-h-96 overflow-y-auto">
                     {[...segments].sort((a, b) => 
                         new Date(b.start_time) - new Date(a.start_time)
-                    ).map((segment) => {
+                    ).map((segment, idx) => {
                         const isLikelyCompatible = segment.duration >= 60;
                         
                         return (
                             <button
-                                key={segment.id}
+                                key={segment.id ?? `segment-${idx}`}
                                 onClick={() => onSegmentClick(segment)}
                                 className={`w-full text-left p-2 sm:p-3 md:p-4 rounded-lg border-2 transition-all ${
                                     selectedSegment?.id === segment.id

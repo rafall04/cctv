@@ -68,7 +68,7 @@ export default function PlaybackTimeline({
                     onClick={handleTimelineClick}
                     className="relative h-8 sm:h-10 md:h-12 bg-gray-200 dark:bg-gray-800 rounded-lg overflow-hidden cursor-pointer"
                 >
-                    {timelineData.sortedSegments.map((segment) => {
+                    {timelineData.sortedSegments.map((segment, idx) => {
                         const segmentStart = new Date(segment.start_time);
                         const segmentEnd = new Date(segment.end_time);
                         const startOffset = ((segmentStart - timelineData.start) / 1000 / timelineData.duration) * 100;
@@ -76,7 +76,7 @@ export default function PlaybackTimeline({
                         
                         return (
                             <div
-                                key={segment.id}
+                                key={segment.id ?? `segment-${idx}`}
                                 onClick={(e) => { e.stopPropagation(); onSegmentClick(segment); }}
                                 className={`absolute h-full cursor-pointer transition-colors ${
                                     selectedSegment?.id === segment.id

@@ -5,7 +5,6 @@ import React from 'react';
  * Provides better UX when there's no data to display
  */
 
-// SVG Illustrations
 const Illustrations = {
     // No cameras illustration
     NoCamera: () => (
@@ -92,6 +91,8 @@ const Illustrations = {
         </svg>
     ),
 };
+
+export const EMPTY_STATE_ICONS = Illustrations;
 
 /**
  * Base EmptyState Component
