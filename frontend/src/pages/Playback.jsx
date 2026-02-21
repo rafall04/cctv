@@ -132,11 +132,23 @@ function Playback() {
     useEffect(() => {
         if (segments.length === 0) return;
         
-        const segmentIdFromUrl = searchParams.get('segment');
-        if (segmentIdFromUrl && !selectedSegment) {
-            const segmentFromUrl = segments.find(s => s.id === parseInt(segmentIdFromUrl));
+        const timestampFromUrl = searchParams.get('t');
+        if (timestampFromUrl && !selectedSegment) {
+            const targetTime = parseInt(timestampFromUrl);
+            const segmentFromUrl = segments.find(s => {
+                const startTime = new Date(s.start_time).getTime();
+                const endTime = new Date(s.end_time).getTime();
+                return targetTime >= startTime && targetTime <= endTime;
+            });
             if (segmentFromUrl) {
                 setSelectedSegment(segmentFromUrl);
+            } else {
+                const closestSegment = segments.reduce((prev, curr) => {
+                    const prevDiff = Math.abs(new Date(prev.start_time).getTime() - targetTime);
+                    const currDiff = Math.abs(new Date(curr.start_time).getTime() - targetTime);
+                    return currDiff < prevDiff ? curr : prev;
+                }, segments[0]);
+                setSelectedSegment(closestSegment);
             }
         }
     }, [segments, selectedSegment, searchParams]);
@@ -299,9 +311,10 @@ function Playback() {
                 
                 setTimeout(() => setAutoPlayNotification(null), 3000);
                 setSelectedSegment(nextSegment);
+                const timestamp = new Date(nextSegment.start_time).getTime();
                 setSearchParams({ 
                     camera: selectedCameraRef.current?.id.toString(), 
-                    segment: nextSegment.id.toString() 
+                    t: timestamp.toString() 
                 }, { replace: false });
             } else {
                 setAutoPlayNotification({ type: 'complete', message: 'Playback selesai - tidak ada segment lagi' });
@@ -396,9 +409,10 @@ function Playback() {
     };
 
     const handleSegmentClick = (segment) => {
+        const timestamp = new Date(segment.start_time).getTime();
         setSearchParams({ 
             camera: selectedCamera?.id.toString(), 
-            segment: segment.id.toString() 
+            t: timestamp.toString() 
         }, { replace: false });
         setSelectedSegment(segment);
         setSeekWarning(null);
@@ -562,19 +576,23 @@ function Playback() {
     const handleCameraChange = useCallback((camera) => {
         setSelectedCamera(camera);
         if (camera) {
+            const timestamp = selectedSegment ? new Date(selectedSegment.start_time).getTime().toString() : '';
             setSearchParams({ 
                 camera: camera.id.toString(),
-                segment: selectedSegment?.id.toString() || '' 
+                t: timestamp || '' 
             }, { replace: false });
         }
     }, [setSearchParams, selectedSegment]);
 
-    // Handle share playback link
+    // Handle share playback link - use timestamp instead of segment ID
     const handleShare = useCallback(async () => {
         const baseUrl = `${window.location.origin}/playback`;
         const params = new URLSearchParams();
         if (selectedCamera?.id) params.set('camera', selectedCamera.id.toString());
-        if (selectedSegment?.id) params.set('segment', selectedSegment.id.toString());
+        if (selectedSegment?.start_time) {
+            const timestamp = new Date(selectedSegment.start_time).getTime();
+            params.set('t', timestamp.toString());
+        }
         const shareUrl = `${baseUrl}?${params.toString()}`;
 
         const shareData = {
@@ -603,7 +621,7 @@ function Playback() {
                 setTimeout(() => setSnapshotNotification(null), 3000);
             }
         }
-    }, [selectedCamera]);
+    }, [selectedCamera, selectedSegment]);
 
     if (loading) {
         return (
