@@ -183,7 +183,7 @@ const SaweriaSupport = memo(function SaweriaSupport() {
 
             {/* Banner - Simplified */}
             {showBanner && (
-                <div className={`fixed bottom-6 right-6 z-[999998] ${bannerMinimized ? 'w-14' : 'w-64'}`}>
+                <div className={`fixed bottom-24 right-6 z-[999998] ${bannerMinimized ? 'w-14' : 'w-64'}`}>
                     {bannerMinimized ? (
                         <button
                             onClick={handleBannerMaximize}
