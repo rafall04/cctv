@@ -22,11 +22,11 @@ export default function Hero({ branding, landingSettings, onCameraClick, disable
             )}
 
             <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 text-center">
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-semibold mb-3 shadow-sm">
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold mb-3 shadow-sm">
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z"/>
                     </svg>
-                    <span>Ramadan Kareem 1446 H</span>
+                    <span>Ramadan Kareem 1447 H</span>
                 </div>
 
                 {branding.show_powered_by === 'true' && (

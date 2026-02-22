@@ -27,28 +27,28 @@ function SimpleHeader({ branding, layoutMode, onLayoutToggle }) {
     const disableAnimations = shouldDisableAnimations();
 
     return (
-        <header className={`sticky top-0 z-[1001] bg-white/90 dark:bg-gray-900/90 ${disableAnimations ? '' : 'backdrop-blur-xl'} border-b border-amber-200/30 dark:border-amber-700/30`}>
+        <header className={`sticky top-0 z-[1001] bg-white/90 dark:bg-gray-900/90 ${disableAnimations ? '' : 'backdrop-blur-xl'} border-b border-emerald-200/30 dark:border-emerald-700/30`}>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-14">
                     {/* Logo */}
                     <a href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity" title={branding.company_name}>
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-white shadow-lg shadow-amber-500/30">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-500/30">
                             <span className="text-sm font-bold">{branding.logo_text}</span>
                         </div>
                         <div className="hidden sm:block">
                             <span className="text-base font-bold text-gray-900 dark:text-white">{branding.company_name}</span>
-                            <span className="text-[10px] text-amber-600 dark:text-amber-400 ml-1">• Ramadan</span>
+                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 ml-1">• Ramadan Kareem</span>
                         </div>
                     </a>
 
                     {/* Layout Mode & Theme Toggle */}
                     <div className="flex items-center gap-2">
                         {/* Ramadan Badge */}
-                        <div className="hidden sm:flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-xs">
-                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
+                            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                                 <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z"/>
                             </svg>
-                            <span>Ramadan</span>
+                            <span>1447 H</span>
                         </div>
 
                         {/* Layout Mode Toggle */}
@@ -80,11 +80,11 @@ function SimpleHeader({ branding, layoutMode, onLayoutToggle }) {
 // ============================================
 function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
     return (
-        <footer className="py-4 border-t border-amber-200/30 dark:border-amber-700/30 bg-gradient-to-r from-amber-50/50 to-emerald-50/50 dark:from-amber-950/20 dark:to-emerald-950/20">
+        <footer className="py-4 border-t border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-r from-emerald-50/50 to-green-50/50 dark:from-emerald-950/20 dark:to-green-950/20">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="text-center space-y-1">
                     <p className="text-xs text-gray-600 dark:text-gray-400">
-                        <span className="text-amber-600 dark:text-amber-400 font-medium">Ramadan Kareem</span> • Sistem monitoring CCTV {branding.company_name}
+                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">Ramadan Kareem 1447 H</span> • CCTV {branding.company_name}
                     </p>
                     <div className="flex items-center justify-center gap-3 text-xs text-gray-500 dark:text-gray-500">
                         <span>© 2026 {branding.company_name}</span>
@@ -95,7 +95,7 @@ function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
                                 e.preventDefault();
                                 document.querySelector('[data-feedback-widget]')?.click();
                             }}
-                            className="hover:text-sky-500 transition-colors"
+                            className="hover:text-emerald-500 transition-colors"
                         >
                             Feedback
                         </a>
@@ -106,9 +106,9 @@ function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
                                     href={saweriaLink}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="hover:text-amber-500 transition-colors"
+                                    className="hover:text-emerald-500 transition-colors"
                                 >
-                                    Saweria
+                                    Dukung
                                 </a>
                             </>
                         )}
