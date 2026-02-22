@@ -409,6 +409,32 @@ export function useCRUD(endpoint) {
 
 ---
 
+## Git & Version Control
+
+**PUSH TO GITHUB - WAJIB dilakukan setelah setiap selesai task:**
+
+1. Setelah menyelesaikan setiap task/fitur, langsung push ke GitHub
+2. Jangan menunggu banyak perubahan - push secara berkala setiap task selesai
+3. Gunakan commit message yang jelas dan deskriptif
+4. Format commit message: `"Add: [deskripsi]"`, `"Fix: [deskripsi]"`, `"Refactor: [deskripsi]"`
+
+Contoh workflow:
+```bash
+# 1. Check status
+git status
+
+# 2. Add perubahan
+git add .
+
+# 3. Commit dengan pesan yang jelas
+git commit -m "Add Ramadan atmosphere to public landing pages"
+
+# 4. Push ke GitHub
+git push origin main
+```
+
+---
+
 ## React Hooks Best Practices & Race Condition Prevention
 
 ### Critical Rules for React Hooks
