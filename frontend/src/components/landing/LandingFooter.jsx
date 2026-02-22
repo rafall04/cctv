@@ -13,16 +13,11 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
         <footer className="py-10 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="mb-8 text-center">
-                    <div className="inline-flex items-center gap-3 px-6 py-3 rounded-2xl bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20 border border-emerald-200/50 dark:border-emerald-700/30 mb-6">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-500/30">
-                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z"/>
-                            </svg>
-                        </div>
-                        <div className="text-left">
-                            <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400">Ramadan Kareem 1447 H</p>
-                            <p className="text-xs text-emerald-600 dark:text-emerald-500">Taqabbala Allahu Minna Wa Minkum</p>
-                        </div>
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200/50 dark:border-emerald-700/30 mb-4">
+                        <svg className="w-5 h-5 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z"/>
+                        </svg>
+                        <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Ramadan Kareem 1447 H</span>
                     </div>
 
                     <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-sky-50 dark:bg-primary/10 mb-4">
@@ -97,11 +92,6 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
 
                 {saweriaEnabled && (
                     <div className="flex flex-col items-center gap-3 mb-6">
-                        <div className="text-center">
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                                Dukung kami untuk tambah CCTV di lokasi strategis
-                            </p>
-                        </div>
                         <a
                             href={saweriaLink}
                             target="_blank"
@@ -109,10 +99,10 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                             className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
                         >
                             <span className="text-xl">☕</span>
-                            <span>Traktir Kopi Yuk!</span>
+                            <span>Traktir Kopi</span>
                         </a>
                         <p className="text-xs text-gray-500 dark:text-gray-400 text-center max-w-md">
-                            Dukungan Anda sangat berarti untuk upgrade server, tambah bandwidth, dan pasang CCTV di titik-titik penting lainnya. Terima kasih!
+                            Dukung kami tambah CCTV di lokasi strategis
                         </p>
                     </div>
                 )}

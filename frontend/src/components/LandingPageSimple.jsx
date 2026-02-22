@@ -35,22 +35,10 @@ function SimpleHeader({ branding, layoutMode, onLayoutToggle }) {
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-500/30">
                             <span className="text-sm font-bold">{branding.logo_text}</span>
                         </div>
-                        <div className="hidden sm:block">
-                            <span className="text-base font-bold text-gray-900 dark:text-white">{branding.company_name}</span>
-                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 ml-1">• Ramadan Kareem</span>
-                        </div>
                     </a>
 
                     {/* Layout Mode & Theme Toggle */}
                     <div className="flex items-center gap-2">
-                        {/* Ramadan Badge */}
-                        <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
-                            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z"/>
-                            </svg>
-                            <span>1447 H</span>
-                        </div>
-
                         {/* Layout Mode Toggle */}
                         <button
                             onClick={onLayoutToggle}
@@ -149,6 +137,16 @@ export default function LandingPageSimple({
 
             {/* Main Content - CamerasSection handles all view modes */}
             <main className="flex-1 min-h-0">
+                {/* Ramadan Banner */}
+                <div className="py-3 px-4 text-center bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/30 border-b border-emerald-200/30 dark:border-emerald-800/30">
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/80 dark:bg-gray-800/80 shadow-sm">
+                        <svg className="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z"/>
+                        </svg>
+                        <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Ramadan Kareem 1447 H</span>
+                    </div>
+                </div>
+
                 {CamerasSection && (
                     <CamerasSection
                         onCameraClick={onCameraClick}
