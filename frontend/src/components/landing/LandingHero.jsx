@@ -3,15 +3,32 @@ import { shouldDisableAnimations } from '../../utils/animationControl';
 
 export default function Hero({ branding, landingSettings, onCameraClick, disableHeavyEffects }) {
     return (
-        <header className="relative overflow-hidden bg-gradient-to-br from-primary/10 via-transparent to-purple-500/10 dark:from-primary/5 dark:to-purple-500/5">
+        <header className="relative overflow-hidden bg-gradient-to-br from-amber-50/80 via-transparent to-emerald-50/80 dark:from-amber-950/30 dark:via-transparent dark:to-emerald-950/30">
             {!disableHeavyEffects && (
                 <>
-                    <div className="absolute top-0 left-1/4 w-64 h-64 bg-primary/10 rounded-full blur-3xl pointer-events-none"></div>
-                    <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                    <div className="absolute top-0 left-1/4 w-64 h-64 bg-amber-200/30 dark:bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                    <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-emerald-200/30 dark:bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                    <div className="absolute top-10 right-10 w-20 h-20 opacity-20 dark:opacity-10 pointer-events-none">
+                        <svg viewBox="0 0 100 100" fill="currentColor" className="text-amber-400 w-full h-full">
+                            <path d="M50 5C30.5 5 15 20.5 15 40c0 19.5 15.5 35 35 35 5 0 9-4 9-9 0-3.5-2-6.5-5-8-4-2.5-6.5-7-6.5-12 0-8 6.5-14.5 14.5-14.5H70c13.5 0 24.5-11 24.5-24.5C94.5 18 78.5 5 50 5z"/>
+                        </svg>
+                    </div>
+                    <div className="absolute top-20 left-10 w-12 h-12 opacity-15 dark:opacity-8 pointer-events-none">
+                        <svg viewBox="0 0 100 100" fill="currentColor" className="text-amber-400 w-full h-full">
+                            <path d="M50 5C30.5 5 15 20.5 15 40c0 19.5 15.5 35 35 35 5 0 9-4 9-9 0-3.5-2-6.5-5-8-4-2.5-6.5-7-6.5-12 0-8 6.5-14.5 14.5-14.5H70c13.5 0 24.5-11 24.5-24.5C94.5 18 78.5 5 50 5z"/>
+                        </svg>
+                    </div>
                 </>
             )}
 
             <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 text-center">
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-semibold mb-3 shadow-sm">
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z"/>
+                    </svg>
+                    <span>Ramadan Kareem 1446 H</span>
+                </div>
+
                 {branding.show_powered_by === 'true' && (
                     <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-sky-100 dark:bg-primary/20 text-primary-600 dark:text-primary-400 text-xs font-semibold mb-3 shadow-sm">
                         <div className="w-5 h-5 rounded bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center text-white text-[10px] font-bold">{branding.logo_text}</div>

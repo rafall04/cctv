@@ -13,6 +13,18 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
         <footer className="py-10 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="mb-8 text-center">
+                    <div className="inline-flex items-center gap-3 px-6 py-3 rounded-2xl bg-gradient-to-r from-amber-50 to-emerald-50 dark:from-amber-900/20 dark:to-emerald-900/20 border border-amber-200/50 dark:border-amber-700/30 mb-6">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-white shadow-lg shadow-amber-500/30">
+                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z"/>
+                            </svg>
+                        </div>
+                        <div className="text-left">
+                            <p className="text-lg font-bold text-amber-700 dark:text-amber-400">Ramadan Kareem</p>
+                            <p className="text-xs text-amber-600 dark:text-amber-500"> Taqabbala Allahu Minna Wa Minkum </p>
+                        </div>
+                    </div>
+
                     <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-sky-50 dark:bg-primary/10 mb-4">
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center text-white">
                             <span className="text-sm font-bold">{branding.logo_text}</span>

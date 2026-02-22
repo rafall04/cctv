@@ -75,6 +75,14 @@ export default function Navbar({ branding, layoutMode, onLayoutToggle }) {
                         <span className="text-xs text-gray-500 dark:text-gray-400">{branding.city_name}</span>
                         <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
                         <ClockDisplay disableAnimations={disableAnimations} />
+                        <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
+                        <span className="text-xs text-amber-500 dark:text-amber-400 font-medium flex items-center gap-1">
+                            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z"/>
+                                <path d="M10 5a1 1 0 011 1v3.586l2.707 2.707a1 1 0 01-1.414 1.414l-3-3A1 1 0 019 10V6a1 1 0 011-1z"/>
+                            </svg>
+                            Ramadan
+                        </span>
                     </div>
 
                     <div className="flex items-center gap-2">

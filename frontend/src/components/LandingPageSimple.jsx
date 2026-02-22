@@ -27,19 +27,30 @@ function SimpleHeader({ branding, layoutMode, onLayoutToggle }) {
     const disableAnimations = shouldDisableAnimations();
 
     return (
-        <header className={`sticky top-0 z-[1001] bg-white/90 dark:bg-gray-900/90 ${disableAnimations ? '' : 'backdrop-blur-xl'} border-b border-gray-200/50 dark:border-gray-800/50`}>
+        <header className={`sticky top-0 z-[1001] bg-white/90 dark:bg-gray-900/90 ${disableAnimations ? '' : 'backdrop-blur-xl'} border-b border-amber-200/30 dark:border-amber-700/30`}>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-14">
                     {/* Logo */}
                     <a href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity" title={branding.company_name}>
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-sky-500/30">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-white shadow-lg shadow-amber-500/30">
                             <span className="text-sm font-bold">{branding.logo_text}</span>
                         </div>
-                        <span className="text-base font-bold text-gray-900 dark:text-white hidden sm:inline">{branding.company_name}</span>
+                        <div className="hidden sm:block">
+                            <span className="text-base font-bold text-gray-900 dark:text-white">{branding.company_name}</span>
+                            <span className="text-[10px] text-amber-600 dark:text-amber-400 ml-1">• Ramadan</span>
+                        </div>
                     </a>
 
                     {/* Layout Mode & Theme Toggle */}
                     <div className="flex items-center gap-2">
+                        {/* Ramadan Badge */}
+                        <div className="hidden sm:flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-xs">
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z"/>
+                            </svg>
+                            <span>Ramadan</span>
+                        </div>
+
                         {/* Layout Mode Toggle */}
                         <button
                             onClick={onLayoutToggle}
@@ -69,11 +80,11 @@ function SimpleHeader({ branding, layoutMode, onLayoutToggle }) {
 // ============================================
 function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
     return (
-        <footer className="py-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+        <footer className="py-4 border-t border-amber-200/30 dark:border-amber-700/30 bg-gradient-to-r from-amber-50/50 to-emerald-50/50 dark:from-amber-950/20 dark:to-emerald-950/20">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="text-center space-y-1">
                     <p className="text-xs text-gray-600 dark:text-gray-400">
-                        Sistem monitoring CCTV {branding.company_name}
+                        <span className="text-amber-600 dark:text-amber-400 font-medium">Ramadan Kareem</span> • Sistem monitoring CCTV {branding.company_name}
                     </p>
                     <div className="flex items-center justify-center gap-3 text-xs text-gray-500 dark:text-gray-500">
                         <span>© 2026 {branding.company_name}</span>
