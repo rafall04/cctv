@@ -562,7 +562,26 @@ class RecordingService {
 
                 const [, year, month, day, hour, minute, second] = match;
                 const startTime = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
-                // Use default 10 minutes duration (or calculate from filename if segment is incomplete)
+
+                // Get actual duration using ffprobe AFTER re-mux (more accurate)
+                // This is critical for proper playback timeline
+                try {
+                    const { execSync } = await import('child_process');
+                    const ffprobeOutput = execSync(
+                        `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`,
+                        { encoding: 'utf8', timeout: 5000 }
+                    ).trim();
+                    
+                    if (ffprobeOutput && parseFloat(ffprobeOutput) > 0) {
+                        actualDuration = Math.round(parseFloat(ffprobeOutput));
+                        console.log(`[Segment] Actual duration from ffprobe: ${actualDuration}s`);
+                    } else {
+                        console.warn(`[Segment] ffprobe returned invalid duration, using default 600s`);
+                    }
+                } catch (ffprobeError) {
+                    console.warn(`[Segment] ffprobe failed, using default duration:`, ffprobeError.message);
+                }
+
                 const endTime = new Date(startTime.getTime() + actualDuration * 1000);
 
                 // Get final file size
