@@ -32,7 +32,7 @@ function SimpleHeader({ branding, layoutMode, onLayoutToggle }) {
                 <div className="flex items-center justify-between h-14">
                     {/* Logo */}
                     <a href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity" title={branding.company_name}>
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-500/30">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center text-white shadow-lg shadow-primary/30">
                             <span className="text-sm font-bold">{branding.logo_text}</span>
                         </div>
                     </a>
