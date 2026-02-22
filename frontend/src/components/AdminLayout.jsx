@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
+import apiClient from '../services/apiClient';
 import { useTheme } from '../contexts/ThemeContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { NetworkStatusBanner } from './ui/NetworkStatusBanner';
@@ -38,6 +39,38 @@ export default function AdminLayout({ children }) {
     useEffect(() => {
         const currentUser = authService.getCurrentUser();
         setUser(currentUser);
+    }, []);
+
+    // Proactive session check - verify session is still valid before it expires
+    // This prevents sudden logout mid-activity
+    const sessionCheckInterval = useRef(null);
+
+    useEffect(() => {
+        const checkSession = async () => {
+            try {
+                // Call /api/auth/verify to check if session is still valid
+                await apiClient.get('/api/auth/verify', { timeout: 5000 });
+            } catch (error) {
+                // If session is invalid (401/403), redirect to login silently
+                if (error.response?.status === 401 || error.response?.status === 403) {
+                    console.log('[Session] Session expired, redirecting to login...');
+                    localStorage.removeItem('user');
+                    window.location.href = '/admin/login?expired=true';
+                }
+            }
+        };
+
+        // Check session every 5 minutes
+        sessionCheckInterval.current = setInterval(checkSession, 5 * 60 * 1000);
+
+        // Also check immediately on mount
+        checkSession();
+
+        return () => {
+            if (sessionCheckInterval.current) {
+                clearInterval(sessionCheckInterval.current);
+            }
+        };
     }, []);
 
     /**

@@ -69,14 +69,14 @@ function showWarningNotification(title, message) {
 
 /**
  * Handle session expiration logic
- * Clears tokens and redirects to login if in admin area
+ * Clears tokens and redirects to login silently (no error notification)
  * @param {Error} error - Error to reject with
  * @returns {Promise<never>} Rejected promise
  */
 function handleSessionExpired(error) {
     localStorage.removeItem('user');
     clearCsrfToken();
-    showErrorNotification('Session Expired', 'Your session has expired. Please log in again.');
+    // Silent redirect - no error notification to avoid disrupting user experience
     if (window.location.pathname.startsWith('/admin')) {
         window.location.href = '/admin/login?expired=true';
     }
