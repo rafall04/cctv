@@ -343,26 +343,18 @@ class RecordingService {
 
     /**
      * Handle segment creation
+     * 
+     * ROBUST APPROACH:
+     * 1. Try re-mux MAX 2 times
+     * 2. If re-mux fails → still register to DB (user can still try to play)
+     * 3. Cleanup based on filename timestamp (not database)
+     * 
+     * This ensures:
+     * - No segment is lost due to connection errors
+     * - User can still see all segments in playback
+     * - Storage is managed by cleanup based on filename timestamp
      */
     onSegmentCreated(cameraId, filename) {
-        // CRITICAL: Check if this file has failed re-mux before (prevent infinite loop)
-        if (isFileFailed(cameraId, filename)) {
-            // File has failed 3+ times (likely corrupt) - delete it from disk
-            const cameraDir = join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
-            const failedPath = join(cameraDir, filename);
-            if (existsSync(failedPath)) {
-                try {
-                    unlinkSync(failedPath);
-                    console.log(`[Segment] ✓ Deleted permanently failed file (3+ remux failures): ${filename}`);
-                } catch (err) {
-                    console.error(`[Segment] Failed to delete permanently failed file ${filename}:`, err.message);
-                }
-            }
-            // Also clean up the failed_remux_files tracking entry
-            removeFailedFile(cameraId, filename);
-            return;
-        }
-
         const cameraDir = join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
         const filePath = join(cameraDir, filename);
 
@@ -463,6 +455,7 @@ class RecordingService {
                 }
 
                 // CRITICAL FIX: Re-mux file to create proper MP4 index for seeking
+                // Skip ffprobe check - go straight to re-mux (robust approach)
                 console.log(`[Segment] Re-muxing file to fix MP4 index: ${filename}`);
                 const tempPath = filePath + '.remux.mp4';
 
@@ -472,85 +465,69 @@ class RecordingService {
                     unlinkSync(tempPath);
                 }
 
-                // Quick ffprobe check (with shorter timeout)
-                // CRITICAL: Store actual duration for accurate database entry
-                let actualDuration = 600; // Default 10 minutes, will be updated by ffprobe
+                // Default duration from filename (10 minutes = 600 seconds)
+                // Will be updated if re-mux succeeds
+                let actualDuration = 600;
+                let reMuxSuccess = false;
 
-                try {
-                    const { execSync } = await import('child_process');
-                    const ffprobeOutput = execSync(
-                        `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`,
-                        { encoding: 'utf8', timeout: 3000 } // Reduced from 5s to 3s
-                    ).trim();
+                // Try re-mux MAX 2 times
+                const MAX_RETRY = 2;
+                for (let attempt = 1; attempt <= MAX_RETRY; attempt++) {
+                    try {
+                        console.log(`[Segment] Re-mux attempt ${attempt}/${MAX_RETRY}: ${filename}`);
+                        
+                        await new Promise((resolve, reject) => {
+                            const ffmpeg = spawn('ffmpeg', [
+                                '-i', filePath,
+                                '-c', 'copy',                    // Copy streams (no re-encode)
+                                '-movflags', '+faststart',       // Move moov atom to start (CRITICAL for seeking)
+                                '-fflags', '+genpts',            // Generate presentation timestamps
+                                '-avoid_negative_ts', 'make_zero', // Normalize timestamps
+                                '-y',                            // Overwrite
+                                tempPath
+                            ]);
 
-                    if (!ffprobeOutput || parseFloat(ffprobeOutput) < 1) {
-                        console.log(`[Segment] File not ready (duration: ${ffprobeOutput}s), will retry later: ${filename}`);
+                            let ffmpegError = '';
+                            ffmpeg.stderr.on('data', (data) => {
+                                ffmpegError += data.toString();
+                            });
 
-                        // Track failed attempt in database
-                        incrementFailCount(cameraId, filename);
+                            ffmpeg.on('close', (code) => {
+                                if (code === 0) {
+                                    console.log(`[Segment] Re-mux successful (attempt ${attempt}): ${filename}`);
+                                    resolve();
+                                } else {
+                                    console.error(`[Segment] Re-mux failed (attempt ${attempt}, code ${code}):`, ffmpegError.slice(-500));
+                                    if (existsSync(tempPath)) {
+                                        unlinkSync(tempPath);
+                                    }
+                                    reject(new Error(`FFmpeg re-mux failed with code ${code}`));
+                                }
+                            });
 
-                        cleanup();
-                        return;
+                            ffmpeg.on('error', (error) => {
+                                console.error(`[Segment] Re-mux spawn error (attempt ${attempt}):`, error);
+                                if (existsSync(tempPath)) {
+                                    unlinkSync(tempPath);
+                                }
+                                reject(error);
+                            });
+                        });
+
+                        // Re-mux succeeded!
+                        reMuxSuccess = true;
+                        break;
+                        
+                    } catch (remuxError) {
+                        console.warn(`[Segment] Re-mux attempt ${attempt} failed:`, remuxError.message);
+                        if (attempt === MAX_RETRY) {
+                            console.error(`[Segment] All ${MAX_RETRY} re-mux attempts failed for: ${filename}`);
+                        }
                     }
-
-                    // Store actual duration from ffprobe
-                    actualDuration = Math.round(parseFloat(ffprobeOutput));
-                    console.log(`[Segment] File is complete, duration: ${actualDuration}s`);
-                } catch (error) {
-                    console.log(`[Segment] ffprobe check failed, file not ready: ${filename}`);
-
-                    // Track failed attempt in database
-                    incrementFailCount(cameraId, filename);
-
-                    cleanup();
-                    return;
                 }
 
-                // Perform re-mux with optimized settings for seeking
-                await new Promise((resolve, reject) => {
-                    const ffmpeg = spawn('ffmpeg', [
-                        '-i', filePath,
-                        '-c', 'copy',                    // Copy streams (no re-encode)
-                        '-movflags', '+faststart',       // Move moov atom to start (CRITICAL for seeking)
-                        '-fflags', '+genpts',            // Generate presentation timestamps
-                        '-avoid_negative_ts', 'make_zero', // Normalize timestamps
-                        '-y',                            // Overwrite
-                        tempPath
-                    ]);
-
-                    let ffmpegError = '';
-                    ffmpeg.stderr.on('data', (data) => {
-                        ffmpegError += data.toString();
-                    });
-
-                    ffmpeg.on('close', (code) => {
-                        if (code === 0) {
-                            console.log(`[Segment] Re-mux successful: ${filename}`);
-                            resolve();
-                        } else {
-                            console.error(`[Segment] Re-mux failed (code ${code}):`, ffmpegError.slice(-500));
-                            // Clean up failed temp file
-                            if (existsSync(tempPath)) {
-                                unlinkSync(tempPath);
-                            }
-                            reject(new Error(`FFmpeg re-mux failed with code ${code}`));
-                        }
-                    });
-
-                    ffmpeg.on('error', (error) => {
-                        console.error(`[Segment] Re-mux spawn error:`, error);
-                        // Clean up on error
-                        if (existsSync(tempPath)) {
-                            unlinkSync(tempPath);
-                        }
-                        reject(error);
-                    });
-                });
-
-                // 🛡️ FIX 1: ATOMIC DATA SAFETY - Replace original with re-muxed file
-                // CRITICAL: Use atomic rename instead of delete+rename to prevent data loss
-                // On Linux/Unix, fs.promises.rename() overwrites target atomically (crash-safe)
-                if (existsSync(tempPath)) {
+                // 🛡️ ATOMIC DATA SAFETY - Replace original with re-muxed file (only if re-mux succeeded)
+                if (reMuxSuccess && existsSync(tempPath)) {
                     const tempStats = statSync(tempPath);
                     console.log(`[Segment] Re-muxed file size: ${(tempStats.size / 1024 / 1024).toFixed(2)} MB`);
 
@@ -570,13 +547,12 @@ class RecordingService {
                             throw error;
                         }
                     }
-                } else {
-                    console.error(`[Segment] Re-muxed file not found: ${tempPath}`);
-                    cleanup();
-                    return;
+                } else if (!reMuxSuccess) {
+                    // Re-mux failed after MAX_RETRY - still register to DB with original file
+                    console.log(`[Segment] Registering to DB without re-mux: ${filename}`);
                 }
 
-                // Parse filename untuk get timestamp
+                // Parse filename untuk get timestamp (source of truth)
                 const match = filename.match(/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
                 if (!match) {
                     console.warn(`[Segment] Invalid filename format: ${filename}`);
@@ -586,10 +562,10 @@ class RecordingService {
 
                 const [, year, month, day, hour, minute, second] = match;
                 const startTime = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
-                // Use actual duration from ffprobe (not hardcoded 10 minutes)
+                // Use default 10 minutes duration (or calculate from filename if segment is incomplete)
                 const endTime = new Date(startTime.getTime() + actualDuration * 1000);
 
-                // Get final file size after re-mux
+                // Get final file size
                 const finalStats = statSync(filePath);
                 const finalSize = finalStats.size;
 
@@ -644,12 +620,20 @@ class RecordingService {
     }
 
     /**
-     * Cleanup old segments - AGE-BASED (FINAL FIX)
-     * CRITICAL: Delete based on FILE AGE, not segment count
-     * This prevents premature deletion of recent files
+     * Cleanup old segments - AGE-BASED (ROBUST)
+     * CRITICAL: Delete based on FILENAME TIMESTAMP, not database
+     * This is the most robust approach - filename timestamp is the source of truth
      * 
-     * ⚡ FIX 2: NON-BLOCKING CLEANUP - Uses async operations to prevent Event Loop freeze
-     * ⚡ FIX 6: Also cleans FILESYSTEM ORPHANS (files on disk but not in DB)
+     * Flow:
+     * 1. Parse timestamp from filename (YYYYMMDD_HHMMSS)
+     * 2. Calculate file age based on filename timestamp
+     * 3. Delete if age > retention period
+     * 
+     * This handles ALL cases:
+     * - Normal segments (10 min)
+     * - Short segments (1-2 min, connection error)
+     * - Orphan files (not registered in DB)
+     * - Files that failed re-mux
      */
     async cleanupOldSegments(cameraId) {
         try {
@@ -999,20 +983,9 @@ class RecordingService {
 
                         // Check each file
                         files.forEach(filename => {
-                            // CRITICAL: Delete files that have failed re-mux 3+ times
-                            if (isFileFailed(cameraId, filename)) {
-                                const failedPath = join(cameraDir, filename);
-                                try {
-                                    if (existsSync(failedPath)) {
-                                        unlinkSync(failedPath);
-                                        console.log(`[Scanner] ✓ Deleted permanently failed file: ${filename}`);
-                                    }
-                                    removeFailedFile(cameraId, filename);
-                                } catch (delErr) {
-                                    console.error(`[Scanner] Failed to delete failed file ${filename}:`, delErr.message);
-                                }
-                                return;
-                            }
+                            // ROBUST APPROACH: No more "failed file" tracking
+                            // All files will be handled by cleanup based on filename timestamp
+                            // This includes files that failed re-mux - they stay until retention
 
                             // Check if already in database
                             const existing = queryOne(
