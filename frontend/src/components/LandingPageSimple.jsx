@@ -174,7 +174,7 @@ export default function LandingPageSimple({
 
             {/* Saweria Support */}
             <Suspense fallback={null}>
-                <SaweriaSupport />
+                <SaweriaSupport enabled={saweriaEnabled} saweriaUrl={saweriaLink} />
             </Suspense>
         </div>
     );

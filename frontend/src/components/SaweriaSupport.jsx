@@ -11,60 +11,30 @@ const CoffeeIcon = () => (
     </svg>
 );
 
-const SaweriaSupport = memo(function SaweriaSupport() {
+const SaweriaSupport = memo(function SaweriaSupport({ enabled = true, saweriaUrl = 'https://saweria.co/raflialdi' }) {
     const [showModal, setShowModal] = useState(false);
     const [showBanner, setShowBanner] = useState(false);
     const [bannerMinimized, setBannerMinimized] = useState(false);
-    const [isEnabled, setIsEnabled] = useState(true);
     const [isReady, setIsReady] = useState(false);
-    
+
     // Simplified - just use one variation
     const modalContent = useMemo(() => ({
         title: 'Traktir Kopi Dong!',
         subtitle: 'Biar semangat maintain server & kamera 24/7',
     }), []);
 
-    // Fetch config once with timeout
     useEffect(() => {
         let isMounted = true;
-        
-        const fetchConfig = async () => {
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 3000);
-                
-                const response = await fetch('/api/saweria/public', { 
-                    signal: controller.signal 
-                }).catch(() => null);
-                
-                clearTimeout(timeoutId);
-                
-                if (isMounted && response?.ok) {
-                    const data = await response.json().catch(() => null);
-                    if (data?.enabled === false) {
-                        setIsEnabled(false);
-                    }
-                }
-            } catch (e) {
-                // Use default - enabled
-            } finally {
-                if (isMounted) {
-                    setIsReady(true);
-                }
-            }
-        };
-        
-        fetchConfig();
-        
+        setIsReady(true);
         return () => { isMounted = false; };
     }, []);
 
     // Show logic after ready
     useEffect(() => {
-        if (!isReady) return;
-        
+        if (!isReady || !enabled) return;
+
         const dontShow = localStorage.getItem(STORAGE_KEY);
-        
+
         if (dontShow === 'true') {
             // Show banner after delay
             const timer = setTimeout(() => {
@@ -73,10 +43,10 @@ const SaweriaSupport = memo(function SaweriaSupport() {
             }, 3000);
             return () => clearTimeout(timer);
         }
-        
+
         // Show modal after scroll or timeout
         let hasScrolled = false;
-        
+
         const handleScroll = () => {
             if (!hasScrolled && window.scrollY > 100) {
                 hasScrolled = true;
@@ -85,21 +55,21 @@ const SaweriaSupport = memo(function SaweriaSupport() {
                 return () => clearTimeout(timer);
             }
         };
-        
+
         const fallbackTimer = setTimeout(() => {
             if (!hasScrolled) {
                 setShowModal(true);
             }
             window.removeEventListener('scroll', handleScroll);
         }, 8000);
-        
+
         window.addEventListener('scroll', handleScroll, { passive: true });
-        
+
         return () => {
             clearTimeout(fallbackTimer);
             window.removeEventListener('scroll', handleScroll);
         };
-    }, [isReady]);
+    }, [isReady, enabled]);
 
     const handleModalClose = () => {
         setShowModal(false);
@@ -113,7 +83,7 @@ const SaweriaSupport = memo(function SaweriaSupport() {
     };
 
     const handleSupport = () => {
-        window.open('https://saweria.co/raflialdi', '_blank', 'noopener,noreferrer');
+        window.open(saweriaUrl, '_blank', 'noopener,noreferrer');
         setShowModal(false);
         setTimeout(() => setShowBanner(true), 2000);
     };
@@ -129,9 +99,9 @@ const SaweriaSupport = memo(function SaweriaSupport() {
     };
 
     const handleBannerClose = () => setShowBanner(false);
-    const handleBannerSupport = () => window.open('https://saweria.co/raflialdi', '_blank', 'noopener,noreferrer');
+    const handleBannerSupport = () => window.open(saweriaUrl, '_blank', 'noopener,noreferrer');
 
-    if (!isReady || !isEnabled) return null;
+    if (!isReady || !enabled) return null;
 
     return (
         <>
@@ -139,7 +109,7 @@ const SaweriaSupport = memo(function SaweriaSupport() {
             {showModal && (
                 <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-black/70">
                     <div className="absolute inset-0" onClick={handleModalClose} />
-                    
+
                     <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-sm w-full max-h-[90vh] overflow-y-auto">
                         <div className="bg-gradient-to-r from-orange-500 to-amber-500 p-4 text-center">
                             <div className="w-12 h-12 mx-auto mb-2 bg-white/30 rounded-full flex items-center justify-center text-white">
@@ -153,7 +123,7 @@ const SaweriaSupport = memo(function SaweriaSupport() {
                             <p className="text-gray-700 dark:text-gray-300 text-center text-sm mb-3">
                                 Dukungan kamu sangat berarti untuk menjaga server tetap aktif 24/7!
                             </p>
-                            
+
                             <div className="flex flex-col gap-2">
                                 <button
                                     onClick={handleSupport}
@@ -161,7 +131,7 @@ const SaweriaSupport = memo(function SaweriaSupport() {
                                 >
                                     Traktir Kopi Sekarang
                                 </button>
-                                
+
                                 <button
                                     onClick={handleModalClose}
                                     className="w-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-medium py-2 px-4 rounded-xl text-sm"

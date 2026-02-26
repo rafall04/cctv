@@ -357,7 +357,7 @@ function LandingPageContent() {
                     <FeedbackWidget />
                 </Suspense>
                 <Suspense fallback={null}>
-                    <SaweriaSupport />
+                    <SaweriaSupport enabled={saweriaEnabled} saweriaUrl={saweriaLink} />
                 </Suspense>
             </div>
         </div>
