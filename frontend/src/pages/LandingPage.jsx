@@ -361,7 +361,7 @@ function LandingPageContent() {
 const Hero = memo(function Hero({ branding, landingSettings, disableHeavyEffects, onCameraClick }) {
     return (
         <>
-            <header className="relative overflow-hidden bg-gradient-to-br from-amber-50/80 via-transparent to-emerald-50/80 dark:from-amber-950/30 dark:via-transparent dark:to-emerald-950/30">
+            <header className="relative overflow-hidden bg-gradient-to-b from-amber-100/50 to-transparent dark:from-amber-900/10 dark:to-transparent">
                 {!disableHeavyEffects && (
                     <>
                         <div className="absolute top-0 left-1/4 w-64 h-64 bg-amber-200/30 dark:bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
@@ -380,11 +380,9 @@ const Hero = memo(function Hero({ branding, landingSettings, disableHeavyEffects
                 )}
 
                 <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 text-center">
-                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold mb-3 shadow-sm">
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z"/>
-                        </svg>
-                        <span>Ramadan Kareem 1447 H</span>
+                    <div className="inline-flex items-center justify-center gap-2 px-5 py-2 rounded-full border border-amber-500/30 bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 text-sm font-semibold mb-6 shadow-sm">
+                        <span>🌙</span>
+                        <span>Selamat Menjalankan Ibadah Puasa 1447 H</span>
                     </div>
 
                     {branding.show_powered_by === 'true' && (
@@ -394,9 +392,8 @@ const Hero = memo(function Hero({ branding, landingSettings, disableHeavyEffects
                         </div>
                     )}
 
-                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold mb-4 shadow-sm">
+                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-semibold mb-4 shadow-sm">
                         <span className="relative flex h-2 w-2">
-                            {!disableHeavyEffects && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
                             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                         </span>
                         {landingSettings.hero_badge}

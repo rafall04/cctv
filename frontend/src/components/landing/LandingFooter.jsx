@@ -17,24 +17,17 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
         <>
         <footer className="py-10 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="mb-8 text-center">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200/50 dark:border-emerald-700/30 mb-4">
-                        <svg className="w-5 h-5 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z"/>
-                        </svg>
-                        <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Ramadan Kareem 1447 H</span>
+                <div className="mb-8 text-center flex flex-col items-center justify-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-600 to-amber-800 flex items-center justify-center text-white shadow-lg shadow-amber-900/20 mb-2">
+                        <span className="text-xl font-bold">{branding.logo_text}</span>
                     </div>
-
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-sky-50 dark:bg-primary/10 mb-4">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center text-white">
-                            <span className="text-sm font-bold">{branding.logo_text}</span>
-                        </div>
-                        <span className="font-bold text-primary-600 dark:text-primary-400">{branding.company_name}</span>
-                    </div>
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
-                        {branding.copyright_text}
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+                        {branding.company_name}
+                    </h2>
+                    <h3 className="text-lg font-medium text-amber-600 dark:text-amber-500">
+                        Ramadan Kareem 1447 H 🌙
                     </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mb-4">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mt-2">
                         {branding.company_description}
                     </p>
                 </div>
@@ -129,16 +122,27 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                     </p>
                 </div>
 
-                <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
-                    <p className="text-center text-gray-400 dark:text-gray-500 text-xs">
+                <div className="pt-8 mt-4 border-t border-gray-100 dark:border-gray-800/50 flex flex-col items-center justify-center gap-2 text-center">
+                    <div className="flex items-center gap-2">
+                        <span className="font-bold text-gray-900 dark:text-white">{branding.company_name}</span>
+                    </div>
+                    <span className="text-sm font-medium text-amber-600 dark:text-amber-500">Ramadan Kareem 1447 H 🌙</span>
+                    
+                    <p className="text-gray-400 dark:text-gray-500 text-xs mt-2">
                         © {new Date().getFullYear()} {branding.company_name} • {branding.copyright_text}
                     </p>
+
+                    {saweriaEnabled && (
+                        <p className="text-gray-400 dark:text-gray-600 text-[10px]">
+                            Sistem donasi dikelola oleh Saweria
+                        </p>
+                    )}
                     {showPoweredBy && (
-                        <p className="text-center text-gray-400 dark:text-gray-600 text-[10px] mt-1">
+                        <p className="text-gray-400 dark:text-gray-600 text-[10px]">
                             Powered by {branding.company_name || 'CCTV System'}
                         </p>
                     )}
-                </div>
+            </div>
             </div>
         </footer>
 

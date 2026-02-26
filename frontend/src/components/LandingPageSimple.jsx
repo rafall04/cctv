@@ -71,35 +71,27 @@ function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
 
     return (
         <>
-            <footer className="py-4 border-t border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-r from-emerald-50/50 to-green-50/50 dark:from-emerald-950/20 dark:to-green-950/20">
+            <footer className="py-8 border-t border-amber-200/50 dark:border-amber-900/50 bg-gradient-to-b from-transparent to-amber-50/30 dark:to-amber-950/20">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="text-center space-y-1">
-                        <p className="text-xs text-gray-600 dark:text-gray-400">
-                            <span className="text-emerald-600 dark:text-emerald-400 font-medium">Ramadan Kareem 1447 H</span> • CCTV {branding.company_name}
-                        </p>
-                        <div className="flex items-center justify-center gap-3 text-xs text-gray-500 dark:text-gray-500">
-                            <span>© 2026 {branding.company_name}</span>
-                            <span>•</span>
-                            <button
-                                onClick={() => setIsFeedbackOpen(true)}
-                                className="hover:text-emerald-500 transition-colors"
-                            >
-                                Feedback
-                            </button>
-                            {saweriaEnabled && saweriaLink && (
-                                <>
-                                    <span>•</span>
-                                    <a
-                                        href={saweriaLink}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="hover:text-emerald-500 transition-colors"
-                                    >
-                                        Dukung
-                                    </a>
-                                </>
-                            )}
+                    <div className="flex flex-col items-center justify-center gap-2 text-center">
+                        <div className="flex items-center gap-2 mb-1">
+                            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-amber-600 to-amber-800 flex items-center justify-center text-white text-xs font-bold">
+                                {branding.logo_text}
+                            </div>
+                            <span className="font-bold text-lg text-gray-900 dark:text-white tracking-tight">{branding.company_name}</span>
                         </div>
+                        
+                        <span className="text-sm font-medium text-amber-600 dark:text-amber-500">Ramadan Kareem 1447 H 🌙</span>
+                        
+                        <p className="text-gray-400 dark:text-gray-500 text-xs mt-2">
+                            © {new Date().getFullYear()} {branding.company_name} • {branding.copyright_text}
+                        </p>
+                        
+                        {saweriaEnabled && saweriaLink && (
+                            <p className="text-gray-400 dark:text-gray-600 text-[10px]">
+                                Sistem donasi dikelola oleh Saweria
+                            </p>
+                        )}
                     </div>
                 </div>
             </footer>
@@ -141,12 +133,9 @@ export default function LandingPageSimple({
             {/* Main Content - CamerasSection handles all view modes */}
             <main className="flex-1 min-h-0">
                 {/* Ramadan Banner */}
-                <div className="py-3 px-4 text-center bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/30 border-b border-emerald-200/30 dark:border-emerald-800/30">
-                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/80 dark:bg-gray-800/80 shadow-sm">
-                        <svg className="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z"/>
-                        </svg>
-                        <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Ramadan Kareem 1447 H</span>
+                <div className="py-6 px-4 text-center bg-gradient-to-b from-amber-100/50 to-transparent dark:from-amber-900/10 dark:to-transparent border-b border-amber-200/30 dark:border-amber-800/30">
+                    <div className="inline-flex items-center justify-center gap-2 px-5 py-2 rounded-full border border-amber-500/30 bg-amber-50 dark:bg-amber-950/20 shadow-sm">
+                        <span className="text-amber-700 dark:text-amber-400 font-semibold text-sm">🌙 Selamat Menjalankan Ibadah Puasa 1447 H</span>
                     </div>
                 </div>
 
