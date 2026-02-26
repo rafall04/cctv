@@ -37,12 +37,6 @@ class CameraHealthService {
         // Grace period in milliseconds (45 seconds)
         this.offlineGracePeriodMs = 45000;
     }
-        this.checkInterval = null;
-        this.isRunning = false;
-        this.lastCheck = null;
-        // Track when cameras went offline for downtime calculation
-        this.offlineSince = new Map(); // cameraId -> timestamp
-    }
 
     /**
      * Start the health check service

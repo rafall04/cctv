@@ -109,6 +109,7 @@ class MediaMtxService {
             return [];
             return [];
         }
+    }
 
     /**
      * Fetches all active paths from the MediaMTX API.
@@ -167,6 +168,7 @@ class MediaMtxService {
         } catch (error) {
             console.error(`[MediaMTX Service] Error checking if path exists (${pathName}):`, error.message);
             return false;
+    }
     }
 
     /**
