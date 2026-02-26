@@ -23,8 +23,7 @@ import MultiViewLayout from '../components/MultiView/MultiViewLayout';
 import VideoPopup from '../components/MultiView/VideoPopup';
 import SaweriaLeaderboard from '../components/SaweriaLeaderboard';
 
-const FeedbackWidget = lazy(() => import('../components/FeedbackWidget'));
-const SaweriaSupport = lazy(() => import('../components/SaweriaSupport'));
+
 
 function LandingPageContent() {
     const { branding } = useBranding();
@@ -353,12 +352,7 @@ function LandingPageContent() {
                     />
                 )}
 
-                <Suspense fallback={null}>
-                    <FeedbackWidget />
-                </Suspense>
-                <Suspense fallback={null}>
-                    <SaweriaSupport enabled={saweriaEnabled} saweriaUrl={saweriaLink} />
-                </Suspense>
+
             </div>
         </div>
     );

@@ -6,7 +6,7 @@ import { useCameras } from '../contexts/CameraContext';
 
 // Lazy load widgets to avoid conflicts with LandingPage
 const FeedbackWidget = lazy(() => import('./FeedbackWidget'));
-const SaweriaSupport = lazy(() => import('./SaweriaSupport'));
+
 
 // ============================================
 // ICONS
@@ -67,43 +67,46 @@ function SimpleHeader({ branding, layoutMode, onLayoutToggle }) {
 // SIMPLE FOOTER - Minimal information
 // ============================================
 function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
+    const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+
     return (
-        <footer className="py-4 border-t border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-r from-emerald-50/50 to-green-50/50 dark:from-emerald-950/20 dark:to-green-950/20">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="text-center space-y-1">
-                    <p className="text-xs text-gray-600 dark:text-gray-400">
-                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">Ramadan Kareem 1447 H</span> • CCTV {branding.company_name}
-                    </p>
-                    <div className="flex items-center justify-center gap-3 text-xs text-gray-500 dark:text-gray-500">
-                        <span>© 2026 {branding.company_name}</span>
-                        <span>•</span>
-                        <a
-                            href="#feedback"
-                            onClick={(e) => {
-                                e.preventDefault();
-                                document.querySelector('[data-feedback-widget]')?.click();
-                            }}
-                            className="hover:text-emerald-500 transition-colors"
-                        >
-                            Feedback
-                        </a>
-                        {saweriaEnabled && saweriaLink && (
-                            <>
-                                <span>•</span>
-                                <a
-                                    href={saweriaLink}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="hover:text-emerald-500 transition-colors"
-                                >
-                                    Dukung
-                                </a>
-                            </>
-                        )}
+        <>
+            <footer className="py-4 border-t border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-r from-emerald-50/50 to-green-50/50 dark:from-emerald-950/20 dark:to-green-950/20">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="text-center space-y-1">
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                            <span className="text-emerald-600 dark:text-emerald-400 font-medium">Ramadan Kareem 1447 H</span> • CCTV {branding.company_name}
+                        </p>
+                        <div className="flex items-center justify-center gap-3 text-xs text-gray-500 dark:text-gray-500">
+                            <span>© 2026 {branding.company_name}</span>
+                            <span>•</span>
+                            <button
+                                onClick={() => setIsFeedbackOpen(true)}
+                                className="hover:text-emerald-500 transition-colors"
+                            >
+                                Feedback
+                            </button>
+                            {saweriaEnabled && saweriaLink && (
+                                <>
+                                    <span>•</span>
+                                    <a
+                                        href={saweriaLink}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="hover:text-emerald-500 transition-colors"
+                                    >
+                                        Dukung
+                                    </a>
+                                </>
+                            )}
+                        </div>
                     </div>
                 </div>
-            </div>
-        </footer>
+            </footer>
+            <Suspense fallback={null}>
+                <FeedbackWidget isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
+            </Suspense>
+        </>
     );
 }
 
@@ -166,16 +169,6 @@ export default function LandingPageSimple({
                 saweriaEnabled={saweriaEnabled}
                 saweriaLink={saweriaLink}
             />
-
-            {/* Feedback Widget */}
-            <Suspense fallback={null}>
-                <FeedbackWidget />
-            </Suspense>
-
-            {/* Saweria Support */}
-            <Suspense fallback={null}>
-                <SaweriaSupport enabled={saweriaEnabled} saweriaUrl={saweriaLink} />
-            </Suspense>
         </div>
     );
 }

@@ -1,4 +1,7 @@
+import { useState, lazy, Suspense } from 'react';
 import { useCameras } from '../../contexts/CameraContext';
+
+const FeedbackWidget = lazy(() => import('../FeedbackWidget'));
 
 export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
     const { cameras, areas } = useCameras();
@@ -8,8 +11,10 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
     const whatsappLink = `https://wa.me/${whatsappNumber}?text=Halo%20Admin%20${encodeURIComponent(branding.company_name)}`;
 
     const showPoweredBy = branding.show_powered_by === 'true';
+    const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
 
     return (
+        <>
         <footer className="py-10 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="mb-8 text-center">
@@ -90,22 +95,33 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                     <span className="text-xs px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">Gratis Akses</span>
                 </div>
 
-                {saweriaEnabled && (
-                    <div className="flex flex-col items-center gap-3 mb-6">
-                        <a
-                            href={saweriaLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                <div className="flex flex-col items-center gap-4 mb-8">
+                    <div className="flex flex-wrap justify-center gap-4">
+                        {saweriaEnabled && saweriaLink && (
+                            <a
+                                href={saweriaLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold rounded-xl"
+                            >
+                                <span className="text-xl">☕</span>
+                                <span>Traktir Kopi</span>
+                            </a>
+                        )}
+                        <button
+                            onClick={() => setIsFeedbackOpen(true)}
+                            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white font-semibold rounded-xl"
                         >
-                            <span className="text-xl">☕</span>
-                            <span>Traktir Kopi</span>
-                        </a>
+                            <span className="text-xl">💬</span>
+                            <span>Kritik & Saran</span>
+                        </button>
+                    </div>
+                    {saweriaEnabled && (
                         <p className="text-xs text-gray-500 dark:text-gray-400 text-center max-w-md">
                             Dukung kami tambah CCTV di lokasi strategis
                         </p>
-                    </div>
-                )}
+                    )}
+                </div>
 
                 <div className="text-center mb-4">
                     <p className="text-[10px] text-gray-400 dark:text-gray-600">
@@ -125,5 +141,10 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                 </div>
             </div>
         </footer>
+
+        <Suspense fallback={null}>
+            <FeedbackWidget isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} />
+        </Suspense>
+        </>
     );
 }
