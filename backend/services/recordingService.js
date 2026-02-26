@@ -403,109 +403,324 @@ ${ffmpegOutput.slice(-1000)}`); // Last 1000 chars
      * 3. Cleanup based on filename timestamp (not database)
      * 
      * This ensures:
+     * - No segment is lost due to connection errors
+     * - User can still see all segments in playback
+     * - Storage is managed by cleanup based on filename timestamp
+     */
+    onSegmentCreated(cameraId, filename) {
+        const cameraDir = join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
+        const filePath = join(cameraDir, filename);
 
+        // CRITICAL: Mark file as being processed (prevent deletion + duplicate processing)
+        const fileKey = `${cameraId}:${filename}`;
+
+        // BUG FIX #2: Prevent duplicate processing
         if (filesBeingProcessed.has(fileKey)) {
+            console.log(`[Segment] Already processing: ${filename}, skipping duplicate`);
             return;
         }
 
         filesBeingProcessed.add(fileKey);
 
+        console.log(`[Segment] Detected new segment: camera${cameraId}/${filename}`);
+
+        // Wait for file stability (not just heuristic setTimeout)
+        // Check for file existence + size stability + file being closed by ffmpeg (if possible)
         const checkStability = async () => {
-            let stableCount = 0;
+            const maxRetries = 10;
+            const retryInterval = 1000;
             let lastSize = -1;
-            for (let i = 0; i < 15; i++) {
-                if (!existsSync(filePath)) return false;
+            let stableCount = 0;
+
+            for (let i = 0; i < maxRetries; i++) {
+                if (!existsSync(filePath)) {
+                    return false;
+                }
+
                 const stats = statSync(filePath);
-                if (stats.size > 0 && stats.size === lastSize) {
+                const currentSize = stats.size;
+
+                if (currentSize > 0 && currentSize === lastSize) {
                     stableCount++;
                 } else {
                     stableCount = 0;
                 }
-                lastSize = stats.size;
-                if (stableCount >= 3) return true;
-                await new Promise(r => setTimeout(r, 1000));
+
+                lastSize = currentSize;
+
+                // If size is stable for 3 checks (3 seconds), it's probably done
+                if (stableCount >= 3) {
+                    return true;
+                }
+
+                await new Promise(resolve => setTimeout(resolve, retryInterval));
             }
             return false;
         };
-
-        try {
-            const isStable = await checkStability();
-            if (!isStable) {
-                console.warn(`[Segment] ${filename} not stable or deleted`);
-                return;
-            }
-
-            const tempPath = filePath + '.remux.mp4';
-            if (existsSync(tempPath)) unlinkSync(tempPath);
-
-            // Re-mux video faststart
-            let remuxSuccess = false;
+        setTimeout(async () => {
             try {
-                await new Promise((resolve, reject) => {
-                    const ffmpegRemux = spawn('ffmpeg', [
-                        '-i', filePath,
-                        '-c', 'copy',
-                        '-movflags', '+faststart',
-                        '-y', tempPath
-                    ]);
-                    ffmpegRemux.on('close', (code) => {
-                        if (code === 0) resolve();
-                        else reject(new Error(`remux code ${code}`));
-                    });
-                    ffmpegRemux.on('error', reject);
-                });
-                remuxSuccess = true;
-            } catch (err) {
-                console.error(`[Segment] Remux failed for ${filename}: `, err.message);
-            }
+                // BUG FIX #1: Ensure cleanup in ALL exit paths
+                const cleanup = () => {
+                    filesBeingProcessed.delete(fileKey);
+                };
 
-            if (remuxSuccess && existsSync(tempPath)) {
-                const finalSize = statSync(tempPath).size;
-                if (finalSize > 0) {
-                    renameSync(tempPath, filePath);
-                } else {
+                if (!existsSync(filePath)) {
+                    console.warn(`[Segment] File not found: ${filePath}`);
+                    cleanup();
+                    return;
+                }
+
+                // Quick file size check - 2 times with 2s gaps (reduced from 3x3s)
+                console.log(`[Segment] Checking file stability: ${filename}`);
+
+                let fileSize1 = statSync(filePath).size;
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                if (!existsSync(filePath)) {
+                    console.warn(`[Segment] File disappeared during check: ${filePath}`);
+                    cleanup();
+                    return;
+                }
+
+                let fileSize2 = statSync(filePath).size;
+
+                // If still growing, wait 3s more (reduced from 5s)
+                if (fileSize2 > fileSize1) {
+                    console.log(`[Segment] File still growing, waiting... (${fileSize1} -> ${fileSize2})`);
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    if (!existsSync(filePath)) {
+                        cleanup();
+                        return;
+                    }
+                    fileSize2 = statSync(filePath).size;
+                }
+
+                const fileSize = fileSize2;
+
+                console.log(`[Segment] Final file size: ${(fileSize / 1024 / 1024).toFixed(2)} MB`);
+                // CRITICAL FIX: Lower threshold to 500KB (from 5MB) to handle tunnel reconnect
+                // This allows files as short as 30 seconds to be saved and playable
+                // Reasoning: 1.5Mbps bitrate × 30s = ~5.6MB, but with compression ~500KB minimum
+                if (fileSize < 500 * 1024) {
+                    console.warn(`[Segment] File too small (< 500KB), likely corrupt or empty: ${filename} (${(fileSize / 1024).toFixed(2)} KB)`);
+                    // BUG FIX: Delete the corrupt/empty file from disk instead of just skipping
+                    // Previously this file was left on disk forever since it's not in DB
+                    try {
+                        await fsPromises.unlink(filePath);
+                        console.log(`[Segment] ✓ Deleted corrupt/empty file: ${filename}`);
+                    } catch (delErr) {
+                        console.error(`[Segment] Failed to delete corrupt file ${filename}:`, delErr.message);
+                    }
+                    cleanup();
+                    return;
+                }
+
+                // Log if file is smaller than expected (< 5MB for 10min segment)
+                if (fileSize < 5 * 1024 * 1024) {
+                    console.log(`[Segment] ⚠️ File smaller than expected (likely from reconnect): ${filename} (${(fileSize / 1024 / 1024).toFixed(2)} MB)`);
+                }
+
+                // CRITICAL FIX: Re-mux file to create proper MP4 index for seeking
+                // Skip ffprobe check - go straight to re-mux (robust approach)
+                console.log(`[Segment] Re-muxing file to fix MP4 index: ${filename}`);
+                const tempPath = filePath + '.remux.mp4';
+
+                // Clean up any existing temp files first
+                if (existsSync(tempPath)) {
+                    console.log(`[Segment] Cleaning up existing temp file: ${tempPath}`);
                     unlinkSync(tempPath);
                 }
-            }
 
-            const stats = statSync(filePath);
-            const sizeInKb = (stats.size / 1024).toFixed(2);
+                // Default duration from filename (10 minutes = 600 seconds)
+                // Will be updated if re-mux succeeds
+                let actualDuration = 600;
+                let reMuxSuccess = false;
 
-            // Database insertion
-            const regex = /(d{4})(d{2})(d{2})_(d{2})(d{2})(d{2})/;
-            const match = filename.match(regex);
-            
-            if (match) {
-                const [, year, month, day, hour, min, sec] = match;
-                const startTime = new Date(`${year}-${month}-${day}T${hour}:${min}:${sec}Z`);
-                const endTime = new Date(startTime.getTime() + (600 * 1000));
+                // Try re-mux MAX 2 times
+                const MAX_RETRY = 2;
+                for (let attempt = 1; attempt <= MAX_RETRY; attempt++) {
+                    try {
+                        console.log(`[Segment] Re-mux attempt ${attempt}/${MAX_RETRY}: ${filename}`);
+                        
+                        await new Promise((resolve, reject) => {
+                            const ffmpeg = spawn('ffmpeg', [
+                                '-i', filePath,
+                                '-c', 'copy',                    // Copy streams (no re-encode)
+                                '-movflags', '+faststart',       // Move moov atom to start (CRITICAL for seeking)
+                                '-fflags', '+genpts',            // Generate presentation timestamps
+                                '-avoid_negative_ts', 'make_zero', // Normalize timestamps
+                                '-y',                            // Overwrite
+                                tempPath
+                            ]);
 
-                const existingRow = queryOne(
+                            let ffmpegError = '';
+                            ffmpeg.stderr.on('data', (data) => {
+                                ffmpegError += data.toString();
+                            });
+
+                            ffmpeg.on('close', (code) => {
+                                if (code === 0) {
+                                    console.log(`[Segment] Re-mux successful (attempt ${attempt}): ${filename}`);
+                                    resolve();
+                                } else {
+                                    console.error(`[Segment] Re-mux failed (attempt ${attempt}, code ${code}):`, ffmpegError.slice(-500));
+                                    if (existsSync(tempPath)) {
+                                        unlinkSync(tempPath);
+                                    }
+                                    reject(new Error(`FFmpeg re-mux failed with code ${code}`));
+                                }
+                            });
+
+                            ffmpeg.on('error', (error) => {
+                                console.error(`[Segment] Re-mux spawn error (attempt ${attempt}):`, error);
+                                if (existsSync(tempPath)) {
+                                    unlinkSync(tempPath);
+                                }
+                                reject(error);
+                            });
+                        });
+
+                        // Re-mux succeeded!
+                        reMuxSuccess = true;
+                        break;
+                        
+                    } catch (remuxError) {
+                        console.warn(`[Segment] Re-mux attempt ${attempt} failed:`, remuxError.message);
+                        if (attempt === MAX_RETRY) {
+                            console.error(`[Segment] All ${MAX_RETRY} re-mux attempts failed for: ${filename}`);
+                        }
+                    }
+                }
+
+                // 🛡️ ATOMIC DATA SAFETY - Replace original with re-muxed file (only if re-mux succeeded)
+                if (reMuxSuccess && existsSync(tempPath)) {
+                    const tempStats = statSync(tempPath);
+                    console.log(`[Segment] Re-muxed file size: ${(tempStats.size / 1024 / 1024).toFixed(2)} MB`);
+
+                    try {
+                        // Atomic rename: overwrites filePath in single operation (no gap)
+                        // If crash occurs during rename, either old or new file exists (never both missing)
+                        await fsPromises.rename(tempPath, filePath);
+                        console.log(`[Segment] ✓ File replaced with re-muxed version (atomic operation)`);
+                    } catch (error) {
+                        // Handle EXDEV error (cross-device rename not supported)
+                        if (error.code === 'EXDEV') {
+                            console.log(`[Segment] Cross-device detected, using copy+delete fallback`);
+                            await fsPromises.copyFile(tempPath, filePath);
+                            await fsPromises.unlink(tempPath);
+                            console.log(`[Segment] ✓ File replaced using copy+delete fallback`);
+                        } else {
+                            throw error;
+                        }
+                    }
+                } else if (!reMuxSuccess) {
+                    // Re-mux failed after MAX_RETRY - still register to DB with original file
+                    console.log(`[Segment] Registering to DB without re-mux: ${filename}`);
+                }
+
+                // Parse filename untuk get timestamp (source of truth)
+                const match = filename.match(/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
+                if (!match) {
+                    console.warn(`[Segment] Invalid filename format: ${filename}`);
+                    cleanup();
+                    return;
+                }
+
+                const [, year, month, day, hour, minute, second] = match;
+                const startTime = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
+
+                // Get actual duration using ffprobe AFTER re-mux (more accurate)
+                // This is critical for proper playback timeline
+                try {
+                    const { execFileSync } = await import('child_process');
+                    const ffprobeOutput = execFileSync(
+                        'ffprobe',
+                        ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', filePath],
+                        { encoding: 'utf8', timeout: 5000 }
+                    ).trim();
+                    
+                    if (ffprobeOutput && parseFloat(ffprobeOutput) > 0) {
+                        actualDuration = Math.round(parseFloat(ffprobeOutput));
+                        console.log(`[Segment] Actual duration from ffprobe: ${actualDuration}s`);
+                    } else {
+                        console.warn(`[Segment] ffprobe returned invalid duration, using default 600s`);
+                    }
+                } catch (ffprobeError) {
+                    console.warn(`[Segment] ffprobe failed, using default duration:`, ffprobeError.message);
+                }
+
+                const endTime = new Date(startTime.getTime() + actualDuration * 1000);
+
+                // Get final file size
+                const finalStats = statSync(filePath);
+                const finalSize = finalStats.size;
+
+                // Check if already in database (prevent duplicates)
+                const existing = queryOne(
                     'SELECT id FROM recording_segments WHERE camera_id = ? AND filename = ?',
                     [cameraId, filename]
                 );
 
-                if (existingRow) {
+                if (existing) {
+                    console.log(`[Segment] Already in database, updating size: ${filename}`);
+                    // Update file size if different
                     execute(
                         'UPDATE recording_segments SET file_size = ? WHERE id = ?',
-                        [stats.size, existingRow.id]
+                        [finalSize, existing.id]
                     );
-                } else {
-                    execute(
-                        `INSERT INTO recording_segments 
-                         (camera_id, filename, start_time, end_time, file_size, duration, file_path) 
-                         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                        [cameraId, filename, startTime.toISOString(), endTime.toISOString(), stats.size, 600, filePath]
-                    );
+                    cleanup();
+                    return;
                 }
+
+                // Save to database
+                execute(
+                    `INSERT INTO recording_segments 
+                    (camera_id, filename, start_time, end_time, file_size, duration, file_path) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                        cameraId,
+                        filename,
+                        startTime.toISOString(),
+                        endTime.toISOString(),
+                        finalSize,
+                        actualDuration, // Use actual duration from ffprobe
+                        filePath
+                    ]
+                );
+
+                console.log(`✓ Segment saved: camera${cameraId}/${filename} (${(finalSize / 1024 / 1024).toFixed(2)} MB)`);
+
+                // CRITICAL: Remove from processing set (allow cleanup)
+                cleanup();
+
+                // NOTE: Cleanup is now handled by scheduled cleanup (every 30 minutes)
+                // No per-segment cleanup to prevent aggressive deletion
+
+            } catch (error) {
+                console.error(`[Segment] Error handling segment creation:`, error);
+
+                // CRITICAL: Remove from processing set on error
+                filesBeingProcessed.delete(fileKey);
             }
-        } catch (error) {
-            console.error(`[Segment] Fatal error processing ${filename}:`, error);
-        } finally {
-            filesBeingProcessed.delete(fileKey);
-        }
+        }, 3000); // Wait 3 seconds initial delay (optimized from 15s)
     }
 
+    /**
+     * Cleanup old segments - AGE-BASED (ROBUST)
+     * CRITICAL: Delete based on FILENAME TIMESTAMP, not database
+     * This is the most robust approach - filename timestamp is the source of truth
+     * 
+     * Flow:
+     * 1. Parse timestamp from filename (YYYYMMDD_HHMMSS)
+     * 2. Calculate file age based on filename timestamp
+     * 3. Delete if age > retention period
+     * 
+     * This handles ALL cases:
+     * - Normal segments (10 min)
+     * - Short segments (1-2 min, connection error)
+     * - Orphan files (not registered in DB)
+     * - Files that failed re-mux
+     */
     async cleanupOldSegments(cameraId) {
         try {
             // SAFETY #1: Don't cleanup if called too frequently (prevent race condition)
