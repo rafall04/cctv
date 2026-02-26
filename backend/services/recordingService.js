@@ -1,3 +1,5 @@
+import os from 'os';
+
 import { spawn } from 'child_process';
 import { existsSync, mkdirSync, unlinkSync, statSync, renameSync, readdirSync } from 'fs';
 import { promises as fsPromises } from 'fs';
@@ -1523,15 +1525,19 @@ ${ffmpegOutput.slice(-1000)}`); // Last 1000 chars
             const { execSync } = await import('child_process');
             let freeBytes = 0;
 
-            try {
-                // Windows: use wmic or PowerShell
-                const drive = RECORDINGS_BASE_PATH.charAt(0);
-                const output = execSync(
-                    `powershell -Command "(Get-PSDrive ${drive}).Free"`,
-                    { encoding: 'utf8', timeout: 5000 }
-                ).trim();
-                freeBytes = parseInt(output) || 0;
-            } catch {
+            if (os.platform() === 'win32') {
+                try {
+                    // Windows: use PowerShell
+                    const drive = RECORDINGS_BASE_PATH.charAt(0);
+                    const output = execSync(
+                        `powershell -Command "(Get-PSDrive ${drive}).Free"`,
+                        { encoding: 'utf8', timeout: 5000 }
+                    ).trim();
+                    freeBytes = parseInt(output) || 0;
+                } catch (err) {
+                    console.error('[DiskCheck] PowerShell disk check failed:', err.message);
+                }
+            } else {
                 try {
                     // Linux/Mac fallback: use df
                     const output = execSync(
@@ -1539,9 +1545,8 @@ ${ffmpegOutput.slice(-1000)}`); // Last 1000 chars
                         { encoding: 'utf8', timeout: 5000 }
                     ).trim();
                     freeBytes = parseInt(output) || 0;
-                } catch {
-                    // Can't determine free space, skip emergency check
-                    return;
+                } catch (err) {
+                    console.error('[DiskCheck] df disk check failed:', err.message);
                 }
             }
 
