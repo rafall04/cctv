@@ -636,6 +636,30 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         setSelectedCamera(camera);
         if (camera) {
             const timestamp = selectedSegment ? new Date(selectedSegment.start_time).getTime().toString() : '';
+            setSearchParams(prev => {
+                prev.set('cam', camera.id.toString());
+                if (timestamp) {
+                    prev.set('t', timestamp);
+                } else {
+                    prev.delete('t');
+                    prev.delete('time');
+                }
+                return prev;
+            }, { replace: true });
+        } else {
+            // If camera is null, clean URL params but keep mode if any
+            setSearchParams(prev => {
+                prev.delete('cam');
+                prev.delete('camera');
+                prev.delete('t');
+                prev.delete('time');
+                return prev;
+            }, { replace: true });
+        }
+    }, [setSearchParams, selectedSegment]);
+        setSelectedCamera(camera);
+        if (camera) {
+            const timestamp = selectedSegment ? new Date(selectedSegment.start_time).getTime().toString() : '';
             setSearchParams({ 
                 cam: camera.id.toString(),
                 t: timestamp || '' 

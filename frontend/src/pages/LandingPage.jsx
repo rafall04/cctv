@@ -270,6 +270,19 @@ function LandingPageContent() {
     // Handle popup close - reset URL to remove camera param
     const handlePopupClose = useCallback(() => {
         setPopup(null);
+        // Reset URL by removing camera and time params but keep mode
+        setSearchParams(prev => {
+            prev.delete('cam');
+            prev.delete('camera');
+            prev.delete('t');
+            prev.delete('time');
+            // Keep current mode if it exists
+            const currentMode = prev.get('mode') || layoutMode;
+            prev.set('mode', currentMode);
+            return prev;
+        }, { replace: true });
+    }, [layoutMode, setSearchParams]);
+        setPopup(null);
         // Reset URL by removing camera param but keep mode
         const currentMode = searchParams.get('mode') || layoutMode;
         setSearchParams(prev => {
