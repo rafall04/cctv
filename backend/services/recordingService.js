@@ -459,6 +459,7 @@ ${ffmpegOutput.slice(-1000)}`); // Last 1000 chars
         (async () => {
             try {
                 const cleanup = () => { filesBeingProcessed.delete(fileKey); };
+                const fs = require('fs');
                 
                 console.log(`[Segment] Waiting for ${filename} to finish recording completely...`);
                 
@@ -515,13 +516,22 @@ ${ffmpegOutput.slice(-1000)}`); // Last 1000 chars
                     try {
                         await new Promise((resolve, reject) => {
                             const { spawn } = require('child_process');
+                            // Timeout added to prevent Zombie FFmpeg Remux process
+                            const remuxTimeout = setTimeout(() => {
+                                reject(new Error('Remux timed out after 2 minutes'));
+                                try { ffmpeg.kill('SIGKILL'); } catch (e) {}
+                            }, 120000);
+                            
                             const ffmpeg = spawn('ffmpeg', [
                                 '-i', filePath,
                                 '-c', 'copy',
                                 '-movflags', '+faststart',
                                 '-y', tempPath
                             ]);
-                            ffmpeg.on('close', (code) => code === 0 ? resolve() : reject(new Error('code '+code)));
+                            ffmpeg.on('close', (code) => {
+                                clearTimeout(remuxTimeout);
+                                code === 0 ? resolve() : reject(new Error('code '+code));
+                            });
                             ffmpeg.on('error', reject);
                         });
                         reMuxSuccess = true;
