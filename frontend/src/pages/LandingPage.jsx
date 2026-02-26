@@ -47,6 +47,12 @@ function LandingPageContent() {
             isInitialMount.current = false;
             const queryMode = searchParams.get('mode');
             if (!queryMode) {
+                setSearchParams(prev => {
+                    prev.set('mode', layoutMode);
+                    return prev;
+                }, { replace: true });
+            }
+            if (!queryMode) {
                 setSearchParams({ mode: layoutMode }, { replace: true });
             }
         }
@@ -71,7 +77,10 @@ function LandingPageContent() {
         // Use startTransition to avoid Suspense hydration errors
         startTransition(() => {
             setLayoutMode(newMode);
-            setSearchParams({ mode: newMode }, { replace: true });
+            setSearchParams(prev => {
+                prev.set('mode', newMode);
+                return prev;
+            }, { replace: true });
         });
         
         try {
@@ -234,7 +243,7 @@ function LandingPageContent() {
     useEffect(() => {
         if (viewMode === 'playback') return; // Don't open popup in playback mode
         
-        const cameraIdFromUrl = searchParams.get('camera');
+        const cameraIdFromUrl = searchParams.get('cam') || searchParams.get('camera');
         if (cameraIdFromUrl && cameras.length > 0) {
             const camera = cameras.find(c => c.id === parseInt(cameraIdFromUrl));
             if (camera) {
@@ -253,7 +262,12 @@ function LandingPageContent() {
         addRecentCamera(camera);
         // Update URL for shareable links
         const currentMode = searchParams.get('mode') || layoutMode;
-        setSearchParams({ camera: camera.id.toString(), mode: currentMode }, { replace: false });
+        setSearchParams(prev => {
+            prev.set('cam', camera.id.toString());
+            prev.set('mode', currentMode);
+            prev.delete('camera'); // Clean up old param if exists
+            return prev;
+        }, { replace: false });
     }, [searchParams, layoutMode, setSearchParams, addRecentCamera]);
 
     // Handle popup close - reset URL to remove camera param
@@ -261,7 +275,12 @@ function LandingPageContent() {
         setPopup(null);
         // Reset URL by removing camera param but keep mode
         const currentMode = searchParams.get('mode') || layoutMode;
-        setSearchParams({ mode: currentMode }, { replace: false });
+        setSearchParams(prev => {
+            prev.delete('cam');
+            prev.delete('camera');
+            prev.set('mode', currentMode);
+            return prev;
+        }, { replace: false });
     }, [searchParams, layoutMode, setSearchParams]);
 
     if (layoutMode === 'simple') {
