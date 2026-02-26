@@ -32,6 +32,14 @@ class CameraHealthService {
         this.checkInterval = null;
         this.isRunning = false;
         this.lastCheck = null;
+        // Track when cameras went offline for grace period (cameraId -> timestamp)
+        this.offlineSince = new Map(); 
+        // Grace period in milliseconds (45 seconds)
+        this.offlineGracePeriodMs = 45000;
+    }
+        this.checkInterval = null;
+        this.isRunning = false;
+        this.lastCheck = null;
         // Track when cameras went offline for downtime calculation
         this.offlineSince = new Map(); // cameraId -> timestamp
     }
@@ -165,29 +173,26 @@ class CameraHealthService {
                 // 1. Path exists in MediaMTX config (configured = online)
                 const isOnline = pathInfo?.isOnline ? 1 : 0;
                 
-                // Only update if status changed
-                if (camera.is_online !== isOnline) {
-                    // Use connection pool for better performance
-                    execute(
-                        'UPDATE cameras SET is_online = ?, last_online_check = ? WHERE id = ?',
-                        [isOnline, timestamp, camera.id]
-                    );
-                    changedCount++;
+                if (isOnline) {
+                    // CAMERA IS ONLINE (MediaMTX says so)
                     
-                    // Send Telegram notification on status change
-                    if (isTelegramConfigured()) {
-                        if (isOnline) {
-                            // Camera came back online
-                            console.log(`[CameraHealth] ${camera.name} is now ONLINE`);
-                            
-                            // Calculate downtime if we tracked when it went offline
+                    // If it was marked offline in the DATABASE, bring it back online
+                    if (camera.is_online === 0) {
+                        execute(
+                            'UPDATE cameras SET is_online = 1, last_online_check = ? WHERE id = ?',
+                            [timestamp, camera.id]
+                        );
+                        changedCount++;
+
+                        console.log(`[CameraHealth] ${camera.name} is now ONLINE`);
+
+                        if (isTelegramConfigured()) {
+                            // Calculate downtime if we have a record
                             let downtime = null;
                             if (this.offlineSince.has(camera.id)) {
                                 downtime = Math.floor((Date.now() - this.offlineSince.get(camera.id)) / 1000);
-                                this.offlineSince.delete(camera.id);
                             }
-                            
-                            // Send online notification (async, don't await)
+
                             sendCameraOnlineNotification({
                                 id: camera.id,
                                 name: camera.name,
@@ -195,27 +200,55 @@ class CameraHealthService {
                             }, downtime).catch(err => {
                                 console.error('[CameraHealth] Failed to send online notification:', err.message);
                             });
-                        } else {
-                            // Camera went offline
-                            console.log(`[CameraHealth] ${camera.name} is now OFFLINE`);
-                            
-                            // Track when camera went offline
-                            this.offlineSince.set(camera.id, Date.now());
-                            
-                            // Send offline notification (async, don't await)
-                            sendCameraOfflineNotification({
-                                id: camera.id,
-                                name: camera.name,
-                                location: camera.location
-                            }).catch(err => {
-                                console.error('[CameraHealth] Failed to send offline notification:', err.message);
-                            });
                         }
+                    }
+
+                    // Always clear the grace period tracking when online
+                    if (this.offlineSince.has(camera.id)) {
+                        this.offlineSince.delete(camera.id);
+                    }
+                } else {
+                    // CAMERA IS OFFLINE (MediaMTX says so)
+                    
+                    // If it's already marked offline in DB, keep it that way
+                    if (camera.is_online === 0) {
+                        // Already confirmed offline, do nothing
                     } else {
-                        if (isOnline) {
-                            console.log(`[CameraHealth] ${camera.name} is now ONLINE`);
+                        // It's marked ONLINE in DB, but MediaMTX says OFFLINE
+                        
+                        // Start or check grace period
+                        if (!this.offlineSince.has(camera.id)) {
+                            // First time we see it offline, record the time
+                            this.offlineSince.set(camera.id, Date.now());
+                            console.log(`[CameraHealth] ${camera.name} offline detected, starting ${this.offlineGracePeriodMs/1000}s grace period`);
                         } else {
-                            console.log(`[CameraHealth] ${camera.name} is now OFFLINE`);
+                            // Already in grace period, check if it's expired
+                            const offlineDuration = Date.now() - this.offlineSince.get(camera.id);
+                            
+                            if (offlineDuration >= this.offlineGracePeriodMs) {
+                                // Grace period expired! Mark as officially offline in DB
+                                execute(
+                                    'UPDATE cameras SET is_online = 0, last_online_check = ? WHERE id = ?',
+                                    [timestamp, camera.id]
+                                );
+                                changedCount++;
+                                
+                                console.log(`[CameraHealth] ${camera.name} is now OFFLINE (Grace period of ${Math.floor(offlineDuration/1000)}s expired)`);
+
+                                if (isTelegramConfigured()) {
+                                    sendCameraOfflineNotification({
+                                        id: camera.id,
+                                        name: camera.name,
+                                        location: camera.location
+                                    }).catch(err => {
+                                        console.error('[CameraHealth] Failed to send offline notification:', err.message);
+                                    });
+                                }
+                                // Note: we keep this.offlineSince entry to calculate downtime later when it recovers
+                            } else {
+                                // Still in grace period
+                                console.log(`[CameraHealth] ${camera.name} still in grace period (${Math.floor(offlineDuration/1000)}s / ${this.offlineGracePeriodMs/1000}s)`);
+                            }
                         }
                     }
                 }

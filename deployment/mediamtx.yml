@@ -14,7 +14,7 @@ apiAddress: :9997
 # HLS settings - OPTIMIZED FOR RAM DISK
 hls: yes
 hlsAddress: :8888
-hlsAlwaysRemux: yes
+hlsAlwaysRemux: no
 hlsAllowOrigin: '*'
 
 # CRITICAL: Write HLS segments to RAM disk (/dev/shm)
