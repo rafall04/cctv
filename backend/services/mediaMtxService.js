@@ -104,9 +104,9 @@ class MediaMtxService {
             const response = await mtxApi.get('/config/paths/list');
             const items = response.data?.items || [];
             return items.map(item => item.name);
-        } catch {
+        } catch (error) {
+            console.error('[MediaMTX Service] Error fetching configured paths:', error.message);
             return [];
-        }
     }
 
     /**
@@ -163,9 +163,9 @@ class MediaMtxService {
         try {
             const paths = await this.getMediaMtxPaths();
             return paths.includes(pathName);
-        } catch {
+        } catch (error) {
+            console.error(`[MediaMTX Service] Error checking if path exists (${pathName}):`, error.message);
             return false;
-        }
     }
 
     /**
@@ -203,7 +203,7 @@ class MediaMtxService {
                 return { success: true, action: 'added' };
             }
         } catch (error) {
-            // Silent fail for common errors
+            console.error(`[MediaMTX Service] Error adding/updating path ${pathName}:`, error.message);
             return { success: false, error: error.message };
         }
     }

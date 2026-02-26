@@ -264,6 +264,17 @@ class RecordingService {
             ffmpeg.on('close', (code) => {
                 if (code !== 0 && code !== null) {
                     console.error(`FFmpeg process for camera ${cameraId} exited with code ${code}`);
+                    console.error(`Last FFmpeg output:
+${ffmpegOutput.slice(-1000)}`); // Last 1000 chars
+                    this.logRestart(cameraId, 'process_crashed', false);
+                } else {
+                    console.log(`FFmpeg process for camera ${cameraId} stopped normally`);
+                }
+                // AUTHORITATIVE REMOVAL: Only remove from activeRecordings when process is truly dead
+                activeRecordings.delete(cameraId);
+            });
+                if (code !== 0 && code !== null) {
+                    console.error(`FFmpeg process for camera ${cameraId} exited with code ${code}`);
                     console.error(`Last FFmpeg output:\n${ffmpegOutput.slice(-1000)}`); // Last 1000 chars
                     this.logRestart(cameraId, 'process_crashed', false);
                 } else {
@@ -288,6 +299,54 @@ class RecordingService {
     }
 
     /**
+     * Stop recording untuk camera
+     */
+    async stopRecording(cameraId) {
+        try {
+            const recording = activeRecordings.get(cameraId);
+            if (!recording) {
+                return { success: false, message: 'Not recording' };
+            }
+
+            const process = recording.process;
+            console.log(`Stopping recording for camera ${cameraId} (PID: ${process.pid})`);
+
+            // Kill ffmpeg process with SIGTERM first, then SIGKILL if it hangs
+            process.kill('SIGTERM');
+
+            // Fallback to SIGKILL after 5 seconds if still running
+            const killTimeout = setTimeout(() => {
+                try {
+                    if (process && !process.killed) {
+                        console.warn(`FFmpeg process ${process.pid} for camera ${cameraId} hung, sending SIGKILL...`);
+                        process.kill('SIGKILL');
+                    }
+                } catch (e) {
+                    // Process might be gone already
+                }
+            }, 5000);
+
+            // Ensure camera ID is removed ONLY after the process fully exits
+            // We use a promise to wait for closure if needed, or rely on the 'close' listener already in startRecording
+            // However, stopRecording should be authoritative.
+            // Let's modify the close listener in startRecording to be the source of truth for activeRecordings.delete
+
+            streamHealthMap.delete(cameraId);
+
+            // Update camera status immediately to UI
+            execute(
+                'UPDATE cameras SET recording_status = ? WHERE id = ?',
+                ['stopped', cameraId]
+            );
+
+            console.log(`✓ Requested stop for camera ${cameraId}`);
+            return { success: true, message: 'Stop request sent' };
+
+        } catch (error) {
+            console.error(`Error stopping recording for camera ${cameraId}:`, error);
+            return { success: false, message: error.message };
+        }
+    }
      * Stop recording untuk camera
      */
     async stopRecording(cameraId) {
@@ -371,7 +430,57 @@ class RecordingService {
 
         console.log(`[Segment] Detected new segment: camera${cameraId}/${filename}`);
 
-        // Optimized wait: 3 seconds (reduced from 15s)
+        // Wait for file stability (not just heuristic setTimeout)
+        // Check for file existence + size stability + file being closed by ffmpeg (if possible)
+        const checkStability = async () => {
+            const maxRetries = 10;
+            const retryInterval = 1000;
+            let lastSize = -1;
+            let stableCount = 0;
+
+            for (let i = 0; i < maxRetries; i++) {
+                if (!existsSync(filePath)) {
+                    return false;
+                }
+
+                const stats = statSync(filePath);
+                const currentSize = stats.size;
+
+                if (currentSize > 0 && currentSize === lastSize) {
+                    stableCount++;
+                } else {
+                    stableCount = 0;
+                }
+
+                lastSize = currentSize;
+
+                // If size is stable for 3 checks (3 seconds), it's probably done
+                if (stableCount >= 3) {
+                    return true;
+                }
+
+                await new Promise(resolve => setTimeout(resolve, retryInterval));
+            }
+            return false;
+        };
+
+        (async () => {
+            try {
+                // BUG FIX #1: Ensure cleanup in ALL exit paths
+                const cleanup = () => {
+                    filesBeingProcessed.delete(fileKey);
+                };
+
+                console.log(`[Segment] Waiting for stability: ${filename}`);
+                const isStable = await checkStability();
+
+                if (!isStable) {
+                    console.warn(`[Segment] File not stable or not found: ${filePath}`);
+                    cleanup();
+                    return;
+                }
+
+                const fileSize = statSync(filePath).size;
         // FFmpeg should have closed file by now with proper segment settings
         setTimeout(async () => {
             try {
@@ -436,23 +545,9 @@ class RecordingService {
                     console.log(`[Segment] ⚠️ File smaller than expected (likely from reconnect): ${filename} (${(fileSize / 1024 / 1024).toFixed(2)} MB)`);
                 }
 
-                // Reduced wait: 3 seconds (optimized from 5s)
-                console.log(`[Segment] Final wait to ensure file is complete: ${filename}`);
-                await new Promise(resolve => setTimeout(resolve, 3000));
-
-                // Quick final check
-                if (!existsSync(filePath)) {
-                    console.warn(`[Segment] File disappeared: ${filePath}`);
-                    cleanup();
-                    return;
-                }
-
-                const finalCheck = statSync(filePath).size;
-                if (Math.abs(finalCheck - fileSize) > 1024 * 100) { // Allow 100KB difference
-                    console.log(`[Segment] File still changing (${fileSize} -> ${finalCheck}), will retry later: ${filename}`);
-                    cleanup();
-                    return;
-                }
+                // CRITICAL FIX: Re-mux file to create proper MP4 index for seeking
+                console.log(`[Segment] Re-muxing file to fix MP4 index: ${filename}`);
+                const tempPath = filePath + '.remux.mp4';
 
                 // CRITICAL FIX: Re-mux file to create proper MP4 index for seeking
                 // Skip ffprobe check - go straight to re-mux (robust approach)
@@ -566,9 +661,10 @@ class RecordingService {
                 // Get actual duration using ffprobe AFTER re-mux (more accurate)
                 // This is critical for proper playback timeline
                 try {
-                    const { execSync } = await import('child_process');
-                    const ffprobeOutput = execSync(
-                        `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`,
+                    const { execFileSync } = await import('child_process');
+                    const ffprobeOutput = execFileSync(
+                        'ffprobe',
+                        ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', filePath],
                         { encoding: 'utf8', timeout: 5000 }
                     ).trim();
                     
