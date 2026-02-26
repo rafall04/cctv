@@ -680,8 +680,8 @@ ${ffmpegOutput.slice(-1000)}`); // Last 1000 chars
                     [
                         cameraId,
                         filename,
-                        startTime.toISOString(),
-                        endTime.toISOString(),
+                        `${year}-${month}-${day} ${hour}:${minute}:${second}`, 
+                        new Date(startTime.getTime() - (startTime.getTimezoneOffset() * 60000) + actualDuration * 1000).toISOString().replace('T', ' ').substring(0, 19),
                         finalSize,
                         actualDuration, // Use actual duration from ffprobe
                         filePath
