@@ -107,7 +107,8 @@ class MediaMtxService {
         } catch (error) {
             console.error('[MediaMTX Service] Error fetching configured paths:', error.message);
             return [];
-    }
+            return [];
+        }
 
     /**
      * Fetches all active paths from the MediaMTX API.
