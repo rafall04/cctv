@@ -341,8 +341,6 @@ ${ffmpegOutput.slice(-1000)}`); // Last 1000 chars
         }
     }
     /**
-     * Stop recording untuk camera
-     */
     async stopRecording(cameraId) {
         try {
             const recording = activeRecordings.get(cameraId);
@@ -545,14 +543,12 @@ ${ffmpegOutput.slice(-1000)}`); // Last 1000 chars
                         await new Promise((resolve, reject) => {
                             const ffmpeg = spawn('ffmpeg', [
                                 '-i', filePath,
-                                '-c', 'copy',                    // Copy streams (no re-encode)
-                                '-movflags', '+faststart',       // Move moov atom to start (CRITICAL for seeking)
-                                '-fflags', '+genpts',            // Generate presentation timestamps
-                                '-avoid_negative_ts', 'make_zero', // Normalize timestamps
+                                '-c', 'copy',                    // Copy streams (No CPU load, support H264/H265)
+                                // ROBUST: Use movflags for HLS/fMP4 to standard MP4 conversion and seeking support
+                                '-movflags', '+faststart',
                                 '-y',                            // Overwrite
                                 tempPath
                             ]);
-
                             let ffmpegError = '';
                             ffmpeg.stderr.on('data', (data) => {
                                 ffmpegError += data.toString();
@@ -592,8 +588,8 @@ ${ffmpegOutput.slice(-1000)}`); // Last 1000 chars
                     }
                 }
 
-                // 🛡️ ATOMIC DATA SAFETY - Replace original with re-muxed file (only if re-mux succeeded)
-                if (reMuxSuccess && existsSync(tempPath)) {
+                // 🛡️ ATOMIC DATA SAFETY - Replace original with re-muxed file (only if re-mux succeeded and NOT empty)
+                if (reMuxSuccess && existsSync(tempPath) && statSync(tempPath).size > 1024) {
                     const tempStats = statSync(tempPath);
                     console.log(`[Segment] Re-muxed file size: ${(tempStats.size / 1024 / 1024).toFixed(2)} MB`);
 
@@ -613,7 +609,17 @@ ${ffmpegOutput.slice(-1000)}`); // Last 1000 chars
                             throw error;
                         }
                     }
-                } else if (!reMuxSuccess) {
+                } else {
+                    if (!reMuxSuccess) {
+                        console.log(`[Segment] Registering to DB without re-mux: ${filename}`);
+                    } else {
+                        console.warn(`[Segment] Remux produced an empty/invalid file. Keeping original.`);
+                    }
+                    // Clean up the junk 0-byte remux file
+                    if (existsSync(tempPath)) {
+                        unlinkSync(tempPath);
+                    }
+                }
                     // Re-mux failed after MAX_RETRY - still register to DB with original file
                     console.log(`[Segment] Registering to DB without re-mux: ${filename}`);
                 }
@@ -680,14 +686,13 @@ ${ffmpegOutput.slice(-1000)}`); // Last 1000 chars
                     [
                         cameraId,
                         filename,
-                        `${year}-${month}-${day} ${hour}:${minute}:${second}`, 
-                        new Date(startTime.getTime() - (startTime.getTimezoneOffset() * 60000) + actualDuration * 1000).toISOString().replace('T', ' ').substring(0, 19),
+                        `${year}-${month}-${day} ${hour}:${minute}:${second}`,
+                        new Date(startTime.getTime() + actualDuration * 1000 - (new Date().getTimezoneOffset() * 60000)).toISOString().replace('T', ' ').substring(0, 19),
                         finalSize,
-                        actualDuration, // Use actual duration from ffprobe
+                        actualDuration,
                         filePath
                     ]
                 );
-
                 console.log(`✓ Segment saved: camera${cameraId}/${filename} (${(finalSize / 1024 / 1024).toFixed(2)} MB)`);
 
                 // CRITICAL: Remove from processing set (allow cleanup)
@@ -1140,13 +1145,11 @@ ${ffmpegOutput.slice(-1000)}`); // Last 1000 chars
 
                 const files = readdirSync(fullPath);
                 files.forEach(file => {
-                    // CRITICAL FIX: ONLY delete .temp.mp4 or .remux.mp4 files
                     // NEVER delete actual recording files (YYYYMMDD_HHMMSS.mp4)
                     if (file.includes('.temp.mp4') || file.includes('.remux.mp4')) {
                         const filePath = join(fullPath, file);
 
                         try {
-                            // Additional safety: check file age (at least 5 minutes old)
                             const stats = statSync(filePath);
                             const fileAge = Date.now() - stats.mtimeMs;
 
