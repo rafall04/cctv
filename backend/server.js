@@ -436,7 +436,7 @@ const shutdown = async () => {
         try {
             const activeSessions = viewerSessionService.getActiveSessions();
             for (const session of activeSessions) {
-                viewerSessionService.stopSession(session.id);
+                viewerSessionService.endSession(session.id);
             }
             console.log(`[Shutdown] Closed ${activeSessions.length} viewer sessions`);
         } catch (error) {
