@@ -77,7 +77,7 @@ function handleSessionExpired(error) {
     localStorage.removeItem('user');
     clearCsrfToken();
     // Silent redirect - no error notification to avoid disrupting user experience
-    if (window.location.pathname.startsWith('/admin')) {
+    if (window.location.pathname.startsWith('/admin') && !window.location.pathname.includes('/login')) {
         window.location.href = '/admin/login?expired=true';
     }
     return Promise.reject(error);
@@ -269,6 +269,11 @@ apiClient.interceptors.response.use(
                     originalRequest.headers['X-CSRF-Token'] = newCsrf;
                     return apiClient(originalRequest);
                 }
+            }
+
+            // If 403 Forbidden (but not CSRF or login attempt), redirect to login
+            if (!originalRequest.url?.includes('/api/auth/login')) {
+                return handleSessionExpired(error);
             }
         }
 

@@ -274,15 +274,16 @@ export default function Dashboard() {
                 setLastSuccessfulUpdate(new Date());
             } else {
                 if (isAutoRefresh && stats) {
-                    // Auto-refresh failed but we have existing data
                     setRefreshError(true);
                 } else {
                     setError(response.message || 'Failed to load dashboard data');
                 }
             }
         } catch (err) {
+            if (err.response?.status === 401 || err.response?.status === 403) {
+                return;
+            }
             if (isAutoRefresh && stats) {
-                // Auto-refresh failed but we have existing data
                 setRefreshError(true);
             } else {
                 setError('Failed to connect to server. Please check your connection.');

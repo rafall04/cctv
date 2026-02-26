@@ -323,6 +323,11 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
             <video
                 ref={videoRef}
                 onMouseDown={handleMouseDown}
+                crossOrigin="anonymous"
+                className={`w-full h-full transition-transform duration-100 ease-out ${isExpanded || isFullScreen ? '!object-contain' : 'object-cover'
+                    }`}
+                ref={videoRef}
+                onMouseDown={handleMouseDown}
                 className={`w-full h-full transition-transform duration-100 ease-out ${isExpanded || isFullScreen ? '!object-contain' : 'object-cover'
                     }`}
                 style={{

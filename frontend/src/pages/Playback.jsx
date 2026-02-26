@@ -93,8 +93,11 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
             if (propSelectedCamera) {
                 setSelectedCamera(propSelectedCamera);
             } else if (cameraIdFromUrl) {
-                const camera = propCameras.find(c => c.id === parseInt(cameraIdFromUrl));
-                if (camera) setSelectedCamera(camera);
+                const camId = parseInt(cameraIdFromUrl);
+                if (!isNaN(camId)) {
+                    const camera = propCameras.find(c => c.id === camId);
+                    if (camera) setSelectedCamera(camera);
+                }
             }
             setLoading(false);
             return;
@@ -112,6 +115,14 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
                     setCameras(uniqueCameras);
                     
                     if (cameraIdFromUrl) {
+                        const camId = parseInt(cameraIdFromUrl);
+                        if (!isNaN(camId)) {
+                            const camera = uniqueCameras.find(c => c.id === camId);
+                            if (camera) {
+                                setSelectedCamera(camera);
+                            }
+                        }
+                    } else if (uniqueCameras.length > 0) {
                         const camera = uniqueCameras.find(c => c.id === parseInt(cameraIdFromUrl));
                         if (camera) {
                             setSelectedCamera(camera);
@@ -140,9 +151,12 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
     // URL camera change effect
     useEffect(() => {
         if (!isInitialMountRef.current && cameraIdFromUrl && cameras.length > 0) {
-            const camera = cameras.find(c => c.id === parseInt(cameraIdFromUrl));
-            if (camera && camera.id !== selectedCamera?.id) {
-                setSelectedCamera(camera);
+            const camId = parseInt(cameraIdFromUrl);
+            if (!isNaN(camId)) {
+                const camera = cameras.find(c => c.id === camId);
+                if (camera && camera.id !== selectedCamera?.id) {
+                    setSelectedCamera(camera);
+                }
             }
         }
         isInitialMountRef.current = false;
@@ -154,6 +168,25 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         
         const timestampFromUrl = searchParams.get('t');
         if (timestampFromUrl && !selectedSegment) {
+            const targetTime = parseInt(timestampFromUrl);
+            if (!isNaN(targetTime)) {
+                const segmentFromUrl = segments.find(s => {
+                    const startTime = new Date(s.start_time).getTime();
+                    const endTime = new Date(s.end_time).getTime();
+                    return targetTime >= startTime && targetTime <= endTime;
+                });
+                if (segmentFromUrl) {
+                    setSelectedSegment(segmentFromUrl);
+                } else {
+                    const closestSegment = segments.reduce((prev, curr) => {
+                        const prevDiff = Math.abs(new Date(prev.start_time).getTime() - targetTime);
+                        const currDiff = Math.abs(new Date(curr.start_time).getTime() - targetTime);
+                        return currDiff < prevDiff ? curr : prev;
+                    }, segments[0]);
+                    setSelectedSegment(closestSegment);
+                }
+            }
+        } else if (!selectedSegment && segments.length > 0) {
             const targetTime = parseInt(timestampFromUrl);
             const segmentFromUrl = segments.find(s => {
                 const startTime = new Date(s.start_time).getTime();
@@ -632,9 +665,13 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
                 await navigator.share(shareData);
             } catch (err) {
                 if (err.name !== 'AbortError') {
-                    await navigator.clipboard.writeText(shareUrl);
-                    setSnapshotNotification({ type: 'success', message: 'Tautan disalin ke clipboard!' });
-                    setTimeout(() => setSnapshotNotification(null), 3000);
+                    try {
+                        await navigator.clipboard.writeText(shareUrl);
+                        setSnapshotNotification({ type: 'success', message: 'Tautan disalin ke clipboard!' });
+                        setTimeout(() => setSnapshotNotification(null), 3000);
+                    } catch (clipErr) {
+                        prompt('Salin link ini:', shareUrl);
+                    }
                 }
             }
         } else {
@@ -643,8 +680,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
                 setSnapshotNotification({ type: 'success', message: 'Tautan disalin ke clipboard!' });
                 setTimeout(() => setSnapshotNotification(null), 3000);
             } catch (err) {
-                setSnapshotNotification({ type: 'error', message: 'Gagal menyalin tautan' });
-                setTimeout(() => setSnapshotNotification(null), 3000);
+                prompt('Salin link ini:', shareUrl);
             }
         }
     }, [selectedCamera, selectedSegment]);
