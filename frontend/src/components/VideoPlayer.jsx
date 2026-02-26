@@ -1,13 +1,9 @@
 import { useEffect, useRef, useState, memo, useCallback } from 'react';
 import { getDeviceCapabilities } from '../utils/deviceDetector';
-import { getHLSConfig } from '../utils/hlsConfig';
-import { createErrorRecoveryHandler } from '../utils/errorRecovery';
 import { createVisibilityObserver } from '../utils/visibilityObserver';
 import { createOrientationObserver, getCurrentOrientation } from '../utils/orientationObserver';
-import { preloadHls } from '../utils/preloadManager';
-import { useStreamTimeout } from '../hooks/useStreamTimeout';
-import { LoadingStage, getStageMessage, createStreamError } from '../utils/streamLoaderTypes';
-import { createFallbackHandler } from '../utils/fallbackHandler';
+import { LoadingStage, getStageMessage } from '../utils/streamLoaderTypes';
+import { useHlsPlayer } from '../hooks/useHlsPlayer';
 
 /**
  * Optimized VideoPlayer Component
@@ -16,60 +12,35 @@ import { createFallbackHandler } from '../utils/fallbackHandler';
  */
 const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = false }) => {
     const videoRef = useRef(null);
-    const hlsRef = useRef(null);
     const containerRef = useRef(null);
     const visibilityObserverRef = useRef(null);
     const orientationObserverRef = useRef(null);
-    const errorRecoveryRef = useRef(null);
     const pauseTimeoutRef = useRef(null);
-    const bufferSpinnerTimeoutRef = useRef(null);
-    // New refs for stream loading fix
-    const fallbackHandlerRef = useRef(null);
-    const abortControllerRef = useRef(null);
 
     // Device capabilities - detected once on mount
     const [deviceTier, setDeviceTier] = useState('medium');
     const [deviceCapabilities, setDeviceCapabilities] = useState(null);
 
-    // Stream Timeout Hook
     const {
-        startTimeout,
-        clearTimeout: clearStreamTimeout,
-        updateStage: updateStreamStage,
-        resetFailures,
-        getConsecutiveFailures,
-    } = useStreamTimeout({
-        deviceTier: deviceTier,
-        onTimeout: (stage) => {
-            cleanupResources();
-            setStatus('timeout');
-            setLoadingStage(LoadingStage.TIMEOUT);
-            setError(`Loading timeout at ${stage} stage`);
-            setShowSpinner(false);
-            setConsecutiveFailures(getConsecutiveFailures());
-        },
-        onMaxFailures: (failures) => {
-            setShowTroubleshooting(true);
-            setConsecutiveFailures(failures);
-        }
+        hlsRef,
+        status,
+        setStatus,
+        loadingStage,
+        setLoadingStage,
+        error,
+        showSpinner,
+        isAutoRetrying,
+        autoRetryCount,
+        retryDelay,
+        consecutiveFailures,
+        showTroubleshooting,
+        handleRetry,
+    } = useHlsPlayer({
+        streams,
+        videoRef,
+        deviceCapabilities,
+        deviceTier,
     });
-
-    // Stream status - now using LoadingStage for progressive feedback
-    const [status, setStatus] = useState('loading'); // loading, playing, paused, error, timeout
-    const [loadingStage, setLoadingStage] = useState(LoadingStage.CONNECTING);
-    const [error, setError] = useState(null);
-    const [retryCount, setRetryCount] = useState(0);
-    const [showSpinner, setShowSpinner] = useState(true);
-    const maxRetries = 4;
-
-    // Auto-retry state
-    const [autoRetryCount, setAutoRetryCount] = useState(0);
-    const [isAutoRetrying, setIsAutoRetrying] = useState(false);
-    const [retryDelay, setRetryDelay] = useState(0);
-
-    // Consecutive failure tracking
-    const [consecutiveFailures, setConsecutiveFailures] = useState(0);
-    const [showTroubleshooting, setShowTroubleshooting] = useState(false);
 
     // Visibility state
     const [isVisible, setIsVisible] = useState(true);
@@ -86,7 +57,6 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-
     // Detect device capabilities on mount
     useEffect(() => {
         const capabilities = getDeviceCapabilities();
@@ -123,113 +93,6 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
             }
         };
     }, [deviceCapabilities?.isMobile, zoom]);
-
-    // Initialize error recovery handler
-    useEffect(() => {
-        errorRecoveryRef.current = createErrorRecoveryHandler({
-            maxRetries,
-            onRetry: (count, delay) => {
-                setError(`Network error - retrying in ${delay / 1000}s...`);
-                setRetryCount(count);
-            },
-            onRecovery: (type) => {
-                if (type === 'network' || type === 'media') {
-                    setError(null);
-                    setStatus('playing');
-                    setLoadingStage(LoadingStage.PLAYING);
-                }
-            },
-            onFailed: (type, result) => {
-                setStatus('error');
-                setLoadingStage(LoadingStage.ERROR);
-                setError(result.message || 'Recovery failed');
-            },
-        });
-
-        return () => {
-            if (errorRecoveryRef.current) {
-                errorRecoveryRef.current.reset();
-            }
-        };
-    }, []);
-
-    // Initialize error recovery handler
-    useEffect(() => {
-        fallbackHandlerRef.current = createFallbackHandler({
-            maxAutoRetries: 3,
-            onAutoRetry: ({ attempt, maxAttempts, delay, errorType }) => {
-                setIsAutoRetrying(true);
-                setAutoRetryCount(attempt);
-                setRetryDelay(delay);
-                setError(`Auto-retry ${attempt}/${maxAttempts} in ${delay / 1000}s...`);
-            },
-            onAutoRetryExhausted: ({ totalAttempts }) => {
-                setIsAutoRetrying(false);
-                setAutoRetryCount(totalAttempts);
-            },
-            onNetworkRestore: () => {
-                // Auto-reconnect when network is restored
-                // **Validates: Requirements 6.5**
-                if (status === 'error' || status === 'timeout') {
-                    handleRetry();
-                }
-            },
-            onManualRetryRequired: ({ errorType, message }) => {
-                setIsAutoRetrying(false);
-                setError(message);
-            },
-        });
-
-        return () => {
-            if (fallbackHandlerRef.current) {
-                fallbackHandlerRef.current.destroy();
-                fallbackHandlerRef.current = null;
-            }
-        };
-    }, [status]);
-
-    /**
-     * Cleanup all resources - **Validates: Requirements 1.3, 7.1, 7.2, 7.3, 7.4, 7.5**
-     * **Property 8: Resource Cleanup on Timeout**
-     */
-    const cleanupResources = useCallback(() => {
-        // Cancel pending network requests
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
-            abortControllerRef.current = null;
-        }
-
-        // Destroy HLS instance - **Validates: Requirements 7.1**
-        if (hlsRef.current) {
-            hlsRef.current.destroy();
-            hlsRef.current = null;
-        }
-
-        // Clear video element source - **Validates: Requirements 7.2**
-        if (videoRef.current) {
-            videoRef.current.pause();
-            videoRef.current.src = '';
-            videoRef.current.load();
-        }
-
-        // Clear loading timeout
-        clearStreamTimeout();
-
-        // Clear fallback handler pending retry
-        if (fallbackHandlerRef.current) {
-            fallbackHandlerRef.current.clearPendingRetry();
-        }
-
-        // Clear all timeouts
-        if (pauseTimeoutRef.current) {
-            clearTimeout(pauseTimeoutRef.current);
-            pauseTimeoutRef.current = null;
-        }
-        if (bufferSpinnerTimeoutRef.current) {
-            clearTimeout(bufferSpinnerTimeoutRef.current);
-            bufferSpinnerTimeoutRef.current = null;
-        }
-    }, []);
 
     // Setup visibility observer for pause/resume based on visibility
     // **Property 9: Visibility-based Stream Control**
@@ -284,302 +147,7 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                 pauseTimeoutRef.current = null;
             }
         };
-    }, [status, isPausedByVisibility]);
-
-    /**
-     * Handle retry - fresh connection with cleared cache
-     * **Validates: Requirements 1.5**
-     */
-    const handleRetry = useCallback(() => {
-        // Reset states
-        setRetryCount(0);
-        setAutoRetryCount(0);
-        setIsAutoRetrying(false);
-        setError(null);
-        setStatus('loading');
-        setLoadingStage(LoadingStage.CONNECTING);
-        setShowSpinner(true);
-        setShowTroubleshooting(false);
-
-        // Reset handlers
-        if (errorRecoveryRef.current) {
-            errorRecoveryRef.current.reset();
-        }
-        if (fallbackHandlerRef.current) {
-            fallbackHandlerRef.current.reset();
-        }
-        resetFailures();
-
-        // Cleanup and reinitialize
-        cleanupResources();
-
-        // Force re-render to trigger initPlayer
-        setDeviceCapabilities(prev => ({ ...prev }));
-    }, [cleanupResources]);
-
-    // Main HLS initialization effect - now using PreloadManager
-    // **Validates: Requirements 2.1, 2.2, 2.3**
-    useEffect(() => {
-        if (!streams || !videoRef.current || !deviceCapabilities) return;
-
-        const video = videoRef.current;
-        let hls = null;
-        let isDestroyed = false;
-
-        // Create abort controller for cancelling requests
-        abortControllerRef.current = new AbortController();
-
-        const initPlayer = async () => {
-            setStatus('loading');
-            setLoadingStage(LoadingStage.CONNECTING);
-            setError(null);
-            setShowSpinner(true);
-
-            // Start loading timeout - **Validates: Requirements 1.1, 5.3**
-            startTimeout(LoadingStage.CONNECTING);
-
-            try {
-                // Use preloaded HLS.js instead of direct import
-                // **Validates: Requirements 2.3**
-                const Hls = await preloadHls();
-
-                if (isDestroyed) return;
-
-                // Update loading stage - **Validates: Requirements 4.1**
-                setLoadingStage(LoadingStage.LOADING);
-                updateStreamStage(LoadingStage.LOADING);
-
-                // Get device-adaptive HLS configuration
-                // **Property 2: Device-based HLS Configuration**
-                const hlsConfig = getHLSConfig(deviceTier, {
-                    isMobile: deviceCapabilities.isMobile,
-                    mobileDeviceType: deviceCapabilities.mobileDeviceType,
-                });
-
-                // Try HLS first
-                if (Hls.isSupported() && streams.hls) {
-                    hls = new Hls(hlsConfig);
-                    hlsRef.current = hls;
-
-                    hls.loadSource(streams.hls);
-                    hls.attachMedia(video);
-
-                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                        if (isDestroyed) return;
-
-                        // Update to buffering stage - **Validates: Requirements 4.3**
-                        setLoadingStage(LoadingStage.BUFFERING);
-                        updateStreamStage(LoadingStage.BUFFERING);
-                    });
-
-                    hls.on(Hls.Events.FRAG_BUFFERED, () => {
-                        if (isDestroyed) return;
-
-                        // Update to starting stage - **Validates: Requirements 4.4**
-                        if (loadingStage === LoadingStage.BUFFERING) {
-                            setLoadingStage(LoadingStage.STARTING);
-                            updateStreamStage(LoadingStage.STARTING);
-
-                            // Attempt playback
-                            video.play().then(() => {
-                                if (isDestroyed) return;
-
-                                setStatus('playing');
-                                setLoadingStage(LoadingStage.PLAYING);
-                                setRetryCount(0);
-                                setAutoRetryCount(0);
-                                setShowSpinner(false);
-                                setConsecutiveFailures(0);
-
-                                // Clear timeout on success
-                                clearStreamTimeout();
-                                resetFailures();
-
-                                // Reset fallback handler on success
-                                if (fallbackHandlerRef.current) {
-                                    fallbackHandlerRef.current.reset();
-                                }
-
-                                if (errorRecoveryRef.current) {
-                                    errorRecoveryRef.current.reset();
-                                }
-                            }).catch((err) => {
-                                if (isDestroyed) return;
-                                console.error('Play error:', err);
-                                setStatus('error');
-                                setLoadingStage(LoadingStage.ERROR);
-                                setError('Failed to play video');
-                                setShowSpinner(false);
-                            });
-                        }
-                    });
-
-                    // Handle HLS errors with ErrorRecovery and FallbackHandler
-                    // **Property 6: Exponential Backoff Recovery**
-                    // **Validates: Requirements 6.1, 6.2, 6.3, 6.4**
-                    hls.on(Hls.Events.ERROR, async (event, data) => {
-                        if (isDestroyed) return;
-                        console.error('HLS error:', data);
-
-                        if (data.fatal) {
-                            // Clear loading timeout
-                            clearStreamTimeout();
-
-                            const errorType = data.type === Hls.ErrorTypes.NETWORK_ERROR ? 'network' :
-                                data.type === Hls.ErrorTypes.MEDIA_ERROR ? 'media' : 'unknown';
-
-                            // Create stream error for diagnostic
-                            const streamError = createStreamError({
-                                type: errorType,
-                                message: data.details || 'Stream error',
-                                stage: loadingStage,
-                                deviceTier: deviceTier,
-                                retryCount: autoRetryCount,
-                            });
-
-                            // Try auto-retry with FallbackHandler
-                            if (fallbackHandlerRef.current) {
-                                const result = fallbackHandlerRef.current.handleError(streamError, () => {
-                                    // Retry function
-                                    if (!isDestroyed && hls) {
-                                        setLoadingStage(LoadingStage.CONNECTING);
-                                        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                                            hls.startLoad();
-                                        } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                                            hls.recoverMediaError();
-                                        }
-                                    }
-                                });
-
-                                if (result.action === 'manual-retry-required') {
-                                    setStatus('error');
-                                    setLoadingStage(LoadingStage.ERROR);
-                                    setShowSpinner(false);
-                                }
-                            } else {
-                                // Fallback error handling if handler not available
-                                if (errorRecoveryRef.current) {
-                                    await errorRecoveryRef.current.handleError(hls, {
-                                        fatal: true,
-                                        type: data.type === Hls.ErrorTypes.NETWORK_ERROR ? 'networkError' :
-                                            data.type === Hls.ErrorTypes.MEDIA_ERROR ? 'mediaError' : 'fatalError',
-                                    });
-                                } else {
-                                    setStatus('error');
-                                    setLoadingStage(LoadingStage.ERROR);
-                                    setError('Fatal error occurred');
-                                    setShowSpinner(false);
-                                    hls.destroy();
-                                }
-                            }
-                        }
-                    });
-                } else if (video.canPlayType('application/vnd.apple.mpegurl') && streams.hls) {
-                    // Native HLS support (Safari)
-                    video.src = streams.hls;
-
-                    video.addEventListener('loadedmetadata', () => {
-                        if (isDestroyed) return;
-                        setLoadingStage(LoadingStage.BUFFERING);
-                    });
-
-                    video.addEventListener('canplay', () => {
-                        if (isDestroyed) return;
-                        setLoadingStage(LoadingStage.STARTING);
-
-                        video.play().then(() => {
-                            if (isDestroyed) return;
-                            setStatus('playing');
-                            setLoadingStage(LoadingStage.PLAYING);
-                            setShowSpinner(false);
-
-                            clearStreamTimeout();
-                            resetFailures();
-                        }).catch((err) => {
-                            if (isDestroyed) return;
-                            console.error('Play error:', err);
-                            setStatus('error');
-                            setLoadingStage(LoadingStage.ERROR);
-                            setError('Failed to play video');
-                            setShowSpinner(false);
-                        });
-                    });
-
-                    video.addEventListener('error', () => {
-                        if (isDestroyed) return;
-                        setStatus('error');
-                        setLoadingStage(LoadingStage.ERROR);
-                        setError('Video playback error');
-                        setShowSpinner(false);
-                    });
-                } else {
-                    setStatus('error');
-                    setLoadingStage(LoadingStage.ERROR);
-                    setError('HLS not supported in this browser');
-                    setShowSpinner(false);
-                }
-            } catch (err) {
-                if (isDestroyed) return;
-                console.error('Failed to load HLS.js:', err);
-                setStatus('error');
-                setLoadingStage(LoadingStage.ERROR);
-                setError('Failed to load video player');
-                setShowSpinner(false);
-            }
-        };
-
-        initPlayer();
-
-        // Cleanup - **Property 5: Resource Cleanup Completeness**
-        // **Validates: Requirements 7.4, 7.5**
-        return () => {
-            isDestroyed = true;
-            cleanupResources();
-            if (hls) {
-                hls.destroy();
-                hlsRef.current = null;
-            }
-        };
-    }, [streams, deviceCapabilities, deviceTier, cleanupResources, loadingStage]);
-
-    // Handle buffering events - **Property 8: Brief Buffer No Spinner**
-    // Don't show spinner for brief buffers (< 2 seconds)
-    const handleWaiting = useCallback(() => {
-        // Only show spinner after 2 seconds of buffering
-        bufferSpinnerTimeoutRef.current = setTimeout(() => {
-            if (status === 'playing') {
-                setShowSpinner(true);
-            }
-        }, 2000);
-    }, [status]);
-
-    const handlePlaying = useCallback(() => {
-        // Clear buffer spinner timeout
-        if (bufferSpinnerTimeoutRef.current) {
-            clearTimeout(bufferSpinnerTimeoutRef.current);
-            bufferSpinnerTimeoutRef.current = null;
-        }
-        setShowSpinner(false);
-    }, []);
-
-    // Attach video event listeners for buffering
-    useEffect(() => {
-        const video = videoRef.current;
-        if (!video) return;
-
-        video.addEventListener('waiting', handleWaiting);
-        video.addEventListener('playing', handlePlaying);
-        video.addEventListener('canplay', handlePlaying);
-
-        return () => {
-            video.removeEventListener('waiting', handleWaiting);
-            video.removeEventListener('playing', handlePlaying);
-            video.removeEventListener('canplay', handlePlaying);
-            if (bufferSpinnerTimeoutRef.current) {
-                clearTimeout(bufferSpinnerTimeoutRef.current);
-            }
-        };
-    }, [handleWaiting, handlePlaying]);
+    }, [status, isPausedByVisibility, hlsRef, setStatus, setLoadingStage]);
 
     // Fullscreen handling
     useEffect(() => {
