@@ -1,7 +1,7 @@
 import os from 'os';
 
-import { spawn } from 'child_process';
-import { existsSync, mkdirSync, unlinkSync, statSync, renameSync, readdirSync } from 'fs';
+import { spawn, execFileSync } from 'child_process';
+import { existsSync, mkdirSync, unlinkSync, statSync, renameSync, readdirSync, copyFileSync } from 'fs';
 import { promises as fsPromises } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -459,7 +459,6 @@ ${ffmpegOutput.slice(-1000)}`); // Last 1000 chars
         (async () => {
             try {
                 const cleanup = () => { filesBeingProcessed.delete(fileKey); };
-                const fs = require('fs');
                 
                 console.log(`[Segment] Waiting for ${filename} to finish recording completely...`);
                 
@@ -469,8 +468,8 @@ ${ffmpegOutput.slice(-1000)}`); // Last 1000 chars
                 let stableCount = 0;
                 
                 for(let i = 0; i < 150; i++) { // 150 * 5s = 12.5 mins
-                    if (!fs.existsSync(filePath)) { cleanup(); return; }
-                    const currSize = fs.statSync(filePath).size;
+                    if (!existsSync(filePath)) { cleanup(); return; }
+                    const currSize = statSync(filePath).size;
                     
                     if (currSize > 0 && currSize === lastSize) {
                         stableCount++;
@@ -486,7 +485,7 @@ ${ffmpegOutput.slice(-1000)}`); // Last 1000 chars
                     await new Promise(r => setTimeout(r, 5000));
                 }
                 
-                if (!isStable || !fs.existsSync(filePath)) {
+                if (!isStable || !existsSync(filePath)) {
                     console.warn(`[Segment] ${filename} never stabilized or disappeared.`);
                     cleanup();
                     return;
@@ -499,14 +498,14 @@ ${ffmpegOutput.slice(-1000)}`); // Last 1000 chars
                 if (fileSize < 500 * 1024) {
                     console.warn(`[Segment] File too small (< 500KB), likely corrupt or empty: ${filename}`);
                     try {
-                        await fs.promises.unlink(filePath);
+                        await fsPromises.unlink(filePath);
                     } catch (e) {}
                     cleanup();
                     return;
                 }
 
                 const tempPath = filePath + '.remux.mp4';
-                if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+                if (existsSync(tempPath)) unlinkSync(tempPath);
 
                 let actualDuration = 600;
                 let reMuxSuccess = false;
@@ -515,7 +514,6 @@ ${ffmpegOutput.slice(-1000)}`); // Last 1000 chars
                 for (let attempt = 1; attempt <= MAX_RETRY; attempt++) {
                     try {
                         await new Promise((resolve, reject) => {
-                            const { spawn } = require('child_process');
                             // Timeout added to prevent Zombie FFmpeg Remux process
                             const remuxTimeout = setTimeout(() => {
                                 reject(new Error('Remux timed out after 2 minutes'));
@@ -542,16 +540,16 @@ ${ffmpegOutput.slice(-1000)}`); // Last 1000 chars
                 }
 
                 // ATOMIC DATA SAFETY - Replace only if valid
-                if (reMuxSuccess && fs.existsSync(tempPath) && fs.statSync(tempPath).size > 1024) {
+                if (reMuxSuccess && existsSync(tempPath) && statSync(tempPath).size > 1024) {
                     try {
-                        await fs.promises.rename(tempPath, filePath);
+                        await fsPromises.rename(tempPath, filePath);
                         console.log(`[Segment] ✓ File replaced with re-muxed version`);
                     } catch (e) {
-                        await fs.promises.copyFile(tempPath, filePath);
-                        fs.unlinkSync(tempPath);
+                        await fsPromises.copyFile(tempPath, filePath);
+                        unlinkSync(tempPath);
                     }
                 } else {
-                    if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+                    if (existsSync(tempPath)) unlinkSync(tempPath);
                     console.warn(`[Segment] Remux produced an empty/invalid file. Keeping original.`);
                 }
 
@@ -561,12 +559,11 @@ ${ffmpegOutput.slice(-1000)}`); // Last 1000 chars
                 const startTime = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
 
                 try {
-                    const { execFileSync } = require('child_process');
                     const ffprobeOutput = execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', filePath], { encoding: 'utf8', timeout: 5000 }).trim();
                     if (ffprobeOutput && parseFloat(ffprobeOutput) > 0) actualDuration = Math.round(parseFloat(ffprobeOutput));
                 } catch (e) { }
 
-                const finalSize = fs.statSync(filePath).size;
+                const finalSize = statSync(filePath).size;
 
                 const existing = queryOne('SELECT id FROM recording_segments WHERE camera_id = ? AND filename = ?', [cameraId, filename]);
                 if (existing) {
