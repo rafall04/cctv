@@ -459,10 +459,8 @@ const shutdown = async () => {
         await fastify.close();
         
         console.log('[Shutdown] ✅ Graceful shutdown completed');
-        process.exit(0);
     } catch (error) {
         console.error('[Shutdown] ❌ Error during shutdown:', error);
-        process.exit(1);
     }
 };
 

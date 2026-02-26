@@ -30,15 +30,10 @@ export function sanitizeString(str) {
         return str;
     }
     
-    return str
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#x27;')
-        .replace(/\//g, '&#x2F;')
-        .replace(/`/g, '&#x60;')
-        .replace(/=/g, '&#x3D;');
+    // Lightweight sanitization: strip <script> tags to prevent basic XSS
+    // Frontend (React) handles proper output encoding.
+    // Preserves characters like =, /, & to prevent URL corruption.
+    return str.replace(/<\/?script\b[^>]*>/gi, '');
 }
 
 /**
