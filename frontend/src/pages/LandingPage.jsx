@@ -46,6 +46,11 @@ function LandingPageContent() {
         if (isInitialMount.current) {
             isInitialMount.current = false;
             const queryMode = searchParams.get('mode');
+            if (!queryMode) {
+                setSearchParams(prev => {
+                    prev.set('mode', layoutMode);
+                    return prev;
+                }, { replace: true });
             }
         }
     }, []);
