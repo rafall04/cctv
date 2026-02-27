@@ -44,7 +44,8 @@ const MIGRATIONS = [
     'add_recording_system.js',
     'create_recordings_table.js',
     'add_core_indexes.js',
-    'add_analytics_indexes.js'
+    'add_analytics_indexes.js',
+    'add_segment_unique_index.js'
 ];
 
 console.log('🚀 Starting migration process...\n');
