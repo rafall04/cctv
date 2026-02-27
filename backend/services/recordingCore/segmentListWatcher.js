@@ -16,10 +16,6 @@ export class SegmentListWatcher {
         try {
             await fsp.mkdir(this.recordingsBasePath, { recursive: true });
 
-            await fsp.mkdir(this.recordingsBasePath, { recursive: true });
-                await fsp.mkdir(this.recordingsBasePath, { recursive: true });
-            }
-
             // Initial scan for existing camera directories
             const entries = await fsp.readdir(this.recordingsBasePath, { withFileTypes: true });
             for (const entry of entries) {
@@ -34,10 +30,11 @@ export class SegmentListWatcher {
                 if (eventType === 'rename' && filename && filename.startsWith('camera')) {
                     const cameraDir = path.join(this.recordingsBasePath, filename);
                     // Delay slightly to ensure directory is fully created
-                    setTimeout(() => {
-                        if (fs.existsSync(cameraDir)) {
+                    setTimeout(async () => {
+                        try {
+                            await fsp.access(cameraDir);
                             this.watchCameraDirectory(cameraDir);
-                        }
+                        } catch (e) {}
                     }, 1000);
                 }
             });
@@ -46,16 +43,17 @@ export class SegmentListWatcher {
         }
     }
 
-    watchCameraDirectory(cameraDir) {
+    async watchCameraDirectory(cameraDir) {
         if (this.watchers.has(cameraDir)) return;
 
         console.log(`[SegmentListWatcher] Watching camera directory: ${cameraDir}`);
         
         // Initial check for segments.csv
         const csvPath = path.join(cameraDir, 'segments.csv');
-        if (fs.existsSync(csvPath)) {
+        try {
+            await fsp.access(csvPath);
             this.processNewLines(cameraDir).catch(err => console.error(`[SegmentListWatcher] Initial process error for ${cameraDir}:`, err));
-        }
+        } catch (e) {}
 
         const watcher = fs.watch(cameraDir, (eventType, filename) => {
             if (filename === 'segments.csv') {
@@ -72,7 +70,11 @@ export class SegmentListWatcher {
         const csvPath = path.join(cameraDir, 'segments.csv');
         let fileHandle;
         try {
-            if (!fs.existsSync(csvPath)) return;
+            try {
+                await fsp.access(csvPath);
+            } catch (e) {
+                return;
+            }
 
             fileHandle = await fsp.open(csvPath, 'r');
             const stats = await fileHandle.stat();
