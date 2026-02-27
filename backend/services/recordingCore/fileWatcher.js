@@ -10,7 +10,6 @@ class FileWatcher {
     }
 
     async startGlobalWatcher(onNewFile) {
-        console.log('[FileWatcher] Native watch disabled. Using segment manifest as primary ingest.');
         return;
     }
 }
