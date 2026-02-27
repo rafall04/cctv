@@ -64,20 +64,22 @@ export class HouseKeeper {
 
     async realTimeCleanup() {
         try {
-            const settings = this.queryOne('SELECT recording_duration_hours FROM settings LIMIT 1');
-            const hours = settings ? settings.recording_duration_hours : 168;
+            const cameras = this.query('SELECT id, recording_duration_hours FROM cameras');
             
-            const thresholdDate = new Date(Date.now() - hours * 3600000);
-            const thresholdStr = thresholdDate.toISOString().replace('T', ' ').substring(0, 19);
+            for (const cam of cameras) {
+                const hours = cam.recording_duration_hours || 168;
+                const thresholdDate = new Date(Date.now() - hours * 3600000);
+                const thresholdStr = thresholdDate.toISOString().replace('T', ' ').substring(0, 19);
 
-            const oldSegments = this.query('SELECT id, file_path FROM recording_segments WHERE end_time < ? LIMIT 10', [thresholdStr]);
-            
-            for (const seg of oldSegments) {
-                if (this.lockManager.isLocked(seg.file_path)) continue;
-                if (await existsAsync(seg.file_path)) {
-                    try { await fsp.unlink(seg.file_path); } catch(e){}
+                const oldSegments = this.query('SELECT id, file_path FROM recording_segments WHERE camera_id = ? AND end_time < ? LIMIT 10', [cam.id, thresholdStr]);
+                
+                for (const seg of oldSegments) {
+                    if (this.lockManager.isLocked(seg.file_path)) continue;
+                    if (await existsAsync(seg.file_path)) {
+                        try { await fsp.unlink(seg.file_path); } catch(e){}
+                    }
+                    this.execute('DELETE FROM recording_segments WHERE id = ?', [seg.id]);
                 }
-                this.execute('DELETE FROM recording_segments WHERE id = ?', [seg.id]);
             }
 
             if (os.platform() === 'linux') {
