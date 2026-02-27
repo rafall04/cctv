@@ -27,6 +27,10 @@ class RecordingService {
         return streamEngine.startRecording(cameraId);
     }
 
+    async shutdownAll() {
+        return streamEngine.shutdownAll();
+    }
+
     async stopRecording(cameraId) {
         return streamEngine.stopRecording(cameraId);
     }
