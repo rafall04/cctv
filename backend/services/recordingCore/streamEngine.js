@@ -57,6 +57,9 @@ class StreamEngine {
             '-segment_clocktime_offset', '0',
             '-reset_timestamps', '1',
             '-segment_format', 'mp4',
+            '-segment_list', path.join(cameraDir, 'segments.csv'),
+            '-segment_list_type', 'csv',
+            '-segment_list_flags', '+append',
             '-strftime', '1',
             path.join(cameraDir, '%Y%m%d_%H%M%S.mp4')
         ];
