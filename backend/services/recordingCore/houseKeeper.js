@@ -105,6 +105,7 @@ export class HouseKeeper {
                         continue;
                     }
 
+                    let fileDeleted = false;
                     try {
                         const stats = await fsp.stat(seg.file_path);
                         // Skip if file is too new (grace period)
@@ -115,18 +116,24 @@ export class HouseKeeper {
 
                         // Try to delete physical file
                         await fsp.unlink(seg.file_path);
+                        fileDeleted = true;
                         deleted++;
                     } catch (e) {
                         // If file is already gone (ENOENT), we should still delete the DB row.
                         // Otherwise, if it's some other error (EPERM, etc), we skip DB deletion to retry later.
-                        if (e.code !== 'ENOENT') {
+                        if (e.code === 'ENOENT') {
+                            fileDeleted = true; // Already gone, safe to remove DB row
+                            deleted++;
+                        } else {
                             console.error(`[HouseKeeper] Failed to unlink ${seg.file_path}:`, e.message);
-                            continue;
+                            fileDeleted = false;
                         }
                     }
 
                     // 4. Delete DB row only if physical file is gone (or was already gone)
-                    this.execute('DELETE FROM recording_segments WHERE id = ?', [seg.id]);
+                    if (fileDeleted) {
+                        this.execute('DELETE FROM recording_segments WHERE id = ?', [seg.id]);
+                    }
                 }
                 if (deleted > 0 || skipped > 0 || kept > 0) {
                     console.log(`[HouseKeeper] Cleanup for Cam ${cam.id}: Deleted: ${deleted}, Skipped: ${skipped} (Locked), Kept: ${kept} (Grace)`);
