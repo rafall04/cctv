@@ -281,4 +281,4 @@ class RecordingService {
     }
 }
 
-export default new RecordingService();
+export const recordingService = new RecordingService();
