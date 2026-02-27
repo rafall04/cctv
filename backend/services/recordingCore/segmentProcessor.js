@@ -59,9 +59,32 @@ class SegmentProcessor {
                     continue;
                 }
 
-                // 2. Probing: Check duration and integrity
+                // 2. Probing: Check duration and integrity with retry logic
                 let durationStr = '0';
+                let ffprobeSuccess = false;
                 this.lockManager.acquire(task.filePath);
+                try {
+                    for (let attempt = 1; attempt <= 3; attempt++) {
+                        try {
+                            const { stdout } = await execFileAsync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', task.filePath], { encoding: 'utf8', timeout: 5000 });
+                            durationStr = stdout.trim();
+                            ffprobeSuccess = true;
+                            break;
+                        } catch (e) {
+                            if (attempt < 3) {
+                                console.log(`[SegmentProcessor] ffprobe retry ${attempt}/3 for ${fileOnly}...`);
+                                const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+                                await new Promise(r => setTimeout(r, delay));
+                            } else {
+                                throw e;
+                            }
+                        }
+                    }
+                } catch(e) {
+                    console.error(`[SegmentProcessor] ffprobe failed for ${fileOnly} after 3 attempts:`, e.message);
+                } finally {
+                    this.lockManager.release(task.filePath);
+                }
                 try {
                     const { stdout } = await execFileAsync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', task.filePath], { encoding: 'utf8', timeout: 5000 });
                     durationStr = stdout.trim();
