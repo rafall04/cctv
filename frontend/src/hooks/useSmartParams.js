@@ -1,57 +1,36 @@
 import { useSearchParams } from 'react-router-dom';
+import { useCallback } from 'react';
 
-/**
- * Custom hook for smart URL parameter management.
- * Prevents destructive overwriting of existing parameters.
- */
 export function useSmartParams() {
-  const [searchParams, setSearchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
 
-  /**
-   * Updates a specific parameter without touching others.
-   * @param {string} key 
-   * @param {string} value 
-   */
-  const updateParam = (key, value) => {
-    setSearchParams(prev => {
-      const newParams = new URLSearchParams(prev);
-      if (value === undefined || value === null) {
-        newParams.delete(key);
-      } else {
-        newParams.set(key, value);
-      }
-      return newParams;
-    }, { replace: true });
-  };
+    const updateParam = useCallback((key, value) => {
+        setSearchParams(prev => {
+            const newParams = new URLSearchParams(prev);
+            newParams.set(key, value);
+            return newParams;
+        }, { replace: true });
+    }, [setSearchParams]);
 
-  /**
-   * Removes a specific parameter without touching others.
-   * @param {string} key 
-   */
-  const removeParam = (key) => {
-    setSearchParams(prev => {
-      const newParams = new URLSearchParams(prev);
-      newParams.delete(key);
-      return newParams;
-    }, { replace: true });
-  };
+    const removeParam = useCallback((key) => {
+        setSearchParams(prev => {
+            const newParams = new URLSearchParams(prev);
+            newParams.delete(key);
+            return newParams;
+        }, { replace: true });
+    }, [setSearchParams]);
 
-  /**
-   * Clears multiple parameters at once.
-   * @param {string[]} keys 
-   */
-  const removeParams = (keys) => {
-    setSearchParams(prev => {
-      const newParams = new URLSearchParams(prev);
-      keys.forEach(key => newParams.delete(key));
-      return newParams;
-    }, { replace: true });
-  };
+    const removeParams = useCallback((keys) => {
+        setSearchParams(prev => {
+            const newParams = new URLSearchParams(prev);
+            keys.forEach(k => newParams.delete(k));
+            return newParams;
+        }, { replace: true });
+    }, [setSearchParams]);
 
-  return {
-    searchParams,
-    updateParam,
-    removeParam,
-    removeParams
-  };
+    const getParam = useCallback((key) => {
+        return searchParams.get(key);
+    }, [searchParams]);
+
+    return { searchParams, updateParam, removeParam, removeParams, getParam };
 }

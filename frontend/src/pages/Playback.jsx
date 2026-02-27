@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSmartParams } from '../hooks/useSmartParams';
 import { cameraService } from '../services/cameraService';
 import recordingService from '../services/recordingService';
 import { useBranding } from '../contexts/BrandingContext';
@@ -13,7 +14,7 @@ const MAX_SEEK_DISTANCE = 180;
 
 function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) {
     const navigate = useNavigate();
-    const [searchParams, setSearchParams] = useSearchParams();
+    const { searchParams, updateParam } = useSmartParams();
     const cameraIdFromUrl = searchParams.get('cam');
     const { branding } = useBranding();
     const { cameras: globalCameras, loading: globalLoading } = useCameras();
