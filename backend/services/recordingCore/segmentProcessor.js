@@ -152,10 +152,10 @@ class SegmentProcessor {
                 const actualDuration = Math.round(rawDuration);
 
                 const [, year, month, day, hour, minute, second] = match;
-                const startTimeStr = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
-                const startDate = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
-                const endDate = new Date(startDate.getTime() + actualDuration * 1000 - (startDate.getTimezoneOffset() * 60000));
-                const endTimeStr = endDate.toISOString().replace('T', ' ').substring(0, 19);
+                const startTimeStr = `${year}-${month}-${day}T${hour}:${minute}:${second}Z`;
+                const startDate = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}Z`);
+                const endDate = new Date(startDate.getTime() + actualDuration * 1000);
+                const endTimeStr = endDate.toISOString().split('.')[0] + 'Z';
 
                 // Final check before insert (just in case)
                 const duplicateCheck = this.queryOne('SELECT id FROM recording_segments WHERE camera_id = ? AND filename = ?', [cameraId, fileOnly]);
