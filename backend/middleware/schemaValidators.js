@@ -64,7 +64,7 @@ export const createCameraSchema = {
                 type: 'string',
                 minLength: 1,
                 maxLength: 500,
-                pattern: '^rtsp://.+$'
+                pattern: '^rtsp://([^:@/]+:[^:@/]+@)?([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\\.)*[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(:\\d{1,5})?(/.*)?$'
             },
             video_codec: {
                 type: 'string',
@@ -138,7 +138,7 @@ export const updateCameraSchema = {
                 type: 'string',
                 minLength: 1,
                 maxLength: 500,
-                pattern: '^rtsp://.+$'
+                pattern: '^rtsp://([^:@/]+:[^:@/]+@)?([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\\.)*[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(:\\d{1,5})?(/.*)?$'
             },
             video_codec: {
                 type: 'string',
