@@ -36,6 +36,14 @@ class SegmentProcessor {
         if (this.isProcessingQueue) return;
         this.isProcessingQueue = true;
 
+        let successCount = 0;
+        let deferredCount = 0;
+        let errorCount = 0;
+        let skipCount = 0;
+        const totalInQueue = this.dbQueue.length;
+        if (this.isProcessingQueue) return;
+        this.isProcessingQueue = true;
+
         while (this.dbQueue.length > 0) {
             const task = this.dbQueue.shift();
             try {
@@ -45,16 +53,23 @@ class SegmentProcessor {
                 const camFolder = parts.length > 1 ? parts[parts.length - 2] : null;
                 const fileOnly = parts[parts.length - 1];
                 
-                if (!camFolder || !camFolder.startsWith('camera')) continue;
+                if (!camFolder || !camFolder.startsWith('camera')) {
+                    skipCount++;
+                    continue;
+                }
                 const cameraId = parseInt(camFolder.replace('camera', ''), 10);
                 
                 const regex = /^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})\.mp4$/;
                 const match = fileOnly.match(regex);
-                if (!match) continue;
+                if (!match) {
+                    skipCount++;
+                    continue;
+                }
 
                 // 1. Check if segment already exists in DB (Idempotency)
                 const existing = this.queryOne('SELECT id FROM recording_segments WHERE camera_id = ? AND filename = ?', [cameraId, fileOnly]);
                 if (existing) {
+                    skipCount++;
                     continue;
                 }
 
@@ -86,14 +101,14 @@ class SegmentProcessor {
                 }
 
                 if (!ffprobeSuccess) {
-                    console.warn(`[SegmentProcessor] Probe failed for ${fileOnly}. Deferring processing to preserve data.`);
+                    deferredCount++;
                     continue; // SKIP processing, but DO NOT delete. Orphan scanner might retry later.
                 }
 
                 const rawDuration = parseFloat(durationStr);
                 if (isNaN(rawDuration) || rawDuration < 1) {
-                    console.log(`[SegmentProcessor] Cleanup: Skipping tiny/invalid file < 1s (successfully probed). Deleting: ${fileOnly}`);
                     try { await fsp.unlink(task.filePath); } catch(e){}
+                    skipCount++;
                     continue;
                 }
 
@@ -125,14 +140,15 @@ class SegmentProcessor {
 
                 if (!remuxSuccess || !(await existsAsync(tempPath))) {
                     if (await existsAsync(tempPath)) try { await fsp.unlink(tempPath); } catch(e){}
+                    errorCount++;
                     continue; // Skip if remux failed
                 }
 
                 // 4. Finalizing: Atomic swap and DB Insert
                 const stats = await fsp.stat(tempPath);
                 if (stats.size <= 1024) {
-                    console.warn(`[SegmentProcessor] Remuxed file too small (${stats.size} bytes), skipping: ${fileOnly}`);
                     await fsp.unlink(tempPath);
+                    errorCount++;
                     continue;
                 }
 
@@ -142,6 +158,7 @@ class SegmentProcessor {
                 } catch (e) {
                     console.error(`[SegmentProcessor] Finalize rename failed for ${fileOnly}:`, e.message);
                     if (await existsAsync(tempPath)) try { await fsp.unlink(tempPath); } catch(err){}
+                    errorCount++;
                     continue;
                 } finally {
                     this.lockManager.release(task.filePath);
@@ -160,7 +177,7 @@ class SegmentProcessor {
                 // Final check before insert (just in case)
                 const duplicateCheck = this.queryOne('SELECT id FROM recording_segments WHERE camera_id = ? AND filename = ?', [cameraId, fileOnly]);
                 if (duplicateCheck) {
-                    console.warn(`[SegmentProcessor] Race condition detected: Segment ${fileOnly} already in DB.`);
+                    skipCount++;
                     continue;
                 }
 
@@ -171,12 +188,17 @@ class SegmentProcessor {
                     [cameraId, fileOnly, startTimeStr, endTimeStr, finalSize, actualDuration, task.filePath]
                 );
 
-                console.log(`[SegmentProcessor] ✓ Finalized ${fileOnly} (${(finalSize/1024/1024).toFixed(2)} MB, ${actualDuration}s)`);
+                successCount++;
                 if (this.onSegmentProcessed) this.onSegmentProcessed();
+                console.log(`[SegmentProcessor] ✓ Finalized ${fileOnly} (${(finalSize/1024/1024).toFixed(2)} MB, ${actualDuration}s)`);
                 
             } catch (error) {
+                errorCount++;
                 console.error('[SegmentProcessor] Error processing task:', error);
             }
+        }
+        if (totalInQueue > 0) {
+            console.log(`[SegmentProcessor] Queue empty. Processed: ${successCount}, Deferred: ${deferredCount}, Errors: ${errorCount}, Skipped: ${skipCount}`);
         }
         this.isProcessingQueue = false;
     }
