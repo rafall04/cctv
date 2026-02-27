@@ -24,6 +24,21 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
     const [segments, setSegments] = useState([]);
     const [selectedSegment, setSelectedSegment] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [selectedDate, setSelectedDate] = useState(() => {
+        const tParams = new URLSearchParams(window.location.search).get('t');
+        if (tParams) {
+            const t = new Date(parseInt(tParams));
+            if (!isNaN(t.getTime())) {
+                const offset = t.getTimezoneOffset();
+                const localDate = new Date(t.getTime() - (offset*60*1000));
+                return localDate.toISOString().split('T')[0];
+            }
+        }
+        const today = new Date();
+        const offset = today.getTimezoneOffset();
+        const localDate = new Date(today.getTime() - (offset*60*1000));
+        return localDate.toISOString().split('T')[0];
+    });
     const [playbackSpeed, setPlaybackSpeed] = useState(1);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
@@ -220,7 +235,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
 
         const fetchSegments = async () => {
             try {
-                const response = await recordingService.getSegments(selectedCamera.id);
+                const response = await recordingService.getSegments(selectedCamera.id, selectedDate);
                 if (response.success && response.data) {
                     const segmentsArray = response.data.segments || [];
                     setSegments(segmentsArray);
@@ -235,14 +250,12 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         };
 
         fetchSegments();
-        const interval = setInterval(fetchSegments, 10000);
         
         return () => {
-            clearInterval(interval);
             setSegments([]);
             setSelectedSegment(null);
         };
-    }, [selectedCamera]);
+    }, [selectedCamera, selectedDate]);
 
     useEffect(() => {
         if (!selectedSegment || !videoRef.current || !selectedCamera) return;
@@ -721,6 +734,16 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
                     onAutoPlayToggle={handleAutoPlayToggle}
                     onShare={handleShare}
                 />
+                
+                <div className="flex justify-between items-center bg-white dark:bg-gray-900 rounded-lg p-3 shadow-sm border border-gray-200 dark:border-gray-800">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Tanggal Rekaman:</span>
+                    <input 
+                        type="date" 
+                        value={selectedDate} 
+                        onChange={(e) => setSelectedDate(e.target.value)}
+                        className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-500 focus:border-primary-500 block p-2 dark:bg-gray-800 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
+                    />
+                </div>
 
                 <PlaybackVideo
                     videoRef={videoRef}

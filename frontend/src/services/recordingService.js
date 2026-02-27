@@ -77,8 +77,12 @@ export const getRestartLogs = async (cameraId = null, limit = 50) => {
 /**
  * Get segments untuk camera (untuk playback)
  */
-export const getSegments = async (cameraId) => {
-    const response = await apiClient.get(`/api/recordings/${cameraId}/segments`);
+export const getSegments = async (cameraId, dateStr) => {
+    let url = `/api/recordings/${cameraId}/segments`;
+    if (dateStr) {
+        url += `?date=${dateStr}`;
+    }
+    const response = await apiClient.get(url);
     return response.data;
 };
 
