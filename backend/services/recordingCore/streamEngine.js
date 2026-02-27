@@ -2,11 +2,17 @@ import { spawn } from 'child_process';
 import { promises as fsp } from 'fs';
 import path from 'path';
 
-import { query, queryOne } from '../../database/connectionPool.js';
+
 
 const RECORDINGS_BASE_PATH = process.env.RECORDINGS_PATH || '/var/www/rafnet-cctv/recordings';
 
 class StreamEngine {
+    constructor({ query, queryOne }) {
+        this.activeRecordings = new Map();
+        this.isShuttingDown = false;
+        this.query = query;
+        this.queryOne = queryOne;
+    }
     constructor() {
         this.activeRecordings = new Map();
         this.isShuttingDown = false;
@@ -23,7 +29,7 @@ class StreamEngine {
     async autoStartRecordings() {
         console.log('[StreamEngine] Auto-starting cameras...');
         try {
-            const cameras = query('SELECT id FROM cameras WHERE enable_recording = 1 AND enabled = 1');
+            const cameras = this.query('SELECT id FROM cameras WHERE enable_recording = 1 AND enabled = 1');
             for (let i = 0; i < cameras.length; i++) {
                 setTimeout(() => this.startRecording(cameras[i].id), i * 300);
             }
@@ -35,7 +41,7 @@ class StreamEngine {
     async startRecording(cameraId) {
         if (this.activeRecordings.has(cameraId)) return;
 
-        const camera = queryOne('SELECT id, private_rtsp_url FROM cameras WHERE id = ?', [cameraId]);
+        const camera = this.queryOne('SELECT id, private_rtsp_url FROM cameras WHERE id = ?', [cameraId]);
         if (!camera || !camera.private_rtsp_url) return;
 
         const cameraDir = path.join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
@@ -60,7 +66,7 @@ class StreamEngine {
         ];
 
         const ffmpeg = spawn('ffmpeg', args, { stdio: 'ignore' });
-        this.activeRecordings.set(cameraId, { process: ffmpeg, autoRestart: true, lastFile: null, lastSize: 0 });
+        this.activeRecordings.set(cameraId, { process: ffmpeg, autoRestart: true, lastFile: null, lastSize: 0, startTime: new Date() });
         console.log(`[StreamEngine] Camera ${cameraId} Started (Wall-Clock Sync Enabled)`);
 
         ffmpeg.on('close', (code) => {
@@ -120,6 +126,34 @@ class StreamEngine {
             } catch (e) {}
         }
     }
+
+    getRecordingStatus(cameraId) {
+        const recording = this.activeRecordings.get(cameraId);
+        if (!recording) return { isRecording: false, status: 'stopped' };
+        return {
+            isRecording: true,
+            status: 'recording',
+            startTime: recording.startTime,
+            duration: Math.floor((Date.now() - recording.startTime.getTime()) / 1000),
+            restartCount: 0
+        };
+    }
+
+    getStorageUsage(cameraId) {
+        try {
+            const result = this.queryOne(
+                'SELECT SUM(file_size) as total_size, COUNT(*) as segment_count FROM recording_segments WHERE camera_id = ?',
+                [cameraId]
+            );
+            return {
+                totalSize: result ? (result.total_size || 0) : 0,
+                segmentCount: result ? (result.segment_count || 0) : 0,
+                totalSizeGB: result ? ((result.total_size || 0) / 1024 / 1024 / 1024).toFixed(2) : '0.00'
+            };
+        } catch (error) {
+            return { totalSize: 0, segmentCount: 0, totalSizeGB: '0.00' };
+        }
+    }
 }
 
-export const streamEngine = new StreamEngine();
+export { StreamEngine };

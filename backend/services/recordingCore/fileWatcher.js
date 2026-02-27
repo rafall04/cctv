@@ -41,4 +41,4 @@ class FileWatcher {
     }
 }
 
-export const fileWatcher = new FileWatcher();
+export { FileWatcher };

@@ -4,8 +4,7 @@ import path from 'path';
 import os from 'os';
 import { execFile } from 'child_process';
 import util from 'util';
-import { lockManager } from './lockManager.js';
-import { execute, query, queryOne } from '../../database/connectionPool.js';
+
 
 const execFileAsync = util.promisify(execFile);
 
@@ -22,10 +21,16 @@ async function existsAsync(filePath) {
 
 
 class HouseKeeper {
+    constructor({ execute, query, queryOne, lockManager }) {
+        this.execute = execute;
+        this.query = query;
+        this.queryOne = queryOne;
+        this.lockManager = lockManager;
+    }
     async recoverOrphanedSegments(enqueueCallback) {
         console.log(`[HouseKeeper] Sweeping for orphaned segments...`);
         try {
-            const cameras = query('SELECT id FROM cameras');
+            const cameras = this.query('SELECT id FROM cameras');
             let recovered = 0;
             
             for (const cam of cameras) {
@@ -37,11 +42,11 @@ class HouseKeeper {
                 
                 for (const file of mp4Files) {
                     const fullPath = path.join(cameraDir, file);
-                    if (lockManager.isLocked(fullPath)) continue;
+                    if (this.lockManager.isLocked(fullPath)) continue;
 
                     const stats = await fsp.stat(fullPath);
                     if (Date.now() - stats.mtime.getTime() > 300000) {
-                        const existing = queryOne('SELECT id FROM recording_segments WHERE camera_id = ? AND filename = ?', [cam.id, file]);
+                        const existing = this.queryOne('SELECT id FROM recording_segments WHERE camera_id = ? AND filename = ?', [cam.id, file]);
                         if (!existing) {
                             if (enqueueCallback) {
                                 enqueueCallback(fullPath, path.join(`camera${cam.id}`, file));
@@ -59,20 +64,20 @@ class HouseKeeper {
 
     async realTimeCleanup() {
         try {
-            const settings = queryOne('SELECT recording_duration_hours FROM settings LIMIT 1');
+            const settings = this.queryOne('SELECT recording_duration_hours FROM settings LIMIT 1');
             const hours = settings ? settings.recording_duration_hours : 168;
             
             const thresholdDate = new Date(Date.now() - hours * 3600000);
             const thresholdStr = thresholdDate.toISOString().replace('T', ' ').substring(0, 19);
 
-            const oldSegments = query('SELECT id, file_path FROM recording_segments WHERE end_time < ? LIMIT 10', [thresholdStr]);
+            const oldSegments = this.query('SELECT id, file_path FROM recording_segments WHERE end_time < ? LIMIT 10', [thresholdStr]);
             
             for (const seg of oldSegments) {
-                if (lockManager.isLocked(seg.file_path)) continue;
+                if (this.lockManager.isLocked(seg.file_path)) continue;
                 if (await existsAsync(seg.file_path)) {
                     try { await fsp.unlink(seg.file_path); } catch(e){}
                 }
-                execute('DELETE FROM recording_segments WHERE id = ?', [seg.id]);
+                this.execute('DELETE FROM recording_segments WHERE id = ?', [seg.id]);
             }
 
             if (os.platform() === 'linux') {
@@ -82,13 +87,13 @@ class HouseKeeper {
                     const freeKB = parseInt(df[3], 10);
                     if (freeKB < 2000000) {
                         console.warn('[HouseKeeper] 🚨 EMERGENCY DISK LOW! Evicting oldest files...');
-                        const oldest = query('SELECT id, file_path FROM recording_segments ORDER BY start_time ASC LIMIT 5');
+                        const oldest = this.query('SELECT id, file_path FROM recording_segments ORDER BY start_time ASC LIMIT 5');
                         for (const seg of oldest) {
-                            if (lockManager.isLocked(seg.file_path)) continue;
+                            if (this.lockManager.isLocked(seg.file_path)) continue;
                             if (await existsAsync(seg.file_path)) {
                                 try { await fsp.unlink(seg.file_path); } catch(e){}
                             }
-                            execute('DELETE FROM recording_segments WHERE id = ?', [seg.id]);
+                            this.execute('DELETE FROM recording_segments WHERE id = ?', [seg.id]);
                         }
                     }
                 } catch (dfErr) {}
@@ -98,4 +103,4 @@ class HouseKeeper {
         }
 }
 
-export const houseKeeper = new HouseKeeper();
+export { HouseKeeper };

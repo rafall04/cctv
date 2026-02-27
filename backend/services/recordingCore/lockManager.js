@@ -16,4 +16,4 @@ export class LockManager {
     }
 }
 
-export const lockManager = new LockManager();
+export { LockManager };

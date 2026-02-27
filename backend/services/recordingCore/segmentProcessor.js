@@ -3,8 +3,7 @@ import util from 'util';
 import { promises as fsp } from 'fs';
 import fs from 'fs';
 import path from 'path';
-import { execute, queryOne } from '../../database/connectionPool.js';
-import { lockManager } from './lockManager.js';
+
 
 const execFileAsync = util.promisify(execFile);
 
@@ -19,6 +18,10 @@ async function existsAsync(filePath) {
 
 
 class SegmentProcessor {
+    constructor({ execute, queryOne, lockManager }) {
+        this.execute = execute;
+        this.queryOne = queryOne;
+        this.lockManager = lockManager;
     constructor() {
         this.dbQueue = [];
         this.isProcessingQueue = false;
@@ -50,17 +53,17 @@ class SegmentProcessor {
                 const match = fileOnly.match(regex);
                 if (!match) continue;
 
-                const existing = queryOne('SELECT id FROM recording_segments WHERE camera_id = ? AND filename = ?', [cameraId, fileOnly]);
+                const existing = this.queryOne('SELECT id FROM recording_segments WHERE camera_id = ? AND filename = ?', [cameraId, fileOnly]);
                 if (existing) continue;
 
                 let durationStr = '0';
                 
-                lockManager.acquire(task.filePath);
+                this.lockManager.acquire(task.filePath);
                 try {
                     const { stdout } = await execFileAsync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', task.filePath], { encoding: 'utf8', timeout: 5000 });
                     durationStr = stdout.trim();
                 } catch(e) {}
-                lockManager.release(task.filePath);
+                this.lockManager.release(task.filePath);
 
                 const rawDuration = parseFloat(durationStr);
                 if (isNaN(rawDuration) || rawDuration < 5) {
@@ -76,7 +79,7 @@ class SegmentProcessor {
                 
                 let remuxSuccess = false;
                 try {
-                    lockManager.acquire(task.filePath);
+                    this.lockManager.acquire(task.filePath);
                     await new Promise((resolve, reject) => {
                         const remuxer = spawn('ffmpeg', [
                             '-i', task.filePath,
@@ -102,12 +105,12 @@ class SegmentProcessor {
                         try { await fsp.unlink(tempPath); } catch(err) {}
                     }
                 } finally {
-                    lockManager.release(task.filePath);
+                    this.lockManager.release(task.filePath);
                 }
 
                 const finalStats = await fsp.stat(task.filePath);
                 try {
-                    lockManager.acquire(task.filePath);
+                    this.lockManager.acquire(task.filePath);
                     await new Promise((resolve, reject) => {
                         const remuxer = spawn('ffmpeg', [
                             '-i', task.filePath,
@@ -121,17 +124,17 @@ class SegmentProcessor {
                     remuxSuccess = true;
                 } catch(e) {
                 } finally {
-                    lockManager.release(task.filePath);
+                    this.lockManager.release(task.filePath);
                 }
 
                 if (remuxSuccess && (await existsAsync(tempPath))) {
                     const stats = await fsp.stat(tempPath);
                     if (stats.size > 1024) {
-                        lockManager.acquire(task.filePath);
+                        this.lockManager.acquire(task.filePath);
                         try {
                             await fsp.rename(tempPath, task.filePath);
                         } finally {
-                            lockManager.release(task.filePath);
+                            this.lockManager.release(task.filePath);
                         }
                     } else {
                         await fsp.unlink(tempPath);
@@ -150,7 +153,7 @@ class SegmentProcessor {
                 const endDate = new Date(startDate.getTime() + actualDuration * 1000 - (startDate.getTimezoneOffset() * 60000));
                 const endTimeStr = endDate.toISOString().replace('T', ' ').substring(0, 19);
 
-                execute(
+                this.execute(
                     `INSERT INTO recording_segments (camera_id, filename, start_time, end_time, file_size, duration, file_path) VALUES (?, ?, ?, ?, ?, ?, ?)`,
                     [cameraId, fileOnly, startTimeStr, endTimeStr, finalSize, actualDuration, task.filePath]
                 );
@@ -170,4 +173,4 @@ class SegmentProcessor {
     }
 }
 
-export const segmentProcessor = new SegmentProcessor();
+export { SegmentProcessor };
