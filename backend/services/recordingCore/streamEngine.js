@@ -83,7 +83,6 @@ class StreamEngine {
 
         console.log(`[StreamEngine] Camera ${cameraId} Started (Wall-Clock Sync Enabled)`);
 
-        console.log(`[StreamEngine] Camera ${cameraId} Started (Wall-Clock Sync Enabled)`);
         ffmpeg.on('close', (code) => {
             const state = this.activeRecordings.get(cameraId);
             this.activeRecordings.delete(cameraId);
