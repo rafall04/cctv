@@ -128,13 +128,12 @@ export class HouseKeeper {
                     // 4. Delete DB row only if physical file is gone (or was already gone)
                     this.execute('DELETE FROM recording_segments WHERE id = ?', [seg.id]);
                 }
+                if (deleted > 0 || skipped > 0 || kept > 0) {
+                    console.log(`[HouseKeeper] Cleanup for Cam ${cam.id}: Deleted: ${deleted}, Skipped: ${skipped} (Locked), Kept: ${kept} (Grace)`);
+                }
             }
         } catch (error) {
             console.error('[HouseKeeper] Error in realTimeCleanup:', error);
         }
     }
 }
-
-                if (deleted > 0 || skipped > 0 || kept > 0) {
-                    console.log(`[HouseKeeper] Cleanup for Cam ${cam.id}: Deleted: ${deleted}, Skipped: ${skipped} (Locked), Kept: ${kept} (Grace)`);
-                }
