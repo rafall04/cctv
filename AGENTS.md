@@ -8,6 +8,12 @@
 RAF NET Secure CCTV Hub - A secure, high-performance video streaming system isolating private IP cameras from public exposure while providing web access via MediaMTX (RTSP to HLS). 
 Stack: Node.js 20+, Fastify, SQLite (better-sqlite3), React 18, Vite, Tailwind CSS, HLS.js.
 
+## RULE PRECEDENCE
+- **Canonical Source**: `AGENTS.md` is the authoritative rule document for engineering workflow and coding constraints.
+- **Compatibility Files**: `.cursorrules` and `GEMINI.md` must mirror `AGENTS.md` and must not introduce conflicting rules.
+- **Operational Docs**: `README.md` and `SECURITY.md` provide operator guidance. If examples conflict with `AGENTS.md`, follow `AGENTS.md`.
+- **Conflict Resolution**: When rules disagree, use this order: `AGENTS.md` > `.cursorrules`/`GEMINI.md` > `SECURITY.md`/`README.md`.
+
 ## STRUCTURE
 ```
 .
@@ -55,6 +61,12 @@ Stack: Node.js 20+, Fastify, SQLite (better-sqlite3), React 18, Vite, Tailwind C
 - **No Blind Edits**: Atlas/Sisyphus-Junior agents must NOT randomly edit files without a plan.
 - **package.json**: NEVER use `fs` module to edit `package.json` blindly without checking the `"type"` field.
 - **Boulder State**: Always check `boulder.json` state to understand the current task context and continuation status.
+
+## GIT & RELEASE WORKFLOW
+- **Auto Push Policy**: Every completed code/documentation change MUST be committed and pushed to GitHub immediately after verification passes (syntax/tests/build), unless explicitly marked local-only by the request.
+- **Atomic Commits**: Keep commits scoped to one logical change area so rollback remains safe and predictable.
+- **Verify Before Push**: Never push unverified changes. Minimum gate: syntax clean + relevant tests/build command successful.
+- **No Stale Local Drift**: Do not leave validated changes only in local working tree. A finished task is considered done only when remote branch contains the update.
 
 ## COMMANDS
 ```bash

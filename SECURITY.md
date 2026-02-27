@@ -4,6 +4,12 @@
 
 This document outlines the security architecture and best practices for the RAF NET CCTV system.
 
+## Policy Authority
+
+- This file defines security hardening guidance.
+- Canonical engineering workflow and coding constraints are defined in `AGENTS.md`.
+- If a deployment/example snippet here conflicts with `AGENTS.md`, follow `AGENTS.md` and keep security intent unchanged.
+
 ## Core Security Principles
 
 ### 1. Camera IP Isolation

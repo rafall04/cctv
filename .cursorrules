@@ -1,0 +1,21 @@
+# Cursor Rules - Project Execution Guardrails
+
+Reference: `AGENTS.md` is the canonical source of truth.
+
+If any rule here conflicts with `AGENTS.md`, follow `AGENTS.md`.
+
+## Mandatory
+- For complex work, read `.sisyphus/plans/*.md` first.
+- Do not make blind edits; follow plan-driven execution.
+- Keep backend code ESM-only (`import/export`).
+- Use async I/O (`fs.promises` / async child process wrappers).
+- Respect recording concurrency locks (`LockManager`) before deletion operations.
+
+## Verification Gate
+- After edits, run syntax checks and relevant tests/build.
+- Do not consider work complete without verification evidence.
+
+## Git Gate
+- After verification passes, commit and push immediately.
+- Keep commits atomic and scoped.
+- Local-only completion is allowed only when explicitly requested.

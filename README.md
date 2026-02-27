@@ -2,6 +2,13 @@
 
 A secure, high-performance video streaming system that isolates private IP cameras from public exposure while providing public web access to camera streams.
 
+## Policy Authority
+
+- This document provides operator/deployment guidance.
+- Canonical engineering workflow and coding constraints are defined in `AGENTS.md`.
+- Security hardening guidance is defined in `SECURITY.md`.
+- If examples here conflict with `AGENTS.md` or `SECURITY.md`, follow those files.
+
 ## 🎯 Key Features
 
 ### Public Features
