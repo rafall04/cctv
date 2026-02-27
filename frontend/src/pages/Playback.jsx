@@ -235,11 +235,28 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
 
         const fetchSegments = async () => {
             try {
-                const response = await recordingService.getSegments(selectedCamera.id, selectedDate);
-                if (response.success && response.data) {
-                    const segmentsArray = response.data.segments || [];
-                    setSegments(segmentsArray);
-                } else {
+                let response = await recordingService.getSegments(selectedCamera.id, selectedDate);
+                
+                // Defensive parsing and fallback logic
+                let segmentsArray = [];
+                if (response?.success === true && Array.isArray(response?.data?.segments)) {
+                    segmentsArray = response.data.segments;
+                }
+                
+                // Fallback if date filter returns empty but camera might have segments elsewhere
+                if (segmentsArray.length === 0) {
+                    console.warn(`No segments found for ${selectedDate}, trying fallback query without date...`);
+                    const fallbackResponse = await recordingService.getSegments(selectedCamera.id);
+                    if (fallbackResponse?.success === true && Array.isArray(fallbackResponse?.data?.segments)) {
+                        if (fallbackResponse.data.segments.length > 0) {
+                            segmentsArray = fallbackResponse.data.segments;
+                            console.warn('Fallback successful: found segments without date filter');
+                        }
+                    }
+                }
+                
+                setSegments(segmentsArray);
+                if (segmentsArray.length === 0 && response?.success === false) {
                     console.warn('API response not successful:', response);
                 }
             } catch (error) {
@@ -248,7 +265,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
                 setSelectedSegment(null);
             }
         };
-
+        
         fetchSegments();
         
         return () => {
