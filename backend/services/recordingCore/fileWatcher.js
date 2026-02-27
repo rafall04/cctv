@@ -2,7 +2,7 @@ import fs from 'fs';
 import { promises as fsp } from 'fs';
 import path from 'path';
 
-const RECORDINGS_BASE_PATH = process.env.RECORDINGS_PATH || '/var/www/rafnet-cctv/recordings';
+import { RECORDINGS_BASE_PATH } from './recordingPaths.js';
 
 class FileWatcher {
     constructor() {

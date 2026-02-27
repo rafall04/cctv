@@ -4,7 +4,7 @@ import path from 'path';
 
 
 
-const RECORDINGS_BASE_PATH = process.env.RECORDINGS_PATH || '/var/www/rafnet-cctv/recordings';
+import { RECORDINGS_BASE_PATH } from './recordingPaths.js';
 
 class StreamEngine {
     constructor({ query, queryOne }) {

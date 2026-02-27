@@ -1,3 +1,4 @@
+import { RECORDINGS_BASE_PATH } from './recordingPaths.js';
 import { promises as fsp } from 'fs';
 import path from 'path';
 import fs from 'fs';
@@ -7,13 +8,15 @@ export class SegmentListWatcher {
         this.segmentProcessor = segmentProcessor;
         this.watchers = new Map(); // cameraDir -> fs.FSWatcher
         this.lastReadPositions = new Map(); // cameraDir -> byteOffset
-        this.recordingsBasePath = path.resolve('recordings');
+        this.recordingsBasePath = RECORDINGS_BASE_PATH;
     }
 
     async startGlobalWatcher() {
         console.log('[SegmentListWatcher] Starting global watcher for segments.csv...');
         try {
-            if (!fs.existsSync(this.recordingsBasePath)) {
+            await fsp.mkdir(this.recordingsBasePath, { recursive: true });
+
+            await fsp.mkdir(this.recordingsBasePath, { recursive: true });
                 await fsp.mkdir(this.recordingsBasePath, { recursive: true });
             }
 

@@ -7,7 +7,7 @@ import util from 'util';
 
 const execFileAsync = util.promisify(execFile);
 
-const RECORDINGS_BASE_PATH = process.env.RECORDINGS_PATH || '/var/www/rafnet-cctv/recordings';
+import { RECORDINGS_BASE_PATH } from './recordingPaths.js';
 
 async function existsAsync(filePath) {
     try {
