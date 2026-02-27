@@ -2,8 +2,6 @@ import { spawn } from 'child_process';
 import { promises as fsp } from 'fs';
 import path from 'path';
 
-
-
 import { RECORDINGS_BASE_PATH } from './recordingPaths.js';
 
 class StreamEngine {
@@ -59,7 +57,6 @@ class StreamEngine {
             '-segment_format', 'mp4',
             '-segment_list', path.join(cameraDir, 'segments.csv'),
             '-segment_list_type', 'csv',
-            '-segment_list_flags', '+append',
             '-strftime', '1',
             path.join(cameraDir, '%Y%m%d_%H%M%S.mp4')
         ];
