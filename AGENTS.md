@@ -13,6 +13,7 @@ Stack: Node.js 20+, Fastify, SQLite (better-sqlite3), React 18, Vite, Tailwind C
 - **Compatibility Files**: `.cursorrules` and `GEMINI.md` must mirror `AGENTS.md` and must not introduce conflicting rules.
 - **Operational Docs**: `README.md` and `SECURITY.md` provide operator guidance. If examples conflict with `AGENTS.md`, follow `AGENTS.md`.
 - **Conflict Resolution**: When rules disagree, use this order: `AGENTS.md` > `.cursorrules`/`GEMINI.md` > `SECURITY.md`/`README.md`.
+- **Governance Artifacts**: Keep `docs/rules-conflict-matrix.md` and `docs/rules-qa-checklist.md` updated whenever rule docs change.
 
 ## STRUCTURE
 ```
