@@ -233,89 +233,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
             bufferingTimeoutRef.current = null;
         }
 
-        #NP|        const fetchSegments = async (isFallback = false) => {
-#WJ|            try {
-#NX|                let response = await recordingService.getSegments(selectedCamera.id, selectedDate);
-#HS|                
-#TJ|                // Defensive parsing and fallback logic
-#HW|                let segmentsArray = [];
-#HQ|                if (response?.success === true && Array.isArray(response?.data?.segments)) {
-#NK|                    segmentsArray = response.data.segments;
-#QY|                }
-#VJ|                
-#JK|                // Fallback if date filter returns empty but camera might have segments elsewhere
-#TN|                if (segmentsArray.length === 0 && !isFallback) {
-#QP|                    console.warn(`No segments found for ${selectedDate}, trying fallback query without date...`);
-#XQ|                    const fallbackResponse = await recordingService.getSegments(selectedCamera.id);
-#NP|                    if (fallbackResponse?.success === true && Array.isArray(fallbackResponse?.data?.segments)) {
-#ZJ|                        if (fallbackResponse.data.segments.length > 0) {
-#NW|                            segmentsArray = fallbackResponse.data.segments;
-#SH|                            console.warn('Fallback successful: found segments without date filter');
-#YJ|                        }
-#ZH|                    }
-#NQ|                }
-#MV|                
-#NN|                setSegments(segmentsArray);
-#XW|                if (segmentsArray.length === 0 && response?.success === false) {
-#PV|                    console.warn('API response not successful:', response);
-#YN|                }
-#YH|            } catch (error) {
-#QP|                console.error('Failed to fetch segments:', error);
-#YV|                setSegments([]);
-#KP|                setSelectedSegment(null);
-#NS|            }
-#RY|        };
-#WJ|            try {
-#NX|                let response = await recordingService.getSegments(selectedCamera.id, selectedDate);
-#HS|                
-#TJ|                // Defensive parsing and fallback logic
-#HW|                let segmentsArray = [];
-#HQ|                if (response?.success === true && Array.isArray(response?.data?.segments)) {
-#NK|                    segmentsArray = response.data.segments;
-#QY|                }
-#VJ|                
-#JK|                // Fallback if date filter returns empty but camera might have segments elsewhere
-#TN|                if (segmentsArray.length === 0 && !isFallback) {
-#QP|                    console.warn(`No segments found for ${selectedDate}, trying fallback query without date...`);
-#XQ|                    const fallbackResponse = await recordingService.getSegments(selectedCamera.id);
-#NP|                    if (fallbackResponse?.success === true && Array.isArray(fallbackResponse?.data?.segments)) {
-#ZJ|                        if (fallbackResponse.data.segments.length > 0) {
-#NW|                            segmentsArray = fallbackResponse.data.segments;
-#SH|                            console.warn('Fallback successful: found segments without date filter');
-#YJ|                        }
-#ZH|                    }
-#NQ|                }
-#MV|                
-#NN|                setSegments(segmentsArray);
-#XW|                if (segmentsArray.length === 0 && response?.success === false) {
-#PV|                    console.warn('API response not successful:', response);
-#YN|                }
-#YH|            } catch (error) {
-#QP|                console.error('Failed to fetch segments:', error);
-#YV|                setSegments([]);
-#KP|                setSelectedSegment(null);
-#NS|            }
-#RY|        };
-#WJ|            try {
-#NX|                let response = await recordingService.getSegments(selectedCamera.id, selectedDate);
-#HS|                
-#TJ|                // Defensive parsing and fallback logic
-#HW|                let segmentsArray = [];
-#HQ|                if (response?.success === true && Array.isArray(response?.data?.segments)) {
-#NK|                    segmentsArray = response.data.segments;
-#QY|                }
-#VJ|                
-#JK|                // Fallback if date filter returns empty but camera might have segments elsewhere
-#TN|                if (segmentsArray.length === 0 && !isFallback) {
-#QP|                    console.warn(`No segments found for ${selectedDate}, trying fallback query without date...`);
-#XQ|                    const fallbackResponse = await recordingService.getSegments(selectedCamera.id);
-#NP|                    if (fallbackResponse?.success === true && Array.isArray(fallbackResponse?.data?.segments)) {
-#ZJ|                        if (fallbackResponse.data.segments.length > 0) {
-#NW|                            segmentsArray = fallbackResponse.data.segments;
-#SH|                            console.warn('Fallback successful: found segments without date filter');
-#YJ|                        }
-#ZH|                    }
-#NQ|                }
+        const fetchSegments = async (isFallback = false) => {
             try {
                 let response = await recordingService.getSegments(selectedCamera.id, selectedDate);
                 
@@ -326,7 +244,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
                 }
                 
                 // Fallback if date filter returns empty but camera might have segments elsewhere
-                if (segmentsArray.length === 0) {
+                if (segmentsArray.length === 0 && !isFallback) {
                     console.warn(`No segments found for ${selectedDate}, trying fallback query without date...`);
                     const fallbackResponse = await recordingService.getSegments(selectedCamera.id);
                     if (fallbackResponse?.success === true && Array.isArray(fallbackResponse?.data?.segments)) {
