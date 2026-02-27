@@ -246,7 +246,173 @@ export const useHlsPlayer = ({ streams, videoRef, deviceCapabilities, deviceTier
                         });
                     });
 
-                    hls.on(Hls.Events.ERROR, async (event, data) => {
+                    #NT|                    hls.on(Hls.Events.ERROR, async (event, data) => {
+#KP|                        if (isDestroyed) return;
+#HX|                        console.error('HLS error:', data);
+#TZ|
+#KW|                        if (data.type === Hls.ErrorTypes.MEDIA_ERROR && 
+                           (data.details === Hls.ErrorDetails.BUFFER_APPENDING_ERROR || 
+                            data.details === Hls.ErrorDetails.FRAG_PARSING_ERROR ||
+                            data?.error?.message?.includes('payload'))) {
+                            
+                            // Try recovery first for non-fatal errors
+                            if (!data.fatal) {
+                                console.warn('Non-fatal media error, attempting recovery...');
+                                hls.recoverMediaError();
+                                return;
+                            }
+                            
+                            clearStreamTimeout();
+                            setStatus('error');
+                            setLoadingStage(LoadingStage.ERROR);
+                            setError('Video codec H.264/H.265 issue or payload error.');
+                            setShowSpinner(false);
+                            
+                            if (hls) {
+                                hls.destroy();
+                            }
+                            return;
+                        }
+
+                        if (data.fatal) {
+                            clearStreamTimeout();
+
+                            const errorType = data.type === Hls.ErrorTypes.NETWORK_ERROR ? 'network' :
+                                data.type === Hls.ErrorTypes.MEDIA_ERROR ? 'media' : 'unknown';
+
+                            const streamError = createStreamError({
+                                type: errorType,
+                                message: data.details || 'Stream error',
+                                stage: loadingStage,
+                                deviceTier: deviceTier,
+                                retryCount: autoRetryCount,
+                            });
+
+                            if (fallbackHandlerRef.current) {
+                                const result = fallbackHandlerRef.current.handleError(streamError, () => {
+                                    if (!isDestroyed && hls) {
+                                        setLoadingStage(LoadingStage.CONNECTING);
+                                        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                                            hls.startLoad();
+                                        } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                                            hls.recoverMediaError();
+                                        }
+                                    }
+                                });
+
+                                if (result.action === 'manual-retry-required') {
+                                    setStatus('error');
+                                    setLoadingStage(LoadingStage.ERROR);
+                                    setShowSpinner(false);
+                                }
+                            } else {
+                                if (errorRecoveryRef.current) {
+                                    await errorRecoveryRef.current.handleError(hls, {
+                                        fatal: true,
+                                        type: data.type === Hls.ErrorTypes.NETWORK_ERROR ? 'networkError' :
+                                            data.type === Hls.ErrorTypes.MEDIA_ERROR ? 'mediaError' : 'fatalError',
+                                    });
+                                } else {
+                                    setStatus('error');
+                                    setLoadingStage(LoadingStage.ERROR);
+                                    setError('Fatal error occurred');
+                                    setShowSpinner(false);
+                                    hls.destroy();
+                                }
+                            }
+                        }
+                    });
+#KP|                        if (isDestroyed) return;
+#HX|                        console.error('HLS error:', data);
+#TZ|
+#KW|                        if (data.type === Hls.ErrorTypes.MEDIA_ERROR && 
+                           (data.details === Hls.ErrorDetails.BUFFER_APPENDING_ERROR || 
+                            data.details === Hls.ErrorDetails.FRAG_PARSING_ERROR ||
+                            data?.error?.message?.includes('payload'))) {
+                            
+                            // Try recovery first for non-fatal errors
+                            if (!data.fatal) {
+                                console.warn('Non-fatal media error, attempting recovery...');
+                                hls.recoverMediaError();
+                                return;
+                            }
+                            
+                            clearStreamTimeout();
+                            setStatus('error');
+                            setLoadingStage(LoadingStage.ERROR);
+                            setError('Video codec H.264/H.265 issue or payload error.');
+                            setShowSpinner(false);
+                            
+                            if (hls) {
+                                hls.destroy();
+                            }
+                            return;
+                        }
+
+                        if (data.fatal) {
+                            clearStreamTimeout();
+
+                            const errorType = data.type === Hls.ErrorTypes.NETWORK_ERROR ? 'network' :
+                                data.type === Hls.ErrorTypes.MEDIA_ERROR ? 'media' : 'unknown';
+
+                            const streamError = createStreamError({
+                                type: errorType,
+                                message: data.details || 'Stream error',
+                                stage: loadingStage,
+                                deviceTier: deviceTier,
+                                retryCount: autoRetryCount,
+                            });
+
+                            if (fallbackHandlerRef.current) {
+                                const result = fallbackHandlerRef.current.handleError(streamError, () => {
+                                    if (!isDestroyed && hls) {
+                                        setLoadingStage(LoadingStage.CONNECTING);
+                                        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                                            hls.startLoad();
+                                        } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                                            hls.recoverMediaError();
+                                        }
+                                    }
+                                });
+
+                                if (result.action === 'manual-retry-required') {
+                                    setStatus('error');
+                                    setLoadingStage(LoadingStage.ERROR);
+                                    setShowSpinner(false);
+                                }
+                            } else {
+                                if (errorRecoveryRef.current) {
+                                    await errorRecoveryRef.current.handleError(hls, {
+                                        fatal: true,
+                                        type: data.type === Hls.ErrorTypes.NETWORK_ERROR ? 'networkError' :
+                                            data.type === Hls.ErrorTypes.MEDIA_ERROR ? 'mediaError' : 'fatalError',
+                                    });
+                                } else {
+                                    setStatus('error');
+                                    setLoadingStage(LoadingStage.ERROR);
+                                    setError('Fatal error occurred');
+                                    setShowSpinner(false);
+                                    hls.destroy();
+                                }
+                            }
+                        }
+                    });
+#KP|                        if (isDestroyed) return;
+#HX|                        console.error('HLS error:', data);
+#TZ|
+#KW|                        if (data.type === Hls.ErrorTypes.MEDIA_ERROR && 
+                           (data.details === Hls.ErrorDetails.BUFFER_APPENDING_ERROR || 
+                            data.details === Hls.ErrorDetails.FRAG_PARSING_ERROR ||
+                            data?.error?.message?.includes('payload'))) {
+                            
+                            // Try recovery first for non-fatal errors
+                            if (!data.fatal) {
+                                console.warn('Non-fatal media error, attempting recovery...');
+                                hls.recoverMediaError();
+                                return;
+                            }
+                            
+                            clearStreamTimeout();
                         if (isDestroyed) return;
                         console.error('HLS error:', data);
 
