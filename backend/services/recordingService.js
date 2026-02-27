@@ -1,380 +1,284 @@
-import { spawn, execFile } from 'child_process';
-import { existsSync, mkdirSync, statSync } from 'fs';
-import { promises as fs } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
-import { promisify } from 'util';
-import { query, queryOne, execute } from '../database/connectionPool.js';
+import { spawn, execFileSync } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import { execute, query, queryOne } from '../database/connectionPool.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-// Base paths
-const RECORDINGS_BASE_PATH = join(__dirname, '..', '..', 'recordings');
-const execFileAsync = promisify(execFile);
-
-// State tracking
-const activeRecordings = new Map();
-
-/**
- * Ensures a directory exists
- * @param {string} dirPath - The directory path
- */
-const ensureDir = (dirPath) => {
-    if (!existsSync(dirPath)) {
-        mkdirSync(dirPath, { recursive: true });
-    }
-};
+// Configuration
+const RECORDINGS_BASE_PATH = process.env.RECORDINGS_PATH || '/var/www/rafnet-cctv/recordings';
+if (!fs.existsSync(RECORDINGS_BASE_PATH)) {
+    fs.mkdirSync(RECORDINGS_BASE_PATH, { recursive: true });
+}
 
 class RecordingService {
     constructor() {
-        ensureDir(RECORDINGS_BASE_PATH);
+        this.activeRecordings = new Map(); // cameraId -> { process, autoRestart: boolean }
+        this.fileDebounceTimers = new Map(); // fileKey -> timeoutId
+        this.dbQueue = [];
+        this.isProcessingQueue = false;
         
-        // Start background tasks with safe intervals (no CPU pegging)
-        this.cleanupInterval = setInterval(() => this.runGlobalCleanup(), 60 * 60 * 1000); // 1 hour
-        this.healthInterval = setInterval(() => this.monitorHealth(), 30 * 1000); // 30 seconds
-        
-        // Run initial cleanup
-        setTimeout(() => this.runGlobalCleanup(), 5000);
+        // 1. Orphan Sweeper (Run once on startup)
+        setTimeout(() => this.recoverOrphanedSegments(), 5000);
+
+        // 2. Global Watcher (Zero CPU file completion detection)
+        this.startGlobalWatcher();
+
+        // 3. Stalled Stream Watchdog (Checks for frozen cameras)
+        setInterval(() => this.checkStalledStreams(), 60000);
+
+        // 4. Auto Cleanup (Disk space management)
+        setInterval(() => this.cleanupOldSegments(), 1800000); // 30 minutes
     }
 
-    /**
-     * Start recording for a camera
-     * @param {number} cameraId
-     */
-    async startRecording(cameraId) {
+    startGlobalWatcher() {
         try {
-            if (activeRecordings.has(cameraId)) {
-                return { success: false, message: 'Already recording' };
-            }
-
-            const camera = queryOne('SELECT * FROM cameras WHERE id = ?', [cameraId]);
-            if (!camera) return { success: false, message: 'Camera not found' };
-            if (!camera.enabled) return { success: false, message: 'Camera disabled' };
-            if (!camera.enable_recording) return { success: false, message: 'Recording not enabled' };
-            if (!camera.private_rtsp_url || !camera.private_rtsp_url.startsWith('rtsp://')) {
-                return { success: false, message: 'Invalid RTSP URL' };
-            }
-
-            const cameraDir = join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
-            ensureDir(cameraDir);
-
-            console.log(`[Recording] Starting camera ${cameraId} (${camera.name})`);
-
-            const outputPattern = join(cameraDir, '%Y%m%d_%H%M%S.mp4');
-            const ffmpegArgs = [
-                '-rtsp_transport', 'tcp',
-                '-i', camera.private_rtsp_url,
-                '-c:v', 'copy',                 // 0% CPU streaming copy
-                '-an',                          // No audio
-                '-f', 'segment',                // Segment muxer
-                '-segment_time', '600',         // 10 minutes chunks
-                '-reset_timestamps', '1',
-                '-segment_format', 'mp4',
-                '-segment_atclocktime', '1',
-                '-strftime', '1',
-                outputPattern
-            ];
-
-            const ffmpeg = spawn('ffmpeg', ffmpegArgs, { stdio: ['ignore', 'ignore', 'pipe'] });
-            
-            const recordingState = {
-                process: ffmpeg,
-                startTime: Date.now(),
-                lastOutputTime: Date.now(),
-                cameraDir,
-                cameraId,
-                camera,
-                lastSegment: null,
-                restartCount: 0
-            };
-            
-            activeRecordings.set(cameraId, recordingState);
-
-            // Update DB status
-            execute(
-                'UPDATE cameras SET recording_status = ?, last_recording_start = ? WHERE id = ?',
-                ['recording', new Date().toISOString(), cameraId]
-            );
-
-            // Handle output for file tracking and health monitoring
-            ffmpeg.stderr.on('data', (data) => {
-                recordingState.lastOutputTime = Date.now();
-                const output = data.toString();
+            fs.watch(RECORDINGS_BASE_PATH, { recursive: true }, (eventType, filename) => {
+                if (!filename || !filename.endsWith('.mp4')) return;
                 
-                // Track segment creation by reading ffmpeg output
-                if (output.includes('Opening') && output.includes('.mp4') && output.includes('for writing')) {
-                    const match = output.match(/(\d{8}_\d{6}\.mp4)/);
-                    if (match) {
-                        const newSegment = match[1];
-                        console.log(`[Recording] Camera ${cameraId} opened segment: ${newSegment}`);
-                        
-                        // If there was a previous segment, it's now fully closed and safe to process!
-                        if (recordingState.lastSegment) {
-                            this.processCompletedSegment(cameraId, recordingState.lastSegment, cameraDir);
-                        }
-                        recordingState.lastSegment = newSegment;
-                    }
-                }
-            });
+                const filePath = path.join(RECORDINGS_BASE_PATH, filename);
+                const fileKey = filename;
 
-            ffmpeg.on('close', (code) => {
-                console.log(`[Recording] Camera ${cameraId} process exited (Code: ${code})`);
-                
-                // Process the final segment if it exists
-                if (recordingState.lastSegment) {
-                    this.processCompletedSegment(cameraId, recordingState.lastSegment, cameraDir);
+                // Reset the 10-second debounce timer every time the file is modified
+                if (this.fileDebounceTimers.has(fileKey)) {
+                    clearTimeout(this.fileDebounceTimers.get(fileKey));
                 }
 
-                activeRecordings.delete(cameraId);
-                execute('UPDATE cameras SET recording_status = ? WHERE id = ?', ['stopped', cameraId]);
-            });
+                // If FFmpeg hasn't touched the file in 10 seconds, it's considered DONE.
+                const timer = setTimeout(() => {
+                    this.fileDebounceTimers.delete(fileKey);
+                    this.enqueueSegmentForDb(filePath, filename);
+                }, 10000);
 
-            return { success: true, message: 'Recording started' };
+                this.fileDebounceTimers.set(fileKey, timer);
+            });
+            console.log('[RecordingService] Global File Watcher Active');
         } catch (error) {
-            console.error(`[Recording] Error starting camera ${cameraId}:`, error);
-            return { success: false, message: error.message };
+            console.error('[RecordingService] Failed to start fs.watch:', error);
         }
     }
 
-    /**
-     * Stop recording
-     * @param {number} cameraId
-     */
-    async stopRecording(cameraId) {
-        const state = activeRecordings.get(cameraId);
-        if (!state) return { success: false, message: 'Not recording' };
+    enqueueSegmentForDb(filePath, filename) {
+        if (!fs.existsSync(filePath)) return;
+        const stats = fs.statSync(filePath);
+        
+        if (stats.size < 500 * 1024) {
+            console.warn(`[Segment] File < 500KB (corrupt/empty). Deleting: ${filename}`);
+            try { fs.unlinkSync(filePath); } catch(e){}
+            return;
+        }
 
-        console.log(`[Recording] Stopping camera ${cameraId}...`);
+        // Add to queue and start processing if idle
+        this.dbQueue.push({ filePath, filename, size: stats.size });
+        if (!this.isProcessingQueue) {
+            this.processDbQueue();
+        }
+    }
+
+    async processDbQueue() {
+        this.isProcessingQueue = true;
+
+        while (this.dbQueue.length > 0) {
+            const task = this.dbQueue.shift();
+            try {
+                // Extract Camera ID and time from filename: camera1/20260227_080000.mp4
+                const parts = task.filename.split(path.sep);
+                const camFolder = parts.length > 1 ? parts[parts.length - 2] : null;
+                const fileOnly = parts[parts.length - 1];
+                
+                if (!camFolder || !camFolder.startsWith('camera')) continue;
+                const cameraId = parseInt(camFolder.replace('camera', ''), 10);
+                
+                const regex = /^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})\.mp4$/;
+                const match = fileOnly.match(regex);
+                if (!match) continue;
+
+                // Check if already exists to prevent duplicates (SQLITE_BUSY safe due to queue)
+                const existing = queryOne('SELECT id FROM recording_segments WHERE camera_id = ? AND filename = ?', [cameraId, fileOnly]);
+                if (existing) continue;
+
+                // Probe exact duration safely
+                let duration = 600;
+                try {
+                    const probeOut = execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', task.filePath], { encoding: 'utf8', timeout: 5000 }).trim();
+                    if (probeOut && parseFloat(probeOut) > 0) duration = Math.round(parseFloat(probeOut));
+                } catch(e) {}
+
+                // Build local time string
+                const [, year, month, day, hour, minute, second] = match;
+                const startTimeStr = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+                const startDate = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
+                
+                // Calculate local end time
+                const endDate = new Date(startDate.getTime() + duration * 1000 - (startDate.getTimezoneOffset() * 60000));
+                const endTimeStr = endDate.toISOString().replace('T', ' ').substring(0, 19);
+
+                execute(
+                    `INSERT INTO recording_segments (camera_id, filename, start_time, end_time, file_size, duration, file_path) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    [cameraId, fileOnly, startTimeStr, endTimeStr, task.size, duration, task.filePath]
+                );
+
+                console.log(`[Database Queue] ✓ Inserted ${fileOnly} (${(task.size/1024/1024).toFixed(2)} MB, ${duration}s)`);
+            } catch (error) {
+                console.error(`[Database Queue] Error processing ${task.filename}:`, error.message);
+            }
+        }
+
+        this.isProcessingQueue = false;
+    }
+
+    async startRecording(cameraId) {
+        if (this.activeRecordings.has(cameraId)) return;
+
+        const camera = queryOne('SELECT id, private_rtsp_url FROM cameras WHERE id = ?', [cameraId]);
+        if (!camera || !camera.private_rtsp_url) return;
+
+        const cameraDir = path.join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
+        if (!fs.existsSync(cameraDir)) fs.mkdirSync(cameraDir, { recursive: true });
+
+        // NATIVE MP4 - NO REMUXING REQUIRED LATER!
+        const args = [
+            '-rtsp_transport', 'tcp',
+            '-i', camera.private_rtsp_url,
+            '-c:v', 'copy',
+            '-an',
+            '-f', 'segment',
+            '-segment_time', '600',
+            '-reset_timestamps', '1',
+            '-segment_format', 'mp4',
+            '-movflags', '+faststart',
+            '-strftime', '1',
+            path.join(cameraDir, '%Y%m%d_%H%M%S.mp4')
+        ];
+
+        const ffmpeg = spawn('ffmpeg', args, { stdio: 'ignore' });
+        
+        this.activeRecordings.set(cameraId, { process: ffmpeg, autoRestart: true, lastFile: null, lastSize: 0 });
+        console.log(`[FFmpeg Camera ${cameraId}] Started (Native MP4)`);
+
+        ffmpeg.on('close', (code) => {
+            const state = this.activeRecordings.get(cameraId);
+            this.activeRecordings.delete(cameraId);
+            
+            console.warn(`[FFmpeg Camera ${cameraId}] Exited with code ${code}`);
+            
+            if (state && state.autoRestart) {
+                console.log(`[Auto-Heal] Restarting Camera ${cameraId} in 5s...`);
+                setTimeout(() => this.startRecording(cameraId), 5000);
+            }
+        });
+    }
+
+    async stopRecording(cameraId) {
+        const state = this.activeRecordings.get(cameraId);
+        if (!state) return;
+
+        // Prevent auto-restart
+        state.autoRestart = false;
         
         try {
             state.process.kill('SIGTERM');
-            
-            // Hard kill after 5s if hung
-            setTimeout(() => {
-                if (activeRecordings.has(cameraId) && !state.process.killed) {
-                    console.warn(`[Recording] Camera ${cameraId} hung, sending SIGKILL`);
-                    try { state.process.kill('SIGKILL'); } catch (e) {}
-                }
-            }, 5000);
-            
-            execute('UPDATE cameras SET recording_status = ? WHERE id = ?', ['stopped', cameraId]);
-            return { success: true, message: 'Stop request sent' };
-        } catch (error) {
-            console.error(`[Recording] Stop error:`, error);
-            return { success: false, message: error.message };
-        }
-    }
-
-    /**
-     * Auto start recordings for all enabled cameras
-     */
-    async autoStartRecordings() {
-        console.log('[Recording] Auto-starting recordings...');
-        const cameras = query('SELECT id FROM cameras WHERE enabled = 1 AND enable_recording = 1');
+            const killTimer = setTimeout(() => {
+                try { state.process.kill('SIGKILL'); } catch(e){}
+            }, 3000);
+            state.process.on('close', () => clearTimeout(killTimer));
+        } catch (error) {}
         
-        for (const camera of cameras) {
-            await this.startRecording(camera.id);
-            // Stagger start by 1 second to avoid CPU spike on boot
-            await new Promise(r => setTimeout(r, 1000));
-        }
-        console.log(`[Recording] Auto-started ${cameras.length} cameras`);
+        console.log(`[FFmpeg Camera ${cameraId}] Stopped Intentionally`);
     }
 
-    /**
-     * Get real-time recording status
-     * @param {number} cameraId 
-     */
-    getRecordingStatus(cameraId) {
-        const state = activeRecordings.get(cameraId);
-        if (!state) {
-            return { isRecording: false, status: 'stopped' };
-        }
-
-        return {
-            isRecording: true,
-            status: 'recording',
-            startTime: new Date(state.startTime),
-            duration: Math.floor((Date.now() - state.startTime) / 1000),
-            restartCount: state.restartCount
-        };
-    }
-
-    /**
-     * Get storage usage for a camera
-     * @param {number} cameraId 
-     */
-    getStorageUsage(cameraId) {
-        try {
-            const result = queryOne(
-                'SELECT SUM(file_size) as total_size, COUNT(*) as segment_count FROM recording_segments WHERE camera_id = ?',
-                [cameraId]
-            );
-
-            return {
-                totalSize: result.total_size || 0,
-                segmentCount: result.segment_count || 0,
-                totalSizeGB: ((result.total_size || 0) / 1024 / 1024 / 1024).toFixed(2)
-            };
-        } catch (error) {
-            console.error(`[Recording] Storage error for ${cameraId}:`, error);
-            return { totalSize: 0, segmentCount: 0, totalSizeGB: '0.00' };
-        }
-    }
-
-    /**
-     * Process a fully closed segment without any polling or infinite loops.
-     */
-    async processCompletedSegment(cameraId, filename, cameraDir) {
-        const filePath = join(cameraDir, filename);
-        
-        try {
-            // Verify file exists and has size
-            if (!existsSync(filePath)) {
-                console.warn(`[Segment] Missing completed file: ${filename}`);
-                return;
-            }
-            
-            const stats = statSync(filePath);
-            if (stats.size < 500 * 1024) {
-                console.warn(`[Segment] File too small, deleting: ${filename}`);
-                await fs.unlink(filePath).catch(() => {});
-                return;
-            }
-
-            console.log(`[Segment] Processing: ${filename} (${(stats.size/1024/1024).toFixed(2)} MB)`);
-
-            // Apply faststart for web seeking (no heavy re-encode)
-            const tempPath = filePath + '.faststart.mp4';
+    checkStalledStreams() {
+        for (const [cameraId, state] of this.activeRecordings.entries()) {
             try {
-                await execFileAsync('ffmpeg', [
-                    '-i', filePath,
-                    '-c', 'copy',
-                    '-movflags', '+faststart',
-                    '-y', tempPath
-                ], { timeout: 60000 }); // 60s max to prevent zombies
+                const cameraDir = path.join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
+                if (!fs.existsSync(cameraDir)) continue;
 
-                // Replace original atomically if successful
-                if (existsSync(tempPath) && statSync(tempPath).size > 1024) {
-                    await fs.rename(tempPath, filePath);
+                // Find the most recently modified mp4
+                const files = fs.readdirSync(cameraDir)
+                    .filter(f => f.endsWith('.mp4'))
+                    .map(f => ({ name: f, time: fs.statSync(path.join(cameraDir, f)).mtime.getTime() }))
+                    .sort((a, b) => b.time - a.time);
+
+                if (files.length > 0) {
+                    const latest = files[0];
+                    const fullPath = path.join(cameraDir, latest.name);
+                    const currentSize = fs.statSync(fullPath).size;
+
+                    // If size hasn't changed in 60s, stream is frozen
+                    if (state.lastFile === latest.name && state.lastSize === currentSize && currentSize > 0) {
+                        console.warn(`[Watchdog] Camera ${cameraId} stream frozen! Killing FFmpeg...`);
+                        try { state.process.kill('SIGKILL'); } catch(e){}
+                    }
+
+                    state.lastFile = latest.name;
+                    state.lastSize = currentSize;
                 }
-            } catch (ffmpegErr) {
-                console.warn(`[Segment] faststart failed for ${filename}, keeping original.`, ffmpegErr.message);
-                if (existsSync(tempPath)) await fs.unlink(tempPath).catch(() => {});
-            }
-
-            // Extract timestamp from filename YYYYMMDD_HHMMSS.mp4
-            const match = filename.match(/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
-            if (!match) return;
-            
-            const [, year, month, day, hour, minute, second] = match;
-            const startTimeStr = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
-            const startTime = new Date(startTimeStr);
-            
-            // Get actual duration using ffprobe
-            let duration = 600;
-            try {
-                const { stdout } = await execFileAsync('ffprobe', [
-                    '-v', 'error',
-                    '-show_entries', 'format=duration',
-                    '-of', 'default=noprint_wrappers=1:nokey=1',
-                    filePath
-                ], { timeout: 5000 });
-                if (stdout) duration = Math.round(parseFloat(stdout));
             } catch (e) {}
-
-            const finalSize = statSync(filePath).size;
-            
-            // Avoid timezone timezone offset issues by storing ISO strictly
-            const endTime = new Date(startTime.getTime() + duration * 1000);
-            const startDb = startTime.toISOString().replace('T', ' ').substring(0, 19);
-            const endDb = endTime.toISOString().replace('T', ' ').substring(0, 19);
-
-            // DB Insert
-            const existing = queryOne('SELECT id FROM recording_segments WHERE camera_id = ? AND filename = ?', [cameraId, filename]);
-            if (!existing) {
-                execute(
-                    `INSERT INTO recording_segments (camera_id, filename, start_time, end_time, file_size, duration, file_path) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                    [cameraId, filename, startDb, endDb, finalSize, duration, filePath]
-                );
-                console.log(`[Segment] ✓ Registered in DB: ${filename}`);
-            }
-
-        } catch (error) {
-            console.error(`[Segment] Processing error for ${filename}:`, error);
         }
     }
 
-    /**
-     * Restarts recording if health is bad
-     */
-    async monitorHealth() {
-        const now = Date.now();
-        for (const [cameraId, state] of activeRecordings.entries()) {
-            // Tunnel timeout 10s, standard 30s
-            const timeout = state.camera.is_tunnel ? 10000 : 30000;
-            if (now - state.lastOutputTime > timeout) {
-                console.log(`[Health] Camera ${cameraId} frozen, restarting...`);
-                state.restartCount++;
-                await this.stopRecording(cameraId);
-                setTimeout(() => this.startRecording(cameraId), 3000);
-            }
-        }
-    }
-
-    /**
-     * Efficient background cleanup that handles both DB and FS
-     */
-    async runGlobalCleanup() {
-        console.log('[Cleanup] Starting global storage cleanup...');
+    recoverOrphanedSegments() {
+        console.log(`[Orphan Sweeper] Scanning for unrecorded segments...`);
         try {
-            const cameras = query('SELECT id, recording_duration_hours FROM cameras');
+            const cameras = query('SELECT id FROM cameras');
+            let recovered = 0;
             
-            for (const camera of cameras) {
-                const retentionHours = camera.recording_duration_hours || 5;
-                const retentionMs = retentionHours * 60 * 60 * 1000;
-                const cutoffTime = Date.now() - retentionMs;
+            cameras.forEach(cam => {
+                const cameraDir = path.join(RECORDINGS_BASE_PATH, `camera${cam.id}`);
+                if (!fs.existsSync(cameraDir)) return;
 
-                // 1. Clean DB entries
-                const segments = query('SELECT id, file_path, start_time FROM recording_segments WHERE camera_id = ?', [camera.id]);
-                for (const segment of segments) {
-                    const segTime = new Date(segment.start_time).getTime();
-                    if (segTime < cutoffTime) {
-                        try {
-                            if (existsSync(segment.file_path)) {
-                                await fs.unlink(segment.file_path);
-                            }
-                            execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
-                        } catch (err) {
-                            console.error(`[Cleanup] Failed to delete DB segment: ${segment.file_path}`, err);
+                const files = fs.readdirSync(cameraDir).filter(f => f.endsWith('.mp4'));
+                files.forEach(file => {
+                    const fullPath = path.join(cameraDir, file);
+                    const stats = fs.statSync(fullPath);
+                    
+                    // Only process files older than 5 minutes (definitely not active)
+                    if (Date.now() - stats.mtime.getTime() > 300000 && stats.size > 500000) {
+                        const existing = queryOne('SELECT id FROM recording_segments WHERE camera_id = ? AND filename = ?', [cam.id, file]);
+                        if (!existing) {
+                            this.enqueueSegmentForDb(fullPath, path.join(`camera${cam.id}`, file));
+                            recovered++;
                         }
-                    } else if (!existsSync(segment.file_path) && (Date.now() - segTime > 60*60*1000)) {
-                        // Orphan DB entry > 1 hour old
-                        execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
                     }
-                }
+                });
+            });
+            if (recovered > 0) console.log(`[Orphan Sweeper] Recovered ${recovered} orphaned segments into DB Queue.`);
+        } catch (e) {}
+    }
 
-                // 2. Clean orphaned filesystem files
-                const cameraDir = join(RECORDINGS_BASE_PATH, `camera${camera.id}`);
-                if (existsSync(cameraDir)) {
-                    const files = await fs.readdir(cameraDir);
-                    for (const file of files) {
-                        const filePath = join(cameraDir, file);
-                        const stats = statSync(filePath);
-                        if (Date.now() - stats.mtimeMs > retentionMs) {
-                            try {
-                                await fs.unlink(filePath);
-                                console.log(`[Cleanup] Deleted orphaned file: ${file}`);
-                            } catch (e) {}
-                        }
+    async cleanupOldSegments() {
+        try {
+            const settings = queryOne('SELECT recording_duration_hours FROM settings LIMIT 1');
+            const hours = settings ? settings.recording_duration_hours : 168; // default 7 days
+            
+            const thresholdDate = new Date(Date.now() - hours * 3600000);
+            const thresholdStr = thresholdDate.toISOString().replace('T', ' ').substring(0, 19);
+
+            const oldSegments = query('SELECT id, file_path FROM recording_segments WHERE end_time < ?', [thresholdStr]);
+            
+            for (const seg of oldSegments) {
+                if (fs.existsSync(seg.file_path)) {
+                    try { fs.unlinkSync(seg.file_path); } catch(e){}
+                }
+                execute('DELETE FROM recording_segments WHERE id = ?', [seg.id]);
+            }
+            
+            if (oldSegments.length > 0) console.log(`[Cleanup] Removed ${oldSegments.length} old segments.`);
+
+            // Emergency Disk Check (< 2GB free)
+            if (os.platform() === 'linux') {
+                const df = execFileSync('df', ['-k', RECORDINGS_BASE_PATH], { encoding: 'utf8' }).split('\n')[1].split(/\s+/);
+                const freeKB = parseInt(df[3], 10);
+                if (freeKB < 2000000) { // < 2GB
+                    console.warn('[Emergency Cleanup] Disk space critically low! Deleting oldest files...');
+                    const oldest = query('SELECT id, file_path FROM recording_segments ORDER BY start_time ASC LIMIT 5');
+                    for (const seg of oldest) {
+                        if (fs.existsSync(seg.file_path)) try { fs.unlinkSync(seg.file_path); } catch(e){}
+                        execute('DELETE FROM recording_segments WHERE id = ?', [seg.id]);
                     }
                 }
             }
-        } catch (error) {
-            console.error('[Cleanup] Global cleanup error:', error);
-        }
+        } catch (error) {}
     }
 }
 
-export const recordingService = new RecordingService();
+export default new RecordingService();
