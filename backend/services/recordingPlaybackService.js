@@ -1,5 +1,5 @@
 import { query, queryOne, execute } from '../database/database.js';
-import { recordingService } from './recordingService.js';
+import { recordingService } from './recordingCore/index.js';
 import { logAdminAction } from './securityAuditLogger.js';
 import { existsSync, statSync } from 'fs';
 

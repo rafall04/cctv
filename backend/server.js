@@ -45,7 +45,7 @@ import mediaMtxService from './services/mediaMtxService.js';
 import streamWarmer from './services/streamWarmer.js';
 import cameraHealthService from './services/cameraHealthService.js';
 import viewerSessionService from './services/viewerSessionService.js';
-import { recordingService } from './services/recordingService.js';
+import { recordingService } from './services/recordingCore/index.js';
 import thumbnailService from './services/thumbnailService.js';
 
 const fastify = Fastify({

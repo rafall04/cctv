@@ -54,7 +54,7 @@ vi.mock('../services/cameraHealthService.js', () => ({
     }
 }));
 
-vi.mock('../services/recordingService.js', () => ({
+vi.mock('../services/recordingCore/index.js', () => ({
     recordingService: {
         autoStartRecordings: vi.fn().mockResolvedValue(),
         shutdownAll: vi.fn().mockResolvedValue()

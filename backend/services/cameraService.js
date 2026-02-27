@@ -123,7 +123,7 @@ class CameraService {
 
         if (isEnabled && isRecordingEnabled) {
             try {
-                const { recordingService } = await import('./recordingService.js');
+                const { recordingService } = await import('./recordingCore/index.js');
                 console.log(`[Camera ${result.lastInsertRowid}] Auto-starting recording (camera created with recording enabled)`);
                 await recordingService.startRecording(result.lastInsertRowid);
             } catch (err) {
@@ -277,7 +277,7 @@ class CameraService {
         }
 
         if (enable_recording !== undefined) {
-            const { recordingService } = await import('./recordingService.js');
+            const { recordingService } = await import('./recordingCore/index.js');
             const newRecordingEnabled = enable_recording === true || enable_recording === 1;
             const oldRecordingEnabled = existingCamera.enable_recording === 1;
             const cameraEnabled = (newEnabled === 1 || newEnabled === true);
