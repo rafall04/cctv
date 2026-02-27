@@ -1,6 +1,7 @@
 import { spawn } from 'child_process';
-import fs from 'fs';
+import { promises as fsp } from 'fs';
 import path from 'path';
+
 import { query, queryOne } from '../../database/connectionPool.js';
 
 const RECORDINGS_BASE_PATH = process.env.RECORDINGS_PATH || '/var/www/rafnet-cctv/recordings';
@@ -38,8 +39,11 @@ class StreamEngine {
         if (!camera || !camera.private_rtsp_url) return;
 
         const cameraDir = path.join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
-        if (!fs.existsSync(cameraDir)) fs.mkdirSync(cameraDir, { recursive: true });
-
+        try {
+            await fsp.access(cameraDir);
+        } catch {
+            await fsp.mkdir(cameraDir, { recursive: true });
+        }
         const args = [
             '-rtsp_transport', 'tcp',
             '-i', camera.private_rtsp_url,
@@ -82,20 +86,30 @@ class StreamEngine {
         console.log(`[StreamEngine] Camera ${cameraId} Stopped Intentionally`);
     }
 
-    checkStalledStreams() {
+    async checkStalledStreams() {
         for (const [cameraId, state] of this.activeRecordings.entries()) {
             try {
                 const cameraDir = path.join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
-                if (!fs.existsSync(cameraDir)) continue;
-                const files = fs.readdirSync(cameraDir)
-                    .filter(f => f.endsWith('.mp4') && !f.includes('.remux.'))
-                    .map(f => ({ name: f, time: fs.statSync(path.join(cameraDir, f)).mtime.getTime() }))
-                    .sort((a, b) => b.time - a.time);
+                try {
+                    await fsp.access(cameraDir);
+                } catch {
+                    continue;
+                }
+                const filesRaw = await fsp.readdir(cameraDir);
+                const mp4Files = filesRaw.filter(f => f.endsWith('.mp4') && !f.includes('.remux.'));
+                
+                const files = [];
+                for (const f of mp4Files) {
+                    const stats = await fsp.stat(path.join(cameraDir, f));
+                    files.push({ name: f, time: stats.mtime.getTime() });
+                }
+                files.sort((a, b) => b.time - a.time);
 
                 if (files.length > 0) {
                     const latest = files[0];
                     const fullPath = path.join(cameraDir, latest.name);
-                    const currentSize = fs.statSync(fullPath).size;
+                    const stats = await fsp.stat(fullPath);
+                    const currentSize = stats.size;
                     if (state.lastFile === latest.name && state.lastSize === currentSize && currentSize > 0) {
                         console.warn(`[StreamEngine Watchdog] Camera ${cameraId} frozen! Executing SIGKILL...`);
                         try { state.process.kill('SIGKILL'); } catch(e){}
