@@ -52,33 +52,41 @@ class SegmentProcessor {
                 const match = fileOnly.match(regex);
                 if (!match) continue;
 
+                // 1. Check if segment already exists in DB (Idempotency)
                 const existing = this.queryOne('SELECT id FROM recording_segments WHERE camera_id = ? AND filename = ?', [cameraId, fileOnly]);
-                if (existing) continue;
+                if (existing) {
+                    console.log(`[SegmentProcessor] Skipping already processed segment: ${fileOnly}`);
+                    continue;
+                }
 
+                // 2. Probing: Check duration and integrity
                 let durationStr = '0';
-                
                 this.lockManager.acquire(task.filePath);
                 try {
                     const { stdout } = await execFileAsync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', task.filePath], { encoding: 'utf8', timeout: 5000 });
                     durationStr = stdout.trim();
-                } catch(e) {}
-                this.lockManager.release(task.filePath);
+                } catch(e) {
+                    console.error(`[SegmentProcessor] ffprobe failed for ${fileOnly}:`, e.message);
+                } finally {
+                    this.lockManager.release(task.filePath);
+                }
 
                 const rawDuration = parseFloat(durationStr);
                 if (isNaN(rawDuration) || rawDuration < 5) {
-                    console.log(`[SegmentProcessor] Cleanup: Skipping tiny/initial file < 5s. Deleting: ${fileOnly}`);
+                    console.log(`[SegmentProcessor] Cleanup: Skipping tiny/invalid file < 5s. Deleting: ${fileOnly}`);
                     try { await fsp.unlink(task.filePath); } catch(e){}
                     continue;
                 }
 
+                // 3. Remuxing: One clean pass with +faststart
                 const tempPath = task.filePath + '.remux.mp4';
                 if (await existsAsync(tempPath)) {
                     try { await fsp.unlink(tempPath); } catch(e){}
                 }
                 
                 let remuxSuccess = false;
+                this.lockManager.acquire(task.filePath);
                 try {
-                    this.lockManager.acquire(task.filePath);
                     await new Promise((resolve, reject) => {
                         const remuxer = spawn('ffmpeg', [
                             '-i', task.filePath,
@@ -90,78 +98,59 @@ class SegmentProcessor {
                         remuxer.on('error', reject);
                     });
                     remuxSuccess = true;
-
-                    if (await existsAsync(tempPath)) {
-                        const stats = await fsp.stat(tempPath);
-                        if (stats.size > 1024) {
-                            await fsp.rename(tempPath, task.filePath);
-                        } else {
-                            await fsp.unlink(tempPath);
-                        }
-                    }
                 } catch(e) {
-                    if (await existsAsync(tempPath)) {
-                        try { await fsp.unlink(tempPath); } catch(err) {}
-                    }
+                    console.error(`[SegmentProcessor] Remux failed for ${fileOnly}:`, e.message);
+                } finally {
+                    this.lockManager.release(task.filePath);
+                }
+
+                if (!remuxSuccess || !(await existsAsync(tempPath))) {
+                    if (await existsAsync(tempPath)) try { await fsp.unlink(tempPath); } catch(e){}
+                    continue; // Skip if remux failed
+                }
+
+                // 4. Finalizing: Atomic swap and DB Insert
+                const stats = await fsp.stat(tempPath);
+                if (stats.size <= 1024) {
+                    console.warn(`[SegmentProcessor] Remuxed file too small (${stats.size} bytes), skipping: ${fileOnly}`);
+                    await fsp.unlink(tempPath);
+                    continue;
+                }
+
+                this.lockManager.acquire(task.filePath);
+                try {
+                    await fsp.rename(tempPath, task.filePath);
+                } catch (e) {
+                    console.error(`[SegmentProcessor] Finalize rename failed for ${fileOnly}:`, e.message);
+                    if (await existsAsync(tempPath)) try { await fsp.unlink(tempPath); } catch(err){}
+                    continue;
                 } finally {
                     this.lockManager.release(task.filePath);
                 }
 
                 const finalStats = await fsp.stat(task.filePath);
-                try {
-                    this.lockManager.acquire(task.filePath);
-                    await new Promise((resolve, reject) => {
-                        const remuxer = spawn('ffmpeg', [
-                            '-i', task.filePath,
-                            '-c', 'copy',
-                            '-movflags', '+faststart',
-                            '-y', tempPath
-                        ]);
-                        remuxer.on('close', (code) => code === 0 ? resolve() : reject(new Error('code '+code)));
-                        remuxer.on('error', reject);
-                    });
-                    remuxSuccess = true;
-                } catch(e) {
-                } finally {
-                    this.lockManager.release(task.filePath);
-                }
-
-                if (remuxSuccess && (await existsAsync(tempPath))) {
-                    const stats = await fsp.stat(tempPath);
-                    if (stats.size > 1024) {
-                        this.lockManager.acquire(task.filePath);
-                        try {
-                            await fsp.rename(tempPath, task.filePath);
-                        } finally {
-                            this.lockManager.release(task.filePath);
-                        }
-                    } else {
-                        await fsp.unlink(tempPath);
-                    }
-                } else if (await existsAsync(tempPath)) {
-                    await fsp.unlink(tempPath);
-                }
-
                 const finalSize = finalStats.size;
                 const actualDuration = Math.round(rawDuration);
 
                 const [, year, month, day, hour, minute, second] = match;
                 const startTimeStr = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
                 const startDate = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
-                
                 const endDate = new Date(startDate.getTime() + actualDuration * 1000 - (startDate.getTimezoneOffset() * 60000));
                 const endTimeStr = endDate.toISOString().replace('T', ' ').substring(0, 19);
+
+                // Final check before insert (just in case)
+                const duplicateCheck = this.queryOne('SELECT id FROM recording_segments WHERE camera_id = ? AND filename = ?', [cameraId, fileOnly]);
+                if (duplicateCheck) {
+                    console.warn(`[SegmentProcessor] Race condition detected: Segment ${fileOnly} already in DB.`);
+                    continue;
+                }
 
                 this.execute(
                     `INSERT INTO recording_segments (camera_id, filename, start_time, end_time, file_size, duration, file_path) VALUES (?, ?, ?, ?, ?, ?, ?)`,
                     [cameraId, fileOnly, startTimeStr, endTimeStr, finalSize, actualDuration, task.filePath]
                 );
 
-                console.log(`[SegmentProcessor] ✓ Published ${fileOnly} (${(finalSize/1024/1024).toFixed(2)} MB, ${actualDuration}s)`);
-                
-                // Emit event or call global houseKeeper if needed? 
-                // Original logic called this.realTimeCleanup() here.
-                // We will handle this in the unified index or by injecting houseKeeper.
+                console.log(`[SegmentProcessor] ✓ Finalized ${fileOnly} (${(finalSize/1024/1024).toFixed(2)} MB, ${actualDuration}s)`);
                 if (this.onSegmentProcessed) this.onSegmentProcessed();
                 
             } catch (error) {
