@@ -1,4 +1,4 @@
-class LockManager {
+export class LockManager {
     constructor() {
         this.locks = new Set();
     }
@@ -17,4 +17,3 @@ class LockManager {
 }
 
 
-module.exports = { LockManager };

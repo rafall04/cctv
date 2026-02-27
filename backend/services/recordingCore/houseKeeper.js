@@ -1,9 +1,9 @@
-const fs = require('fs');
-const fsp = require('fs').promises;
-const path = require('path');
-const os = require('os');
-const { execFile } = require('child_process');
-const util = require('util');
+import fs from 'fs';
+import { promises as fsp } from 'fs';
+import path from 'path';
+import os from 'os';
+import { execFile } from 'child_process';
+import util from 'util';
 
 
 const execFileAsync = util.promisify(execFile);
@@ -20,7 +20,7 @@ async function existsAsync(filePath) {
 }
 
 
-class HouseKeeper {
+export class HouseKeeper {
     constructor({ execute, query, queryOne, lockManager }) {
         this.execute = execute;
         this.query = query;
@@ -106,4 +106,3 @@ class HouseKeeper {
     }
 }
 
-module.exports = { HouseKeeper };

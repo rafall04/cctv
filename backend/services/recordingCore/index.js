@@ -1,16 +1,12 @@
-const { StreamEngine } = require('./streamEngine.js');
-const { SegmentProcessor } = require('./segmentProcessor.js');
-const { FileWatcher } = require('./fileWatcher.js');
-const { HouseKeeper } = require('./houseKeeper.js');
-const { LockManager } = require('./lockManager.js');
-const { query, queryOne, execute } = require('../../database/connectionPool.js');
+import { StreamEngine } from './streamEngine.js';
 import { SegmentProcessor } from './segmentProcessor.js';
 import { FileWatcher } from './fileWatcher.js';
 import { HouseKeeper } from './houseKeeper.js';
 import { LockManager } from './lockManager.js';
 import { query, queryOne, execute } from '../../database/connectionPool.js';
 
-class RecordingService {
+
+export class RecordingService {
     constructor(db, customLockManager) {
         this.lockManager = customLockManager || new LockManager();
         const dbDeps = db || { query, queryOne, execute };
