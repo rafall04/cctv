@@ -359,10 +359,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
                 setTimeout(() => setAutoPlayNotification(null), 3000);
                 setSelectedSegment(nextSegment);
                 const timestamp = new Date(nextSegment.start_time).getTime();
-                setSearchParams({ 
-                    cam: selectedCameraRef.current?.id.toString(), 
-                    t: timestamp.toString() 
-                }, { replace: false });
+                updateParam('cam', selectedCameraRef.current?.id.toString()); updateParam('t', timestamp.toString());
             } else {
                 setAutoPlayNotification({ type: 'complete', message: 'Playback selesai - tidak ada segment lagi' });
                 setTimeout(() => setAutoPlayNotification(null), 5000);
@@ -457,10 +454,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
 
     const handleSegmentClick = (segment) => {
         const timestamp = new Date(segment.start_time).getTime();
-        setSearchParams({ 
-            cam: selectedCamera?.id.toString(), 
-            t: timestamp.toString() 
-        }, { replace: false });
+        updateParam('cam', selectedCamera?.id.toString()); updateParam('t', timestamp.toString());
         setSelectedSegment(segment);
         setSeekWarning(null);
         setAutoPlayNotification(null);
@@ -636,15 +630,9 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
             }, { replace: true });
         } else {
             // If camera is null, clean URL params but keep mode if any
-            setSearchParams(prev => {
-                prev.delete('cam');
-                prev.delete('camera');
-                prev.delete('t');
-                prev.delete('time');
-                return prev;
-            }, { replace: true });
+            removeParams(['cam', 'camera', 't', 'time']);
         }
-    }, [setSearchParams, selectedSegment]);
+    }, [updateParam, removeParam, selectedSegment]);
 
     // Handle share playback link - use timestamp instead of segment ID
     const handleShare = useCallback(async () => {
