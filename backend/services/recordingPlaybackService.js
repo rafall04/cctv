@@ -1,7 +1,7 @@
 import { query, queryOne, execute } from '../database/database.js';
-import { recordingService } from './recordingCore/index.js';
+import recordingService from './recordingCore/index.js';
 import { logAdminAction } from './securityAuditLogger.js';
-import { existsSync, statSync } from 'fs';
+import { promises as fsp } from 'fs';
 
 class RecordingPlaybackService {
     async startRecording(cameraId, duration_hours, request) {
@@ -167,7 +167,7 @@ class RecordingPlaybackService {
         };
     }
 
-    getStreamSegment(cameraId, filename) {
+    async getStreamSegment(cameraId, filename) {
         const segment = queryOne(
             'SELECT * FROM recording_segments WHERE camera_id = ? AND filename = ?',
             [cameraId, filename]
@@ -179,13 +179,15 @@ class RecordingPlaybackService {
             throw err;
         }
 
-        if (!existsSync(segment.file_path)) {
+        try {
+            await fsp.access(segment.file_path);
+        } catch (e) {
             const err = new Error('Segment file not found on disk');
             err.statusCode = 404;
             throw err;
         }
 
-        const stats = statSync(segment.file_path);
+        const stats = await fsp.stat(segment.file_path);
 
         if (Math.abs(stats.size - segment.file_size) > 1024 * 1024) {
             execute(
@@ -211,7 +213,7 @@ class RecordingPlaybackService {
         const totalSegments = totalCountResult ? totalCountResult.count : 0;
 
         const segments = query(
-            `SELECT filename, duration FROM recording_segments 
+            `SELECT filename, duration, start_time, end_time FROM recording_segments 
             WHERE camera_id = ? 
             ORDER BY start_time ASC 
             LIMIT ? OFFSET ?`,
@@ -221,22 +223,38 @@ class RecordingPlaybackService {
         if (segments.length === 0) {
             const err = new Error('No segments found');
             err.statusCode = 404;
-            throw err;
+ throw err;
         }
 
-        let playlist = '#EXTM3U\n';
-        playlist += '#EXT-X-VERSION:3\n';
-        playlist += '#EXT-X-TARGETDURATION:600\n';
-        playlist += `#EXT-X-MEDIA-SEQUENCE:${offset}\n`;
+        let playlist = "#EXTM3U\n";
+        playlist += "#EXT-X-VERSION:3\n";
+        playlist += "#EXT-X-TARGETDURATION:600\n";
+        playlist += `#EXT-X-MEDIA-SEQUENCE:${offset}
+`;
+        playlist += "#EXT-X-PLAYLIST-TYPE:VOD\n";
+        playlist += "#EXT-X-INDEPENDENT-SEGMENTS\n\n";
+        let previousEndTime = null;
 
         segments.forEach(segment => {
-            playlist += `#EXTINF:${segment.duration}.0,\n`;
-            playlist += `/api/recordings/${cameraId}/stream/${segment.filename}\n`;
+            if (previousEndTime) {
+                const currentStartTime = new Date(segment.start_time).getTime();
+                const gap = (currentStartTime - previousEndTime) / 1000;
+
+                if (gap > 2) {
+                    playlist += "#EXT-X-DISCONTINUITY\n";
+                }
+            }
+
+            playlist += `#EXTINF:${segment.duration}.0,
+`;
+            playlist += `/api/recordings/${cameraId}/stream/${segment.filename}
+`;
+            previousEndTime = new Date(segment.end_time).getTime();
         });
 
         // Only add ENDLIST if we've reached the end of available segments
         if (offset + segments.length >= totalSegments) {
-            playlist += '#EXT-X-ENDLIST\n';
+            playlist += "#EXT-X-ENDLIST\n";
         }
 
         return playlist;

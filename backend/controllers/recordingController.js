@@ -87,7 +87,7 @@ export async function streamSegment(request, reply) {
         const { cameraId, filename } = request.params;
         console.log(`[Stream Request] Camera: ${cameraId}, File: ${filename}`);
 
-        const { segment, stats } = recordingPlaybackService.getStreamSegment(cameraId, filename);
+        const { segment, stats } = await recordingPlaybackService.getStreamSegment(cameraId, filename);
 
         // Set CORS headers explicitly
         reply.header('Access-Control-Allow-Origin', '*');
