@@ -41,6 +41,9 @@ Stack: Node.js 20+, Fastify, SQLite (better-sqlite3), React 18, Vite, Tailwind C
 - **Deployment**: DO NOT edit generated scripts manually. DO NOT add CORS in Apache (Fastify handles it). DO NOT use `lowLatency` MediaMTX variant.
 - **Caching**: NEVER cache the Service Worker (`nginx.conf`).
 - **URLs**: DO NOT reuse the same URL parameter for different features (live vs playback).
+- **Strict ES Modules**: NEVER use `module.exports` or `require()`. Enforce `import/export` everywhere. Mixing CommonJS and ES Modules causes heavy backend crashes in this `type: module` repo.
+- **Strict Async I/O**: NEVER use synchronous I/O functions like `fs.readFileSync`, `fs.existsSync`, or `execFileSync`. Enforce `fs.promises` and appropriate async wrappers.
+- **Concurrency Safety**: NEVER delete files manually without locks. `recordingCore` relies on `LockManager` to prevent race conditions during file deletions (e.g., in `houseKeeper`).
 
 ## UNIQUE STYLES
 - **Configuration-Driven UI**: Core UI components (`Alert`, `NetworkStatusBanner`) map `CONFIG` objects to styles/icons.
