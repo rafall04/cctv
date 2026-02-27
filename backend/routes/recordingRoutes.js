@@ -17,6 +17,51 @@ import { authMiddleware } from '../middleware/authMiddleware.js';
  */
 export default async function recordingRoutes(fastify) {
     // ============================================
+    // SCHEMAS
+    // ============================================
+    const segmentsSchema = {
+        response: {
+            200: {
+                type: 'object',
+                properties: {
+                    success: { type: 'boolean' },
+                    data: {
+                        type: 'object',
+                        properties: {
+                            camera_id: { type: ['integer', 'string'] },
+                            camera_name: { type: 'string' },
+                            segments: { type: 'array', items: { type: 'object', additionalProperties: true } },
+                            total_segments: { type: 'number' }
+                        },
+                        required: ['camera_id', 'camera_name', 'segments', 'total_segments']
+                    }
+                },
+                required: ['success', 'data']
+            }
+        }
+    };
+
+    const statusSchema = {
+        response: {
+            200: {
+                type: 'object',
+                properties: {
+                    success: { type: 'boolean' },
+                    data: {
+                        type: 'object',
+                        properties: {
+                            runtime_status: { type: 'object', additionalProperties: true },
+                            storage: { type: 'object', additionalProperties: true }
+                        },
+                        required: ['runtime_status', 'storage']
+                    }
+                },
+                required: ['success', 'data']
+            }
+        }
+    };
+
+    // ============================================
     // ADMIN ROUTES (Protected)
     // ============================================
     
@@ -45,8 +90,10 @@ export default async function recordingRoutes(fastify) {
 
     // Get recording status
     fastify.get('/recordings/:cameraId/status', {
-        onRequest: [authMiddleware]
+        onRequest: [authMiddleware],
+        schema: statusSchema
     }, getRecordingStatus);
+
 
     // Update recording settings
     fastify.put('/recordings/:cameraId/settings', {
@@ -63,7 +110,10 @@ export default async function recordingRoutes(fastify) {
     // ============================================
 
     // Get segments untuk camera (untuk playback UI)
-    fastify.get('/recordings/:cameraId/segments', getSegments);
+    fastify.get('/recordings/:cameraId/segments', {
+        schema: segmentsSchema
+    }, getSegments);
+
 
     // Stream segment file
     fastify.get('/recordings/:cameraId/stream/:filename', streamSegment);
