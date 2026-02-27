@@ -200,10 +200,22 @@ class RecordingPlaybackService {
         };
     }
 
-    generatePlaylist(cameraId) {
-        const segments = query(
-            'SELECT filename, duration FROM recording_segments WHERE camera_id = ? ORDER BY start_time ASC',
+    generatePlaylist(cameraId, options = {}) {
+        const { limit = 60, offset = 0 } = options;
+
+        // Calculate total segments to determine media sequence if needed
+        const totalCountResult = queryOne(
+            'SELECT COUNT(*) as count FROM recording_segments WHERE camera_id = ?',
             [cameraId]
+        );
+        const totalSegments = totalCountResult ? totalCountResult.count : 0;
+
+        const segments = query(
+            `SELECT filename, duration FROM recording_segments 
+            WHERE camera_id = ? 
+            ORDER BY start_time ASC 
+            LIMIT ? OFFSET ?`,
+            [cameraId, limit, offset]
         );
 
         if (segments.length === 0) {
@@ -215,14 +227,17 @@ class RecordingPlaybackService {
         let playlist = '#EXTM3U\n';
         playlist += '#EXT-X-VERSION:3\n';
         playlist += '#EXT-X-TARGETDURATION:600\n';
-        playlist += '#EXT-X-MEDIA-SEQUENCE:0\n';
+        playlist += `#EXT-X-MEDIA-SEQUENCE:${offset}\n`;
 
         segments.forEach(segment => {
             playlist += `#EXTINF:${segment.duration}.0,\n`;
             playlist += `/api/recordings/${cameraId}/stream/${segment.filename}\n`;
         });
 
-        playlist += '#EXT-X-ENDLIST\n';
+        // Only add ENDLIST if we've reached the end of available segments
+        if (offset + segments.length >= totalSegments) {
+            playlist += '#EXT-X-ENDLIST\n';
+        }
 
         return playlist;
     }

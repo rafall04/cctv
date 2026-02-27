@@ -141,8 +141,13 @@ export async function streamSegment(request, reply) {
 export async function generatePlaylist(request, reply) {
     try {
         const { cameraId } = request.params;
-        const { date } = request.query || {};
-        const playlist = recordingPlaybackService.generatePlaylist(cameraId);
+        const { limit, offset } = request.query;
+        
+        const options = {};
+        if (limit) options.limit = parseInt(limit, 10);
+        if (offset) options.offset = parseInt(offset, 10);
+
+        const playlist = recordingPlaybackService.generatePlaylist(cameraId, options);
 
         reply.header('Content-Type', 'application/vnd.apple.mpegurl');
         return reply.send(playlist);
