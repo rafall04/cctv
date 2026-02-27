@@ -55,7 +55,6 @@ class SegmentProcessor {
                 // 1. Check if segment already exists in DB (Idempotency)
                 const existing = this.queryOne('SELECT id FROM recording_segments WHERE camera_id = ? AND filename = ?', [cameraId, fileOnly]);
                 if (existing) {
-                    console.log(`[SegmentProcessor] Skipping already processed segment: ${fileOnly}`);
                     continue;
                 }
 
