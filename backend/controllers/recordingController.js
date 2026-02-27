@@ -5,6 +5,7 @@ import { createReadStream } from 'fs';
 export async function startRecording(request, reply) {
     try {
         const { cameraId } = request.params;
+        const { date } = request.query || {};
         const { duration_hours } = request.body;
 
         const result = await recordingPlaybackService.startRecording(cameraId, duration_hours, request);
@@ -22,6 +23,7 @@ export async function startRecording(request, reply) {
 export async function stopRecording(request, reply) {
     try {
         const { cameraId } = request.params;
+        const { date } = request.query || {};
 
         const result = await recordingPlaybackService.stopRecording(cameraId, request);
         return reply.send(result);
@@ -38,6 +40,7 @@ export async function stopRecording(request, reply) {
 export async function getRecordingStatus(request, reply) {
     try {
         const { cameraId } = request.params;
+        const { date } = request.query || {};
         const status = recordingPlaybackService.getRecordingStatus(cameraId);
 
         return reply.send({ success: true, data: status });
@@ -65,7 +68,8 @@ export async function getRecordingsOverview(request, reply) {
 export async function getSegments(request, reply) {
     try {
         const { cameraId } = request.params;
-        const segmentsData = recordingPlaybackService.getSegments(cameraId);
+        const { date } = request.query || {};
+        const segmentsData = recordingPlaybackService.getSegments(cameraId, date);
 
         return reply.send({ success: true, data: segmentsData });
     } catch (error) {
@@ -137,6 +141,7 @@ export async function streamSegment(request, reply) {
 export async function generatePlaylist(request, reply) {
     try {
         const { cameraId } = request.params;
+        const { date } = request.query || {};
         const playlist = recordingPlaybackService.generatePlaylist(cameraId);
 
         reply.header('Content-Type', 'application/vnd.apple.mpegurl');
@@ -154,6 +159,7 @@ export async function generatePlaylist(request, reply) {
 export async function getRestartLogs(request, reply) {
     try {
         const { cameraId } = request.params;
+        const { date } = request.query || {};
         const { limit = 50 } = request.query;
 
         const logs = recordingPlaybackService.getRestartLogs(cameraId, limit);
@@ -168,6 +174,7 @@ export async function getRestartLogs(request, reply) {
 export async function updateRecordingSettings(request, reply) {
     try {
         const { cameraId } = request.params;
+        const { date } = request.query || {};
 
         await recordingPlaybackService.updateRecordingSettings(cameraId, request.body, request);
 

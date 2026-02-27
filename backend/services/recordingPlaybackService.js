@@ -129,7 +129,7 @@ class RecordingPlaybackService {
         };
     }
 
-    getSegments(cameraId) {
+    getSegments(cameraId, dateStr) {
         const camera = queryOne('SELECT id, name FROM cameras WHERE id = ?', [cameraId]);
         if (!camera) {
             const err = new Error('Camera not found');
@@ -137,8 +137,8 @@ class RecordingPlaybackService {
             throw err;
         }
 
-        const segments = query(
-            `SELECT 
+        let sql = `
+            SELECT 
                 id, 
                 filename, 
                 start_time, 
@@ -147,10 +147,17 @@ class RecordingPlaybackService {
                 duration,
                 created_at
             FROM recording_segments 
-            WHERE camera_id = ? 
-            ORDER BY start_time DESC`,
-            [cameraId]
-        );
+            WHERE camera_id = ?`;
+        let params = [cameraId];
+
+        if (dateStr) {
+            sql += ` AND date(start_time, 'localtime') = ?`;
+            params.push(dateStr);
+        }
+
+        sql += ` ORDER BY start_time DESC`;
+
+        const segments = query(sql, params);
 
         return {
             camera_id: camera.id,
