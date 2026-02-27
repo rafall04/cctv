@@ -1,9 +1,9 @@
-import fs from 'fs';
-import { promises as fsp } from 'fs';
-import path from 'path';
-import os from 'os';
-import { execFile } from 'child_process';
-import util from 'util';
+const fs = require('fs');
+const fsp = require('fs').promises;
+const path = require('path');
+const os = require('os');
+const { execFile } = require('child_process');
+const util = require('util');
 
 
 const execFileAsync = util.promisify(execFile);
@@ -103,4 +103,5 @@ class HouseKeeper {
         }
 }
 
-export { HouseKeeper };
+
+module.exports = { HouseKeeper };
