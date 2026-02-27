@@ -1,7 +1,22 @@
-import { spawn, execFileSync } from 'child_process';
+import { spawn, execFile } from 'child_process';
+import util from 'util';
+import { promises as fsp } from 'fs';
 import fs from 'fs';
 import path from 'path';
 import { execute, queryOne } from '../../database/connectionPool.js';
+import { lockManager } from './lockManager.js';
+
+const execFileAsync = util.promisify(execFile);
+
+async function existsAsync(filePath) {
+    try {
+        await fsp.access(filePath);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 
 class SegmentProcessor {
     constructor() {
@@ -9,8 +24,8 @@ class SegmentProcessor {
         this.isProcessingQueue = false;
     }
 
-    enqueueSegment(filePath, filename) {
-        if (!fs.existsSync(filePath)) return;
+    async enqueueSegment(filePath, filename) {
+        if (!(await existsAsync(filePath))) return;
         this.dbQueue.push({ filePath, filename });
         if (!this.isProcessingQueue) this.processQueue();
     }
@@ -22,7 +37,7 @@ class SegmentProcessor {
         while (this.dbQueue.length > 0) {
             const task = this.dbQueue.shift();
             try {
-                if (!fs.existsSync(task.filePath)) continue;
+                if (!(await existsAsync(task.filePath))) continue;
 
                 const parts = task.filename.split(path.sep);
                 const camFolder = parts.length > 1 ? parts[parts.length - 2] : null;
@@ -39,22 +54,29 @@ class SegmentProcessor {
                 if (existing) continue;
 
                 let durationStr = '0';
+                
+                lockManager.acquire(task.filePath);
                 try {
-                    durationStr = execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', task.filePath], { encoding: 'utf8', timeout: 5000 }).trim();
+                    const { stdout } = await execFileAsync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', task.filePath], { encoding: 'utf8', timeout: 5000 });
+                    durationStr = stdout.trim();
                 } catch(e) {}
+                lockManager.release(task.filePath);
 
                 const rawDuration = parseFloat(durationStr);
                 if (isNaN(rawDuration) || rawDuration < 5) {
                     console.warn(`[SegmentProcessor] File corrupt or < 5s duration. Deleting: ${fileOnly}`);
-                    try { fs.unlinkSync(task.filePath); } catch(e){}
+                    try { await fsp.unlink(task.filePath); } catch(e){}
                     continue;
                 }
 
                 const tempPath = task.filePath + '.remux.mp4';
-                if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+                if (await existsAsync(tempPath)) {
+                    try { await fsp.unlink(tempPath); } catch(e){}
+                }
                 
                 let remuxSuccess = false;
                 try {
+                    lockManager.acquire(task.filePath);
                     await new Promise((resolve, reject) => {
                         const remuxer = spawn('ffmpeg', [
                             '-i', task.filePath,
@@ -66,15 +88,59 @@ class SegmentProcessor {
                         remuxer.on('error', reject);
                     });
                     remuxSuccess = true;
-                } catch(e) {}
 
-                if (remuxSuccess && fs.existsSync(tempPath) && fs.statSync(tempPath).size > 1024) {
-                    fs.renameSync(tempPath, task.filePath);
-                } else if (fs.existsSync(tempPath)) {
-                    fs.unlinkSync(tempPath);
+                    if (await existsAsync(tempPath)) {
+                        const stats = await fsp.stat(tempPath);
+                        if (stats.size > 1024) {
+                            await fsp.rename(tempPath, task.filePath);
+                        } else {
+                            await fsp.unlink(tempPath);
+                        }
+                    }
+                } catch(e) {
+                    if (await existsAsync(tempPath)) {
+                        try { await fsp.unlink(tempPath); } catch(err) {}
+                    }
+                } finally {
+                    lockManager.release(task.filePath);
                 }
 
-                const finalSize = fs.statSync(task.filePath).size;
+                const finalStats = await fsp.stat(task.filePath);
+                try {
+                    lockManager.acquire(task.filePath);
+                    await new Promise((resolve, reject) => {
+                        const remuxer = spawn('ffmpeg', [
+                            '-i', task.filePath,
+                            '-c', 'copy',
+                            '-movflags', '+faststart',
+                            '-y', tempPath
+                        ]);
+                        remuxer.on('close', (code) => code === 0 ? resolve() : reject(new Error('code '+code)));
+                        remuxer.on('error', reject);
+                    });
+                    remuxSuccess = true;
+                } catch(e) {
+                } finally {
+                    lockManager.release(task.filePath);
+                }
+
+                if (remuxSuccess && (await existsAsync(tempPath))) {
+                    const stats = await fsp.stat(tempPath);
+                    if (stats.size > 1024) {
+                        lockManager.acquire(task.filePath);
+                        try {
+                            await fsp.rename(tempPath, task.filePath);
+                        } finally {
+                            lockManager.release(task.filePath);
+                        }
+                    } else {
+                        await fsp.unlink(tempPath);
+                    }
+                } else if (await existsAsync(tempPath)) {
+                    await fsp.unlink(tempPath);
+                }
+
+                const finalSize = finalStats.size;
                 const actualDuration = Math.round(rawDuration);
 
                 const [, year, month, day, hour, minute, second] = match;
