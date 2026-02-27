@@ -1,6 +1,7 @@
 import { StreamEngine } from './streamEngine.js';
 import { SegmentProcessor } from './segmentProcessor.js';
 import { FileWatcher } from './fileWatcher.js';
+import { SegmentListWatcher } from './segmentListWatcher.js';
 import { HouseKeeper } from './houseKeeper.js';
 import { LockManager } from './lockManager.js';
 import { query, queryOne, execute } from '../../database/connectionPool.js';
@@ -15,6 +16,7 @@ export class RecordingService {
         this.segmentProcessor = new SegmentProcessor({ ...dbDeps, lockManager: this.lockManager });
         this.fileWatcher = new FileWatcher();
         this.houseKeeper = new HouseKeeper({ ...dbDeps, lockManager: this.lockManager });
+        this.segmentListWatcher = new SegmentListWatcher(this.segmentProcessor);
 
         // Wire dependencies
         this.segmentProcessor.onSegmentProcessed = () => this.houseKeeper.realTimeCleanup();
@@ -24,6 +26,7 @@ export class RecordingService {
 
         // Start watchers/intervals
         this.fileWatcher.startGlobalWatcher((path, name) => this.segmentProcessor.enqueueSegment(path, name));
+        this.segmentListWatcher.startGlobalWatcher();
         
         setInterval(() => this.streamEngine.checkStalledStreams(), 60000);
         setInterval(() => this.houseKeeper.realTimeCleanup(), 1800000);
@@ -60,6 +63,7 @@ export class RecordingService {
     get processor() { return this.segmentProcessor; }
     get watcher() { return this.fileWatcher; }
     get keeper() { return this.houseKeeper; }
+    get listWatcher() { return this.segmentListWatcher; }
 }
 
 export const recordingService = new RecordingService();
