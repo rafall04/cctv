@@ -163,8 +163,25 @@ apiClient.interceptors.request.use(
             config.headers['X-API-Key'] = API_KEY;
         }
 
-        // JWT tokens are in HttpOnly cookies - automatically sent by browser
-        // No need to manually attach Authorization header
+    // JWT tokens are in HttpOnly cookies - automatically sent by browser
+    // No need to manually attach Authorization header
+
+    // Check if user info is present in localStorage but potentially expired
+    // This allows the server to know which user is making the request even if cookie is missing/expired
+    const user = localStorage.getItem('user');
+    if (user) {
+        try {
+            const parsedUser = JSON.parse(user);
+            if (parsedUser && parsedUser.id) {
+                config.headers['X-User-Id'] = parsedUser.id;
+            }
+        } catch (e) {
+            // Ignore parse errors
+        }
+    }
+    // No need to manually attach Authorization header
+
+        // Add CSRF token for state-changing requests
 
         // Add CSRF token for state-changing requests
         if (isStateChangingMethod(config.method)) {

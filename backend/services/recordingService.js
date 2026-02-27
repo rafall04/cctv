@@ -186,6 +186,26 @@ class RecordingService {
         console.log(`[FFmpeg Camera ${cameraId}] Stopped Intentionally`);
     }
 
+    
+
+    async autoStartRecordings() {
+        console.log('[RecordingService] Auto-starting recordings for active cameras...');
+        try {
+            // Adjust query depending on your schema. We try to be safe.
+            const cameras = query('SELECT id FROM cameras');
+            
+            for (let i = 0; i < cameras.length; i++) {
+                const cam = cameras[i];
+                // Stagger starts to avoid CPU/Network spikes
+                setTimeout(() => {
+                    this.startRecording(cam.id);
+                }, i * 300); // 300ms between each camera
+            }
+        } catch (error) {
+            console.error('[RecordingService] Error during autoStartRecordings:', error);
+        }
+    }
+
     checkStalledStreams() {
         for (const [cameraId, state] of this.activeRecordings.entries()) {
             try {
@@ -279,6 +299,31 @@ class RecordingService {
             }
         } catch (error) {}
     }
+    async autoStartRecordings() {
+        console.log('[RecordingService] Auto-starting recordings for active cameras...');
+        try {
+            // Fetch cameras that have recording enabled and are enabled/active
+            const cameras = query('SELECT id FROM cameras WHERE enabled = 1 AND enable_recording = 1');
+            
+            if (cameras.length === 0) {
+                console.log('[RecordingService] No cameras found with recording enabled.');
+                return;
+            }
+
+            console.log(`[RecordingService] Found ${cameras.length} cameras to auto-start.`);
+
+            for (const camera of cameras) {
+                // Stagger starts to avoid CPU spikes (200ms delay)
+                await new Promise(resolve => setTimeout(resolve, 200));
+                this.startRecording(camera.id).catch(err => {
+                    console.error(`[RecordingService] Failed to auto-start camera ${camera.id}:`, err.message);
+                });
+            }
+        } catch (error) {
+            console.error('[RecordingService] Error during autoStartRecordings:', error.message);
+        }
+    }
+
 }
 
 export const recordingService = new RecordingService();

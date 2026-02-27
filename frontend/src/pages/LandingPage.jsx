@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef, memo, lazy, Suspense, startTransition } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useSmartParams } from '../hooks/useSmartParams';
 import { getPublicSaweriaConfig } from '../services/saweriaService';
 import { useBranding } from '../contexts/BrandingContext';
 import { updateMetaTags } from '../utils/metaUpdater';
@@ -27,8 +28,8 @@ import SaweriaLeaderboard from '../components/SaweriaLeaderboard';
 
 function LandingPageContent() {
     const { branding } = useBranding();
-    const { cameras, deviceTier } = useCameras();
-    const [searchParams, setSearchParams] = useSearchParams();
+    const { cameras, loading, deviceTier } = useCameras();
+    const { searchParams, updateParam, removeParams } = useSmartParams();
     const [layoutMode, setLayoutMode] = useState(() => {
         const queryMode = searchParams.get('mode');
         if (queryMode === 'simple' || queryMode === 'full') return queryMode;
@@ -47,14 +48,10 @@ function LandingPageContent() {
             isInitialMount.current = false;
             const queryMode = searchParams.get('mode');
             if (!queryMode) {
-                setSearchParams(prev => {
-                    prev.set('mode', layoutMode);
-                    return prev;
-                }, { replace: true });
+                updateParam('mode', layoutMode);
             }
         }
-    }, []);
-
+    }, [searchParams, updateParam, layoutMode]);
     useEffect(() => {
         if (isInitialMount.current) return;
         const queryMode = searchParams.get('mode');
@@ -74,10 +71,7 @@ function LandingPageContent() {
         // Use startTransition to avoid Suspense hydration errors
         startTransition(() => {
             setLayoutMode(newMode);
-            setSearchParams(prev => {
-                prev.set('mode', newMode);
-                return prev;
-            }, { replace: true });
+            updateParam('mode', newMode);
         });
         
         try {
@@ -85,7 +79,7 @@ function LandingPageContent() {
         } catch (err) {
             console.warn('Failed to save to localStorage:', err);
         }
-    }, [layoutMode, setSearchParams]);
+    }, [layoutMode, updateParam]);
 
     const [popup, setPopup] = useState(null);
     const [multiCameras, setMultiCameras] = useState([]);
@@ -238,7 +232,7 @@ function LandingPageContent() {
 
     // Handle camera URL param - auto open popup when camera param exists (only in map/grid mode)
     useEffect(() => {
-        if (viewMode === 'playback') return; // Don't open popup in playback mode
+        if (viewMode === 'playback' || loading || cameras.length === 0) return; // Wait for loading and don't open popup in playback mode
         
         const cameraIdFromUrl = searchParams.get('cam') || searchParams.get('camera');
         if (cameraIdFromUrl && cameras.length > 0) {
@@ -251,7 +245,7 @@ function LandingPageContent() {
                 }
             }
         }
-    }, [cameras, searchParams, viewMode]);
+    }, [cameras, searchParams, viewMode, loading]);
 
     // Handle camera selection and update URL
     const handleCameraClick = useCallback((camera) => {
@@ -259,39 +253,17 @@ function LandingPageContent() {
         addRecentCamera(camera);
         // Update URL for shareable links
         const currentMode = searchParams.get('mode') || layoutMode;
-        setSearchParams(prev => {
-            prev.set('cam', camera.id.toString());
-            prev.set('mode', currentMode);
-            prev.delete('camera'); // Clean up old param if exists
-            return prev;
-        }, { replace: false });
-    }, [searchParams, layoutMode, setSearchParams, addRecentCamera]);
+        updateParam('cam', camera.id.toString());
+        updateParam('mode', currentMode);
+        removeParams(['camera']); // Clean up old param if exists
+    }, [searchParams, layoutMode, updateParam, removeParams, addRecentCamera]);
 
     // Handle popup close - reset URL to remove camera param
     const handlePopupClose = useCallback(() => {
         setPopup(null);
         // Reset URL by removing camera and time params but keep mode
-        setSearchParams(prev => {
-            prev.delete('cam');
-            prev.delete('camera');
-            prev.delete('t');
-            prev.delete('time');
-            // Keep current mode if it exists
-            const currentMode = prev.get('mode') || layoutMode;
-            prev.set('mode', currentMode);
-            return prev;
-        }, { replace: true });
-    }, [layoutMode, setSearchParams]);
-        setPopup(null);
-        // Reset URL by removing camera param but keep mode
-        const currentMode = searchParams.get('mode') || layoutMode;
-        setSearchParams(prev => {
-            prev.delete('cam');
-            prev.delete('camera');
-            prev.set('mode', currentMode);
-            return prev;
-        }, { replace: false });
-    }, [searchParams, layoutMode, setSearchParams]);
+        removeParams(['cam', 'camera', 't', 'time']);
+    }, [removeParams]);
 
     if (layoutMode === 'simple') {
         return (

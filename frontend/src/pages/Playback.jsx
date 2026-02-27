@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { cameraService } from '../services/cameraService';
 import recordingService from '../services/recordingService';
 import { useBranding } from '../contexts/BrandingContext';
-
+import { useCameras } from '../contexts/CameraContext';
 import PlaybackHeader from '../components/playback/PlaybackHeader';
 import PlaybackVideo from '../components/playback/PlaybackVideo';
 import PlaybackTimeline from '../components/playback/PlaybackTimeline';
@@ -16,6 +16,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
     const [searchParams, setSearchParams] = useSearchParams();
     const cameraIdFromUrl = searchParams.get('cam');
     const { branding } = useBranding();
+    const { cameras: globalCameras, loading: globalLoading } = useCameras();
     
     const [cameras, setCameras] = useState(propCameras || []);
     const [selectedCamera, setSelectedCamera] = useState(propSelectedCamera || null);
@@ -103,44 +104,30 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
             return;
         }
 
-        const fetchCameras = async () => {
-            try {
-                const response = await cameraService.getActiveCameras();
-                if (response.success) {
-                    const recordingCameras = response.data.filter(cam => cam.enable_recording);
-                    const uniqueCameras = recordingCameras.filter((cam, index, self) => 
-                        index === self.findIndex(c => c.id === cam.id)
-                    );
-                    
-                    setCameras(uniqueCameras);
-                    
-                    if (cameraIdFromUrl) {
-                        const camId = parseInt(cameraIdFromUrl);
-                        if (!isNaN(camId)) {
-                            const camera = uniqueCameras.find(c => c.id === camId);
-                            if (camera) {
-                                setSelectedCamera(camera);
-                            }
-                        }
-                    } else if (uniqueCameras.length > 0) {
-                        const camera = uniqueCameras.find(c => c.id === parseInt(cameraIdFromUrl));
-                        if (camera) {
-                            setSelectedCamera(camera);
-                        }
-                    } else if (uniqueCameras.length > 0) {
-                        setSelectedCamera(uniqueCameras[0]);
+        if (!globalLoading && globalCameras.length > 0) {
+            const recordingCameras = globalCameras.filter(cam => cam.enable_recording);
+            const uniqueCameras = recordingCameras.filter((cam, index, self) =>
+                index === self.findIndex(c => c.id === cam.id)
+            );
+            
+            setCameras(uniqueCameras);
+            setLoading(false);
+            
+            if (cameraIdFromUrl) {
+                const camId = parseInt(cameraIdFromUrl);
+                if (!isNaN(camId)) {
+                    const camera = uniqueCameras.find(c => c.id === camId);
+                    if (camera) {
+                        setSelectedCamera(camera);
                     }
                 }
-            } catch (error) {
-                console.error('Failed to fetch cameras:', error);
-            } finally {
-                setLoading(false);
+            } else if (uniqueCameras.length > 0 && !selectedCamera) {
+                setSelectedCamera(uniqueCameras[0]);
             }
-        };
-
-        fetchCameras();
-    }, []);
-
+        } else if (!globalLoading && globalCameras.length === 0) {
+            setLoading(false);
+        }
+    }, [globalLoading, globalCameras, propCameras, propSelectedCamera, cameraIdFromUrl]);
     // Sync selectedCamera from props when it changes
     useEffect(() => {
         if (propSelectedCamera) {
@@ -655,15 +642,6 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
                 prev.delete('time');
                 return prev;
             }, { replace: true });
-        }
-    }, [setSearchParams, selectedSegment]);
-        setSelectedCamera(camera);
-        if (camera) {
-            const timestamp = selectedSegment ? new Date(selectedSegment.start_time).getTime().toString() : '';
-            setSearchParams({ 
-                cam: camera.id.toString(),
-                t: timestamp || '' 
-            }, { replace: false });
         }
     }, [setSearchParams, selectedSegment]);
 

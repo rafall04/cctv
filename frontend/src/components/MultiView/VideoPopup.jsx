@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, useCallback, memo } from 'react';
+import { useSmartParams } from '../../hooks/useSmartParams';
 import Hls from 'hls.js';
 import { Icons } from '../ui/Icons.jsx';
 import CodecBadge from '../CodecBadge.jsx';
@@ -26,6 +27,7 @@ function VideoPopup({ camera, onClose }) {
     const fallbackHandlerRef = useRef(null);
     const abortControllerRef = useRef(null);
     const { branding } = useBranding(); // ← FIX: Add branding context
+    const { updateParam } = useSmartParams();
 
     // Handle close with fullscreen exit
     const handleClose = async () => {
@@ -42,14 +44,16 @@ function VideoPopup({ camera, onClose }) {
 
     // Share camera URL
     const handleShare = useCallback(async () => {
-        const url = `${window.location.origin}/?cam=${camera.id}`;
+        const url = new URL(window.location.origin);
+        url.searchParams.set('cam', camera.id.toString());
+        const shareUrl = url.toString();
         
         if (navigator.share) {
             try {
                 await navigator.share({
                     title: `${camera.name} - Live CCTV`,
                     text: `Lihat live streaming CCTV ${camera.name}`,
-                    url: url
+                    url: shareUrl
                 });
                 return;
             } catch (err) {
@@ -61,11 +65,11 @@ function VideoPopup({ camera, onClose }) {
         
         // Fallback: Copy to clipboard
         try {
-            await navigator.clipboard.writeText(url);
-            alert('Link kamera berhasil disalin!\n\n' + url);
+            await navigator.clipboard.writeText(shareUrl);
+            alert('Link kamera berhasil disalin!\n\n' + shareUrl);
         } catch (err) {
             console.error('Failed to copy:', err);
-            prompt('Salin link ini:', url);
+            prompt('Salin link ini:', shareUrl);
         }
     }, [camera]);
 

@@ -155,13 +155,16 @@ function DashboardStatsSkeleton() {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
             {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6">
-                    <div className="flex items-center justify-between mb-4">
+                <div key={i} className="bg-white dark:bg-amber-950/30 border border-gray-200 dark:border-amber-900/30 rounded-2xl p-6 relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-transparent to-white/5 dark:to-amber-500/5 pointer-events-none"></div>
+                    <div className="flex items-center justify-between mb-4 relative z-10">
                         <Skeleton variant="rectangular" className="w-12 h-12 rounded-xl" />
                         <Skeleton variant="text" className="h-3 w-16" />
                     </div>
-                    <Skeleton variant="text" className="h-9 w-16 mb-2" />
-                    <Skeleton variant="text" className="h-4 w-24" />
+                    <div className="relative z-10">
+                        <Skeleton variant="text" className="h-9 w-16 mb-2" />
+                        <Skeleton variant="text" className="h-4 w-24" />
+                    </div>
                 </div>
             ))}
         </div>
@@ -171,8 +174,9 @@ function DashboardStatsSkeleton() {
 // Skeleton for streams table
 function DashboardStreamsSkeleton() {
     return (
-        <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl overflow-hidden">
-            <div className="overflow-x-auto">
+        <div className="bg-white dark:bg-amber-950/30 border border-gray-200 dark:border-amber-900/30 rounded-2xl overflow-hidden relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-transparent to-white/5 dark:to-amber-500/5 pointer-events-none"></div>
+            <div className="overflow-x-auto relative z-10">
                 <table className="w-full">
                     <thead>
                         <tr className="border-b border-gray-200 dark:border-gray-700/50 bg-gray-50 dark:bg-gray-800/50">
@@ -212,8 +216,9 @@ function DashboardStreamsSkeleton() {
 // Skeleton for activity log
 function DashboardActivitySkeleton() {
     return (
-        <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6">
-            <div className="space-y-6">
+        <div className="bg-white dark:bg-amber-950/30 border border-gray-200 dark:border-amber-900/30 rounded-2xl p-6 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-transparent to-white/5 dark:to-amber-500/5 pointer-events-none"></div>
+            <div className="space-y-6 relative z-10">
                 {[1, 2, 3, 4].map((i) => (
                     <div key={i} className="flex gap-4">
                         <Skeleton variant="circular" className="w-[18px] h-[18px] mt-0.5" />
@@ -523,6 +528,10 @@ export default function Dashboard() {
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
                 {/* Cameras */}
+                <div className="bg-white dark:bg-amber-950/30 border border-gray-200 dark:border-amber-900/30 rounded-2xl p-6 hover:shadow-2xl hover:border-amber-500/50 transition-all duration-300 group relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-transparent to-white/10 dark:to-amber-500/10 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                    <div className="flex items-center justify-between mb-4 relative z-10">
+                {/* Cameras */}
                 <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6 hover:shadow-lg hover:border-primary/30 transition-all group">
                     <div className="flex items-center justify-between mb-4">
                         <div className="w-12 h-12 bg-gradient-to-br from-primary-400 to-primary-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/30 group-hover:scale-110 transition-transform">
@@ -544,13 +553,14 @@ export default function Dashboard() {
 
                 {/* Viewers - Clickable to show all sessions */}
                 <div 
-                    className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6 hover:shadow-lg hover:border-purple-500/30 transition-all group cursor-pointer"
+                    className="bg-white dark:bg-amber-950/30 border border-gray-200 dark:border-amber-900/30 rounded-2xl p-6 hover:shadow-2xl hover:border-amber-500/50 transition-all duration-300 group cursor-pointer relative overflow-hidden"
                     onClick={() => setViewerModal({ 
                         title: 'Semua Viewer Aktif', 
                         sessions: stats?.allSessions || [] 
                     })}
                 >
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="absolute inset-0 bg-gradient-to-br from-transparent to-white/10 dark:to-purple-500/10 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                    <div className="flex items-center justify-between mb-4 relative z-10">
                         <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-purple-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-purple-500/30 group-hover:scale-110 transition-transform">
                             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -564,8 +574,9 @@ export default function Dashboard() {
                 </div>
 
                 {/* Memory */}
-                <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6 hover:shadow-lg hover:border-primary/30 transition-all group">
-                    <div className="flex items-center justify-between mb-4">
+                <div className="bg-white dark:bg-amber-950/30 border border-gray-200 dark:border-amber-900/30 rounded-2xl p-6 hover:shadow-2xl hover:border-amber-500/50 transition-all duration-300 group relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-transparent to-white/10 dark:to-blue-500/10 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                    <div className="flex items-center justify-between mb-4 relative z-10">
                         <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-primary-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/30 group-hover:scale-110 transition-transform">
                             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
@@ -584,8 +595,9 @@ export default function Dashboard() {
                 </div>
 
                 {/* CPU */}
-                <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6 hover:shadow-lg hover:border-amber-500/30 transition-all group">
-                    <div className="flex items-center justify-between mb-4">
+                <div className="bg-white dark:bg-amber-950/30 border border-gray-200 dark:border-amber-900/30 rounded-2xl p-6 hover:shadow-2xl hover:border-amber-500/50 transition-all duration-300 group relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-transparent to-white/10 dark:to-orange-500/10 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                    <div className="flex items-center justify-between mb-4 relative z-10">
                         <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-amber-500/30 group-hover:scale-110 transition-transform">
                             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -758,8 +770,9 @@ export default function Dashboard() {
                     {/* Activity Log */}
                     <div>
                         <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Activity Log</h2>
-                        <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6">
-                        <div className="space-y-6">
+                        <div className="bg-white dark:bg-amber-950/30 border border-gray-200 dark:border-amber-900/30 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-br from-transparent to-white/5 dark:to-amber-500/5 pointer-events-none"></div>
+                        <div className="space-y-6 relative z-10">
                             {stats?.recentLogs.length === 0 ? (
                                 /* No activity logs empty state - Requirements: 3.5 */
                                 <NoActivityEmptyState />
@@ -788,9 +801,11 @@ export default function Dashboard() {
                     </div>
 
                     {/* System Health */}
-                    <div className="bg-gradient-to-br from-sky-50 to-blue-50 dark:from-primary/5 dark:to-primary/5 border border-sky-200/50 dark:border-primary/20 rounded-2xl p-6">
-                        <h4 className="text-sm font-bold text-primary-600 dark:text-primary-400 mb-4 flex items-center gap-2">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <div className="bg-white dark:bg-amber-950/30 border border-gray-200 dark:border-amber-900/30 rounded-2xl p-6 relative overflow-hidden shadow-xl">
+                        <div className="absolute inset-0 bg-gradient-to-br from-transparent to-white/5 dark:to-amber-500/5 pointer-events-none"></div>
+                        <div className="relative z-10">
+                            <h4 className="text-sm font-bold text-amber-600 dark:text-amber-500 mb-4 flex items-center gap-2">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                             </svg>
                             System Health
@@ -822,6 +837,8 @@ export default function Dashboard() {
                         </div>
                     </div>
                     </div>
+                    </div>
+                </div>
                 </div>
             </div>
 
@@ -833,6 +850,7 @@ export default function Dashboard() {
                     onClose={() => setViewerModal(null)}
                 />
             )}
+        </div>
         </div>
     );
 }

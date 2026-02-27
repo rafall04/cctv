@@ -93,3 +93,25 @@ export function useCameras() {
     }
     return context;
 }
+
+/**
+ * Helper hook to wait for cameras to be loaded before executing a callback
+ */
+export function useWaitCameras(callback, deps = []) {
+    const { cameras, loading, error } = useCameras();
+    const [ready, setReady] = useState(false);
+
+    useEffect(() => {
+        if (!loading && cameras.length > 0) {
+            setReady(true);
+        }
+    }, [loading, cameras]);
+
+    useEffect(() => {
+        if (ready && callback) {
+            callback(cameras);
+        }
+    }, [ready, ...deps]);
+
+    return { cameras, loading, error, ready };
+}
