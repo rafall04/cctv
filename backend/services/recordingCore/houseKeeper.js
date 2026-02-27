@@ -93,19 +93,29 @@ export class HouseKeeper {
                 const queryParams = emergencyMode ? [cam.id] : [cam.id, cutoffStr];
 
                 const oldSegments = this.query(queryStr, queryParams);
+                let deleted = 0;
+                let skipped = 0;
+                let kept = 0;
                 const graceThreshold = Date.now() - 90000; // 90 seconds grace period
 
                 for (const seg of oldSegments) {
                     // Skip if locked
-                    if (this.lockManager.isLocked(seg.file_path)) continue;
+                    if (this.lockManager.isLocked(seg.file_path)) {
+                        skipped++;
+                        continue;
+                    }
 
                     try {
                         const stats = await fsp.stat(seg.file_path);
                         // Skip if file is too new (grace period)
-                        if (stats.mtimeMs > graceThreshold) continue;
+                        if (stats.mtimeMs > graceThreshold) {
+                            kept++;
+                            continue;
+                        }
 
                         // Try to delete physical file
                         await fsp.unlink(seg.file_path);
+                        deleted++;
                     } catch (e) {
                         // If file is already gone (ENOENT), we should still delete the DB row.
                         // Otherwise, if it's some other error (EPERM, etc), we skip DB deletion to retry later.
@@ -124,3 +134,7 @@ export class HouseKeeper {
         }
     }
 }
+
+                if (deleted > 0 || skipped > 0 || kept > 0) {
+                    console.log(`[HouseKeeper] Cleanup for Cam ${cam.id}: Deleted: ${deleted}, Skipped: ${skipped} (Locked), Kept: ${kept} (Grace)`);
+                }

@@ -24,6 +24,7 @@ class FileWatcher {
                 
                 if (this.stabilizingFiles.has(filePath)) return;
                 this.stabilizingFiles.add(filePath);
+                console.log(`[FileWatcher] Stabilizing... ${filename}`);
 
                 try {
                     let stable = false;
@@ -53,6 +54,7 @@ class FileWatcher {
                     }
 
                     if (stable) {
+                        console.log(`[FileWatcher] Finalized: ${filename}`);
                         if (onNewFile) onNewFile(filePath, filename);
                     }
                 } finally {
