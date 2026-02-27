@@ -5,7 +5,6 @@ import os from 'os';
 import { execFile } from 'child_process';
 import util from 'util';
 
-
 const execFileAsync = util.promisify(execFile);
 
 const RECORDINGS_BASE_PATH = process.env.RECORDINGS_PATH || '/var/www/rafnet-cctv/recordings';
@@ -19,7 +18,6 @@ async function existsAsync(filePath) {
     }
 }
 
-
 export class HouseKeeper {
     constructor({ execute, query, queryOne, lockManager }) {
         this.execute = execute;
@@ -27,6 +25,7 @@ export class HouseKeeper {
         this.queryOne = queryOne;
         this.lockManager = lockManager;
     }
+
     async recoverOrphanedSegments(enqueueCallback) {
         console.log(`[HouseKeeper] Sweeping for orphaned segments...`);
         try {
@@ -64,47 +63,64 @@ export class HouseKeeper {
 
     async realTimeCleanup() {
         try {
+            // 1. Get all cameras with their recording retention settings
             const cameras = this.query('SELECT id, recording_duration_hours FROM cameras');
-            
-            for (const cam of cameras) {
-                const hours = cam.recording_duration_hours || 168;
-                const thresholdDate = new Date(Date.now() - hours * 3600000);
-                const thresholdStr = thresholdDate.toISOString().replace('T', ' ').substring(0, 19);
 
-                const oldSegments = this.query('SELECT id, file_path FROM recording_segments WHERE camera_id = ? AND end_time < ? LIMIT 10', [cam.id, thresholdStr]);
-                
-                for (const seg of oldSegments) {
-                    if (this.lockManager.isLocked(seg.file_path)) continue;
-                    if (await existsAsync(seg.file_path)) {
-                        try { await fsp.unlink(seg.file_path); } catch(e){}
-                    }
-                    this.execute('DELETE FROM recording_segments WHERE id = ?', [seg.id]);
+            // 2. Disk Emergency Mode Check
+            let emergencyMode = false;
+            try {
+                // Use fs.promises.statfs (available in Node 18+)
+                const stats = await fsp.statfs(RECORDINGS_BASE_PATH);
+                const freeSpaceGB = (Number(stats.bavail) * Number(stats.bsize)) / (1024 * 1024 * 1024);
+                if (freeSpaceGB < 10) {
+                    emergencyMode = true;
+                    console.warn(`[HouseKeeper] 🚨 EMERGENCY DISK LOW! (${freeSpaceGB.toFixed(2)}GB free). Accelerating cleanup.`);
                 }
+            } catch (err) {
+                console.error('[HouseKeeper] Disk space check failed:', err);
             }
 
-            if (os.platform() === 'linux') {
-                try {
-                    const { stdout } = await execFileAsync('df', ['-k', RECORDINGS_BASE_PATH], { encoding: 'utf8' });
-                    const df = stdout.split('\n')[1].split(/\s+/);
-                    const freeKB = parseInt(df[3], 10);
-                    if (freeKB < 2000000) {
-                        console.warn('[HouseKeeper] 🚨 EMERGENCY DISK LOW! Evicting oldest files...');
-                        const oldest = this.query('SELECT id, file_path FROM recording_segments ORDER BY start_time ASC LIMIT 5');
-                        for (const seg of oldest) {
-                            if (this.lockManager.isLocked(seg.file_path)) continue;
-                            if (await existsAsync(seg.file_path)) {
-                                try { await fsp.unlink(seg.file_path); } catch(e){}
-                            }
-                            this.execute('DELETE FROM recording_segments WHERE id = ?', [seg.id]);
+            for (const cam of cameras) {
+                const hours = cam.recording_duration_hours || 168; // Default 7 days
+                const cutoffDate = new Date(Date.now() - hours * 3600000);
+                const cutoffStr = cutoffDate.toISOString().replace('T', ' ').substring(0, 19);
+
+                // 3. Query segments to clean up
+                // In emergency mode, we ignore the retention hour limit for the oldest files, but still respect grace/locks.
+                const queryStr = emergencyMode
+                    ? 'SELECT id, file_path FROM recording_segments WHERE camera_id = ? ORDER BY end_time ASC LIMIT 100'
+                    : 'SELECT id, file_path FROM recording_segments WHERE camera_id = ? AND end_time <= ? ORDER BY end_time ASC LIMIT 100';
+                const queryParams = emergencyMode ? [cam.id] : [cam.id, cutoffStr];
+
+                const oldSegments = this.query(queryStr, queryParams);
+                const graceThreshold = Date.now() - 90000; // 90 seconds grace period
+
+                for (const seg of oldSegments) {
+                    // Skip if locked
+                    if (this.lockManager.isLocked(seg.file_path)) continue;
+
+                    try {
+                        const stats = await fsp.stat(seg.file_path);
+                        // Skip if file is too new (grace period)
+                        if (stats.mtimeMs > graceThreshold) continue;
+
+                        // Try to delete physical file
+                        await fsp.unlink(seg.file_path);
+                    } catch (e) {
+                        // If file is already gone (ENOENT), we should still delete the DB row.
+                        // Otherwise, if it's some other error (EPERM, etc), we skip DB deletion to retry later.
+                        if (e.code !== 'ENOENT') {
+                            console.error(`[HouseKeeper] Failed to unlink ${seg.file_path}:`, e.message);
+                            continue;
                         }
                     }
-                } catch (dfErr) {}
+
+                    // 4. Delete DB row only if physical file is gone (or was already gone)
+                    this.execute('DELETE FROM recording_segments WHERE id = ?', [seg.id]);
+                }
             }
         } catch (error) {
             console.error('[HouseKeeper] Error in realTimeCleanup:', error);
         }
-
-
     }
 }
-
