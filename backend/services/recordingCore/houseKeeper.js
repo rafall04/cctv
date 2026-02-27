@@ -101,7 +101,9 @@ class HouseKeeper {
         } catch (error) {
             console.error('[HouseKeeper] Error in realTimeCleanup:', error);
         }
-}
 
+
+    }
+}
 
 module.exports = { HouseKeeper };
