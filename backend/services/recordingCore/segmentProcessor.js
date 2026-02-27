@@ -86,9 +86,14 @@ class SegmentProcessor {
                     this.lockManager.release(task.filePath);
                 }
 
+                if (!ffprobeSuccess) {
+                    console.warn(`[SegmentProcessor] Probe failed for ${fileOnly}. Deferring processing to preserve data.`);
+                    continue; // SKIP processing, but DO NOT delete. Orphan scanner might retry later.
+                }
+
                 const rawDuration = parseFloat(durationStr);
                 if (isNaN(rawDuration) || rawDuration < 1) {
-                    console.log(`[SegmentProcessor] Cleanup: Skipping tiny/invalid file < 1s. Deleting: ${fileOnly}`);
+                    console.log(`[SegmentProcessor] Cleanup: Skipping tiny/invalid file < 1s (successfully probed). Deleting: ${fileOnly}`);
                     try { await fsp.unlink(task.filePath); } catch(e){}
                     continue;
                 }
