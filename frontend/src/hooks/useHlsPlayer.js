@@ -250,6 +250,27 @@ export const useHlsPlayer = ({ streams, videoRef, deviceCapabilities, deviceTier
                         if (isDestroyed) return;
                         console.error('HLS error:', data);
 
+                        if (data.type === Hls.ErrorTypes.MEDIA_ERROR && 
+                           (data.details === Hls.ErrorDetails.BUFFER_APPENDING_ERROR || 
+                            data.details === Hls.ErrorDetails.FRAG_PARSING_ERROR ||
+                            data?.error?.message?.includes('payload'))) {
+                            
+                            clearStreamTimeout();
+                            setStatus('error');
+                            setLoadingStage(LoadingStage.ERROR);
+                            setError('Video codec H.265 tidak didukung di browser ini. Mohon gunakan Safari/Edge.');
+                            setShowSpinner(false);
+                            
+                            if (hls) {
+                                hls.destroy();
+                            }
+                            return;
+                        }
+
+                        if (data.fatal) {
+                        if (isDestroyed) return;
+                        console.error('HLS error:', data);
+
                         if (data.fatal) {
                             clearStreamTimeout();
 
