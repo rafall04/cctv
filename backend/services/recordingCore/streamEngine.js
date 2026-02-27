@@ -61,14 +61,19 @@ class StreamEngine {
             path.join(cameraDir, '%Y%m%d_%H%M%S.mp4')
         ];
 
-        const ffmpeg = spawn('ffmpeg', args, { stdio: 'ignore' });
+        const ffmpeg = spawn('ffmpeg', args, { stdio: ['ignore', 'pipe', 'pipe'] });
         this.activeRecordings.set(cameraId, { process: ffmpeg, autoRestart: true, lastFile: null, lastSize: 0, startTime: new Date() });
         console.log(`[StreamEngine] Camera ${cameraId} Started (Wall-Clock Sync Enabled)`);
 
         ffmpeg.on('close', (code) => {
             const state = this.activeRecordings.get(cameraId);
             this.activeRecordings.delete(cameraId);
-            console.warn(`[StreamEngine] Camera ${cameraId} Exited (Code: ${code})`);
+            const isExpected = this.isShuttingDown || code === 255 || code === 0 || code === null;
+            if (isExpected) {
+                console.log(`[StreamEngine] Camera ${cameraId} closed normally or via restart (Code: ${code})`);
+            } else {
+                console.error(`[StreamEngine] Camera ${cameraId} Crashed! (Code: ${code})`);
+            }
             
             if (state && state.autoRestart && !this.isShuttingDown) {
                 setTimeout(() => this.startRecording(cameraId), 5000);

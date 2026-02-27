@@ -66,7 +66,7 @@ class SegmentProcessor {
 
                 const rawDuration = parseFloat(durationStr);
                 if (isNaN(rawDuration) || rawDuration < 5) {
-                    console.warn(`[SegmentProcessor] File corrupt or < 5s duration. Deleting: ${fileOnly}`);
+                    console.log(`[SegmentProcessor] Cleanup: Skipping tiny/initial file < 5s. Deleting: ${fileOnly}`);
                     try { await fsp.unlink(task.filePath); } catch(e){}
                     continue;
                 }
