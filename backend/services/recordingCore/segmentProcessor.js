@@ -22,7 +22,6 @@ class SegmentProcessor {
         this.execute = execute;
         this.queryOne = queryOne;
         this.lockManager = lockManager;
-    constructor() {
         this.dbQueue = [];
         this.isProcessingQueue = false;
     }

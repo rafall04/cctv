@@ -13,10 +13,6 @@ class StreamEngine {
         this.query = query;
         this.queryOne = queryOne;
     }
-    constructor() {
-        this.activeRecordings = new Map();
-        this.isShuttingDown = false;
-    }
 
     async shutdownAll() {
         this.isShuttingDown = true;
