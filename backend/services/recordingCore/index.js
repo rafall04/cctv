@@ -1,4 +1,9 @@
-import { StreamEngine } from './streamEngine.js';
+const { StreamEngine } = require('./streamEngine.js');
+const { SegmentProcessor } = require('./segmentProcessor.js');
+const { FileWatcher } = require('./fileWatcher.js');
+const { HouseKeeper } = require('./houseKeeper.js');
+const { LockManager } = require('./lockManager.js');
+const { query, queryOne, execute } = require('../../database/connectionPool.js');
 import { SegmentProcessor } from './segmentProcessor.js';
 import { FileWatcher } from './fileWatcher.js';
 import { HouseKeeper } from './houseKeeper.js';
