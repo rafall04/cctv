@@ -14,7 +14,7 @@ const MAX_SEEK_DISTANCE = 180;
 
 function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) {
     const navigate = useNavigate();
-    const { searchParams, updateParam } = useSmartParams();
+    const { searchParams, updateParam, removeParam, removeParams } = useSmartParams();
     const cameraIdFromUrl = searchParams.get('cam');
     const { branding } = useBranding();
     const { cameras: globalCameras, loading: globalLoading } = useCameras();
