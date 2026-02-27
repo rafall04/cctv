@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { execFileSync } from 'child_process';
-import { execute, query, queryOne } from '../database/connectionPool.js';
+import { execute, query, queryOne } from '../../database/connectionPool.js';
 
 const RECORDINGS_BASE_PATH = process.env.RECORDINGS_PATH || '/var/www/rafnet-cctv/recordings';
 

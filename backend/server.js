@@ -432,6 +432,13 @@ const shutdown = async () => {
         }
         
         // Close all active viewer sessions
+        console.log('[Shutdown] Halting CCTV Recordings...');
+        try {
+            await recordingService.shutdownAll();
+        } catch (e) {
+            console.error('[Shutdown] Recording cleanup error:', e.message);
+        }
+
         console.log('[Shutdown] Closing active viewer sessions...');
         try {
             const activeSessions = viewerSessionService.getActiveSessions();

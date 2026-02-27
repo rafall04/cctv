@@ -1,13 +1,22 @@
 import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { query, queryOne } from '../database/connectionPool.js';
+import { query, queryOne } from '../../database/connectionPool.js';
 
 const RECORDINGS_BASE_PATH = process.env.RECORDINGS_PATH || '/var/www/rafnet-cctv/recordings';
 
 class StreamEngine {
     constructor() {
         this.activeRecordings = new Map();
+        this.isShuttingDown = false;
+    }
+
+    async shutdownAll() {
+        this.isShuttingDown = true;
+        console.log('[StreamEngine] Engaging Global Shutdown, Disabling Auto-Heal...');
+        for (const [cameraId] of this.activeRecordings) {
+            await this.stopRecording(cameraId);
+        }
     }
 
     async autoStartRecordings() {
@@ -55,7 +64,7 @@ class StreamEngine {
             this.activeRecordings.delete(cameraId);
             console.warn(`[StreamEngine] Camera ${cameraId} Exited (Code: ${code})`);
             
-            if (state && state.autoRestart) {
+            if (state && state.autoRestart && !this.isShuttingDown) {
                 setTimeout(() => this.startRecording(cameraId), 5000);
             }
         });

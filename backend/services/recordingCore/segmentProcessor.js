@@ -1,7 +1,7 @@
 import { spawn, execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { execute, queryOne } from '../database/connectionPool.js';
+import { execute, queryOne } from '../../database/connectionPool.js';
 
 class SegmentProcessor {
     constructor() {
