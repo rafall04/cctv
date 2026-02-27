@@ -165,7 +165,9 @@ class SegmentProcessor {
                 }
 
                 this.execute(
-                    `INSERT INTO recording_segments (camera_id, filename, start_time, end_time, file_size, duration, file_path) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    `INSERT INTO recording_segments (camera_id, filename, start_time, end_time, file_size, duration, file_path) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?)
+                     ON CONFLICT(camera_id, filename) DO NOTHING`,
                     [cameraId, fileOnly, startTimeStr, endTimeStr, finalSize, actualDuration, task.filePath]
                 );
 
