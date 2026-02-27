@@ -1,45 +1,64 @@
-import { streamEngine } from './streamEngine.js';
-import { segmentProcessor } from './segmentProcessor.js';
-import { fileWatcher } from './fileWatcher.js';
-import { houseKeeper } from './houseKeeper.js';
+import { StreamEngine } from './streamEngine.js';
+import { SegmentProcessor } from './segmentProcessor.js';
+import { FileWatcher } from './fileWatcher.js';
+import { HouseKeeper } from './houseKeeper.js';
+import { LockManager } from './lockManager.js';
+import { query, queryOne, execute } from '../../database/connectionPool.js';
 
 class RecordingService {
-    constructor() {
+    constructor(db, customLockManager) {
+        this.lockManager = customLockManager || new LockManager();
+        const dbDeps = db || { query, queryOne, execute };
+
+        this.streamEngine = new StreamEngine(dbDeps);
+        this.segmentProcessor = new SegmentProcessor({ ...dbDeps, lockManager: this.lockManager });
+        this.fileWatcher = new FileWatcher();
+        this.houseKeeper = new HouseKeeper({ ...dbDeps, lockManager: this.lockManager });
+
         // Wire dependencies
-        segmentProcessor.onSegmentProcessed = () => houseKeeper.realTimeCleanup();
+        this.segmentProcessor.onSegmentProcessed = () => this.houseKeeper.realTimeCleanup();
 
         // Initial recovery
-        setTimeout(() => houseKeeper.recoverOrphanedSegments((path, name) => segmentProcessor.enqueueSegment(path, name)), 5000);
+        setTimeout(() => this.houseKeeper.recoverOrphanedSegments((path, name) => this.segmentProcessor.enqueueSegment(path, name)), 5000);
 
         // Start watchers/intervals
-        fileWatcher.startGlobalWatcher((path, name) => segmentProcessor.enqueueSegment(path, name));
+        this.fileWatcher.startGlobalWatcher((path, name) => this.segmentProcessor.enqueueSegment(path, name));
         
-        setInterval(() => streamEngine.checkStalledStreams(), 60000);
-        setInterval(() => houseKeeper.realTimeCleanup(), 1800000);
+        setInterval(() => this.streamEngine.checkStalledStreams(), 60000);
+        setInterval(() => this.houseKeeper.realTimeCleanup(), 1800000);
     }
 
     // Proxy methods to maintain compatibility with existing callers
     async autoStartRecordings() {
-        return streamEngine.autoStartRecordings();
+        return this.streamEngine.autoStartRecordings();
     }
 
     async startRecording(cameraId) {
-        return streamEngine.startRecording(cameraId);
+        return this.streamEngine.startRecording(cameraId);
     }
 
     async shutdownAll() {
-        return streamEngine.shutdownAll();
+        return this.streamEngine.shutdownAll();
     }
 
     async stopRecording(cameraId) {
-        return streamEngine.stopRecording(cameraId);
+        return this.streamEngine.stopRecording(cameraId);
     }
 
+    getRecordingStatus(cameraId) {
+        return this.streamEngine.getRecordingStatus(cameraId);
+    }
+
+    getStorageUsage(cameraId) {
+        return this.streamEngine.getStorageUsage(cameraId);
+    }
+
+
     // Accessible modules if needed
-    get engine() { return streamEngine; }
-    get processor() { return segmentProcessor; }
-    get watcher() { return fileWatcher; }
-    get houseKeeper() { return houseKeeper; }
+    get engine() { return this.streamEngine; }
+    get processor() { return this.segmentProcessor; }
+    get watcher() { return this.fileWatcher; }
+    get keeper() { return this.houseKeeper; }
 }
 
 export const recordingService = new RecordingService();
