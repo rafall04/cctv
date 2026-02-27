@@ -248,7 +248,7 @@ apiClient.interceptors.response.use(
                 originalRequest._retry = true;
 
                 try {
-                    const response = await apiClient.post('/api/auth/refresh');
+                    const response = await apiClient.post('/api/auth/refresh', {});
 
                     if (response.data.success) {
                         // Tokens refreshed in cookies, retry original request
