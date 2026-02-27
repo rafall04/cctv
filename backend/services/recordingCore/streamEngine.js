@@ -22,7 +22,7 @@ class StreamEngine {
     async autoStartRecordings() {
         console.log('[StreamEngine] Auto-starting cameras...');
         try {
-            const cameras = query('SELECT id FROM cameras WHERE is_active = 1 OR status = "online"');
+            const cameras = query('SELECT id FROM cameras WHERE enable_recording = 1 AND enabled = 1');
             for (let i = 0; i < cameras.length; i++) {
                 setTimeout(() => this.startRecording(cameras[i].id), i * 300);
             }
