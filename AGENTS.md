@@ -49,6 +49,13 @@ Stack: Node.js 20+, Fastify, SQLite (better-sqlite3), React 18, Vite, Tailwind C
 - **Configuration-Driven UI**: Core UI components (`Alert`, `NetworkStatusBanner`) map `CONFIG` objects to styles/icons.
 - **LINE#ID Tagging**: Codebase uses `LINE#ID` tagging in internal representation for high-precision edits.
 
+## SISYPHUS WORKFLOW
+- **Plan First**: Any complex task requires creating a plan inside `.sisyphus/plans/` using the Prometheus Plan Builder methodology before writing code.
+- **Read Plans**: Future agents MUST read `.sisyphus/plans/*.md` before executing work.
+- **No Blind Edits**: Atlas/Sisyphus-Junior agents must NOT randomly edit files without a plan.
+- **package.json**: NEVER use `fs` module to edit `package.json` blindly without checking the `"type"` field.
+- **Boulder State**: Always check `boulder.json` state to understand the current task context and continuation status.
+
 ## COMMANDS
 ```bash
 # Backend
