@@ -9,11 +9,11 @@ const RECORDINGS_BASE_PATH = process.env.RECORDINGS_PATH || '/var/www/rafnet-cct
 class StreamEngine {
     constructor({ query, queryOne }) {
         this.activeRecordings = new Map();
+        this.restartAttempts = new Map(); // Track restart attempts per camera
         this.isShuttingDown = false;
         this.query = query;
         this.queryOne = queryOne;
     }
-
     async shutdownAll() {
         this.isShuttingDown = true;
         console.log('[StreamEngine] Engaging Global Shutdown, Disabling Auto-Heal...');
@@ -62,9 +62,28 @@ class StreamEngine {
         ];
 
         const ffmpeg = spawn('ffmpeg', args, { stdio: ['ignore', 'pipe', 'pipe'] });
-        this.activeRecordings.set(cameraId, { process: ffmpeg, autoRestart: true, lastFile: null, lastSize: 0, startTime: new Date() });
+        this.activeRecordings.set(cameraId, { 
+            process: ffmpeg, 
+            autoRestart: true, 
+            lastFile: null, 
+            lastSize: 0, 
+            startTime: new Date() 
+        });
+        
+        // Reset restart attempts on successful start if the camera runs for > 15s
+        setTimeout(() => {
+            if (this.activeRecordings.has(cameraId)) {
+                const current = this.activeRecordings.get(cameraId);
+                if (current.process === ffmpeg) {
+                    this.restartAttempts.set(cameraId, 0);
+                    console.log(`[StreamEngine] Camera ${cameraId} stable, resetting restart attempts.`);
+                }
+            }
+        }, 15000);
+
         console.log(`[StreamEngine] Camera ${cameraId} Started (Wall-Clock Sync Enabled)`);
 
+        console.log(`[StreamEngine] Camera ${cameraId} Started (Wall-Clock Sync Enabled)`);
         ffmpeg.on('close', (code) => {
             const state = this.activeRecordings.get(cameraId);
             this.activeRecordings.delete(cameraId);
@@ -76,7 +95,15 @@ class StreamEngine {
             }
             
             if (state && state.autoRestart && !this.isShuttingDown) {
-                setTimeout(() => this.startRecording(cameraId), 5000);
+                const attempts = (this.restartAttempts.get(cameraId) || 0) + 1;
+                this.restartAttempts.set(cameraId, attempts);
+                
+                const baseDelay = attempts <= 2 ? 2000 : 10000;
+                const jitter = Math.random() * 500;
+                const delay = baseDelay + jitter;
+                
+                console.log(`[StreamEngine] Restarting Camera ${cameraId} in ${Math.round(delay)}ms (Attempt ${attempts})`);
+                setTimeout(() => this.startRecording(cameraId), delay);
             }
         });
     }
@@ -130,13 +157,14 @@ class StreamEngine {
 
     getRecordingStatus(cameraId) {
         const recording = this.activeRecordings.get(cameraId);
-        if (!recording) return { isRecording: false, status: 'stopped' };
+        const attempts = this.restartAttempts.get(cameraId) || 0;
+        if (!recording) return { isRecording: false, status: 'stopped', restartCount: attempts };
         return {
             isRecording: true,
             status: 'recording',
             startTime: recording.startTime,
             duration: Math.floor((Date.now() - recording.startTime.getTime()) / 1000),
-            restartCount: 0
+            restartCount: attempts
         };
     }
 
