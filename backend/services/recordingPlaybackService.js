@@ -151,8 +151,8 @@ class RecordingPlaybackService {
         let params = [cameraId];
 
         if (dateStr) {
-            sql += ` AND date(start_time, 'localtime') = ?`;
-            params.push(dateStr);
+            sql += ` AND (date(start_time, 'localtime') = ? OR date(start_time) = ? OR substr(start_time, 1, 10) = ?)`;
+            params.push(dateStr, dateStr, dateStr);
         }
 
         sql += ` ORDER BY start_time DESC`;
