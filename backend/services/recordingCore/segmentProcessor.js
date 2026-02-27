@@ -85,14 +85,6 @@ class SegmentProcessor {
                 } finally {
                     this.lockManager.release(task.filePath);
                 }
-                try {
-                    const { stdout } = await execFileAsync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', task.filePath], { encoding: 'utf8', timeout: 5000 });
-                    durationStr = stdout.trim();
-                } catch(e) {
-                    console.error(`[SegmentProcessor] ffprobe failed for ${fileOnly}:`, e.message);
-                } finally {
-                    this.lockManager.release(task.filePath);
-                }
 
                 const rawDuration = parseFloat(durationStr);
                 if (isNaN(rawDuration) || rawDuration < 1) {
