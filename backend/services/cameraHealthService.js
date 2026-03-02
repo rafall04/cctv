@@ -1,10 +1,11 @@
 import axios from 'axios';
+import net from 'net';
 import { config } from '../config/config.js';
 import { query, queryOne, execute } from '../database/connectionPool.js';
-import { 
-    sendCameraOfflineNotification, 
+import {
+    sendCameraOfflineNotification,
     sendCameraOnlineNotification,
-    isTelegramConfigured 
+    isTelegramConfigured
 } from './telegramService.js';
 import { getTimezone } from './timezoneService.js';
 
@@ -15,7 +16,7 @@ const mediaMtxApiBaseUrl = 'http://localhost:9997/v3';
  */
 function getTimestamp() {
     const timezone = getTimezone();
-    return new Date().toLocaleString('sv-SE', { 
+    return new Date().toLocaleString('sv-SE', {
         timeZone: timezone,
         year: 'numeric',
         month: '2-digit',
@@ -25,6 +26,37 @@ function getTimestamp() {
         second: '2-digit',
         hour12: false
     }).replace(' ', ' ');
+}
+
+/**
+ * Check if a TCP port is open on a host
+ * @param {string} host 
+ * @param {number} port 
+ * @param {number} timeoutMs 
+ * @returns {Promise<boolean>}
+ */
+function checkTcpPort(host, port, timeoutMs = 3000) {
+    return new Promise((resolve) => {
+        const socket = new net.Socket();
+
+        socket.setTimeout(timeoutMs);
+
+        socket.on('connect', () => {
+            socket.destroy();
+            resolve(true);
+        });
+
+        socket.on('timeout', () => {
+            socket.destroy();
+            resolve(false);
+        });
+
+        socket.on('error', () => {
+            resolve(false);
+        });
+
+        socket.connect(port, host);
+    });
 }
 
 class CameraHealthService {
@@ -47,7 +79,7 @@ class CameraHealthService {
         }
 
         this.isRunning = true;
-        console.log(`[CameraHealth] Starting health check service (interval: ${intervalMs/1000}s)`);
+        console.log(`[CameraHealth] Starting health check service (interval: ${intervalMs / 1000}s)`);
 
         // Initial check after 10 seconds (give MediaMTX time to start)
         setTimeout(() => this.checkAllCameras(), 10000);
@@ -79,13 +111,13 @@ class CameraHealthService {
     async getActivePaths() {
         try {
             // Get configured paths from config (not just active paths)
-            const configResponse = await axios.get(`${mediaMtxApiBaseUrl}/config/paths/list`, { 
-                timeout: 5000 
+            const configResponse = await axios.get(`${mediaMtxApiBaseUrl}/config/paths/list`, {
+                timeout: 5000
             });
-            
+
             const pathMap = new Map();
             const configItems = configResponse.data?.items || [];
-            
+
             // First, mark all configured paths as "online" (path exists = camera configured)
             for (const item of configItems) {
                 pathMap.set(item.name, {
@@ -99,14 +131,14 @@ class CameraHealthService {
                     isOnline: true
                 });
             }
-            
+
             // Then get active paths to check if they're actually streaming
             try {
-                const pathsResponse = await axios.get(`${mediaMtxApiBaseUrl}/paths/list`, { 
-                    timeout: 5000 
+                const pathsResponse = await axios.get(`${mediaMtxApiBaseUrl}/paths/list`, {
+                    timeout: 5000
                 });
                 const activeItems = pathsResponse.data?.items || [];
-                
+
                 for (const item of activeItems) {
                     if (pathMap.has(item.name)) {
                         const existing = pathMap.get(item.name);
@@ -118,7 +150,7 @@ class CameraHealthService {
             } catch (e) {
                 // Paths list might fail if no active streams, that's OK
             }
-            
+
             return pathMap;
         } catch (error) {
             // MediaMTX might be offline
@@ -133,11 +165,11 @@ class CameraHealthService {
     async checkAllCameras() {
         try {
             const activePaths = await this.getActivePaths();
-            
-            // Get all enabled cameras (include stream_key for path lookup)
+
+            // Get all enabled cameras (include stream_key and private_rtsp_url for path & ping lookup)
             // Use connection pool for better performance
             const cameras = query(`
-                SELECT id, name, location, is_online, stream_key 
+                SELECT id, name, location, is_online, stream_key, private_rtsp_url 
                 FROM cameras 
                 WHERE enabled = 1
             `);
@@ -147,24 +179,42 @@ class CameraHealthService {
 
             const timestamp = getTimestamp();
 
+            // Process camera health checks in parallel to avoid long blocking times
+            const healthResults = await Promise.allSettled(cameras.map(async (camera) => {
+                let isActuallyOnline = false;
+                const pathName = camera.stream_key || `camera${camera.id}`;
+                const pathInfo = activePaths.get(pathName);
+
+                // 1. Primary Check: Direct TCP Ping to RTSP port
+                if (camera.private_rtsp_url) {
+                    try {
+                        const parsedUrl = new URL(camera.private_rtsp_url);
+                        const host = parsedUrl.hostname;
+                        const port = parseInt(parsedUrl.port) || 554;
+                        isActuallyOnline = await checkTcpPort(host, port);
+                    } catch (e) {
+                        console.warn(`[CameraHealth] Invalid RTSP URL for ${camera.name}: ${camera.private_rtsp_url}`);
+                    }
+                }
+
+                // 2. Fallback Check: MediaMTX Active Stream (for Tunnel/VPN cameras)
+                if (!isActuallyOnline && pathInfo && (pathInfo.ready || pathInfo.sourceReady)) {
+                    isActuallyOnline = true;
+                }
+
+                return { camera, pathName, isOnline: isActuallyOnline ? 1 : 0 };
+            }));
+
             let onlineCount = 0;
             let offlineCount = 0;
             let changedCount = 0;
 
-            for (const camera of cameras) {
-                // Use stream_key if available, fallback to legacy camera{id} format
-                const pathName = camera.stream_key || `camera${camera.id}`;
+            for (const result of healthResults) {
+                if (result.status !== 'fulfilled') continue;
+
+                const { camera, pathName, isOnline } = result.value;
                 const pathInfo = activePaths.get(pathName);
-                
-                // Debug: log path lookup
-                if (!pathInfo) {
-                    console.log(`[CameraHealth] Camera ${camera.id} (${camera.name}): path "${pathName}" NOT found in MediaMTX`);
-                }
-                
-                // Camera is online if:
-                // 1. Path exists in MediaMTX config (configured = online)
-                const isOnline = pathInfo?.isOnline ? 1 : 0;
-                
+
                 // Only update if status changed
                 if (camera.is_online !== isOnline) {
                     // Use connection pool for better performance
@@ -173,20 +223,20 @@ class CameraHealthService {
                         [isOnline, timestamp, camera.id]
                     );
                     changedCount++;
-                    
+
                     // Send Telegram notification on status change
                     if (isTelegramConfigured()) {
                         if (isOnline) {
                             // Camera came back online
                             console.log(`[CameraHealth] ${camera.name} is now ONLINE`);
-                            
+
                             // Calculate downtime if we tracked when it went offline
                             let downtime = null;
                             if (this.offlineSince.has(camera.id)) {
                                 downtime = Math.floor((Date.now() - this.offlineSince.get(camera.id)) / 1000);
                                 this.offlineSince.delete(camera.id);
                             }
-                            
+
                             // Send online notification (async, don't await)
                             sendCameraOnlineNotification({
                                 id: camera.id,
@@ -198,10 +248,10 @@ class CameraHealthService {
                         } else {
                             // Camera went offline
                             console.log(`[CameraHealth] ${camera.name} is now OFFLINE`);
-                            
+
                             // Track when camera went offline
                             this.offlineSince.set(camera.id, Date.now());
-                            
+
                             // Send offline notification (async, don't await)
                             sendCameraOfflineNotification({
                                 id: camera.id,
@@ -280,24 +330,43 @@ class CameraHealthService {
     async checkCamera(cameraId) {
         try {
             const activePaths = await this.getActivePaths();
-            
-            // Get camera's stream_key from database using connection pool
-            const camera = queryOne('SELECT stream_key FROM cameras WHERE id = ?', [cameraId]);
-            
+
+            // Get camera's stream_key and url from database using connection pool
+            const camera = queryOne('SELECT stream_key, private_rtsp_url FROM cameras WHERE id = ?', [cameraId]);
+
             // Use stream_key if available, fallback to legacy format
             const pathName = camera?.stream_key || `camera${cameraId}`;
             const pathInfo = activePaths.get(pathName);
-            
-            const isOnline = pathInfo?.isOnline ? 1 : 0;
-            
+
+            let isOnline = false;
+
+            // 1. Primary Check: Direct TCP ping
+            if (camera?.private_rtsp_url) {
+                try {
+                    const parsedUrl = new URL(camera.private_rtsp_url);
+                    const host = parsedUrl.hostname;
+                    const port = parseInt(parsedUrl.port) || 554;
+                    isOnline = await checkTcpPort(host, port);
+                } catch (e) {
+                    console.warn(`[CameraHealth] Invalid RTSP URL for camera ${cameraId}`);
+                }
+            }
+
+            // 2. Fallback Check: MediaMTX Active Stream
+            if (!isOnline && pathInfo && (pathInfo.ready || pathInfo.sourceReady)) {
+                isOnline = true;
+            }
+
+            const isOnlineValue = isOnline ? 1 : 0;
+
             // Update database with configured timezone timestamp
             const timestamp = getTimestamp();
             execute(
                 'UPDATE cameras SET is_online = ?, last_online_check = ? WHERE id = ?',
-                [isOnline, timestamp, cameraId]
+                [isOnlineValue, timestamp, cameraId]
             );
 
-            return isOnline === 1;
+            return isOnline;
         } catch (error) {
             console.error(`[CameraHealth] Check camera ${cameraId} failed:`, error.message);
             return false;
