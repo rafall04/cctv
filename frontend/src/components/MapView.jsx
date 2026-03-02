@@ -79,41 +79,16 @@ const createCameraIcon = (status = 'active', isTunnel = false, isOnline = true) 
         darkColor = '#059669';
     }
 
-    // Icon SVG berdasarkan status - desain modern menggunakan stroke/outline CCTV bullet
     let iconSvg;
     if (status === 'maintenance') {
-        // CCTV icon + Wrench (Perbaikan)
-        iconSvg = `
-            <path d="M16.75 12h3.632a1 1 0 0 1 .894 1.447l-2.034 4.069a1 1 0 0 1-1.708.134l-2.124-2.124" />
-            <path d="M17.321 8.354a1.864 1.864 0 1 1-2.636-2.636 1.864 1.864 0 0 1 2.636 2.636z" />
-            <path d="M18.893 11.536A4.542 4.542 0 1 0 12.464 5.107l-6.38 6.38a1.5 1.5 0 0 0 .428 2.508l2.5 1a1.5 1.5 0 0 0 1.942-.693l2.846-5.693a1 1 0 0 1 1.748-.094z" />
-            <path d="M2 19h11" />
-            <path d="M6 15v4" />
-            <path d="M8.5 15v4" />
-            <!-- Silang coret untuk maintenance -->
-            <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" transform="scale(0.5) translate(20, -5)" stroke-width="3" stroke="#ef4444" fill="#ef4444"/>
-        `;
+        // Wrench icon
+        iconSvg = '<path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" stroke-width="2" stroke="white" fill="none"/>';
     } else if (!isOnline) {
-        // CCTV icon + Garis coret (Offline)
-        iconSvg = `
-            <path d="M16.75 12h3.632a1 1 0 0 1 .894 1.447l-2.034 4.069a1 1 0 0 1-1.708.134l-2.124-2.124" />
-            <path d="M17.321 8.354a1.864 1.864 0 1 1-2.636-2.636 1.864 1.864 0 0 1 2.636 2.636z" />
-            <path d="M18.893 11.536A4.542 4.542 0 1 0 12.464 5.107l-6.38 6.38a1.5 1.5 0 0 0 .428 2.508l2.5 1a1.5 1.5 0 0 0 1.942-.693l2.846-5.693a1 1 0 0 1 1.748-.094z" />
-            <path d="M2 19h11" />
-            <path d="M6 15v4" />
-            <path d="M8.5 15v4" />
-            <line x1="2" y1="2" x2="22" y2="22" stroke="white" stroke-width="2" />
-        `;
+        // X icon
+        iconSvg = '<path d="M6 6l12 12M6 18L18 6" stroke="white" stroke-width="3" stroke-linecap="round" fill="none"/>';
     } else {
-        // CCTV icon normal
-        iconSvg = `
-            <path d="M16.75 12h3.632a1 1 0 0 1 .894 1.447l-2.034 4.069a1 1 0 0 1-1.708.134l-2.124-2.124" />
-            <path d="M17.321 8.354a1.864 1.864 0 1 1-2.636-2.636 1.864 1.864 0 0 1 2.636 2.636z" />
-            <path d="M18.893 11.536A4.542 4.542 0 1 0 12.464 5.107l-6.38 6.38a1.5 1.5 0 0 0 .428 2.508l2.5 1a1.5 1.5 0 0 0 1.942-.693l2.846-5.693a1 1 0 0 1 1.748-.094z" />
-            <path d="M2 19h11" />
-            <path d="M6 15v4" />
-            <path d="M8.5 15v4" />
-        `;
+        // Simple CCTV icon
+        iconSvg = '<path d="M18 10.48V6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-4.48l4 3.98v-11l-4 3.98z"/>';
     }
 
     const icon = L.divIcon({
@@ -137,7 +112,7 @@ const createCameraIcon = (status = 'active', isTunnel = false, isOnline = true) 
                     align-items: center;
                     justify-content: center;
                 ">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(45deg);">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="white" style="transform: rotate(45deg);">
                         ${iconSvg}
                     </svg>
                 </div>
@@ -728,13 +703,13 @@ const VideoModal = memo(({ camera, onClose }) => {
                                     {/* Progress dots untuk visual feedback */}
                                     <div className="flex items-center justify-center gap-1 mt-2">
                                         <span className={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${loadingStage === LoadingStage.CONNECTING || loadingStage === LoadingStage.LOADING || loadingStage === LoadingStage.BUFFERING
-                                                ? 'bg-sky-500' : 'bg-gray-600'
+                                            ? 'bg-sky-500' : 'bg-gray-600'
                                             }`} />
                                         <span className={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${loadingStage === LoadingStage.LOADING || loadingStage === LoadingStage.BUFFERING
-                                                ? 'bg-sky-500' : 'bg-gray-600'
+                                            ? 'bg-sky-500' : 'bg-gray-600'
                                             }`} />
                                         <span className={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${loadingStage === LoadingStage.BUFFERING
-                                                ? 'bg-sky-500' : 'bg-gray-600'
+                                            ? 'bg-sky-500' : 'bg-gray-600'
                                             }`} />
                                     </div>
                                 </div>
@@ -798,8 +773,8 @@ const VideoModal = memo(({ camera, onClose }) => {
                     {snapshotNotification && (
                         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
                             <div className={`px-5 py-3 rounded-xl shadow-2xl border-2 ${snapshotNotification.type === 'success'
-                                    ? 'bg-green-500 border-green-400'
-                                    : 'bg-red-500 border-red-400'
+                                ? 'bg-green-500 border-green-400'
+                                : 'bg-red-500 border-red-400'
                                 } text-white animate-slide-down`}>
                                 <div className="flex items-center gap-3">
                                     {snapshotNotification.type === 'success' ? (
