@@ -16,7 +16,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
     const [searchParams, setSearchParams] = useSearchParams();
     const cameraIdFromUrl = searchParams.get('cam');
     const { branding } = useBranding();
-    
+
     const [cameras, setCameras] = useState(propCameras || []);
     const [selectedCamera, setSelectedCamera] = useState(propSelectedCamera || null);
     const [segments, setSegments] = useState([]);
@@ -37,32 +37,32 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         const saved = localStorage.getItem('playback-autoplay-enabled');
         return saved !== null ? saved === 'true' : true;
     });
-    
+
     const videoRef = useRef(null);
     const containerRef = useRef(null);
     const isInitialLoadRef = useRef(true);
     const lastSeekTimeRef = useRef(0);
     const bufferingTimeoutRef = useRef(null);
-    
+
     // Refs to avoid stale closures in event handlers
     const selectedSegmentRef = useRef(selectedSegment);
     const segmentsRef = useRef(segments);
     const autoPlayEnabledRef = useRef(autoPlayEnabled);
     const selectedCameraRef = useRef(selectedCamera);
-    
+
     // Keep refs in sync
     useEffect(() => {
         selectedSegmentRef.current = selectedSegment;
     }, [selectedSegment]);
-    
+
     useEffect(() => {
         segmentsRef.current = segments;
     }, [segments]);
-    
+
     useEffect(() => {
         autoPlayEnabledRef.current = autoPlayEnabled;
     }, [autoPlayEnabled]);
-    
+
     useEffect(() => {
         selectedCameraRef.current = selectedCamera;
     }, [selectedCamera]);
@@ -71,14 +71,14 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         const newValue = !autoPlayEnabled;
         setAutoPlayEnabled(newValue);
         localStorage.setItem('playback-autoplay-enabled', String(newValue));
-        
+
         setAutoPlayNotification({
             type: newValue ? 'enabled' : 'disabled',
-            message: newValue 
-                ? 'Auto-play diaktifkan - segment berikutnya akan diputar otomatis' 
+            message: newValue
+                ? 'Auto-play diaktifkan - segment berikutnya akan diputar otomatis'
                 : 'Auto-play dinonaktifkan - video akan berhenti di akhir segment'
         });
-        
+
         setTimeout(() => {
             setAutoPlayNotification(null);
         }, 3000);
@@ -105,12 +105,12 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
                 const response = await cameraService.getActiveCameras();
                 if (response.success) {
                     const recordingCameras = response.data.filter(cam => cam.enable_recording);
-                    const uniqueCameras = recordingCameras.filter((cam, index, self) => 
+                    const uniqueCameras = recordingCameras.filter((cam, index, self) =>
                         index === self.findIndex(c => c.id === cam.id)
                     );
-                    
+
                     setCameras(uniqueCameras);
-                    
+
                     if (cameraIdFromUrl) {
                         const camera = uniqueCameras.find(c => c.id === parseInt(cameraIdFromUrl));
                         if (camera) {
@@ -148,20 +148,28 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         isInitialMountRef.current = false;
     }, [cameraIdFromUrl, cameras, selectedCamera]);
 
+    // Titik untuk auto-seek time setelah video dimuat dari payload share link
+    const playbackSeekTargetRef = useRef(null);
+
     // Effect to select segment from URL or auto-select latest when segments are loaded
     useEffect(() => {
         if (segments.length === 0) return;
-        
+
         const timestampFromUrl = searchParams.get('t');
-        if (timestampFromUrl && !selectedSegment) {
+        if (timestampFromUrl && (!selectedSegment || isInitialMountRef.current)) {
             const targetTime = parseInt(timestampFromUrl);
             const segmentFromUrl = segments.find(s => {
                 const startTime = new Date(s.start_time).getTime();
                 const endTime = new Date(s.end_time).getTime();
                 return targetTime >= startTime && targetTime <= endTime;
             });
+
             if (segmentFromUrl) {
                 setSelectedSegment(segmentFromUrl);
+                // Hitung selisih detik pencarian untuk dikonsumsi video nanti saat loadedMetadata
+                const sTime = new Date(segmentFromUrl.start_time).getTime();
+                const diffSeconds = (targetTime - sTime) / 1000;
+                playbackSeekTargetRef.current = diffSeconds > 0 ? diffSeconds : 0;
             } else {
                 const closestSegment = segments.reduce((prev, curr) => {
                     const prevDiff = Math.abs(new Date(prev.start_time).getTime() - targetTime);
@@ -169,10 +177,12 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
                     return currDiff < prevDiff ? curr : prev;
                 }, segments[0]);
                 setSelectedSegment(closestSegment);
+                // Karena fallback ke closest, seek ke awal saja
+                playbackSeekTargetRef.current = 0;
             }
         } else if (!selectedSegment && segments.length > 0) {
             // Auto-select latest segment if no segment selected
-            const sortedSegments = [...segments].sort((a, b) => 
+            const sortedSegments = [...segments].sort((a, b) =>
                 new Date(b.start_time) - new Date(a.start_time)
             );
             setSelectedSegment(sortedSegments[0]);
@@ -215,7 +225,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
 
         fetchSegments();
         const interval = setInterval(fetchSegments, 10000);
-        
+
         return () => {
             clearInterval(interval);
             setSegments([]);
@@ -246,20 +256,30 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
                 if (response.ok) {
                     const contentType = response.headers.get('content-type');
                     const contentLength = response.headers.get('content-length');
-                    
+
                     if (!contentType || !contentType.includes('video')) {
                         setVideoError(`Invalid Content-Type: ${contentType}`);
                         return;
                     }
-                    
+
                     const fileSize = parseInt(contentLength || '0');
                     if (fileSize < 1024 * 1024) {
                         setVideoError(`File too small: ${(fileSize / 1024).toFixed(2)} KB`);
                         return;
                     }
-                    
+
                     video.src = streamUrl;
                     video.load();
+
+                    // Handler otomatis untuk melakukan "seeking" spesifik pasca video dimuat
+                    const onLoadedMetadataSeek = () => {
+                        if (playbackSeekTargetRef.current !== null) {
+                            video.currentTime = playbackSeekTargetRef.current;
+                            lastSeekTimeRef.current = playbackSeekTargetRef.current;
+                            playbackSeekTargetRef.current = null; // Clear setelah digunakan
+                        }
+                    };
+                    video.addEventListener('loadedmetadata', onLoadedMetadataSeek, { once: true });
                 } else {
                     setVideoError(`HTTP ${response.status}: ${response.statusText}`);
                 }
@@ -305,54 +325,54 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
 
         const handleTimeUpdate = () => setCurrentTime(video.currentTime);
         const handleLoadedMetadata = () => setDuration(video.duration);
-        
+
         const handleEnded = () => {
             if (!autoPlayEnabledRef.current) {
                 setAutoPlayNotification({ type: 'stopped', message: 'Video selesai - Auto-play dinonaktifkan' });
                 setTimeout(() => setAutoPlayNotification(null), 5000);
                 return;
             }
-            
+
             const currentSegment = selectedSegmentRef.current;
             const currentSegments = segmentsRef.current;
-            
+
             if (!currentSegment || currentSegments.length === 0) return;
-            
+
             const currentIndex = currentSegments.findIndex(s => s.id === currentSegment.id);
             if (currentIndex === -1) return;
-            
+
             const nextSegment = currentSegments[currentIndex - 1];
-            
+
             if (nextSegment) {
                 const currentEnd = new Date(currentSegment.end_time);
                 const nextStart = new Date(nextSegment.start_time);
                 const gapSeconds = (nextStart - currentEnd) / 1000;
-                
+
                 if (gapSeconds > 30) {
                     const gapMinutes = Math.round(gapSeconds / 60);
                     setAutoPlayNotification({ type: 'gap', message: `Melewati ${gapMinutes} menit rekaman yang hilang` });
                 } else {
                     setAutoPlayNotification({ type: 'next', message: 'Memutar segment berikutnya...' });
                 }
-                
+
                 setTimeout(() => setAutoPlayNotification(null), 3000);
                 setSelectedSegment(nextSegment);
                 const timestamp = new Date(nextSegment.start_time).getTime();
-                setSearchParams({ 
-                    cam: selectedCameraRef.current?.id.toString(), 
-                    t: timestamp.toString() 
+                setSearchParams({
+                    cam: selectedCameraRef.current?.id.toString(),
+                    t: timestamp.toString()
                 }, { replace: false });
             } else {
                 setAutoPlayNotification({ type: 'complete', message: 'Playback selesai - tidak ada segment lagi' });
                 setTimeout(() => setAutoPlayNotification(null), 5000);
             }
         };
-        
+
         const handleSeeking = () => {
             const targetTime = video.currentTime;
             const previousTime = lastSeekTimeRef.current || 0;
             const seekDistance = Math.abs(targetTime - previousTime);
-            
+
             if (seekDistance > MAX_SEEK_DISTANCE) {
                 const direction = targetTime > previousTime ? 1 : -1;
                 const limitedTarget = previousTime + (MAX_SEEK_DISTANCE * direction);
@@ -362,25 +382,25 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
             } else {
                 lastSeekTimeRef.current = targetTime;
             }
-            
+
             setIsSeeking(true);
             setIsBuffering(true);
             setVideoError(null);
             setErrorType(null);
         };
-        
+
         const handleSeeked = () => {
             setIsSeeking(false);
-            
+
             if (bufferingTimeoutRef.current) {
                 clearTimeout(bufferingTimeoutRef.current);
             }
-            
+
             bufferingTimeoutRef.current = setTimeout(() => {
                 setIsBuffering(false);
             }, 5000);
         };
-        
+
         const handleWaiting = () => setIsBuffering(true);
         const handlePlaying = () => {
             setIsBuffering(false);
@@ -388,9 +408,9 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
                 clearTimeout(bufferingTimeoutRef.current);
             }
         };
-        
+
         const handleCanPlay = () => setIsBuffering(false);
-        
+
         const handleStalled = () => {
             setIsBuffering(true);
             setTimeout(() => {
@@ -420,7 +440,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
             video.removeEventListener('playing', handlePlaying);
             video.removeEventListener('canplay', handleCanPlay);
             video.removeEventListener('stalled', handleStalled);
-            
+
             if (bufferingTimeoutRef.current) {
                 clearTimeout(bufferingTimeoutRef.current);
             }
@@ -436,9 +456,9 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
 
     const handleSegmentClick = (segment) => {
         const timestamp = new Date(segment.start_time).getTime();
-        setSearchParams({ 
-            cam: selectedCamera?.id.toString(), 
-            t: timestamp.toString() 
+        setSearchParams({
+            cam: selectedCamera?.id.toString(),
+            t: timestamp.toString()
         }, { replace: false });
         setSelectedSegment(segment);
         setSeekWarning(null);
@@ -446,6 +466,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         setIsSeeking(false);
         setIsBuffering(false);
         lastSeekTimeRef.current = 0;
+        playbackSeekTargetRef.current = 0; // Reset saat diklik manual dari list agar selalu play dari awal segmen
         if (bufferingTimeoutRef.current) {
             clearTimeout(bufferingTimeoutRef.current);
             bufferingTimeoutRef.current = null;
@@ -495,7 +516,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         }
 
         const cameraName = selectedCameraRef.current?.name || 'camera';
-        
+
         try {
             const video = videoRef.current;
             const canvas = document.createElement('canvas');
@@ -508,14 +529,14 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
             const watermarkHeight = Math.max(40, canvas.height * 0.08);
             const padding = watermarkHeight * 0.3;
             const fontSize = watermarkHeight * 0.4;
-            
+
             ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
             ctx.fillRect(canvas.width - (watermarkHeight * 4) - padding, canvas.height - watermarkHeight - padding, watermarkHeight * 4, watermarkHeight);
 
             const logoSize = watermarkHeight * 0.6;
             const logoX = canvas.width - (watermarkHeight * 3.5) - padding;
             const logoY = canvas.height - (watermarkHeight / 2) - padding;
-            
+
             ctx.fillStyle = '#0ea5e9';
             ctx.beginPath();
             ctx.arc(logoX, logoY, logoSize / 2, 0, Math.PI * 2);
@@ -582,10 +603,10 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
 
     const handleTimelineClick = (targetTime) => {
         if (!videoRef.current) return;
-        
+
         const currentPos = videoRef.current.currentTime;
         const seekDistance = Math.abs(targetTime - currentPos);
-        
+
         if (seekDistance > MAX_SEEK_DISTANCE) {
             const direction = targetTime > currentPos ? 1 : -1;
             const limitedTarget = currentPos + (MAX_SEEK_DISTANCE * direction);
@@ -603,23 +624,33 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         setSelectedCamera(camera);
         if (camera) {
             const timestamp = selectedSegment ? new Date(selectedSegment.start_time).getTime().toString() : '';
-            setSearchParams({ 
+            setSearchParams({
                 cam: camera.id.toString(),
-                t: timestamp || '' 
+                t: timestamp || ''
             }, { replace: false });
         }
     }, [setSearchParams, selectedSegment]);
 
     // Handle share playback link - use timestamp instead of segment ID
     const handleShare = useCallback(async () => {
-        const baseUrl = `${window.location.origin}/playback`;
+        const baseUrl = `${window.location.origin}/?mode=playback`; // Memastikan diarahkan ke tab playback saat domain diclick
         const params = new URLSearchParams();
         if (selectedCamera?.id) params.set('cam', selectedCamera.id.toString());
+
+        // Akumulasikan start_time UNIX segment + currentTime detik
         if (selectedSegment?.start_time) {
-            const timestamp = new Date(selectedSegment.start_time).getTime();
-            params.set('t', timestamp.toString());
+            const baseTimeMs = new Date(selectedSegment.start_time).getTime();
+            let preciseTimestamp = baseTimeMs;
+
+            // Tambahkan dengan detik yang sedang berjalan (jika video valid)
+            if (videoRef.current && typeof videoRef.current.currentTime === 'number') {
+                const currentSecsMs = Math.floor(videoRef.current.currentTime * 1000);
+                preciseTimestamp += currentSecsMs;
+            }
+            params.set('t', preciseTimestamp.toString());
         }
-        const shareUrl = `${baseUrl}?${params.toString()}`;
+
+        const shareUrl = `${baseUrl}&${params.toString()}`;
 
         const shareData = {
             title: `Playback - ${selectedCamera?.name || 'CCTV'}`,
