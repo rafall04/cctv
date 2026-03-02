@@ -77,9 +77,10 @@ function handleSessionExpired(error) {
     localStorage.removeItem('user');
     clearCsrfToken();
     showErrorNotification('Session Expired', 'Your session has expired. Please log in again.');
-    if (window.location.pathname.startsWith('/admin')) {
-        window.location.href = '/admin/login?expired=true';
-    }
+
+    // Dispatch a global event so React Router can handle the redirect cleanly
+    window.dispatchEvent(new Event('session-expired'));
+
     return Promise.reject(error);
 }
 

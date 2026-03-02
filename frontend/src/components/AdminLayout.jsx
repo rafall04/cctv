@@ -19,8 +19,8 @@ const Icons = {
     Logout: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>,
     Menu: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16m-7 6h7" /></svg>,
     X: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>,
-    Sun: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>,
-    Moon: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>,
+    Sun: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></svg>,
+    Moon: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" /></svg>,
     Home: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>,
     ChevronRight: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>,
 };
@@ -38,7 +38,19 @@ export default function AdminLayout({ children }) {
     useEffect(() => {
         const currentUser = authService.getCurrentUser();
         setUser(currentUser);
-    }, []);
+
+        // Listen for global session-expired events
+        // Dispatched by apiClient when 401 Unauthorized occurs on any API route
+        const handleSessionExpired = () => {
+            navigate('/admin/login?expired=true', { replace: true });
+        };
+
+        window.addEventListener('session-expired', handleSessionExpired);
+
+        return () => {
+            window.removeEventListener('session-expired', handleSessionExpired);
+        };
+    }, [navigate]);
 
     /**
      * Handle network coming back online
@@ -48,7 +60,7 @@ export default function AdminLayout({ children }) {
     const handleOnline = useCallback(() => {
         setIsOffline(false);
         showSuccess('Connection Restored', 'You are back online. Data will refresh automatically.');
-        
+
         // Trigger a page refresh to reload data
         // This ensures all components get fresh data after reconnection
         window.dispatchEvent(new CustomEvent('network-reconnected'));
@@ -89,7 +101,7 @@ export default function AdminLayout({ children }) {
                 onOffline={handleOffline}
                 showSuccessOnReconnect={false} // We handle success notification ourselves
             />
-            
+
             {/* Mobile Header */}
             <header className={`lg:hidden fixed left-0 right-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800 transition-all ${isOffline ? 'top-12' : 'top-0'}`}>
                 <div className="flex items-center justify-between px-4 h-16">
@@ -145,11 +157,10 @@ export default function AdminLayout({ children }) {
                             key={item.path}
                             to={item.path}
                             onClick={() => setIsMobileMenuOpen(false)}
-                            className={`group flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${
-                                isActive(item.path)
+                            className={`group flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${isActive(item.path)
                                     ? 'bg-gradient-to-r from-primary to-primary-600 text-white shadow-lg shadow-primary/30'
                                     : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/80 hover:text-gray-900 dark:hover:text-white'
-                            }`}
+                                }`}
                         >
                             <div className={`${isActive(item.path) ? '' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`}>
                                 {item.icon}
