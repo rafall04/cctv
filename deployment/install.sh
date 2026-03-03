@@ -42,18 +42,10 @@ CLIENT_NAME=${CLIENT_NAME:-"RAF NET"}
 CLIENT_CODE=$(echo "$CLIENT_NAME" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
 
 # Frontend Domain
-read -p "Frontend Domain (e.g., cctv.client.com): " FRONTEND_DOMAIN
-while [ -z "$FRONTEND_DOMAIN" ]; do
-    print_error "Frontend domain is required!"
-    read -p "Frontend Domain: " FRONTEND_DOMAIN
-done
+read -p "Frontend Domain (optional, e.g., cctv.client.com): " FRONTEND_DOMAIN
 
 # Backend Domain
-read -p "Backend Domain (e.g., api-cctv.client.com): " BACKEND_DOMAIN
-while [ -z "$BACKEND_DOMAIN" ]; do
-    print_error "Backend domain is required!"
-    read -p "Backend Domain: " BACKEND_DOMAIN
-done
+read -p "Backend Domain (optional, e.g., api-cctv.client.com): " BACKEND_DOMAIN
 
 # Server IP
 read -p "Server IP [$DETECTED_IP]: " SERVER_IP

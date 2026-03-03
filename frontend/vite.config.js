@@ -8,7 +8,9 @@ export default defineConfig({
         host: true,
         proxy: {
             '/api': {
-                target: process.env.VITE_API_URL || 'http://localhost:3000',
+                target: (process.env.VITE_API_URL && process.env.VITE_API_URL.startsWith('http'))
+                    ? process.env.VITE_API_URL
+                    : 'http://localhost:3000',
                 changeOrigin: true,
             },
         },
@@ -22,13 +24,13 @@ export default defineConfig({
                 manualChunks: {
                     // React core
                     'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-                    
+
                     // Video player (HLS.js is large)
                     'video-player': ['hls.js'],
-                    
+
                     // Map libraries (Leaflet is large)
                     'map-vendor': ['leaflet', 'react-leaflet'],
-                    
+
                     // Admin pages (lazy loaded)
                     'admin-pages': [
                         './src/pages/Dashboard.jsx',

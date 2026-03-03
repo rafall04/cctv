@@ -83,7 +83,7 @@ PORT_PUBLIC=800
 # ===================================
 # Public Stream URLs
 # ===================================
-PUBLIC_STREAM_BASE_URL=http://localhost:800
+PUBLIC_STREAM_BASE_URL=
 PUBLIC_HLS_PATH=/hls
 PUBLIC_WEBRTC_PATH=/webrtc
 
@@ -127,7 +127,7 @@ print_success "Backend .env created"
 # Frontend .env
 cat > frontend/.env << 'EOF'
 # Backend API URL
-VITE_API_URL=http://localhost:800
+VITE_API_URL=
 
 # Frontend Domain
 VITE_FRONTEND_DOMAIN=localhost

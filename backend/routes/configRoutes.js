@@ -26,31 +26,16 @@ export default async function configRoutes(fastify) {
      */
     fastify.get('/api/config/public', async (request, reply) => {
         // Detect protocol from request
-        const protocol = request.headers['x-forwarded-proto'] || 
-                        (request.socket.encrypted ? 'https' : 'http');
-        
+        const protocol = request.headers['x-forwarded-proto'] ||
+            (request.socket.encrypted ? 'https' : 'http');
+
         // Build API URL
-        let apiUrl;
-        if (config.security.backendDomain) {
-            // Use configured backend domain
-            apiUrl = `${protocol}://${config.security.backendDomain}`;
-            
-            // Add port if non-standard
-            const portPublic = process.env.PORT_PUBLIC;
-            if (portPublic && portPublic !== '80' && portPublic !== '443') {
-                apiUrl += `:${portPublic}`;
-            }
-        } else {
-            // Fallback to request hostname
-            apiUrl = `${protocol}://${request.hostname}`;
-            if (config.server.port !== 80 && config.server.port !== 443) {
-                apiUrl += `:${config.server.port}`;
-            }
-        }
-        
+        // In the Single-Port Nginx Architecture, we use relative paths for everything.
+        const apiUrl = '/api';
+
         // WebSocket protocol
         const wsProtocol = protocol === 'https' ? 'wss' : 'ws';
-        
+
         return {
             apiUrl,
             frontendDomain: config.security.frontendDomain || request.hostname,
@@ -61,7 +46,7 @@ export default async function configRoutes(fastify) {
             timestamp: new Date().toISOString(),
         };
     });
-    
+
     /**
      * GET /api/config/version
      * 
@@ -90,12 +75,12 @@ export default async function configRoutes(fastify) {
             // Get branding settings
             const db = fastify.db;
             const settings = db.prepare('SELECT key, value FROM settings WHERE key LIKE "company_%" OR key LIKE "meta_%"').all();
-            
+
             const branding = {};
             settings.forEach(setting => {
                 branding[setting.key] = setting.value;
             });
-            
+
             // Build manifest
             const manifest = {
                 name: branding.meta_title || branding.company_name || 'CCTV System',
@@ -128,7 +113,7 @@ export default async function configRoutes(fastify) {
                 lang: 'id',
                 dir: 'ltr'
             };
-            
+
             reply.header('Content-Type', 'application/manifest+json');
             reply.header('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
             return manifest;

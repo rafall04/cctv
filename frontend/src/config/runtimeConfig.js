@@ -27,12 +27,12 @@ export const loadRuntimeConfig = async () => {
     if (runtimeConfig) {
         return runtimeConfig;
     }
-    
+
     // Return existing promise if already loading
     if (loadPromise) {
         return loadPromise;
     }
-    
+
     // Start loading
     loadPromise = (async () => {
         try {
@@ -43,15 +43,15 @@ export const loadRuntimeConfig = async () => {
                     'Accept': 'application/json',
                 },
             });
-            
+
             if (!response.ok) {
                 throw new Error(`Failed to load config: ${response.status}`);
             }
-            
+
             const config = await response.json();
-            
+
             console.log('✅ Runtime config loaded from backend:', config);
-            
+
             runtimeConfig = {
                 apiUrl: config.apiUrl,
                 frontendDomain: config.frontendDomain,
@@ -61,15 +61,15 @@ export const loadRuntimeConfig = async () => {
                 wsProtocol: config.wsProtocol,
                 source: 'backend',
             };
-            
+
             return runtimeConfig;
         } catch (error) {
             console.warn('⚠️ Failed to load runtime config from backend:', error.message);
             console.warn('⚠️ Falling back to .env configuration');
-            
-            // Fallback to .env
+
+            // Fallback to .env or relative path
             runtimeConfig = {
-                apiUrl: import.meta.env.VITE_API_URL || window.location.origin,
+                apiUrl: import.meta.env.VITE_API_URL || '',
                 frontendDomain: import.meta.env.VITE_FRONTEND_DOMAIN || window.location.hostname,
                 serverIp: '',
                 portPublic: window.location.port || '800',
@@ -77,13 +77,13 @@ export const loadRuntimeConfig = async () => {
                 wsProtocol: window.location.protocol === 'https:' ? 'wss' : 'ws',
                 source: 'env',
             };
-            
+
             return runtimeConfig;
         } finally {
             loadPromise = null;
         }
     })();
-    
+
     return loadPromise;
 };
 
@@ -96,9 +96,13 @@ export const getApiUrl = () => {
     if (!runtimeConfig) {
         console.warn('⚠️ Runtime config not loaded yet! Call loadRuntimeConfig() first');
         // Return fallback
-        return import.meta.env.VITE_API_URL || window.location.origin;
+        let url = import.meta.env.VITE_API_URL || '';
+        if (!import.meta.env.VITE_API_URL && import.meta.env.DEV) {
+            url = '/api';
+        }
+        return url;
     }
-    
+
     return runtimeConfig.apiUrl;
 };
 
@@ -111,7 +115,7 @@ export const getFrontendDomain = () => {
     if (!runtimeConfig) {
         return import.meta.env.VITE_FRONTEND_DOMAIN || window.location.hostname;
     }
-    
+
     return runtimeConfig.frontendDomain;
 };
 
@@ -124,7 +128,7 @@ export const getServerIp = () => {
     if (!runtimeConfig) {
         return '';
     }
-    
+
     return runtimeConfig.serverIp;
 };
 
@@ -137,7 +141,7 @@ export const getProtocol = () => {
     if (!runtimeConfig) {
         return window.location.protocol.replace(':', '');
     }
-    
+
     return runtimeConfig.protocol;
 };
 
@@ -150,7 +154,7 @@ export const getWsProtocol = () => {
     if (!runtimeConfig) {
         return window.location.protocol === 'https:' ? 'wss' : 'ws';
     }
-    
+
     return runtimeConfig.wsProtocol;
 };
 
@@ -163,7 +167,7 @@ export const getConfigSource = () => {
     if (!runtimeConfig) {
         return 'unknown';
     }
-    
+
     return runtimeConfig.source;
 };
 

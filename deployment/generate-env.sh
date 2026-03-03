@@ -82,7 +82,7 @@ MEDIAMTX_HLS_URL_INTERNAL=http://localhost:${MEDIAMTX_HLS_PORT}
 MEDIAMTX_WEBRTC_URL_INTERNAL=http://localhost:${MEDIAMTX_WEBRTC_PORT}
 
 # Public Stream URLs
-PUBLIC_STREAM_BASE_URL=${PUBLIC_STREAM_BASE_URL}
+PUBLIC_STREAM_BASE_URL=
 PUBLIC_HLS_PATH=/hls
 PUBLIC_WEBRTC_PATH=/webrtc
 
@@ -141,7 +141,7 @@ cat > "${APP_DIR}/frontend/.env" << EOF
 # Generated: $(date)
 
 # Backend API URL
-VITE_API_URL=${BACKEND_URL}
+VITE_API_URL=
 
 # API Key (generate from admin panel)
 VITE_API_KEY=CHANGE_THIS_TO_YOUR_API_KEY
@@ -180,15 +180,17 @@ server {
     }
 }
 
-# Frontend Server
+# Unified Single-Port Server (Frontend & Backend)
 server {
     listen NGINX_PORT_PLACEHOLDER;
     listen [::]:NGINX_PORT_PLACEHOLDER;
 
-    server_name FRONTEND_DOMAIN_PLACEHOLDER SERVER_IP_PLACEHOLDER;
+    server_name _ FRONTEND_DOMAIN_PLACEHOLDER SERVER_IP_PLACEHOLDER BACKEND_DOMAIN_PLACEHOLDER;
 
     root APP_DIR_PLACEHOLDER/frontend/dist;
     index index.html;
+
+    client_max_body_size 10M;
 
     # Security: Block sensitive files
     location ~ /\.env { deny all; return 404; }
@@ -251,64 +253,8 @@ server {
         add_header Cache-Control "public, immutable";
     }
 
-    access_log /var/log/nginx/CLIENT_CODE_PLACEHOLDER-frontend.access.log;
-    error_log /var/log/nginx/CLIENT_CODE_PLACEHOLDER-frontend.error.log;
-}
-
-# Backend API Server
-server {
-    listen NGINX_PORT_PLACEHOLDER;
-    listen [::]:NGINX_PORT_PLACEHOLDER;
-
-    server_name BACKEND_DOMAIN_PLACEHOLDER;
-
-    client_max_body_size 10M;
-
-    # Security: Block sensitive files
-    location ~ /\.env { deny all; return 404; }
-    location ~ /\.git { deny all; return 404; }
-    location ~ \.(bak|backup|old|sql|db|sqlite)$ { deny all; return 404; }
-    location ~ /node_modules/ { deny all; return 404; }
-
-    # Security Headers
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-
-    # HLS Stream Proxy
-    location /hls/ {
-        proxy_pass http://localhost:BACKEND_PORT_PLACEHOLDER;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_buffering off;
-        proxy_cache hls_cache;
-        proxy_cache_valid 200 2s;
-        add_header X-Cache-Status $upstream_cache_status;
-    }
-
-    # Recording Playback
-    location /api/recordings/ {
-        proxy_pass http://localhost:BACKEND_PORT_PLACEHOLDER;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header Range $http_range;
-        proxy_buffering off;
-        proxy_read_timeout 300s;
-    }
-
-    # Backend API
-    location / {
-        proxy_pass http://localhost:BACKEND_PORT_PLACEHOLDER;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    }
-
-    access_log /var/log/nginx/CLIENT_CODE_PLACEHOLDER-backend.access.log;
-    error_log /var/log/nginx/CLIENT_CODE_PLACEHOLDER-backend.error.log;
+    access_log /var/log/nginx/CLIENT_CODE_PLACEHOLDER-access.log;
+    error_log /var/log/nginx/CLIENT_CODE_PLACEHOLDER-error.log;
 }
 NGINX_EOF
 

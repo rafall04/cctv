@@ -31,13 +31,28 @@ export function getAllowedOrigins() {
 /**
  * Check if an origin is allowed
  * @param {string} origin - Origin to check
+ * @param {object} request - Fastify request object (optional)
  * @returns {boolean} - True if allowed
  */
-export function isOriginAllowed(origin) {
+export function isOriginAllowed(origin, request = null) {
     if (!origin) {
         return true; // Allow requests without Origin (non-browser clients)
     }
-    
+
+    // Single-Port Architecture: Allow if the origin matches the Host or X-Forwarded-Host
+    if (request) {
+        try {
+            const originUrl = new URL(origin);
+            const host = request.headers['x-forwarded-host'] || request.headers['host'];
+
+            if (host && originUrl.host === host) {
+                return true;
+            }
+        } catch (e) {
+            // Ignore invalid origin URL, continue to whitelist check
+        }
+    }
+
     const allowedOrigins = getAllowedOrigins();
     return allowedOrigins.includes(origin);
 }
@@ -51,7 +66,7 @@ export function extractOriginFromReferer(referer) {
     if (!referer) {
         return null;
     }
-    
+
     try {
         const url = new URL(referer);
         return `${url.protocol}//${url.host}`;
@@ -67,7 +82,7 @@ export function extractOriginFromReferer(referer) {
  */
 export function isBrowserRequest(request) {
     const userAgent = request.headers['user-agent'] || '';
-    
+
     // Common browser user agent patterns
     const browserPatterns = [
         /Mozilla/i,
@@ -79,7 +94,7 @@ export function isBrowserRequest(request) {
         /MSIE/i,
         /Trident/i
     ];
-    
+
     return browserPatterns.some(pattern => pattern.test(userAgent));
 }
 
@@ -94,50 +109,50 @@ export async function originValidatorMiddleware(fastify, _options) {
         '/api/viewer',  // Viewer tracking endpoints
         '/hls'          // HLS proxy - public streaming endpoint
     ];
-    
+
     fastify.addHook('onRequest', async (request, reply) => {
         // Skip validation for whitelisted paths
         const shouldSkip = skipPaths.some(path => request.url.startsWith(path));
         if (shouldSkip) {
             return;
         }
-        
+
         const origin = request.headers['origin'];
         const referer = request.headers['referer'];
-        
+
         // If no Origin header, check if it's a browser request
         if (!origin) {
             // For browser requests, try to use Referer as fallback
             if (isBrowserRequest(request) && referer) {
                 const refererOrigin = extractOriginFromReferer(referer);
-                
-                if (refererOrigin && !isOriginAllowed(refererOrigin)) {
+
+                if (refererOrigin && !isOriginAllowed(refererOrigin, request)) {
                     logSecurityEvent(SECURITY_EVENTS.ORIGIN_VALIDATION_FAILURE, {
                         reason: 'Invalid Referer origin',
                         referer,
                         refererOrigin,
                         allowedOrigins: getAllowedOrigins()
                     }, request);
-                    
+
                     return reply.code(403).send({
                         success: false,
                         message: 'Forbidden - Invalid origin'
                     });
                 }
             }
-            
+
             // Allow non-browser requests without Origin (API clients, curl, etc.)
             return;
         }
-        
+
         // Validate Origin header
-        if (!isOriginAllowed(origin)) {
+        if (!isOriginAllowed(origin, request)) {
             logSecurityEvent(SECURITY_EVENTS.ORIGIN_VALIDATION_FAILURE, {
                 reason: 'Invalid Origin header',
                 origin,
                 allowedOrigins: getAllowedOrigins()
             }, request);
-            
+
             return reply.code(403).send({
                 success: false,
                 message: 'Forbidden - Invalid origin'
