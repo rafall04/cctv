@@ -13,7 +13,7 @@ export function getSaweriaSettings() {
                 id: 1,
                 saweria_link: 'https://saweria.co/raflialdi',
                 leaderboard_link: 'https://saweria.co/overlays/leaderboard/raflialdi',
-                enabled: 1,
+                enabled: 0,
                 updated_at: new Date().toISOString()
             };
         }
@@ -72,11 +72,11 @@ export function getPublicSaweriaConfig() {
         };
     } catch (error) {
         console.error('Error getting public Saweria config:', error);
-        // Return safe default
+        // Fail-safe: disable on error
         return {
-            enabled: true,
-            saweria_link: 'https://saweria.co/raflialdi',
-            leaderboard_link: 'https://saweria.co/overlays/leaderboard/raflialdi'
+            enabled: false,
+            saweria_link: null,
+            leaderboard_link: null
         };
     }
 }

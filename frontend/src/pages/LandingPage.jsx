@@ -68,13 +68,13 @@ function LandingPageContent() {
 
     const toggleLayoutMode = useCallback(() => {
         const newMode = layoutMode === 'full' ? 'simple' : 'full';
-        
+
         // Use startTransition to avoid Suspense hydration errors
         startTransition(() => {
             setLayoutMode(newMode);
             setSearchParams({ mode: newMode }, { replace: true });
         });
-        
+
         try {
             localStorage.setItem('landing_layout_mode', newMode);
         } catch (err) {
@@ -91,7 +91,7 @@ function LandingPageContent() {
 
     const [saweriaLink, setSaweriaLink] = useState('https://saweria.co/raflialdi');
     const [saweriaLeaderboardLink, setSaweriaLeaderboardLink] = useState('');
-    const [saweriaEnabled, setSaweriaEnabled] = useState(true);
+    const [saweriaEnabled, setSaweriaEnabled] = useState(false);
 
     const [landingSettings, setLandingSettings] = useState({
         area_coverage: 'Saat ini area coverage kami baru mencakup <strong>Dander</strong> dan <strong>Tanjungharjo</strong>',
@@ -158,7 +158,7 @@ function LandingPageContent() {
                 const [saweriaRes, landingRes] = await Promise.all([
                     getPublicSaweriaConfig().catch((err) => {
                         console.warn('Saweria config fetch failed, using defaults:', err);
-                        return { success: true, data: { enabled: true, saweria_link: 'https://saweria.co/raflialdi' } };
+                        return { success: true, data: { enabled: false, saweria_link: null } };
                     }),
                     fetch(`${getApiUrl()}/api/settings/landing-page`)
                         .then(res => res.json())
@@ -166,7 +166,7 @@ function LandingPageContent() {
                 ]);
 
                 if (saweriaRes && saweriaRes.data) {
-                    setSaweriaEnabled(saweriaRes.data.enabled !== false);
+                    setSaweriaEnabled(saweriaRes.data.enabled === true);
                     if (saweriaRes.data.saweria_link) {
                         setSaweriaLink(saweriaRes.data.saweria_link);
                     }
@@ -234,7 +234,7 @@ function LandingPageContent() {
     // Handle camera URL param - auto open popup when camera param exists (only in map/grid mode)
     useEffect(() => {
         if (viewMode === 'playback') return; // Don't open popup in playback mode
-        
+
         const cameraIdFromUrl = searchParams.get('camera');
         if (cameraIdFromUrl && cameras.length > 0) {
             const camera = cameras.find(c => c.id === parseInt(cameraIdFromUrl));
@@ -306,9 +306,9 @@ function LandingPageContent() {
             <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
                 <LandingNavbar branding={branding} layoutMode={layoutMode} onLayoutToggle={toggleLayoutMode} />
 
-                <Hero 
-                    branding={branding} 
-                    landingSettings={landingSettings} 
+                <Hero
+                    branding={branding}
+                    landingSettings={landingSettings}
                     disableHeavyEffects={disableHeavyEffects}
                     onCameraClick={setPopup}
                 />
@@ -374,12 +374,12 @@ const Hero = memo(function Hero({ branding, landingSettings, disableHeavyEffects
                         <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-emerald-200/30 dark:bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
                         <div className="absolute top-10 right-10 w-20 h-20 opacity-20 dark:opacity-10 pointer-events-none">
                             <svg viewBox="0 0 100 100" fill="currentColor" className="text-amber-400 w-full h-full">
-                                <path d="M50 5C30.5 5 15 20.5 15 40c0 19.5 15.5 35 35 35 5 0 9-4 9-9 0-3.5-2-6.5-5-8-4-2.5-6.5-7-6.5-12 0-8 6.5-14.5 14.5-14.5H70c13.5 0 24.5-11 24.5-24.5C94.5 18 78.5 5 50 5z"/>
+                                <path d="M50 5C30.5 5 15 20.5 15 40c0 19.5 15.5 35 35 35 5 0 9-4 9-9 0-3.5-2-6.5-5-8-4-2.5-6.5-7-6.5-12 0-8 6.5-14.5 14.5-14.5H70c13.5 0 24.5-11 24.5-24.5C94.5 18 78.5 5 50 5z" />
                             </svg>
                         </div>
                         <div className="absolute top-20 left-10 w-12 h-12 opacity-15 dark:opacity-8 pointer-events-none">
                             <svg viewBox="0 0 100 100" fill="currentColor" className="text-amber-400 w-full h-full">
-                                <path d="M50 5C30.5 5 15 20.5 15 40c0 19.5 15.5 35 35 35 5 0 9-4 9-9 0-3.5-2-6.5-5-8-4-2.5-6.5-7-6.5-12 0-8 6.5-14.5 14.5-14.5H70c13.5 0 24.5-11 24.5-24.5C94.5 18 78.5 5 50 5z"/>
+                                <path d="M50 5C30.5 5 15 20.5 15 40c0 19.5 15.5 35 35 35 5 0 9-4 9-9 0-3.5-2-6.5-5-8-4-2.5-6.5-7-6.5-12 0-8 6.5-14.5 14.5-14.5H70c13.5 0 24.5-11 24.5-24.5C94.5 18 78.5 5 50 5z" />
                             </svg>
                         </div>
                     </>
@@ -388,7 +388,7 @@ const Hero = memo(function Hero({ branding, landingSettings, disableHeavyEffects
                 <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 text-center">
                     <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold mb-3 shadow-sm">
                         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z"/>
+                            <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z" />
                         </svg>
                         <span>Ramadan Kareem 1447 H</span>
                     </div>
