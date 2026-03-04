@@ -8,12 +8,12 @@ import CameraCard from './LandingCameraCard';
 const MapView = lazy(() => import('../MapView'));
 const Playback = lazy(() => import('../../pages/Playback'));
 
-export default function CamerasSection({ 
-    onCameraClick, 
-    onAddMulti, 
-    multiCameras, 
-    viewMode, 
-    setViewMode, 
+export default function CamerasSection({
+    onCameraClick,
+    onAddMulti,
+    multiCameras,
+    viewMode,
+    setViewMode,
     landingSettings = { section_title: 'CCTV Publik' },
     selectedCamera,
     favorites = [],
@@ -94,33 +94,36 @@ export default function CamerasSection({
                         <div className="flex items-center p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
                             <button
                                 onClick={() => setViewMode('map')}
-                                className={`p-2.5 rounded-lg transition-colors ${viewMode === 'map'
+                                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${viewMode === 'map'
                                     ? 'bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm'
                                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                                     }`}
                                 title="Map View"
                             >
                                 <Icons.Map />
+                                <span>Peta</span>
                             </button>
                             <button
                                 onClick={() => setViewMode('grid')}
-                                className={`p-2.5 rounded-lg transition-colors ${viewMode === 'grid'
+                                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${viewMode === 'grid'
                                     ? 'bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm'
                                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                                     }`}
                                 title="Grid View (Multi-View)"
                             >
                                 <Icons.Grid />
+                                <span>Grid</span>
                             </button>
                             <button
                                 onClick={() => setViewMode('playback')}
-                                className={`p-2.5 rounded-lg transition-colors ${viewMode === 'playback'
+                                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${viewMode === 'playback'
                                     ? 'bg-white dark:bg-gray-700 text-primary-600 dark:text-primary-400 shadow-sm'
                                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                                     }`}
                                 title="Playback Rekaman"
                             >
                                 <Icons.Clock />
+                                <span>Playback</span>
                             </button>
                         </div>
                     </div>
@@ -354,7 +357,7 @@ export default function CamerasSection({
                             <div className="w-6 h-6 border-2 border-gray-300 border-t-primary rounded-full animate-spin" />
                         </div>
                     }>
-                        <Playback 
+                        <Playback
                             cameras={cameras.filter(c => c.enable_recording)}
                             selectedCamera={selectedCamera}
                         />
