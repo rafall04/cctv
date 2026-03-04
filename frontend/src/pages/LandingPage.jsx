@@ -101,6 +101,16 @@ function LandingPageContent() {
         }
     }, [layoutMode, viewMode, searchParams, setSearchParams]);
 
+    // Handle Browser Back/Forward generic navigation
+    useEffect(() => {
+        if (isInitialMount.current) return;
+        const queryView = searchParams.get('view');
+        // Only update local state if URL explicitly changes via browser history
+        if (queryView && ['map', 'grid', 'playback'].includes(queryView) && queryView !== viewMode) {
+            setViewMode(queryView);
+        }
+    }, [searchParams, viewMode, setViewMode]);
+
     useEffect(() => {
         if (isInitialMount.current) return;
         const queryMode = searchParams.get('mode');
@@ -344,6 +354,8 @@ function LandingPageContent() {
                     favorites={favorites}
                     onToggleFavorite={toggleFavorite}
                     isFavorite={isFavorite}
+                    viewMode={viewMode}
+                    setViewMode={handleViewModeChange}
                 />
 
                 <MultiViewButton

@@ -1,8 +1,7 @@
-import { useState, useCallback, lazy, Suspense } from 'react';
+import { lazy, Suspense } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useBranding } from '../contexts/BrandingContext';
 import { shouldDisableAnimations } from '../utils/animationControl';
-import { useCameras } from '../contexts/CameraContext';
 
 // Lazy load widgets to avoid conflicts with LandingPage
 const FeedbackWidget = lazy(() => import('./FeedbackWidget'));
@@ -110,7 +109,6 @@ function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
 // ============================================
 // LANDING PAGE SIMPLE - Minimal layout
 // ============================================
-import { useSearchParams } from 'react-router-dom';
 
 // ... (other imports)
 
@@ -126,34 +124,11 @@ export default function LandingPageSimple({
     favorites,
     onToggleFavorite,
     isFavorite,
+    viewMode,
+    setViewMode
 }) {
     const { branding } = useBranding();
-    const { cameras, areas, loading } = useCameras();
-    const [searchParams, setSearchParams] = useSearchParams();
-    const [viewMode, setViewMode] = useState(() => {
-        const queryView = searchParams.get('view');
-        // Backward compatibility: If old mode=playback is in URL, use it
-        const queryMode = searchParams.get('mode');
-        if (queryMode === 'playback' || queryMode === 'grid') return queryMode;
 
-        return ['map', 'grid', 'playback'].includes(queryView) ? queryView : 'grid';
-    });
-
-    // Handle view mode change and sync URL
-    const handleViewModeChange = useCallback((newMode) => {
-        setViewMode(newMode);
-        setSearchParams((prev) => {
-            prev.set('view', newMode);
-            if (newMode !== 'playback') {
-                prev.delete('cam');
-                prev.delete('t');
-            }
-            if (!prev.has('mode') || !['full', 'simple'].includes(prev.get('mode'))) {
-                prev.set('mode', layoutMode);
-            }
-            return prev;
-        }, { replace: true });
-    }, [layoutMode, setSearchParams]);
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
@@ -181,7 +156,7 @@ export default function LandingPageSimple({
                         onAddMulti={onAddMulti}
                         multiCameras={multiCameras}
                         viewMode={viewMode}
-                        setViewMode={handleViewModeChange}
+                        setViewMode={setViewMode}
                         favorites={favorites}
                         onToggleFavorite={onToggleFavorite}
                         isFavorite={isFavorite}
