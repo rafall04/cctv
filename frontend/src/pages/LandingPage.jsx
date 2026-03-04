@@ -48,10 +48,13 @@ function LandingPageContent() {
             isInitialMount.current = false;
             const queryMode = searchParams.get('mode');
             if (!queryMode) {
-                setSearchParams({ mode: layoutMode }, { replace: true });
+                setSearchParams((prev) => {
+                    prev.set('mode', layoutMode);
+                    return prev;
+                }, { replace: true });
             }
         }
-    }, []);
+    }, [layoutMode, searchParams, setSearchParams]);
 
     useEffect(() => {
         if (isInitialMount.current) return;
@@ -72,7 +75,10 @@ function LandingPageContent() {
         // Use startTransition to avoid Suspense hydration errors
         startTransition(() => {
             setLayoutMode(newMode);
-            setSearchParams({ mode: newMode }, { replace: true });
+            setSearchParams((prev) => {
+                prev.set('mode', newMode);
+                return prev;
+            }, { replace: true });
         });
 
         try {
@@ -84,7 +90,10 @@ function LandingPageContent() {
 
     const [popup, setPopup] = useState(null);
     const [multiCameras, setMultiCameras] = useState([]);
-    const [viewMode, setViewMode] = useState('map');
+    const [viewMode, setViewMode] = useState(() => {
+        const queryMode = searchParams.get('mode');
+        return queryMode === 'playback' ? 'playback' : 'map';
+    });
     const [showMulti, setShowMulti] = useState(false);
     const { addToast } = useToast();
     const [maxReached, setMaxReached] = useState(false);
@@ -253,17 +262,27 @@ function LandingPageContent() {
         setPopup(camera);
         addRecentCamera(camera);
         // Update URL for shareable links
-        const currentMode = searchParams.get('mode') || layoutMode;
-        setSearchParams({ camera: camera.id.toString(), mode: currentMode }, { replace: false });
-    }, [searchParams, layoutMode, setSearchParams, addRecentCamera]);
+        setSearchParams((prev) => {
+            prev.set('camera', camera.id.toString());
+            if (!prev.has('mode')) {
+                prev.set('mode', layoutMode);
+            }
+            return prev;
+        }, { replace: false });
+    }, [layoutMode, setSearchParams, addRecentCamera]);
 
     // Handle popup close - reset URL to remove camera param
     const handlePopupClose = useCallback(() => {
         setPopup(null);
         // Reset URL by removing camera param but keep mode
-        const currentMode = searchParams.get('mode') || layoutMode;
-        setSearchParams({ mode: currentMode }, { replace: false });
-    }, [searchParams, layoutMode, setSearchParams]);
+        setSearchParams((prev) => {
+            prev.delete('camera');
+            if (!prev.has('mode')) {
+                prev.set('mode', layoutMode);
+            }
+            return prev;
+        }, { replace: false });
+    }, [layoutMode, setSearchParams]);
 
     if (layoutMode === 'simple') {
         return (

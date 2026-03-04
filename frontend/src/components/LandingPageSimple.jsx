@@ -110,6 +110,10 @@ function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
 // ============================================
 // LANDING PAGE SIMPLE - Minimal layout
 // ============================================
+import { useSearchParams } from 'react-router-dom';
+
+// ... (other imports)
+
 export default function LandingPageSimple({
     onCameraClick,
     onAddMulti,
@@ -125,7 +129,10 @@ export default function LandingPageSimple({
 }) {
     const { branding } = useBranding();
     const { cameras, areas, loading } = useCameras();
-    const [viewMode, setViewMode] = useState('grid');
+    const [searchParams] = useSearchParams();
+    const [viewMode, setViewMode] = useState(() => {
+        return searchParams.get('mode') === 'playback' ? 'playback' : 'grid';
+    });
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
@@ -141,7 +148,7 @@ export default function LandingPageSimple({
                 <div className="py-3 px-4 text-center bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/30 border-b border-emerald-200/30 dark:border-emerald-800/30">
                     <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/80 dark:bg-gray-800/80 shadow-sm">
                         <svg className="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z"/>
+                            <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z" />
                         </svg>
                         <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Ramadan Kareem 1447 H</span>
                     </div>
