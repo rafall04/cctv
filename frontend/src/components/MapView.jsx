@@ -239,9 +239,13 @@ const VideoModal = memo(({ camera, onClose }) => {
     // Fullscreen toggle with landscape orientation lock
     const toggleFullscreen = useCallback(async () => {
         try {
-            if (!document.fullscreenElement) {
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
                 // Enter fullscreen - use outer wrapper
-                await outerWrapperRef.current?.requestFullscreen?.();
+                if (outerWrapperRef.current?.requestFullscreen) {
+                    await outerWrapperRef.current.requestFullscreen();
+                } else if (outerWrapperRef.current?.webkitRequestFullscreen) {
+                    await outerWrapperRef.current.webkitRequestFullscreen();
+                }
 
                 // Reset zoom to 1.0 when entering fullscreen to avoid "auto zoom" effect
                 handleResetZoom();
@@ -259,7 +263,11 @@ const VideoModal = memo(({ camera, onClose }) => {
                 }
             } else {
                 // Exit fullscreen
-                await document.exitFullscreen?.();
+                if (document.exitFullscreen) {
+                    await document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                    await document.webkitExitFullscreen();
+                }
 
                 // Reset zoom when exiting fullscreen
                 handleResetZoom();
@@ -302,7 +310,7 @@ const VideoModal = memo(({ camera, onClose }) => {
     // Track fullscreen state and unlock orientation on exit
     useEffect(() => {
         const handleFullscreenChange = () => {
-            const isNowFullscreen = !!document.fullscreenElement;
+            const isNowFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement);
             setIsFullscreen(isNowFullscreen);
 
             // Unlock orientation when exiting fullscreen (e.g., via ESC key)
@@ -315,8 +323,10 @@ const VideoModal = memo(({ camera, onClose }) => {
             }
         };
         document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
         return () => {
             document.removeEventListener('fullscreenchange', handleFullscreenChange);
+            document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
             // Cleanup: unlock orientation on unmount
             if (screen.orientation && screen.orientation.unlock) {
                 try {

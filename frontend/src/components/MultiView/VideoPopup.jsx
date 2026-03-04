@@ -29,9 +29,13 @@ function VideoPopup({ camera, onClose }) {
 
     // Handle close with fullscreen exit
     const handleClose = async () => {
-        if (document.fullscreenElement) {
+        if (document.fullscreenElement || document.webkitFullscreenElement) {
             try {
-                await document.exitFullscreen?.();
+                if (document.exitFullscreen) {
+                    await document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                    await document.webkitExitFullscreen();
+                }
                 await new Promise(resolve => setTimeout(resolve, 100));
             } catch (error) {
                 console.error('Error exiting fullscreen:', error);
@@ -43,7 +47,7 @@ function VideoPopup({ camera, onClose }) {
     // Share camera URL
     const handleShare = useCallback(async () => {
         const url = `${window.location.origin}/?camera=${camera.id}`;
-        
+
         if (navigator.share) {
             try {
                 await navigator.share({
@@ -58,7 +62,7 @@ function VideoPopup({ camera, onClose }) {
                 }
             }
         }
-        
+
         // Fallback: Copy to clipboard
         try {
             await navigator.clipboard.writeText(url);
@@ -167,7 +171,7 @@ function VideoPopup({ camera, onClose }) {
     // Track fullscreen state to disable animations and unlock orientation on exit
     useEffect(() => {
         const handleFullscreenChange = () => {
-            const isNowFullscreen = !!document.fullscreenElement;
+            const isNowFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement);
             setIsFullscreen(isNowFullscreen);
 
             // Unlock orientation when exiting fullscreen (e.g., via ESC key)
@@ -180,8 +184,10 @@ function VideoPopup({ camera, onClose }) {
             }
         };
         document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
         return () => {
             document.removeEventListener('fullscreenchange', handleFullscreenChange);
+            document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
             // Cleanup: unlock orientation on unmount
             if (screen.orientation && screen.orientation.unlock) {
                 try {
@@ -547,9 +553,13 @@ function VideoPopup({ camera, onClose }) {
 
     const toggleFS = async () => {
         try {
-            if (!document.fullscreenElement) {
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
                 // Enter fullscreen
-                await outerWrapperRef.current?.requestFullscreen?.();
+                if (outerWrapperRef.current?.requestFullscreen) {
+                    await outerWrapperRef.current.requestFullscreen();
+                } else if (outerWrapperRef.current?.webkitRequestFullscreen) {
+                    await outerWrapperRef.current.webkitRequestFullscreen();
+                }
 
                 // Reset zoom to 1.0 when entering fullscreen to avoid "auto zoom" effect
                 const wrapper = getZoomableWrapper();
@@ -571,7 +581,11 @@ function VideoPopup({ camera, onClose }) {
                 }
             } else {
                 // Exit fullscreen
-                await document.exitFullscreen?.();
+                if (document.exitFullscreen) {
+                    await document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                    await document.webkitExitFullscreen();
+                }
 
                 // Reset zoom when exiting fullscreen
                 const wrapper = getZoomableWrapper();
