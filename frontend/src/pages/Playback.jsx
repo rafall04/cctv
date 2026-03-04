@@ -633,7 +633,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
 
     // Handle share playback link - use timestamp instead of segment ID
     const handleShare = useCallback(async () => {
-        const baseUrl = `${window.location.origin}/?mode=playback`; // Memastikan diarahkan ke tab playback saat domain diclick
+        const baseUrl = `${window.location.origin}/?mode=full&view=playback`; // Memastikan diarahkan ke tab playback saat domain diclick
         const params = new URLSearchParams();
         if (selectedCamera?.id) params.set('cam', selectedCamera.id.toString());
 

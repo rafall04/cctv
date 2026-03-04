@@ -47,14 +47,34 @@ function LandingPageContent() {
         if (isInitialMount.current) {
             isInitialMount.current = false;
             const queryMode = searchParams.get('mode');
-            if (!queryMode) {
-                setSearchParams((prev) => {
-                    prev.set('mode', layoutMode);
-                    return prev;
-                }, { replace: true });
+            const queryView = searchParams.get('view');
+
+            let needsUpdate = false;
+            const newParams = new URLSearchParams(searchParams);
+
+            // Fix missing or invalid mode wrapper
+            if (!queryMode || !['full', 'simple'].includes(queryMode)) {
+                newParams.set('mode', layoutMode);
+                needsUpdate = true;
+            }
+
+            // Backward compatibility for old share links (?mode=playback)
+            if (queryMode === 'playback' || queryMode === 'grid') {
+                newParams.set('view', queryMode);
+                needsUpdate = true;
+            }
+
+            // Persist the view param if missing
+            if (!queryView && !['playback', 'grid'].includes(queryMode)) {
+                newParams.set('view', viewMode);
+                needsUpdate = true;
+            }
+
+            if (needsUpdate) {
+                setSearchParams(newParams, { replace: true });
             }
         }
-    }, [layoutMode, searchParams, setSearchParams]);
+    }, [layoutMode, viewMode, searchParams, setSearchParams]);
 
     useEffect(() => {
         if (isInitialMount.current) return;
@@ -91,20 +111,27 @@ function LandingPageContent() {
     const [popup, setPopup] = useState(null);
     const [multiCameras, setMultiCameras] = useState([]);
     const [viewMode, setViewMode] = useState(() => {
+        const queryView = searchParams.get('view');
+        // Backward compatibility: If old mode=playback is in URL, use it
         const queryMode = searchParams.get('mode');
-        return queryMode === 'playback' ? 'playback' : 'map';
+        if (queryMode === 'playback' || queryMode === 'grid') return queryMode;
+
+        return ['map', 'grid', 'playback'].includes(queryView) ? queryView : 'map';
     });
-    // Handle view mode change and sync URL — when leaving playback, clean URL params
+    // Handle view mode change and sync URL
     const handleViewModeChange = useCallback((newMode) => {
         setViewMode(newMode);
-        if (newMode !== 'playback') {
-            setSearchParams((prev) => {
-                prev.set('mode', layoutMode);
+        setSearchParams((prev) => {
+            prev.set('view', newMode);
+            if (newMode !== 'playback') {
                 prev.delete('cam');
                 prev.delete('t');
-                return prev;
-            }, { replace: true });
-        }
+            }
+            if (!prev.has('mode') || !['full', 'simple'].includes(prev.get('mode'))) {
+                prev.set('mode', layoutMode);
+            }
+            return prev;
+        }, { replace: true });
     }, [layoutMode, setSearchParams]);
 
     const [showMulti, setShowMulti] = useState(false);
@@ -277,12 +304,15 @@ function LandingPageContent() {
         // Update URL for shareable links
         setSearchParams((prev) => {
             prev.set('camera', camera.id.toString());
-            if (!prev.has('mode')) {
+            if (!prev.has('mode') || !['full', 'simple'].includes(prev.get('mode'))) {
                 prev.set('mode', layoutMode);
+            }
+            if (!prev.has('view')) {
+                prev.set('view', viewMode);
             }
             return prev;
         }, { replace: false });
-    }, [layoutMode, setSearchParams, addRecentCamera]);
+    }, [layoutMode, viewMode, setSearchParams, addRecentCamera]);
 
     // Handle popup close - reset URL to remove camera param
     const handlePopupClose = useCallback(() => {

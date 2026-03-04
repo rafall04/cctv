@@ -46,7 +46,7 @@ function VideoPopup({ camera, onClose }) {
 
     // Share camera URL
     const handleShare = useCallback(async () => {
-        const url = `${window.location.origin}/?camera=${camera.id}`;
+        const url = `${window.location.origin}/?mode=full&view=map&camera=${camera.id}`;
 
         if (navigator.share) {
             try {

@@ -131,20 +131,28 @@ export default function LandingPageSimple({
     const { cameras, areas, loading } = useCameras();
     const [searchParams, setSearchParams] = useSearchParams();
     const [viewMode, setViewMode] = useState(() => {
-        return searchParams.get('mode') === 'playback' ? 'playback' : 'grid';
+        const queryView = searchParams.get('view');
+        // Backward compatibility: If old mode=playback is in URL, use it
+        const queryMode = searchParams.get('mode');
+        if (queryMode === 'playback' || queryMode === 'grid') return queryMode;
+
+        return ['map', 'grid', 'playback'].includes(queryView) ? queryView : 'grid';
     });
 
-    // Handle view mode change and sync URL — when leaving playback, clean URL params
+    // Handle view mode change and sync URL
     const handleViewModeChange = useCallback((newMode) => {
         setViewMode(newMode);
-        if (newMode !== 'playback') {
-            setSearchParams((prev) => {
-                prev.set('mode', layoutMode); // 'simple'
+        setSearchParams((prev) => {
+            prev.set('view', newMode);
+            if (newMode !== 'playback') {
                 prev.delete('cam');
                 prev.delete('t');
-                return prev;
-            }, { replace: true });
-        }
+            }
+            if (!prev.has('mode') || !['full', 'simple'].includes(prev.get('mode'))) {
+                prev.set('mode', layoutMode);
+            }
+            return prev;
+        }, { replace: true });
     }, [layoutMode, setSearchParams]);
 
     return (
