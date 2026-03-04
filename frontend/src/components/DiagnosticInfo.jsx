@@ -24,8 +24,8 @@ export const formatErrorType = (errorType) => {
         media: 'Media Error',
         unknown: 'Unknown Error',
     };
-    // Use Object.hasOwn to avoid returning inherited properties like valueOf, toString
-    return Object.hasOwn(typeMap, errorType) ? typeMap[errorType] : 'Unknown Error';
+    // Use hasOwnProperty to avoid returning inherited properties like valueOf, toString
+    return Object.prototype.hasOwnProperty.call(typeMap, errorType) ? typeMap[errorType] : 'Unknown Error';
 };
 
 /**
@@ -39,8 +39,8 @@ export const formatDeviceTier = (deviceTier) => {
         medium: 'Medium',
         high: 'High-End',
     };
-    // Use Object.hasOwn to avoid returning inherited properties like valueOf, toString
-    return Object.hasOwn(tierMap, deviceTier) ? tierMap[deviceTier] : 'Unknown';
+    // Use hasOwnProperty to avoid returning inherited properties like valueOf, toString
+    return Object.prototype.hasOwnProperty.call(tierMap, deviceTier) ? tierMap[deviceTier] : 'Unknown';
 };
 
 /**
@@ -185,7 +185,7 @@ const DiagnosticInfo = ({
     // **Validates: Requirements 8.4**
     const handleCopy = useCallback(async () => {
         const text = formatDiagnosticText(diagnosticInfo);
-        
+
         try {
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 await navigator.clipboard.writeText(text);
@@ -268,26 +268,26 @@ const DiagnosticInfo = ({
                     </button>
                 )}
             </div>
-            
+
             <div className="space-y-1.5">
                 {/* Error Type - Requirement 8.1 */}
                 <div className="flex justify-between text-[9px]">
                     <span className="text-dark-500">Error Type:</span>
                     <span className="text-dark-300 font-medium">{formatErrorType(errorType)}</span>
                 </div>
-                
+
                 {/* Device Tier - Requirement 8.2 */}
                 <div className="flex justify-between text-[9px]">
                     <span className="text-dark-500">Device:</span>
                     <span className="text-dark-300 font-medium">{formatDeviceTier(deviceTier)}</span>
                 </div>
-                
+
                 {/* Loading Stage - Requirement 8.3 */}
                 <div className="flex justify-between text-[9px]">
                     <span className="text-dark-500">Stage:</span>
                     <span className="text-dark-300 font-medium">{stage}</span>
                 </div>
-                
+
                 {/* Retry Count */}
                 {retryCount > 0 && (
                     <div className="flex justify-between text-[9px]">
@@ -295,7 +295,7 @@ const DiagnosticInfo = ({
                         <span className="text-dark-300 font-medium">{retryCount}</span>
                     </div>
                 )}
-                
+
                 {/* Consecutive Failures */}
                 {consecutiveFailures > 0 && (
                     <div className="flex justify-between text-[9px]">
@@ -303,7 +303,7 @@ const DiagnosticInfo = ({
                         <span className="text-dark-300 font-medium">{consecutiveFailures}</span>
                     </div>
                 )}
-                
+
                 {/* Retry Time Estimate - Requirement 8.5 */}
                 {showRetryEstimate && (
                     <div className="flex justify-between text-[9px]">

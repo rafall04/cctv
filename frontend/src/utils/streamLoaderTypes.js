@@ -123,8 +123,8 @@ export const createStreamError = ({
  * @returns {string} User-friendly message for the stage
  */
 export const getStageMessage = (stage) => {
-    // Use Object.hasOwn to avoid returning inherited Object prototype properties
-    if (Object.hasOwn(LOADING_STAGE_MESSAGES, stage)) {
+    // Use hasOwnProperty to avoid returning inherited Object prototype properties
+    if (Object.prototype.hasOwnProperty.call(LOADING_STAGE_MESSAGES, stage)) {
         return LOADING_STAGE_MESSAGES[stage];
     }
     return 'Loading...';
@@ -178,7 +178,7 @@ export const isValidStageTransition = (fromStage, toStage) => {
  */
 export const getNextStage = (currentStage) => {
     const currentIndex = LOADING_STAGE_ORDER.indexOf(currentStage);
-    
+
     if (currentIndex === -1 || currentIndex >= LOADING_STAGE_ORDER.length - 1) {
         return null;
     }
@@ -193,9 +193,9 @@ export const getNextStage = (currentStage) => {
  * @returns {boolean} True if loading is complete
  */
 export const isLoadingComplete = (stage) => {
-    return stage === LoadingStage.PLAYING || 
-           stage === LoadingStage.ERROR || 
-           stage === LoadingStage.TIMEOUT;
+    return stage === LoadingStage.PLAYING ||
+        stage === LoadingStage.ERROR ||
+        stage === LoadingStage.TIMEOUT;
 };
 
 /**
