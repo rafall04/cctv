@@ -95,6 +95,8 @@ function LandingPageContent() {
         return queryMode === 'playback' ? 'playback' : 'map';
     });
     const isViewModeInitial = useRef(true);
+    const layoutModeRef = useRef(layoutMode);
+    useEffect(() => { layoutModeRef.current = layoutMode; }, [layoutMode]);
 
     // Sync viewMode changes → URL
     useEffect(() => {
@@ -107,15 +109,15 @@ function LandingPageContent() {
             if (viewMode === 'playback') {
                 prev.set('mode', 'playback');
             } else {
-                // Revert to actual layout mode (full/simple)
-                prev.set('mode', layoutMode);
+                // Revert to actual layout mode (full/simple) via ref
+                prev.set('mode', layoutModeRef.current);
                 // Clean playback-specific params
                 prev.delete('cam');
                 prev.delete('t');
             }
             return prev;
         }, { replace: true });
-    }, [viewMode, layoutMode, setSearchParams]);
+    }, [viewMode, setSearchParams]);
 
     const [showMulti, setShowMulti] = useState(false);
     const { addToast } = useToast();

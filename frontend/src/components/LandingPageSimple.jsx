@@ -134,6 +134,8 @@ export default function LandingPageSimple({
         return searchParams.get('mode') === 'playback' ? 'playback' : 'grid';
     });
     const isViewModeInitial = useRef(true);
+    const layoutModeRef = useRef(layoutMode);
+    useEffect(() => { layoutModeRef.current = layoutMode; }, [layoutMode]);
 
     // Sync viewMode changes → URL
     useEffect(() => {
@@ -146,15 +148,15 @@ export default function LandingPageSimple({
             if (viewMode === 'playback') {
                 prev.set('mode', 'playback');
             } else {
-                // Revert to actual layout mode (simple)
-                prev.set('mode', layoutMode);
+                // Revert to actual layout mode (simple) via ref
+                prev.set('mode', layoutModeRef.current);
                 // Clean playback-specific params
                 prev.delete('cam');
                 prev.delete('t');
             }
             return prev;
         }, { replace: true });
-    }, [viewMode, layoutMode, setSearchParams]);
+    }, [viewMode, setSearchParams]);
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
