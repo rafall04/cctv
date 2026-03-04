@@ -56,15 +56,16 @@ function LandingPageContent() {
     const handleViewModeChange = useCallback((newMode) => {
         setViewMode(newMode);
         setSearchParams((prev) => {
-            prev.set('view', newMode);
+            const next = new URLSearchParams(prev);
+            next.set('view', newMode);
             if (newMode !== 'playback') {
-                prev.delete('cam');
-                prev.delete('t');
+                next.delete('cam');
+                next.delete('t');
             }
-            if (!prev.has('mode') || !['full', 'simple'].includes(prev.get('mode'))) {
-                prev.set('mode', layoutMode);
+            if (!next.has('mode') || !['full', 'simple'].includes(next.get('mode'))) {
+                next.set('mode', layoutMode);
             }
-            return prev;
+            return next;
         }, { replace: true });
     }, [layoutMode, setSearchParams]);
 
@@ -130,11 +131,13 @@ function LandingPageContent() {
         // Use startTransition to avoid Suspense hydration errors
         startTransition(() => {
             setLayoutMode(newMode);
-            setSearchParams((prev) => {
-                prev.set('mode', newMode);
-                return prev;
-            }, { replace: true });
         });
+
+        setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.set('mode', newMode);
+            return next;
+        }, { replace: true });
 
         try {
             localStorage.setItem('landing_layout_mode', newMode);
@@ -315,14 +318,15 @@ function LandingPageContent() {
         addRecentCamera(camera);
         // Update URL for shareable links
         setSearchParams((prev) => {
-            prev.set('camera', camera.id.toString());
-            if (!prev.has('mode') || !['full', 'simple'].includes(prev.get('mode'))) {
-                prev.set('mode', layoutMode);
+            const next = new URLSearchParams(prev);
+            next.set('camera', camera.id.toString());
+            if (!next.has('mode') || !['full', 'simple'].includes(next.get('mode'))) {
+                next.set('mode', layoutMode);
             }
-            if (!prev.has('view')) {
-                prev.set('view', viewMode);
+            if (!next.has('view')) {
+                next.set('view', viewMode);
             }
-            return prev;
+            return next;
         }, { replace: false });
     }, [layoutMode, viewMode, setSearchParams, addRecentCamera]);
 
@@ -331,11 +335,12 @@ function LandingPageContent() {
         setPopup(null);
         // Reset URL by removing camera param but keep mode
         setSearchParams((prev) => {
-            prev.delete('camera');
-            if (!prev.has('mode')) {
-                prev.set('mode', layoutMode);
+            const next = new URLSearchParams(prev);
+            next.delete('camera');
+            if (!next.has('mode')) {
+                next.set('mode', layoutMode);
             }
-            return prev;
+            return next;
         }, { replace: false });
     }, [layoutMode, setSearchParams]);
 
