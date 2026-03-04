@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useCallback, lazy, Suspense } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useBranding } from '../contexts/BrandingContext';
 import { shouldDisableAnimations } from '../utils/animationControl';
@@ -133,30 +133,19 @@ export default function LandingPageSimple({
     const [viewMode, setViewMode] = useState(() => {
         return searchParams.get('mode') === 'playback' ? 'playback' : 'grid';
     });
-    const isViewModeInitial = useRef(true);
-    const layoutModeRef = useRef(layoutMode);
-    useEffect(() => { layoutModeRef.current = layoutMode; }, [layoutMode]);
 
-    // Sync viewMode changes → URL
-    useEffect(() => {
-        if (isViewModeInitial.current) {
-            isViewModeInitial.current = false;
-            return;
-        }
-
-        setSearchParams((prev) => {
-            if (viewMode === 'playback') {
-                prev.set('mode', 'playback');
-            } else {
-                // Revert to actual layout mode (simple) via ref
-                prev.set('mode', layoutModeRef.current);
-                // Clean playback-specific params
+    // Handle view mode change and sync URL — when leaving playback, clean URL params
+    const handleViewModeChange = useCallback((newMode) => {
+        setViewMode(newMode);
+        if (newMode !== 'playback') {
+            setSearchParams((prev) => {
+                prev.set('mode', layoutMode); // 'simple'
                 prev.delete('cam');
                 prev.delete('t');
-            }
-            return prev;
-        }, { replace: true });
-    }, [viewMode, setSearchParams]);
+                return prev;
+            }, { replace: true });
+        }
+    }, [layoutMode, setSearchParams]);
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
@@ -184,7 +173,7 @@ export default function LandingPageSimple({
                         onAddMulti={onAddMulti}
                         multiCameras={multiCameras}
                         viewMode={viewMode}
-                        setViewMode={setViewMode}
+                        setViewMode={handleViewModeChange}
                         favorites={favorites}
                         onToggleFavorite={onToggleFavorite}
                         isFavorite={isFavorite}

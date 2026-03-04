@@ -94,30 +94,18 @@ function LandingPageContent() {
         const queryMode = searchParams.get('mode');
         return queryMode === 'playback' ? 'playback' : 'map';
     });
-    const isViewModeInitial = useRef(true);
-    const layoutModeRef = useRef(layoutMode);
-    useEffect(() => { layoutModeRef.current = layoutMode; }, [layoutMode]);
-
-    // Sync viewMode changes → URL
-    useEffect(() => {
-        if (isViewModeInitial.current) {
-            isViewModeInitial.current = false;
-            return;
-        }
-
-        setSearchParams((prev) => {
-            if (viewMode === 'playback') {
-                prev.set('mode', 'playback');
-            } else {
-                // Revert to actual layout mode (full/simple) via ref
-                prev.set('mode', layoutModeRef.current);
-                // Clean playback-specific params
+    // Handle view mode change and sync URL — when leaving playback, clean URL params
+    const handleViewModeChange = useCallback((newMode) => {
+        setViewMode(newMode);
+        if (newMode !== 'playback') {
+            setSearchParams((prev) => {
+                prev.set('mode', layoutMode);
                 prev.delete('cam');
                 prev.delete('t');
-            }
-            return prev;
-        }, { replace: true });
-    }, [viewMode, setSearchParams]);
+                return prev;
+            }, { replace: true });
+        }
+    }, [layoutMode, setSearchParams]);
 
     const [showMulti, setShowMulti] = useState(false);
     const { addToast } = useToast();
@@ -362,7 +350,7 @@ function LandingPageContent() {
                     onAddMulti={handleAddMulti}
                     multiCameras={multiCameras}
                     viewMode={viewMode}
-                    setViewMode={setViewMode}
+                    setViewMode={handleViewModeChange}
                     landingSettings={landingSettings}
                     selectedCamera={popup}
                     favorites={favorites}
