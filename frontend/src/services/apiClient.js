@@ -232,7 +232,14 @@ apiClient.interceptors.response.use(
                 originalRequest._retry = true;
 
                 try {
-                    const response = await apiClient.post('/api/auth/refresh');
+                    const csrf = await getCsrfToken();
+                    const response = await axios.post(`${API_URL}/api/auth/refresh`, {}, {
+                        withCredentials: true,
+                        headers: {
+                            ...(API_KEY && { 'X-API-Key': API_KEY }),
+                            ...(csrf && { 'X-CSRF-Token': csrf })
+                        }
+                    });
 
                     if (response.data.success) {
                         // Tokens refreshed in cookies, retry original request
