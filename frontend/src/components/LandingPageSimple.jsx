@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useBranding } from '../contexts/BrandingContext';
 import { shouldDisableAnimations } from '../utils/animationControl';
@@ -129,10 +129,32 @@ export default function LandingPageSimple({
 }) {
     const { branding } = useBranding();
     const { cameras, areas, loading } = useCameras();
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [viewMode, setViewMode] = useState(() => {
         return searchParams.get('mode') === 'playback' ? 'playback' : 'grid';
     });
+    const isViewModeInitial = useRef(true);
+
+    // Sync viewMode changes → URL
+    useEffect(() => {
+        if (isViewModeInitial.current) {
+            isViewModeInitial.current = false;
+            return;
+        }
+
+        setSearchParams((prev) => {
+            if (viewMode === 'playback') {
+                prev.set('mode', 'playback');
+            } else {
+                // Revert to actual layout mode (simple)
+                prev.set('mode', layoutMode);
+                // Clean playback-specific params
+                prev.delete('cam');
+                prev.delete('t');
+            }
+            return prev;
+        }, { replace: true });
+    }, [viewMode, layoutMode, setSearchParams]);
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">

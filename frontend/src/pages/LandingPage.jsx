@@ -94,6 +94,29 @@ function LandingPageContent() {
         const queryMode = searchParams.get('mode');
         return queryMode === 'playback' ? 'playback' : 'map';
     });
+    const isViewModeInitial = useRef(true);
+
+    // Sync viewMode changes → URL
+    useEffect(() => {
+        if (isViewModeInitial.current) {
+            isViewModeInitial.current = false;
+            return;
+        }
+
+        setSearchParams((prev) => {
+            if (viewMode === 'playback') {
+                prev.set('mode', 'playback');
+            } else {
+                // Revert to actual layout mode (full/simple)
+                prev.set('mode', layoutMode);
+                // Clean playback-specific params
+                prev.delete('cam');
+                prev.delete('t');
+            }
+            return prev;
+        }, { replace: true });
+    }, [viewMode, layoutMode, setSearchParams]);
+
     const [showMulti, setShowMulti] = useState(false);
     const { addToast } = useToast();
     const [maxReached, setMaxReached] = useState(false);
