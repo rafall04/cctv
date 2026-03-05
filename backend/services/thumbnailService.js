@@ -1,4 +1,4 @@
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import { existsSync, mkdirSync, unlinkSync, copyFileSync } from 'fs';
 import { join } from 'path';
@@ -8,6 +8,7 @@ import { query, execute } from '../database/database.js';
 import { config } from '../config/config.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -170,19 +171,18 @@ class ThumbnailService {
         const tempPath = join(THUMBNAIL_DIR, `${cameraId}_temp.jpg`);
 
         try {
-            const command = [
-                'ffmpeg',
+            const ffmpegArgs = [
                 '-loglevel', 'error',
                 '-rw_timeout', '10000000',
-                '-i', `"${hlsUrl}"`,
+                '-i', hlsUrl,
                 '-vframes', '1',
                 '-vf', 'scale=320:180:force_original_aspect_ratio=decrease,pad=320:180:(ow-iw)/2:(oh-ih)/2',
                 '-q:v', '8',
-                `"${tempPath}"`,
+                tempPath,
                 '-y'
-            ].join(' ');
+            ];
 
-            await execAsync(command, {
+            await execFileAsync('ffmpeg', ffmpegArgs, {
                 timeout: FFMPEG_TIMEOUT_MS,
                 maxBuffer: 1024 * 1024
             });
