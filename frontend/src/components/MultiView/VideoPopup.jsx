@@ -12,6 +12,7 @@ import { useStreamTimeout } from '../../hooks/useStreamTimeout';
 import { viewerService } from '../../services/viewerService';
 import { takeSnapshot as takeSnapshotUtil } from '../../utils/snapshotHelper';
 import { useBranding } from '../../contexts/BrandingContext';
+import { createCameraSlug } from '../../utils/slugify';
 
 // ============================================
 // VIDEO POPUP - Optimized with fullscreen detection, timeout handler, progressive stages, and auto-retry
@@ -46,7 +47,7 @@ function VideoPopup({ camera, onClose }) {
 
     // Share camera URL
     const handleShare = useCallback(async () => {
-        const url = `${window.location.origin}/?mode=full&view=map&camera=${camera.id}`;
+        const url = `${window.location.origin}/?mode=full&view=map&camera=${createCameraSlug(camera)}`;
 
         if (navigator.share) {
             try {

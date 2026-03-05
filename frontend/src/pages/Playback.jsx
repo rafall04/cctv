@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { cameraService } from '../services/cameraService';
 import recordingService from '../services/recordingService';
 import { useBranding } from '../contexts/BrandingContext';
+import { createCameraSlug, parseCameraIdFromSlug } from '../utils/slugify';
 
 import PlaybackHeader from '../components/playback/PlaybackHeader';
 import PlaybackVideo from '../components/playback/PlaybackVideo';
@@ -112,7 +113,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
                     setCameras(uniqueCameras);
 
                     if (cameraIdFromUrl) {
-                        const camera = uniqueCameras.find(c => c.id === parseInt(cameraIdFromUrl));
+                        const camera = uniqueCameras.find(c => c.id === parseCameraIdFromSlug(cameraIdFromUrl));
                         if (camera) {
                             setSelectedCamera(camera);
                         }
@@ -140,7 +141,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
     // URL camera change effect
     useEffect(() => {
         if (!isInitialMountRef.current && cameraIdFromUrl && cameras.length > 0) {
-            const camera = cameras.find(c => c.id === parseInt(cameraIdFromUrl));
+            const camera = cameras.find(c => c.id === parseCameraIdFromSlug(cameraIdFromUrl));
             if (camera && camera.id !== selectedCamera?.id) {
                 setSelectedCamera(camera);
             }
@@ -625,7 +626,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         if (camera) {
             const timestamp = selectedSegment ? new Date(selectedSegment.start_time).getTime().toString() : '';
             setSearchParams({
-                cam: camera.id.toString(),
+                cam: createCameraSlug(camera),
                 t: timestamp || ''
             }, { replace: false });
         }
@@ -635,7 +636,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
     const handleShare = useCallback(async () => {
         const baseUrl = `${window.location.origin}/?mode=full&view=playback`; // Memastikan diarahkan ke tab playback saat domain diclick
         const params = new URLSearchParams();
-        if (selectedCamera?.id) params.set('cam', selectedCamera.id.toString());
+        if (selectedCamera?.id) params.set('cam', createCameraSlug(selectedCamera));
 
         // Akumulasikan start_time UNIX segment + currentTime detik
         if (selectedSegment?.start_time) {

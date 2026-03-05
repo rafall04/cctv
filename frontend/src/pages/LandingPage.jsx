@@ -14,6 +14,7 @@ import { Icons } from '../components/ui/Icons';
 import LandingNavbar from '../components/landing/LandingNavbar';
 import LandingFooter from '../components/landing/LandingFooter';
 import LandingHero from '../components/landing/LandingHero';
+import { createCameraSlug, parseCameraIdFromSlug } from '../utils/slugify';
 import LandingCamerasSection from '../components/landing/LandingCamerasSection';
 import LandingStatsBar from '../components/landing/LandingStatsBar';
 
@@ -301,7 +302,7 @@ function LandingPageContent() {
 
         const cameraIdFromUrl = searchParams.get('camera');
         if (cameraIdFromUrl && cameras.length > 0) {
-            const camera = cameras.find(c => c.id === parseInt(cameraIdFromUrl));
+            const camera = cameras.find(c => c.id === parseCameraIdFromSlug(cameraIdFromUrl));
             if (camera) {
                 // Check if camera is available (not offline/maintenance)
                 const isAvailable = camera.status !== 'maintenance' && camera.is_online !== 0;
@@ -319,7 +320,7 @@ function LandingPageContent() {
         // Update URL for shareable links
         setSearchParams((prev) => {
             const next = new URLSearchParams(prev);
-            next.set('camera', camera.id.toString());
+            next.set('camera', createCameraSlug(camera));
             if (!next.has('mode') || !['full', 'simple'].includes(next.get('mode'))) {
                 next.set('mode', layoutMode);
             }
