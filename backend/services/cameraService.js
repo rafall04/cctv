@@ -113,7 +113,7 @@ class CameraService {
 
         const result = execute(
             'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, recording_duration_hours, video_codec, stream_source, external_hls_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [name, sourceType === 'internal' ? private_rtsp_url : null, description || null, location || null, group_name || null, finalAreaId, isEnabled, isTunnel, lat, lng, cameraStatus, streamKey, isRecordingEnabled, recordingDuration, codecValue, sourceType, sourceType === 'external' ? external_hls_url : null]
+            [name, sourceType === 'internal' ? private_rtsp_url : '', description || null, location || null, group_name || null, finalAreaId, isEnabled, isTunnel, lat, lng, cameraStatus, streamKey, isRecordingEnabled, recordingDuration, codecValue, sourceType, sourceType === 'external' ? external_hls_url : null]
         );
 
         execute(
