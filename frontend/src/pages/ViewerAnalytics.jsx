@@ -40,11 +40,13 @@ function formatWatchTime(seconds) {
  */
 function formatDate(dateStr, options = {}) {
     const date = new Date(dateStr);
+    const { year, ...restOptions } = options;
+
     return date.toLocaleDateString('id-ID', {
         day: '2-digit',
         month: 'short',
-        year: options.year ? 'numeric' : undefined,
-        ...options
+        year: year ? 'numeric' : undefined,
+        ...restOptions
     });
 }
 
@@ -295,10 +297,9 @@ function ActiveViewerCard({ session }) {
 /**
  * Daily Detail Modal - Shows all sessions for a specific date
  */
-function DailyDetailModal({ date, sessions, onClose }) {
-    if (!date) return null;
-
+export function DailyDetailModal({ date, sessions, onClose }) {
     const filteredSessions = sessions.filter(s => {
+        if (!date) return false;
         const sessionDate = new Date(s.started_at).toISOString().split('T')[0];
         return sessionDate === date;
     });
@@ -312,6 +313,8 @@ function DailyDetailModal({ date, sessions, onClose }) {
             totalWatchTime: totalDuration
         };
     }, [filteredSessions]);
+
+    if (!date) return null;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
