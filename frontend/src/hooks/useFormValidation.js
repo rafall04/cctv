@@ -18,6 +18,8 @@ export function useFormValidation(initialValues = {}, validationRules = {}) {
     const [touched, setTouched] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    const [validationRules, setValidationRules] = useState(initialRules);
+
     /**
      * Validate a single field against its rules
      * @param {string} name - Field name
@@ -31,11 +33,11 @@ export function useFormValidation(initialValues = {}, validationRules = {}) {
 
         // Required validation
         if (rules.required) {
-            const isEmpty = value === undefined || value === null || value === '' || 
+            const isEmpty = value === undefined || value === null || value === '' ||
                 (typeof value === 'string' && value.trim() === '');
             if (isEmpty) {
-                return typeof rules.required === 'string' 
-                    ? rules.required 
+                return typeof rules.required === 'string'
+                    ? rules.required
                     : `${name} is required`;
             }
         }
@@ -50,7 +52,7 @@ export function useFormValidation(initialValues = {}, validationRules = {}) {
         // Min length validation
         if (rules.minLength) {
             if (stringValue.length < rules.minLength.value) {
-                return rules.minLength.message || 
+                return rules.minLength.message ||
                     `${name} must be at least ${rules.minLength.value} characters`;
             }
         }
@@ -58,7 +60,7 @@ export function useFormValidation(initialValues = {}, validationRules = {}) {
         // Max length validation
         if (rules.maxLength) {
             if (stringValue.length > rules.maxLength.value) {
-                return rules.maxLength.message || 
+                return rules.maxLength.message ||
                     `${name} must not exceed ${rules.maxLength.value} characters`;
             }
         }
@@ -113,7 +115,7 @@ export function useFormValidation(initialValues = {}, validationRules = {}) {
         });
 
         setErrors(newErrors);
-        
+
         // Mark all fields as touched
         const allTouched = {};
         Object.keys(validationRules).forEach(name => {
@@ -131,7 +133,7 @@ export function useFormValidation(initialValues = {}, validationRules = {}) {
     const handleChange = useCallback((e) => {
         const { name, value, type, checked } = e.target;
         const newValue = type === 'checkbox' ? checked : value;
-        
+
         setValues(prev => ({
             ...prev,
             [name]: newValue
@@ -153,7 +155,7 @@ export function useFormValidation(initialValues = {}, validationRules = {}) {
      */
     const handleBlur = useCallback((e) => {
         const { name } = e.target;
-        
+
         setTouched(prev => ({
             ...prev,
             [name]: true
@@ -216,12 +218,22 @@ export function useFormValidation(initialValues = {}, validationRules = {}) {
     /**
      * Reset form with new initial values
      * @param {Object} newValues - New initial values
+     * @param {Object} newRules - Optional new validation rules
      */
-    const resetWith = useCallback((newValues) => {
+    const resetWith = useCallback((newValues, newRules = null) => {
         setValues(newValues);
+        if (newRules) setValidationRules(newRules);
         setErrors({});
         setTouched({});
         setIsSubmitting(false);
+    }, []);
+
+    /**
+     * Update validation rules
+     * @param {Object} newRules - New validation rules
+     */
+    const updateRules = useCallback((newRules) => {
+        setValidationRules(newRules);
     }, []);
 
     /**
@@ -257,7 +269,7 @@ export function useFormValidation(initialValues = {}, validationRules = {}) {
         isSubmitting,
         errorCount,
         hasErrors,
-        
+
         // Methods
         handleChange,
         handleBlur,
@@ -268,8 +280,9 @@ export function useFormValidation(initialValues = {}, validationRules = {}) {
         validateForm,
         reset,
         resetWith,
+        updateRules,
         setSubmitting,
-        
+
         // Utility for getting field props
         getFieldProps: (name) => ({
             name,

@@ -74,6 +74,7 @@ export default function CameraManagement() {
         handleBlur,
         validateForm,
         resetWith,
+        updateRules,
         setFieldValue,
         setFieldError,
         isSubmitting,
@@ -192,6 +193,12 @@ export default function CameraManagement() {
     const handleFormChange = (e) => {
         const { name, value, type, checked } = e.target;
         const newValue = type === 'checkbox' ? checked : value;
+
+        // If switching stream source, update validation rules dynamically
+        if (name === 'stream_source') {
+            updateRules(getValidationRules(newValue));
+        }
+
         handleChange({ target: { name, value: newValue, type, checked } });
 
         // Clear modal error when user makes changes
