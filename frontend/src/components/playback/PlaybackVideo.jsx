@@ -1,4 +1,3 @@
-import { useRef, useEffect, useState } from 'react';
 import CodecBadge from '../CodecBadge';
 
 export default function PlaybackVideo({

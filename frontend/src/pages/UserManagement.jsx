@@ -3,7 +3,7 @@ import { userService } from '../services/userService';
 import { authService } from '../services/authService';
 import { useNotification } from '../contexts/NotificationContext';
 import { TableSkeleton } from '../components/ui/Skeleton';
-import { EmptyState, NoUsersEmptyState } from '../components/ui/EmptyState';
+import { NoUsersEmptyState } from '../components/ui/EmptyState';
 import { Alert } from '../components/ui/Alert';
 
 /**
@@ -366,14 +366,6 @@ export default function UserManagement() {
         }).format(new Date(dateString + ' UTC'));
     };
 
-    // Users icon for empty state
-    const UsersIcon = () => (
-        <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-        </svg>
-    );
-
     return (
         <div className="space-y-8">
             {/* Header */}
@@ -549,8 +541,9 @@ export default function UserManagement() {
                             )}
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Username</label>
+                                <label htmlFor="user-username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Username</label>
                                 <input 
+                                    id="user-username"
                                     type="text" 
                                     name="username" 
                                     value={formData.username} 
@@ -572,8 +565,9 @@ export default function UserManagement() {
 
                             {!editingUser && (
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Password</label>
+                                    <label htmlFor="user-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Password</label>
                                     <input 
+                                        id="user-password"
                                         type="password" 
                                         name="password" 
                                         value={formData.password} 
@@ -594,8 +588,8 @@ export default function UserManagement() {
                             )}
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Role</label>
-                                <select name="role" value={formData.role} onChange={handleChange} className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary">
+                                <label htmlFor="user-role" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Role</label>
+                                <select id="user-role" name="role" value={formData.role} onChange={handleChange} className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary">
                                     <option value="admin">Admin</option>
                                     <option value="viewer">Viewer</option>
                                 </select>
@@ -634,8 +628,9 @@ export default function UserManagement() {
                             )}
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">New Password</label>
+                                <label htmlFor="user-new-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">New Password</label>
                                 <input 
+                                    id="user-new-password"
                                     type="password" 
                                     name="password" 
                                     value={passwordData.password} 
@@ -648,8 +643,9 @@ export default function UserManagement() {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Confirm Password</label>
+                                <label htmlFor="user-confirm-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Confirm Password</label>
                                 <input 
+                                    id="user-confirm-password"
                                     type="password" 
                                     name="confirmPassword" 
                                     value={passwordData.confirmPassword} 

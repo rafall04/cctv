@@ -2,9 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { adminService } from '../services/adminService';
 import { Link, useNavigate } from 'react-router-dom';
 import { Skeleton } from '../components/ui/Skeleton';
-import { EmptyState, NoStreamsEmptyState, NoActivityEmptyState } from '../components/ui/EmptyState';
+import { NoStreamsEmptyState, NoActivityEmptyState } from '../components/ui/EmptyState';
 import { Alert } from '../components/ui/Alert';
-import { useNotification } from '../contexts/NotificationContext';
 import { CameraStatusOverview } from '../components/CameraStatusOverview';
 import { QuickStatsCards } from '../components/QuickStatsCards';
 import { TopCamerasWidget } from '../components/TopCamerasWidget';
@@ -256,12 +255,16 @@ export default function Dashboard() {
     const [lastSuccessfulUpdate, setLastSuccessfulUpdate] = useState(null);
     const [refreshError, setRefreshError] = useState(false);
     const [isRetrying, setIsRetrying] = useState(false);
-    const [dateRange, setDateRange] = useState('today'); // Date range filter
+    const [dateRange, setDateRange] = useState('today');
     const intervalRef = useRef(null);
+    const statsRef = useRef(null);
     const navigate = useNavigate();
-    const { warning } = useNotification();
 
-    const loadStats = useCallback(async (isAutoRefresh = false, period = 'today') => {
+    useEffect(() => {
+        statsRef.current = stats;
+    }, [stats]);
+
+    const loadStats = useCallback(async (isAutoRefresh = false) => {
         try {
             if (!isAutoRefresh) {
                 setIsRetrying(true);
@@ -273,16 +276,14 @@ export default function Dashboard() {
                 setRefreshError(false);
                 setLastSuccessfulUpdate(new Date());
             } else {
-                if (isAutoRefresh && stats) {
-                    // Auto-refresh failed but we have existing data
+                if (isAutoRefresh && statsRef.current) {
                     setRefreshError(true);
                 } else {
                     setError(response.message || 'Failed to load dashboard data');
                 }
             }
         } catch (err) {
-            if (isAutoRefresh && stats) {
-                // Auto-refresh failed but we have existing data
+            if (isAutoRefresh && statsRef.current) {
                 setRefreshError(true);
             } else {
                 setError('Failed to connect to server. Please check your connection.');
@@ -291,22 +292,20 @@ export default function Dashboard() {
             setLoading(false);
             setIsRetrying(false);
         }
-    }, [stats]);
+    }, []);
 
     useEffect(() => {
-        loadStats(false, dateRange);
-        intervalRef.current = setInterval(() => loadStats(true, dateRange), 10000);
+        loadStats(false);
+        intervalRef.current = setInterval(() => loadStats(true), 10000);
         return () => {
             if (intervalRef.current) {
                 clearInterval(intervalRef.current);
             }
         };
-    }, [dateRange]); // Re-fetch when date range changes
+    }, [loadStats]);
 
-    const handleDateRangeChange = (range, customDates) => {
+    const handleDateRangeChange = (range) => {
         setDateRange(range);
-        setLoading(true);
-        loadStats(false, range);
     };
 
     const handleRetry = () => {
@@ -385,13 +384,6 @@ export default function Dashboard() {
         const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    };
-
-    const formatUptime = (seconds) => {
-        const d = Math.floor(seconds / (3600 * 24));
-        const h = Math.floor((seconds % (3600 * 24)) / 3600);
-        const m = Math.floor((seconds % 3600) / 60);
-        return `${d}d ${h}h ${m}m`;
     };
 
     const formatLastUpdate = (date) => {

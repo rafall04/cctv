@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { cameraService } from '../services/cameraService';
 import recordingService from '../services/recordingService';
 import { useBranding } from '../contexts/BrandingContext';
@@ -13,7 +13,6 @@ import PlaybackSegmentList from '../components/playback/PlaybackSegmentList';
 const MAX_SEEK_DISTANCE = 180;
 
 function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) {
-    const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const cameraIdFromUrl = searchParams.get('cam');
     const { branding } = useBranding();
@@ -41,7 +40,6 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
 
     const videoRef = useRef(null);
     const containerRef = useRef(null);
-    const isInitialLoadRef = useRef(true);
     const lastSeekTimeRef = useRef(0);
     const bufferingTimeoutRef = useRef(null);
 
@@ -89,15 +87,26 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
 
     // Fetch cameras effect - only if no propCameras provided
     useEffect(() => {
+        let isMounted = true;
+
         if (propCameras && propCameras.length > 0) {
-            setCameras(propCameras);
-            if (propSelectedCamera) {
-                setSelectedCamera(propSelectedCamera);
-            } else if (cameraIdFromUrl) {
-                const camera = propCameras.find(c => c.id === parseInt(cameraIdFromUrl));
-                if (camera) setSelectedCamera(camera);
+            if (isMounted) {
+                setCameras(propCameras);
             }
-            setLoading(false);
+
+            if (propSelectedCamera) {
+                if (isMounted) {
+                    setSelectedCamera(propSelectedCamera);
+                }
+            } else if (cameraIdFromUrl) {
+                const camera = propCameras.find(c => c.id === parseCameraIdFromSlug(cameraIdFromUrl));
+                if (camera && isMounted) {
+                    setSelectedCamera(camera);
+                }
+            }
+            if (isMounted) {
+                setLoading(false);
+            }
             return;
         }
 
@@ -109,6 +118,10 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
                     const uniqueCameras = recordingCameras.filter((cam, index, self) =>
                         index === self.findIndex(c => c.id === cam.id)
                     );
+
+                    if (!isMounted) {
+                        return;
+                    }
 
                     setCameras(uniqueCameras);
 
@@ -124,12 +137,17 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
             } catch (error) {
                 console.error('Failed to fetch cameras:', error);
             } finally {
-                setLoading(false);
+                if (isMounted) {
+                    setLoading(false);
+                }
             }
         };
 
         fetchCameras();
-    }, []);
+        return () => {
+            isMounted = false;
+        };
+    }, [cameraIdFromUrl, propCameras, propSelectedCamera]);
 
     // Sync selectedCamera from props when it changes
     useEffect(() => {
@@ -196,6 +214,8 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
             return;
         }
 
+        let isMounted = true;
+
         setSelectedSegment(null);
         setSegments([]);
         setIsSeeking(false);
@@ -213,14 +233,18 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
                 const response = await recordingService.getSegments(selectedCamera.id);
                 if (response.success && response.data) {
                     const segmentsArray = response.data.segments || [];
-                    setSegments(segmentsArray);
+                    if (isMounted) {
+                        setSegments(segmentsArray);
+                    }
                 } else {
                     console.warn('API response not successful:', response);
                 }
             } catch (error) {
                 console.error('Failed to fetch segments:', error);
-                setSegments([]);
-                setSelectedSegment(null);
+                if (isMounted) {
+                    setSegments([]);
+                    setSelectedSegment(null);
+                }
             }
         };
 
@@ -228,9 +252,8 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         const interval = setInterval(fetchSegments, 10000);
 
         return () => {
+            isMounted = false;
             clearInterval(interval);
-            setSegments([]);
-            setSelectedSegment(null);
         };
     }, [selectedCamera]);
 
@@ -446,7 +469,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
                 clearTimeout(bufferingTimeoutRef.current);
             }
         };
-    }, []);
+    }, [setSearchParams]);
 
     const handleSpeedChange = (speed) => {
         setPlaybackSpeed(speed);
@@ -472,13 +495,6 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
             clearTimeout(bufferingTimeoutRef.current);
             bufferingTimeoutRef.current = null;
         }
-    };
-
-    const formatTime = (seconds) => {
-        if (!seconds || isNaN(seconds)) return '00:00';
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     };
 
     const formatTimestamp = (timestamp) => {

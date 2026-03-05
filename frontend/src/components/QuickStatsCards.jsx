@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { adminService } from '../services/adminService';
 
 /**
@@ -9,14 +9,7 @@ export function QuickStatsCards({ dateRange = 'today' }) {
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        loadTodayStats();
-        // Refresh every 30 seconds
-        const interval = setInterval(loadTodayStats, 30000);
-        return () => clearInterval(interval);
-    }, [dateRange]); // Re-fetch when dateRange changes
-
-    const loadTodayStats = async () => {
+    const loadTodayStats = useCallback(async () => {
         try {
             const response = await adminService.getTodayStats(dateRange);
             if (response.success) {
@@ -27,7 +20,14 @@ export function QuickStatsCards({ dateRange = 'today' }) {
         } finally {
             setLoading(false);
         }
-    };
+    }, [dateRange]);
+
+    useEffect(() => {
+        setLoading(true);
+        loadTodayStats();
+        const interval = setInterval(loadTodayStats, 30000);
+        return () => clearInterval(interval);
+    }, [loadTodayStats]);
 
     const formatDuration = (seconds) => {
         if (seconds < 60) return `${seconds}s`;
@@ -35,14 +35,6 @@ export function QuickStatsCards({ dateRange = 'today' }) {
         if (mins < 60) return `${mins}m`;
         const hours = Math.floor(mins / 60);
         return `${hours}h ${mins % 60}m`;
-    };
-
-    const formatWatchTime = (seconds) => {
-        if (!seconds) return '0m';
-        const hours = Math.floor(seconds / 3600);
-        const mins = Math.floor((seconds % 3600) / 60);
-        if (hours > 0) return `${hours}h ${mins}m`;
-        return `${mins}m`;
     };
 
     const TrendBadge = ({ value, inverse = false }) => {

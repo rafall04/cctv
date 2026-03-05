@@ -6,8 +6,7 @@ import { useState } from 'react';
  */
 export function DateRangeSelector({ value = 'today', onChange }) {
     const [showCustom, setShowCustom] = useState(false);
-    const [customStart, setCustomStart] = useState('');
-    const [customEnd, setCustomEnd] = useState('');
+    const [customDate, setCustomDate] = useState('');
 
     const presets = [
         { value: 'today', label: 'Hari Ini', icon: '📅' },
@@ -27,8 +26,8 @@ export function DateRangeSelector({ value = 'today', onChange }) {
     };
 
     const handleCustomApply = () => {
-        if (customStart && customEnd) {
-            onChange('custom', { start: customStart, end: customEnd });
+        if (customDate) {
+            onChange(`date:${customDate}`);
             setShowCustom(false);
         }
     };
@@ -38,27 +37,32 @@ export function DateRangeSelector({ value = 'today', onChange }) {
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         
         switch (preset) {
-            case 'today':
+            case 'today': {
                 return { start: today, end: now };
-            case 'yesterday':
+            }
+            case 'yesterday': {
                 const yesterday = new Date(today);
                 yesterday.setDate(yesterday.getDate() - 1);
                 return { start: yesterday, end: today };
-            case '7days':
+            }
+            case '7days': {
                 const week = new Date(today);
                 week.setDate(week.getDate() - 7);
                 return { start: week, end: now };
-            case '30days':
+            }
+            case '30days': {
                 const month = new Date(today);
                 month.setDate(month.getDate() - 30);
                 return { start: month, end: now };
+            }
             default:
                 return null;
         }
     };
 
     const formatDateRange = (preset) => {
-        if (preset === 'custom') return 'Custom Range';
+        if (preset.startsWith('date:')) return preset.replace('date:', '');
+        if (preset === 'custom') return 'Custom Date';
         const range = getDateRange(preset);
         if (!range) return '';
         
@@ -117,22 +121,8 @@ export function DateRangeSelector({ value = 'today', onChange }) {
                             </label>
                             <input
                                 type="date"
-                                value={customStart}
-                                onChange={(e) => setCustomStart(e.target.value)}
-                                max={customEnd || new Date().toISOString().split('T')[0]}
-                                className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                                Tanggal Akhir
-                            </label>
-                            <input
-                                type="date"
-                                value={customEnd}
-                                onChange={(e) => setCustomEnd(e.target.value)}
-                                min={customStart}
+                                value={customDate}
+                                onChange={(e) => setCustomDate(e.target.value)}
                                 max={new Date().toISOString().split('T')[0]}
                                 className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                             />
@@ -140,7 +130,7 @@ export function DateRangeSelector({ value = 'today', onChange }) {
 
                         <button
                             onClick={handleCustomApply}
-                            disabled={!customStart || !customEnd}
+                            disabled={!customDate}
                             className="w-full px-4 py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-medium rounded-lg transition-all disabled:cursor-not-allowed"
                         >
                             Terapkan

@@ -541,6 +541,11 @@ export default function ViewerAnalytics() {
     const [sessionsPage, setSessionsPage] = useState(1);
     const sessionsPerPage = 15;
     const intervalRef = useRef(null);
+    const analyticsRef = useRef(null);
+
+    useEffect(() => {
+        analyticsRef.current = analytics;
+    }, [analytics]);
 
     const loadAnalytics = useCallback(async (isAutoRefresh = false) => {
         try {
@@ -559,14 +564,14 @@ export default function ViewerAnalytics() {
                 setRefreshError(false);
                 setLastUpdate(new Date());
             } else {
-                if (isAutoRefresh && analytics) {
+                if (isAutoRefresh && analyticsRef.current) {
                     setRefreshError(true);
                 } else {
                     setError(response.message || 'Gagal memuat data analytics');
                 }
             }
         } catch (err) {
-            if (isAutoRefresh && analytics) {
+            if (isAutoRefresh && analyticsRef.current) {
                 setRefreshError(true);
             } else {
                 setError('Gagal terhubung ke server');
@@ -574,13 +579,13 @@ export default function ViewerAnalytics() {
         } finally {
             setLoading(false);
         }
-    }, [period, customDate, analytics]);
+    }, [period, customDate]);
 
     useEffect(() => {
         setLoading(true);
         setSessionsPage(1);
         loadAnalytics(false);
-    }, [period, customDate]);
+    }, [loadAnalytics]);
 
     useEffect(() => {
         intervalRef.current = setInterval(() => loadAnalytics(true), 30000);

@@ -2,7 +2,6 @@ export default function PlaybackSegmentList({
     segments,
     selectedSegment,
     onSegmentClick,
-    formatTimestamp,
 }) {
     const formatFileSize = (bytes) => {
         if (bytes === 0) return '0 B';

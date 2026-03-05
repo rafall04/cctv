@@ -6,11 +6,11 @@ import { NotificationProvider } from './contexts/NotificationContext';
 import { BrandingProvider } from './contexts/BrandingContext';
 import { ToastContainer } from './components/ui/ToastContainer';
 import { ApiClientInitializer } from './components/ApiClientInitializer';
-import ErrorBoundary, { InlineErrorBoundary } from './components/ui/ErrorBoundary';
+import ErrorBoundary from './components/ui/ErrorBoundary';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import ProtectedRoute from './components/ProtectedRoute';
-import AdminLayout from './components/AdminLayout';
+import AdminLayout from './layouts/AdminLayout';
 
 // Lazy load admin pages for better code splitting
 const CameraManagement = lazy(() => import('./pages/CameraManagement'));

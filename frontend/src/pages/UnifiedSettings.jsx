@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import TelegramSettings from '../components/settings/TelegramSettings';
-import SaweriaSettingsTab from '../components/settings/SaweriaSettingsTab';
-import BrandingSettingsTab from '../components/settings/BrandingSettingsTab';
+import TelegramSettingsPanel from '../components/admin/settings/TelegramSettingsPanel';
+import SaweriaSettingsPanel from '../components/admin/settings/SaweriaSettingsPanel';
+import BrandingSettingsPanel from '../components/admin/settings/BrandingSettingsPanel';
+import GeneralSettingsPanel from '../components/admin/settings/GeneralSettingsPanel';
 import ApiKeySettings from '../components/settings/ApiKeySettings';
-import GeneralSettingsTab from '../components/settings/GeneralSettingsTab';
 import TimezoneSettingsTab from '../components/settings/TimezoneSettingsTab';
 import BackupSettingsTab from '../components/settings/BackupSettingsTab';
 
@@ -95,12 +95,12 @@ export default function UnifiedSettings() {
 
             {/* Tab Content */}
             <div className="mt-6">
-                {activeTab === 'general' && <GeneralSettingsTab />}
+                {activeTab === 'general' && <GeneralSettingsPanel />}
                 {activeTab === 'timezone' && <TimezoneSettingsTab />}
                 {activeTab === 'backup' && <BackupSettingsTab />}
-                {activeTab === 'telegram' && <TelegramSettings />}
-                {activeTab === 'saweria' && <SaweriaSettingsTab />}
-                {activeTab === 'branding' && <BrandingSettingsTab />}
+                {activeTab === 'telegram' && <TelegramSettingsPanel />}
+                {activeTab === 'saweria' && <SaweriaSettingsPanel />}
+                {activeTab === 'branding' && <BrandingSettingsPanel />}
                 {activeTab === 'apikey' && <ApiKeySettings />}
             </div>
         </div>

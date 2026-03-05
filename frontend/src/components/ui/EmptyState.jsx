@@ -1,4 +1,3 @@
-import React from 'react';
 
 /**
  * EmptyState Component - Improved empty states with illustrations

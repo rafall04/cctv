@@ -4,7 +4,7 @@ import { areaService } from '../services/areaService';
 import { useNotification } from '../contexts/NotificationContext';
 import { useFormValidation } from '../hooks/useFormValidation';
 import { validateRtspUrl, getRtspFormatHint } from '../utils/validators';
-import { CameraCardSkeleton, Skeleton } from '../components/ui/Skeleton';
+import { Skeleton } from '../components/ui/Skeleton';
 import { NoCamerasEmptyState } from '../components/ui/EmptyState';
 import { Alert } from '../components/ui/Alert';
 
@@ -59,11 +59,9 @@ export default function CameraManagement() {
     const [deletingId, setDeletingId] = useState(null);
     const [togglingId, setTogglingId] = useState(null);
 
-    // Undo state for delete
-    const [undoData, setUndoData] = useState(null);
     const undoTimerRef = useRef(null);
 
-    const { success, error: showError, warning } = useNotification();
+    const { success, error: showError } = useNotification();
 
     // Form validation hook
     const {
@@ -291,8 +289,6 @@ export default function CameraManagement() {
             const result = await cameraService.deleteCamera(camera.id);
             if (result.success) {
                 // Store deleted camera for undo
-                setUndoData({ camera, timestamp: Date.now() });
-
                 // Remove from list immediately
                 setCameras(prev => prev.filter(c => c.id !== camera.id));
 
@@ -304,7 +300,6 @@ export default function CameraManagement() {
                     clearTimeout(undoTimerRef.current);
                 }
                 undoTimerRef.current = setTimeout(() => {
-                    setUndoData(null);
                 }, 5000);
             } else {
                 showError('Delete Failed', result.message || 'Failed to delete camera');
