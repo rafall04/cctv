@@ -36,7 +36,7 @@ class StreamService {
     getStreamUrls(cameraId, requestHost) {
         const camera = queryOne(
             `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel,
-                    c.latitude, c.longitude, c.stream_key, c.video_codec,
+                    c.latitude, c.longitude, c.stream_key, c.video_codec, c.stream_source, c.external_hls_url,
                     a.name as area_name, a.rt, a.rw, a.kelurahan, a.kecamatan
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 
@@ -70,7 +70,10 @@ class StreamService {
                 kelurahan: camera.kelurahan,
                 kecamatan: camera.kecamatan,
             },
-            streams: this.buildStreamUrls(streamPath, requestHost),
+            streams: camera.stream_source === 'external' && camera.external_hls_url
+                ? { hls: camera.external_hls_url, webrtc: null }
+                : this.buildStreamUrls(streamPath, requestHost),
+            stream_source: camera.stream_source || 'internal',
         };
     }
 
@@ -78,7 +81,7 @@ class StreamService {
         const cameras = query(
             `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel,
                     c.latitude, c.longitude, c.status, c.is_online, c.last_online_check, c.stream_key, c.video_codec,
-                    c.thumbnail_path, c.thumbnail_updated_at,
+                    c.thumbnail_path, c.thumbnail_updated_at, c.stream_source, c.external_hls_url,
                     a.name as area_name, a.rt, a.rw, a.kelurahan, a.kecamatan
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 
@@ -88,9 +91,13 @@ class StreamService {
 
         const camerasWithStreams = cameras.map(camera => {
             const streamPath = camera.stream_key || `camera${camera.id}`;
+            const isExternal = camera.stream_source === 'external' && camera.external_hls_url;
             return {
                 ...camera,
-                streams: this.buildStreamUrls(streamPath, requestHost),
+                streams: isExternal
+                    ? { hls: camera.external_hls_url, webrtc: null }
+                    : this.buildStreamUrls(streamPath, requestHost),
+                stream_source: camera.stream_source || 'internal',
             };
         });
 

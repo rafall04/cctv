@@ -147,6 +147,17 @@ function VideoPopup({ camera, onClose }) {
                         </svg>
                     )
                 };
+            case 'cors':
+                return {
+                    title: 'Stream Eksternal Diblokir',
+                    desc: 'Server pihak ketiga tidak mengizinkan akses lintas domain (CORS). Hubungi penyedia stream atau coba akses langsung URL-nya.',
+                    color: 'blue',
+                    icon: (
+                        <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                        </svg>
+                    )
+                };
             default:
                 return {
                     title: 'CCTV Tidak Terkoneksi',
@@ -167,6 +178,7 @@ function VideoPopup({ camera, onClose }) {
         gray: 'bg-gray-500/20 text-gray-400',
         purple: 'bg-purple-500/20 text-purple-400',
         red: 'bg-red-500/20 text-red-400',
+        blue: 'bg-blue-500/20 text-blue-400',
     };
 
     // Track fullscreen state to disable animations and unlock orientation on exit
@@ -442,6 +454,17 @@ function VideoPopup({ camera, onClose }) {
 
                 // Clear loading timeout
                 clearStreamTimeout();
+
+                // Check for CORS error on external streams
+                if (camera.stream_source === 'external' && d.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                    // Usually CORS errors manifest as network errors / manifestLoadError with 0 status
+                    // Even if it's a 404, we classify it as CORS/Blocked for external streams
+                    console.error('Stream eksternal diblokir (kemungkinan CORS atau Server Down).', d);
+                    setStatus('error');
+                    setErrorType('cors');
+                    setLoadingStage(LoadingStage.ERROR);
+                    return;
+                }
 
                 // Check for codec incompatibility - NOT recoverable
                 if (d.details === 'manifestIncompatibleCodecsError' ||

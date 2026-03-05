@@ -22,19 +22,29 @@ const LocationPicker = lazy(() => import('../components/LocationPicker'));
  * - Empty state with quick-add button (Requirements: 4.10)
  */
 
-// Validation rules for camera form
-const getValidationRules = () => ({
+// Validation rules for camera form - stream_source aware
+const getValidationRules = (streamSource) => ({
     name: {
         required: 'Camera name is required',
         minLength: { value: 2, message: 'Name must be at least 2 characters' },
         maxLength: { value: 100, message: 'Name must not exceed 100 characters' },
     },
     private_rtsp_url: {
-        required: 'RTSP URL is required',
+        required: streamSource === 'internal' ? 'RTSP URL is required' : false,
         custom: (value) => {
+            if (streamSource === 'external') return undefined;
             if (!value || value.trim() === '') return undefined;
             const result = validateRtspUrl(value);
             return result.isValid ? undefined : result.error;
+        },
+    },
+    external_hls_url: {
+        required: streamSource === 'external' ? 'External HLS URL is required' : false,
+        custom: (value) => {
+            if (streamSource === 'internal') return undefined;
+            if (!value || value.trim() === '') return undefined;
+            if (!value.startsWith('http')) return 'URL must start with http:// or https://';
+            return undefined;
         },
     },
 });
@@ -48,11 +58,11 @@ export default function CameraManagement() {
     const [areas, setAreas] = useState([]);
     const [deletingId, setDeletingId] = useState(null);
     const [togglingId, setTogglingId] = useState(null);
-    
+
     // Undo state for delete
     const [undoData, setUndoData] = useState(null);
     const undoTimerRef = useRef(null);
-    
+
     const { success, error: showError, warning } = useNotification();
 
     // Form validation hook
@@ -84,8 +94,10 @@ export default function CameraManagement() {
             status: 'active',
             enable_recording: false,
             recording_duration_hours: 5,
+            stream_source: 'internal',
+            external_hls_url: '',
         },
-        getValidationRules()
+        getValidationRules('internal')
     );
 
     const [modalError, setModalError] = useState('');
@@ -93,7 +105,7 @@ export default function CameraManagement() {
     useEffect(() => {
         loadCameras();
         loadAreas();
-        
+
         // Cleanup undo timer on unmount
         return () => {
             if (undoTimerRef.current) {
@@ -146,7 +158,9 @@ export default function CameraManagement() {
             status: 'active',
             enable_recording: false,
             recording_duration_hours: 5,
-        });
+            stream_source: 'internal',
+            external_hls_url: '',
+        }, getValidationRules('internal'));
         setModalError('');
         setShowModal(true);
     };
@@ -155,7 +169,7 @@ export default function CameraManagement() {
         setEditingCamera(camera);
         resetWith({
             name: camera.name,
-            private_rtsp_url: camera.private_rtsp_url,
+            private_rtsp_url: camera.private_rtsp_url || '',
             video_codec: camera.video_codec || 'h264',
             description: camera.description || '',
             location: camera.location || '',
@@ -168,7 +182,9 @@ export default function CameraManagement() {
             status: camera.status || 'active',
             enable_recording: camera.enable_recording === 1,
             recording_duration_hours: camera.recording_duration_hours || 5,
-        });
+            stream_source: camera.stream_source || 'internal',
+            external_hls_url: camera.external_hls_url || '',
+        }, getValidationRules(camera.stream_source || 'internal'));
         setModalError('');
         setShowModal(true);
     };
@@ -177,7 +193,7 @@ export default function CameraManagement() {
         const { name, value, type, checked } = e.target;
         const newValue = type === 'checkbox' ? checked : value;
         handleChange({ target: { name, value: newValue, type, checked } });
-        
+
         // Clear modal error when user makes changes
         if (modalError) setModalError('');
     };
@@ -185,38 +201,41 @@ export default function CameraManagement() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setModalError('');
-        
+
         // Validate form
         if (!validateForm()) {
             return;
         }
-        
+
         setSubmitting(true);
         try {
             // Ensure recording_duration_hours is a number
-            const recordingDuration = formData.recording_duration_hours 
-                ? parseInt(formData.recording_duration_hours, 10) 
+            const recordingDuration = formData.recording_duration_hours
+                ? parseInt(formData.recording_duration_hours, 10)
                 : 5;
-            
-            const data = { 
-                ...formData, 
-                enabled: formData.enabled ? 1 : 0, 
-                is_tunnel: formData.is_tunnel ? 1 : 0, 
+
+            const data = {
+                ...formData,
+                enabled: formData.enabled ? 1 : 0,
+                is_tunnel: formData.is_tunnel ? 1 : 0,
                 status: formData.status,
                 enable_recording: formData.enable_recording ? 1 : 0,
-                recording_duration_hours: recordingDuration
+                recording_duration_hours: recordingDuration,
+                stream_source: formData.stream_source || 'internal',
+                external_hls_url: formData.stream_source === 'external' ? formData.external_hls_url : null,
+                private_rtsp_url: formData.stream_source === 'internal' ? formData.private_rtsp_url : null,
             };
-            
+
             console.log('[Camera Submit] Data being sent:', data);
-            
-            const result = editingCamera 
+
+            const result = editingCamera
                 ? await cameraService.updateCamera(editingCamera.id, data)
                 : await cameraService.createCamera(data);
-            
+
             if (result.success) {
                 setShowModal(false);
                 loadCameras();
-                
+
                 // Show success toast (Requirements: 4.1, 4.5)
                 if (editingCamera) {
                     success('Camera Updated', `"${formData.name}" has been updated successfully.`);
@@ -226,8 +245,8 @@ export default function CameraManagement() {
             } else {
                 // Handle specific error cases (Requirements: 4.2, 4.4)
                 const errorMessage = result.message || 'Something went wrong';
-                
-                if (errorMessage.toLowerCase().includes('already exists') || 
+
+                if (errorMessage.toLowerCase().includes('already exists') ||
                     errorMessage.toLowerCase().includes('duplicate')) {
                     setFieldError('name', 'Camera name already in use');
                     setModalError('Camera name already in use. Please choose a different name.');
@@ -238,11 +257,11 @@ export default function CameraManagement() {
         } catch (err) {
             console.error('[Camera Submit] Error:', err);
             console.error('[Camera Submit] Error response:', err.response?.data);
-            
+
             const errorMessage = err.response?.data?.message || err.message || 'Something went wrong';
-            
+
             // Handle duplicate name error (Requirements: 4.4)
-            if (errorMessage.toLowerCase().includes('already exists') || 
+            if (errorMessage.toLowerCase().includes('already exists') ||
                 errorMessage.toLowerCase().includes('duplicate')) {
                 setFieldError('name', 'Camera name already in use');
                 setModalError('Camera name already in use. Please choose a different name.');
@@ -259,20 +278,20 @@ export default function CameraManagement() {
     // Handle delete with undo option (Requirements: 4.6, 4.7, 4.8)
     const handleDelete = async (camera) => {
         if (!window.confirm(`Delete camera "${camera.name}"?`)) return;
-        
+
         setDeletingId(camera.id);
         try {
             const result = await cameraService.deleteCamera(camera.id);
             if (result.success) {
                 // Store deleted camera for undo
                 setUndoData({ camera, timestamp: Date.now() });
-                
+
                 // Remove from list immediately
                 setCameras(prev => prev.filter(c => c.id !== camera.id));
-                
+
                 // Show success toast with undo option (Requirements: 4.7)
                 success('Camera Deleted', `"${camera.name}" has been deleted.`);
-                
+
                 // Clear undo data after 5 seconds
                 if (undoTimerRef.current) {
                     clearTimeout(undoTimerRef.current);
@@ -295,25 +314,25 @@ export default function CameraManagement() {
     const toggleStatus = useCallback(async (camera) => {
         const previousEnabled = camera.enabled;
         const newEnabled = camera.enabled === 1 ? 0 : 1;
-        
+
         // Optimistic update
-        setCameras(prev => prev.map(c => 
+        setCameras(prev => prev.map(c =>
             c.id === camera.id ? { ...c, enabled: newEnabled } : c
         ));
         setTogglingId(camera.id);
-        
+
         try {
             const result = await cameraService.updateCamera(camera.id, { enabled: newEnabled });
             if (!result.success) {
                 // Rollback on failure
-                setCameras(prev => prev.map(c => 
+                setCameras(prev => prev.map(c =>
                     c.id === camera.id ? { ...c, enabled: previousEnabled } : c
                 ));
                 showError('Update Failed', result.message || 'Failed to update camera status');
             }
         } catch (err) {
             // Rollback on error
-            setCameras(prev => prev.map(c => 
+            setCameras(prev => prev.map(c =>
                 c.id === camera.id ? { ...c, enabled: previousEnabled } : c
             ));
             showError('Update Failed', err.response?.data?.message || 'Failed to update camera status');
@@ -327,25 +346,25 @@ export default function CameraManagement() {
     const toggleMaintenance = useCallback(async (camera) => {
         const previousStatus = camera.status;
         const newStatus = camera.status === 'maintenance' ? 'active' : 'maintenance';
-        
+
         // Optimistic update
-        setCameras(prev => prev.map(c => 
+        setCameras(prev => prev.map(c =>
             c.id === camera.id ? { ...c, status: newStatus } : c
         ));
         setTogglingMaintenanceId(camera.id);
-        
+
         try {
             const result = await cameraService.updateCamera(camera.id, { status: newStatus });
             if (!result.success) {
                 // Rollback on failure
-                setCameras(prev => prev.map(c => 
+                setCameras(prev => prev.map(c =>
                     c.id === camera.id ? { ...c, status: previousStatus } : c
                 ));
                 showError('Update Failed', result.message || 'Failed to update maintenance status');
             }
         } catch (err) {
             // Rollback on error
-            setCameras(prev => prev.map(c => 
+            setCameras(prev => prev.map(c =>
                 c.id === camera.id ? { ...c, status: previousStatus } : c
             ));
             showError('Update Failed', err.response?.data?.message || 'Failed to update maintenance status');
@@ -393,7 +412,7 @@ export default function CameraManagement() {
             </div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Failed to Load Cameras</h3>
             <p className="text-gray-500 dark:text-gray-400 mb-6">{loadError}</p>
-            <button 
+            <button
                 onClick={loadCameras}
                 className="px-6 py-2.5 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-primary/25 transition-all"
             >
@@ -448,6 +467,11 @@ export default function CameraManagement() {
                                     </svg>
                                 </div>
                                 <div className="absolute top-3 right-3 flex gap-2">
+                                    {camera.stream_source === 'external' && (
+                                        <span className="px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm bg-blue-500/90 text-white" title="Stream Eksternal (Dishub/Pihak Ketiga)">
+                                            🌐 Eksternal
+                                        </span>
+                                    )}
                                     {camera.status === 'maintenance' && (
                                         <span className="px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm bg-red-500/90 text-white" title="Dalam Perbaikan">
                                             🔧 Perbaikan
@@ -458,11 +482,10 @@ export default function CameraManagement() {
                                             ⚠️ Tunnel
                                         </span>
                                     )}
-                                    <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm ${
-                                        camera.enabled
-                                            ? 'bg-emerald-500/90 text-white'
-                                            : 'bg-gray-500/90 text-white'
-                                    }`}>
+                                    <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm ${camera.enabled
+                                        ? 'bg-emerald-500/90 text-white'
+                                        : 'bg-gray-500/90 text-white'
+                                        }`}>
                                         {camera.enabled ? 'Live' : 'Offline'}
                                     </span>
                                 </div>
@@ -480,8 +503,8 @@ export default function CameraManagement() {
                                         <p className="text-sm font-medium text-gray-900 dark:text-white">{camera.location || 'Not specified'}</p>
                                     </div>
                                     <div className="flex gap-1">
-                                        <button 
-                                            onClick={() => openEditModal(camera)} 
+                                        <button
+                                            onClick={() => openEditModal(camera)}
                                             className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 hover:text-primary hover:bg-sky-50 dark:hover:bg-primary/10 transition-all"
                                             title="Edit camera"
                                         >
@@ -489,8 +512,8 @@ export default function CameraManagement() {
                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                             </svg>
                                         </button>
-                                        <button 
-                                            onClick={() => handleDelete(camera)} 
+                                        <button
+                                            onClick={() => handleDelete(camera)}
                                             disabled={deletingId === camera.id}
                                             className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                             title="Delete camera"
@@ -521,7 +544,7 @@ export default function CameraManagement() {
                                         </button>
                                     </div>
                                 </div>
-                                
+
                                 {/* Maintenance Toggle */}
                                 <div className="flex items-center justify-between pt-3 mt-3 border-t border-gray-200 dark:border-gray-700/50">
                                     <div className="flex items-center gap-1.5">
@@ -557,10 +580,10 @@ export default function CameraManagement() {
                                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                                     {editingCamera ? 'Edit Camera' : 'Add Camera'}
                                 </h3>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">Configure RTSP stream</p>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">Configure stream source</p>
                             </div>
-                            <button 
-                                onClick={() => setShowModal(false)} 
+                            <button
+                                onClick={() => setShowModal(false)}
                                 className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-500 dark:text-gray-400 transition-colors"
                                 disabled={isSubmitting}
                             >
@@ -573,8 +596,8 @@ export default function CameraManagement() {
                         <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
                             {/* Modal error alert */}
                             {modalError && (
-                                <Alert 
-                                    type="error" 
+                                <Alert
+                                    type="error"
                                     message={modalError}
                                     dismissible
                                     onDismiss={() => setModalError('')}
@@ -587,31 +610,30 @@ export default function CameraManagement() {
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                         Name <span className="text-red-500">*</span>
                                     </label>
-                                    <input 
-                                        type="text" 
-                                        name="name" 
-                                        value={formData.name} 
+                                    <input
+                                        type="text"
+                                        name="name"
+                                        value={formData.name}
                                         onChange={handleFormChange}
                                         onBlur={handleBlur}
                                         disabled={isSubmitting}
-                                        className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 text-sm ${
-                                            getFieldError('name') 
-                                                ? 'border-red-500 focus:ring-red-500' 
-                                                : 'border-gray-200 dark:border-gray-700/50'
-                                        }`}
-                                        placeholder="Front Entrance" 
+                                        className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 text-sm ${getFieldError('name')
+                                            ? 'border-red-500 focus:ring-red-500'
+                                            : 'border-gray-200 dark:border-gray-700/50'
+                                            }`}
+                                        placeholder="Front Entrance"
                                     />
                                     {getFieldError('name') && (
                                         <p className="mt-1 text-xs text-red-500">{getFieldError('name')}</p>
                                     )}
                                 </div>
-                                
+
                                 {/* Area field */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Area</label>
-                                    <select 
-                                        name="area_id" 
-                                        value={formData.area_id} 
+                                    <select
+                                        name="area_id"
+                                        value={formData.area_id}
                                         onChange={handleFormChange}
                                         disabled={isSubmitting}
                                         className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 text-sm"
@@ -622,98 +644,171 @@ export default function CameraManagement() {
                                 </div>
                             </div>
 
-                            {/* RTSP URL field with validation */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    RTSP URL <span className="text-red-500">*</span>
-                                </label>
-                                <input 
-                                    type="text" 
-                                    name="private_rtsp_url" 
-                                    value={formData.private_rtsp_url} 
-                                    onChange={handleFormChange}
-                                    onBlur={handleBlur}
-                                    disabled={isSubmitting}
-                                    className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white font-mono text-xs placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 ${
-                                        getFieldError('private_rtsp_url') 
-                                            ? 'border-red-500 focus:ring-red-500' 
-                                            : 'border-gray-200 dark:border-gray-700/50'
-                                    }`}
-                                    placeholder="rtsp://user:pass@ip:port/path" 
-                                />
-                                {getFieldError('private_rtsp_url') ? (
-                                    <p className="mt-1 text-xs text-red-500">{getFieldError('private_rtsp_url')}</p>
-                                ) : (
-                                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{getRtspFormatHint()}</p>
-                                )}
+                            {/* Stream Source Toggle */}
+                            <div className="p-3 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-gray-900 dark:text-white">Sumber Stream</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Pilih sumber video</p>
+                                    </div>
+                                </div>
+                                <div className="flex rounded-lg overflow-hidden border border-blue-200 dark:border-blue-500/30">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            handleFormChange({ target: { name: 'stream_source', value: 'internal', type: 'text' } });
+                                        }}
+                                        disabled={isSubmitting}
+                                        className={`flex-1 px-3 py-2 text-xs font-semibold transition-colors ${formData.stream_source !== 'external'
+                                            ? 'bg-blue-500 text-white'
+                                            : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-blue-500/10'
+                                            }`}
+                                    >
+                                        🎥 Internal (RTSP)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            handleFormChange({ target: { name: 'stream_source', value: 'external', type: 'text' } });
+                                        }}
+                                        disabled={isSubmitting}
+                                        className={`flex-1 px-3 py-2 text-xs font-semibold transition-colors ${formData.stream_source === 'external'
+                                            ? 'bg-blue-500 text-white'
+                                            : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-blue-500/10'
+                                            }`}
+                                    >
+                                        🌐 Eksternal (HLS)
+                                    </button>
+                                </div>
                             </div>
 
-                            {/* Video Codec Selection */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                    Video Codec
-                                </label>
-                                <div className="flex gap-4">
-                                    <label className="flex items-center gap-2 cursor-pointer group">
-                                        <input
-                                            type="radio"
-                                            name="video_codec"
-                                            value="h264"
-                                            checked={formData.video_codec === 'h264'}
-                                            onChange={handleFormChange}
-                                            disabled={isSubmitting}
-                                            className="w-4 h-4 text-primary-600 focus:ring-primary focus:ring-2 disabled:opacity-50"
-                                        />
-                                        <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-primary-600 dark:group-hover:text-primary-400">
-                                            H.264 (Universal)
-                                        </span>
+                            {/* RTSP URL field - only for internal */}
+                            {formData.stream_source !== 'external' && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        RTSP URL <span className="text-red-500">*</span>
                                     </label>
-                                    <label className="flex items-center gap-2 cursor-pointer group">
-                                        <input
-                                            type="radio"
-                                            name="video_codec"
-                                            value="h265"
-                                            checked={formData.video_codec === 'h265'}
-                                            onChange={handleFormChange}
-                                            disabled={isSubmitting}
-                                            className="w-4 h-4 text-purple-600 focus:ring-purple-500 focus:ring-2 disabled:opacity-50"
-                                        />
-                                        <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-purple-600 dark:group-hover:text-purple-400">
-                                            H.265 (Safari only)
-                                        </span>
-                                    </label>
+                                    <input
+                                        type="text"
+                                        name="private_rtsp_url"
+                                        value={formData.private_rtsp_url}
+                                        onChange={handleFormChange}
+                                        onBlur={handleBlur}
+                                        disabled={isSubmitting}
+                                        className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white font-mono text-xs placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 ${getFieldError('private_rtsp_url')
+                                            ? 'border-red-500 focus:ring-red-500'
+                                            : 'border-gray-200 dark:border-gray-700/50'
+                                            }`}
+                                        placeholder="rtsp://user:pass@ip:port/path"
+                                    />
+                                    {getFieldError('private_rtsp_url') ? (
+                                        <p className="mt-1 text-xs text-red-500">{getFieldError('private_rtsp_url')}</p>
+                                    ) : (
+                                        <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{getRtspFormatHint()}</p>
+                                    )}
                                 </div>
-                                <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                                    H.265 lebih efisien bandwidth tapi hanya support di Safari. H.264 kompatibel dengan semua browser.
-                                </p>
-                            </div>
+                            )}
+
+                            {/* External HLS URL field - only for external */}
+                            {formData.stream_source === 'external' && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        URL HLS Eksternal <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        name="external_hls_url"
+                                        value={formData.external_hls_url}
+                                        onChange={handleFormChange}
+                                        onBlur={handleBlur}
+                                        disabled={isSubmitting}
+                                        className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white font-mono text-xs placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 ${getFieldError('external_hls_url')
+                                            ? 'border-red-500 focus:ring-red-500'
+                                            : 'border-gray-200 dark:border-gray-700/50'
+                                            }`}
+                                        placeholder="https://data.bojonegorokab.go.id/live/local/xxx.m3u8"
+                                    />
+                                    {getFieldError('external_hls_url') ? (
+                                        <p className="mt-1 text-xs text-red-500">{getFieldError('external_hls_url')}</p>
+                                    ) : (
+                                        <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">URL .m3u8 dari sumber pihak ketiga (Dishub, Pemkab, dll). Stream diakses langsung dari browser tanpa melalui server.</p>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Video Codec Selection - only for internal */}
+                            {formData.stream_source !== 'external' && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Video Codec
+                                    </label>
+                                    <div className="flex gap-4">
+                                        <label className="flex items-center gap-2 cursor-pointer group">
+                                            <input
+                                                type="radio"
+                                                name="video_codec"
+                                                value="h264"
+                                                checked={formData.video_codec === 'h264'}
+                                                onChange={handleFormChange}
+                                                disabled={isSubmitting}
+                                                className="w-4 h-4 text-primary-600 focus:ring-primary focus:ring-2 disabled:opacity-50"
+                                            />
+                                            <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-primary-600 dark:group-hover:text-primary-400">
+                                                H.264 (Universal)
+                                            </span>
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer group">
+                                            <input
+                                                type="radio"
+                                                name="video_codec"
+                                                value="h265"
+                                                checked={formData.video_codec === 'h265'}
+                                                onChange={handleFormChange}
+                                                disabled={isSubmitting}
+                                                className="w-4 h-4 text-purple-600 focus:ring-purple-500 focus:ring-2 disabled:opacity-50"
+                                            />
+                                            <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-purple-600 dark:group-hover:text-purple-400">
+                                                H.265 (Safari only)
+                                            </span>
+                                        </label>
+                                    </div>
+                                    <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                        H.265 lebih efisien bandwidth tapi hanya support di Safari. H.264 kompatibel dengan semua browser.
+                                    </p>
+                                </div>
+                            )}
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                                 {/* Location field */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Location</label>
-                                    <input 
-                                        type="text" 
-                                        name="location" 
-                                        value={formData.location} 
+                                    <input
+                                        type="text"
+                                        name="location"
+                                        value={formData.location}
                                         onChange={handleFormChange}
                                         disabled={isSubmitting}
-                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 text-sm" 
-                                        placeholder="Building A" 
+                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 text-sm"
+                                        placeholder="Building A"
                                     />
                                 </div>
-                                
+
                                 {/* Group field */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Group</label>
-                                    <input 
-                                        type="text" 
-                                        name="group_name" 
-                                        value={formData.group_name} 
+                                    <input
+                                        type="text"
+                                        name="group_name"
+                                        value={formData.group_name}
                                         onChange={handleFormChange}
                                         disabled={isSubmitting}
-                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 text-sm" 
-                                        placeholder="Security" 
+                                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 text-sm"
+                                        placeholder="Security"
                                     />
                                 </div>
                             </div>
@@ -721,14 +816,14 @@ export default function CameraManagement() {
                             {/* Description field */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
-                                <textarea 
-                                    name="description" 
-                                    value={formData.description} 
+                                <textarea
+                                    name="description"
+                                    value={formData.description}
                                     onChange={handleFormChange}
                                     disabled={isSubmitting}
-                                    rows="2" 
-                                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary resize-none disabled:opacity-50 text-sm" 
-                                    placeholder="Optional notes..." 
+                                    rows="2"
+                                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary resize-none disabled:opacity-50 text-sm"
+                                    placeholder="Optional notes..."
                                 />
                             </div>
 
@@ -737,8 +832,8 @@ export default function CameraManagement() {
                                 <div className="flex items-center gap-2 mb-2">
                                     <div className="w-7 h-7 rounded-lg bg-sky-100 dark:bg-primary/20 flex items-center justify-center text-primary-600 dark:text-primary-400 shrink-0">
                                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                            <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/>
-                                            <circle cx="12" cy="11" r="3"/>
+                                            <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
+                                            <circle cx="12" cy="11" r="3" />
                                         </svg>
                                     </div>
                                     <p className="text-sm font-medium text-gray-900 dark:text-white">Lokasi Kamera</p>
@@ -787,8 +882,8 @@ export default function CameraManagement() {
                                 <div className="flex items-center gap-2 mb-3">
                                     <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-500/20 flex items-center justify-center text-red-600 dark:text-red-400 shrink-0">
                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                            <circle cx="12" cy="12" r="10"/>
-                                            <circle cx="12" cy="12" r="3" fill="currentColor"/>
+                                            <circle cx="12" cy="12" r="10" />
+                                            <circle cx="12" cy="12" r="3" fill="currentColor" />
                                         </svg>
                                     </div>
                                     <div>
@@ -869,17 +964,17 @@ export default function CameraManagement() {
 
                             {/* Action buttons - Sticky at bottom */}
                             <div className="flex gap-3 pt-2 sticky bottom-0 bg-white dark:bg-gray-800 pb-1">
-                                <button 
-                                    type="button" 
-                                    onClick={() => setShowModal(false)} 
-                                    className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 text-sm" 
+                                <button
+                                    type="button"
+                                    onClick={() => setShowModal(false)}
+                                    className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 text-sm"
                                     disabled={isSubmitting}
                                 >
                                     Cancel
                                 </button>
-                                <button 
-                                    type="submit" 
-                                    className="flex-[2] px-4 py-2.5 bg-gradient-to-r from-primary to-primary-600 text-white font-medium rounded-xl shadow-lg shadow-primary/30 hover:from-primary-600 hover:to-blue-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2 text-sm" 
+                                <button
+                                    type="submit"
+                                    className="flex-[2] px-4 py-2.5 bg-gradient-to-r from-primary to-primary-600 text-white font-medium rounded-xl shadow-lg shadow-primary/30 hover:from-primary-600 hover:to-blue-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2 text-sm"
                                     disabled={isSubmitting}
                                 >
                                     {isSubmitting && (

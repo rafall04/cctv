@@ -169,7 +169,7 @@ class CameraHealthService {
             // Get all enabled cameras (include stream_key and private_rtsp_url for path & ping lookup)
             // Use connection pool for better performance
             const cameras = query(`
-                SELECT id, name, location, is_online, stream_key, private_rtsp_url 
+                SELECT id, name, location, is_online, stream_key, private_rtsp_url, stream_source 
                 FROM cameras 
                 WHERE enabled = 1
             `);
@@ -181,6 +181,11 @@ class CameraHealthService {
 
             // Process camera health checks in parallel to avoid long blocking times
             const healthResults = await Promise.allSettled(cameras.map(async (camera) => {
+                // Skip external cameras — they don't use our MediaMTX
+                if (camera.stream_source === 'external') {
+                    return { camera, pathName: null, isOnline: camera.is_online, skip: true };
+                }
+
                 let isActuallyOnline = false;
                 const pathName = camera.stream_key || `camera${camera.id}`;
                 const pathInfo = activePaths.get(pathName);
@@ -212,7 +217,11 @@ class CameraHealthService {
             for (const result of healthResults) {
                 if (result.status !== 'fulfilled') continue;
 
-                const { camera, pathName, isOnline } = result.value;
+                const { camera, pathName, isOnline, skip } = result.value;
+                if (skip) {
+                    if (isOnline) onlineCount++; else offlineCount++;
+                    continue;
+                }
                 const pathInfo = activePaths.get(pathName);
 
                 // Only update if status changed
@@ -331,8 +340,13 @@ class CameraHealthService {
         try {
             const activePaths = await this.getActivePaths();
 
-            // Get camera's stream_key and url from database using connection pool
-            const camera = queryOne('SELECT stream_key, private_rtsp_url FROM cameras WHERE id = ?', [cameraId]);
+            // Get camera's stream_key, url, and source from database using connection pool
+            const camera = queryOne('SELECT stream_key, private_rtsp_url, stream_source FROM cameras WHERE id = ?', [cameraId]);
+
+            // External cameras: always consider them online (we can't check their RTSP)
+            if (camera?.stream_source === 'external') {
+                return true;
+            }
 
             // Use stream_key if available, fallback to legacy format
             const pathName = camera?.stream_key || `camera${cameraId}`;

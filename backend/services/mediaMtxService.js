@@ -145,7 +145,7 @@ class MediaMtxService {
                     stream_key,
                     COALESCE(stream_key, 'camera' || id) as path_name 
                 FROM cameras 
-                WHERE enabled = 1
+                WHERE enabled = 1 AND (stream_source = 'internal' OR stream_source IS NULL)
             `);
             return cameras;
         } catch (error) {

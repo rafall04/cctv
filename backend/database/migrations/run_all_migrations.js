@@ -44,7 +44,8 @@ const MIGRATIONS = [
     'add_recording_system.js',
     'create_recordings_table.js',
     'add_core_indexes.js',
-    'add_analytics_indexes.js'
+    'add_analytics_indexes.js',
+    'add_external_stream.js'
 ];
 
 console.log('🚀 Starting migration process...\n');
@@ -56,23 +57,23 @@ let errorCount = 0;
 
 for (const migrationFile of MIGRATIONS) {
     const migrationPath = join(__dirname, migrationFile);
-    
+
     try {
         console.log(`⏳ Running: ${migrationFile}`);
-        
+
         // Import and run migration
         const migration = await import(`file://${migrationPath}`);
-        
+
         // Most migrations are self-executing, but some export a function
         if (typeof migration.default === 'function') {
             await migration.default();
         }
-        
+
         console.log(`✅ Success: ${migrationFile}\n`);
         successCount++;
-        
+
     } catch (error) {
-        if (error.message.includes('already exists') || 
+        if (error.message.includes('already exists') ||
             error.message.includes('duplicate column')) {
             console.log(`⏭️  Skipped: ${migrationFile} (already applied)\n`);
             skipCount++;

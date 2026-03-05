@@ -28,7 +28,8 @@ class CameraService {
         return query(
             `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel, 
                     c.latitude, c.longitude, c.status, c.enable_recording, c.video_codec, c.stream_key, 
-                    c.thumbnail_path, c.thumbnail_updated_at, a.name as area_name 
+                    c.thumbnail_path, c.thumbnail_updated_at, c.stream_source, c.external_hls_url,
+                    a.name as area_name 
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 
              WHERE c.enabled = 1 
@@ -53,16 +54,35 @@ class CameraService {
     }
 
     async createCamera(data, request) {
-        const { name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, enable_recording, recording_duration_hours, video_codec } = data;
+        const { name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, enable_recording, recording_duration_hours, video_codec, stream_source, external_hls_url } = data;
 
-        if (!name || !private_rtsp_url) {
-            const err = new Error('Name and RTSP URL are required');
+        const sourceType = stream_source === 'external' ? 'external' : 'internal';
+
+        if (!name) {
+            const err = new Error('Camera name is required');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        // Conditional validation based on stream source
+        if (sourceType === 'internal' && !private_rtsp_url) {
+            const err = new Error('RTSP URL is required for internal cameras');
+            err.statusCode = 400;
+            throw err;
+        }
+        if (sourceType === 'external' && !external_hls_url) {
+            const err = new Error('External HLS URL is required for external cameras');
+            err.statusCode = 400;
+            throw err;
+        }
+        if (sourceType === 'external' && external_hls_url && !external_hls_url.startsWith('http')) {
+            const err = new Error('External HLS URL must start with http:// or https://');
             err.statusCode = 400;
             throw err;
         }
 
         const codecValue = video_codec || 'h264';
-        if (!['h264', 'h265'].includes(codecValue)) {
+        if (sourceType === 'internal' && !['h264', 'h265'].includes(codecValue)) {
             const err = new Error('Invalid video codec. Must be h264 or h265');
             err.statusCode = 400;
             throw err;
@@ -92,8 +112,8 @@ class CameraService {
         const cameraStatus = status || 'active';
 
         const result = execute(
-            'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, recording_duration_hours, video_codec) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [name, private_rtsp_url, description || null, location || null, group_name || null, finalAreaId, isEnabled, isTunnel, lat, lng, cameraStatus, streamKey, isRecordingEnabled, recordingDuration, codecValue]
+            'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, recording_duration_hours, video_codec, stream_source, external_hls_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [name, sourceType === 'internal' ? private_rtsp_url : null, description || null, location || null, group_name || null, finalAreaId, isEnabled, isTunnel, lat, lng, cameraStatus, streamKey, isRecordingEnabled, recordingDuration, codecValue, sourceType, sourceType === 'external' ? external_hls_url : null]
         );
 
         execute(
@@ -110,7 +130,7 @@ class CameraService {
 
         this.invalidateCameraCache();
 
-        if (isEnabled) {
+        if (isEnabled && sourceType === 'internal') {
             try {
                 const mtxResult = await mediaMtxService.updateCameraPath(streamKey, private_rtsp_url);
                 if (!mtxResult.success) {
@@ -139,9 +159,9 @@ class CameraService {
     }
 
     async updateCamera(id, data, request) {
-        const { name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, enable_recording, recording_duration_hours, video_codec } = data;
+        const { name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, enable_recording, recording_duration_hours, video_codec, stream_source, external_hls_url } = data;
 
-        const existingCamera = queryOne('SELECT id, name, private_rtsp_url, enabled, stream_key, enable_recording FROM cameras WHERE id = ?', [id]);
+        const existingCamera = queryOne('SELECT id, name, private_rtsp_url, enabled, stream_key, enable_recording, stream_source FROM cameras WHERE id = ?', [id]);
 
         if (!existingCamera) {
             const err = new Error('Camera not found');
@@ -224,6 +244,19 @@ class CameraService {
             updates.push('video_codec = ?');
             values.push(video_codec);
         }
+        if (stream_source !== undefined) {
+            if (!['internal', 'external'].includes(stream_source)) {
+                const err = new Error('Invalid stream source. Must be internal or external');
+                err.statusCode = 400;
+                throw err;
+            }
+            updates.push('stream_source = ?');
+            values.push(stream_source);
+        }
+        if (external_hls_url !== undefined) {
+            updates.push('external_hls_url = ?');
+            values.push(external_hls_url || null);
+        }
 
         if (updates.length === 0) {
             const err = new Error('No fields to update');
@@ -254,12 +287,20 @@ class CameraService {
 
         this.invalidateCameraCache();
 
+        const currentStreamSource = stream_source !== undefined ? stream_source : (existingCamera.stream_source || 'internal');
         const newEnabled = enabled !== undefined ? enabled : existingCamera.enabled;
         const newRtspUrl = private_rtsp_url !== undefined ? private_rtsp_url : existingCamera.private_rtsp_url;
         const rtspChanged = private_rtsp_url !== undefined && private_rtsp_url !== existingCamera.private_rtsp_url;
         const enabledChanged = enabled !== undefined && enabled !== existingCamera.enabled;
 
-        if (newEnabled === 0 || newEnabled === false) {
+        // If stream source changed to external, remove MediaMTX path
+        if (currentStreamSource === 'external') {
+            try {
+                await mediaMtxService.removeCameraPathByKey(streamKey);
+            } catch (err) {
+                console.error('MediaMTX remove path error (switched to external):', err.message);
+            }
+        } else if (newEnabled === 0 || newEnabled === false) {
             try {
                 await mediaMtxService.removeCameraPathByKey(streamKey);
             } catch (err) {
