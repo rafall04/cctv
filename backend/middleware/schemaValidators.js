@@ -53,7 +53,7 @@ export const refreshTokenSchema = {
 export const createCameraSchema = {
     body: {
         type: 'object',
-        required: ['name', 'private_rtsp_url'],
+        required: ['name'],
         properties: {
             name: {
                 type: 'string',
@@ -61,10 +61,17 @@ export const createCameraSchema = {
                 maxLength: 100
             },
             private_rtsp_url: {
+                anyOf: [
+                    { type: 'string', minLength: 1, maxLength: 500, pattern: '^rtsp://.+$' },
+                    { type: 'null' }
+                ]
+            },
+            stream_source: {
                 type: 'string',
-                minLength: 1,
-                maxLength: 500,
-                pattern: '^rtsp://.+$'
+                enum: ['internal', 'external']
+            },
+            external_hls_url: {
+                anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }]
             },
             video_codec: {
                 type: 'string',
@@ -135,10 +142,17 @@ export const updateCameraSchema = {
                 maxLength: 100
             },
             private_rtsp_url: {
+                anyOf: [
+                    { type: 'string', minLength: 1, maxLength: 500, pattern: '^rtsp://.+$' },
+                    { type: 'null' }
+                ]
+            },
+            stream_source: {
                 type: 'string',
-                minLength: 1,
-                maxLength: 500,
-                pattern: '^rtsp://.+$'
+                enum: ['internal', 'external']
+            },
+            external_hls_url: {
+                anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }]
             },
             video_codec: {
                 type: 'string',
@@ -518,12 +532,12 @@ export const schemas = {
     // Auth
     login: loginSchema,
     refreshToken: refreshTokenSchema,
-    
+
     // Camera
     createCamera: createCameraSchema,
     updateCamera: updateCameraSchema,
     cameraIdParam: cameraIdParamSchema,
-    
+
     // User
     createUser: createUserSchema,
     updateUser: updateUserSchema,
@@ -531,16 +545,16 @@ export const schemas = {
     changeOwnPassword: changeOwnPasswordSchema,
     updateProfile: updateProfileSchema,
     userIdParam: userIdParamSchema,
-    
+
     // Area
     createArea: createAreaSchema,
     updateArea: updateAreaSchema,
     areaIdParam: areaIdParamSchema,
-    
+
     // API Key
     createApiKey: createApiKeySchema,
     apiKeyIdParam: apiKeyIdParamSchema,
-    
+
     // Stream
     streamCameraIdParam: streamCameraIdParamSchema
 };
