@@ -185,7 +185,7 @@ class CameraService {
         }
         if (private_rtsp_url !== undefined) {
             updates.push('private_rtsp_url = ?');
-            values.push(private_rtsp_url);
+            values.push(private_rtsp_url || '');
         }
         if (description !== undefined) {
             updates.push('description = ?');
