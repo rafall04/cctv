@@ -1041,8 +1041,11 @@ const MapView = memo(({
     className = '',
     focusedCameraId = null, // ID kamera yang akan difokuskan
     onFocusHandled = null, // Callback setelah fokus ditangani
+    selectedArea: controlledSelectedArea = undefined,
+    onAreaChange = null,
 }) => {
-    const [selectedArea, setSelectedArea] = useState('all');
+    const [internalSelectedArea, setInternalSelectedArea] = useState('all');
+    const selectedAreaValue = controlledSelectedArea ?? internalSelectedArea;
     const [modalCamera, setModalCamera] = useState(null);
     const [mapKey, setMapKey] = useState(0);
     const [mapSettings, setMapSettings] = useState({
@@ -1055,6 +1058,14 @@ const MapView = memo(({
     const [pendingFocusCamera, setPendingFocusCamera] = useState(null);
     // Flag untuk mencegah map reset saat close modal
     const [preserveMapPosition, setPreserveMapPosition] = useState(false);
+
+    const setSelectedAreaValue = useCallback((value) => {
+        if (typeof onAreaChange === 'function') {
+            onAreaChange(value);
+            return;
+        }
+        setInternalSelectedArea(value);
+    }, [onAreaChange]);
 
     // Load map settings from backend
     useEffect(() => {
@@ -1071,8 +1082,8 @@ const MapView = memo(({
             const camera = cameras.find(c => c.id === focusedCameraId);
             if (camera && hasValidCoords(camera)) {
                 // Set area filter to show the camera if needed
-                if (camera.area_name && selectedArea !== camera.area_name && selectedArea !== 'all') {
-                    setSelectedArea('all');
+                if (camera.area_name && selectedAreaValue !== camera.area_name && selectedAreaValue !== 'all') {
+                    setSelectedAreaValue('all');
                 }
                 // Set pending focus camera - map will navigate first
                 setPendingFocusCamera(camera);
@@ -1083,7 +1094,7 @@ const MapView = memo(({
                 onFocusHandled?.();
             }
         }
-    }, [focusedCameraId, cameras, onFocusHandled, selectedArea]);
+    }, [focusedCameraId, cameras, onFocusHandled, selectedAreaValue, setSelectedAreaValue]);
 
     // Handle focused camera - Step 2: Open modal after map animation
     useEffect(() => {
@@ -1107,14 +1118,14 @@ const MapView = memo(({
 
     const filtered = useMemo(() => {
         let result;
-        if (selectedArea === 'all') {
+        if (selectedAreaValue === 'all') {
             result = camerasWithCoords;
         } else {
-            result = camerasWithCoords.filter(c => c.area_name === selectedArea);
+            result = camerasWithCoords.filter(c => c.area_name === selectedAreaValue);
         }
         // Terapkan offset untuk marker yang bertumpuk
         return applyMarkerOffset(result);
-    }, [camerasWithCoords, selectedArea]);
+    }, [camerasWithCoords, selectedAreaValue]);
 
     const stats = useMemo(() => {
         const maintenance = filtered.filter(c => c.status === 'maintenance').length;
@@ -1141,8 +1152,8 @@ const MapView = memo(({
         }
 
         // Jika area spesifik dipilih, gunakan koordinat area tersebut
-        if (selectedArea !== 'all') {
-            const areaData = areas.find(a => a.name === selectedArea);
+        if (selectedAreaValue !== 'all') {
+            const areaData = areas.find(a => a.name === selectedAreaValue);
             if (areaData?.latitude && areaData?.longitude) {
                 return {
                     center: [parseFloat(areaData.latitude), parseFloat(areaData.longitude)],
@@ -1152,7 +1163,7 @@ const MapView = memo(({
             }
             // Area tidak punya koordinat, tapi tetap filter kamera
             // Jika ada kamera di area ini, gunakan bounds kamera
-            const areaCameras = camerasWithCoords.filter(c => c.area_name === selectedArea);
+            const areaCameras = camerasWithCoords.filter(c => c.area_name === selectedAreaValue);
             if (areaCameras.length > 0) {
                 const cameraBounds = L.latLngBounds(areaCameras.map(c => [parseFloat(c.latitude), parseFloat(c.longitude)]));
                 return { center: null, zoom: null, bounds: cameraBounds };
@@ -1161,7 +1172,7 @@ const MapView = memo(({
         }
 
         // "Semua Lokasi" - gunakan settings dengan zoom dari settings
-        if (selectedArea === 'all' && mapSettings.latitude && mapSettings.longitude) {
+        if (selectedAreaValue === 'all' && mapSettings.latitude && mapSettings.longitude) {
             return {
                 center: [mapSettings.latitude, mapSettings.longitude],
                 zoom: mapSettings.zoom || 13, // Gunakan zoom dari settings
@@ -1175,7 +1186,7 @@ const MapView = memo(({
             zoom: mapSettings.zoom || defaultZoom,
             bounds: null
         };
-    }, [camerasWithCoords, selectedArea, areas, defaultCenter, defaultZoom, mapSettings, pendingFocusCamera, preserveMapPosition]);
+    }, [camerasWithCoords, selectedAreaValue, areas, defaultCenter, defaultZoom, mapSettings, pendingFocusCamera, preserveMapPosition]);
 
     const openModal = useCallback((camera) => {
         // Set preserve position saat buka modal dari klik marker
@@ -1190,7 +1201,8 @@ const MapView = memo(({
     }, []);
 
     const handleAreaChange = (e) => {
-        setSelectedArea(e.target.value);
+        const nextArea = e?.target?.value || 'all';
+        setSelectedAreaValue(nextArea);
         // Reset preserve position saat ganti area filter
         setPreserveMapPosition(false);
         setMapKey(prev => prev + 1);
@@ -1252,7 +1264,7 @@ const MapView = memo(({
             {/* Filter Area - Top Left */}
             <div className="absolute top-3 left-3 z-[1000]">
                 <select
-                    value={selectedArea}
+                    value={selectedAreaValue}
                     onChange={handleAreaChange}
                     className="px-2.5 py-1.5 sm:px-3 sm:py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg shadow-lg text-xs sm:text-sm font-medium border-0 focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer max-w-[180px] sm:max-w-none truncate"
                 >
@@ -1329,3 +1341,5 @@ const MapView = memo(({
 
 MapView.displayName = 'MapView';
 export default MapView;
+
+

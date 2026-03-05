@@ -9,11 +9,14 @@ import {
 } from './telegramService.js';
 import { getTimezone } from './timezoneService.js';
 
-const mediaMtxApiBaseUrl = 'http://localhost:9997/v3';
+const mediaMtxApiBaseUrl = `${(config.mediamtx?.apiUrl || 'http://localhost:9997').replace(/\/$/, '')}/v3`;
 
-/**
- * Get current timestamp in configured timezone format for SQLite
- */
+const ONLINE_SUCCESS_THRESHOLD = 2;
+const OFFLINE_FAIL_THRESHOLD = 3;
+const EXTERNAL_REQUEST_TIMEOUT_MS = 10000;
+const EXTERNAL_MAX_PDT_AGE_SEC = 120;
+const EXTERNAL_STALE_SEQUENCE_THRESHOLD = 2;
+
 function getTimestamp() {
     const timezone = getTimezone();
     return new Date().toLocaleString('sv-SE', {
@@ -25,16 +28,9 @@ function getTimestamp() {
         minute: '2-digit',
         second: '2-digit',
         hour12: false
-    }).replace(' ', ' ');
+    });
 }
 
-/**
- * Check if a TCP port is open on a host
- * @param {string} host 
- * @param {number} port 
- * @param {number} timeoutMs 
- * @returns {Promise<boolean>}
- */
 function checkTcpPort(host, port, timeoutMs = 3000) {
     return new Promise((resolve) => {
         const socket = new net.Socket();
@@ -59,19 +55,72 @@ function checkTcpPort(host, port, timeoutMs = 3000) {
     });
 }
 
+function parsePlaylist(playlistText) {
+    const normalizedText = String(playlistText || '').replace(/^\uFEFF/, '');
+    const lines = normalizedText
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+    if (lines.length === 0 || lines[0] !== '#EXTM3U') {
+        return { ok: false, reason: 'invalid_m3u8' };
+    }
+
+    const entries = lines.filter((line) => !line.startsWith('#'));
+    const isMaster = lines.some((line) => line.startsWith('#EXT-X-STREAM-INF'));
+
+    let targetDuration = null;
+    let mediaSequence = null;
+    let lastProgramDateTimeMs = null;
+
+    for (const line of lines) {
+        if (line.startsWith('#EXT-X-TARGETDURATION:')) {
+            const value = parseInt(line.split(':')[1], 10);
+            if (!Number.isNaN(value)) {
+                targetDuration = value;
+            }
+        } else if (line.startsWith('#EXT-X-MEDIA-SEQUENCE:')) {
+            const value = parseInt(line.split(':')[1], 10);
+            if (!Number.isNaN(value)) {
+                mediaSequence = value;
+            }
+        } else if (line.startsWith('#EXT-X-PROGRAM-DATE-TIME:')) {
+            const pdtRaw = line.slice('#EXT-X-PROGRAM-DATE-TIME:'.length);
+            const parsed = Date.parse(pdtRaw);
+            if (!Number.isNaN(parsed)) {
+                lastProgramDateTimeMs = parsed;
+            }
+        }
+    }
+
+    return {
+        ok: true,
+        isMaster,
+        entries,
+        targetDuration,
+        mediaSequence,
+        lastProgramDateTimeMs
+    };
+}
+
+function resolvePlaylistUrl(baseUrl, childPath) {
+    try {
+        return new URL(childPath, baseUrl).toString();
+    } catch {
+        return null;
+    }
+}
+
 class CameraHealthService {
     constructor() {
         this.checkInterval = null;
         this.isRunning = false;
+        this.isChecking = false;
         this.lastCheck = null;
-        // Track when cameras went offline for downtime calculation
-        this.offlineSince = new Map(); // cameraId -> timestamp
+        this.offlineSince = new Map();
+        this.healthState = new Map();
     }
 
-    /**
-     * Start the health check service
-     * @param {number} intervalMs - Check interval in milliseconds (default: 30000 = 30s)
-     */
     start(intervalMs = 30000) {
         if (this.isRunning) {
             console.log('[CameraHealth] Service already running');
@@ -81,133 +130,340 @@ class CameraHealthService {
         this.isRunning = true;
         console.log(`[CameraHealth] Starting health check service (interval: ${intervalMs / 1000}s)`);
 
-        // Initial check after 10 seconds (give MediaMTX time to start)
-        setTimeout(() => this.checkAllCameras(), 10000);
+        setTimeout(() => {
+            this.checkAllCameras().catch((error) => {
+                console.error('[CameraHealth] Initial check failed:', error.message);
+            });
+        }, 10000);
 
-        // Regular interval checks
         this.checkInterval = setInterval(() => {
-            this.checkAllCameras();
+            this.checkAllCameras().catch((error) => {
+                console.error('[CameraHealth] Interval check failed:', error.message);
+            });
         }, intervalMs);
     }
 
-    /**
-     * Stop the health check service
-     */
     stop() {
         if (this.checkInterval) {
             clearInterval(this.checkInterval);
             this.checkInterval = null;
         }
         this.isRunning = false;
+        this.isChecking = false;
         console.log('[CameraHealth] Service stopped');
     }
 
-    /**
-     * Get active paths from MediaMTX
-     * A path is considered "configured" if it exists in MediaMTX config
-     * A path is "streaming" if source is ready or has readers
-     * @returns {Promise<Map<string, object>>} Map of path name to path info
-     */
-    async getActivePaths() {
+    ensureCameraState(cameraId, currentDbOnline) {
+        if (!this.healthState.has(cameraId)) {
+            this.healthState.set(cameraId, {
+                effectiveOnline: currentDbOnline === 1,
+                successStreak: 0,
+                failStreak: 0,
+                sequenceStaleCount: 0,
+                lastMediaSequence: null,
+                lastReason: null,
+                lastDetails: null
+            });
+        }
+        return this.healthState.get(cameraId);
+    }
+
+    async fetchPlaylist(url) {
         try {
-            // Get configured paths from config (not just active paths)
+            const response = await axios.get(url, {
+                timeout: EXTERNAL_REQUEST_TIMEOUT_MS,
+                responseType: 'text',
+                transformResponse: [(data) => data],
+                headers: {
+                    Accept: 'application/vnd.apple.mpegurl,application/x-mpegURL,*/*',
+                    'User-Agent': 'cctv-healthcheck/1.0'
+                },
+                validateStatus: (status) => status < 500
+            });
+
+            if (response.status >= 400) {
+                return {
+                    ok: false,
+                    reason: `http_${response.status}`,
+                    status: response.status
+                };
+            }
+
+            return {
+                ok: true,
+                body: String(response.data || ''),
+                status: response.status
+            };
+        } catch (error) {
+            return {
+                ok: false,
+                reason: error.code || 'request_error',
+                status: error.response?.status || null
+            };
+        }
+    }
+
+    evaluateExternalFreshness(cameraId, mediaInfo) {
+        const state = this.healthState.get(cameraId);
+
+        if (mediaInfo.lastProgramDateTimeMs) {
+            const ageSec = Math.max(0, (Date.now() - mediaInfo.lastProgramDateTimeMs) / 1000);
+            const maxAge = Math.max(30, (mediaInfo.targetDuration || 5) * 4);
+            if (ageSec > Math.min(maxAge, EXTERNAL_MAX_PDT_AGE_SEC)) {
+                return {
+                    ok: false,
+                    reason: 'stale_program_date_time',
+                    details: { ageSec: Math.round(ageSec) }
+                };
+            }
+
+            if (state) {
+                state.sequenceStaleCount = 0;
+                if (Number.isFinite(mediaInfo.mediaSequence)) {
+                    state.lastMediaSequence = mediaInfo.mediaSequence;
+                }
+            }
+
+            return { ok: true, reason: 'fresh_program_date_time' };
+        }
+
+        if (Number.isFinite(mediaInfo.mediaSequence) && state) {
+            if (state.lastMediaSequence !== null && mediaInfo.mediaSequence <= state.lastMediaSequence) {
+                state.sequenceStaleCount += 1;
+            } else {
+                state.sequenceStaleCount = 0;
+            }
+
+            state.lastMediaSequence = mediaInfo.mediaSequence;
+
+            if (state.sequenceStaleCount >= EXTERNAL_STALE_SEQUENCE_THRESHOLD) {
+                return {
+                    ok: false,
+                    reason: 'stale_media_sequence',
+                    details: { staleChecks: state.sequenceStaleCount }
+                };
+            }
+
+            return { ok: true, reason: 'media_sequence_progressing' };
+        }
+
+        return { ok: true, reason: 'segment_present_no_freshness_marker' };
+    }
+
+    async probeExternalStream(cameraId, externalHlsUrl) {
+        if (!externalHlsUrl) {
+            return { online: false, reason: 'missing_external_hls_url' };
+        }
+
+        let currentUrl = externalHlsUrl;
+        let parsedMedia = null;
+
+        for (let depth = 0; depth < 3; depth += 1) {
+            const playlistResponse = await this.fetchPlaylist(currentUrl);
+            if (!playlistResponse.ok) {
+                return {
+                    online: false,
+                    reason: playlistResponse.reason,
+                    details: { stage: depth === 0 ? 'master' : 'child', status: playlistResponse.status }
+                };
+            }
+
+            const parsed = parsePlaylist(playlistResponse.body);
+            if (!parsed.ok) {
+                return {
+                    online: false,
+                    reason: parsed.reason,
+                    details: { stage: depth === 0 ? 'master_parse' : 'child_parse' }
+                };
+            }
+
+            if (!parsed.isMaster) {
+                parsedMedia = parsed;
+                break;
+            }
+
+            const nextChild = parsed.entries[0];
+            if (!nextChild) {
+                return {
+                    online: false,
+                    reason: 'master_has_no_variant'
+                };
+            }
+
+            const nextUrl = resolvePlaylistUrl(currentUrl, nextChild);
+            if (!nextUrl) {
+                return {
+                    online: false,
+                    reason: 'invalid_variant_url'
+                };
+            }
+
+            currentUrl = nextUrl;
+        }
+
+        if (!parsedMedia) {
+            return {
+                online: false,
+                reason: 'nested_master_without_media'
+            };
+        }
+
+        if (!parsedMedia.entries.length) {
+            return {
+                online: false,
+                reason: 'media_playlist_has_no_segments'
+            };
+        }
+
+        const freshness = this.evaluateExternalFreshness(cameraId, parsedMedia);
+        if (!freshness.ok) {
+            return {
+                online: false,
+                reason: freshness.reason,
+                details: freshness.details || null
+            };
+        }
+
+        return {
+            online: true,
+            reason: freshness.reason
+        };
+    }
+
+    async getActivePaths() {
+        const pathMap = new Map();
+
+        try {
             const configResponse = await axios.get(`${mediaMtxApiBaseUrl}/config/paths/list`, {
                 timeout: 5000
             });
 
-            const pathMap = new Map();
             const configItems = configResponse.data?.items || [];
-
-            // First, mark all configured paths as "online" (path exists = camera configured)
             for (const item of configItems) {
                 pathMap.set(item.name, {
                     name: item.name,
                     configured: true,
                     ready: false,
                     sourceReady: false,
-                    readers: 0,
-                    // Camera is online if it's configured in MediaMTX
-                    // (sourceOnDemand means source won't be ready until someone watches)
-                    isOnline: true
+                    readers: 0
                 });
             }
-
-            // Then get active paths to check if they're actually streaming
-            try {
-                const pathsResponse = await axios.get(`${mediaMtxApiBaseUrl}/paths/list`, {
-                    timeout: 5000
-                });
-                const activeItems = pathsResponse.data?.items || [];
-
-                for (const item of activeItems) {
-                    if (pathMap.has(item.name)) {
-                        const existing = pathMap.get(item.name);
-                        existing.ready = item.ready || false;
-                        existing.sourceReady = item.sourceReady || false;
-                        existing.readers = item.readers?.length || 0;
-                    }
-                }
-            } catch (e) {
-                // Paths list might fail if no active streams, that's OK
-            }
-
-            return pathMap;
         } catch (error) {
-            // MediaMTX might be offline
-            console.error('[CameraHealth] Failed to get paths:', error.message);
-            return new Map();
+            console.error('[CameraHealth] Failed to get configured paths:', error.message);
+            return pathMap;
         }
+
+        try {
+            const pathsResponse = await axios.get(`${mediaMtxApiBaseUrl}/paths/list`, {
+                timeout: 5000
+            });
+            const activeItems = pathsResponse.data?.items || [];
+
+            for (const item of activeItems) {
+                const existing = pathMap.get(item.name) || {
+                    name: item.name,
+                    configured: false,
+                    ready: false,
+                    sourceReady: false,
+                    readers: 0
+                };
+
+                existing.ready = item.ready || false;
+                existing.sourceReady = item.sourceReady || false;
+                existing.readers = item.readers?.length || 0;
+
+                pathMap.set(item.name, existing);
+            }
+        } catch (error) {
+            console.warn('[CameraHealth] Failed to get active paths:', error.message);
+        }
+
+        return pathMap;
     }
 
-    /**
-     * Check all cameras and update their online status
-     */
+    async evaluateCameraRaw(camera, activePaths) {
+        if ((camera.stream_source || 'internal') === 'external') {
+            return this.probeExternalStream(camera.id, camera.external_hls_url);
+        }
+
+        const pathName = camera.stream_key || `camera${camera.id}`;
+        const pathInfo = activePaths.get(pathName);
+
+        if (camera.private_rtsp_url) {
+            try {
+                const parsedUrl = new URL(camera.private_rtsp_url);
+                const host = parsedUrl.hostname;
+                const port = parseInt(parsedUrl.port, 10) || 554;
+                const tcpOnline = await checkTcpPort(host, port);
+                if (tcpOnline) {
+                    return { online: true, reason: 'rtsp_tcp_online' };
+                }
+            } catch {
+                return { online: false, reason: 'invalid_rtsp_url' };
+            }
+        }
+
+        if (pathInfo && (pathInfo.ready || pathInfo.sourceReady || pathInfo.readers > 0)) {
+            return { online: true, reason: 'mediamtx_path_ready' };
+        }
+
+        return { online: false, reason: 'internal_stream_unreachable' };
+    }
+
+    applyHysteresis(camera, rawResult) {
+        const state = this.ensureCameraState(camera.id, camera.is_online);
+
+        if (rawResult.online) {
+            state.successStreak += 1;
+            state.failStreak = 0;
+
+            if (state.effectiveOnline || state.successStreak >= ONLINE_SUCCESS_THRESHOLD) {
+                state.effectiveOnline = true;
+            }
+        } else {
+            state.failStreak += 1;
+            state.successStreak = 0;
+
+            if (!state.effectiveOnline || state.failStreak >= OFFLINE_FAIL_THRESHOLD) {
+                state.effectiveOnline = false;
+            }
+        }
+
+        state.lastReason = rawResult.reason;
+        state.lastDetails = rawResult.details || null;
+
+        return state.effectiveOnline ? 1 : 0;
+    }
+
     async checkAllCameras() {
+        if (this.isChecking) {
+            console.log('[CameraHealth] Previous check still running, skipping this tick');
+            return;
+        }
+
+        this.isChecking = true;
+
         try {
             const activePaths = await this.getActivePaths();
-
-            // Get all enabled cameras (include stream_key and private_rtsp_url for path & ping lookup)
-            // Use connection pool for better performance
             const cameras = query(`
-                SELECT id, name, location, is_online, stream_key, private_rtsp_url, stream_source 
-                FROM cameras 
+                SELECT id, name, location, is_online, stream_key, private_rtsp_url, stream_source, external_hls_url
+                FROM cameras
                 WHERE enabled = 1
             `);
 
-            // Debug: log what paths we found
-            console.log(`[CameraHealth] Found ${activePaths.size} configured paths in MediaMTX`);
-
             const timestamp = getTimestamp();
+            const activeCameraIds = new Set(cameras.map((camera) => camera.id));
 
-            // Process camera health checks in parallel to avoid long blocking times
             const healthResults = await Promise.allSettled(cameras.map(async (camera) => {
-                // Skip external cameras — they don't use our MediaMTX
-                if (camera.stream_source === 'external') {
-                    return { camera, pathName: null, isOnline: camera.is_online, skip: true };
-                }
+                this.ensureCameraState(camera.id, camera.is_online);
+                const rawResult = await this.evaluateCameraRaw(camera, activePaths);
+                const isOnline = this.applyHysteresis(camera, rawResult);
 
-                let isActuallyOnline = false;
-                const pathName = camera.stream_key || `camera${camera.id}`;
-                const pathInfo = activePaths.get(pathName);
-
-                // 1. Primary Check: Direct TCP Ping to RTSP port
-                if (camera.private_rtsp_url) {
-                    try {
-                        const parsedUrl = new URL(camera.private_rtsp_url);
-                        const host = parsedUrl.hostname;
-                        const port = parseInt(parsedUrl.port) || 554;
-                        isActuallyOnline = await checkTcpPort(host, port);
-                    } catch (e) {
-                        console.warn(`[CameraHealth] Invalid RTSP URL for ${camera.name}: ${camera.private_rtsp_url}`);
-                    }
-                }
-
-                // 2. Fallback Check: MediaMTX Active Stream (for Tunnel/VPN cameras)
-                if (!isActuallyOnline && pathInfo && (pathInfo.ready || pathInfo.sourceReady)) {
-                    isActuallyOnline = true;
-                }
-
-                return { camera, pathName, isOnline: isActuallyOnline ? 1 : 0 };
+                return {
+                    camera,
+                    isOnline,
+                    rawReason: rawResult.reason
+                };
             }));
 
             let onlineCount = 0;
@@ -215,100 +471,84 @@ class CameraHealthService {
             let changedCount = 0;
 
             for (const result of healthResults) {
-                if (result.status !== 'fulfilled') continue;
-
-                const { camera, pathName, isOnline, skip } = result.value;
-                if (skip) {
-                    if (isOnline) onlineCount++; else offlineCount++;
+                if (result.status !== 'fulfilled') {
                     continue;
                 }
-                const pathInfo = activePaths.get(pathName);
 
-                // Only update if status changed
-                if (camera.is_online !== isOnline) {
-                    // Use connection pool for better performance
-                    execute(
-                        'UPDATE cameras SET is_online = ?, last_online_check = ? WHERE id = ?',
-                        [isOnline, timestamp, camera.id]
-                    );
-                    changedCount++;
+                const { camera, isOnline, rawReason } = result.value;
 
-                    // Send Telegram notification on status change
+                execute(
+                    'UPDATE cameras SET is_online = ?, last_online_check = ? WHERE id = ?',
+                    [isOnline, timestamp, camera.id]
+                );
+
+                const statusChanged = camera.is_online !== isOnline;
+                if (statusChanged) {
+                    changedCount += 1;
+
                     if (isTelegramConfigured()) {
                         if (isOnline) {
-                            // Camera came back online
-                            console.log(`[CameraHealth] ${camera.name} is now ONLINE`);
-
-                            // Calculate downtime if we tracked when it went offline
                             let downtime = null;
                             if (this.offlineSince.has(camera.id)) {
                                 downtime = Math.floor((Date.now() - this.offlineSince.get(camera.id)) / 1000);
                                 this.offlineSince.delete(camera.id);
                             }
 
-                            // Send online notification (async, don't await)
                             sendCameraOnlineNotification({
                                 id: camera.id,
                                 name: camera.name,
                                 location: camera.location
-                            }, downtime).catch(err => {
-                                console.error('[CameraHealth] Failed to send online notification:', err.message);
+                            }, downtime).catch((error) => {
+                                console.error('[CameraHealth] Failed to send online notification:', error.message);
                             });
                         } else {
-                            // Camera went offline
-                            console.log(`[CameraHealth] ${camera.name} is now OFFLINE`);
-
-                            // Track when camera went offline
                             this.offlineSince.set(camera.id, Date.now());
-
-                            // Send offline notification (async, don't await)
                             sendCameraOfflineNotification({
                                 id: camera.id,
                                 name: camera.name,
                                 location: camera.location
-                            }).catch(err => {
-                                console.error('[CameraHealth] Failed to send offline notification:', err.message);
+                            }).catch((error) => {
+                                console.error('[CameraHealth] Failed to send offline notification:', error.message);
                             });
-                        }
-                    } else {
-                        if (isOnline) {
-                            console.log(`[CameraHealth] ${camera.name} is now ONLINE`);
-                        } else {
-                            console.log(`[CameraHealth] ${camera.name} is now OFFLINE`);
                         }
                     }
                 }
 
                 if (isOnline) {
-                    onlineCount++;
+                    onlineCount += 1;
                 } else {
-                    offlineCount++;
+                    offlineCount += 1;
+                }
+
+                if (!isOnline) {
+                    console.warn(`[CameraHealth] Camera ${camera.id} (${camera.name}) offline reason: ${rawReason}`);
+                }
+            }
+
+            for (const cameraId of this.healthState.keys()) {
+                if (!activeCameraIds.has(cameraId)) {
+                    this.healthState.delete(cameraId);
+                    this.offlineSince.delete(cameraId);
                 }
             }
 
             this.lastCheck = new Date();
-
-            // Always log status for debugging
             console.log(`[CameraHealth] Check complete: ${onlineCount} online, ${offlineCount} offline (${changedCount} changed)`);
-
         } catch (error) {
             console.error('[CameraHealth] Check failed:', error.message);
+        } finally {
+            this.isChecking = false;
         }
     }
 
-    /**
-     * Get current health status summary
-     * @returns {Promise<object>}
-     */
     async getStatus() {
         try {
-            // Use connection pool for better performance
             const stats = queryOne(`
-                SELECT 
+                SELECT
                     COUNT(*) as total,
                     SUM(CASE WHEN is_online = 1 THEN 1 ELSE 0 END) as online,
                     SUM(CASE WHEN is_online = 0 OR is_online IS NULL THEN 1 ELSE 0 END) as offline
-                FROM cameras 
+                FROM cameras
                 WHERE enabled = 1
             `);
 
@@ -331,56 +571,32 @@ class CameraHealthService {
         }
     }
 
-    /**
-     * Force check a specific camera
-     * @param {number} cameraId 
-     * @returns {Promise<boolean>} true if online
-     */
     async checkCamera(cameraId) {
         try {
             const activePaths = await this.getActivePaths();
-
-            // Get camera's stream_key, url, and source from database using connection pool
-            const camera = queryOne('SELECT stream_key, private_rtsp_url, stream_source FROM cameras WHERE id = ?', [cameraId]);
-
-            // External cameras: always consider them online (we can't check their RTSP)
-            if (camera?.stream_source === 'external') {
-                return true;
-            }
-
-            // Use stream_key if available, fallback to legacy format
-            const pathName = camera?.stream_key || `camera${cameraId}`;
-            const pathInfo = activePaths.get(pathName);
-
-            let isOnline = false;
-
-            // 1. Primary Check: Direct TCP ping
-            if (camera?.private_rtsp_url) {
-                try {
-                    const parsedUrl = new URL(camera.private_rtsp_url);
-                    const host = parsedUrl.hostname;
-                    const port = parseInt(parsedUrl.port) || 554;
-                    isOnline = await checkTcpPort(host, port);
-                } catch (e) {
-                    console.warn(`[CameraHealth] Invalid RTSP URL for camera ${cameraId}`);
-                }
-            }
-
-            // 2. Fallback Check: MediaMTX Active Stream
-            if (!isOnline && pathInfo && (pathInfo.ready || pathInfo.sourceReady)) {
-                isOnline = true;
-            }
-
-            const isOnlineValue = isOnline ? 1 : 0;
-
-            // Update database with configured timezone timestamp
-            const timestamp = getTimestamp();
-            execute(
-                'UPDATE cameras SET is_online = ?, last_online_check = ? WHERE id = ?',
-                [isOnlineValue, timestamp, cameraId]
+            const camera = queryOne(
+                `SELECT id, name, location, is_online, stream_key, private_rtsp_url, stream_source, external_hls_url
+                 FROM cameras
+                 WHERE id = ?`,
+                [cameraId]
             );
 
-            return isOnline;
+            if (!camera) {
+                return false;
+            }
+
+            this.ensureCameraState(camera.id, camera.is_online);
+            const rawResult = await this.evaluateCameraRaw(camera, activePaths);
+            const isOnline = this.applyHysteresis(camera, rawResult);
+            const timestamp = getTimestamp();
+
+            execute(
+                'UPDATE cameras SET is_online = ?, last_online_check = ? WHERE id = ?',
+                [isOnline, timestamp, camera.id]
+            );
+
+            this.lastCheck = new Date();
+            return isOnline === 1;
         } catch (error) {
             console.error(`[CameraHealth] Check camera ${cameraId} failed:`, error.message);
             return false;
@@ -388,4 +604,10 @@ class CameraHealthService {
     }
 }
 
-export default new CameraHealthService();
+const cameraHealthService = new CameraHealthService();
+
+export { CameraHealthService, parsePlaylist };
+export default cameraHealthService;
+
+
+

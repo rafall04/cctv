@@ -23,20 +23,28 @@ export default function CamerasSection({
     const { cameras, areas, loading } = useCameras();
     const [connectionTab, setConnectionTab] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedArea, setSelectedArea] = useState('all');
     const [showSearchDropdown, setShowSearchDropdown] = useState(false);
     const [focusedCameraId, setFocusedCameraId] = useState(null);
     const searchInputRef = useRef(null);
     const searchContainerRef = useRef(null);
 
-    const tunnelCameras = useMemo(() => cameras.filter(c => c.is_tunnel === 1), [cameras]);
-    const stableCameras = useMemo(() => cameras.filter(c => c.is_tunnel !== 1), [cameras]);
-    const hasTunnelCameras = useMemo(() => tunnelCameras.length > 0, [tunnelCameras]);
+    const areaOptions = useMemo(() => {
+        const names = new Set();
+        areas.forEach((area) => {
+            if (area?.name) names.add(area.name);
+        });
+        cameras.forEach((camera) => {
+            if (camera?.area_name) names.add(camera.area_name);
+        });
+        return Array.from(names).sort((a, b) => a.localeCompare(b));
+    }, [areas, cameras]);
 
     const searchFilteredCameras = useMemo(() => {
         if (!searchQuery.trim()) return cameras;
 
         const query = searchQuery.toLowerCase().trim();
-        return cameras.filter(camera => {
+        return cameras.filter((camera) => {
             const name = (camera.name || '').toLowerCase();
             const location = (camera.location || '').toLowerCase();
             const areaName = (camera.area_name || '').toLowerCase();
@@ -47,15 +55,24 @@ export default function CamerasSection({
         });
     }, [cameras, searchQuery]);
 
-    const filteredForGrid = useMemo(() => {
-        let baseList = searchFilteredCameras;
-        if (connectionTab === 'stable') return baseList.filter(c => c.is_tunnel !== 1);
-        if (connectionTab === 'tunnel') return baseList.filter(c => c.is_tunnel === 1);
-        if (connectionTab === 'favorites') return baseList.filter(c => favorites.includes(c.id));
-        return baseList;
-    }, [searchFilteredCameras, connectionTab, favorites]);
+    const areaFilteredCameras = useMemo(() => {
+        if (selectedArea === 'all') return searchFilteredCameras;
+        return searchFilteredCameras.filter((camera) => camera.area_name === selectedArea);
+    }, [searchFilteredCameras, selectedArea]);
 
-    const displayCameras = viewMode === 'map' ? searchFilteredCameras : filteredForGrid;
+    const filteredForGrid = useMemo(() => {
+        let baseList = areaFilteredCameras;
+        if (connectionTab === 'stable') return baseList.filter((camera) => camera.is_tunnel !== 1);
+        if (connectionTab === 'tunnel') return baseList.filter((camera) => camera.is_tunnel === 1);
+        if (connectionTab === 'favorites') return baseList.filter((camera) => favorites.includes(camera.id));
+        return baseList;
+    }, [areaFilteredCameras, connectionTab, favorites]);
+
+    const favoritesInAreaCount = useMemo(() => (
+        areaFilteredCameras.filter((camera) => favorites.includes(camera.id)).length
+    ), [areaFilteredCameras, favorites]);
+
+    const displayCameras = viewMode === 'map' ? areaFilteredCameras : filteredForGrid;
 
     const clearSearch = useCallback(() => {
         setSearchQuery('');
@@ -63,15 +80,27 @@ export default function CamerasSection({
         searchInputRef.current?.focus();
     }, []);
 
+    const handleAreaChange = useCallback((valueOrEvent) => {
+        const nextArea = typeof valueOrEvent === 'string'
+            ? valueOrEvent
+            : valueOrEvent?.target?.value || 'all';
+
+        setSelectedArea(nextArea);
+        setFocusedCameraId(null);
+    }, []);
+
     const handleCameraSelect = useCallback((camera) => {
         if (viewMode === 'map') {
+            if (selectedArea !== 'all' && camera.area_name && camera.area_name !== selectedArea) {
+                setSelectedArea('all');
+            }
             setFocusedCameraId(camera.id);
         } else {
             onCameraClick(camera);
         }
         setSearchQuery('');
         setShowSearchDropdown(false);
-    }, [viewMode, onCameraClick]);
+    }, [viewMode, onCameraClick, selectedArea]);
 
     const handleFocusHandled = useCallback(() => {
         setFocusedCameraId(null);
@@ -87,7 +116,7 @@ export default function CamerasSection({
                                 {landingSettings.section_title}
                             </h2>
                             <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-                                {cameras.length} kamera tersedia • Streaming langsung 24/7
+                                {cameras.length} kamera tersedia | Streaming langsung 24/7
                             </p>
                         </div>
 
@@ -155,20 +184,20 @@ export default function CamerasSection({
                                     </button>
                                 )}
                                 <span className="hidden sm:flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] text-gray-400 dark:text-gray-500 bg-gray-200 dark:bg-gray-700 rounded">
-                                    <kbd className="font-sans">⌘</kbd>
+                                    <kbd className="font-sans">Ctrl</kbd>
                                     <kbd className="font-sans">K</kbd>
                                 </span>
                             </div>
                         </div>
 
-                        {showSearchDropdown && searchFilteredCameras.length > 0 && (
+                        {showSearchDropdown && areaFilteredCameras.length > 0 && (
                             <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden z-[1100] max-h-[300px] sm:max-h-[400px] overflow-y-auto">
                                 <div className="px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700 sticky top-0">
                                     <span className="text-xs text-gray-500 dark:text-gray-400">
-                                        {searchFilteredCameras.length} kamera ditemukan • Klik untuk {viewMode === 'map' ? 'lihat di peta' : 'putar video'}
+                                        {areaFilteredCameras.length} kamera ditemukan | Klik untuk {viewMode === 'map' ? 'lihat di peta' : 'putar video'}
                                     </span>
                                 </div>
-                                {searchFilteredCameras.map((camera, idx) => {
+                                {areaFilteredCameras.map((camera, idx) => {
                                     const isMaintenance = camera.status === 'maintenance';
                                     const isTunnel = camera.is_tunnel === 1;
                                     const hasCoords = camera.latitude && camera.longitude;
@@ -253,17 +282,35 @@ export default function CamerasSection({
                             </div>
                         )}
 
-                        {showSearchDropdown && searchQuery.trim() && searchFilteredCameras.length === 0 && (
+                        {showSearchDropdown && searchQuery.trim() && areaFilteredCameras.length === 0 && (
                             <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden z-[1100] p-6 text-center">
                                 <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-400">
                                     <Icons.Search />
                                 </div>
                                 <p className="text-gray-500 dark:text-gray-400 text-sm">
-                                    Tidak ditemukan kamera untuk "<span className="font-medium text-gray-700 dark:text-gray-300">{searchQuery}</span>"
+                                    Tidak ditemukan kamera untuk &quot;<span className="font-medium text-gray-700 dark:text-gray-300">{searchQuery}</span>&quot;
                                 </p>
                             </div>
                         )}
                     </div>
+
+                    {(viewMode === 'grid' || viewMode === 'map') && areaOptions.length > 0 && (
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Filter Area:</span>
+                            <select
+                                value={selectedArea}
+                                onChange={handleAreaChange}
+                                className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500"
+                            >
+                                <option value="all">Semua Area ({searchFilteredCameras.length})</option>
+                                {areaOptions.map((area) => (
+                                    <option key={area} value={area}>
+                                        {area} ({searchFilteredCameras.filter((camera) => camera.area_name === area).length})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                 </div>
 
                 {viewMode === 'grid' && (
@@ -276,7 +323,7 @@ export default function CamerasSection({
                                     : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                                     }`}
                             >
-                                Semua ({searchFilteredCameras.length})
+                                Semua ({areaFilteredCameras.length})
                             </button>
                             <button
                                 onClick={() => setConnectionTab('stable')}
@@ -286,7 +333,7 @@ export default function CamerasSection({
                                     }`}
                             >
                                 <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                Stabil ({searchFilteredCameras.filter(c => c.is_tunnel !== 1).length})
+                                Stabil ({areaFilteredCameras.filter((camera) => camera.is_tunnel !== 1).length})
                             </button>
                             <button
                                 onClick={() => setConnectionTab('tunnel')}
@@ -296,7 +343,7 @@ export default function CamerasSection({
                                     }`}
                             >
                                 <span className="w-2 h-2 rounded-full bg-orange-500"></span>
-                                Tunnel ({searchFilteredCameras.filter(c => c.is_tunnel === 1).length})
+                                Tunnel ({areaFilteredCameras.filter((camera) => camera.is_tunnel === 1).length})
                             </button>
                             {favorites.length > 0 && (
                                 <button
@@ -309,7 +356,7 @@ export default function CamerasSection({
                                     <svg className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 24 24">
                                         <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                                     </svg>
-                                    Favorit ({favorites.length})
+                                    Favorit ({favoritesInAreaCount})
                                 </button>
                             )}
                         </div>
@@ -338,6 +385,11 @@ export default function CamerasSection({
                             filterName={connectionTab === 'tunnel' ? 'Koneksi Tunnel' : connectionTab === 'favorites' ? 'Kamera Favorit' : 'Koneksi Stabil'}
                             onClearFilter={() => setConnectionTab('all')}
                         />
+                    ) : selectedArea !== 'all' ? (
+                        <NoDataWithFilterEmptyState
+                            filterName={`Area ${selectedArea}`}
+                            onClearFilter={() => setSelectedArea('all')}
+                        />
                     ) : (
                         <div className="text-center py-16">
                             <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400">
@@ -358,7 +410,7 @@ export default function CamerasSection({
                         </div>
                     }>
                         <Playback
-                            cameras={cameras.filter(c => c.enable_recording)}
+                            cameras={cameras.filter((camera) => camera.enable_recording)}
                             selectedCamera={selectedCamera}
                         />
                     </Suspense>
@@ -369,8 +421,10 @@ export default function CamerasSection({
                         </div>
                     }>
                         <MapView
-                            cameras={cameras}
+                            cameras={searchFilteredCameras}
                             areas={areas}
+                            selectedArea={selectedArea}
+                            onAreaChange={handleAreaChange}
                             className="h-[450px] sm:h-[550px]"
                             focusedCameraId={focusedCameraId}
                             onFocusHandled={handleFocusHandled}
@@ -384,7 +438,7 @@ export default function CamerasSection({
                                 camera={camera}
                                 onClick={() => onCameraClick(camera)}
                                 onAddMulti={() => onAddMulti(camera)}
-                                inMulti={multiCameras.some(c => c.id === camera.id)}
+                                inMulti={multiCameras.some((item) => item.id === camera.id)}
                                 isFavorite={isFavorite}
                                 onToggleFavorite={onToggleFavorite}
                             />
@@ -395,3 +449,6 @@ export default function CamerasSection({
         </section>
     );
 }
+
+
+

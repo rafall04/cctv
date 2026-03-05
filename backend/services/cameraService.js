@@ -161,7 +161,7 @@ class CameraService {
     async updateCamera(id, data, request) {
         const { name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, enable_recording, recording_duration_hours, video_codec, stream_source, external_hls_url } = data;
 
-        const existingCamera = queryOne('SELECT id, name, private_rtsp_url, enabled, stream_key, enable_recording, stream_source FROM cameras WHERE id = ?', [id]);
+        const existingCamera = queryOne('SELECT id, name, private_rtsp_url, enabled, stream_key, enable_recording, stream_source, external_hls_url FROM cameras WHERE id = ?', [id]);
 
         if (!existingCamera) {
             const err = new Error('Camera not found');
@@ -243,6 +243,25 @@ class CameraService {
             }
             updates.push('video_codec = ?');
             values.push(video_codec);
+        }
+        const effectiveStreamSource = stream_source !== undefined
+            ? stream_source
+            : (existingCamera.stream_source || 'internal');
+        const effectiveExternalHlsUrl = external_hls_url !== undefined
+            ? (external_hls_url || null)
+            : (existingCamera.external_hls_url || null);
+
+        if (effectiveStreamSource === 'external') {
+            if (!effectiveExternalHlsUrl) {
+                const err = new Error('External HLS URL is required for external cameras');
+                err.statusCode = 400;
+                throw err;
+            }
+            if (!effectiveExternalHlsUrl.startsWith('http://') && !effectiveExternalHlsUrl.startsWith('https://')) {
+                const err = new Error('External HLS URL must start with http:// or https://');
+                err.statusCode = 400;
+                throw err;
+            }
         }
         if (stream_source !== undefined) {
             if (!['internal', 'external'].includes(stream_source)) {
@@ -379,3 +398,4 @@ class CameraService {
 }
 
 export default new CameraService();
+

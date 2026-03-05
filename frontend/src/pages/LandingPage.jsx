@@ -345,6 +345,8 @@ function LandingPageContent() {
         }, { replace: false });
     }, [layoutMode, setSearchParams]);
 
+    const shouldHideFloatingWidgets = showMulti && viewMode === 'grid';
+
     if (layoutMode === 'simple') {
         return (
             <div key="simple-mode">
@@ -362,6 +364,7 @@ function LandingPageContent() {
                     isFavorite={isFavorite}
                     viewMode={viewMode}
                     setViewMode={handleViewModeChange}
+                    hideFloatingWidgets={shouldHideFloatingWidgets}
                 />
 
                 <MultiViewButton
@@ -435,12 +438,16 @@ function LandingPageContent() {
                     />
                 )}
 
-                <Suspense fallback={null}>
-                    <FeedbackWidget />
-                </Suspense>
-                <Suspense fallback={null}>
-                    <SaweriaSupport />
-                </Suspense>
+                {!shouldHideFloatingWidgets && (
+                    <>
+                        <Suspense fallback={null}>
+                            <FeedbackWidget />
+                        </Suspense>
+                        <Suspense fallback={null}>
+                            <SaweriaSupport />
+                        </Suspense>
+                    </>
+                )}
             </div>
         </div>
     );
@@ -559,3 +566,4 @@ export default function LandingPage() {
         </ToastProvider>
     );
 }
+

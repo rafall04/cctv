@@ -125,7 +125,8 @@ export default function LandingPageSimple({
     onToggleFavorite,
     isFavorite,
     viewMode,
-    setViewMode
+    setViewMode,
+    hideFloatingWidgets = false
 }) {
     const { branding } = useBranding();
 
@@ -170,15 +171,21 @@ export default function LandingPageSimple({
                 saweriaLink={saweriaLink}
             />
 
-            {/* Feedback Widget */}
-            <Suspense fallback={null}>
-                <FeedbackWidget />
-            </Suspense>
+            {!hideFloatingWidgets && (
+                <>
+                    {/* Feedback Widget */}
+                    <Suspense fallback={null}>
+                        <FeedbackWidget />
+                    </Suspense>
 
-            {/* Saweria Support */}
-            <Suspense fallback={null}>
-                <SaweriaSupport />
-            </Suspense>
+                    {/* Saweria Support */}
+                    <Suspense fallback={null}>
+                        <SaweriaSupport />
+                    </Suspense>
+                </>
+            )}
         </div>
     );
 }
+
+

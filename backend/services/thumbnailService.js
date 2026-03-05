@@ -1,19 +1,22 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { existsSync, mkdirSync, unlinkSync, renameSync } from 'fs';
+import { existsSync, mkdirSync, unlinkSync, copyFileSync } from 'fs';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { query, execute } from '../database/database.js';
+import { config } from '../config/config.js';
 
 const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const THUMBNAIL_DIR = join(__dirname, '..', 'data', 'thumbnails');
-const HLS_BASE_URL = 'http://localhost:8888';
+const INTERNAL_HLS_BASE_URL = (config.mediamtx?.hlsUrlInternal || 'http://localhost:8888').replace(/\/$/, '');
+const THUMBNAIL_INTERVAL_MS = 5 * 60 * 1000;
+const THUMBNAIL_CONCURRENCY = 3;
+const FFMPEG_TIMEOUT_MS = 15000;
 
-// Ensure thumbnail directory exists
 if (!existsSync(THUMBNAIL_DIR)) {
     mkdirSync(THUMBNAIL_DIR, { recursive: true });
     console.log('[Thumbnail] Created directory:', THUMBNAIL_DIR);
@@ -26,9 +29,6 @@ class ThumbnailService {
         this.ffmpegAvailable = null;
     }
 
-    /**
-     * Check if FFmpeg is available
-     */
     async checkFFmpeg() {
         if (this.ffmpegAvailable !== null) {
             return this.ffmpegAvailable;
@@ -37,21 +37,16 @@ class ThumbnailService {
         try {
             await execAsync('ffmpeg -version', { timeout: 3000 });
             this.ffmpegAvailable = true;
-            console.log('[Thumbnail] FFmpeg detected ✓');
+            console.log('[Thumbnail] FFmpeg detected');
             return true;
-        } catch (error) {
+        } catch {
             this.ffmpegAvailable = false;
             console.warn('[Thumbnail] FFmpeg not found - thumbnail generation disabled');
-            console.warn('[Thumbnail] Install FFmpeg: https://ffmpeg.org/download.html');
             return false;
         }
     }
 
-    /**
-     * Start periodic thumbnail generation (every 5 minutes)
-     */
     async start() {
-        // Check FFmpeg availability first
         const hasFFmpeg = await this.checkFFmpeg();
         if (!hasFFmpeg) {
             console.log('[Thumbnail] Service disabled (FFmpeg not available)');
@@ -59,19 +54,20 @@ class ThumbnailService {
         }
 
         console.log('[Thumbnail] Service started - generating every 5 minutes');
-        
-        // Initial generation after 10 seconds
-        setTimeout(() => this.generateAllThumbnails(), 10000);
-        
-        // Periodic generation every 5 minutes
+
+        setTimeout(() => {
+            this.generateAllThumbnails().catch((error) => {
+                console.error('[Thumbnail] Initial generation failed:', error.message);
+            });
+        }, 10000);
+
         this.generationInterval = setInterval(() => {
-            this.generateAllThumbnails();
-        }, 5 * 60 * 1000);
+            this.generateAllThumbnails().catch((error) => {
+                console.error('[Thumbnail] Interval generation failed:', error.message);
+            });
+        }, THUMBNAIL_INTERVAL_MS);
     }
 
-    /**
-     * Stop periodic generation
-     */
     stop() {
         if (this.generationInterval) {
             clearInterval(this.generationInterval);
@@ -80,17 +76,39 @@ class ThumbnailService {
         console.log('[Thumbnail] Service stopped');
     }
 
-    /**
-     * Generate thumbnails for all enabled cameras
-     */
+    resolveCameraHlsUrl(camera) {
+        if ((camera.stream_source || 'internal') === 'external') {
+            const url = (camera.external_hls_url || '').trim();
+            if (url.startsWith('http://') || url.startsWith('https://')) {
+                return url;
+            }
+            return null;
+        }
+
+        if (!camera.stream_key) {
+            return null;
+        }
+
+        return `${INTERNAL_HLS_BASE_URL}/${camera.stream_key}/index.m3u8`;
+    }
+
+    async processCamera(camera) {
+        const hlsUrl = this.resolveCameraHlsUrl(camera);
+
+        if (!hlsUrl) {
+            throw new Error('No valid HLS URL for camera source');
+        }
+
+        await this.generateThumbnail(camera.id, hlsUrl);
+    }
+
     async generateAllThumbnails() {
-        // Skip if FFmpeg not available
         if (this.ffmpegAvailable === false) {
             return;
         }
 
         if (this.isGenerating) {
-            console.log('[Thumbnail] Generation already in progress, skipping...');
+            console.log('[Thumbnail] Generation already in progress, skipping');
             return;
         }
 
@@ -98,13 +116,14 @@ class ThumbnailService {
         const startTime = Date.now();
 
         try {
-            const cameras = query(
-                'SELECT id, name, stream_key, enabled FROM cameras WHERE enabled = 1'
-            );
+            const cameras = query(`
+                SELECT id, name, stream_key, stream_source, external_hls_url
+                FROM cameras
+                WHERE enabled = 1
+            `);
 
             if (cameras.length === 0) {
                 console.log('[Thumbnail] No enabled cameras found');
-                this.isGenerating = false;
                 return;
             }
 
@@ -112,95 +131,100 @@ class ThumbnailService {
 
             let success = 0;
             let failed = 0;
+            let cursor = 0;
 
-            for (const camera of cameras) {
-                if (!camera.stream_key) {
-                    console.log(`[Thumbnail] Skipping camera ${camera.id}: no stream_key`);
-                    failed++;
-                    continue;
-                }
+            const workerCount = Math.min(THUMBNAIL_CONCURRENCY, cameras.length);
+            const worker = async () => {
+                while (true) {
+                    const currentIndex = cursor;
+                    cursor += 1;
 
-                try {
-                    console.log(`[Thumbnail] Processing camera ${camera.id} (${camera.name})...`);
-                    await this.generateThumbnail(camera.id, camera.stream_key);
-                    success++;
-                    console.log(`[Thumbnail] ✓ Camera ${camera.id} success`);
-                } catch (error) {
-                    console.error(`[Thumbnail] ✗ Camera ${camera.id} (${camera.name}) failed:`, error.message);
-                    failed++;
+                    if (currentIndex >= cameras.length) {
+                        break;
+                    }
+
+                    const camera = cameras[currentIndex];
+                    try {
+                        await this.processCamera(camera);
+                        success += 1;
+                    } catch (error) {
+                        failed += 1;
+                        console.error(`[Thumbnail] Camera ${camera.id} (${camera.name}) failed:`, error.message);
+                    }
                 }
-            }
+            };
+
+            await Promise.all(Array.from({ length: workerCount }, () => worker()));
 
             const duration = ((Date.now() - startTime) / 1000).toFixed(1);
             console.log(`[Thumbnail] Complete: ${success} success, ${failed} failed (${duration}s)`);
-
         } catch (error) {
-            console.error('[Thumbnail] Generation error:', error);
+            console.error('[Thumbnail] Generation error:', error.message);
         } finally {
             this.isGenerating = false;
         }
     }
 
-    /**
-     * Generate thumbnail for single camera
-     * Ultra-optimized: 320x180, quality 60, ~10-15KB
-     */
-    async generateThumbnail(cameraId, streamKey) {
-        const hlsUrl = `${HLS_BASE_URL}/${streamKey}/index.m3u8`;
+    async generateThumbnail(cameraId, hlsUrl) {
         const outputPath = join(THUMBNAIL_DIR, `${cameraId}.jpg`);
         const tempPath = join(THUMBNAIL_DIR, `${cameraId}_temp.jpg`);
 
         try {
-            // FFmpeg command: ultra-lightweight
-            // -vframes 1: ambil 1 frame saja
-            // -s 320x180: tiny resolution (16:9 ratio)
-            // -q:v 8: JPEG quality ~60% (scale 2-31, lower=better)
-            // -loglevel error: suppress verbose output
-            const command = `ffmpeg -loglevel error -i "${hlsUrl}" -vframes 1 -s 320x180 -q:v 8 "${tempPath}" -y`;
+            const command = [
+                'ffmpeg',
+                '-loglevel', 'error',
+                '-rw_timeout', '10000000',
+                '-i', `"${hlsUrl}"`,
+                '-vframes', '1',
+                '-vf', 'scale=320:180:force_original_aspect_ratio=decrease,pad=320:180:(ow-iw)/2:(oh-ih)/2',
+                '-q:v', '8',
+                `"${tempPath}"`,
+                '-y'
+            ].join(' ');
 
             await execAsync(command, {
-                timeout: 15000, // 15 detik timeout (increased for slow streams)
-                maxBuffer: 1024 * 1024 // 1MB buffer
+                timeout: FFMPEG_TIMEOUT_MS,
+                maxBuffer: 1024 * 1024
             });
 
-            // Atomic replace (avoid serving partial file)
-            if (existsSync(outputPath)) {
-                unlinkSync(outputPath);
-            }
-            
-            if (existsSync(tempPath)) {
-                renameSync(tempPath, outputPath);
-            } else {
-                throw new Error('Temp file not created');
+            if (!existsSync(tempPath)) {
+                throw new Error('Temporary thumbnail was not created');
             }
 
-            // Update database (path must match static server prefix)
+            copyFileSync(tempPath, outputPath);
+            unlinkSync(tempPath);
+
             execute(
                 'UPDATE cameras SET thumbnail_path = ?, thumbnail_updated_at = CURRENT_TIMESTAMP WHERE id = ?',
                 [`/api/thumbnails/${cameraId}.jpg`, cameraId]
             );
-
-            console.log(`[Thumbnail] Generated for camera ${cameraId}`);
-
         } catch (error) {
-            // Cleanup temp file
             if (existsSync(tempPath)) {
                 try {
                     unlinkSync(tempPath);
-                } catch (cleanupError) {
-                    console.error(`[Thumbnail] Cleanup error for ${cameraId}:`, cleanupError.message);
+                } catch {
+                    // Ignore cleanup errors
                 }
             }
             throw error;
         }
     }
 
-    /**
-     * Generate thumbnail on-demand (for newly added camera)
-     */
-    async generateSingle(cameraId, streamKey) {
+    async generateSingle(cameraId, streamKey, streamSource = 'internal', externalHlsUrl = null) {
         try {
-            await this.generateThumbnail(cameraId, streamKey);
+            const camera = {
+                id: cameraId,
+                stream_key: streamKey,
+                stream_source: streamSource,
+                external_hls_url: externalHlsUrl
+            };
+            const hlsUrl = this.resolveCameraHlsUrl(camera);
+
+            if (!hlsUrl) {
+                return { success: false, error: 'No valid source URL for thumbnail generation' };
+            }
+
+            await this.generateThumbnail(cameraId, hlsUrl);
             return { success: true };
         } catch (error) {
             console.error(`[Thumbnail] On-demand generation failed for ${cameraId}:`, error.message);
