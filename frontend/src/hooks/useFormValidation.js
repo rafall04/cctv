@@ -9,10 +9,10 @@ import { useState, useCallback, useMemo } from 'react';
  * Requirements: 7.1, 7.2, 7.3, 7.4
  * 
  * @param {Object} initialValues - Initial form values
- * @param {Object} validationRules - Validation rules for each field
+ * @param {Object} initialRules - Validation rules for each field
  * @returns {Object} Form validation state and methods
  */
-export function useFormValidation(initialValues = {}, validationRules = {}) {
+export function useFormValidation(initialValues = {}, initialRules = {}) {
     const [values, setValues] = useState(initialValues);
     const [errors, setErrors] = useState({});
     const [touched, setTouched] = useState({});
