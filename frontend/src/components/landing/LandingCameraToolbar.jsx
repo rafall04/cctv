@@ -7,7 +7,6 @@ export default function LandingCameraToolbar({
     viewMode,
     onViewModeChange,
     searchProps,
-    helperText,
     contextualControls = null,
 }) {
     return (
@@ -27,13 +26,8 @@ export default function LandingCameraToolbar({
 
             <LandingSearchBox {...searchProps} />
 
-            {(helperText || contextualControls) && (
+            {contextualControls && (
                 <div className="flex flex-col gap-3 rounded-2xl border border-gray-200/70 bg-white/85 px-4 py-3 shadow-sm dark:border-gray-700/60 dark:bg-gray-900/70">
-                    {helperText && (
-                        <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                            {helperText}
-                        </p>
-                    )}
                     {contextualControls}
                 </div>
             )}

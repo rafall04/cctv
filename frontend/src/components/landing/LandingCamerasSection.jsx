@@ -199,13 +199,6 @@ export default function CamerasSection({
                         showSearchDropdown,
                         dropdownContent: searchDropdown,
                     }}
-                    helperText={
-                        viewMode === 'map'
-                            ? 'Filter area diterapkan langsung ke peta aktif.'
-                            : viewMode === 'grid'
-                                ? 'Pilih area lalu sempitkan hasil berdasarkan kualitas koneksi.'
-                                : null
-                    }
                     contextualControls={viewMode === 'playback' ? null : contextualControls}
                 />
 

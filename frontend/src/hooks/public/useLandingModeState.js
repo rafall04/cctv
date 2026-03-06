@@ -32,10 +32,13 @@ function getInitialViewMode(searchParams) {
 export function useLandingModeState(searchParams, setSearchParams) {
     const isInitialMount = useRef(true);
     const [layoutMode, setLayoutMode] = useState(() => getInitialLayoutMode(searchParams));
-    const [viewMode, setViewMode] = useState(() => getInitialViewMode(searchParams));
+    const viewMode = getInitialViewMode(searchParams);
 
     const handleViewModeChange = useCallback((newMode) => {
-        setViewMode(newMode);
+        if (newMode === viewMode) {
+            return;
+        }
+
         setSearchParams((prev) => {
             const next = new URLSearchParams(prev);
             next.set('view', newMode);
@@ -48,7 +51,7 @@ export function useLandingModeState(searchParams, setSearchParams) {
             }
             return next;
         }, { replace: true });
-    }, [layoutMode, setSearchParams]);
+    }, [layoutMode, setSearchParams, viewMode]);
 
     useEffect(() => {
         if (!isInitialMount.current) {
@@ -78,17 +81,6 @@ export function useLandingModeState(searchParams, setSearchParams) {
 
         if (needsUpdate) {
             setSearchParams(nextParams, { replace: true });
-        }
-    }, [layoutMode, searchParams, setSearchParams, viewMode]);
-
-    useEffect(() => {
-        if (isInitialMount.current) {
-            return;
-        }
-
-        const queryView = searchParams.get('view');
-        if (queryView && ['map', 'grid', 'playback'].includes(queryView) && queryView !== viewMode) {
-            setViewMode(queryView);
         }
     }, [searchParams, viewMode]);
 

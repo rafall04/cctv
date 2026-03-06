@@ -13,6 +13,19 @@ import PlaybackSegmentList from '../components/playback/PlaybackSegmentList';
 import { useAdminReconnectRefresh } from '../hooks/admin/useAdminReconnectRefresh';
 
 const MAX_SEEK_DISTANCE = 180;
+const STALL_RECOVERY_DELAY_MS = 8000;
+
+function getSegmentKey(segment) {
+    if (!segment) {
+        return null;
+    }
+
+    if (segment.id) {
+        return `id:${segment.id}`;
+    }
+
+    return `${segment.filename || 'no-file'}:${segment.start_time || 'no-start'}`;
+}
 
 function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -44,7 +57,9 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
     const containerRef = useRef(null);
     const lastSeekTimeRef = useRef(0);
     const bufferingTimeoutRef = useRef(null);
+    const stallRecoveryTimeoutRef = useRef(null);
     const segmentsRequestIdRef = useRef(0);
+    const playbackSourceRef = useRef({ segmentKey: null, streamUrl: null });
 
     // Refs to avoid stale closures in event handlers
     const selectedSegmentRef = useRef(selectedSegment);
@@ -68,6 +83,13 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
     useEffect(() => {
         selectedCameraRef.current = selectedCamera;
     }, [selectedCamera]);
+
+    const clearStallRecoveryTimeout = useCallback(() => {
+        if (stallRecoveryTimeoutRef.current) {
+            clearTimeout(stallRecoveryTimeoutRef.current);
+            stallRecoveryTimeoutRef.current = null;
+        }
+    }, []);
 
     const handleAutoPlayToggle = useCallback(() => {
         const newValue = !autoPlayEnabled;
@@ -187,7 +209,9 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
             });
 
             if (segmentFromUrl) {
-                setSelectedSegment(segmentFromUrl);
+                if (getSegmentKey(segmentFromUrl) !== getSegmentKey(selectedSegment)) {
+                    setSelectedSegment(segmentFromUrl);
+                }
                 // Hitung selisih detik pencarian untuk dikonsumsi video nanti saat loadedMetadata
                 const sTime = new Date(segmentFromUrl.start_time).getTime();
                 const diffSeconds = (targetTime - sTime) / 1000;
@@ -198,7 +222,9 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
                     const currDiff = Math.abs(new Date(curr.start_time).getTime() - targetTime);
                     return currDiff < prevDiff ? curr : prev;
                 }, segments[0]);
-                setSelectedSegment(closestSegment);
+                if (getSegmentKey(closestSegment) !== getSegmentKey(selectedSegment)) {
+                    setSelectedSegment(closestSegment);
+                }
                 // Karena fallback ke closest, seek ke awal saja
                 playbackSeekTargetRef.current = 0;
             }
@@ -292,8 +318,13 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
 
         setVideoError(null);
         setErrorType(null);
+        clearStallRecoveryTimeout();
 
         const streamUrl = recordingService.getSegmentStreamUrl(selectedCamera.id, selectedSegment.filename);
+        playbackSourceRef.current = {
+            segmentKey: getSegmentKey(selectedSegment),
+            streamUrl,
+        };
         const video = videoRef.current;
         video.pause();
         video.removeAttribute('src');
@@ -357,11 +388,12 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         return () => {
             abortController.abort();
             clearTimeout(playTimeout);
+            clearStallRecoveryTimeout();
             video.pause();
             video.removeAttribute('src');
             video.load();
         };
-    }, [selectedSegment, selectedCamera]);
+    }, [clearStallRecoveryTimeout, selectedSegment, selectedCamera]);
 
     useEffect(() => {
         const video = videoRef.current;
@@ -454,20 +486,62 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         const handleWaiting = () => setIsBuffering(true);
         const handlePlaying = () => {
             setIsBuffering(false);
+            clearStallRecoveryTimeout();
             if (bufferingTimeoutRef.current) {
                 clearTimeout(bufferingTimeoutRef.current);
             }
         };
 
-        const handleCanPlay = () => setIsBuffering(false);
+        const handleCanPlay = () => {
+            setIsBuffering(false);
+            clearStallRecoveryTimeout();
+        };
 
         const handleStalled = () => {
+            const currentSegmentKey = getSegmentKey(selectedSegmentRef.current);
             setIsBuffering(true);
-            setTimeout(() => {
-                if (video.readyState < 3) {
-                    video.load();
+
+            if (!currentSegmentKey || stallRecoveryTimeoutRef.current) {
+                return;
+            }
+
+            stallRecoveryTimeoutRef.current = setTimeout(() => {
+                stallRecoveryTimeoutRef.current = null;
+
+                if (getSegmentKey(selectedSegmentRef.current) !== currentSegmentKey) {
+                    return;
                 }
-            }, 2000);
+
+                if (video.readyState >= 3 || video.ended || video.seeking) {
+                    return;
+                }
+
+                const currentSource = playbackSourceRef.current;
+                if (!currentSource.streamUrl || currentSource.segmentKey !== currentSegmentKey) {
+                    return;
+                }
+
+                const resumeTime = Number.isFinite(video.currentTime) ? video.currentTime : 0;
+                const shouldResumePlayback = !video.paused;
+
+                const handleReloadedMetadata = () => {
+                    if (resumeTime > 0 && Number.isFinite(video.duration) && resumeTime < video.duration) {
+                        video.currentTime = resumeTime;
+                    }
+
+                    if (shouldResumePlayback) {
+                        const playPromise = video.play();
+                        if (playPromise?.catch) {
+                            playPromise.catch(() => {});
+                        }
+                    }
+                };
+
+                video.addEventListener('loadedmetadata', handleReloadedMetadata, { once: true });
+                video.pause();
+                video.src = currentSource.streamUrl;
+                video.load();
+            }, STALL_RECOVERY_DELAY_MS);
         };
 
         video.addEventListener('timeupdate', handleTimeUpdate);
@@ -494,8 +568,9 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
             if (bufferingTimeoutRef.current) {
                 clearTimeout(bufferingTimeoutRef.current);
             }
+            clearStallRecoveryTimeout();
         };
-    }, [setSearchParams]);
+    }, [clearStallRecoveryTimeout, setSearchParams]);
 
     const handleSpeedChange = (speed) => {
         setPlaybackSpeed(speed);
@@ -504,7 +579,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         }
     };
 
-    const handleSegmentClick = (segment) => {
+    const handleSegmentClick = useCallback((segment) => {
         const timestamp = new Date(segment.start_time).getTime();
         setSearchParams({
             cam: selectedCamera?.id.toString(),
@@ -515,13 +590,14 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         setAutoPlayNotification(null);
         setIsSeeking(false);
         setIsBuffering(false);
+        clearStallRecoveryTimeout();
         lastSeekTimeRef.current = 0;
         playbackSeekTargetRef.current = 0; // Reset saat diklik manual dari list agar selalu play dari awal segmen
         if (bufferingTimeoutRef.current) {
             clearTimeout(bufferingTimeoutRef.current);
             bufferingTimeoutRef.current = null;
         }
-    };
+    }, [clearStallRecoveryTimeout, selectedCamera, setSearchParams]);
 
     const formatTimestamp = (timestamp) => {
         return new Date(timestamp).toLocaleString('id-ID', {
@@ -665,6 +741,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
     // Handle camera change and update URL for shareable links
     const handleCameraChange = useCallback((camera) => {
         setSelectedCamera(camera);
+        clearStallRecoveryTimeout();
         if (camera) {
             const timestamp = selectedSegment ? new Date(selectedSegment.start_time).getTime().toString() : '';
             setSearchParams({
@@ -672,7 +749,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
                 t: timestamp || ''
             }, { replace: false });
         }
-    }, [setSearchParams, selectedSegment]);
+    }, [clearStallRecoveryTimeout, selectedSegment, setSearchParams]);
 
     // Handle share playback link - use timestamp instead of segment ID
     const handleShare = useCallback(async () => {

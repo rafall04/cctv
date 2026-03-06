@@ -48,11 +48,13 @@ describe('LandingCamerasSection controls', () => {
         render(<LandingCamerasSection {...commonProps} viewMode="map" />);
         expect(screen.getByText('Area')).toBeTruthy();
         expect(screen.queryByText(/Stabil \(/)).toBeNull();
+        expect(screen.queryByText(/Filter area diterapkan/i)).toBeNull();
     });
 
     it('mode playback tidak menampilkan filter area global', () => {
         render(<LandingCamerasSection {...commonProps} viewMode="playback" />);
         expect(screen.queryByText('Area')).toBeNull();
         expect(screen.getByText('playback-panel')).toBeTruthy();
+        expect(screen.queryByText(/Pilih area lalu sempitkan/i)).toBeNull();
     });
 });
