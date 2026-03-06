@@ -352,6 +352,55 @@ export default function Dashboard() {
     const cpuLoad = stats?.system?.cpuLoad ?? 0;
     const memUsed = stats?.system?.totalMem - stats?.system?.freeMem;
     const memPercent = Math.round((memUsed / stats?.system?.totalMem) * 100);
+    const attentionItems = [
+        !stats?.mtxConnected && {
+            title: 'Media server offline',
+            description: 'Transport stream tidak bisa dipantau sampai MediaMTX kembali terhubung.',
+            tone: 'border-red-200 bg-red-50 text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300',
+        },
+        (stats?.cameraStatusBreakdown?.offline || 0) > 0 && {
+            title: `${stats.cameraStatusBreakdown.offline} kamera offline`,
+            description: 'Perlu pengecekan koneksi atau sumber stream.',
+            tone: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300',
+        },
+        (stats?.cameraStatusBreakdown?.maintenance || 0) > 0 && {
+            title: `${stats.cameraStatusBreakdown.maintenance} kamera maintenance`,
+            description: 'Status operasional sedang ditahan untuk perbaikan.',
+            tone: 'border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800/70 dark:text-gray-300',
+        },
+        refreshError && {
+            title: 'Refresh background gagal',
+            description: `Data terakhir yang valid: ${formatLastUpdate(lastSuccessfulUpdate)}.`,
+            tone: 'border-sky-200 bg-sky-50 text-sky-700 dark:border-primary/20 dark:bg-primary/10 dark:text-sky-300',
+        },
+    ].filter(Boolean);
+
+    const getStreamTransportTone = (state) => {
+        switch (state) {
+            case 'ready':
+                return 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400';
+            case 'buffering':
+                return 'bg-amber-100 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400';
+            case 'maintenance':
+                return 'bg-red-100 text-red-600 dark:bg-red-500/10 dark:text-red-400';
+            case 'invalid':
+            case 'offline':
+            default:
+                return 'bg-gray-100 text-gray-600 dark:bg-gray-700/70 dark:text-gray-300';
+        }
+    };
+
+    const getOperationalTone = (state) => {
+        switch (state) {
+            case 'online':
+                return 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400';
+            case 'maintenance':
+                return 'bg-red-100 text-red-600 dark:bg-red-500/10 dark:text-red-400';
+            case 'offline':
+            default:
+                return 'bg-gray-100 text-gray-600 dark:bg-gray-700/70 dark:text-gray-300';
+        }
+    };
 
     return (
         <div className="space-y-8">
@@ -359,8 +408,8 @@ export default function Dashboard() {
             {refreshError && (
                 <Alert
                     type="warning"
-                    title="Auto-refresh failed"
-                    message={`Unable to fetch latest data. Last successful update: ${formatLastUpdate(lastSuccessfulUpdate)}`}
+                    title="Refresh background gagal"
+                    message={`Data terbaru belum bisa diambil. Update valid terakhir: ${formatLastUpdate(lastSuccessfulUpdate)}`}
                     dismissible
                     onDismiss={() => setRefreshError(false)}
                     className="mb-4"
@@ -377,12 +426,9 @@ export default function Dashboard() {
                             </svg>
                         </div>
                         <div className="flex-1">
-                            <h3 className="text-sm font-semibold text-red-800 dark:text-red-400">MediaMTX Server Offline</h3>
+                            <h3 className="text-sm font-semibold text-red-800 dark:text-red-400">MediaMTX offline</h3>
                             <p className="text-sm text-red-600 dark:text-red-300 mt-1">
-                                The media streaming server is not responding. Live streams will be unavailable until the connection is restored.
-                            </p>
-                            <p className="text-xs text-red-500 dark:text-red-400 mt-2">
-                                Tip: Check if MediaMTX is running on port 9997 and restart if necessary.
+                                Server media tidak merespons. Status transport stream akan terbatas sampai koneksi pulih.
                             </p>
                         </div>
                     </div>
@@ -394,7 +440,7 @@ export default function Dashboard() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                         <div className="flex items-center gap-3 mb-2">
-                            <p className="text-sm font-semibold text-primary">System Overview</p>
+                            <p className="text-sm font-semibold text-primary">Ringkasan Sistem</p>
                             {lastSuccessfulUpdate && (
                                 <span className="text-xs text-gray-400 dark:text-gray-500">
                                     • Updated {formatLastUpdate(lastSuccessfulUpdate)}
@@ -403,7 +449,7 @@ export default function Dashboard() {
                         </div>
                         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
                         <p className="text-gray-500 dark:text-gray-400 mt-1">
-                            Monitoring {stats?.summary.totalCameras} cameras across {stats?.summary.totalAreas} areas
+                            Monitoring {stats?.summary.totalCameras} kamera di {stats?.summary.totalAreas} area
                         </p>
                     </div>
                     
@@ -464,6 +510,17 @@ export default function Dashboard() {
 
             {/* Quick Stats Mini Cards - Phase 2 */}
             <QuickStatsCards dateRange={dateRange} />
+
+            {attentionItems.length > 0 && (
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    {attentionItems.map((item) => (
+                        <div key={item.title} className={`rounded-2xl border px-4 py-3 ${item.tone}`}>
+                            <p className="text-sm font-semibold">{item.title}</p>
+                            <p className="mt-1 text-xs opacity-90">{item.description}</p>
+                        </div>
+                    ))}
+                </div>
+            )}
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -560,13 +617,13 @@ export default function Dashboard() {
                 {/* Enhanced Live Streams Table */}
                 <div className="xl:col-span-2 space-y-4">
                     <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Live Streams</h2>
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Stream Aktif</h2>
                         <div className="flex items-center gap-3">
                             <span className="text-xs text-gray-400 dark:text-gray-500">
-                                Sorted by viewers
+                                Diurutkan berdasarkan viewer
                             </span>
                             <Link to="/admin/cameras" className="text-sm font-semibold text-primary hover:text-primary-600 transition-colors flex items-center gap-1">
-                                Manage All
+                                Kelola semua
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                                 </svg>
@@ -594,8 +651,8 @@ export default function Dashboard() {
                                                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                                         </svg>
                                                     </div>
-                                                    <p className="font-semibold text-gray-900 dark:text-white">Media Server Offline</p>
-                                                    <p className="text-sm text-gray-500 dark:text-gray-400">Unable to fetch stream statistics</p>
+                                                    <p className="font-semibold text-gray-900 dark:text-white">Media server offline</p>
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400">Statistik transport stream belum tersedia</p>
                                                     <button
                                                         onClick={handleRetry}
                                                         className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-primary-600 hover:text-sky-700 dark:text-primary-400 dark:hover:text-sky-300 transition-colors"
@@ -603,7 +660,7 @@ export default function Dashboard() {
                                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                                             <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                                         </svg>
-                                                        Retry Connection
+                                                        Coba lagi
                                                     </button>
                                                 </div>
                                             </td>
@@ -650,18 +707,19 @@ export default function Dashboard() {
                                                             </div>
                                                         </td>
                                                         <td className="px-6 py-4">
-                                                            <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                                                                stream.state === 'ready' 
-                                                                    ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' 
-                                                                    : 'bg-amber-100 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                                                            }`}>
-                                                                {stream.state}
-                                                            </span>
+                                                            <div className="flex flex-wrap gap-2">
+                                                                <span className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${getOperationalTone(stream.operationalState)}`}>
+                                                                    Operasional: {stream.operationalState || 'offline'}
+                                                                </span>
+                                                                <span className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${getStreamTransportTone(stream.state)}`}>
+                                                                    Transport: {stream.state}
+                                                                </span>
+                                                            </div>
                                                         </td>
                                                         <td className="px-6 py-4 text-center">
                                                             <button
                                                                 onClick={() => setViewerModal({
-                                                                    title: `Viewer - ${stream.name}`,
+                                                                    title: `Viewer ${stream.name}`,
                                                                     sessions: stream.sessions || []
                                                                 })}
                                                                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
@@ -702,7 +760,7 @@ export default function Dashboard() {
 
                     {/* Activity Log */}
                     <div>
-                        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Activity Log</h2>
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Aktivitas Terkini</h2>
                         <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6">
                         <div className="space-y-6">
                             {stats?.recentLogs.length === 0 ? (

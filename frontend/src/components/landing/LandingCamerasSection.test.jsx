@@ -46,13 +46,13 @@ describe('LandingCamerasSection controls', () => {
 
     it('mode map hanya menampilkan filter area tanpa connection tabs', () => {
         render(<LandingCamerasSection {...commonProps} viewMode="map" />);
-        expect(screen.getByText('Filter Area:')).toBeTruthy();
+        expect(screen.getByText('Area')).toBeTruthy();
         expect(screen.queryByText(/Stabil \(/)).toBeNull();
     });
 
     it('mode playback tidak menampilkan filter area global', () => {
         render(<LandingCamerasSection {...commonProps} viewMode="playback" />);
-        expect(screen.queryByText('Filter Area:')).toBeNull();
+        expect(screen.queryByText('Area')).toBeNull();
         expect(screen.getByText('playback-panel')).toBeTruthy();
     });
 });

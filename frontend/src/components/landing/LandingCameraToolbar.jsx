@@ -1,4 +1,3 @@
-import LandingAreaFilter from './LandingAreaFilter';
 import LandingSearchBox from './LandingSearchBox';
 import LandingViewModeSwitch from './LandingViewModeSwitch';
 
@@ -8,18 +7,18 @@ export default function LandingCameraToolbar({
     viewMode,
     onViewModeChange,
     searchProps,
-    showAreaFilter,
-    areaFilterProps,
+    helperText,
+    contextualControls = null,
 }) {
     return (
-        <div className="flex flex-col gap-4 mb-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
+        <div className="mb-5 flex flex-col gap-4 sm:mb-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div className="space-y-1">
                     <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
                         {title}
                     </h2>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
-                        {camerasCount} kamera tersedia | Streaming langsung 24/7
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                        {camerasCount} kamera tersedia
                     </p>
                 </div>
 
@@ -28,7 +27,16 @@ export default function LandingCameraToolbar({
 
             <LandingSearchBox {...searchProps} />
 
-            {showAreaFilter && <LandingAreaFilter {...areaFilterProps} />}
+            {(helperText || contextualControls) && (
+                <div className="flex flex-col gap-3 rounded-2xl border border-gray-200/70 bg-white/85 px-4 py-3 shadow-sm dark:border-gray-700/60 dark:bg-gray-900/70">
+                    {helperText && (
+                        <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                            {helperText}
+                        </p>
+                    )}
+                    {contextualControls}
+                </div>
+            )}
         </div>
     );
 }

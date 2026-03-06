@@ -1279,59 +1279,37 @@ const MapView = memo(({
                 </div>
             )}
 
-            {/* Stats - Bottom Center (di atas attribution) */}
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-[1000]">
-                <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 sm:px-3 sm:py-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg text-xs sm:text-sm">
-                    <span className="flex items-center gap-1">
-                        <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-emerald-500" />
-                        <span className="font-medium text-gray-700 dark:text-gray-200">{stats.stabil}</span>
-                    </span>
-                    <span className="text-gray-300 dark:text-gray-600">|</span>
-                    <span className="flex items-center gap-1">
-                        <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-orange-500" />
-                        <span className="font-medium text-gray-700 dark:text-gray-200">{stats.tunnel}</span>
-                    </span>
-                    {stats.offline > 0 && (
-                        <>
-                            <span className="text-gray-300 dark:text-gray-600">|</span>
-                            <span className="flex items-center gap-1">
-                                <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-gray-500" />
-                                <span className="font-medium text-gray-700 dark:text-gray-200">{stats.offline}</span>
+            <div className="absolute bottom-3 left-3 z-[1000] max-w-[calc(100%-5rem)]">
+                <div className="rounded-xl bg-white/95 px-3 py-2 shadow-lg dark:bg-gray-800/95">
+                    <div className="mb-2 flex items-center gap-2">
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
+                            Status Kamera
+                        </span>
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                            {stats.total} total
+                        </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 text-[11px] sm:text-xs">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 font-medium text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
+                            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                            Stabil {stats.stabil}
+                        </span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-1 font-medium text-orange-700 dark:bg-orange-500/10 dark:text-orange-400">
+                            <span className="h-2 w-2 rounded-full bg-orange-500" />
+                            Tunnel {stats.tunnel}
+                        </span>
+                        {stats.offline > 0 && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                                <span className="h-2 w-2 rounded-full bg-gray-500" />
+                                Offline {stats.offline}
                             </span>
-                        </>
-                    )}
-                    {stats.maintenance > 0 && (
-                        <>
-                            <span className="text-gray-300 dark:text-gray-600">|</span>
-                            <span className="flex items-center gap-1">
-                                <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-red-500" />
-                                <span className="font-medium text-gray-700 dark:text-gray-200">{stats.maintenance}</span>
+                        )}
+                        {stats.maintenance > 0 && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-1 font-medium text-red-700 dark:bg-red-500/10 dark:text-red-400">
+                                <span className="h-2 w-2 rounded-full bg-red-500" />
+                                Perbaikan {stats.maintenance}
                             </span>
-                        </>
-                    )}
-                </div>
-            </div>
-
-            {/* Legend - Bottom Left (di atas stats) */}
-            <div className="absolute bottom-12 sm:bottom-14 left-3 z-[1000]">
-                <div className="px-2 py-1 sm:px-2.5 sm:py-1.5 bg-white/95 dark:bg-gray-800/95 rounded-lg shadow-lg text-[9px] sm:text-[10px]">
-                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                        <span className="flex items-center gap-0.5 sm:gap-1">
-                            <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-500" />
-                            <span className="text-gray-600 dark:text-gray-300">Stabil</span>
-                        </span>
-                        <span className="flex items-center gap-0.5 sm:gap-1">
-                            <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-orange-500" />
-                            <span className="text-gray-600 dark:text-gray-300">Tunnel</span>
-                        </span>
-                        <span className="flex items-center gap-0.5 sm:gap-1">
-                            <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-gray-500" />
-                            <span className="text-gray-600 dark:text-gray-300">Offline</span>
-                        </span>
-                        <span className="flex items-center gap-0.5 sm:gap-1">
-                            <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-500" />
-                            <span className="text-gray-600 dark:text-gray-300">Perbaikan</span>
-                        </span>
+                        )}
                     </div>
                 </div>
             </div>

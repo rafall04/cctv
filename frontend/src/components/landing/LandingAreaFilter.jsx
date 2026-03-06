@@ -9,12 +9,14 @@ export default function LandingAreaFilter({
     }
 
     return (
-        <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Filter Area:</span>
+        <div className="flex flex-wrap items-center gap-3">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
+                Area
+            </span>
             <select
                 value={selectedArea}
                 onChange={onChange}
-                className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500"
+                className="min-w-[180px] rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
             >
                 <option value="all">Semua Area ({searchFilteredCameras.length})</option>
                 {areaOptions.map((area) => (

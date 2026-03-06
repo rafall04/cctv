@@ -8,7 +8,19 @@ export function useRecordingDashboardData() {
     const [restartLogs, setRestartLogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [refreshError, setRefreshError] = useState(false);
+    const [lastSuccessfulUpdate, setLastSuccessfulUpdate] = useState(null);
     const requestIdRef = useRef(0);
+    const recordingsRef = useRef([]);
+    const restartLogsRef = useRef([]);
+
+    useEffect(() => {
+        recordingsRef.current = recordings;
+    }, [recordings]);
+
+    useEffect(() => {
+        restartLogsRef.current = restartLogs;
+    }, [restartLogs]);
 
     const fetchData = useCallback(async ({ mode = 'initial' } = {}) => {
         const isBackgroundMode = mode === 'background' || mode === 'resume';
@@ -29,16 +41,27 @@ export function useRecordingDashboardData() {
                 return;
             }
 
+            const hasCachedData = recordingsRef.current.length > 0 || restartLogsRef.current.length > 0;
+
             if (recordingsRes.success && recordingsRes.data) {
                 setRecordings(recordingsRes.data.cameras || recordingsRes.data || []);
+            } else if (isBackgroundMode && hasCachedData) {
+                setRefreshError(true);
             } else if (!isBackgroundMode) {
                 setRecordings([]);
             }
 
             if (restartsRes.success && restartsRes.data) {
                 setRestartLogs(restartsRes.data);
+            } else if (isBackgroundMode && hasCachedData) {
+                setRefreshError(true);
             } else if (!isBackgroundMode) {
                 setRestartLogs([]);
+            }
+
+            if (recordingsRes.success && restartsRes.success) {
+                setRefreshError(false);
+                setLastSuccessfulUpdate(new Date());
             }
         } catch (error) {
             if (requestId !== requestIdRef.current) {
@@ -49,6 +72,8 @@ export function useRecordingDashboardData() {
                 setError(error.response?.data?.message || error.message || 'Failed to load recording data');
                 setRecordings([]);
                 setRestartLogs([]);
+            } else if (recordingsRef.current.length > 0 || restartLogsRef.current.length > 0) {
+                setRefreshError(true);
             }
         } finally {
             if (requestId === requestIdRef.current && !isBackgroundMode) {
@@ -83,6 +108,8 @@ export function useRecordingDashboardData() {
         restartLogs,
         loading,
         error,
+        refreshError,
+        lastSuccessfulUpdate,
         summary,
         fetchData,
     };

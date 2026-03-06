@@ -9,8 +9,8 @@ export default function LandingConnectionTabs({
     const tunnelCount = areaFilteredCameras.filter((camera) => camera.is_tunnel === 1).length;
 
     return (
-        <div className="mb-6">
-            <div className="flex flex-wrap gap-2 p-1.5 bg-gray-100 dark:bg-gray-800 rounded-xl w-fit">
+        <div>
+            <div className="flex w-fit flex-wrap gap-2 rounded-xl bg-gray-100 p-1.5 dark:bg-gray-800">
                 <button
                     onClick={() => onChange('all')}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
@@ -61,7 +61,7 @@ export default function LandingConnectionTabs({
             </div>
 
             {connectionTab === 'tunnel' && (
-                <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20 rounded-lg text-sm text-orange-700 dark:text-orange-400 flex items-start gap-2">
+                <div className="mt-3 flex items-start gap-2 rounded-xl border border-orange-200 bg-orange-50 p-3 text-sm text-orange-700 dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-400">
                     <svg className="w-5 h-5 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>

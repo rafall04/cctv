@@ -5,6 +5,7 @@ import { GridSkeleton, CameraCardSkeleton } from '../ui/Skeleton';
 import { NoSearchResultsEmptyState, NoDataWithFilterEmptyState } from '../ui/EmptyState';
 import { Icons } from '../ui/Icons';
 import LandingCameraToolbar from './LandingCameraToolbar';
+import LandingAreaFilter from './LandingAreaFilter';
 import LandingConnectionTabs from './LandingConnectionTabs';
 import LandingResultsGrid from './LandingResultsGrid';
 import LandingMapPanel from './LandingMapPanel';
@@ -21,11 +22,11 @@ function renderSearchDropdown({
 }) {
     if (searchQuery.trim() && cameras.length === 0) {
         return (
-            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden z-[1100] p-6 text-center">
-                <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-400">
+            <div className="absolute left-0 right-0 top-full z-[1100] mt-2 rounded-xl border border-gray-200 bg-white p-6 text-center shadow-2xl dark:border-gray-700 dark:bg-gray-800">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 text-gray-400 dark:bg-gray-700">
                     <Icons.Search />
                 </div>
-                <p className="text-gray-500 dark:text-gray-400 text-sm">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
                     Tidak ditemukan kamera untuk &quot;<span className="font-medium text-gray-700 dark:text-gray-300">{searchQuery}</span>&quot;
                 </p>
             </div>
@@ -37,10 +38,10 @@ function renderSearchDropdown({
     }
 
     return (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden z-[1100] max-h-[300px] sm:max-h-[400px] overflow-y-auto">
-            <div className="px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700 sticky top-0">
+        <div className="absolute left-0 right-0 top-full z-[1100] mt-2 max-h-[300px] overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-800 sm:max-h-[400px]">
+            <div className="sticky top-0 border-b border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-700 dark:bg-gray-900/50">
                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {cameras.length} kamera ditemukan | Klik untuk {viewMode === 'map' ? 'lihat di peta' : 'putar video'}
+                    {cameras.length} hasil pencarian
                 </span>
             </div>
             {cameras.map((camera, index) => {
@@ -54,62 +55,55 @@ function renderSearchDropdown({
                         key={camera.id ?? `search-${index}`}
                         onClick={() => onSelect(camera)}
                         disabled={isDisabled}
-                        className={`w-full px-4 py-3 flex items-center gap-3 text-left transition-colors border-b border-gray-100 dark:border-gray-700/50 last:border-b-0 ${
+                        className={`flex w-full items-center gap-3 border-b border-gray-100 px-4 py-3 text-left transition-colors last:border-b-0 dark:border-gray-700/50 ${
                             !isDisabled
-                                ? 'hover:bg-sky-50 dark:hover:bg-primary/10 cursor-pointer'
-                                : 'opacity-50 cursor-not-allowed'
+                                ? 'cursor-pointer hover:bg-sky-50 dark:hover:bg-primary/10'
+                                : 'cursor-not-allowed opacity-50'
                         }`}
                     >
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
                             isMaintenance
-                                ? 'bg-red-100 dark:bg-red-500/20 text-red-500'
+                                ? 'bg-red-100 text-red-500 dark:bg-red-500/20'
                                 : isTunnel
-                                    ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-500'
-                                    : 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-500'
+                                    ? 'bg-orange-100 text-orange-500 dark:bg-orange-500/20'
+                                    : 'bg-emerald-100 text-emerald-500 dark:bg-emerald-500/20'
                         }`}>
                             {isMaintenance ? (
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63" />
                                 </svg>
                             ) : (
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                     <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                 </svg>
                             )}
                         </div>
 
-                        <div className="flex-1 min-w-0">
+                        <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                                <span className={`font-medium truncate ${
+                                <span className={`truncate font-medium ${
                                     isMaintenance ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'
                                 }`}>
                                     {camera.name}
                                 </span>
                                 {isMaintenance && (
-                                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 rounded-full">
-                                        PERBAIKAN
+                                    <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-600 dark:bg-red-500/20 dark:text-red-400">
+                                        Perbaikan
                                     </span>
                                 )}
                                 {isTunnel && !isMaintenance && (
-                                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded-full">
-                                        TUNNEL
+                                    <span className="rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium text-orange-600 dark:bg-orange-500/20 dark:text-orange-400">
+                                        Tunnel
                                     </span>
                                 )}
                             </div>
-                            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 truncate">
-                                {[camera.location, camera.area_name].filter(Boolean).join(' • ') || 'Lokasi tidak tersedia'}
+                            <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
+                                {[camera.area_name, camera.location].filter(Boolean).join(' / ') || 'Lokasi tidak tersedia'}
                             </p>
                         </div>
 
-                        {!isDisabled && (
-                            <div className="text-gray-400 dark:text-gray-500 shrink-0">
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path d="M9 5l7 7-7 7" />
-                                </svg>
-                            </div>
-                        )}
                         {isDisabled && (
-                            <span className="text-[10px] text-gray-400 dark:text-gray-500 shrink-0">
+                            <span className="shrink-0 text-[10px] text-gray-400 dark:text-gray-500">
                                 Tanpa koordinat
                             </span>
                         )}
@@ -164,9 +158,32 @@ export default function CamerasSection({
         searchQuery,
     });
 
+    const contextualControls = (
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            {(viewMode === 'map' || viewMode === 'grid') && (
+                <LandingAreaFilter
+                    selectedArea={selectedArea}
+                    onChange={handleAreaChange}
+                    areaOptions={areaOptions}
+                    searchFilteredCameras={searchFilteredCameras}
+                />
+            )}
+
+            {viewMode === 'grid' && (
+                <LandingConnectionTabs
+                    connectionTab={connectionTab}
+                    onChange={setConnectionTab}
+                    areaFilteredCameras={areaFilteredCameras}
+                    favorites={favorites}
+                    favoritesInAreaCount={favoritesInAreaCount}
+                />
+            )}
+        </div>
+    );
+
     return (
         <section id="playback-section" className="py-8 pb-16 sm:py-12 sm:pb-24">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <LandingCameraToolbar
                     title={landingSettings.section_title}
                     camerasCount={cameras.length}
@@ -182,24 +199,15 @@ export default function CamerasSection({
                         showSearchDropdown,
                         dropdownContent: searchDropdown,
                     }}
-                    showAreaFilter={viewMode === 'grid' || viewMode === 'map'}
-                    areaFilterProps={{
-                        selectedArea,
-                        onChange: handleAreaChange,
-                        areaOptions,
-                        searchFilteredCameras,
-                    }}
+                    helperText={
+                        viewMode === 'map'
+                            ? 'Filter area diterapkan langsung ke peta aktif.'
+                            : viewMode === 'grid'
+                                ? 'Pilih area lalu sempitkan hasil berdasarkan kualitas koneksi.'
+                                : null
+                    }
+                    contextualControls={viewMode === 'playback' ? null : contextualControls}
                 />
-
-                {viewMode === 'grid' && (
-                    <LandingConnectionTabs
-                        connectionTab={connectionTab}
-                        onChange={setConnectionTab}
-                        areaFilteredCameras={areaFilteredCameras}
-                        favorites={favorites}
-                        favoritesInAreaCount={favoritesInAreaCount}
-                    />
-                )}
 
                 {loading ? (
                     <GridSkeleton items={6} columns={3} SkeletonComponent={CameraCardSkeleton} />
@@ -220,11 +228,11 @@ export default function CamerasSection({
                             onClearFilter={() => handleAreaChange('all')}
                         />
                     ) : (
-                        <div className="text-center py-16">
-                            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400">
+                        <div className="py-16 text-center">
+                            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100 text-gray-400 dark:bg-gray-800">
                                 <Icons.Camera />
                             </div>
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                            <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
                                 Belum Ada Kamera
                             </h3>
                             <p className="text-gray-500 dark:text-gray-400">
