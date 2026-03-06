@@ -1,9 +1,18 @@
 import apiClient from './apiClient';
+import { getRequestPolicyConfig, REQUEST_POLICY } from './requestPolicy';
 
 export const settingsService = {
     // Public - get map default center
     getMapCenter: async () => {
         const response = await apiClient.get('/api/settings/map-center');
+        return response.data;
+    },
+
+    getPublicLandingPageSettings: async () => {
+        const response = await apiClient.get(
+            '/api/settings/landing-page',
+            getRequestPolicyConfig(REQUEST_POLICY.SILENT_PUBLIC)
+        );
         return response.data;
     },
 

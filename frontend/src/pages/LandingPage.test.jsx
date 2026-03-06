@@ -1,14 +1,15 @@
 // @vitest-environment jsdom
 
-import { render, waitFor, act } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { waitFor, act } from '@testing-library/react';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import { renderWithRouter } from '../test/renderWithRouter';
 import LandingPage from './LandingPage';
 
-const { getPublicSaweriaConfig, testMediaMTXConnection, updateMetaTags } = vi.hoisted(() => ({
+const { getPublicSaweriaConfig, testBackendReachability, updateMetaTags, getPublicLandingPageSettings } = vi.hoisted(() => ({
     getPublicSaweriaConfig: vi.fn(),
-    testMediaMTXConnection: vi.fn(),
+    testBackendReachability: vi.fn(),
     updateMetaTags: vi.fn(),
+    getPublicLandingPageSettings: vi.fn(),
 }));
 
 vi.mock('../services/saweriaService', () => ({
@@ -30,11 +31,17 @@ vi.mock('../utils/metaUpdater', () => ({
 }));
 
 vi.mock('../utils/connectionTester', () => ({
-    testMediaMTXConnection,
+    testBackendReachability,
 }));
 
 vi.mock('../config/config.js', () => ({
     getApiUrl: () => 'https://api.example.com',
+}));
+
+vi.mock('../services/settingsService', () => ({
+    settingsService: {
+        getPublicLandingPageSettings,
+    },
 }));
 
 vi.mock('../contexts/CameraContext', () => ({
@@ -119,13 +126,15 @@ vi.mock('../components/SaweriaSupport', () => ({
 describe('LandingPage connectivity recovery', () => {
     beforeEach(() => {
         getPublicSaweriaConfig.mockReset();
-        testMediaMTXConnection.mockReset();
+        testBackendReachability.mockReset();
         updateMetaTags.mockReset();
+        getPublicLandingPageSettings.mockReset();
 
         getPublicSaweriaConfig.mockResolvedValue({
             success: true,
             data: { enabled: false, saweria_link: null },
         });
+        getPublicLandingPageSettings.mockResolvedValue({ success: false });
 
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
             json: async () => ({ success: false }),
@@ -137,18 +146,14 @@ describe('LandingPage connectivity recovery', () => {
     });
 
     it('mengecek ulang konektivitas saat browser kembali online', async () => {
-        testMediaMTXConnection
+        testBackendReachability
             .mockResolvedValueOnce({ reachable: false, latency: -1 })
             .mockResolvedValueOnce({ reachable: true, latency: 120 });
 
-        render(
-            <MemoryRouter>
-                <LandingPage />
-            </MemoryRouter>
-        );
+        renderWithRouter(<LandingPage />);
 
         await waitFor(() => {
-            expect(testMediaMTXConnection).toHaveBeenCalledTimes(1);
+            expect(testBackendReachability).toHaveBeenCalledTimes(1);
         });
 
         await act(async () => {
@@ -156,23 +161,19 @@ describe('LandingPage connectivity recovery', () => {
         });
 
         await waitFor(() => {
-            expect(testMediaMTXConnection).toHaveBeenCalledTimes(2);
+            expect(testBackendReachability).toHaveBeenCalledTimes(2);
         });
     }, 10000);
 
     it('mengecek ulang konektivitas saat tab kembali focus setelah jeda throttle', async () => {
-        testMediaMTXConnection
+        testBackendReachability
             .mockResolvedValueOnce({ reachable: true, latency: 90 })
             .mockResolvedValueOnce({ reachable: true, latency: 95 });
 
-        render(
-            <MemoryRouter>
-                <LandingPage />
-            </MemoryRouter>
-        );
+        renderWithRouter(<LandingPage />);
 
         await waitFor(() => {
-            expect(testMediaMTXConnection).toHaveBeenCalledTimes(1);
+            expect(testBackendReachability).toHaveBeenCalledTimes(1);
         });
 
         await act(async () => {
@@ -181,7 +182,7 @@ describe('LandingPage connectivity recovery', () => {
         });
 
         await waitFor(() => {
-            expect(testMediaMTXConnection).toHaveBeenCalledTimes(2);
+            expect(testBackendReachability).toHaveBeenCalledTimes(2);
         });
     }, 10000);
 });

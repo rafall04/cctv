@@ -1,4 +1,5 @@
 import apiClient from './apiClient';
+import { getRequestPolicyConfig, REQUEST_POLICY } from './requestPolicy';
 
 export const feedbackService = {
     // Public - submit feedback
@@ -8,14 +9,17 @@ export const feedbackService = {
     },
 
     // Admin - get all feedbacks
-    async getAll(params = {}, config = {}) {
-        const response = await apiClient.get('/api/feedback', { ...config, params });
+    async getAll(params = {}, policy = REQUEST_POLICY.BLOCKING, config = {}) {
+        const response = await apiClient.get('/api/feedback', {
+            ...getRequestPolicyConfig(policy, config),
+            params,
+        });
         return response.data;
     },
 
     // Admin - get stats
-    async getStats(config = {}) {
-        const response = await apiClient.get('/api/feedback/stats', config);
+    async getStats(policy = REQUEST_POLICY.BLOCKING, config = {}) {
+        const response = await apiClient.get('/api/feedback/stats', getRequestPolicyConfig(policy, config));
         return response.data;
     },
 

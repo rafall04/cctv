@@ -1,5 +1,6 @@
 import apiClient from './apiClient';
 import { getApiUrl } from '../config/config.js';
+import { getRequestPolicyConfig, REQUEST_POLICY } from './requestPolicy';
 
 /**
  * Recording Service - Frontend API calls
@@ -46,8 +47,8 @@ export const getRecordingStatus = async (cameraId) => {
 /**
  * Get recordings overview (dashboard)
  */
-export const getRecordingsOverview = async (config = {}) => {
-    const response = await apiClient.get('/api/recordings/overview', config);
+export const getRecordingsOverview = async (policy = REQUEST_POLICY.BLOCKING, config = {}) => {
+    const response = await apiClient.get('/api/recordings/overview', getRequestPolicyConfig(policy, config));
     return response.data;
 };
 
@@ -62,11 +63,11 @@ export const updateRecordingSettings = async (cameraId, settings) => {
 /**
  * Get restart logs
  */
-export const getRestartLogs = async (cameraId = null, limit = 50, config = {}) => {
+export const getRestartLogs = async (cameraId = null, limit = 50, policy = REQUEST_POLICY.BLOCKING, config = {}) => {
     const url = cameraId 
         ? `/api/recordings/${cameraId}/restarts?limit=${limit}`
         : `/api/recordings/restarts?limit=${limit}`;
-    const response = await apiClient.get(url, config);
+    const response = await apiClient.get(url, getRequestPolicyConfig(policy, config));
     return response.data;
 };
 
@@ -77,8 +78,11 @@ export const getRestartLogs = async (cameraId = null, limit = 50, config = {}) =
 /**
  * Get segments untuk camera (untuk playback)
  */
-export const getSegments = async (cameraId, config = {}) => {
-    const response = await apiClient.get(`/api/recordings/${cameraId}/segments`, config);
+export const getSegments = async (cameraId, policy = REQUEST_POLICY.BLOCKING, config = {}) => {
+    const response = await apiClient.get(
+        `/api/recordings/${cameraId}/segments`,
+        getRequestPolicyConfig(policy, config)
+    );
     return response.data;
 };
 

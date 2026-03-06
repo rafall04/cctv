@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { streamService } from '../services/streamService';
 import { areaService } from '../services/areaService';
+import { REQUEST_POLICY } from '../services/requestPolicy';
 import { detectDeviceTier } from '../utils/deviceDetector';
 
 const CameraContext = createContext(null);
@@ -42,8 +43,14 @@ export function CameraProvider({ children, autoRefresh = true }) {
 
         try {
             const [camsRes, areasRes] = await Promise.all([
-                streamService.getAllActiveStreams(requestConfig),
-                areaService.getPublicAreas(requestConfig),
+                streamService.getAllActiveStreams(
+                    preserveExistingData ? REQUEST_POLICY.BACKGROUND : REQUEST_POLICY.BLOCKING,
+                    requestConfig
+                ),
+                areaService.getPublicAreas(
+                    preserveExistingData ? REQUEST_POLICY.BACKGROUND : REQUEST_POLICY.SILENT_PUBLIC,
+                    requestConfig
+                ),
             ]);
 
             if (!mountedRef.current || requestId < latestAppliedRequestRef.current) {

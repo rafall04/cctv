@@ -1,10 +1,11 @@
 import apiClient from './apiClient';
+import { getRequestPolicyConfig, REQUEST_POLICY } from './requestPolicy';
 
 export const cameraService = {
     // Get all active cameras (public)
-    async getActiveCameras(config = {}) {
+    async getActiveCameras(policy = REQUEST_POLICY.BLOCKING, config = {}) {
         try {
-            const response = await apiClient.get('/api/cameras/active', config);
+            const response = await apiClient.get('/api/cameras/active', getRequestPolicyConfig(policy, config));
             return response.data;
         } catch (error) {
             console.error('Get active cameras error:', error);
@@ -13,9 +14,9 @@ export const cameraService = {
     },
 
     // Get all cameras (admin only)
-    async getAllCameras(config = {}) {
+    async getAllCameras(policy = REQUEST_POLICY.BLOCKING, config = {}) {
         try {
-            const response = await apiClient.get('/api/cameras', config);
+            const response = await apiClient.get('/api/cameras', getRequestPolicyConfig(policy, config));
             return response.data;
         } catch (error) {
             console.error('Get all cameras error:', error);

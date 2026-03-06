@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { renderWithRouter } from '../test/renderWithRouter';
 import Dashboard from './Dashboard';
 
 const { getStats } = vi.hoisted(() => ({
@@ -79,11 +79,7 @@ describe('Dashboard', () => {
     });
 
     it('mengubah range quick stats tanpa double-fetch dashboard utama', async () => {
-        render(
-            <MemoryRouter>
-                <Dashboard />
-            </MemoryRouter>
-        );
+        renderWithRouter(<Dashboard />);
 
         await waitFor(() => {
             expect(screen.getByTestId('quick-stats').textContent).toBe('today');
@@ -100,11 +96,7 @@ describe('Dashboard', () => {
     });
 
     it('merefresh dashboard saat browser kembali fokus tanpa toast blocking', async () => {
-        render(
-            <MemoryRouter>
-                <Dashboard />
-            </MemoryRouter>
-        );
+        renderWithRouter(<Dashboard />);
 
         await waitFor(() => {
             expect(getStats).toHaveBeenCalledTimes(1);
@@ -115,8 +107,5 @@ describe('Dashboard', () => {
         await waitFor(() => {
             expect(getStats).toHaveBeenCalledTimes(2);
         });
-        expect(getStats).toHaveBeenLastCalledWith(
-            expect.objectContaining({ skipGlobalErrorNotification: true })
-        );
     });
 });

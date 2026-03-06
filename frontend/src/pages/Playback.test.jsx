@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { TestRouter } from '../test/renderWithRouter';
 import Playback from './Playback';
 
 const { getSegments } = vi.hoisted(() => ({
@@ -68,13 +68,13 @@ describe('Playback', () => {
         const closestSegmentTimestamp = Date.parse('2026-03-05T10:18:00.000Z').toString();
 
         render(
-            <MemoryRouter initialEntries={[`/playback?cam=1&t=${closestSegmentTimestamp}`]}>
+            <TestRouter initialEntries={[`/playback?cam=1&t=${closestSegmentTimestamp}`]}>
                 <Playback
                     cameras={[
                         { id: 1, name: 'Lobby', enable_recording: 1 },
                     ]}
                 />
-            </MemoryRouter>
+            </TestRouter>
         );
 
         await waitFor(() => {

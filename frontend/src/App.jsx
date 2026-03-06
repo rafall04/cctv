@@ -32,7 +32,7 @@ function App() {
         <SecurityProvider>
         <NotificationProvider>
         <ApiClientInitializer>
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <ToastContainer />
             <Routes>
                 {/* Public routes */}

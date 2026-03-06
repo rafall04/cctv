@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { adminService } from '../../services/adminService';
 import { mapPeriodToApi, normalizeAnalyticsData } from '../../utils/admin/viewerAnalyticsAdapter';
 import { useAdminReconnectRefresh } from './useAdminReconnectRefresh';
+import { REQUEST_POLICY } from '../../services/requestPolicy';
 
 export function useViewerAnalyticsData(period, customDate) {
     const [analytics, setAnalytics] = useState(null);
@@ -25,10 +26,10 @@ export function useViewerAnalyticsData(period, customDate) {
             const [analyticsResponse, realtimeResponse] = await Promise.all([
                 adminService.getViewerAnalytics(
                     apiPeriod,
-                    isBackgroundMode ? { skipGlobalErrorNotification: true } : {}
+                    isBackgroundMode ? REQUEST_POLICY.BACKGROUND : REQUEST_POLICY.BLOCKING
                 ),
                 adminService.getRealTimeViewers(
-                    isBackgroundMode ? { skipGlobalErrorNotification: true } : {}
+                    isBackgroundMode ? REQUEST_POLICY.BACKGROUND : REQUEST_POLICY.BLOCKING
                 ),
             ]);
 

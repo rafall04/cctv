@@ -1,9 +1,10 @@
 import apiClient from './apiClient';
+import { getRequestPolicyConfig, REQUEST_POLICY } from './requestPolicy';
 
 export const adminService = {
-    async getStats(config = {}) {
+    async getStats(policy = REQUEST_POLICY.BLOCKING, config = {}) {
         try {
-            const response = await apiClient.get('/api/admin/stats', config);
+            const response = await apiClient.get('/api/admin/stats', getRequestPolicyConfig(policy, config));
             return response.data;
         } catch (error) {
             console.error('Get stats error:', error);
@@ -14,9 +15,12 @@ export const adminService = {
         }
     },
 
-    async getTodayStats(period = 'today', config = {}) {
+    async getTodayStats(period = 'today', policy = REQUEST_POLICY.BLOCKING, config = {}) {
         try {
-            const response = await apiClient.get(`/api/admin/stats/today?period=${period}`, config);
+            const response = await apiClient.get(
+                `/api/admin/stats/today?period=${period}`,
+                getRequestPolicyConfig(policy, config)
+            );
             return response.data;
         } catch (error) {
             console.error('Get today stats error:', error);
@@ -27,9 +31,12 @@ export const adminService = {
         }
     },
 
-    async getViewerAnalytics(period = '7days', config = {}) {
+    async getViewerAnalytics(period = '7days', policy = REQUEST_POLICY.BLOCKING, config = {}) {
         try {
-            const response = await apiClient.get(`/api/admin/analytics/viewers?period=${period}`, config);
+            const response = await apiClient.get(
+                `/api/admin/analytics/viewers?period=${period}`,
+                getRequestPolicyConfig(policy, config)
+            );
             return response.data;
         } catch (error) {
             console.error('Get viewer analytics error:', error);
@@ -40,9 +47,12 @@ export const adminService = {
         }
     },
 
-    async getRealTimeViewers(config = {}) {
+    async getRealTimeViewers(policy = REQUEST_POLICY.BLOCKING, config = {}) {
         try {
-            const response = await apiClient.get('/api/admin/analytics/realtime', config);
+            const response = await apiClient.get(
+                '/api/admin/analytics/realtime',
+                getRequestPolicyConfig(policy, config)
+            );
             return response.data;
         } catch (error) {
             console.error('Get real-time viewers error:', error);

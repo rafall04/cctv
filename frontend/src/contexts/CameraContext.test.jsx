@@ -77,9 +77,11 @@ describe('CameraContext', () => {
         }, { timeout: 4000 });
 
         expect(getAllActiveStreams).toHaveBeenLastCalledWith(
+            'background',
             expect.objectContaining({ skipGlobalErrorNotification: true })
         );
         expect(getPublicAreas).toHaveBeenLastCalledWith(
+            'background',
             expect.objectContaining({ skipGlobalErrorNotification: true })
         );
     });

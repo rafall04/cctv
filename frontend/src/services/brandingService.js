@@ -1,4 +1,5 @@
 import apiClient from './apiClient';
+import { getRequestPolicyConfig, REQUEST_POLICY } from './requestPolicy';
 
 /**
  * Branding Service
@@ -12,9 +13,10 @@ export const brandingService = {
      */
     async getPublicBranding() {
         try {
-            const response = await apiClient.get('/api/branding/public', {
-                skipGlobalErrorNotification: true,
-            });
+            const response = await apiClient.get(
+                '/api/branding/public',
+                getRequestPolicyConfig(REQUEST_POLICY.SILENT_PUBLIC)
+            );
             return response.data.success ? response.data.data : null;
         } catch (error) {
             console.error('Get public branding error:', error);

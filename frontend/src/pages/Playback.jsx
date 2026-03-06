@@ -4,6 +4,7 @@ import { cameraService } from '../services/cameraService';
 import recordingService from '../services/recordingService';
 import { useBranding } from '../contexts/BrandingContext';
 import { createCameraSlug, parseCameraIdFromSlug } from '../utils/slugify';
+import { REQUEST_POLICY } from '../services/requestPolicy';
 
 import PlaybackHeader from '../components/playback/PlaybackHeader';
 import PlaybackVideo from '../components/playback/PlaybackVideo';
@@ -114,7 +115,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
 
         const fetchCameras = async () => {
             try {
-                const response = await cameraService.getActiveCameras();
+                const response = await cameraService.getActiveCameras(REQUEST_POLICY.BLOCKING);
                 if (response.success) {
                     const recordingCameras = response.data.filter(cam => cam.enable_recording);
                     const uniqueCameras = recordingCameras.filter((cam, index, self) =>
@@ -235,7 +236,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         try {
             const response = await recordingService.getSegments(
                 cameraId,
-                isBackgroundMode ? { skipGlobalErrorNotification: true } : {}
+                isBackgroundMode ? REQUEST_POLICY.BACKGROUND : REQUEST_POLICY.BLOCKING
             );
 
             if (requestId !== segmentsRequestIdRef.current) {

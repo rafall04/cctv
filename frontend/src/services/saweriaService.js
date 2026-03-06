@@ -1,4 +1,5 @@
 import apiClient from './apiClient';
+import { getRequestPolicyConfig, REQUEST_POLICY } from './requestPolicy';
 
 /**
  * Get Saweria settings (Admin only)
@@ -21,9 +22,10 @@ export async function updateSaweriaSettings(settings) {
  * Returns only enabled settings
  */
 export async function getPublicSaweriaConfig() {
-    const response = await apiClient.get('/api/saweria/config', {
-        skipGlobalErrorNotification: true,
-    });
+    const response = await apiClient.get(
+        '/api/saweria/config',
+        getRequestPolicyConfig(REQUEST_POLICY.SILENT_PUBLIC)
+    );
     return response.data;
 }
 

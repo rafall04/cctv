@@ -1,14 +1,15 @@
 import apiClient from './apiClient';
+import { getRequestPolicyConfig, REQUEST_POLICY } from './requestPolicy';
 
 export const areaService = {
     // Public - get all areas (no auth required)
-    getPublicAreas: async (config = {}) => {
-        const response = await apiClient.get('/api/areas/public', config);
+    getPublicAreas: async (policy = REQUEST_POLICY.SILENT_PUBLIC, config = {}) => {
+        const response = await apiClient.get('/api/areas/public', getRequestPolicyConfig(policy, config));
         return response.data;
     },
     
-    getAllAreas: async (config = {}) => {
-        const response = await apiClient.get('/api/areas', config);
+    getAllAreas: async (policy = REQUEST_POLICY.BLOCKING, config = {}) => {
+        const response = await apiClient.get('/api/areas', getRequestPolicyConfig(policy, config));
         return response.data;
     },
     getAreaById: async (id) => {

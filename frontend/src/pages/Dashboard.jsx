@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { adminService } from '../services/adminService';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Skeleton } from '../components/ui/Skeleton';
 import { NoStreamsEmptyState, NoActivityEmptyState } from '../components/ui/EmptyState';
@@ -8,7 +7,7 @@ import { CameraStatusOverview } from '../components/CameraStatusOverview';
 import { QuickStatsCards } from '../components/QuickStatsCards';
 import { TopCamerasWidget } from '../components/TopCamerasWidget';
 import { DateRangeSelector } from '../components/DateRangeSelector';
-import { useAdminReconnectRefresh } from '../hooks/admin/useAdminReconnectRefresh';
+import { useDashboardData } from '../hooks/admin/useDashboardData';
 
 /**
  * Viewer Sessions Modal - Shows list of viewers with IP addresses
@@ -249,91 +248,24 @@ function DashboardHeaderSkeleton() {
 }
 
 export default function Dashboard() {
-    const [stats, setStats] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
     const [viewerModal, setViewerModal] = useState(null); // { title, sessions }
-    const [lastSuccessfulUpdate, setLastSuccessfulUpdate] = useState(null);
-    const [refreshError, setRefreshError] = useState(false);
-    const [isRetrying, setIsRetrying] = useState(false);
-    const [dateRange, setDateRange] = useState('today');
-    const intervalRef = useRef(null);
-    const statsRef = useRef(null);
-    const requestIdRef = useRef(0);
     const navigate = useNavigate();
-
-    useEffect(() => {
-        statsRef.current = stats;
-    }, [stats]);
-
-    const loadStats = useCallback(async ({ mode = 'initial' } = {}) => {
-        const isBackgroundMode = mode === 'background' || mode === 'resume';
-        const requestId = ++requestIdRef.current;
-
-        try {
-            if (!isBackgroundMode) {
-                setIsRetrying(true);
-            }
-            const response = await adminService.getStats(
-                isBackgroundMode
-                    ? { skipGlobalErrorNotification: true }
-                    : {}
-            );
-
-            if (requestId !== requestIdRef.current) {
-                return;
-            }
-
-            if (response.success) {
-                setStats(response.data);
-                setError(null);
-                setRefreshError(false);
-                setLastSuccessfulUpdate(new Date());
-            } else {
-                if (isBackgroundMode && statsRef.current) {
-                    setRefreshError(true);
-                } else {
-                    setError(response.message || 'Failed to load dashboard data');
-                }
-            }
-        } catch (err) {
-            if (requestId !== requestIdRef.current) {
-                return;
-            }
-
-            if (isBackgroundMode && statsRef.current) {
-                setRefreshError(true);
-            } else {
-                setError('Failed to connect to server. Please check your connection.');
-            }
-        } finally {
-            if (requestId === requestIdRef.current) {
-                setLoading(false);
-                setIsRetrying(false);
-            }
-        }
-    }, []);
-
-    useEffect(() => {
-        loadStats({ mode: 'initial' });
-        intervalRef.current = setInterval(() => loadStats({ mode: 'background' }), 10000);
-        return () => {
-            if (intervalRef.current) {
-                clearInterval(intervalRef.current);
-            }
-        };
-    }, [loadStats]);
-
-    useAdminReconnectRefresh(() => loadStats({ mode: 'resume' }));
+    const {
+        stats,
+        loading,
+        error,
+        lastSuccessfulUpdate,
+        refreshError,
+        isRetrying,
+        dateRange,
+        setDateRange,
+        setRefreshError,
+        loadStats,
+        handleRetry,
+    } = useDashboardData();
 
     const handleDateRangeChange = (range) => {
         setDateRange(range);
-    };
-
-    const handleRetry = () => {
-        setError(null);
-        setLoading(true);
-        loadStats({ mode: 'initial' });
     };
 
     const handleAddCamera = () => {
@@ -477,7 +409,7 @@ export default function Dashboard() {
                     
                     {/* Refresh Button - Standalone */}
                     <button
-                        onClick={() => loadStats(false)}
+                        onClick={() => loadStats({ mode: 'initial' })}
                         disabled={isRetrying}
                         className="inline-flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all disabled:opacity-50 self-start sm:self-auto"
                         title="Refresh Dashboard"

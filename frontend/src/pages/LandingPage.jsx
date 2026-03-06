@@ -1,21 +1,19 @@
-import { useEffect, useState, useCallback, useRef, memo, lazy, Suspense, startTransition } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { getPublicSaweriaConfig } from '../services/saweriaService';
 import { useBranding } from '../contexts/BrandingContext';
 import { updateMetaTags } from '../utils/metaUpdater';
-import { testMediaMTXConnection as testBackendReachability } from '../utils/connectionTester';
-import { getApiUrl } from '../config/config.js';
 import { useCameras, CameraProvider } from '../contexts/CameraContext';
 import { ToastProvider, useToast } from '../contexts/ToastContext';
 import { useCameraStatusTracker } from '../hooks/useCameraStatusTracker';
 import { useCameraHistory } from '../hooks/useCameraHistory';
-
+import { useLandingModeState } from '../hooks/public/useLandingModeState';
+import { useLandingReachability } from '../hooks/public/useLandingReachability';
+import { useLandingPublicConfig } from '../hooks/public/useLandingPublicConfig';
+import { useLandingInteractions } from '../hooks/public/useLandingInteractions';
 import LandingNavbar from '../components/landing/LandingNavbar';
+import LandingHero from '../components/landing/LandingHero';
 import LandingFooter from '../components/landing/LandingFooter';
-import { createCameraSlug, parseCameraIdFromSlug } from '../utils/slugify';
 import LandingCamerasSection from '../components/landing/LandingCamerasSection';
-import LandingStatsBar from '../components/landing/LandingStatsBar';
-
 import LandingPageSimple from '../components/LandingPageSimple';
 import MultiViewButton from '../components/MultiView/MultiViewButton';
 import MultiViewLayout from '../components/MultiView/MultiViewLayout';
@@ -28,356 +26,59 @@ const SaweriaSupport = lazy(() => import('../components/SaweriaSupport'));
 function LandingPageContent() {
     const { branding } = useBranding();
     const { cameras, deviceTier } = useCameras();
-    const [searchParams, setSearchParams] = useSearchParams();
-    const [layoutMode, setLayoutMode] = useState(() => {
-        const queryMode = searchParams.get('mode');
-        if (queryMode === 'simple' || queryMode === 'full') return queryMode;
-        try {
-            const savedMode = localStorage.getItem('landing_layout_mode');
-            if (savedMode === 'simple' || savedMode === 'full') return savedMode;
-        } catch (err) {
-            console.warn('Failed to read localStorage:', err);
-        }
-        return 'full';
-    });
-    const isInitialMount = useRef(true);
-
-    const [viewMode, setViewMode] = useState(() => {
-        const queryView = searchParams.get('view');
-        // Backward compatibility: If old mode=playback is in URL, use it
-        const queryMode = searchParams.get('mode');
-        if (queryMode === 'playback' || queryMode === 'grid') return queryMode;
-
-        return ['map', 'grid', 'playback'].includes(queryView) ? queryView : 'map';
-    });
-
-    // Handle view mode change and sync URL
-    const handleViewModeChange = useCallback((newMode) => {
-        setViewMode(newMode);
-        setSearchParams((prev) => {
-            const next = new URLSearchParams(prev);
-            next.set('view', newMode);
-            if (newMode !== 'playback') {
-                next.delete('cam');
-                next.delete('t');
-            }
-            if (!next.has('mode') || !['full', 'simple'].includes(next.get('mode'))) {
-                next.set('mode', layoutMode);
-            }
-            return next;
-        }, { replace: true });
-    }, [layoutMode, setSearchParams]);
-
-    useEffect(() => {
-        if (isInitialMount.current) {
-            isInitialMount.current = false;
-            const queryMode = searchParams.get('mode');
-            const queryView = searchParams.get('view');
-
-            let needsUpdate = false;
-            const newParams = new URLSearchParams(searchParams);
-
-            // Fix missing or invalid mode wrapper
-            if (!queryMode || !['full', 'simple'].includes(queryMode)) {
-                newParams.set('mode', layoutMode);
-                needsUpdate = true;
-            }
-
-            // Backward compatibility for old share links (?mode=playback)
-            if (queryMode === 'playback' || queryMode === 'grid') {
-                newParams.set('view', queryMode);
-                needsUpdate = true;
-            }
-
-            // Persist the view param if missing
-            if (!queryView && !['playback', 'grid'].includes(queryMode)) {
-                newParams.set('view', viewMode);
-                needsUpdate = true;
-            }
-
-            if (needsUpdate) {
-                setSearchParams(newParams, { replace: true });
-            }
-        }
-    }, [layoutMode, viewMode, searchParams, setSearchParams]);
-
-    // Handle Browser Back/Forward generic navigation
-    useEffect(() => {
-        if (isInitialMount.current) return;
-        const queryView = searchParams.get('view');
-        // Only update local state if URL explicitly changes via browser history
-        if (queryView && ['map', 'grid', 'playback'].includes(queryView) && queryView !== viewMode) {
-            setViewMode(queryView);
-        }
-    }, [searchParams, viewMode, setViewMode]);
-
-    useEffect(() => {
-        if (isInitialMount.current) return;
-        const queryMode = searchParams.get('mode');
-        if ((queryMode === 'simple' || queryMode === 'full') && queryMode !== layoutMode) {
-            setLayoutMode(queryMode);
-            try {
-                localStorage.setItem('landing_layout_mode', queryMode);
-            } catch (err) {
-                console.warn('Failed to save to localStorage:', err);
-            }
-        }
-    }, [layoutMode, searchParams]);
-
-    const toggleLayoutMode = useCallback(() => {
-        const newMode = layoutMode === 'full' ? 'simple' : 'full';
-
-        // Use startTransition to avoid Suspense hydration errors
-        startTransition(() => {
-            setLayoutMode(newMode);
-        });
-
-        setSearchParams((prev) => {
-            const next = new URLSearchParams(prev);
-            next.set('mode', newMode);
-            return next;
-        }, { replace: true });
-
-        try {
-            localStorage.setItem('landing_layout_mode', newMode);
-        } catch (err) {
-            console.warn('Failed to save to localStorage:', err);
-        }
-    }, [layoutMode, setSearchParams]);
-
-    const [popup, setPopup] = useState(null);
-    const [multiCameras, setMultiCameras] = useState([]);
-
-    const [showMulti, setShowMulti] = useState(false);
     const { addToast } = useToast();
-    const [maxReached, setMaxReached] = useState(false);
+    const [searchParams, setSearchParams] = useSearchParams();
+    const { favorites, toggleFavorite, isFavorite, addRecentCamera } = useCameraHistory();
 
-    const [saweriaLink, setSaweriaLink] = useState('https://saweria.co/raflialdi');
-    const [saweriaLeaderboardLink, setSaweriaLeaderboardLink] = useState('');
-    const [saweriaEnabled, setSaweriaEnabled] = useState(false);
+    const {
+        layoutMode,
+        viewMode,
+        setViewMode,
+        toggleLayoutMode,
+    } = useLandingModeState(searchParams, setSearchParams);
 
-    const [landingSettings, setLandingSettings] = useState({
-        area_coverage: 'Saat ini area coverage kami baru mencakup <strong>Dander</strong> dan <strong>Tanjungharjo</strong>',
-        hero_badge: 'LIVE STREAMING 24 JAM',
-        section_title: 'CCTV Publik'
+    useLandingReachability();
+
+    const {
+        saweriaEnabled,
+        saweriaLink,
+        saweriaLeaderboardLink,
+        landingSettings,
+    } = useLandingPublicConfig();
+
+    const {
+        popup,
+        multiCameras,
+        showMulti,
+        maxReached,
+        maxStreams,
+        setShowMulti,
+        setPopup,
+        handleAddMulti,
+        handleRemoveMulti,
+        handleCameraClick,
+        handlePopupClose,
+    } = useLandingInteractions({
+        cameras,
+        layoutMode,
+        viewMode,
+        deviceTier,
+        searchParams,
+        setSearchParams,
+        addToast,
+        addRecentCamera,
     });
 
-    const maxStreams = deviceTier === 'low' ? 2 : deviceTier === 'mid' ? 4 : 6;
+    useCameraStatusTracker(cameras, addToast);
 
-    const connectivityMountedRef = useRef(true);
-    const connectivityInFlightRef = useRef(false);
-    const lastConnectivityCheckRef = useRef(0);
-
-    const checkServerConnectivity = useCallback(async ({ force = false } = {}) => {
-        const now = Date.now();
-        if (!force && now - lastConnectivityCheckRef.current < 3000) {
-            return;
-        }
-
-        if (connectivityInFlightRef.current) {
-            return;
-        }
-
-        connectivityInFlightRef.current = true;
-        lastConnectivityCheckRef.current = now;
-
-        try {
-            let apiUrl;
-            const hostname = window.location.hostname;
-            const protocol = window.location.protocol;
-
-            if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) {
-                apiUrl = '/api/health';
-            } else if (protocol === 'https:') {
-                const frontendDomain = import.meta.env.VITE_FRONTEND_DOMAIN || hostname;
-                if (hostname === frontendDomain) {
-                    const baseUrl = getApiUrl();
-                    apiUrl = `${baseUrl.replace(/\/$/, '')}/health`;
-                } else {
-                    apiUrl = `${protocol}//${hostname.replace('cctv.', 'api-cctv.')}/health`;
-                }
-            } else {
-                const baseUrl = getApiUrl();
-                apiUrl = `${baseUrl.replace(/\/$/, '')}/health`;
-            }
-
-            const result = await testBackendReachability(apiUrl);
-
-            if (!connectivityMountedRef.current) {
-                return;
-            }
-
-            if (!result.reachable) {
-                console.warn('[LandingPage] Backend health check unreachable');
-            }
-        } catch (err) {
-            if (connectivityMountedRef.current) {
-                console.warn('[LandingPage] Backend health check failed:', err);
-            }
-        } finally {
-            connectivityInFlightRef.current = false;
-        }
-    }, []);
-
-    useEffect(() => {
-        connectivityMountedRef.current = true;
-        checkServerConnectivity({ force: true });
-
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible') {
-                checkServerConnectivity();
-            }
-        };
-
-        const handleFocus = () => {
-            checkServerConnectivity();
-        };
-
-        const handleOnline = () => {
-            checkServerConnectivity({ force: true });
-        };
-
-        window.addEventListener('focus', handleFocus);
-        window.addEventListener('online', handleOnline);
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-
-        return () => {
-            connectivityMountedRef.current = false;
-            window.removeEventListener('focus', handleFocus);
-            window.removeEventListener('online', handleOnline);
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
-    }, [checkServerConnectivity]);
-
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const [saweriaRes, landingRes] = await Promise.all([
-                    getPublicSaweriaConfig().catch((err) => {
-                        console.warn('Saweria config fetch failed, using defaults:', err);
-                        return { success: true, data: { enabled: false, saweria_link: null } };
-                    }),
-                    fetch(`${getApiUrl()}/api/settings/landing-page`)
-                        .then(res => res.json())
-                        .catch(() => ({ success: false }))
-                ]);
-
-                if (saweriaRes && saweriaRes.data) {
-                    setSaweriaEnabled(saweriaRes.data.enabled === true);
-                    if (saweriaRes.data.saweria_link) {
-                        setSaweriaLink(saweriaRes.data.saweria_link);
-                    }
-                    if (saweriaRes.data.leaderboard_link) {
-                        setSaweriaLeaderboardLink(saweriaRes.data.leaderboard_link);
-                    }
-                }
-
-                if (landingRes && landingRes.success && landingRes.data) {
-                    setLandingSettings(landingRes.data);
-                }
-            } catch (err) {
-                console.error('Failed to fetch data:', err);
-            }
-        };
-        fetchData();
-    }, []);
+    const disableHeavyEffects = deviceTier === 'low';
+    const shouldHideFloatingWidgets = showMulti && viewMode === 'grid';
 
     useEffect(() => {
         if (branding) {
             updateMetaTags(branding);
         }
     }, [branding]);
-
-    const handleAddMulti = useCallback((camera) => {
-        setMultiCameras(prev => {
-            const exists = prev.some(c => c.id === camera.id);
-
-            if (exists) {
-                addToast(`"${camera.name}" removed from Multi-View`, 'info');
-                setMaxReached(false);
-                return prev.filter(c => c.id !== camera.id);
-            }
-
-            if (prev.length >= maxStreams) {
-                addToast(`Maximum ${maxStreams} cameras allowed in Multi-View mode (${deviceTier}-end device)`, 'warning');
-                setMaxReached(true);
-                setTimeout(() => setMaxReached(false), 3000);
-                return prev;
-            }
-
-            addToast(`"${camera.name}" added to Multi-View (${prev.length + 1}/${maxStreams})`, 'success');
-            return [...prev, camera];
-        });
-    }, [addToast, maxStreams, deviceTier]);
-
-    const handleRemoveMulti = useCallback((id) => {
-        setMultiCameras(prev => {
-            const camera = prev.find(c => c.id === id);
-            if (camera) {
-                addToast(`"${camera.name}" removed from Multi-View`, 'info');
-            }
-            const next = prev.filter(c => c.id !== id);
-            if (next.length === 0) setShowMulti(false);
-            setMaxReached(false);
-            return next;
-        });
-    }, [addToast]);
-
-    useCameraStatusTracker(cameras, addToast);
-    const { favorites, toggleFavorite, isFavorite, addRecentCamera } = useCameraHistory();
-
-    const disableHeavyEffects = deviceTier === 'low';
-
-    // Handle camera URL param - auto open popup when camera param exists (only in map/grid mode)
-    useEffect(() => {
-        if (viewMode === 'playback') return; // Don't open popup in playback mode
-
-        const cameraIdFromUrl = searchParams.get('camera');
-        if (cameraIdFromUrl && cameras.length > 0) {
-            const camera = cameras.find(c => c.id === parseCameraIdFromSlug(cameraIdFromUrl));
-            if (camera) {
-                // Check if camera is available (not offline/maintenance)
-                const isAvailable = camera.status !== 'maintenance' && camera.is_online !== 0;
-                if (isAvailable) {
-                    setPopup(camera);
-                }
-            }
-        }
-    }, [cameras, searchParams, viewMode]);
-
-    // Handle camera selection and update URL
-    const handleCameraClick = useCallback((camera) => {
-        setPopup(camera);
-        addRecentCamera(camera);
-        // Update URL for shareable links
-        setSearchParams((prev) => {
-            const next = new URLSearchParams(prev);
-            next.set('camera', createCameraSlug(camera));
-            if (!next.has('mode') || !['full', 'simple'].includes(next.get('mode'))) {
-                next.set('mode', layoutMode);
-            }
-            if (!next.has('view')) {
-                next.set('view', viewMode);
-            }
-            return next;
-        }, { replace: false });
-    }, [layoutMode, viewMode, setSearchParams, addRecentCamera]);
-
-    // Handle popup close - reset URL to remove camera param
-    const handlePopupClose = useCallback(() => {
-        setPopup(null);
-        // Reset URL by removing camera param but keep mode
-        setSearchParams((prev) => {
-            const next = new URLSearchParams(prev);
-            next.delete('camera');
-            if (!next.has('mode')) {
-                next.set('mode', layoutMode);
-            }
-            return next;
-        }, { replace: false });
-    }, [layoutMode, setSearchParams]);
-
-    const shouldHideFloatingWidgets = showMulti && viewMode === 'grid';
 
     if (layoutMode === 'simple') {
         return (
@@ -395,7 +96,7 @@ function LandingPageContent() {
                     onToggleFavorite={toggleFavorite}
                     isFavorite={isFavorite}
                     viewMode={viewMode}
-                    setViewMode={handleViewModeChange}
+                    setViewMode={setViewMode}
                     hideFloatingWidgets={shouldHideFloatingWidgets}
                 />
 
@@ -423,7 +124,7 @@ function LandingPageContent() {
             <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
                 <LandingNavbar branding={branding} layoutMode={layoutMode} onLayoutToggle={toggleLayoutMode} />
 
-                <Hero
+                <LandingHero
                     branding={branding}
                     landingSettings={landingSettings}
                     disableHeavyEffects={disableHeavyEffects}
@@ -435,7 +136,7 @@ function LandingPageContent() {
                     onAddMulti={handleAddMulti}
                     multiCameras={multiCameras}
                     viewMode={viewMode}
-                    setViewMode={handleViewModeChange}
+                    setViewMode={setViewMode}
                     landingSettings={landingSettings}
                     selectedCamera={popup}
                     favorites={favorites}
@@ -485,115 +186,6 @@ function LandingPageContent() {
     );
 }
 
-const Hero = memo(function Hero({ branding, landingSettings, disableHeavyEffects, onCameraClick }) {
-    return (
-        <>
-            <header className="relative overflow-hidden bg-gradient-to-br from-amber-50/80 via-transparent to-emerald-50/80 dark:from-amber-950/30 dark:via-transparent dark:to-emerald-950/30">
-                {!disableHeavyEffects && (
-                    <>
-                        <div className="absolute top-0 left-1/4 w-64 h-64 bg-amber-200/30 dark:bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
-                        <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-emerald-200/30 dark:bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
-                        <div className="absolute top-10 right-10 w-20 h-20 opacity-20 dark:opacity-10 pointer-events-none">
-                            <svg viewBox="0 0 100 100" fill="currentColor" className="text-amber-400 w-full h-full">
-                                <path d="M50 5C30.5 5 15 20.5 15 40c0 19.5 15.5 35 35 35 5 0 9-4 9-9 0-3.5-2-6.5-5-8-4-2.5-6.5-7-6.5-12 0-8 6.5-14.5 14.5-14.5H70c13.5 0 24.5-11 24.5-24.5C94.5 18 78.5 5 50 5z" />
-                            </svg>
-                        </div>
-                        <div className="absolute top-20 left-10 w-12 h-12 opacity-15 dark:opacity-8 pointer-events-none">
-                            <svg viewBox="0 0 100 100" fill="currentColor" className="text-amber-400 w-full h-full">
-                                <path d="M50 5C30.5 5 15 20.5 15 40c0 19.5 15.5 35 35 35 5 0 9-4 9-9 0-3.5-2-6.5-5-8-4-2.5-6.5-7-6.5-12 0-8 6.5-14.5 14.5-14.5H70c13.5 0 24.5-11 24.5-24.5C94.5 18 78.5 5 50 5z" />
-                            </svg>
-                        </div>
-                    </>
-                )}
-
-                <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 text-center">
-                    <div
-                        data-testid="landing-hero-badge-stack"
-                        className="mx-auto mb-6 flex max-w-sm flex-col items-center gap-2.5 sm:gap-3"
-                    >
-                        <div className="flex items-center gap-2 rounded-full bg-emerald-100 px-4 py-1.5 text-xs font-semibold text-emerald-600 shadow-sm dark:bg-emerald-500/20 dark:text-emerald-400">
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z" />
-                            </svg>
-                            <span>Ramadan Kareem 1447 H</span>
-                        </div>
-
-                        {branding.show_powered_by === 'true' && (
-                            <div className="flex items-center gap-2 rounded-full bg-sky-100 px-4 py-1.5 text-xs font-semibold text-primary-600 shadow-sm dark:bg-primary/20 dark:text-primary-400">
-                                <div className="flex h-5 w-5 items-center justify-center rounded bg-gradient-to-br from-primary to-primary-600 text-[10px] font-bold text-white">{branding.logo_text}</div>
-                                <span>Powered by {branding.company_name}</span>
-                            </div>
-                        )}
-
-                        <div className="mt-1 flex items-center gap-2 rounded-full bg-emerald-100 px-4 py-1.5 text-xs font-semibold text-emerald-600 shadow-sm dark:bg-emerald-500/20 dark:text-emerald-400">
-                            <span className="relative flex h-2 w-2">
-                                {!disableHeavyEffects && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                            </span>
-                            {landingSettings.hero_badge}
-                        </div>
-                    </div>
-                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-4">
-                        {branding.hero_title}
-                    </h1>
-                    <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mb-3 text-sm sm:text-base">
-                        {branding.hero_subtitle}
-                    </p>
-                    <p className="text-gray-500 dark:text-gray-500 max-w-xl mx-auto mb-6 text-xs">
-                        {branding.footer_text}
-                    </p>
-
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 mb-8">
-                        <svg className="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
-                            <circle cx="12" cy="11" r="3" />
-                        </svg>
-                        <span
-                            className="text-sm text-amber-700 dark:text-amber-400"
-                            dangerouslySetInnerHTML={{ __html: landingSettings.area_coverage }}
-                        />
-                    </div>
-
-                    <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
-                        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
-                            <div className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-primary/20 flex items-center justify-center text-primary-600 dark:text-primary-400">
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                            </div>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">HD Streaming</span>
-                        </div>
-                        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
-                            <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center text-purple-600 dark:text-purple-400">
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
-                            </div>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Multi-View</span>
-                        </div>
-                        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
-                            <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
-                            </div>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Aman</span>
-                        </div>
-                        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
-                            <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400">
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            </div>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">24/7 Live</span>
-                        </div>
-                        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/80 dark:bg-gray-800/80 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
-                            <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            </div>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Playback</span>
-                        </div>
-                    </div>
-
-                    <LandingStatsBar onCameraClick={onCameraClick} />
-                </div>
-            </header>
-        </>
-    );
-});
-
 export default function LandingPage() {
     return (
         <ToastProvider>
@@ -603,4 +195,3 @@ export default function LandingPage() {
         </ToastProvider>
     );
 }
-

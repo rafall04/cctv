@@ -1,5 +1,6 @@
 import apiClient from './apiClient';
 import { getApiUrl } from '../config/config.js';
+import { getRequestPolicyConfig, REQUEST_POLICY } from './requestPolicy';
 
 /**
  * Get base URL for API/backend from central config
@@ -74,9 +75,9 @@ const makeStreamUrlsAbsolute = (streams) => {
 };
 
 export const streamService = {
-    async getAllActiveStreams(config = {}) {
+    async getAllActiveStreams(policy = REQUEST_POLICY.SILENT_PUBLIC, config = {}) {
         try {
-            const response = await apiClient.get('/api/stream', config);
+            const response = await apiClient.get('/api/stream', getRequestPolicyConfig(policy, config));
             if (response.data?.success && response.data?.data) {
                 response.data.data = response.data.data.map(camera => ({
                     ...camera,
@@ -92,9 +93,12 @@ export const streamService = {
         }
     },
 
-    async getStreamUrls(cameraId) {
+    async getStreamUrls(cameraId, policy = REQUEST_POLICY.BLOCKING, config = {}) {
         try {
-            const response = await apiClient.get(`/api/stream/${cameraId}`);
+            const response = await apiClient.get(
+                `/api/stream/${cameraId}`,
+                getRequestPolicyConfig(policy, config)
+            );
             if (response.data?.success && response.data?.data?.streams) {
                 response.data.data.streams = makeStreamUrlsAbsolute(response.data.data.streams);
             }

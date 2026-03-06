@@ -4,6 +4,7 @@ import { areaService } from '../../services/areaService';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useFormValidation } from '../useFormValidation';
 import { useAdminReconnectRefresh } from './useAdminReconnectRefresh';
+import { REQUEST_POLICY } from '../../services/requestPolicy';
 import {
     buildCameraPayload,
     defaultCameraFormValues,
@@ -60,7 +61,7 @@ export function useCameraManagementPage() {
 
         try {
             const response = await areaService.getAllAreas(
-                isBackgroundMode ? { skipGlobalErrorNotification: true } : {}
+                isBackgroundMode ? REQUEST_POLICY.BACKGROUND : REQUEST_POLICY.BLOCKING
             );
             if (requestId !== areasRequestIdRef.current) {
                 return;
@@ -87,7 +88,7 @@ export function useCameraManagementPage() {
             }
 
             const response = await cameraService.getAllCameras(
-                isBackgroundMode ? { skipGlobalErrorNotification: true } : {}
+                isBackgroundMode ? REQUEST_POLICY.BACKGROUND : REQUEST_POLICY.BLOCKING
             );
             if (requestId !== camerasRequestIdRef.current) {
                 return;

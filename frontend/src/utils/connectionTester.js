@@ -113,10 +113,15 @@ export const testMediaMTXConnection = async (baseUrl, streamPath = '', timeout =
     return testConnection(url, timeout);
 };
 
+export const testBackendReachability = async (url, timeout = DEFAULT_TIMEOUT) => {
+    return testConnection(url, timeout);
+};
+
 // Export default object for convenience
 export default {
     testConnection,
     isServerReachable,
     testMediaMTXConnection,
+    testBackendReachability,
     DEFAULT_TIMEOUT,
 };

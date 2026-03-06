@@ -1,6 +1,7 @@
+import LandingStatsBar from './LandingStatsBar';
 import { Icons } from '../ui/Icons';
 
-export default function Hero({ branding, landingSettings, disableHeavyEffects }) {
+export default function Hero({ branding, landingSettings, disableHeavyEffects, onCameraClick }) {
     return (
         <header className="relative overflow-hidden bg-gradient-to-br from-amber-50/80 via-transparent to-emerald-50/80 dark:from-amber-950/30 dark:via-transparent dark:to-emerald-950/30">
             {!disableHeavyEffects && (
@@ -103,6 +104,8 @@ export default function Hero({ branding, landingSettings, disableHeavyEffects })
                         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Playback</span>
                     </div>
                 </div>
+
+                <LandingStatsBar onCameraClick={onCameraClick} />
             </div>
         </header>
     );
