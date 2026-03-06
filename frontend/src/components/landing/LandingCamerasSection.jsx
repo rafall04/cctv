@@ -152,7 +152,7 @@ export default function CamerasSection({
     } = filters;
 
     const searchDropdown = renderSearchDropdown({
-        cameras: showSearchDropdown ? areaFilteredCameras : [],
+        cameras: showSearchDropdown && searchQuery.trim() ? areaFilteredCameras : [],
         viewMode,
         onSelect: handleCameraSelect,
         searchQuery,

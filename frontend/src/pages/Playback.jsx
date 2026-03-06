@@ -13,7 +13,8 @@ import PlaybackSegmentList from '../components/playback/PlaybackSegmentList';
 import { useAdminReconnectRefresh } from '../hooks/admin/useAdminReconnectRefresh';
 
 const MAX_SEEK_DISTANCE = 180;
-const STALL_RECOVERY_DELAY_MS = 8000;
+const STALL_RECOVERY_DELAY_MS = 15000;
+const MAX_HARD_RECOVERY_ATTEMPTS = 1;
 
 function getSegmentKey(segment) {
     if (!segment) {
@@ -58,6 +59,9 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
     const lastSeekTimeRef = useRef(0);
     const bufferingTimeoutRef = useRef(null);
     const stallRecoveryTimeoutRef = useRef(null);
+    const stallSinceRef = useRef(null);
+    const lastStablePlaybackRef = useRef(Date.now());
+    const hardRecoveryAttemptRef = useRef(0);
     const segmentsRequestIdRef = useRef(0);
     const playbackSourceRef = useRef({ segmentKey: null, streamUrl: null });
 
@@ -90,6 +94,15 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
             stallRecoveryTimeoutRef.current = null;
         }
     }, []);
+
+    const resetPlaybackRecoveryState = useCallback((resetAttempts = false) => {
+        clearStallRecoveryTimeout();
+        stallSinceRef.current = null;
+        if (resetAttempts) {
+            hardRecoveryAttemptRef.current = 0;
+        }
+        lastStablePlaybackRef.current = Date.now();
+    }, [clearStallRecoveryTimeout]);
 
     const handleAutoPlayToggle = useCallback(() => {
         const newValue = !autoPlayEnabled;
@@ -318,7 +331,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
 
         setVideoError(null);
         setErrorType(null);
-        clearStallRecoveryTimeout();
+        resetPlaybackRecoveryState(true);
 
         const streamUrl = recordingService.getSegmentStreamUrl(selectedCamera.id, selectedSegment.filename);
         playbackSourceRef.current = {
@@ -388,12 +401,12 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         return () => {
             abortController.abort();
             clearTimeout(playTimeout);
-            clearStallRecoveryTimeout();
+            resetPlaybackRecoveryState(false);
             video.pause();
             video.removeAttribute('src');
             video.load();
         };
-    }, [clearStallRecoveryTimeout, selectedSegment, selectedCamera]);
+    }, [resetPlaybackRecoveryState, selectedSegment, selectedCamera]);
 
     useEffect(() => {
         const video = videoRef.current;
@@ -405,7 +418,60 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         const video = videoRef.current;
         if (!video) return;
 
-        const handleTimeUpdate = () => setCurrentTime(video.currentTime);
+        const scheduleHardRecovery = () => {
+            if (stallRecoveryTimeoutRef.current || hardRecoveryAttemptRef.current >= MAX_HARD_RECOVERY_ATTEMPTS) {
+                return;
+            }
+
+            stallRecoveryTimeoutRef.current = setTimeout(() => {
+                stallRecoveryTimeoutRef.current = null;
+
+                const currentSegmentKey = getSegmentKey(selectedSegmentRef.current);
+                const currentSource = playbackSourceRef.current;
+                const now = Date.now();
+                const stalledFor = stallSinceRef.current ? now - stallSinceRef.current : 0;
+                const lastStableAgo = now - lastStablePlaybackRef.current;
+
+                if (!currentSegmentKey || currentSource.segmentKey !== currentSegmentKey) {
+                    return;
+                }
+
+                if (video.readyState >= 3 || video.ended || video.seeking) {
+                    return;
+                }
+
+                if (stalledFor < STALL_RECOVERY_DELAY_MS || lastStableAgo < STALL_RECOVERY_DELAY_MS) {
+                    return;
+                }
+
+                hardRecoveryAttemptRef.current += 1;
+                const resumeTime = Number.isFinite(video.currentTime) ? video.currentTime : 0;
+                const shouldResumePlayback = !video.paused;
+
+                const handleReloadedMetadata = () => {
+                    if (resumeTime > 0 && Number.isFinite(video.duration) && resumeTime < video.duration) {
+                        video.currentTime = resumeTime;
+                    }
+
+                    if (shouldResumePlayback) {
+                        const playPromise = video.play();
+                        if (playPromise?.catch) {
+                            playPromise.catch(() => {});
+                        }
+                    }
+                };
+
+                video.addEventListener('loadedmetadata', handleReloadedMetadata, { once: true });
+                video.pause();
+                video.src = currentSource.streamUrl;
+                video.load();
+            }, STALL_RECOVERY_DELAY_MS);
+        };
+
+        const handleTimeUpdate = () => {
+            setCurrentTime(video.currentTime);
+            lastStablePlaybackRef.current = Date.now();
+        };
         const handleLoadedMetadata = () => setDuration(video.duration);
 
         const handleEnded = () => {
@@ -483,10 +549,16 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
             }, 5000);
         };
 
-        const handleWaiting = () => setIsBuffering(true);
+        const handleWaiting = () => {
+            setIsBuffering(true);
+            if (!stallSinceRef.current) {
+                stallSinceRef.current = Date.now();
+            }
+            scheduleHardRecovery();
+        };
         const handlePlaying = () => {
             setIsBuffering(false);
-            clearStallRecoveryTimeout();
+            resetPlaybackRecoveryState(false);
             if (bufferingTimeoutRef.current) {
                 clearTimeout(bufferingTimeoutRef.current);
             }
@@ -494,54 +566,15 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
 
         const handleCanPlay = () => {
             setIsBuffering(false);
-            clearStallRecoveryTimeout();
+            resetPlaybackRecoveryState(false);
         };
 
         const handleStalled = () => {
-            const currentSegmentKey = getSegmentKey(selectedSegmentRef.current);
             setIsBuffering(true);
-
-            if (!currentSegmentKey || stallRecoveryTimeoutRef.current) {
-                return;
+            if (!stallSinceRef.current) {
+                stallSinceRef.current = Date.now();
             }
-
-            stallRecoveryTimeoutRef.current = setTimeout(() => {
-                stallRecoveryTimeoutRef.current = null;
-
-                if (getSegmentKey(selectedSegmentRef.current) !== currentSegmentKey) {
-                    return;
-                }
-
-                if (video.readyState >= 3 || video.ended || video.seeking) {
-                    return;
-                }
-
-                const currentSource = playbackSourceRef.current;
-                if (!currentSource.streamUrl || currentSource.segmentKey !== currentSegmentKey) {
-                    return;
-                }
-
-                const resumeTime = Number.isFinite(video.currentTime) ? video.currentTime : 0;
-                const shouldResumePlayback = !video.paused;
-
-                const handleReloadedMetadata = () => {
-                    if (resumeTime > 0 && Number.isFinite(video.duration) && resumeTime < video.duration) {
-                        video.currentTime = resumeTime;
-                    }
-
-                    if (shouldResumePlayback) {
-                        const playPromise = video.play();
-                        if (playPromise?.catch) {
-                            playPromise.catch(() => {});
-                        }
-                    }
-                };
-
-                video.addEventListener('loadedmetadata', handleReloadedMetadata, { once: true });
-                video.pause();
-                video.src = currentSource.streamUrl;
-                video.load();
-            }, STALL_RECOVERY_DELAY_MS);
+            scheduleHardRecovery();
         };
 
         video.addEventListener('timeupdate', handleTimeUpdate);
@@ -568,9 +601,9 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
             if (bufferingTimeoutRef.current) {
                 clearTimeout(bufferingTimeoutRef.current);
             }
-            clearStallRecoveryTimeout();
+            resetPlaybackRecoveryState(false);
         };
-    }, [clearStallRecoveryTimeout, setSearchParams]);
+    }, [resetPlaybackRecoveryState, setSearchParams]);
 
     const handleSpeedChange = (speed) => {
         setPlaybackSpeed(speed);
@@ -590,14 +623,14 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         setAutoPlayNotification(null);
         setIsSeeking(false);
         setIsBuffering(false);
-        clearStallRecoveryTimeout();
+        resetPlaybackRecoveryState(true);
         lastSeekTimeRef.current = 0;
         playbackSeekTargetRef.current = 0; // Reset saat diklik manual dari list agar selalu play dari awal segmen
         if (bufferingTimeoutRef.current) {
             clearTimeout(bufferingTimeoutRef.current);
             bufferingTimeoutRef.current = null;
         }
-    }, [clearStallRecoveryTimeout, selectedCamera, setSearchParams]);
+    }, [resetPlaybackRecoveryState, selectedCamera, setSearchParams]);
 
     const formatTimestamp = (timestamp) => {
         return new Date(timestamp).toLocaleString('id-ID', {
@@ -741,7 +774,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
     // Handle camera change and update URL for shareable links
     const handleCameraChange = useCallback((camera) => {
         setSelectedCamera(camera);
-        clearStallRecoveryTimeout();
+        resetPlaybackRecoveryState(true);
         if (camera) {
             const timestamp = selectedSegment ? new Date(selectedSegment.start_time).getTime().toString() : '';
             setSearchParams({
@@ -749,7 +782,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
                 t: timestamp || ''
             }, { replace: false });
         }
-    }, [clearStallRecoveryTimeout, selectedSegment, setSearchParams]);
+    }, [resetPlaybackRecoveryState, selectedSegment, setSearchParams]);
 
     // Handle share playback link - use timestamp instead of segment ID
     const handleShare = useCallback(async () => {

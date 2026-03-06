@@ -67,6 +67,11 @@ export function useLandingCameraFilters(cameras, areas, favorites, viewMode, onC
 
     const displayCameras = viewMode === 'map' ? areaFilteredCameras : filteredForGrid;
 
+    const handleSearchChange = useCallback((value) => {
+        setSearchQuery(value);
+        setShowSearchDropdown(value.trim().length > 0);
+    }, []);
+
     const clearSearch = useCallback(() => {
         setSearchQuery('');
         setShowSearchDropdown(false);
@@ -103,7 +108,7 @@ export function useLandingCameraFilters(cameras, areas, favorites, viewMode, onC
         connectionTab,
         setConnectionTab,
         searchQuery,
-        setSearchQuery,
+        setSearchQuery: handleSearchChange,
         selectedArea,
         setSelectedArea,
         showSearchDropdown,

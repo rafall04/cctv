@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import LandingCamerasSection from './LandingCamerasSection';
 
@@ -56,5 +56,21 @@ describe('LandingCamerasSection controls', () => {
         expect(screen.queryByText('Area')).toBeNull();
         expect(screen.getByText('playback-panel')).toBeTruthy();
         expect(screen.queryByText(/Pilih area lalu sempitkan/i)).toBeNull();
+    });
+
+    it('menutup dropdown search saat query kembali kosong', () => {
+        render(<LandingCamerasSection {...commonProps} viewMode="map" />);
+
+        const input = screen.getByPlaceholderText(/Cari kamera berdasarkan nama/i);
+        fireEvent.change(input, { target: { value: 'kamera-tidak-ada' } });
+        fireEvent.focus(input);
+
+        expect(screen.getByText(/Tidak ditemukan kamera/i)).toBeTruthy();
+
+        fireEvent.change(input, { target: { value: '' } });
+
+        expect(screen.queryByText(/Tidak ditemukan kamera/i)).toBeNull();
+        expect(screen.queryByText('Lobby')).toBeNull();
+        expect(screen.queryByText('Gate')).toBeNull();
     });
 });
