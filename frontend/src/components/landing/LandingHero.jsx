@@ -1,13 +1,6 @@
 import LandingStatsBar from './LandingStatsBar';
-import { Icons } from '../ui/Icons';
 
 export default function Hero({ branding, landingSettings, disableHeavyEffects, onCameraClick }) {
-    const featureChips = [
-        { label: 'Streaming HD', icon: <Icons.Eye />, tone: 'bg-sky-100 dark:bg-primary/20 text-primary-600 dark:text-primary-400' },
-        { label: 'Multi-View', icon: <Icons.Grid />, tone: 'bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400' },
-        { label: 'Playback', icon: <Icons.Clock />, tone: 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400' },
-    ];
-
     return (
         <header className="relative overflow-hidden bg-gradient-to-br from-amber-50/80 via-transparent to-emerald-50/80 dark:from-amber-950/30 dark:via-transparent dark:to-emerald-950/30">
             {!disableHeavyEffects && (
@@ -73,20 +66,6 @@ export default function Hero({ branding, landingSettings, disableHeavyEffects, o
                         className="text-sm text-amber-700 dark:text-amber-400"
                         dangerouslySetInnerHTML={{ __html: landingSettings.area_coverage }}
                     />
-                </div>
-
-                <div className="mx-auto mb-2 flex max-w-3xl flex-wrap justify-center gap-2.5 sm:gap-3">
-                    {featureChips.map((chip) => (
-                        <div
-                            key={chip.label}
-                            className="flex items-center gap-2 rounded-full border border-gray-200/60 bg-white/80 px-3.5 py-2 text-sm shadow-sm dark:border-gray-700/60 dark:bg-gray-800/80"
-                        >
-                            <div className={`flex h-7 w-7 items-center justify-center rounded-full ${chip.tone}`}>
-                                {chip.icon}
-                            </div>
-                            <span className="font-medium text-gray-700 dark:text-gray-300">{chip.label}</span>
-                        </div>
-                    ))}
                 </div>
 
                 <LandingStatsBar onCameraClick={onCameraClick} />

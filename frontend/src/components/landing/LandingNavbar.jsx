@@ -3,6 +3,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useCameras } from '../../contexts/CameraContext';
 import { Icons } from '../ui/Icons';
 import { shouldDisableAnimations } from '../../utils/animationControl';
+import LayoutModeToggle from './LayoutModeToggle';
 
 function ClockDisplay({ disableAnimations }) {
     const timeRef = useRef(null);
@@ -46,6 +47,11 @@ export default function Navbar({ branding, layoutMode, onLayoutToggle }) {
     const disableAnimations = shouldDisableAnimations();
 
     const cameraCount = useMemo(() => cameras?.length || 0, [cameras]);
+    const handleLayoutChange = (nextMode) => {
+        if (nextMode !== layoutMode) {
+            onLayoutToggle();
+        }
+    };
 
     return (
         <nav className={`sticky top-0 z-[1001] bg-white/90 dark:bg-gray-900/90 ${disableAnimations ? '' : 'backdrop-blur-xl'} border-b border-gray-200/50 dark:border-gray-800/50`}>
@@ -75,22 +81,14 @@ export default function Navbar({ branding, layoutMode, onLayoutToggle }) {
                         <span className="text-xs text-gray-500 dark:text-gray-400">{branding.city_name}</span>
                         <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
                         <ClockDisplay disableAnimations={disableAnimations} />
-                        <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
-                        <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
-                            Publik
-                        </span>
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <button
-                            onClick={onLayoutToggle}
-                            className="p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                            title={layoutMode === 'simple' ? 'Switch to Full Layout' : 'Switch to Simple Layout'}
-                            aria-label={layoutMode === 'simple' ? 'Beralih ke Tampilan Lengkap' : 'Beralih ke Tampilan Sederhana'}
-                        >
-                            {layoutMode === 'simple' ? <Icons.Layout /> : <Icons.Grid />}
-                        </button>
-
+                        <LayoutModeToggle
+                            layoutMode={layoutMode}
+                            onChange={handleLayoutChange}
+                            compact
+                        />
                         <button
                             onClick={toggleTheme}
                             className="p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"

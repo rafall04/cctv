@@ -33,7 +33,7 @@ vi.mock('./SaweriaSupport', () => ({
 }));
 
 describe('LandingPageSimple footer layout', () => {
-    it('menjaga simple mode tetap ringkas tanpa duplikasi badge footer', () => {
+    it('menjaga simple mode tetap ringkas tanpa copy tambahan', () => {
         render(
             <LandingPageSimple
                 onCameraClick={() => {}}
@@ -55,8 +55,11 @@ describe('LandingPageSimple footer layout', () => {
 
         expect(screen.getAllByText('Ramadan Kareem 1447 H').length).toBe(1);
         expect(screen.getAllByText('RAF NET').length).toBeGreaterThan(0);
-        expect(document.body.textContent).not.toContain('â€¢');
-        expect(document.body.textContent).not.toContain('Â©');
-        expect(document.body.textContent).not.toContain('â˜•');
+        expect(screen.getByRole('tab', { name: /full/i })).not.toBeNull();
+        expect(screen.getByRole('tab', { name: /simple/i })).not.toBeNull();
+        expect(document.body.textContent).not.toContain('Penutup ringkas untuk tampilan cepat tanpa elemen berulang.');
+        expect(document.body.textContent).not.toContain('Ã¢â‚¬Â¢');
+        expect(document.body.textContent).not.toContain('Ã‚Â©');
+        expect(document.body.textContent).not.toContain('Ã¢Ëœâ€¢');
     });
 });

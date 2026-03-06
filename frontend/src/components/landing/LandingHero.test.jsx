@@ -37,6 +37,9 @@ describe('LandingHero', () => {
         expect(screen.getByText('Ramadan Kareem 1447 H')).not.toBeNull();
         expect(screen.getByText('Powered by RAF NET')).not.toBeNull();
         expect(screen.getByText('LIVE STREAMING 24 JAM')).not.toBeNull();
+        expect(screen.queryByText('Streaming HD')).toBeNull();
+        expect(screen.queryByText('Multi-View')).toBeNull();
+        expect(screen.queryByText('Playback')).toBeNull();
     });
 
     it('tidak merender powered by saat dinonaktifkan', () => {

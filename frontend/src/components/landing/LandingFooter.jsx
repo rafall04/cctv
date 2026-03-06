@@ -6,7 +6,6 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
     const areaCount = areas?.length || 0;
     const whatsappNumber = branding.whatsapp_number || '6289685645956';
     const whatsappLink = `https://wa.me/${whatsappNumber}?text=Halo%20Admin%20${encodeURIComponent(branding.company_name)}`;
-    const showPoweredBy = branding.show_powered_by === 'true';
 
     return (
         <footer className="border-t border-gray-200 bg-white py-12 dark:border-gray-800 dark:bg-gray-900">
@@ -22,17 +21,16 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                             </div>
                             <span className="font-bold text-primary-600 dark:text-primary-400">{branding.company_name}</span>
                         </div>
-                        <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                            Akses CCTV publik yang rapi, cepat, dan tetap terhubung selama Ramadan.
-                        </p>
                     </div>
 
                     <h3 className="mb-2 text-lg font-bold text-gray-900 dark:text-white">
                         {branding.copyright_text}
                     </h3>
-                    <p className="mx-auto mb-3 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
-                        {branding.company_description}
-                    </p>
+                    {branding.company_description && (
+                        <p className="mx-auto mb-3 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
+                            {branding.company_description}
+                        </p>
+                    )}
                 </div>
 
                 <div className="mb-8 grid grid-cols-1 gap-8 md:grid-cols-3">
@@ -103,11 +101,6 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                     <p className="text-center text-xs text-gray-400 dark:text-gray-500">
                         &copy; {new Date().getFullYear()} {branding.company_name} &bull; {branding.copyright_text}
                     </p>
-                    {showPoweredBy && (
-                        <p className="mt-1 text-center text-[10px] text-gray-400 dark:text-gray-600">
-                            Infrastruktur publik oleh {branding.company_name || 'CCTV System'}
-                        </p>
-                    )}
                 </div>
             </div>
         </footer>

@@ -35,5 +35,7 @@ describe('LandingFooter', () => {
         expect(stack.className).toContain('flex-col');
         expect(screen.getAllByText('RAF NET').length).toBeGreaterThan(0);
         expect(screen.queryByText('Ramadan Kareem 1447 H')).toBeNull();
+        expect(screen.queryByText(/Akses CCTV publik/i)).toBeNull();
+        expect(screen.queryByText(/Infrastruktur publik oleh/i)).toBeNull();
     });
 });
