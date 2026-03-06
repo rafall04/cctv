@@ -22,7 +22,7 @@ const branding = {
 };
 
 describe('LandingFooter', () => {
-    it('merender stack Ramadan dan brand secara vertikal', () => {
+    it('merender footer ringan tanpa mengulang badge Ramadan besar', () => {
         render(
             <LandingFooter
                 saweriaEnabled={false}
@@ -33,7 +33,7 @@ describe('LandingFooter', () => {
 
         const stack = screen.getByTestId('landing-footer-brand-stack');
         expect(stack.className).toContain('flex-col');
-        expect(screen.getByText('Ramadan Kareem 1447 H')).not.toBeNull();
         expect(screen.getAllByText('RAF NET').length).toBeGreaterThan(0);
+        expect(screen.queryByText('Ramadan Kareem 1447 H')).toBeNull();
     });
 });

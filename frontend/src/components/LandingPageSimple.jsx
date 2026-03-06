@@ -51,22 +51,19 @@ function SimpleHeader({ branding, layoutMode, onLayoutToggle }) {
 
 function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
     return (
-        <footer className="py-6 border-t border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-r from-emerald-50/50 to-green-50/50 dark:from-emerald-950/20 dark:to-green-950/20">
+        <footer className="mt-4 py-6 border-t border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-r from-emerald-50/50 to-green-50/50 dark:from-emerald-950/20 dark:to-green-950/20 sm:mt-6">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="text-center space-y-3">
                     <div className="flex flex-col items-center gap-2">
-                        <div className="inline-flex items-center gap-2 rounded-full bg-white/85 dark:bg-gray-800/85 px-3 py-1.5 shadow-sm">
-                            <svg className="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z" />
-                            </svg>
-                            <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Ramadan Kareem 1447 H</span>
-                        </div>
                         <div className="inline-flex items-center gap-2 rounded-full bg-sky-50 dark:bg-primary/10 px-4 py-2">
                             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center text-white shadow-lg shadow-primary/20">
                                 <span className="text-xs font-bold">{branding.logo_text}</span>
                             </div>
                             <span className="text-sm font-bold text-primary-600 dark:text-primary-400">{branding.company_name}</span>
                         </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Penutup ringkas untuk tampilan cepat tanpa elemen berulang.
+                        </p>
                     </div>
 
                     <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-gray-500 dark:text-gray-500">
@@ -124,7 +121,7 @@ export default function LandingPageSimple({
                 onLayoutToggle={onLayoutToggle}
             />
 
-            <main className="flex-1 min-h-0">
+            <main className="flex-1 min-h-0 pb-4 sm:pb-6">
                 <div className="py-3 px-4 text-center bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/30 border-b border-emerald-200/30 dark:border-emerald-800/30">
                     <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/80 dark:bg-gray-800/80 shadow-sm">
                         <svg className="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">

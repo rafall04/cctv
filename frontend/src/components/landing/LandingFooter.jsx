@@ -14,27 +14,23 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                 <div className="mb-10 text-center">
                     <div
                         data-testid="landing-footer-brand-stack"
-                        className="mx-auto mb-6 flex max-w-sm flex-col items-center gap-3"
+                        className="mx-auto mb-5 flex max-w-sm flex-col items-center gap-3"
                     >
-                        <div className="flex items-center gap-2 rounded-full border border-emerald-200/50 bg-emerald-50 px-4 py-1.5 text-xs font-semibold text-emerald-700 shadow-sm dark:border-emerald-700/30 dark:bg-emerald-900/30 dark:text-emerald-400">
-                            <svg className="h-4 w-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z" />
-                            </svg>
-                            <span>Ramadan Kareem 1447 H</span>
-                        </div>
-
                         <div className="flex items-center gap-2 rounded-full bg-sky-50 px-4 py-2 text-sm dark:bg-primary/10">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary-600 text-white">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary-600 text-white shadow-lg shadow-primary/20">
                                 <span className="text-sm font-bold">{branding.logo_text}</span>
                             </div>
                             <span className="font-bold text-primary-600 dark:text-primary-400">{branding.company_name}</span>
                         </div>
+                        <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                            Akses CCTV publik yang rapi, cepat, dan tetap terhubung selama Ramadan.
+                        </p>
                     </div>
 
                     <h3 className="mb-2 text-lg font-bold text-gray-900 dark:text-white">
                         {branding.copyright_text}
                     </h3>
-                    <p className="mx-auto mb-4 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
+                    <p className="mx-auto mb-3 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
                         {branding.company_description}
                     </p>
                 </div>
@@ -86,15 +82,6 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                     </div>
                 </div>
 
-                <div className="mb-6 flex flex-wrap justify-center gap-2">
-                    <span className="rounded-full bg-gray-100 px-3 py-1.5 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-400">WiFi Rumah</span>
-                    <span className="rounded-full bg-gray-100 px-3 py-1.5 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-400">Pasang CCTV</span>
-                    <span className="rounded-full bg-gray-100 px-3 py-1.5 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-400">HD Streaming</span>
-                    <span className="rounded-full bg-gray-100 px-3 py-1.5 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-400">Multi-View</span>
-                    <span className="rounded-full bg-gray-100 px-3 py-1.5 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-400">Playback</span>
-                    <span className="rounded-full bg-gray-100 px-3 py-1.5 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-400">Gratis Akses</span>
-                </div>
-
                 {saweriaEnabled && (
                     <div className="mb-6 flex flex-col items-center gap-3">
                         <a
@@ -112,19 +99,13 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                     </div>
                 )}
 
-                <div className="mb-4 text-center">
-                    <p className="text-[10px] text-gray-400 dark:text-gray-600">
-                        {branding.meta_keywords}
-                    </p>
-                </div>
-
                 <div className="border-t border-gray-100 pt-4 dark:border-gray-800">
                     <p className="text-center text-xs text-gray-400 dark:text-gray-500">
                         &copy; {new Date().getFullYear()} {branding.company_name} &bull; {branding.copyright_text}
                     </p>
                     {showPoweredBy && (
                         <p className="mt-1 text-center text-[10px] text-gray-400 dark:text-gray-600">
-                            Powered by {branding.company_name || 'CCTV System'}
+                            Infrastruktur publik oleh {branding.company_name || 'CCTV System'}
                         </p>
                     )}
                 </div>

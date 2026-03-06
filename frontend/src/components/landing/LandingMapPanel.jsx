@@ -22,6 +22,7 @@ export default function LandingMapPanel({
                 areas={areas}
                 selectedArea={selectedArea}
                 onAreaChange={onAreaChange}
+                showAreaFilter={false}
                 className="h-[450px] sm:h-[550px]"
                 focusedCameraId={focusedCameraId}
                 onFocusHandled={onFocusHandled}

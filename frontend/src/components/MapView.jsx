@@ -1043,6 +1043,7 @@ const MapView = memo(({
     onFocusHandled = null, // Callback setelah fokus ditangani
     selectedArea: controlledSelectedArea = undefined,
     onAreaChange = null,
+    showAreaFilter = true,
 }) => {
     const [internalSelectedArea, setInternalSelectedArea] = useState('all');
     const selectedAreaValue = controlledSelectedArea ?? internalSelectedArea;
@@ -1261,21 +1262,22 @@ const MapView = memo(({
                 ))}
             </MapContainer>
 
-            {/* Filter Area - Top Left */}
-            <div className="absolute top-3 left-3 z-[1000]">
-                <select
-                    value={selectedAreaValue}
-                    onChange={handleAreaChange}
-                    className="px-2.5 py-1.5 sm:px-3 sm:py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg shadow-lg text-xs sm:text-sm font-medium border-0 focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer max-w-[180px] sm:max-w-none truncate"
-                >
-                    <option value="all">{mapSettings.name || 'Semua Lokasi'} ({camerasWithCoords.length})</option>
-                    {areaNames.map(area => (
-                        <option key={area} value={area}>
-                            {area} ({camerasWithCoords.filter(c => c.area_name === area).length})
-                        </option>
-                    ))}
-                </select>
-            </div>
+            {showAreaFilter && (
+                <div className="absolute top-3 left-3 z-[1000]">
+                    <select
+                        value={selectedAreaValue}
+                        onChange={handleAreaChange}
+                        className="px-2.5 py-1.5 sm:px-3 sm:py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg shadow-lg text-xs sm:text-sm font-medium border-0 focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer max-w-[180px] sm:max-w-none truncate"
+                    >
+                        <option value="all">{mapSettings.name || 'Semua Lokasi'} ({camerasWithCoords.length})</option>
+                        {areaNames.map(area => (
+                            <option key={area} value={area}>
+                                {area} ({camerasWithCoords.filter(c => c.area_name === area).length})
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            )}
 
             {/* Stats - Bottom Center (di atas attribution) */}
             <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-[1000]">

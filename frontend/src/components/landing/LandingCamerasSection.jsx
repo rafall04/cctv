@@ -86,29 +86,19 @@ function renderSearchDropdown({
                                     {camera.name}
                                 </span>
                                 {isMaintenance && (
-                                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 rounded">
+                                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 rounded-full">
                                         PERBAIKAN
                                     </span>
                                 )}
                                 {isTunnel && !isMaintenance && (
-                                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded">
+                                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded-full">
                                         TUNNEL
                                     </span>
                                 )}
                             </div>
-                            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                {camera.location && (
-                                    <span className="flex items-center gap-1 truncate">
-                                        <Icons.MapPin />
-                                        {camera.location}
-                                    </span>
-                                )}
-                                {camera.area_name && (
-                                    <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-[10px]">
-                                        {camera.area_name}
-                                    </span>
-                                )}
-                            </div>
+                            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 truncate">
+                                {[camera.location, camera.area_name].filter(Boolean).join(' • ') || 'Lokasi tidak tersedia'}
+                            </p>
                         </div>
 
                         {!isDisabled && (
@@ -175,7 +165,7 @@ export default function CamerasSection({
     });
 
     return (
-        <section id="playback-section" className="py-8 pb-14 sm:py-12 sm:pb-20">
+        <section id="playback-section" className="py-8 pb-16 sm:py-12 sm:pb-24">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <LandingCameraToolbar
                     title={landingSettings.section_title}
