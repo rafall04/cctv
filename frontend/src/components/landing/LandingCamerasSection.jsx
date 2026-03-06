@@ -107,7 +107,7 @@ export default function CamerasSection({
     }, []);
 
     return (
-        <section id="playback-section" className="py-6 pb-10 sm:py-10 sm:pb-14">
+        <section id="playback-section" className="py-8 pb-14 sm:py-12 sm:pb-20">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex flex-col gap-4 mb-4">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

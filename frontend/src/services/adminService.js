@@ -1,9 +1,9 @@
 import apiClient from './apiClient';
 
 export const adminService = {
-    async getStats() {
+    async getStats(config = {}) {
         try {
-            const response = await apiClient.get('/api/admin/stats');
+            const response = await apiClient.get('/api/admin/stats', config);
             return response.data;
         } catch (error) {
             console.error('Get stats error:', error);
@@ -14,9 +14,9 @@ export const adminService = {
         }
     },
 
-    async getTodayStats(period = 'today') {
+    async getTodayStats(period = 'today', config = {}) {
         try {
-            const response = await apiClient.get(`/api/admin/stats/today?period=${period}`);
+            const response = await apiClient.get(`/api/admin/stats/today?period=${period}`, config);
             return response.data;
         } catch (error) {
             console.error('Get today stats error:', error);
@@ -27,9 +27,9 @@ export const adminService = {
         }
     },
 
-    async getViewerAnalytics(period = '7days') {
+    async getViewerAnalytics(period = '7days', config = {}) {
         try {
-            const response = await apiClient.get(`/api/admin/analytics/viewers?period=${period}`);
+            const response = await apiClient.get(`/api/admin/analytics/viewers?period=${period}`, config);
             return response.data;
         } catch (error) {
             console.error('Get viewer analytics error:', error);
@@ -40,9 +40,9 @@ export const adminService = {
         }
     },
 
-    async getRealTimeViewers() {
+    async getRealTimeViewers(config = {}) {
         try {
-            const response = await apiClient.get('/api/admin/analytics/realtime');
+            const response = await apiClient.get('/api/admin/analytics/realtime', config);
             return response.data;
         } catch (error) {
             console.error('Get real-time viewers error:', error);

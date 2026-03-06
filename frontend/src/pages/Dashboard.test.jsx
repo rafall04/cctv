@@ -98,4 +98,25 @@ describe('Dashboard', () => {
         expect(screen.getByTestId('quick-stats').textContent).toBe('date:2026-03-05');
         expect(getStats).toHaveBeenCalledTimes(1);
     });
+
+    it('merefresh dashboard saat browser kembali fokus tanpa toast blocking', async () => {
+        render(
+            <MemoryRouter>
+                <Dashboard />
+            </MemoryRouter>
+        );
+
+        await waitFor(() => {
+            expect(getStats).toHaveBeenCalledTimes(1);
+        });
+
+        fireEvent(window, new Event('focus'));
+
+        await waitFor(() => {
+            expect(getStats).toHaveBeenCalledTimes(2);
+        });
+        expect(getStats).toHaveBeenLastCalledWith(
+            expect.objectContaining({ skipGlobalErrorNotification: true })
+        );
+    });
 });

@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { feedbackService } from '../services/feedbackService';
 import { TableSkeleton } from '../components/ui/Skeleton';
 import { NoFeedbackEmptyState } from '../components/ui/EmptyState';
+import { useAdminReconnectRefresh } from '../hooks/admin/useAdminReconnectRefresh';
 
 const Icons = {
     Mail: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>,
@@ -28,42 +29,68 @@ export default function FeedbackManagement() {
     const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
     const [filter, setFilter] = useState('');
     const [selectedFeedback, setSelectedFeedback] = useState(null);
+    const requestIdRef = useRef(0);
 
-    const fetchFeedbacks = async () => {
-        setLoading(true);
+    const fetchFeedbacks = useCallback(async ({ mode = 'initial' } = {}) => {
+        const isBackgroundMode = mode === 'background' || mode === 'resume';
+        const requestId = ++requestIdRef.current;
+
+        if (!isBackgroundMode) {
+            setLoading(true);
+        }
+
         try {
             const params = { page: pagination.page, limit: pagination.limit };
             if (filter) params.status = filter;
 
-            const response = await feedbackService.getAll(params);
+            const response = await feedbackService.getAll(
+                params,
+                isBackgroundMode ? { skipGlobalErrorNotification: true } : {}
+            );
+            if (requestId !== requestIdRef.current) {
+                return;
+            }
             setFeedbacks(response.data);
             setPagination(prev => ({ ...prev, ...response.pagination }));
         } catch (error) {
-            console.error('Failed to fetch feedbacks:', error);
+            if (requestId === requestIdRef.current) {
+                console.error('Failed to fetch feedbacks:', error);
+            }
         } finally {
-            setLoading(false);
+            if (requestId === requestIdRef.current && !isBackgroundMode) {
+                setLoading(false);
+            }
         }
-    };
+    }, [filter, pagination.limit, pagination.page]);
 
-    const fetchStats = async () => {
+    const fetchStats = useCallback(async ({ mode = 'initial' } = {}) => {
         try {
-            const response = await feedbackService.getStats();
+            const response = await feedbackService.getStats(
+                mode === 'background' || mode === 'resume'
+                    ? { skipGlobalErrorNotification: true }
+                    : {}
+            );
             setStats(response.data);
         } catch (error) {
             console.error('Failed to fetch stats:', error);
         }
-    };
+    }, []);
 
     useEffect(() => {
-        fetchFeedbacks();
-        fetchStats();
-    }, [pagination.page, filter]);
+        fetchFeedbacks({ mode: 'initial' });
+        fetchStats({ mode: 'initial' });
+    }, [fetchFeedbacks, fetchStats]);
+
+    useAdminReconnectRefresh(() => Promise.all([
+        fetchFeedbacks({ mode: 'resume' }),
+        fetchStats({ mode: 'resume' }),
+    ]));
 
     const handleStatusChange = async (id, newStatus) => {
         try {
             await feedbackService.updateStatus(id, newStatus);
-            fetchFeedbacks();
-            fetchStats();
+            fetchFeedbacks({ mode: 'initial' });
+            fetchStats({ mode: 'initial' });
             if (selectedFeedback?.id === id) {
                 setSelectedFeedback(prev => ({ ...prev, status: newStatus }));
             }
@@ -76,8 +103,8 @@ export default function FeedbackManagement() {
         if (!confirm('Yakin ingin menghapus feedback ini?')) return;
         try {
             await feedbackService.delete(id);
-            fetchFeedbacks();
-            fetchStats();
+            fetchFeedbacks({ mode: 'initial' });
+            fetchStats({ mode: 'initial' });
             if (selectedFeedback?.id === id) {
                 setSelectedFeedback(null);
             }
@@ -105,7 +132,7 @@ export default function FeedbackManagement() {
                     <p className="text-gray-500 dark:text-gray-400 mt-1">Kelola feedback dari pengunjung</p>
                 </div>
                 <button
-                    onClick={() => { fetchFeedbacks(); fetchStats(); }}
+                    onClick={() => { fetchFeedbacks({ mode: 'initial' }); fetchStats({ mode: 'initial' }); }}
                     className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
                 >
                     <Icons.Refresh />

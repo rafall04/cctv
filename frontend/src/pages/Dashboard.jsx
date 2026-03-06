@@ -8,6 +8,7 @@ import { CameraStatusOverview } from '../components/CameraStatusOverview';
 import { QuickStatsCards } from '../components/QuickStatsCards';
 import { TopCamerasWidget } from '../components/TopCamerasWidget';
 import { DateRangeSelector } from '../components/DateRangeSelector';
+import { useAdminReconnectRefresh } from '../hooks/admin/useAdminReconnectRefresh';
 
 /**
  * Viewer Sessions Modal - Shows list of viewers with IP addresses
@@ -258,51 +259,72 @@ export default function Dashboard() {
     const [dateRange, setDateRange] = useState('today');
     const intervalRef = useRef(null);
     const statsRef = useRef(null);
+    const requestIdRef = useRef(0);
     const navigate = useNavigate();
 
     useEffect(() => {
         statsRef.current = stats;
     }, [stats]);
 
-    const loadStats = useCallback(async (isAutoRefresh = false) => {
+    const loadStats = useCallback(async ({ mode = 'initial' } = {}) => {
+        const isBackgroundMode = mode === 'background' || mode === 'resume';
+        const requestId = ++requestIdRef.current;
+
         try {
-            if (!isAutoRefresh) {
+            if (!isBackgroundMode) {
                 setIsRetrying(true);
             }
-            const response = await adminService.getStats();
+            const response = await adminService.getStats(
+                isBackgroundMode
+                    ? { skipGlobalErrorNotification: true }
+                    : {}
+            );
+
+            if (requestId !== requestIdRef.current) {
+                return;
+            }
+
             if (response.success) {
                 setStats(response.data);
                 setError(null);
                 setRefreshError(false);
                 setLastSuccessfulUpdate(new Date());
             } else {
-                if (isAutoRefresh && statsRef.current) {
+                if (isBackgroundMode && statsRef.current) {
                     setRefreshError(true);
                 } else {
                     setError(response.message || 'Failed to load dashboard data');
                 }
             }
         } catch (err) {
-            if (isAutoRefresh && statsRef.current) {
+            if (requestId !== requestIdRef.current) {
+                return;
+            }
+
+            if (isBackgroundMode && statsRef.current) {
                 setRefreshError(true);
             } else {
                 setError('Failed to connect to server. Please check your connection.');
             }
         } finally {
-            setLoading(false);
-            setIsRetrying(false);
+            if (requestId === requestIdRef.current) {
+                setLoading(false);
+                setIsRetrying(false);
+            }
         }
     }, []);
 
     useEffect(() => {
-        loadStats(false);
-        intervalRef.current = setInterval(() => loadStats(true), 10000);
+        loadStats({ mode: 'initial' });
+        intervalRef.current = setInterval(() => loadStats({ mode: 'background' }), 10000);
         return () => {
             if (intervalRef.current) {
                 clearInterval(intervalRef.current);
             }
         };
     }, [loadStats]);
+
+    useAdminReconnectRefresh(() => loadStats({ mode: 'resume' }));
 
     const handleDateRangeChange = (range) => {
         setDateRange(range);
@@ -311,7 +333,7 @@ export default function Dashboard() {
     const handleRetry = () => {
         setError(null);
         setLoading(true);
-        loadStats(false);
+        loadStats({ mode: 'initial' });
     };
 
     const handleAddCamera = () => {

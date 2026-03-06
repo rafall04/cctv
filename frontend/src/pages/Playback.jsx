@@ -9,6 +9,7 @@ import PlaybackHeader from '../components/playback/PlaybackHeader';
 import PlaybackVideo from '../components/playback/PlaybackVideo';
 import PlaybackTimeline from '../components/playback/PlaybackTimeline';
 import PlaybackSegmentList from '../components/playback/PlaybackSegmentList';
+import { useAdminReconnectRefresh } from '../hooks/admin/useAdminReconnectRefresh';
 
 const MAX_SEEK_DISTANCE = 180;
 
@@ -42,6 +43,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
     const containerRef = useRef(null);
     const lastSeekTimeRef = useRef(0);
     const bufferingTimeoutRef = useRef(null);
+    const segmentsRequestIdRef = useRef(0);
 
     // Refs to avoid stale closures in event handlers
     const selectedSegmentRef = useRef(selectedSegment);
@@ -208,54 +210,77 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         }
     }, [segments, selectedSegment, searchParams]);
 
+    const loadSegments = useCallback(async (cameraId, { mode = 'initial', reset = false } = {}) => {
+        if (!cameraId) {
+            return;
+        }
+
+        const isBackgroundMode = mode === 'background' || mode === 'resume';
+        const requestId = ++segmentsRequestIdRef.current;
+
+        if (reset) {
+            setSelectedSegment(null);
+            setSegments([]);
+            setIsSeeking(false);
+            setIsBuffering(false);
+            setSeekWarning(null);
+            setAutoPlayNotification(null);
+            lastSeekTimeRef.current = 0;
+            if (bufferingTimeoutRef.current) {
+                clearTimeout(bufferingTimeoutRef.current);
+                bufferingTimeoutRef.current = null;
+            }
+        }
+
+        try {
+            const response = await recordingService.getSegments(
+                cameraId,
+                isBackgroundMode ? { skipGlobalErrorNotification: true } : {}
+            );
+
+            if (requestId !== segmentsRequestIdRef.current) {
+                return;
+            }
+
+            if (response.success && response.data) {
+                const segmentsArray = response.data.segments || [];
+                setSegments(segmentsArray);
+            } else if (!isBackgroundMode) {
+                console.warn('API response not successful:', response);
+            }
+        } catch (error) {
+            if (requestId !== segmentsRequestIdRef.current) {
+                return;
+            }
+
+            console.error('Failed to fetch segments:', error);
+            if (!isBackgroundMode) {
+                setSegments([]);
+                setSelectedSegment(null);
+            }
+        }
+    }, []);
+
     // Fetch segments effect
     useEffect(() => {
         if (!selectedCamera) {
             return;
         }
 
-        let isMounted = true;
-
-        setSelectedSegment(null);
-        setSegments([]);
-        setIsSeeking(false);
-        setIsBuffering(false);
-        setSeekWarning(null);
-        setAutoPlayNotification(null);
-        lastSeekTimeRef.current = 0;
-        if (bufferingTimeoutRef.current) {
-            clearTimeout(bufferingTimeoutRef.current);
-            bufferingTimeoutRef.current = null;
-        }
-
-        const fetchSegments = async () => {
-            try {
-                const response = await recordingService.getSegments(selectedCamera.id);
-                if (response.success && response.data) {
-                    const segmentsArray = response.data.segments || [];
-                    if (isMounted) {
-                        setSegments(segmentsArray);
-                    }
-                } else {
-                    console.warn('API response not successful:', response);
-                }
-            } catch (error) {
-                console.error('Failed to fetch segments:', error);
-                if (isMounted) {
-                    setSegments([]);
-                    setSelectedSegment(null);
-                }
-            }
-        };
-
-        fetchSegments();
-        const interval = setInterval(fetchSegments, 10000);
+        loadSegments(selectedCamera.id, { mode: 'initial', reset: true });
+        const interval = setInterval(() => {
+            loadSegments(selectedCamera.id, { mode: 'background' });
+        }, 10000);
 
         return () => {
-            isMounted = false;
             clearInterval(interval);
         };
-    }, [selectedCamera]);
+    }, [loadSegments, selectedCamera]);
+
+    useAdminReconnectRefresh(
+        () => loadSegments(selectedCamera?.id, { mode: 'resume' }),
+        { enabled: Boolean(selectedCamera?.id) }
+    );
 
     useEffect(() => {
         if (!selectedSegment || !videoRef.current || !selectedCamera) return;

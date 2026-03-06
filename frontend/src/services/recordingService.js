@@ -46,8 +46,8 @@ export const getRecordingStatus = async (cameraId) => {
 /**
  * Get recordings overview (dashboard)
  */
-export const getRecordingsOverview = async () => {
-    const response = await apiClient.get('/api/recordings/overview');
+export const getRecordingsOverview = async (config = {}) => {
+    const response = await apiClient.get('/api/recordings/overview', config);
     return response.data;
 };
 
@@ -62,11 +62,11 @@ export const updateRecordingSettings = async (cameraId, settings) => {
 /**
  * Get restart logs
  */
-export const getRestartLogs = async (cameraId = null, limit = 50) => {
+export const getRestartLogs = async (cameraId = null, limit = 50, config = {}) => {
     const url = cameraId 
         ? `/api/recordings/${cameraId}/restarts?limit=${limit}`
         : `/api/recordings/restarts?limit=${limit}`;
-    const response = await apiClient.get(url);
+    const response = await apiClient.get(url, config);
     return response.data;
 };
 
@@ -77,8 +77,8 @@ export const getRestartLogs = async (cameraId = null, limit = 50) => {
 /**
  * Get segments untuk camera (untuk playback)
  */
-export const getSegments = async (cameraId) => {
-    const response = await apiClient.get(`/api/recordings/${cameraId}/segments`);
+export const getSegments = async (cameraId, config = {}) => {
+    const response = await apiClient.get(`/api/recordings/${cameraId}/segments`, config);
     return response.data;
 };
 

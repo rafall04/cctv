@@ -8,14 +8,14 @@ export const feedbackService = {
     },
 
     // Admin - get all feedbacks
-    async getAll(params = {}) {
-        const response = await apiClient.get('/api/feedback', { params });
+    async getAll(params = {}, config = {}) {
+        const response = await apiClient.get('/api/feedback', { ...config, params });
         return response.data;
     },
 
     // Admin - get stats
-    async getStats() {
-        const response = await apiClient.get('/api/feedback/stats');
+    async getStats(config = {}) {
+        const response = await apiClient.get('/api/feedback/stats', config);
         return response.data;
     },
 

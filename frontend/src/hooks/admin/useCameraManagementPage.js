@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { cameraService } from '../../services/cameraService';
 import { areaService } from '../../services/areaService';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useFormValidation } from '../useFormValidation';
+import { useAdminReconnectRefresh } from './useAdminReconnectRefresh';
 import {
     buildCameraPayload,
     defaultCameraFormValues,
@@ -30,6 +31,8 @@ export function useCameraManagementPage() {
     const [deletingId, setDeletingId] = useState(null);
     const [togglingId, setTogglingId] = useState(null);
     const [togglingMaintenanceId, setTogglingMaintenanceId] = useState(null);
+    const camerasRequestIdRef = useRef(0);
+    const areasRequestIdRef = useRef(0);
 
     const { success, error: showError } = useNotification();
 
@@ -51,39 +54,78 @@ export function useCameraManagementPage() {
         getCameraValidationRules('internal')
     );
 
-    const loadAreas = useCallback(async () => {
+    const loadAreas = useCallback(async ({ mode = 'initial' } = {}) => {
+        const isBackgroundMode = mode === 'background' || mode === 'resume';
+        const requestId = ++areasRequestIdRef.current;
+
         try {
-            const response = await areaService.getAllAreas();
+            const response = await areaService.getAllAreas(
+                isBackgroundMode ? { skipGlobalErrorNotification: true } : {}
+            );
+            if (requestId !== areasRequestIdRef.current) {
+                return;
+            }
+
             if (response.success) {
                 setAreas(response.data);
             }
         } catch (error) {
-            console.error('Load areas error:', error);
+            if (requestId === areasRequestIdRef.current) {
+                console.error('Load areas error:', error);
+            }
         }
     }, []);
 
-    const loadCameras = useCallback(async () => {
+    const loadCameras = useCallback(async ({ mode = 'initial' } = {}) => {
+        const isBackgroundMode = mode === 'background' || mode === 'resume';
+        const requestId = ++camerasRequestIdRef.current;
+
         try {
-            setLoading(true);
-            setLoadError(null);
-            const response = await cameraService.getAllCameras();
+            if (!isBackgroundMode) {
+                setLoading(true);
+                setLoadError(null);
+            }
+
+            const response = await cameraService.getAllCameras(
+                isBackgroundMode ? { skipGlobalErrorNotification: true } : {}
+            );
+            if (requestId !== camerasRequestIdRef.current) {
+                return;
+            }
+
             if (response.success) {
                 setCameras(response.data);
-            } else {
+                setLoadError(null);
+            } else if (!isBackgroundMode) {
                 setLoadError(response.message || 'Failed to load cameras');
+            } else {
+                console.warn('Background camera refresh failed:', response.message);
             }
         } catch (error) {
+            if (requestId !== camerasRequestIdRef.current) {
+                return;
+            }
+
             console.error('Load cameras error:', error);
-            setLoadError(error.response?.data?.message || 'Failed to load cameras. Please try again.');
+            if (!isBackgroundMode) {
+                setLoadError(error.response?.data?.message || 'Failed to load cameras. Please try again.');
+            }
         } finally {
-            setLoading(false);
+            if (requestId === camerasRequestIdRef.current && !isBackgroundMode) {
+                setLoading(false);
+            }
         }
     }, []);
 
     useEffect(() => {
-        loadCameras();
-        loadAreas();
+        loadCameras({ mode: 'initial' });
+        loadAreas({ mode: 'initial' });
     }, [loadAreas, loadCameras]);
+
+    useAdminReconnectRefresh(() => Promise.all([
+        loadCameras({ mode: 'resume' }),
+        loadAreas({ mode: 'resume' }),
+    ]));
 
     const closeModal = useCallback(() => {
         setShowModal(false);
@@ -146,7 +188,7 @@ export function useCameraManagementPage() {
 
             if (result.success) {
                 closeModal();
-                await loadCameras();
+                await loadCameras({ mode: 'initial' });
 
                 if (editingCamera) {
                     success('Camera Updated', `"${formData.name}" has been updated successfully.`);

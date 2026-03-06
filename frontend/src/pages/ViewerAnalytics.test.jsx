@@ -112,7 +112,7 @@ describe('ViewerAnalytics', () => {
         fireEvent.click(screen.getByRole('button', { name: '30 Hari' }));
 
         await waitFor(() => {
-            expect(getViewerAnalytics).toHaveBeenLastCalledWith('30days');
+            expect(getViewerAnalytics).toHaveBeenLastCalledWith('30days', {});
         });
     });
 

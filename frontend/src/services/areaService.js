@@ -7,8 +7,8 @@ export const areaService = {
         return response.data;
     },
     
-    getAllAreas: async () => {
-        const response = await apiClient.get('/api/areas');
+    getAllAreas: async (config = {}) => {
+        const response = await apiClient.get('/api/areas', config);
         return response.data;
     },
     getAreaById: async (id) => {

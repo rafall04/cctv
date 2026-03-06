@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import recordingService from '../services/recordingService';
 import { useNotification } from '../contexts/NotificationContext';
 import { TableSkeleton, StatCardSkeleton } from '../components/ui/Skeleton';
+import { useAdminReconnectRefresh } from '../hooks/admin/useAdminReconnectRefresh';
 
 function RecordingDashboard() {
     const [recordings, setRecordings] = useState([]);
@@ -9,52 +10,77 @@ function RecordingDashboard() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const { showNotification } = useNotification();
+    const requestIdRef = useRef(0);
 
-    useEffect(() => {
-        fetchData();
-        const interval = setInterval(fetchData, 10000); // Refresh setiap 10 detik
-        return () => clearInterval(interval);
-    }, []);
+    const fetchData = useCallback(async ({ mode = 'initial' } = {}) => {
+        const isBackgroundMode = mode === 'background' || mode === 'resume';
+        const requestId = ++requestIdRef.current;
 
-    const fetchData = async () => {
         try {
-            setError(null);
+            if (!isBackgroundMode) {
+                setError(null);
+            }
             
             const [recordingsRes, restartsRes] = await Promise.all([
-                recordingService.getRecordingsOverview(),
-                recordingService.getRestartLogs()
+                recordingService.getRecordingsOverview(
+                    isBackgroundMode ? { skipGlobalErrorNotification: true } : {}
+                ),
+                recordingService.getRestartLogs(
+                    null,
+                    50,
+                    isBackgroundMode ? { skipGlobalErrorNotification: true } : {}
+                )
             ]);
 
+            if (requestId !== requestIdRef.current) {
+                return;
+            }
+
             if (recordingsRes.success && recordingsRes.data) {
-                // Handle both old and new response format
                 const camerasData = recordingsRes.data.cameras || recordingsRes.data || [];
                 setRecordings(camerasData);
-            } else {
+            } else if (!isBackgroundMode) {
                 setRecordings([]);
             }
 
             if (restartsRes.success && restartsRes.data) {
                 setRestartLogs(restartsRes.data);
-            } else {
+            } else if (!isBackgroundMode) {
                 setRestartLogs([]);
             }
         } catch (error) {
+            if (requestId !== requestIdRef.current) {
+                return;
+            }
+
             console.error('Failed to fetch recording data:', error);
-            const errorMessage = error.response?.data?.message || error.message || 'Failed to load recording data';
-            setError(errorMessage);
-            setRecordings([]);
-            setRestartLogs([]);
+            if (!isBackgroundMode) {
+                const errorMessage = error.response?.data?.message || error.message || 'Failed to load recording data';
+                setError(errorMessage);
+                setRecordings([]);
+                setRestartLogs([]);
+            }
         } finally {
-            setLoading(false);
+            if (requestId === requestIdRef.current && !isBackgroundMode) {
+                setLoading(false);
+            }
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        fetchData({ mode: 'initial' });
+        const interval = setInterval(() => fetchData({ mode: 'background' }), 10000);
+        return () => clearInterval(interval);
+    }, [fetchData]);
+
+    useAdminReconnectRefresh(() => fetchData({ mode: 'resume' }));
 
     const handleStartRecording = async (cameraId) => {
         try {
             const response = await recordingService.startRecording(cameraId);
             if (response.success) {
                 showNotification('Recording started successfully', 'success');
-                fetchData();
+                fetchData({ mode: 'initial' });
             }
         } catch (error) {
             showNotification(error.response?.data?.message || 'Failed to start recording', 'error');
@@ -66,7 +92,7 @@ function RecordingDashboard() {
             const response = await recordingService.stopRecording(cameraId);
             if (response.success) {
                 showNotification('Recording stopped successfully', 'success');
-                fetchData();
+                fetchData({ mode: 'initial' });
             }
         } catch (error) {
             showNotification(error.response?.data?.message || 'Failed to stop recording', 'error');

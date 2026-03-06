@@ -2,9 +2,9 @@ import apiClient from './apiClient';
 
 export const cameraService = {
     // Get all active cameras (public)
-    async getActiveCameras() {
+    async getActiveCameras(config = {}) {
         try {
-            const response = await apiClient.get('/api/cameras/active');
+            const response = await apiClient.get('/api/cameras/active', config);
             return response.data;
         } catch (error) {
             console.error('Get active cameras error:', error);
@@ -13,9 +13,9 @@ export const cameraService = {
     },
 
     // Get all cameras (admin only)
-    async getAllCameras() {
+    async getAllCameras(config = {}) {
         try {
-            const response = await apiClient.get('/api/cameras');
+            const response = await apiClient.get('/api/cameras', config);
             return response.data;
         } catch (error) {
             console.error('Get all cameras error:', error);
