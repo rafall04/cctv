@@ -21,7 +21,9 @@ export async function updateSaweriaSettings(settings) {
  * Returns only enabled settings
  */
 export async function getPublicSaweriaConfig() {
-    const response = await apiClient.get('/api/saweria/config');
+    const response = await apiClient.get('/api/saweria/config', {
+        skipGlobalErrorNotification: true,
+    });
     return response.data;
 }
 

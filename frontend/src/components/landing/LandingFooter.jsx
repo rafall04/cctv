@@ -6,7 +6,6 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
     const areaCount = areas?.length || 0;
     const whatsappNumber = branding.whatsapp_number || '6289685645956';
     const whatsappLink = `https://wa.me/${whatsappNumber}?text=Halo%20Admin%20${encodeURIComponent(branding.company_name)}`;
-
     const showPoweredBy = branding.show_powered_by === 'true';
 
     return (
@@ -15,7 +14,7 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                 <div className="mb-8 text-center">
                     <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200/50 dark:border-emerald-700/30 mb-4">
                         <svg className="w-5 h-5 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z"/>
+                            <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z" />
                         </svg>
                         <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Ramadan Kareem 1447 H</span>
                     </div>
@@ -26,6 +25,7 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                         </div>
                         <span className="font-bold text-primary-600 dark:text-primary-400">{branding.company_name}</span>
                     </div>
+
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
                         {branding.copyright_text}
                     </h3>
@@ -38,9 +38,9 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                     <div className="text-center md:text-left">
                         <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Layanan Kami</h4>
                         <ul className="text-sm text-gray-500 dark:text-gray-400 space-y-1.5">
-                            <li>• Pemasangan WiFi rumah & kantor</li>
-                            <li>• Instalasi CCTV</li>
-                            <li>• Monitoring CCTV online 24 jam</li>
+                            <li>&bull; Pemasangan WiFi rumah & kantor</li>
+                            <li>&bull; Instalasi CCTV</li>
+                            <li>&bull; Monitoring CCTV online 24 jam</li>
                         </ul>
                     </div>
 
@@ -98,7 +98,7 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
                         >
-                            <span className="text-xl">☕</span>
+                            <span className="text-xl">Kopi</span>
                             <span>Traktir Kopi</span>
                         </a>
                         <p className="text-xs text-gray-500 dark:text-gray-400 text-center max-w-md">
@@ -115,7 +115,7 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
 
                 <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
                     <p className="text-center text-gray-400 dark:text-gray-500 text-xs">
-                        © {new Date().getFullYear()} {branding.company_name} • {branding.copyright_text}
+                        &copy; {new Date().getFullYear()} {branding.company_name} &bull; {branding.copyright_text}
                     </p>
                     {showPoweredBy && (
                         <p className="text-center text-gray-400 dark:text-gray-600 text-[10px] mt-1">

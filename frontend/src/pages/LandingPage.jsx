@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { getPublicSaweriaConfig } from '../services/saweriaService';
 import { useBranding } from '../contexts/BrandingContext';
 import { updateMetaTags } from '../utils/metaUpdater';
-import { testMediaMTXConnection } from '../utils/connectionTester';
+import { testMediaMTXConnection as testBackendReachability } from '../utils/connectionTester';
 import { getApiUrl } from '../config/config.js';
 import { useCameras, CameraProvider } from '../contexts/CameraContext';
 import { ToastProvider, useToast } from '../contexts/ToastContext';
@@ -164,8 +164,6 @@ function LandingPageContent() {
 
     const maxStreams = deviceTier === 'low' ? 2 : deviceTier === 'mid' ? 4 : 6;
 
-    const [, setServerStatus] = useState('checking');
-    const [, setServerLatency] = useState(-1);
     const connectivityMountedRef = useRef(true);
     const connectivityInFlightRef = useRef(false);
     const lastConnectivityCheckRef = useRef(0);
@@ -203,23 +201,18 @@ function LandingPageContent() {
                 apiUrl = `${baseUrl.replace(/\/$/, '')}/health`;
             }
 
-            const result = await testMediaMTXConnection(apiUrl);
+            const result = await testBackendReachability(apiUrl);
 
             if (!connectivityMountedRef.current) {
                 return;
             }
 
-            if (result.reachable) {
-                setServerStatus('online');
-                setServerLatency(result.latency);
-            } else {
-                setServerStatus('offline');
-                setServerLatency(-1);
+            if (!result.reachable) {
+                console.warn('[LandingPage] Backend health check unreachable');
             }
         } catch (err) {
             if (connectivityMountedRef.current) {
-                setServerStatus('offline');
-                setServerLatency(-1);
+                console.warn('[LandingPage] Backend health check failed:', err);
             }
         } finally {
             connectivityInFlightRef.current = false;

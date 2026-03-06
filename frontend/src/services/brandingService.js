@@ -12,7 +12,9 @@ export const brandingService = {
      */
     async getPublicBranding() {
         try {
-            const response = await apiClient.get('/api/branding/public');
+            const response = await apiClient.get('/api/branding/public', {
+                skipGlobalErrorNotification: true,
+            });
             return response.data.success ? response.data.data : null;
         } catch (error) {
             console.error('Get public branding error:', error);

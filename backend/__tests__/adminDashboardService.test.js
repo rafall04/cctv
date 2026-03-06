@@ -122,6 +122,34 @@ describe('adminDashboardService camera status helpers', () => {
         ]));
     });
 
+    it('menandai kamera internal tanpa path MediaMTX sebagai offline transport meski is_online bernilai 1', () => {
+        const streams = buildDashboardStreams({
+            cameras: [
+                {
+                    id: 7,
+                    name: 'Detached Internal',
+                    stream_key: 'detached-internal',
+                    enabled: 1,
+                    status: 'active',
+                    is_online: 1,
+                    stream_source: 'internal',
+                    external_hls_url: null,
+                },
+            ],
+            paths: [],
+        });
+
+        expect(streams).toEqual([
+            expect.objectContaining({
+                id: 7,
+                streamSource: 'internal',
+                operationalState: 'online',
+                state: 'offline',
+                ready: false,
+            }),
+        ]);
+    });
+
     it('menandai kamera external tanpa HLS sebagai invalid stream dan offline', () => {
         const streams = buildDashboardStreams({
             cameras: [

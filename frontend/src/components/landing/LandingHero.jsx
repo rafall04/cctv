@@ -1,7 +1,6 @@
 import { Icons } from '../ui/Icons';
-import { shouldDisableAnimations } from '../../utils/animationControl';
 
-export default function Hero({ branding, landingSettings, onCameraClick, disableHeavyEffects }) {
+export default function Hero({ branding, landingSettings, disableHeavyEffects }) {
     return (
         <header className="relative overflow-hidden bg-gradient-to-br from-amber-50/80 via-transparent to-emerald-50/80 dark:from-amber-950/30 dark:via-transparent dark:to-emerald-950/30">
             {!disableHeavyEffects && (

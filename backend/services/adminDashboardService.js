@@ -61,9 +61,7 @@ function getStreamState(camera, path = null) {
         return { ready: false, state: 'buffering' };
     }
 
-    return operationalState === 'online'
-        ? { ready: true, state: 'ready' }
-        : { ready: false, state: 'offline' };
+    return { ready: false, state: 'offline' };
 }
 
 export function buildDashboardStreams({
@@ -85,6 +83,7 @@ export function buildDashboardStreams({
         const camera = camerasByStreamKey[path.name];
         const cameraId = camera ? Number.parseInt(camera.id, 10) : null;
         const { ready, state } = getStreamState(camera, path);
+        const operationalState = camera ? getCameraOperationalState(camera) : 'unknown';
         const viewers = cameraId ? (viewersByCamera[cameraId] || 0) : 0;
         const sessions = cameraId ? (sessionsByCamera[cameraId] || []) : [];
         const hasActiveViewers = viewers > 0;
@@ -103,14 +102,16 @@ export function buildDashboardStreams({
             bytesReceived: hasActiveViewers ? (path.bytesReceived || 0) : 0,
             bytesSent: hasActiveViewers ? (path.bytesSent || 0) : 0,
             streamSource: camera?.stream_source || 'internal',
+            operationalState,
         };
     });
 
-    const externalStreams = cameras
-        .filter((camera) => camera.stream_source === 'external' && !matchedCameraIds.has(camera.id))
+    const detachedStreams = cameras
+        .filter((camera) => !matchedCameraIds.has(camera.id))
         .map((camera) => {
             const cameraId = Number.parseInt(camera.id, 10);
             const { ready, state } = getStreamState(camera);
+            const operationalState = getCameraOperationalState(camera);
 
             return {
                 id: camera.id,
@@ -121,11 +122,12 @@ export function buildDashboardStreams({
                 sessions: sessionsByCamera[cameraId] || [],
                 bytesReceived: 0,
                 bytesSent: 0,
-                streamSource: 'external',
+                streamSource: camera.stream_source || 'internal',
+                operationalState,
             };
         });
 
-    return [...internalStreams, ...externalStreams];
+    return [...internalStreams, ...detachedStreams];
 }
 
 class AdminDashboardService {

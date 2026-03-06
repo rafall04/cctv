@@ -23,12 +23,6 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
             ? 'bg-gray-200 dark:bg-gray-700'
             : 'bg-gray-100 dark:bg-gray-800';
 
-    const iconStyle = isMaintenance
-        ? 'text-red-300 dark:text-red-700'
-        : isOffline
-            ? 'text-gray-400 dark:text-gray-600'
-            : 'text-gray-300 dark:text-gray-700';
-
     const transitionClass = disableAnimations ? '' : 'transition-all duration-200';
     const hoverTransform = disableAnimations ? '' : 'hover:-translate-y-1';
 

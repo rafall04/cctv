@@ -3,24 +3,15 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useBranding } from '../contexts/BrandingContext';
 import { shouldDisableAnimations } from '../utils/animationControl';
 
-// Lazy load widgets to avoid conflicts with LandingPage
 const FeedbackWidget = lazy(() => import('./FeedbackWidget'));
 const SaweriaSupport = lazy(() => import('./SaweriaSupport'));
 
-// ============================================
-// ICONS
-// ============================================
 const Icons = {
     Sun: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></svg>,
     Moon: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" /></svg>,
     Grid: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>,
-    Map: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l5.447 2.724A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>,
-    Playback: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
 };
 
-// ============================================
-// SIMPLE HEADER - Compact navigation with layout toggle
-// ============================================
 function SimpleHeader({ branding, layoutMode, onLayoutToggle }) {
     const { isDark, toggleTheme } = useTheme();
     const disableAnimations = shouldDisableAnimations();
@@ -29,25 +20,21 @@ function SimpleHeader({ branding, layoutMode, onLayoutToggle }) {
         <header className={`sticky top-0 z-[1001] bg-white/90 dark:bg-gray-900/90 ${disableAnimations ? '' : 'backdrop-blur-xl'} border-b border-emerald-200/30 dark:border-emerald-700/30`}>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-14">
-                    {/* Logo */}
                     <a href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity" title={branding.company_name}>
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center text-white shadow-lg shadow-primary/30">
                             <span className="text-sm font-bold">{branding.logo_text}</span>
                         </div>
                     </a>
 
-                    {/* Layout Mode & Theme Toggle */}
                     <div className="flex items-center gap-2">
-                        {/* Layout Mode Toggle */}
                         <button
                             onClick={onLayoutToggle}
                             className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                             title={layoutMode === 'simple' ? 'Switch to Full Layout' : 'Switch to Simple Layout'}
                         >
-                            {layoutMode === 'simple' ? <Icons.Grid /> : <Icons.Grid />}
+                            <Icons.Grid />
                         </button>
 
-                        {/* Dark Mode Toggle */}
                         <button
                             onClick={toggleTheme}
                             className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
@@ -62,20 +49,28 @@ function SimpleHeader({ branding, layoutMode, onLayoutToggle }) {
     );
 }
 
-// ============================================
-// SIMPLE FOOTER - Minimal information
-// ============================================
 function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
     return (
-        <footer className="py-4 border-t border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-r from-emerald-50/50 to-green-50/50 dark:from-emerald-950/20 dark:to-green-950/20">
+        <footer className="py-6 border-t border-emerald-200/30 dark:border-emerald-700/30 bg-gradient-to-r from-emerald-50/50 to-green-50/50 dark:from-emerald-950/20 dark:to-green-950/20">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="text-center space-y-1">
-                    <p className="text-xs text-gray-600 dark:text-gray-400">
-                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">Ramadan Kareem 1447 H</span> • CCTV {branding.company_name}
-                    </p>
-                    <div className="flex items-center justify-center gap-3 text-xs text-gray-500 dark:text-gray-500">
-                        <span>© 2026 {branding.company_name}</span>
-                        <span>•</span>
+                <div className="text-center space-y-3">
+                    <div className="flex flex-col items-center gap-2">
+                        <div className="inline-flex items-center gap-2 rounded-full bg-white/85 dark:bg-gray-800/85 px-3 py-1.5 shadow-sm">
+                            <svg className="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z" />
+                            </svg>
+                            <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Ramadan Kareem 1447 H</span>
+                        </div>
+                        <div className="inline-flex items-center gap-2 rounded-full bg-sky-50 dark:bg-primary/10 px-4 py-2">
+                            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center text-white shadow-lg shadow-primary/20">
+                                <span className="text-xs font-bold">{branding.logo_text}</span>
+                            </div>
+                            <span className="text-sm font-bold text-primary-600 dark:text-primary-400">{branding.company_name}</span>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-gray-500 dark:text-gray-500">
+                        <span>&copy; {new Date().getFullYear()} {branding.company_name}</span>
                         <a
                             href="#feedback"
                             onClick={(e) => {
@@ -87,17 +82,14 @@ function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
                             Feedback
                         </a>
                         {saweriaEnabled && saweriaLink && (
-                            <>
-                                <span>•</span>
-                                <a
-                                    href={saweriaLink}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="hover:text-emerald-500 transition-colors"
-                                >
-                                    Dukung
-                                </a>
-                            </>
+                            <a
+                                href={saweriaLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="hover:text-emerald-500 transition-colors"
+                            >
+                                Dukung
+                            </a>
                         )}
                     </div>
                 </div>
@@ -105,12 +97,6 @@ function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
         </footer>
     );
 }
-
-// ============================================
-// LANDING PAGE SIMPLE - Minimal layout
-// ============================================
-
-// ... (other imports)
 
 export default function LandingPageSimple({
     onCameraClick,
@@ -130,7 +116,6 @@ export default function LandingPageSimple({
 }) {
     const { branding } = useBranding();
 
-
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
             <SimpleHeader
@@ -139,9 +124,7 @@ export default function LandingPageSimple({
                 onLayoutToggle={onLayoutToggle}
             />
 
-            {/* Main Content - CamerasSection handles all view modes */}
             <main className="flex-1 min-h-0">
-                {/* Ramadan Banner */}
                 <div className="py-3 px-4 text-center bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/30 border-b border-emerald-200/30 dark:border-emerald-800/30">
                     <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/80 dark:bg-gray-800/80 shadow-sm">
                         <svg className="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
@@ -173,12 +156,10 @@ export default function LandingPageSimple({
 
             {!hideFloatingWidgets && (
                 <>
-                    {/* Feedback Widget */}
                     <Suspense fallback={null}>
                         <FeedbackWidget />
                     </Suspense>
 
-                    {/* Saweria Support */}
                     <Suspense fallback={null}>
                         <SaweriaSupport />
                     </Suspense>
@@ -187,5 +168,3 @@ export default function LandingPageSimple({
         </div>
     );
 }
-
-
