@@ -190,4 +190,41 @@ describe('Playback', () => {
         expect(HTMLMediaElement.prototype.load).toHaveBeenCalledTimes(initialLoadCalls);
         expect(screen.getByTestId('buffering-state').textContent).toBe('false');
     }, 15000);
+
+    it('refresh prop cameras dengan id kamera aktif yang sama tidak me-reset playback', async () => {
+        const initialCameras = [
+            { id: 1, name: 'Lobby', enable_recording: 1, location: 'Area A' },
+        ];
+
+        const { rerender } = render(
+            <TestRouter initialEntries={['/playback?cam=1']}>
+                <Playback cameras={initialCameras} />
+            </TestRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('video-segment').textContent).toBe('seg-2');
+        });
+
+        const initialGetSegmentsCalls = getSegments.mock.calls.length;
+        const initialLoadCalls = HTMLMediaElement.prototype.load.mock.calls.length;
+
+        rerender(
+            <TestRouter initialEntries={['/playback?cam=1']}>
+                <Playback
+                    cameras={[
+                        { id: 1, name: 'Lobby Refresh', enable_recording: 1, location: 'Area B' },
+                    ]}
+                />
+            </TestRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('video-segment').textContent).toBe('seg-2');
+        });
+
+        expect(screen.getByTestId('list-segment').textContent).toBe('seg-2');
+        expect(getSegments).toHaveBeenCalledTimes(initialGetSegmentsCalls);
+        expect(HTMLMediaElement.prototype.load).toHaveBeenCalledTimes(initialLoadCalls);
+    });
 });
