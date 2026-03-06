@@ -9,11 +9,9 @@ import { useCameras, CameraProvider } from '../contexts/CameraContext';
 import { ToastProvider, useToast } from '../contexts/ToastContext';
 import { useCameraStatusTracker } from '../hooks/useCameraStatusTracker';
 import { useCameraHistory } from '../hooks/useCameraHistory';
-import { Icons } from '../components/ui/Icons';
 
 import LandingNavbar from '../components/landing/LandingNavbar';
 import LandingFooter from '../components/landing/LandingFooter';
-import LandingHero from '../components/landing/LandingHero';
 import { createCameraSlug, parseCameraIdFromSlug } from '../utils/slugify';
 import LandingCamerasSection from '../components/landing/LandingCamerasSection';
 import LandingStatsBar from '../components/landing/LandingStatsBar';
@@ -124,7 +122,7 @@ function LandingPageContent() {
                 console.warn('Failed to save to localStorage:', err);
             }
         }
-    }, [searchParams]);
+    }, [layoutMode, searchParams]);
 
     const toggleLayoutMode = useCallback(() => {
         const newMode = layoutMode === 'full' ? 'simple' : 'full';
@@ -166,56 +164,97 @@ function LandingPageContent() {
 
     const maxStreams = deviceTier === 'low' ? 2 : deviceTier === 'mid' ? 4 : 6;
 
-    const [serverStatus, setServerStatus] = useState('checking');
-    const [serverLatency, setServerLatency] = useState(-1);
+    const [, setServerStatus] = useState('checking');
+    const [, setServerLatency] = useState(-1);
+    const connectivityMountedRef = useRef(true);
+    const connectivityInFlightRef = useRef(false);
+    const lastConnectivityCheckRef = useRef(0);
 
-    useEffect(() => {
-        let isMounted = true;
+    const checkServerConnectivity = useCallback(async ({ force = false } = {}) => {
+        const now = Date.now();
+        if (!force && now - lastConnectivityCheckRef.current < 3000) {
+            return;
+        }
 
-        const checkServerConnectivity = async () => {
-            try {
-                let apiUrl;
-                const hostname = window.location.hostname;
-                const protocol = window.location.protocol;
+        if (connectivityInFlightRef.current) {
+            return;
+        }
 
-                if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) {
-                    apiUrl = '/api/health';
-                } else if (protocol === 'https:') {
-                    const frontendDomain = import.meta.env.VITE_FRONTEND_DOMAIN || hostname;
-                    if (hostname === frontendDomain) {
-                        const baseUrl = getApiUrl();
-                        apiUrl = `${baseUrl.replace(/\/$/, '')}/health`;
-                    } else {
-                        apiUrl = `${protocol}//${hostname.replace('cctv.', 'api-cctv.')}/health`;
-                    }
-                } else {
+        connectivityInFlightRef.current = true;
+        lastConnectivityCheckRef.current = now;
+
+        try {
+            let apiUrl;
+            const hostname = window.location.hostname;
+            const protocol = window.location.protocol;
+
+            if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) {
+                apiUrl = '/api/health';
+            } else if (protocol === 'https:') {
+                const frontendDomain = import.meta.env.VITE_FRONTEND_DOMAIN || hostname;
+                if (hostname === frontendDomain) {
                     const baseUrl = getApiUrl();
                     apiUrl = `${baseUrl.replace(/\/$/, '')}/health`;
+                } else {
+                    apiUrl = `${protocol}//${hostname.replace('cctv.', 'api-cctv.')}/health`;
                 }
+            } else {
+                const baseUrl = getApiUrl();
+                apiUrl = `${baseUrl.replace(/\/$/, '')}/health`;
+            }
 
-                const result = await testMediaMTXConnection(apiUrl);
+            const result = await testMediaMTXConnection(apiUrl);
 
-                if (isMounted) {
-                    if (result.reachable) {
-                        setServerStatus('online');
-                        setServerLatency(result.latency);
-                    } else {
-                        setServerStatus('offline');
-                    }
-                }
-            } catch (err) {
-                if (isMounted) {
-                    setServerStatus('offline');
-                }
+            if (!connectivityMountedRef.current) {
+                return;
+            }
+
+            if (result.reachable) {
+                setServerStatus('online');
+                setServerLatency(result.latency);
+            } else {
+                setServerStatus('offline');
+                setServerLatency(-1);
+            }
+        } catch (err) {
+            if (connectivityMountedRef.current) {
+                setServerStatus('offline');
+                setServerLatency(-1);
+            }
+        } finally {
+            connectivityInFlightRef.current = false;
+        }
+    }, []);
+
+    useEffect(() => {
+        connectivityMountedRef.current = true;
+        checkServerConnectivity({ force: true });
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                checkServerConnectivity();
             }
         };
 
-        checkServerConnectivity();
+        const handleFocus = () => {
+            checkServerConnectivity();
+        };
+
+        const handleOnline = () => {
+            checkServerConnectivity({ force: true });
+        };
+
+        window.addEventListener('focus', handleFocus);
+        window.addEventListener('online', handleOnline);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
 
         return () => {
-            isMounted = false;
+            connectivityMountedRef.current = false;
+            window.removeEventListener('focus', handleFocus);
+            window.removeEventListener('online', handleOnline);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, []);
+    }, [checkServerConnectivity]);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -292,7 +331,7 @@ function LandingPageContent() {
     }, [addToast]);
 
     useCameraStatusTracker(cameras, addToast);
-    const { favorites, recentCameras, toggleFavorite, isFavorite, addRecentCamera } = useCameraHistory();
+    const { favorites, toggleFavorite, isFavorite, addRecentCamera } = useCameraHistory();
 
     const disableHeavyEffects = deviceTier === 'low';
 

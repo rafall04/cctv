@@ -2,7 +2,7 @@
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Dashboard from './Dashboard';
 
 const { getStats } = vi.hoisted(() => ({
@@ -70,6 +70,12 @@ describe('Dashboard', () => {
                 allSessions: [],
             },
         });
+        vi.spyOn(globalThis, 'setInterval').mockImplementation(() => 1);
+        vi.spyOn(globalThis, 'clearInterval').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
     });
 
     it('mengubah range quick stats tanpa double-fetch dashboard utama', async () => {

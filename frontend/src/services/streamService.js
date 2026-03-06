@@ -74,9 +74,9 @@ const makeStreamUrlsAbsolute = (streams) => {
 };
 
 export const streamService = {
-    async getAllActiveStreams() {
+    async getAllActiveStreams(config = {}) {
         try {
-            const response = await apiClient.get('/api/stream');
+            const response = await apiClient.get('/api/stream', config);
             if (response.data?.success && response.data?.data) {
                 response.data.data = response.data.data.map(camera => ({
                     ...camera,

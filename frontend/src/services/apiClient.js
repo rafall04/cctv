@@ -2,10 +2,7 @@ import axios from 'axios';
 import { getApiUrl, getApiKey } from '../config/config.js';
 import {
     parseApiError,
-    getErrorMessage,
     isNetworkError,
-    isAuthError,
-    isServerError,
     isTimeoutError,
     retryWithBackoff,
     isRetryableError,
@@ -56,15 +53,8 @@ function showErrorNotification(title, message) {
     }
 }
 
-/**
- * Show warning notification if callback is set
- * @param {string} title - Notification title
- * @param {string} message - Notification message
- */
-function showWarningNotification(title, message) {
-    if (notificationCallback) {
-        notificationCallback('warning', title, message);
-    }
+function shouldSuppressGlobalErrorNotification(config) {
+    return config?.skipGlobalErrorNotification === true;
 }
 
 /**
@@ -196,7 +186,9 @@ apiClient.interceptors.response.use(
         // Handle timeout errors
         // Requirements: 10.3
         if (isTimeoutError(error)) {
-            showErrorNotification('Request Timeout', ERROR_MESSAGES.TIMEOUT_ERROR);
+            if (!shouldSuppressGlobalErrorNotification(originalRequest)) {
+                showErrorNotification('Request Timeout', ERROR_MESSAGES.TIMEOUT_ERROR);
+            }
 
             // Offer retry option if callback is set
             if (timeoutRetryCallback && originalRequest && !originalRequest._timeoutRetry) {
@@ -212,7 +204,9 @@ apiClient.interceptors.response.use(
 
         // Handle network errors (not timeout)
         if (isNetworkError(error) && !isTimeoutError(error)) {
-            showErrorNotification('Connection Error', ERROR_MESSAGES.NETWORK_ERROR);
+            if (!shouldSuppressGlobalErrorNotification(originalRequest)) {
+                showErrorNotification('Connection Error', ERROR_MESSAGES.NETWORK_ERROR);
+            }
             error.parsedError = parsedError;
             return Promise.reject(error);
         }

@@ -4,6 +4,130 @@ import mediaMtxService from './mediaMtxService.js';
 import viewerSessionService from './viewerSessionService.js';
 import { getTimezone, formatDateTime } from './timezoneService.js';
 
+export function getCameraOperationalState(camera) {
+    if (camera?.status === 'maintenance') {
+        return 'maintenance';
+    }
+
+    if (!camera?.enabled) {
+        return 'disabled';
+    }
+
+    if (camera.is_online === 1) {
+        return 'online';
+    }
+
+    return 'offline';
+}
+
+export function getCameraStatusBreakdown(cameras = []) {
+    return cameras.reduce((acc, camera) => {
+        const state = getCameraOperationalState(camera);
+
+        if (state === 'online') {
+            acc.online += 1;
+        } else if (state === 'offline') {
+            acc.offline += 1;
+        } else if (state === 'maintenance') {
+            acc.maintenance += 1;
+        }
+
+        return acc;
+    }, { online: 0, offline: 0, maintenance: 0 });
+}
+
+function getStreamState(camera, path = null) {
+    const operationalState = getCameraOperationalState(camera);
+
+    if (operationalState === 'maintenance') {
+        return { ready: false, state: 'maintenance' };
+    }
+
+    if (camera?.stream_source === 'external') {
+        if (!camera.external_hls_url) {
+            return { ready: false, state: 'invalid' };
+        }
+
+        return operationalState === 'online'
+            ? { ready: true, state: 'ready' }
+            : { ready: false, state: 'offline' };
+    }
+
+    if (path?.sourceReady || path?.ready) {
+        return { ready: true, state: 'ready' };
+    }
+
+    if (path?.readers && path.readers.length > 0) {
+        return { ready: false, state: 'buffering' };
+    }
+
+    return operationalState === 'online'
+        ? { ready: true, state: 'ready' }
+        : { ready: false, state: 'offline' };
+}
+
+export function buildDashboardStreams({
+    cameras = [],
+    paths = [],
+    viewersByCamera = {},
+    sessionsByCamera = {},
+}) {
+    const camerasByStreamKey = {};
+    const matchedCameraIds = new Set();
+
+    cameras.forEach((camera) => {
+        if (camera.stream_key) {
+            camerasByStreamKey[camera.stream_key] = camera;
+        }
+    });
+
+    const internalStreams = paths.map((path) => {
+        const camera = camerasByStreamKey[path.name];
+        const cameraId = camera ? Number.parseInt(camera.id, 10) : null;
+        const { ready, state } = getStreamState(camera, path);
+        const viewers = cameraId ? (viewersByCamera[cameraId] || 0) : 0;
+        const sessions = cameraId ? (sessionsByCamera[cameraId] || []) : [];
+        const hasActiveViewers = viewers > 0;
+
+        if (camera?.id != null) {
+            matchedCameraIds.add(camera.id);
+        }
+
+        return {
+            id: camera?.id || path.name,
+            name: camera?.name || `Unknown (${path.name.substring(0, 8)}...)`,
+            ready,
+            state,
+            viewers,
+            sessions,
+            bytesReceived: hasActiveViewers ? (path.bytesReceived || 0) : 0,
+            bytesSent: hasActiveViewers ? (path.bytesSent || 0) : 0,
+            streamSource: camera?.stream_source || 'internal',
+        };
+    });
+
+    const externalStreams = cameras
+        .filter((camera) => camera.stream_source === 'external' && !matchedCameraIds.has(camera.id))
+        .map((camera) => {
+            const cameraId = Number.parseInt(camera.id, 10);
+            const { ready, state } = getStreamState(camera);
+
+            return {
+                id: camera.id,
+                name: camera.name,
+                ready,
+                state,
+                viewers: viewersByCamera[cameraId] || 0,
+                sessions: sessionsByCamera[cameraId] || [],
+                bytesReceived: 0,
+                bytesSent: 0,
+                streamSource: 'external',
+            };
+        });
+
+    return [...internalStreams, ...externalStreams];
+}
+
 class AdminDashboardService {
 
     async getDashboardStats() {
@@ -83,55 +207,20 @@ class AdminDashboardService {
             });
         });
 
-        const camerasByStreamKey = {};
-        const allCameras = query('SELECT id, name, stream_key FROM cameras WHERE enabled = 1');
-        allCameras.forEach(cam => {
-            if (cam.stream_key) {
-                camerasByStreamKey[cam.stream_key] = cam;
-            }
+        const allCameras = query(`
+            SELECT id, name, stream_key, enabled, status, is_online, stream_source, external_hls_url
+            FROM cameras
+            WHERE enabled = 1
+        `);
+
+        const activeStreams = buildDashboardStreams({
+            cameras: allCameras,
+            paths: mtxStats.paths || [],
+            viewersByCamera,
+            sessionsByCamera,
         });
 
-        const activeStreams = (mtxStats.paths || []).map(p => {
-            const cam = camerasByStreamKey[p.name];
-            const cameraId = cam ? cam.id : null;
-
-            let state = 'idle';
-            if (p.sourceReady || p.ready) {
-                state = 'ready';
-            } else if (p.readers && p.readers.length > 0) {
-                state = 'buffering';
-            }
-
-            const cameraIdInt = cameraId ? parseInt(cameraId) : null;
-            const viewers = cameraIdInt ? (viewersByCamera[cameraIdInt] || 0) : 0;
-            const sessions = cameraIdInt ? (sessionsByCamera[cameraIdInt] || []) : [];
-
-            const hasActiveViewers = viewers > 0;
-
-            return {
-                id: cameraId || p.name,
-                name: cam ? cam.name : `Unknown (${p.name.substring(0, 8)}...)`,
-                ready: p.ready || false,
-                state: state,
-                viewers: viewers,
-                sessions: sessions,
-                bytesReceived: hasActiveViewers ? (p.bytesReceived || 0) : 0,
-                bytesSent: hasActiveViewers ? (p.bytesSent || 0) : 0
-            };
-        });
-
-        const cameraStatusBreakdown = { online: 0, offline: 0, maintenance: 0 };
-
-        allCameras.forEach(cam => {
-            const streamKey = cam.stream_key;
-            const hasStream = mtxStats.paths?.some(p => p.name === streamKey && (p.ready || p.sourceReady));
-
-            if (hasStream) {
-                cameraStatusBreakdown.online++;
-            } else {
-                cameraStatusBreakdown.offline++;
-            }
-        });
+        const cameraStatusBreakdown = getCameraStatusBreakdown(allCameras);
 
         const topCameras = allCameras
             .map(cam => ({
@@ -208,21 +297,23 @@ class AdminDashboardService {
                     SUM(CASE WHEN status = 'maintenance' THEN 1 ELSE 0 END) as maintenance
                 FROM cameras
             `);
-
-            const mtxStats = await mediaMtxService.getStats();
-            const activeCameras = query('SELECT id, stream_key FROM cameras WHERE enabled = 1');
-            let onlineCount = 0;
-            activeCameras.forEach(cam => {
-                const hasStream = mtxStats.paths?.some(p => p.name === cam.stream_key && (p.ready || p.sourceReady));
-                if (hasStream) onlineCount++;
-            });
-            const offlineCount = cameraStatus.active - onlineCount;
+            const activeCameras = query(`
+                SELECT id, enabled, status, is_online, stream_source, external_hls_url
+                FROM cameras
+                WHERE enabled = 1
+            `);
+            const statusBreakdown = getCameraStatusBreakdown(activeCameras);
 
             return {
                 current: { totalSessions: 0, uniqueViewers: 0, avgDuration: 0, totalWatchTime: 0, activeNow: activeNow },
                 compare: { totalSessions: 0, uniqueViewers: 0, avgDuration: 0, totalWatchTime: 0 },
                 comparison: { sessionsChange: 0, viewersChange: 0, durationChange: 0 },
-                cameras: { total: cameraStatus.total, online: onlineCount, offline: offlineCount, maintenance: cameraStatus.maintenance },
+                cameras: {
+                    total: cameraStatus.total,
+                    online: statusBreakdown.online,
+                    offline: statusBreakdown.offline,
+                    maintenance: statusBreakdown.maintenance,
+                },
                 period: period,
                 warning: 'Analytics table not initialized - run migration: add_viewer_sessions.js'
             };
@@ -282,15 +373,12 @@ class AdminDashboardService {
                 SUM(CASE WHEN status = 'maintenance' THEN 1 ELSE 0 END) as maintenance
             FROM cameras
         `);
-
-        const mtxStats = await mediaMtxService.getStats();
-        const activeCameras = query('SELECT id, stream_key FROM cameras WHERE enabled = 1');
-        let onlineCount = 0;
-        activeCameras.forEach(cam => {
-            const hasStream = mtxStats.paths?.some(p => p.name === cam.stream_key && (p.ready || p.sourceReady));
-            if (hasStream) onlineCount++;
-        });
-        const offlineCount = cameraStatus.active - onlineCount;
+        const activeCameras = query(`
+            SELECT id, enabled, status, is_online, stream_source, external_hls_url
+            FROM cameras
+            WHERE enabled = 1
+        `);
+        const statusBreakdown = getCameraStatusBreakdown(activeCameras);
 
         const calculateChange = (current, compare) => {
             if (!compare || compare === 0) return current > 0 ? 100 : 0;
@@ -321,9 +409,9 @@ class AdminDashboardService {
             },
             cameras: {
                 total: cameraStatus.total,
-                online: onlineCount,
-                offline: offlineCount,
-                maintenance: cameraStatus.maintenance,
+                online: statusBreakdown.online,
+                offline: statusBreakdown.offline,
+                maintenance: statusBreakdown.maintenance,
             },
             period: period
         };

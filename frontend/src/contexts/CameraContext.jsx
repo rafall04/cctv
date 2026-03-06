@@ -1,55 +1,137 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { streamService } from '../services/streamService';
 import { areaService } from '../services/areaService';
 import { detectDeviceTier } from '../utils/deviceDetector';
 
 const CameraContext = createContext(null);
+const RESUME_RETRY_DELAYS = [500, 1500];
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export function CameraProvider({ children, autoRefresh = true }) {
     const [cameras, setCameras] = useState([]);
     const [areas, setAreas] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const [initialLoadError, setInitialLoadError] = useState(null);
+    const [backgroundRefreshError, setBackgroundRefreshError] = useState(null);
     const [deviceTier] = useState(() => detectDeviceTier());
+    const camerasRef = useRef([]);
+    const areasRef = useRef([]);
+    const requestIdRef = useRef(0);
+    const latestAppliedRequestRef = useRef(0);
+    const activeRefreshPromiseRef = useRef(null);
+    const mountedRef = useRef(true);
 
-    const fetchInitialData = useCallback(async () => {
-        setLoading(true);
+    useEffect(() => {
+        camerasRef.current = cameras;
+    }, [cameras]);
+
+    useEffect(() => {
+        areasRef.current = areas;
+    }, [areas]);
+
+    const runFetch = useCallback(async ({ mode = 'initial' } = {}) => {
+        const requestId = ++requestIdRef.current;
+        const preserveExistingData = mode !== 'initial';
+        const requestConfig = { skipGlobalErrorNotification: preserveExistingData };
+
+        if (mode === 'initial') {
+            setLoading(true);
+            setInitialLoadError(null);
+        }
+
         try {
-            setError(null);
             const [camsRes, areasRes] = await Promise.all([
-                streamService.getAllActiveStreams().catch(err => {
-                    console.error('Failed to fetch streams', err);
-                    return { success: false, data: [] };
-                }),
-                areaService.getPublicAreas().catch(err => {
-                    console.error('Failed to fetch areas', err);
-                    return { success: false, data: [] };
-                })
+                streamService.getAllActiveStreams(requestConfig),
+                areaService.getPublicAreas(requestConfig),
             ]);
 
-            if (camsRes.data) {
+            if (!mountedRef.current || requestId < latestAppliedRequestRef.current) {
+                return { cameras: camerasRef.current, areas: areasRef.current, stale: true };
+            }
+
+            latestAppliedRequestRef.current = requestId;
+
+            if (Array.isArray(camsRes?.data)) {
                 setCameras(camsRes.data);
+                camerasRef.current = camsRes.data;
             }
-            if (areasRes.data) {
+            if (Array.isArray(areasRes?.data)) {
                 setAreas(areasRes.data);
+                areasRef.current = areasRes.data;
             }
+
+            setBackgroundRefreshError(null);
+            setInitialLoadError(null);
+
             return {
                 cameras: camsRes.data || [],
-                areas: areasRes.data || []
+                areas: areasRes.data || [],
             };
         } catch (err) {
+            if (!mountedRef.current || requestId < latestAppliedRequestRef.current) {
+                return { cameras: camerasRef.current, areas: areasRef.current, stale: true, error: err };
+            }
+
             console.error('Failed to fetch camera and area data:', err);
-            setError(err);
-            return { cameras: [], areas: [] };
+
+            if (preserveExistingData && (camerasRef.current.length > 0 || areasRef.current.length > 0)) {
+                setBackgroundRefreshError(err);
+                return { cameras: camerasRef.current, areas: areasRef.current, error: err, preserved: true };
+            }
+
+            setInitialLoadError(err);
+            return { cameras: [], areas: [], error: err };
         } finally {
-            setLoading(false);
+            if (mode === 'initial' && mountedRef.current) {
+                setLoading(false);
+            }
         }
     }, []);
 
+    const refreshData = useCallback(async ({ mode = 'resume' } = {}) => {
+        if (activeRefreshPromiseRef.current) {
+            return activeRefreshPromiseRef.current;
+        }
+
+        const refreshOperation = (async () => {
+            const shouldRetry = mode === 'initial' || mode === 'resume';
+            let lastResult = null;
+
+            try {
+                lastResult = await runFetch({ mode });
+
+                if (!lastResult?.error || !shouldRetry) {
+                    return lastResult;
+                }
+
+                for (const delay of RESUME_RETRY_DELAYS) {
+                    await wait(delay);
+                    lastResult = await runFetch({ mode: 'resume' });
+                    if (!lastResult?.error) {
+                        return lastResult;
+                    }
+                }
+
+                return lastResult;
+            } finally {
+                activeRefreshPromiseRef.current = null;
+            }
+        })();
+
+        activeRefreshPromiseRef.current = refreshOperation;
+        return refreshOperation;
+    }, [runFetch]);
+
     // Initial fetch
     useEffect(() => {
-        fetchInitialData();
-    }, [fetchInitialData]);
+        mountedRef.current = true;
+        refreshData({ mode: 'initial' });
+
+        return () => {
+            mountedRef.current = false;
+        };
+    }, [refreshData]);
 
     // Background refresh
     useEffect(() => {
@@ -58,25 +140,58 @@ export function CameraProvider({ children, autoRefresh = true }) {
         const refreshMs = deviceTier === 'low' ? 60000 : deviceTier === 'high' ? 15000 : 30000;
         const refreshInterval = setInterval(async () => {
             try {
-                const camsRes = await streamService.getAllActiveStreams();
-                if (camsRes.data) {
-                    setCameras(camsRes.data);
-                }
+                await refreshData({ mode: 'background' });
             } catch (err) {
                 console.warn('Background refresh failed:', err);
             }
         }, refreshMs);
 
         return () => clearInterval(refreshInterval);
-    }, [deviceTier, autoRefresh]);
+    }, [deviceTier, autoRefresh, refreshData]);
+
+    useEffect(() => {
+        if (!autoRefresh) return;
+
+        let lastResumeAt = 0;
+        const MIN_RESUME_GAP = 1500;
+        const triggerResumeRefresh = () => {
+            const now = Date.now();
+            if (now - lastResumeAt < MIN_RESUME_GAP) {
+                return;
+            }
+
+            lastResumeAt = now;
+            refreshData({ mode: 'resume' }).catch((err) => {
+                console.warn('Resume refresh failed:', err);
+            });
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                triggerResumeRefresh();
+            }
+        };
+
+        window.addEventListener('focus', triggerResumeRefresh);
+        window.addEventListener('online', triggerResumeRefresh);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            window.removeEventListener('focus', triggerResumeRefresh);
+            window.removeEventListener('online', triggerResumeRefresh);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [autoRefresh, refreshData]);
 
     const value = {
         cameras,
         areas,
         loading,
-        error,
+        error: initialLoadError || backgroundRefreshError,
+        initialLoadError,
+        backgroundRefreshError,
         deviceTier,
-        refreshData: fetchInitialData
+        refreshData
     };
 
     return (
