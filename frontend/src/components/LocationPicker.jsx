@@ -9,6 +9,11 @@ import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import { settingsService } from '../services/settingsService';
 import 'leaflet/dist/leaflet.css';
 
+const MAP_TYPES = {
+    HYBRID: 'hybrid',
+    STREET: 'street',
+};
+
 // Simple search box - debounced
 const SearchBox = memo(function SearchBox({ onSearch }) {
     const [query, setQuery] = useState('');
@@ -99,10 +104,7 @@ const SearchBox = memo(function SearchBox({ onSearch }) {
 });
 
 // Lazy loaded map component
-const LazyMap = ({ position, mapCenter, defaultZoom, onLocationSelect }) => {
-    const mapRef = useRef(null);
-    const markerRef = useRef(null);
-    const [mapReady, setMapReady] = useState(false);
+const LazyMap = ({ position, mapCenter, defaultZoom, mapType, onLocationSelect }) => {
     const [leafletModules, setLeafletModules] = useState(null);
 
     // Load leaflet modules
@@ -165,6 +167,12 @@ const LazyMap = ({ position, mapCenter, defaultZoom, onLocationSelect }) => {
     }
 
     const { MapContainer, TileLayer, Marker, useMapEvents, useMap } = leafletModules.RL;
+    const tileUrl = mapType === MAP_TYPES.HYBRID
+        ? 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'
+        : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+    const tileAttribution = mapType === MAP_TYPES.HYBRID
+        ? '&copy; Google'
+        : '&copy; OpenStreetMap';
 
     // Map click handler
     const MapClickHandler = () => {
@@ -196,8 +204,8 @@ const LazyMap = ({ position, mapCenter, defaultZoom, onLocationSelect }) => {
                 style={{ background: '#e5e7eb', zIndex: 0 }}
             >
                 <TileLayer
-                    attribution='&copy; OpenStreetMap'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution={tileAttribution}
+                    url={tileUrl}
                 />
                 <MapController center={mapCenter} />
                 <MapClickHandler />
@@ -241,6 +249,7 @@ const LocationPicker = ({
     const [mapCenter, setMapCenter] = useState(
         latitude && longitude ? [parseFloat(latitude), parseFloat(longitude)] : [-7.1507, 111.8815]
     );
+    const [mapType, setMapType] = useState(MAP_TYPES.HYBRID);
     const [loadingGPS, setLoadingGPS] = useState(false);
     const [gpsError, setGpsError] = useState(null);
 
@@ -416,9 +425,36 @@ const LocationPicker = ({
     // Expanded view with map
     return (
         <div className="space-y-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-start gap-2">
                 <div className="flex-1">
                     <SearchBox onSearch={handleSearch} />
+                </div>
+                <div
+                    className="inline-flex rounded-lg border border-gray-200 bg-white p-1 shadow-sm dark:border-gray-700 dark:bg-gray-800"
+                    data-testid="location-picker-map-type"
+                >
+                    <button
+                        type="button"
+                        onClick={() => setMapType(MAP_TYPES.HYBRID)}
+                        className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                            mapType === MAP_TYPES.HYBRID
+                                ? 'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300'
+                                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                        }`}
+                    >
+                        Hybrid
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setMapType(MAP_TYPES.STREET)}
+                        className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                            mapType === MAP_TYPES.STREET
+                                ? 'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300'
+                                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                        }`}
+                    >
+                        Street
+                    </button>
                 </div>
                 <button
                     type="button"
@@ -461,6 +497,7 @@ const LocationPicker = ({
                 position={position}
                 mapCenter={mapCenter}
                 defaultZoom={defaultZoom}
+                mapType={mapType}
                 onLocationSelect={handleLocationSelect}
             />
             
