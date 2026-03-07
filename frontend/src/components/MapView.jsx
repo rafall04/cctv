@@ -1059,6 +1059,7 @@ const MapView = memo(({
     const [pendingFocusCamera, setPendingFocusCamera] = useState(null);
     // Flag untuk mencegah map reset saat close modal
     const [preserveMapPosition, setPreserveMapPosition] = useState(false);
+    const previousSelectedAreaRef = useRef(selectedAreaValue);
 
     const setSelectedAreaValue = useCallback((value) => {
         if (typeof onAreaChange === 'function') {
@@ -1108,6 +1109,35 @@ const MapView = memo(({
             return () => clearTimeout(timer);
         }
     }, [pendingFocusCamera]);
+
+    useEffect(() => {
+        const previousSelectedArea = previousSelectedAreaRef.current;
+        if (previousSelectedArea === selectedAreaValue) {
+            return;
+        }
+
+        const isFocusDrivenAreaChange = Boolean(
+            pendingFocusCamera
+            && (selectedAreaValue === 'all' || pendingFocusCamera.area_name === selectedAreaValue)
+        );
+
+        if (!isFocusDrivenAreaChange) {
+            setPreserveMapPosition(false);
+            setPendingFocusCamera((current) => {
+                if (!current) {
+                    return null;
+                }
+
+                if (selectedAreaValue === 'all' || current.area_name === selectedAreaValue) {
+                    return current;
+                }
+
+                return null;
+            });
+        }
+
+        previousSelectedAreaRef.current = selectedAreaValue;
+    }, [pendingFocusCamera, selectedAreaValue]);
 
     const camerasWithCoords = useMemo(() => cameras.filter(hasValidCoords), [cameras]);
 

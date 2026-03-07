@@ -1,21 +1,41 @@
 // @vitest-environment jsdom
 
-import { act, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import MapView from './MapView';
+
+const {
+    fitBoundsMock,
+    setViewMock,
+    startSessionMock,
+    stopSessionMock,
+} = vi.hoisted(() => ({
+    fitBoundsMock: vi.fn(),
+    setViewMock: vi.fn(),
+    startSessionMock: vi.fn().mockResolvedValue('session-1'),
+    stopSessionMock: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('react-leaflet', () => ({
     MapContainer: ({ children }) => <div data-testid="map-container">{children}</div>,
     TileLayer: () => <div />,
-    Marker: () => <div />,
+    Marker: ({ eventHandlers, position }) => (
+        <button
+            data-testid={`marker-${position[0]}-${position[1]}`}
+            onClick={() => eventHandlers?.click?.()}
+            type="button"
+        >
+            marker
+        </button>
+    ),
     ZoomControl: () => <div />,
     LayersControl: Object.assign(({ children }) => <div>{children}</div>, {
         BaseLayer: ({ children }) => <div>{children}</div>,
     }),
     useMap: () => ({
         flyTo: vi.fn(),
-        fitBounds: vi.fn(),
-        setView: vi.fn(),
+        fitBounds: fitBoundsMock,
+        setView: setViewMock,
         invalidateSize: vi.fn(),
     }),
 }));
@@ -29,7 +49,9 @@ vi.mock('leaflet', () => ({
             },
         },
         divIcon: vi.fn(() => ({})),
-        latLngBounds: vi.fn(() => ({})),
+        latLngBounds: vi.fn(() => ({
+            isValid: () => true,
+        })),
     },
 }));
 
@@ -47,7 +69,10 @@ vi.mock('../services/settingsService', () => ({
 }));
 
 vi.mock('../services/viewerService', () => ({
-    viewerService: {},
+    viewerService: {
+        startSession: startSessionMock,
+        stopSession: stopSessionMock,
+    },
 }));
 
 vi.mock('../utils/deviceDetector', () => ({
@@ -131,8 +156,45 @@ describe('MapView area filter visibility', () => {
         },
     ];
 
+    const areaCameras = [
+        {
+            id: 1,
+            name: 'Lobby',
+            latitude: '-7.1507',
+            longitude: '111.8815',
+            area_name: 'Dander',
+            is_online: 1,
+            status: 'active',
+            is_tunnel: 0,
+        },
+        {
+            id: 2,
+            name: 'Kantor',
+            latitude: '-7.2507',
+            longitude: '112.0815',
+            area_name: 'Baureno',
+            is_online: 1,
+            status: 'active',
+            is_tunnel: 0,
+        },
+    ];
+
+    const areas = [
+        { name: 'Dander', latitude: '-7.1500', longitude: '111.8800' },
+        { name: 'Baureno', latitude: '-7.2500', longitude: '112.0800' },
+    ];
+
     beforeEach(() => {
+        vi.useRealTimers();
         window.URL.createObjectURL = vi.fn(() => 'blob:test');
+        fitBoundsMock.mockReset();
+        setViewMock.mockReset();
+        startSessionMock.mockClear();
+        stopSessionMock.mockClear();
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
     });
 
     it('menyembunyikan filter area internal saat showAreaFilter=false', async () => {
@@ -177,5 +239,115 @@ describe('MapView area filter visibility', () => {
         });
 
         expect(screen.queryByText(/Perbaikan/i)).toBeNull();
+    });
+
+    it('mengikuti area baru setelah marker dibuka lalu area internal diganti', async () => {
+        await act(async () => {
+            render(<MapView cameras={areaCameras} areas={areas} showAreaFilter />);
+        });
+
+        setViewMock.mockClear();
+        fitBoundsMock.mockClear();
+
+        fireEvent.click(screen.getByTestId('marker--7.1507-111.8815'));
+
+        await waitFor(() => {
+            expect(startSessionMock).toHaveBeenCalledWith(1);
+        });
+
+        fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Baureno' } });
+
+        await waitFor(() => {
+            expect(setViewMock).toHaveBeenCalledWith([-7.25, 112.08], 15, { animate: true, duration: 0.5 });
+        });
+        expect(fitBoundsMock).not.toHaveBeenCalled();
+    });
+
+    it('mengikuti area baru saat selectedArea dikontrol parent setelah modal pernah dibuka', async () => {
+        const { rerender } = render(
+            <MapView cameras={areaCameras} areas={areas} showAreaFilter selectedArea="Dander" />
+        );
+
+        await waitFor(() => {
+            expect(setViewMock).toHaveBeenCalledWith([-7.15, 111.88], 15, { animate: true, duration: 0.5 });
+        });
+
+        setViewMock.mockClear();
+
+        fireEvent.click(screen.getByTestId('marker--7.1507-111.8815'));
+
+        await waitFor(() => {
+            expect(startSessionMock).toHaveBeenCalledWith(1);
+        });
+
+        rerender(<MapView cameras={areaCameras} areas={areas} showAreaFilter selectedArea="Baureno" />);
+
+        await waitFor(() => {
+            expect(setViewMock).toHaveBeenCalledWith([-7.25, 112.08], 15, { animate: true, duration: 0.5 });
+        });
+    });
+
+    it('menjaga posisi map saat modal ditutup tanpa ganti area', async () => {
+        await act(async () => {
+            render(<MapView cameras={areaCameras} areas={areas} showAreaFilter selectedArea="Dander" />);
+        });
+
+        await waitFor(() => {
+            expect(setViewMock).toHaveBeenCalled();
+        });
+
+        setViewMock.mockClear();
+        fitBoundsMock.mockClear();
+
+        fireEvent.click(screen.getByTestId('marker--7.1507-111.8815'));
+
+        await waitFor(() => {
+            expect(screen.getByTitle('Tutup')).toBeTruthy();
+        });
+
+        fireEvent.click(screen.getByTitle('Tutup'));
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(setViewMock).not.toHaveBeenCalled();
+        expect(fitBoundsMock).not.toHaveBeenCalled();
+    });
+
+    it('membatalkan pending focus lama saat area berubah sebelum modal dibuka', async () => {
+        const onFocusHandled = vi.fn();
+        const { rerender } = render(
+            <MapView
+                cameras={areaCameras}
+                areas={areas}
+                showAreaFilter
+                selectedArea="all"
+                focusedCameraId={1}
+                onFocusHandled={onFocusHandled}
+            />
+        );
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+        expect(onFocusHandled).toHaveBeenCalled();
+
+        rerender(
+            <MapView
+                cameras={areaCameras}
+                areas={areas}
+                showAreaFilter
+                selectedArea="Baureno"
+                focusedCameraId={null}
+                onFocusHandled={onFocusHandled}
+            />
+        );
+
+        await act(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 700));
+        });
+
+        expect(screen.queryByText('Lobby')).toBeNull();
     });
 });
