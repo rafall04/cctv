@@ -242,7 +242,7 @@ class AdminDashboardService {
         `).map(log => {
             return {
                 ...log,
-                created_at_wib: formatDateTime(log.created_at).split(' ')[1]
+                created_at_wib: formatDateTime(log.created_at)
             };
         });
 

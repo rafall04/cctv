@@ -778,10 +778,10 @@ export default function Dashboard() {
                                         }`}></div>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm font-medium text-gray-900 dark:text-white">{log.details}</p>
-                                            <div className="flex items-center gap-2 mt-1">
+                                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
                                                 <span className="text-xs text-gray-500 dark:text-gray-400">{log.username}</span>
-                                                <span className="text-xs text-gray-300 dark:text-gray-600">•</span>
-                                                <span className="text-xs text-primary font-medium">{log.created_at_wib}</span>
+                                                <span className="text-xs text-gray-400 dark:text-gray-500">&bull;</span>
+                                                <span className="text-xs text-primary font-medium break-words">{log.created_at_wib}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -791,8 +791,8 @@ export default function Dashboard() {
                     </div>
 
                     {/* System Health */}
-                    <div className="bg-gradient-to-br from-sky-50 to-blue-50 dark:from-primary/5 dark:to-primary/5 border border-sky-200/50 dark:border-primary/20 rounded-2xl p-6">
-                        <h4 className="text-sm font-bold text-primary-600 dark:text-primary-400 mb-4 flex items-center gap-2">
+                    <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6 shadow-sm">
+                        <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                             </svg>

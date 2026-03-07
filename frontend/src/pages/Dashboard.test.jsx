@@ -108,4 +108,60 @@ describe('Dashboard', () => {
             expect(getStats).toHaveBeenCalledTimes(2);
         });
     });
+
+    it('menampilkan timestamp log lengkap dan card system health yang konsisten di dark mode', async () => {
+        getStats.mockResolvedValueOnce({
+            success: true,
+            data: {
+                summary: {
+                    totalCameras: 2,
+                    activeCameras: 2,
+                    disabledCameras: 0,
+                    totalAreas: 1,
+                    activeViewers: 1,
+                },
+                system: {
+                    platform: 'win32',
+                    arch: 'x64',
+                    cpus: 8,
+                    cpuModel: 'Test CPU',
+                    cpuLoad: 10,
+                    totalMem: 16000,
+                    freeMem: 8000,
+                    usedMem: 8000,
+                    memUsagePercent: 50,
+                    uptime: 1000,
+                    loadAvg: [0, 0, 0],
+                },
+                streams: [],
+                recentLogs: [
+                    {
+                        id: 1,
+                        action: 'UPDATE_CAMERA',
+                        details: 'Updated camera ID: 7',
+                        username: 'aldi',
+                        created_at_wib: '08/03/2026 18.06.05',
+                    },
+                ],
+                mtxConnected: true,
+                cameraStatusBreakdown: { online: 2, offline: 0, maintenance: 0 },
+                topCameras: [],
+                allSessions: [],
+            },
+        });
+
+        renderWithRouter(<Dashboard />);
+
+        await waitFor(() => {
+            expect(screen.getByText('Updated camera ID: 7')).toBeTruthy();
+        });
+
+        expect(screen.getByText('aldi')).toBeTruthy();
+        expect(screen.getByText('08/03/2026 18.06.05')).toBeTruthy();
+
+        const systemHealthCard = screen.getByText('System Health').closest('div');
+        expect(systemHealthCard?.className).toContain('dark:bg-gray-800/50');
+        expect(systemHealthCard?.className).toContain('dark:border-gray-700/50');
+        expect(screen.getByText('Optimal').className).toContain('dark:bg-emerald-500/10');
+    });
 });

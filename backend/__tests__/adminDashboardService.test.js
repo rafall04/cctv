@@ -1,5 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as database from '../database/database.js';
+import mediaMtxService from '../services/mediaMtxService.js';
+import viewerSessionService from '../services/viewerSessionService.js';
+import * as timezoneService from '../services/timezoneService.js';
 import {
+    default as adminDashboardService,
     buildDashboardStreams,
     getCameraOperationalState,
     getCameraStatusBreakdown,
@@ -171,5 +176,67 @@ describe('adminDashboardService camera status helpers', () => {
             state: 'invalid',
             ready: false,
         }));
+    });
+});
+
+describe('adminDashboardService dashboard stats', () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it('mengembalikan recent logs dengan tanggal penuh dan jam tanpa mengubah urutan', async () => {
+        vi.spyOn(database, 'queryOne')
+            .mockReturnValueOnce({ total: 3, active: 2, disabled: 1 })
+            .mockReturnValueOnce({ total: 2 });
+
+        vi.spyOn(database, 'query')
+            .mockReturnValueOnce([
+                {
+                    id: 7,
+                    name: 'Camera Alpha',
+                    stream_key: 'camera-alpha',
+                    enabled: 1,
+                    status: 'active',
+                    is_online: 1,
+                    stream_source: 'internal',
+                    external_hls_url: null,
+                },
+            ])
+            .mockReturnValueOnce([
+                {
+                    id: 10,
+                    action: 'UPDATE_CAMERA',
+                    details: 'Updated camera ID: 7',
+                    user_id: 1,
+                    username: 'aldi',
+                    created_at: '2026-03-08T11:06:05.000Z',
+                },
+                {
+                    id: 9,
+                    action: 'UPDATE_CAMERA',
+                    details: 'Updated camera ID: 5',
+                    user_id: 1,
+                    username: 'aldi',
+                    created_at: '2026-03-08T11:05:42.000Z',
+                },
+            ]);
+
+        vi.spyOn(mediaMtxService, 'getStats').mockResolvedValue({ paths: [] });
+        vi.spyOn(viewerSessionService, 'getViewerStats').mockReturnValue({
+            activeViewers: 0,
+            viewersByCamera: [],
+            activeSessions: [],
+            allSessions: [],
+        });
+        vi.spyOn(timezoneService, 'getTimezone').mockReturnValue('Asia/Jakarta');
+
+        const stats = await adminDashboardService.getDashboardStats();
+
+        expect(stats.recentLogs).toHaveLength(2);
+        expect(stats.recentLogs[0].id).toBe(10);
+        expect(stats.recentLogs[0].created_at_wib).toMatch(/\d{2}\/\d{2}\/\d{4}/);
+        expect(stats.recentLogs[0].created_at_wib).toMatch(/\d{2}\.\d{2}\.\d{2}/);
+        expect(stats.recentLogs[0].created_at_wib).not.toBe('18.06.05');
+        expect(stats.recentLogs[1].id).toBe(9);
     });
 });
