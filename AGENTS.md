@@ -418,6 +418,33 @@ export function useCRUD(endpoint) {
 3. Gunakan commit message yang jelas dan deskriptif
 4. Format commit message: `"Add: [deskripsi]"`, `"Fix: [deskripsi]"`, `"Refactor: [deskripsi]"`
 
+### Aturan Wajib Push Setiap Perubahan Sekecil Apa Pun
+
+1. Setiap perubahan, sekecil apa pun, wajib diakhiri dengan `git add`, `git commit`, dan `git push`
+2. Tidak boleh menumpuk perubahan kecil untuk dipush nanti; satu perubahan kecil tetap harus dipush saat selesai
+3. Perubahan seperti typo, copy text, spacing, class Tailwind, test, refactor kecil, dan config ringan tetap dianggap pekerjaan yang wajib dipush
+4. Sebelum push, wajib cek `git status` agar perubahan yang ikut commit memang sesuai
+5. Jika ada perubahan user lain yang belum boleh ikut dikirim, commit hanya file yang relevan, jangan asal `git add .`
+6. Jika pekerjaan belum lolos verifikasi yang relevan, selesaikan verifikasi dulu sebelum commit dan push
+7. Setelah commit, wajib push ke branch kerja yang aktif di GitHub pada sesi itu
+8. Jangan mengakhiri pekerjaan hanya di local repository; status akhir yang benar adalah perubahan sudah ada di GitHub
+
+### Workflow Minimum Setelah Selesai Mengerjakan Apa Pun
+
+```bash
+# 1. Cek perubahan
+git status
+
+# 2. Add file yang relevan
+git add <file-yang-diubah>
+
+# 3. Commit dengan pesan jelas
+git commit -m "Fix: perbaiki status bar MapView"
+
+# 4. Push ke GitHub
+git push
+```
+
 Contoh workflow:
 ```bash
 # 1. Check status

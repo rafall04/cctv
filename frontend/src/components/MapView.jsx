@@ -1131,9 +1131,9 @@ const MapView = memo(({
     const stats = useMemo(() => {
         const maintenance = filtered.filter(c => c.status === 'maintenance').length;
         const offline = filtered.filter(c => c.status !== 'maintenance' && c.is_online === 0).length;
-        const stabil = filtered.filter(c => c.status !== 'maintenance' && c.is_online !== 0 && !c.is_tunnel).length;
+        const online = filtered.filter(c => c.status !== 'maintenance' && c.is_online !== 0 && !c.is_tunnel).length;
         const tunnel = filtered.filter(c => c.status !== 'maintenance' && c.is_online !== 0 && (c.is_tunnel === 1 || c.is_tunnel === true)).length;
-        return { stabil, tunnel, maintenance, offline, total: filtered.length };
+        return { online, tunnel, offline: offline + maintenance };
     }, [filtered]);
 
     const { center, zoom, bounds } = useMemo(() => {
@@ -1279,38 +1279,23 @@ const MapView = memo(({
                 </div>
             )}
 
-            <div className="absolute bottom-3 left-3 z-[1000] max-w-[calc(100%-5rem)]">
-                <div className="rounded-xl bg-white/95 px-3 py-2 shadow-lg dark:bg-gray-800/95">
-                    <div className="mb-2 flex items-center gap-2">
-                        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
-                            Status Kamera
-                        </span>
-                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-                            {stats.total} total
-                        </span>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5 text-[11px] sm:text-xs">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 font-medium text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
-                            <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                            Stabil {stats.stabil}
-                        </span>
-                        <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-1 font-medium text-orange-700 dark:bg-orange-500/10 dark:text-orange-400">
-                            <span className="h-2 w-2 rounded-full bg-orange-500" />
-                            Tunnel {stats.tunnel}
-                        </span>
-                        {stats.offline > 0 && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-300">
-                                <span className="h-2 w-2 rounded-full bg-gray-500" />
-                                Offline {stats.offline}
-                            </span>
-                        )}
-                        {stats.maintenance > 0 && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-1 font-medium text-red-700 dark:bg-red-500/10 dark:text-red-400">
-                                <span className="h-2 w-2 rounded-full bg-red-500" />
-                                Perbaikan {stats.maintenance}
-                            </span>
-                        )}
-                    </div>
+            <div className="pointer-events-none absolute bottom-3 left-1/2 z-[1000] w-full -translate-x-1/2 px-3">
+                <div
+                    className="mx-auto inline-flex max-w-[calc(100%-6rem)] items-center gap-1.5 overflow-hidden rounded-full bg-white/90 px-2 py-1 shadow-md backdrop-blur dark:bg-gray-800/85 sm:gap-2 sm:px-2.5"
+                    data-testid="map-status-bar"
+                >
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-medium leading-none text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                        Online {stats.online}
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-1 text-[10px] font-medium leading-none text-orange-700 dark:bg-orange-500/10 dark:text-orange-400">
+                        <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
+                        Tunnel {stats.tunnel}
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-[10px] font-medium leading-none text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                        <span className="h-1.5 w-1.5 rounded-full bg-gray-500" />
+                        Offline {stats.offline}
+                    </span>
                 </div>
             </div>
 

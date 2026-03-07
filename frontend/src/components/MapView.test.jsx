@@ -88,6 +88,49 @@ describe('MapView area filter visibility', () => {
         },
     ];
 
+    const statusCameras = [
+        {
+            id: 1,
+            name: 'Lobby',
+            latitude: '-7.1507',
+            longitude: '111.8815',
+            area_name: 'Dander',
+            is_online: 1,
+            status: 'active',
+            is_tunnel: 0,
+        },
+        {
+            id: 2,
+            name: 'Gerbang',
+            latitude: '-7.1508',
+            longitude: '111.8816',
+            area_name: 'Dander',
+            is_online: 1,
+            status: 'active',
+            is_tunnel: 1,
+        },
+        {
+            id: 3,
+            name: 'Gudang',
+            latitude: '-7.1509',
+            longitude: '111.8817',
+            area_name: 'Dander',
+            is_online: 0,
+            status: 'active',
+            is_tunnel: 0,
+        },
+        {
+            id: 4,
+            name: 'Parkir',
+            latitude: '-7.1510',
+            longitude: '111.8818',
+            area_name: 'Dander',
+            is_online: 1,
+            status: 'maintenance',
+            is_tunnel: 0,
+        },
+    ];
+
     beforeEach(() => {
         window.URL.createObjectURL = vi.fn(() => 'blob:test');
     });
@@ -108,5 +151,31 @@ describe('MapView area filter visibility', () => {
         await waitFor(() => {
             expect(screen.getByRole('combobox')).toBeTruthy();
         });
+    });
+
+    it('merender status bar compact dengan tiga label utama', async () => {
+        await act(async () => {
+            render(<MapView cameras={statusCameras} areas={[]} showAreaFilter={false} />);
+        });
+
+        await waitFor(() => {
+            expect(screen.getByTestId('map-status-bar')).toBeTruthy();
+        });
+
+        expect(screen.getByText('Online 1')).toBeTruthy();
+        expect(screen.getByText('Tunnel 1')).toBeTruthy();
+        expect(screen.getByText('Offline 2')).toBeTruthy();
+    });
+
+    it('tidak lagi merender label perbaikan pada status bar compact', async () => {
+        await act(async () => {
+            render(<MapView cameras={statusCameras} areas={[]} showAreaFilter={false} />);
+        });
+
+        await waitFor(() => {
+            expect(screen.getByTestId('map-status-bar')).toBeTruthy();
+        });
+
+        expect(screen.queryByText(/Perbaikan/i)).toBeNull();
     });
 });
