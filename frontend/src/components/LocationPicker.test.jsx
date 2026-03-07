@@ -30,7 +30,7 @@ vi.mock('leaflet', () => ({
 }));
 
 vi.mock('react-leaflet', () => ({
-    MapContainer: ({ children }) => <div data-testid="location-picker-map">{children}</div>,
+    MapContainer: ({ children, className }) => <div data-testid="location-picker-map" className={className}>{children}</div>,
     TileLayer: ({ url }) => <div data-testid="location-picker-tile-url">{url}</div>,
     Marker: ({ position }) => (
         <div data-testid="location-picker-marker">
@@ -61,6 +61,8 @@ describe('LocationPicker basemap toggle', () => {
             expect(screen.getByTestId('location-picker-map-type')).toBeTruthy();
         });
 
+        expect(screen.getByTestId('location-picker-map').className).toContain('location-picker-map');
+        expect(screen.getByText('Klik peta untuk pilih lokasi').className).toContain('dark:text-gray-200');
         expect(screen.getByTestId('location-picker-tile-url').textContent)
             .toBe('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}');
         expect(screen.getByRole('button', { name: 'Hybrid' })).toBeTruthy();

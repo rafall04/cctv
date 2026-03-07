@@ -20,9 +20,9 @@ export default function CameraLocationSection({
                             <circle cx="12" cy="11" r="3" />
                         </svg>
                     </div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">Lokasi Kamera</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Lokasi Kamera</p>
                 </div>
-                <Suspense fallback={<div className="h-10 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center"><span className="text-gray-400 text-xs">Loading...</span></div>}>
+                <Suspense fallback={<div className="h-10 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center"><span className="text-gray-500 dark:text-gray-400 text-xs">Loading...</span></div>}>
                     <LocationPicker
                         latitude={latitude}
                         longitude={longitude}
@@ -39,7 +39,7 @@ export default function CameraLocationSection({
                         </svg>
                     </div>
                     <div>
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">Koneksi Tunnel</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Koneksi Tunnel</p>
                         <p className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">Kurang stabil</p>
                     </div>
                 </div>

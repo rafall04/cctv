@@ -196,11 +196,11 @@ const LazyMap = ({ position, mapCenter, defaultZoom, mapType, onLocationSelect }
     };
 
     return (
-        <div className="relative rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+        <div className="location-picker-map-shell relative rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
             <MapContainer
                 center={mapCenter}
                 zoom={defaultZoom}
-                className="w-full h-[200px]"
+                className="location-picker-map w-full h-[200px]"
                 style={{ background: '#e5e7eb', zIndex: 0 }}
             >
                 <TileLayer
@@ -226,7 +226,7 @@ const LazyMap = ({ position, mapCenter, defaultZoom, mapType, onLocationSelect }
             
             {!position && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/10 pointer-events-none">
-                    <div className="bg-white dark:bg-gray-800 px-3 py-1.5 rounded-lg shadow text-xs text-gray-600 dark:text-gray-300">
+                    <div className="bg-white/95 dark:bg-gray-900/90 px-3 py-1.5 rounded-lg shadow-sm border border-white/70 dark:border-gray-700 text-xs text-gray-700 dark:text-gray-200">
                         Klik peta untuk pilih lokasi
                     </div>
                 </div>
