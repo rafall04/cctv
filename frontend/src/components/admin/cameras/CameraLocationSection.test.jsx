@@ -24,6 +24,8 @@ describe('CameraLocationSection dark mode readability', () => {
         expect(screen.getByText('Lokasi Kamera').className).toContain('dark:text-gray-100');
         expect(screen.getByText('Pilih lokasi dengan GPS atau buka peta untuk menentukan titik kamera.').className)
             .toContain('dark:text-gray-400');
+        expect(screen.getByText('Loading...').parentElement.className)
+            .toContain('dark:bg-gray-800');
         expect(screen.getByText('Koneksi Tunnel').className).toContain('dark:text-gray-100');
         expect(screen.getByText('Kurang stabil').className).toContain('dark:text-gray-400');
         expect(screen.getByText('Loading...').className).toContain('dark:text-gray-400');

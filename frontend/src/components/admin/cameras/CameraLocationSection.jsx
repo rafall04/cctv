@@ -12,7 +12,7 @@ export default function CameraLocationSection({
 }) {
     return (
         <>
-            <div className="p-3 bg-sky-50 dark:bg-primary/10 border border-sky-200 dark:border-primary/20 rounded-xl">
+            <div className="rounded-xl border border-gray-200/80 bg-white p-4 dark:border-gray-700/70 dark:bg-gray-800/70">
                 <div className="mb-3">
                     <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-lg bg-sky-100 dark:bg-primary/20 flex items-center justify-center text-primary-600 dark:text-primary-400 shrink-0">
@@ -27,13 +27,15 @@ export default function CameraLocationSection({
                         Pilih lokasi dengan GPS atau buka peta untuk menentukan titik kamera.
                     </p>
                 </div>
-                <Suspense fallback={<div className="h-10 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center"><span className="text-gray-500 dark:text-gray-400 text-xs">Loading...</span></div>}>
+                <div className="border-t border-gray-200/70 pt-3 dark:border-gray-700/70">
+                    <Suspense fallback={<div className="h-10 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center"><span className="text-gray-500 dark:text-gray-400 text-xs">Loading...</span></div>}>
                     <LocationPicker
                         latitude={latitude}
                         longitude={longitude}
                         onLocationChange={onLocationChange}
                     />
-                </Suspense>
+                    </Suspense>
+                </div>
             </div>
 
             <div className="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl">

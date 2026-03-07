@@ -52,14 +52,15 @@ describe('LocationPicker basemap toggle', () => {
     it('menggunakan hybrid sebagai basemap default saat map dibuka', async () => {
         render(<LocationPicker latitude="" longitude="" onLocationChange={vi.fn()} />);
 
+        expect(screen.queryByText('Lokasi Kamera')).toBeNull();
         expect(screen.getByText('Belum ada koordinat').className)
             .toContain('dark:text-gray-400');
         expect(screen.getByTestId('location-picker-collapsed-panel').className)
-            .toContain('dark:bg-gray-900/40');
+            .toContain('sm:flex-row');
         expect(screen.getByRole('button', { name: 'Pilih di Peta' }).className)
-            .toContain('bg-sky-600');
+            .toContain('dark:bg-sky-500/20');
         expect(screen.getByRole('button', { name: 'GPS' }).className)
-            .toContain('dark:text-emerald-300');
+            .toContain('dark:bg-gray-800/60');
         expect(screen.queryByRole('button', { name: 'Hapus' })).toBeNull();
 
         fireEvent.click(screen.getByRole('button', { name: /pilih di peta/i }));
@@ -115,13 +116,13 @@ describe('LocationPicker basemap toggle', () => {
         );
 
         expect(screen.getByRole('button', { name: 'Hapus' }).className)
-            .toContain('dark:text-red-400');
+            .toContain('dark:bg-gray-800/60');
         expect(screen.getByRole('button', { name: 'GPS' }).className)
-            .toContain('border-emerald-200');
+            .toContain('border-gray-200');
         expect(screen.getByRole('button', { name: 'Edit Peta' }).className)
-            .toContain('bg-sky-600');
+            .toContain('dark:bg-sky-500/20');
         expect(screen.getByTestId('location-picker-actions').className)
-            .toContain('flex-wrap');
+            .toContain('sm:justify-end');
     });
 
     it('menjaga pilihan basemap saat map ditutup lalu dibuka kembali dalam sesi yang sama', async () => {

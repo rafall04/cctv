@@ -196,11 +196,11 @@ const LazyMap = ({ position, mapCenter, defaultZoom, mapType, onLocationSelect }
     };
 
     return (
-        <div className="location-picker-map-shell relative rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+        <div className="relative rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
             <MapContainer
                 center={mapCenter}
                 zoom={defaultZoom}
-                className="location-picker-map w-full h-[200px]"
+                className="w-full h-[200px]"
                 style={{ background: '#e5e7eb', zIndex: 0 }}
             >
                 <TileLayer
@@ -352,76 +352,71 @@ const LocationPicker = ({
         return (
             <div className="space-y-2">
                 <div
-                    className="rounded-xl border border-gray-200/80 bg-white/80 p-3 shadow-sm dark:border-gray-700/70 dark:bg-gray-900/40"
+                    className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
                     data-testid="location-picker-collapsed-panel"
                 >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="min-w-0 space-y-1">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
-                                Lokasi Kamera
-                            </p>
-                            {position ? (
-                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                                    <span className="text-gray-600 dark:text-gray-300">
-                                        <span className="font-medium text-gray-800 dark:text-gray-100">Lat:</span> {position[0].toFixed(6)}
-                                    </span>
-                                    <span className="text-gray-600 dark:text-gray-300">
-                                        <span className="font-medium text-gray-800 dark:text-gray-100">Lng:</span> {position[1].toFixed(6)}
-                                    </span>
-                                </div>
-                            ) : (
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Belum ada koordinat</p>
-                            )}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2" data-testid="location-picker-actions">
-                            {position && (
-                                <button
-                                    type="button"
-                                    onClick={handleClear}
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 transition-colors hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
-                                >
-                                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                    <span>Hapus</span>
-                                </button>
-                            )}
+                    <div className="min-w-0 flex-1">
+                        {position ? (
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                                <span className="text-gray-700 dark:text-gray-200">
+                                    <span className="font-semibold text-gray-800 dark:text-white">Lat:</span> {position[0].toFixed(6)}
+                                </span>
+                                <span className="text-gray-700 dark:text-gray-200">
+                                    <span className="font-semibold text-gray-800 dark:text-white">Lng:</span> {position[1].toFixed(6)}
+                                </span>
+                            </div>
+                        ) : (
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Belum ada koordinat</p>
+                        )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 sm:justify-end" data-testid="location-picker-actions">
+                        {position && (
                             <button
                                 type="button"
-                                onClick={handleUseGPS}
-                                disabled={loadingGPS}
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-50 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20"
-                                title="Gunakan lokasi GPS device"
+                                onClick={handleClear}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50 dark:border-red-500/25 dark:bg-gray-800/60 dark:text-red-300 dark:hover:bg-red-500/10"
                             >
-                                {loadingGPS ? (
-                                    <>
-                                        <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-                                        </svg>
-                                        <span>GPS...</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                            <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/>
-                                            <circle cx="12" cy="11" r="3"/>
-                                        </svg>
-                                        <span>GPS</span>
-                                    </>
-                                )}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setShowMap(true)}
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-400"
-                            >
-                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13V7m0 13l6-3m-6-10l6-3m0 13V4m0 13l5.553 2.776A1 1 0 0022 18.882V8.118a1 1 0 00-.447-.842L15 4" />
+                                <svg className="h-3.5 w-3.5 text-red-500 dark:text-red-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
-                                <span>{primaryActionLabel}</span>
+                                <span>Hapus</span>
                             </button>
-                        </div>
+                        )}
+                        <button
+                            type="button"
+                            onClick={handleUseGPS}
+                            disabled={loadingGPS}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800/60 dark:text-gray-200 dark:hover:bg-gray-700/70"
+                            title="Gunakan lokasi GPS device"
+                        >
+                            {loadingGPS ? (
+                                <>
+                                    <svg className="h-3.5 w-3.5 animate-spin text-emerald-500 dark:text-emerald-300" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                                    </svg>
+                                    <span>GPS...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <svg className="h-3.5 w-3.5 text-emerald-500 dark:text-emerald-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/>
+                                        <circle cx="12" cy="11" r="3"/>
+                                    </svg>
+                                    <span>GPS</span>
+                                </>
+                            )}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setShowMap(true)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-sky-600 bg-sky-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-sky-700 dark:border-sky-400/30 dark:bg-sky-500/20 dark:text-sky-100 dark:hover:bg-sky-500/30"
+                        >
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13V7m0 13l6-3m-6-10l6-3m0 13V4m0 13l5.553 2.776A1 1 0 0022 18.882V8.118a1 1 0 00-.447-.842L15 4" />
+                            </svg>
+                            <span>{primaryActionLabel}</span>
+                        </button>
                     </div>
                 </div>
                 
