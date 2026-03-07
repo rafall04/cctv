@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, useCallback, memo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Hls from 'hls.js';
 import { Icons } from '../ui/Icons.jsx';
 import CodecBadge from '../CodecBadge.jsx';
@@ -13,12 +14,14 @@ import { viewerService } from '../../services/viewerService';
 import { takeSnapshot as takeSnapshotUtil } from '../../utils/snapshotHelper';
 import { useBranding } from '../../contexts/BrandingContext';
 import { createCameraSlug } from '../../utils/slugify';
+import { buildPublicCameraShareUrl } from '../../utils/publicShareUrl';
 
 // ============================================
 // VIDEO POPUP - Optimized with fullscreen detection, timeout handler, progressive stages, and auto-retry
 // **Validates: Requirements 1.1, 1.2, 1.3, 1.4, 2.3, 3.1, 3.2, 4.1, 4.2, 4.3, 4.4, 6.1, 6.2, 6.3, 6.4, 7.1, 7.2, 7.3**
 // ============================================
 function VideoPopup({ camera, onClose }) {
+    const [searchParams] = useSearchParams();
     const videoRef = useRef(null);
     const wrapperRef = useRef(null);
     const modalRef = useRef(null);
@@ -47,7 +50,10 @@ function VideoPopup({ camera, onClose }) {
 
     // Share camera URL
     const handleShare = useCallback(async () => {
-        const url = `${window.location.origin}/?mode=full&view=map&camera=${createCameraSlug(camera)}`;
+        const url = buildPublicCameraShareUrl({
+            searchParams,
+            camera: createCameraSlug(camera),
+        });
 
         if (navigator.share) {
             try {
@@ -72,7 +78,7 @@ function VideoPopup({ camera, onClose }) {
             console.error('Failed to copy:', err);
             prompt('Salin link ini:', url);
         }
-    }, [camera]);
+    }, [camera, searchParams]);
 
     // Check camera status first
     const isMaintenance = camera.status === 'maintenance';

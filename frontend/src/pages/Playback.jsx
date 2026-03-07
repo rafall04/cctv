@@ -4,6 +4,7 @@ import { cameraService } from '../services/cameraService';
 import recordingService from '../services/recordingService';
 import { useBranding } from '../contexts/BrandingContext';
 import { createCameraSlug, parseCameraIdFromSlug } from '../utils/slugify';
+import { buildPublicPlaybackShareUrl } from '../utils/publicShareUrl';
 import { REQUEST_POLICY } from '../services/requestPolicy';
 
 import PlaybackHeader from '../components/playback/PlaybackHeader';
@@ -43,6 +44,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         return propCameras?.[0]?.id ?? null;
     });
     const [segments, setSegments] = useState([]);
+    const [segmentsCameraId, setSegmentsCameraId] = useState(null);
     const [selectedSegment, setSelectedSegment] = useState(null);
     const [loading, setLoading] = useState(true);
     const [playbackSpeed, setPlaybackSpeed] = useState(1);
@@ -67,6 +69,8 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
     const bufferingTimeoutRef = useRef(null);
     const segmentsRequestIdRef = useRef(0);
     const playbackSourceRef = useRef({ segmentKey: null, streamUrl: null });
+    const playbackSeekTargetRef = useRef(null);
+    const sourceLoadTokenRef = useRef(0);
 
     // Refs to avoid stale closures in event handlers
     const selectedSegmentRef = useRef(selectedSegment);
@@ -122,7 +126,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
                 next.set('cam', String(cameraId));
             }
 
-            if (timestamp) {
+            if (timestamp !== null && timestamp !== undefined) {
                 next.set('t', String(timestamp));
             } else {
                 next.delete('t');
@@ -131,6 +135,59 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
             return next;
         }, { replace });
     }, [setSearchParams]);
+
+    const resetBufferingTimeout = useCallback(() => {
+        if (bufferingTimeoutRef.current) {
+            clearTimeout(bufferingTimeoutRef.current);
+            bufferingTimeoutRef.current = null;
+        }
+    }, []);
+
+    const resetVideoElement = useCallback(() => {
+        const video = videoRef.current;
+        if (!video) {
+            return;
+        }
+
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
+    }, []);
+
+    const resetPlaybackSession = useCallback(({
+        clearSegment = false,
+        clearSegments = false,
+        preserveAutoPlayNotification = false,
+    } = {}) => {
+        sourceLoadTokenRef.current += 1;
+        playbackSourceRef.current = { segmentKey: null, streamUrl: null };
+        lastSeekTimeRef.current = 0;
+        playbackSeekTargetRef.current = null;
+        resetBufferingTimeout();
+
+        setCurrentTime(0);
+        setDuration(0);
+        setVideoError(null);
+        setErrorType(null);
+        setIsSeeking(false);
+        setIsBuffering(false);
+        setSeekWarning(null);
+
+        if (!preserveAutoPlayNotification) {
+            setAutoPlayNotification(null);
+        }
+
+        if (clearSegment) {
+            setSelectedSegment(null);
+        }
+
+        if (clearSegments) {
+            setSegments([]);
+            setSegmentsCameraId(null);
+        }
+
+        resetVideoElement();
+    }, [resetBufferingTimeout, resetVideoElement]);
 
     const handleAutoPlayToggle = useCallback(() => {
         const newValue = !autoPlayEnabled;
@@ -229,9 +286,16 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         isInitialMountRef.current = false;
     }, [cameraIdFromUrl, cameras]);
 
-    // Titik untuk auto-seek time setelah video dimuat dari payload share link
-    const playbackSeekTargetRef = useRef(null);
-    const selectedSegmentKey = getSegmentKey(selectedSegment);
+    const selectedSegmentKey = useMemo(() => {
+        if (!selectedSegment || !selectedCameraId || segmentsCameraId !== selectedCameraId) {
+            return null;
+        }
+
+        const segmentKey = getSegmentKey(selectedSegment);
+        const segmentExists = segments.some((segment) => getSegmentKey(segment) === segmentKey);
+
+        return segmentExists ? segmentKey : null;
+    }, [segments, segmentsCameraId, selectedCameraId, selectedSegment]);
 
     // Effect to select segment from URL or auto-select latest when segments are loaded
     useEffect(() => {
@@ -284,17 +348,10 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         const requestId = ++segmentsRequestIdRef.current;
 
         if (reset) {
-            setSelectedSegment(null);
-            setSegments([]);
-            setIsSeeking(false);
-            setIsBuffering(false);
-            setSeekWarning(null);
-            setAutoPlayNotification(null);
-            lastSeekTimeRef.current = 0;
-            if (bufferingTimeoutRef.current) {
-                clearTimeout(bufferingTimeoutRef.current);
-                bufferingTimeoutRef.current = null;
-            }
+            resetPlaybackSession({
+                clearSegment: true,
+                clearSegments: true,
+            });
         }
 
         try {
@@ -310,6 +367,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
             if (response.success && response.data) {
                 const segmentsArray = response.data.segments || [];
                 setSegments(segmentsArray);
+                setSegmentsCameraId(cameraId);
 
                 const activeSegmentKey = getSegmentKey(selectedSegmentRef.current);
                 if (activeSegmentKey) {
@@ -329,10 +387,11 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
             console.error('Failed to fetch segments:', error);
             if (!isBackgroundMode) {
                 setSegments([]);
+                setSegmentsCameraId(null);
                 setSelectedSegment(null);
             }
         }
-    }, []);
+    }, [resetPlaybackSession]);
 
     // Fetch segments effect
     useEffect(() => {
@@ -356,97 +415,120 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
     );
 
     useEffect(() => {
-        const currentSelectedSegment = selectedSegmentRef.current;
-        if (!currentSelectedSegment || !videoRef.current || !selectedCameraId) return;
-
-        if (!currentSelectedSegment.filename || currentSelectedSegment.filename.trim() === '') {
+        if (!selectedSegmentKey || !selectedSegment || !videoRef.current || !selectedCameraId) {
             return;
         }
 
-        const nextSegmentKey = getSegmentKey(currentSelectedSegment);
-        const nextStreamUrl = recordingService.getSegmentStreamUrl(selectedCameraId, currentSelectedSegment.filename);
+        if (!selectedSegment.filename || selectedSegment.filename.trim() === '') {
+            return;
+        }
+
+        const nextStreamUrl = recordingService.getSegmentStreamUrl(selectedCameraId, selectedSegment.filename);
         if (
-            playbackSourceRef.current.segmentKey === nextSegmentKey
+            playbackSourceRef.current.segmentKey === selectedSegmentKey
             && playbackSourceRef.current.streamUrl === nextStreamUrl
         ) {
             return;
         }
 
+        const sourceToken = sourceLoadTokenRef.current + 1;
+        sourceLoadTokenRef.current = sourceToken;
         setVideoError(null);
         setErrorType(null);
-
         playbackSourceRef.current = {
-            segmentKey: nextSegmentKey,
+            segmentKey: selectedSegmentKey,
             streamUrl: nextStreamUrl,
         };
         const video = videoRef.current;
-        video.pause();
-        video.removeAttribute('src');
+        let canPlayRetried = false;
+
+        const isStale = () => sourceLoadTokenRef.current !== sourceToken;
+
+        const handleAutoPlayFailure = (error) => {
+            if (isStale() || error?.name === 'AbortError') {
+                return;
+            }
+
+            setIsBuffering(false);
+            setAutoPlayNotification({
+                type: 'manual',
+                message: 'Auto-play gagal. Tekan tombol play untuk melanjutkan.',
+            });
+        };
+
+        const attemptPlayback = () => {
+            if (isStale()) {
+                return;
+            }
+
+            const playPromise = video.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(handleAutoPlayFailure);
+            }
+        };
+
+        const handleSourceLoadedMetadata = () => {
+            if (isStale()) {
+                return;
+            }
+
+            if (playbackSeekTargetRef.current !== null) {
+                video.currentTime = playbackSeekTargetRef.current;
+                lastSeekTimeRef.current = playbackSeekTargetRef.current;
+                playbackSeekTargetRef.current = null;
+            }
+
+            attemptPlayback();
+        };
+
+        const handleSourceCanPlay = () => {
+            if (isStale() || canPlayRetried || !video.paused) {
+                return;
+            }
+
+            canPlayRetried = true;
+            attemptPlayback();
+        };
+
+        const handleSourceError = () => {
+            if (isStale()) {
+                return;
+            }
+
+            const mediaError = video.error;
+            const errorCode = mediaError?.code;
+
+            setIsBuffering(false);
+            setErrorType(errorCode === 2 ? 'network' : null);
+            setVideoError(mediaError?.message || 'Gagal memuat video playback');
+        };
+
+        resetBufferingTimeout();
+        setCurrentTime(0);
+        setDuration(0);
+        setIsSeeking(false);
+        setIsBuffering(true);
+        setAutoPlayNotification(null);
+
+        video.addEventListener('loadedmetadata', handleSourceLoadedMetadata);
+        video.addEventListener('canplay', handleSourceCanPlay);
+        video.addEventListener('error', handleSourceError);
+
+        resetVideoElement();
+        video.src = nextStreamUrl;
         video.load();
 
-        const abortController = new AbortController();
-
-        fetch(nextStreamUrl, { method: 'HEAD', signal: abortController.signal })
-            .then(response => {
-                if (response.ok) {
-                    const contentType = response.headers.get('content-type');
-                    const contentLength = response.headers.get('content-length');
-
-                    if (!contentType || !contentType.includes('video')) {
-                        setVideoError(`Invalid Content-Type: ${contentType}`);
-                        return;
-                    }
-
-                    const fileSize = parseInt(contentLength || '0');
-                    if (fileSize < 1024 * 1024) {
-                        setVideoError(`File too small: ${(fileSize / 1024).toFixed(2)} KB`);
-                        return;
-                    }
-
-                    video.src = nextStreamUrl;
-                    video.load();
-
-                    // Handler otomatis untuk melakukan "seeking" spesifik pasca video dimuat
-                    const onLoadedMetadataSeek = () => {
-                        if (playbackSeekTargetRef.current !== null) {
-                            video.currentTime = playbackSeekTargetRef.current;
-                            lastSeekTimeRef.current = playbackSeekTargetRef.current;
-                            playbackSeekTargetRef.current = null; // Clear setelah digunakan
-                        }
-                    };
-                    video.addEventListener('loadedmetadata', onLoadedMetadataSeek, { once: true });
-                } else {
-                    setVideoError(`HTTP ${response.status}: ${response.statusText}`);
-                }
-            })
-            .catch(error => {
-                if (error.name !== 'AbortError') {
-                    setVideoError(`Network error: ${error.message}`);
-                }
-            });
-
-        // Remove the handler here since we have a separate useEffect for playback speed
-        const playTimeout = setTimeout(() => {
-            if (video.readyState >= 2) {
-                const playPromise = video.play();
-                if (playPromise !== undefined) {
-                    playPromise.catch(error => {
-                        if (error.name !== 'AbortError') {
-                            setVideoError(`Play failed: ${error.message}`);
-                        }
-                    });
-                }
-            }
-        }, 500);
-
         return () => {
-            abortController.abort();
-            clearTimeout(playTimeout);
-            video.pause();
-            video.removeAttribute('src');
-            video.load();
+            video.removeEventListener('loadedmetadata', handleSourceLoadedMetadata);
+            video.removeEventListener('canplay', handleSourceCanPlay);
+            video.removeEventListener('error', handleSourceError);
+
+            if (!isStale()) {
+                resetBufferingTimeout();
+                resetVideoElement();
+            }
         };
-    }, [selectedCameraId, selectedSegmentKey]);
+    }, [resetBufferingTimeout, resetVideoElement, selectedCameraId, selectedSegment, selectedSegmentKey]);
 
     useEffect(() => {
         const video = videoRef.current;
@@ -550,7 +632,9 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         };
 
         const handleCanPlay = () => {
-            setIsBuffering(false);
+            if (!video.paused) {
+                setIsBuffering(false);
+            }
         };
 
         const handleStalled = () => {
@@ -582,7 +666,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
                 clearTimeout(bufferingTimeoutRef.current);
             }
         };
-    }, [setSearchParams, updatePlaybackSearchParams]);
+    }, [updatePlaybackSearchParams]);
 
     const handleSpeedChange = (speed) => {
         setPlaybackSpeed(speed);
@@ -757,34 +841,36 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
             return;
         }
 
+        resetPlaybackSession({
+            clearSegment: true,
+            clearSegments: true,
+        });
         setSelectedCameraId(camera.id);
         updatePlaybackSearchParams({
             camera,
-            timestamp: selectedSegment ? new Date(selectedSegment.start_time).getTime() : null,
+            timestamp: null,
             replace: false,
         });
-    }, [selectedSegment, updatePlaybackSearchParams]);
+    }, [resetPlaybackSession, updatePlaybackSearchParams]);
 
     // Handle share playback link - use timestamp instead of segment ID
     const handleShare = useCallback(async () => {
-        const baseUrl = `${window.location.origin}/?mode=full&view=playback`; // Memastikan diarahkan ke tab playback saat domain diclick
-        const params = new URLSearchParams();
-        if (selectedCamera?.id) params.set('cam', createCameraSlug(selectedCamera));
-
-        // Akumulasikan start_time UNIX segment + currentTime detik
+        let preciseTimestamp = null;
         if (selectedSegment?.start_time) {
             const baseTimeMs = new Date(selectedSegment.start_time).getTime();
-            let preciseTimestamp = baseTimeMs;
+            preciseTimestamp = baseTimeMs;
 
-            // Tambahkan dengan detik yang sedang berjalan (jika video valid)
             if (videoRef.current && typeof videoRef.current.currentTime === 'number') {
                 const currentSecsMs = Math.floor(videoRef.current.currentTime * 1000);
                 preciseTimestamp += currentSecsMs;
             }
-            params.set('t', preciseTimestamp.toString());
         }
 
-        const shareUrl = `${baseUrl}&${params.toString()}`;
+        const shareUrl = buildPublicPlaybackShareUrl({
+            searchParams,
+            camera: selectedCamera?.id ? createCameraSlug(selectedCamera) : null,
+            timestamp: preciseTimestamp,
+        });
 
         const shareData = {
             title: `Playback - ${selectedCamera?.name || 'CCTV'}`,
@@ -812,7 +898,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
                 setTimeout(() => setSnapshotNotification(null), 3000);
             }
         }
-    }, [selectedCamera, selectedSegment]);
+    }, [searchParams, selectedCamera, selectedSegment]);
 
 
 

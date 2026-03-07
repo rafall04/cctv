@@ -154,7 +154,7 @@ export default function PlaybackVideo({
                     className="w-full h-full object-contain"
                     controls
                     playsInline
-                    preload="metadata"
+                    preload="auto"
                     crossOrigin="anonymous"
                     muted
                 />
