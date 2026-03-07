@@ -131,7 +131,7 @@ export default function AdminLayout({ children }) {
                 </div>
 
                 <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
-                    <p className="px-3 mb-3 text-[10px] font-bold text-gray-400 dark:text-gray-600 uppercase tracking-widest">Main Menu</p>
+                    <p className="px-3 mb-3 text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Main Menu</p>
                     {navItems.map((item) => (
                         <Link
                             key={item.path}
@@ -139,10 +139,10 @@ export default function AdminLayout({ children }) {
                             onClick={() => setIsMobileMenuOpen(false)}
                             className={`group flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${isActive(item.path)
                                 ? 'bg-gradient-to-r from-primary to-primary-600 text-white shadow-lg shadow-primary/30'
-                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/80 hover:text-gray-900 dark:hover:text-white'
+                                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/80 hover:text-gray-900 dark:hover:text-white'
                             }`}
                         >
-                            <div className={isActive(item.path) ? '' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}>
+                            <div className={isActive(item.path) ? '' : 'text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-white'}>
                                 {item.icon}
                             </div>
                             <span className="flex-1">{item.label}</span>
@@ -151,18 +151,18 @@ export default function AdminLayout({ children }) {
                     ))}
 
                     <div className="pt-6 mt-6 border-t border-gray-200 dark:border-gray-800">
-                        <p className="px-3 mb-3 text-[10px] font-bold text-gray-400 dark:text-gray-600 uppercase tracking-widest">Quick Links</p>
+                        <p className="px-3 mb-3 text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Quick Links</p>
                         <a
                             href="/"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="group flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/80 hover:text-gray-900 dark:hover:text-white transition-all"
+                            className="group flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/80 hover:text-gray-900 dark:hover:text-white transition-all"
                         >
-                            <div className="text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300">
+                            <div className="text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-white">
                                 <Icons.Home />
                             </div>
                             <span className="flex-1">Public View</span>
-                            <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                             </svg>
                         </a>
@@ -172,9 +172,9 @@ export default function AdminLayout({ children }) {
                 <div className="p-4 border-t border-gray-200 dark:border-gray-800 space-y-3">
                     <button
                         onClick={toggleTheme}
-                        className="hidden lg:flex w-full items-center gap-3 px-4 py-3 rounded-xl font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/80 transition-all"
+                        className="hidden lg:flex w-full items-center gap-3 px-4 py-3 rounded-xl font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/80 transition-all"
                     >
-                        <div className="text-gray-400 dark:text-gray-500">
+                        <div className="text-gray-500 dark:text-gray-400">
                             {isDark ? <Icons.Sun /> : <Icons.Moon />}
                         </div>
                         <span>{isDark ? 'Light Mode' : 'Dark Mode'}</span>

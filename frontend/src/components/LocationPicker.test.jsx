@@ -52,6 +52,9 @@ describe('LocationPicker basemap toggle', () => {
     it('menggunakan hybrid sebagai basemap default saat map dibuka', async () => {
         render(<LocationPicker latitude="" longitude="" onLocationChange={vi.fn()} />);
 
+        expect(screen.getByText('Belum ada koordinat').className)
+            .toContain('dark:text-gray-400');
+
         fireEvent.click(screen.getByRole('button', { name: /pilih di peta/i }));
 
         await waitFor(() => {
@@ -62,6 +65,8 @@ describe('LocationPicker basemap toggle', () => {
             .toBe('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}');
         expect(screen.getByRole('button', { name: 'Hybrid' })).toBeTruthy();
         expect(screen.getByRole('button', { name: 'Street' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Street' }).className)
+            .toContain('dark:text-gray-300');
     });
 
     it('berpindah ke street tanpa mengubah koordinat yang sudah dipilih', async () => {

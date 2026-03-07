@@ -66,7 +66,7 @@ export default function UnifiedSettings() {
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                     System Settings
                 </h1>
-                <p className="text-gray-600 dark:text-gray-400 mt-1">
+                <p className="text-gray-600 dark:text-gray-300 mt-1">
                     Manage your CCTV system configuration and integrations
                 </p>
             </div>
@@ -82,7 +82,7 @@ export default function UnifiedSettings() {
                                 flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap
                                 ${activeTab === tab.id
                                     ? 'border-sky-500 text-sky-600 dark:text-sky-400'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+                                    : 'border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300 dark:text-gray-300 dark:hover:text-white'
                                 }
                             `}
                         >

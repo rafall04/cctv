@@ -31,11 +31,11 @@ export default function CameraFormModal({
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                             {editingCamera ? 'Edit Camera' : 'Add Camera'}
                         </h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Configure stream source</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-300">Configure stream source</p>
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-500 dark:text-gray-400 transition-colors"
+                        className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-600 dark:text-gray-300 transition-colors"
                         disabled={isSubmitting}
                     >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

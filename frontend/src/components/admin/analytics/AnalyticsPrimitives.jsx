@@ -41,7 +41,7 @@ export function StatsCard({ icon, label, value, subValue, color = 'sky', trend }
                 <div className={`w-12 h-12 bg-gradient-to-br ${colorClasses[color]} rounded-xl flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform`}>
                     {icon}
                 </div>
-                <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{label}</span>
+                <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{label}</span>
             </div>
             <div className="flex items-baseline gap-2 mb-1">
                 <h3 className="text-3xl font-bold text-gray-900 dark:text-white">{value}</h3>
@@ -76,7 +76,7 @@ export function PeriodSelector({ value, onChange, customDate, onCustomDateChange
                                 setShowDatePicker(false);
                             }
                         }}
-                        className={`px-3 py-2 text-sm font-medium rounded-lg transition-all ${value === period.value ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}
+                        className={`px-3 py-2 text-sm font-medium rounded-lg transition-all ${value === period.value ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white'}`}
                     >
                         {period.label}
                     </button>
@@ -91,7 +91,7 @@ export function PeriodSelector({ value, onChange, customDate, onCustomDateChange
                         onChange('custom');
                     }}
                     max={new Date().toISOString().split('T')[0]}
-                    className="px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    className="px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
             )}
         </div>
@@ -103,7 +103,7 @@ export function CameraFilter({ cameras, value, onChange }) {
         <select
             value={value}
             onChange={(event) => onChange(event.target.value)}
-            className="px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            className="px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent"
         >
             <option value="">Semua Kamera</option>
             {cameras.map((camera) => (
@@ -121,7 +121,7 @@ export function ActiveViewerCard({ session }) {
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
                 session.deviceType === 'mobile' ? 'bg-blue-100 dark:bg-primary/20 text-primary' :
                 session.deviceType === 'tablet' ? 'bg-purple-100 dark:bg-purple-500/20 text-purple-500' :
-                'bg-gray-100 dark:bg-gray-700 text-gray-500'
+                'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
             }`}>
                 <DeviceIcon type={session.deviceType} className="w-5 h-5" />
             </div>
@@ -143,7 +143,7 @@ export function ActiveViewerCard({ session }) {
 
 export function InteractiveBarChart({ data, maxValue, onBarClick, selectedDate }) {
     if (!data || data.length === 0) {
-        return <div className="flex items-center justify-center h-48 text-gray-400 dark:text-gray-500">Tidak ada data</div>;
+        return <div className="flex items-center justify-center h-48 text-gray-500 dark:text-gray-400">Tidak ada data</div>;
     }
 
     const max = maxValue || Math.max(...data.map((item) => item.value), 1);
@@ -156,7 +156,7 @@ export function InteractiveBarChart({ data, maxValue, onBarClick, selectedDate }
                     className={`flex items-center gap-3 p-1 rounded-lg cursor-pointer transition-all hover:bg-gray-50 dark:hover:bg-gray-800/50 ${selectedDate === item.rawDate ? 'bg-sky-50 dark:bg-primary/10 ring-1 ring-primary/30' : ''}`}
                     onClick={() => onBarClick(item)}
                 >
-                    <span className="text-xs text-gray-500 dark:text-gray-400 w-16 text-right truncate">{item.label}</span>
+                    <span className="text-xs text-gray-600 dark:text-gray-300 w-16 text-right truncate">{item.label}</span>
                     <div className="flex-1 h-6 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
                         <div
                             className={`h-full rounded-lg transition-all duration-500 ${selectedDate === item.rawDate ? 'bg-gradient-to-r from-primary-400 to-primary' : 'bg-gradient-to-r from-primary to-primary-600'}`}
@@ -172,7 +172,7 @@ export function InteractiveBarChart({ data, maxValue, onBarClick, selectedDate }
 
 export function SimpleBarChart({ data, maxValue }) {
     if (!data || data.length === 0) {
-        return <div className="flex items-center justify-center h-48 text-gray-400 dark:text-gray-500">Tidak ada data</div>;
+        return <div className="flex items-center justify-center h-48 text-gray-500 dark:text-gray-400">Tidak ada data</div>;
     }
 
     const max = maxValue || Math.max(...data.map((item) => item.value), 1);
@@ -181,7 +181,7 @@ export function SimpleBarChart({ data, maxValue }) {
         <div className="space-y-2">
             {data.map((item, index) => (
                 <div key={`${item.label}-${index}`} className="flex items-center gap-3">
-                    <span className="text-xs text-gray-500 dark:text-gray-400 w-16 text-right truncate">{item.label}</span>
+                    <span className="text-xs text-gray-600 dark:text-gray-300 w-16 text-right truncate">{item.label}</span>
                     <div className="flex-1 h-6 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
                         <div className="h-full bg-gradient-to-r from-primary to-primary-600 rounded-lg transition-all duration-500" style={{ width: `${Math.max((item.value / max) * 100, 2)}%` }} />
                     </div>
@@ -212,13 +212,13 @@ export function Pagination({ currentPage, totalPages, onPageChange }) {
 
     return (
         <div className="flex items-center justify-center gap-1 mt-4">
-            <button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed">
+            <button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1} className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
             </button>
             {start > 1 && (
                 <>
-                    <button onClick={() => onPageChange(1)} className="px-3 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-sm">1</button>
-                    {start > 2 && <span className="px-2 text-gray-400">...</span>}
+                    <button onClick={() => onPageChange(1)} className="px-3 py-1 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">1</button>
+                    {start > 2 && <span className="px-2 text-gray-500 dark:text-gray-400">...</span>}
                 </>
             )}
             {pages.map((page) => (
@@ -232,11 +232,11 @@ export function Pagination({ currentPage, totalPages, onPageChange }) {
             ))}
             {end < totalPages && (
                 <>
-                    {end < totalPages - 1 && <span className="px-2 text-gray-400">...</span>}
-                    <button onClick={() => onPageChange(totalPages)} className="px-3 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-sm">{totalPages}</button>
+                    {end < totalPages - 1 && <span className="px-2 text-gray-500 dark:text-gray-400">...</span>}
+                    <button onClick={() => onPageChange(totalPages)} className="px-3 py-1 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">{totalPages}</button>
                 </>
             )}
-            <button onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed">
+            <button onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages} className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
             </button>
         </div>

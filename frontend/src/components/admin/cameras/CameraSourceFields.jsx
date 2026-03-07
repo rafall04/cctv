@@ -26,7 +26,7 @@ export default function CameraSourceFields({
                         type="button"
                         onClick={() => onChange({ target: { name: 'stream_source', value: 'internal', type: 'text' } })}
                         disabled={isSubmitting}
-                        className={`flex-1 px-3 py-2 text-xs font-semibold transition-colors ${formData.stream_source !== 'external' ? 'bg-blue-500 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-blue-500/10'}`}
+                        className={`flex-1 px-3 py-2 text-xs font-semibold transition-colors ${formData.stream_source !== 'external' ? 'bg-blue-500 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-500/10'}`}
                     >
                         Internal (RTSP)
                     </button>
@@ -34,7 +34,7 @@ export default function CameraSourceFields({
                         type="button"
                         onClick={() => onChange({ target: { name: 'stream_source', value: 'external', type: 'text' } })}
                         disabled={isSubmitting}
-                        className={`flex-1 px-3 py-2 text-xs font-semibold transition-colors ${formData.stream_source === 'external' ? 'bg-blue-500 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-blue-500/10'}`}
+                        className={`flex-1 px-3 py-2 text-xs font-semibold transition-colors ${formData.stream_source === 'external' ? 'bg-blue-500 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-500/10'}`}
                     >
                         External (HLS)
                     </button>
@@ -61,7 +61,7 @@ export default function CameraSourceFields({
                         {getFieldError('private_rtsp_url') ? (
                             <p className="mt-1 text-xs text-red-500">{getFieldError('private_rtsp_url')}</p>
                         ) : (
-                            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{getRtspFormatHint()}</p>
+                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{getRtspFormatHint()}</p>
                         )}
                     </div>
 
@@ -119,7 +119,7 @@ export default function CameraSourceFields({
                     {getFieldError('external_hls_url') ? (
                         <p className="mt-1 text-xs text-red-500">{getFieldError('external_hls_url')}</p>
                     ) : (
-                        <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">URL .m3u8 dari sumber pihak ketiga. Stream diakses langsung dari browser tanpa melalui server.</p>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">URL .m3u8 dari sumber pihak ketiga. Stream diakses langsung dari browser tanpa melalui server.</p>
                     )}
                 </div>
             )}

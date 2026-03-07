@@ -332,7 +332,7 @@ export default function AreaManagement() {
                                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">{editingArea ? 'Edit Area' : 'Tambah Area'}</h3>
                                 <p className="text-sm text-gray-500 dark:text-gray-400">Isi detail lokasi</p>
                             </div>
-                            <button onClick={() => setShowModal(false)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-500">
+                            <button onClick={() => setShowModal(false)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-600 dark:text-gray-300">
                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M6 18L18 6M6 6l12 12"/></svg>
                             </button>
                         </div>
@@ -382,10 +382,10 @@ export default function AreaManagement() {
                             {/* Koordinat dengan LocationPicker */}
                             <div className="pt-4 border-t border-gray-200 dark:border-gray-700/50">
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Koordinat Area (untuk Map View)</label>
-                                <Suspense fallback={<div className="text-sm text-gray-500">Loading map...</div>}>
+                                <Suspense fallback={<div className="text-sm text-gray-600 dark:text-gray-300">Loading map...</div>}>
                                     <LocationPicker latitude={formData.latitude} longitude={formData.longitude} onLocationChange={handleLocationChange} />
                                 </Suspense>
-                                <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">Koordinat digunakan untuk memindahkan peta saat filter area dipilih</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Koordinat digunakan untuk memindahkan peta saat filter area dipilih</p>
                             </div>
 
                             <div className="flex gap-3 pt-2">
@@ -409,7 +409,7 @@ export default function AreaManagement() {
                                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">Lokasi Default Peta</h3>
                                 <p className="text-sm text-gray-500 dark:text-gray-400">Titik tengah saat &quot;Semua Lokasi&quot; dipilih</p>
                             </div>
-                            <button onClick={() => setShowMapCenterModal(false)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-500">
+                            <button onClick={() => setShowMapCenterModal(false)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-600 dark:text-gray-300">
                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M6 18L18 6M6 6l12 12"/></svg>
                             </button>
                         </div>
@@ -419,7 +419,7 @@ export default function AreaManagement() {
                                 <input type="text" value={mapCenter.name} onChange={(e) => setMapCenter({...mapCenter, name: e.target.value})}
                                     className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                                     placeholder="Contoh: Kabupaten Bojonegoro" />
-                                <p className="text-xs text-gray-400 mt-1">Nama ini akan ditampilkan di filter &quot;Semua Lokasi&quot;</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Nama ini akan ditampilkan di filter &quot;Semua Lokasi&quot;</p>
                             </div>
 
                             <div>
@@ -437,7 +437,7 @@ export default function AreaManagement() {
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Pilih Titik Tengah</label>
-                                <Suspense fallback={<div className="text-sm text-gray-500">Loading map...</div>}>
+                                <Suspense fallback={<div className="text-sm text-gray-600 dark:text-gray-300">Loading map...</div>}>
                                     <LocationPicker 
                                         latitude={mapCenter.latitude} 
                                         longitude={mapCenter.longitude} 
