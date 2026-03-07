@@ -14,6 +14,7 @@ import PlaybackSegmentList from '../components/playback/PlaybackSegmentList';
 import { useAdminReconnectRefresh } from '../hooks/admin/useAdminReconnectRefresh';
 
 const MAX_SEEK_DISTANCE = 180;
+const BUFFERING_STALL_THRESHOLD_MS = 350;
 function getSegmentKey(segment) {
     if (!segment) {
         return null;
@@ -71,6 +72,11 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
     const playbackSourceRef = useRef({ segmentKey: null, streamUrl: null });
     const playbackSeekTargetRef = useRef(null);
     const sourceLoadTokenRef = useRef(0);
+    const activeSourceTokenRef = useRef(0);
+    const lastPlaybackProgressRef = useRef(0);
+    const lastPlaybackProgressAtRef = useRef(0);
+    const hasLoadedDataForSourceRef = useRef(false);
+    const hasStartedPlaybackForSourceRef = useRef(false);
 
     // Refs to avoid stale closures in event handlers
     const selectedSegmentRef = useRef(selectedSegment);
@@ -143,6 +149,31 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         }
     }, []);
 
+    const clearBufferingState = useCallback(() => {
+        resetBufferingTimeout();
+        setIsBuffering(false);
+    }, [resetBufferingTimeout]);
+
+    const resetSourcePlaybackState = useCallback(({
+        clearSeeking = true,
+        clearBuffering = true,
+    } = {}) => {
+        resetBufferingTimeout();
+        activeSourceTokenRef.current = sourceLoadTokenRef.current;
+        hasLoadedDataForSourceRef.current = false;
+        hasStartedPlaybackForSourceRef.current = false;
+        lastPlaybackProgressRef.current = 0;
+        lastPlaybackProgressAtRef.current = 0;
+
+        if (clearSeeking) {
+            setIsSeeking(false);
+        }
+
+        if (clearBuffering) {
+            setIsBuffering(false);
+        }
+    }, [resetBufferingTimeout]);
+
     const resetVideoElement = useCallback(() => {
         const video = videoRef.current;
         if (!video) {
@@ -163,14 +194,12 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         playbackSourceRef.current = { segmentKey: null, streamUrl: null };
         lastSeekTimeRef.current = 0;
         playbackSeekTargetRef.current = null;
-        resetBufferingTimeout();
+        resetSourcePlaybackState();
 
         setCurrentTime(0);
         setDuration(0);
         setVideoError(null);
         setErrorType(null);
-        setIsSeeking(false);
-        setIsBuffering(false);
         setSeekWarning(null);
 
         if (!preserveAutoPlayNotification) {
@@ -187,7 +216,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         }
 
         resetVideoElement();
-    }, [resetBufferingTimeout, resetVideoElement]);
+    }, [resetSourcePlaybackState, resetVideoElement]);
 
     const handleAutoPlayToggle = useCallback(() => {
         const newValue = !autoPlayEnabled;
@@ -415,7 +444,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
     );
 
     useEffect(() => {
-        if (!selectedSegmentKey || !selectedSegment || !videoRef.current || !selectedCameraId) {
+        if (loading || !selectedSegmentKey || !selectedSegment || !videoRef.current || !selectedCameraId) {
             return;
         }
 
@@ -433,6 +462,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
 
         const sourceToken = sourceLoadTokenRef.current + 1;
         sourceLoadTokenRef.current = sourceToken;
+        activeSourceTokenRef.current = sourceToken;
         setVideoError(null);
         setErrorType(null);
         playbackSourceRef.current = {
@@ -449,7 +479,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
                 return;
             }
 
-            setIsBuffering(false);
+            clearBufferingState();
             setAutoPlayNotification({
                 type: 'manual',
                 message: 'Auto-play gagal. Tekan tombol play untuk melanjutkan.',
@@ -463,7 +493,16 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
 
             const playPromise = video.play();
             if (playPromise !== undefined) {
-                playPromise.catch(handleAutoPlayFailure);
+                playPromise
+                    .then(() => {
+                        if (isStale()) {
+                            return;
+                        }
+
+                        hasStartedPlaybackForSourceRef.current = true;
+                        clearBufferingState();
+                    })
+                    .catch(handleAutoPlayFailure);
             }
         };
 
@@ -498,15 +537,17 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
             const mediaError = video.error;
             const errorCode = mediaError?.code;
 
-            setIsBuffering(false);
+            clearBufferingState();
             setErrorType(errorCode === 2 ? 'network' : null);
             setVideoError(mediaError?.message || 'Gagal memuat video playback');
         };
 
-        resetBufferingTimeout();
+        resetSourcePlaybackState({
+            clearSeeking: true,
+            clearBuffering: false,
+        });
         setCurrentTime(0);
         setDuration(0);
-        setIsSeeking(false);
         setIsBuffering(true);
         setAutoPlayNotification(null);
 
@@ -524,28 +565,59 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
             video.removeEventListener('error', handleSourceError);
 
             if (!isStale()) {
-                resetBufferingTimeout();
+                resetSourcePlaybackState();
                 resetVideoElement();
             }
         };
-    }, [resetBufferingTimeout, resetVideoElement, selectedCameraId, selectedSegment, selectedSegmentKey]);
+    }, [clearBufferingState, loading, resetSourcePlaybackState, resetVideoElement, selectedCameraId, selectedSegment, selectedSegmentKey]);
 
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
         video.playbackRate = playbackSpeed;
-    }, [playbackSpeed]);
+    }, [loading, playbackSpeed]);
 
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
 
+        const hasActiveSource = () => {
+            return activeSourceTokenRef.current === sourceLoadTokenRef.current
+                && playbackSourceRef.current.streamUrl !== null;
+        };
+
+        const markPlaybackProgress = () => {
+            const now = Date.now();
+            lastPlaybackProgressRef.current = video.currentTime;
+            lastPlaybackProgressAtRef.current = now;
+            hasStartedPlaybackForSourceRef.current = true;
+            clearBufferingState();
+        };
+
         const handleTimeUpdate = () => {
+            if (hasActiveSource()) {
+                const previousTime = lastPlaybackProgressRef.current;
+                const currentVideoTime = video.currentTime;
+                if (currentVideoTime > previousTime + 0.01) {
+                    markPlaybackProgress();
+                }
+            }
+
             setCurrentTime(video.currentTime);
         };
         const handleLoadedMetadata = () => setDuration(video.duration);
+        const handleLoadedData = () => {
+            if (!hasActiveSource()) {
+                return;
+            }
+
+            hasLoadedDataForSourceRef.current = true;
+            clearBufferingState();
+        };
 
         const handleEnded = () => {
+            clearBufferingState();
+
             if (!autoPlayEnabledRef.current) {
                 setAutoPlayNotification({ type: 'stopped', message: 'Video selesai - Auto-play dinonaktifkan' });
                 setTimeout(() => setAutoPlayNotification(null), 5000);
@@ -611,10 +683,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
 
         const handleSeeked = () => {
             setIsSeeking(false);
-
-            if (bufferingTimeoutRef.current) {
-                clearTimeout(bufferingTimeoutRef.current);
-            }
+            resetBufferingTimeout();
 
             bufferingTimeoutRef.current = setTimeout(() => {
                 setIsBuffering(false);
@@ -622,51 +691,86 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         };
 
         const handleWaiting = () => {
+            if (!hasActiveSource() || !hasLoadedDataForSourceRef.current || video.paused || video.ended) {
+                return;
+            }
+
             setIsBuffering(true);
         };
         const handlePlaying = () => {
-            setIsBuffering(false);
-            if (bufferingTimeoutRef.current) {
-                clearTimeout(bufferingTimeoutRef.current);
+            if (!hasActiveSource()) {
+                return;
             }
+
+            hasLoadedDataForSourceRef.current = true;
+            markPlaybackProgress();
         };
 
         const handleCanPlay = () => {
-            if (!video.paused) {
-                setIsBuffering(false);
+            if (!hasActiveSource()) {
+                return;
             }
+
+            hasLoadedDataForSourceRef.current = true;
+            clearBufferingState();
+        };
+
+        const handleCanPlayThrough = () => {
+            if (!hasActiveSource()) {
+                return;
+            }
+
+            hasLoadedDataForSourceRef.current = true;
+            clearBufferingState();
         };
 
         const handleStalled = () => {
+            if (
+                !hasActiveSource()
+                || !hasLoadedDataForSourceRef.current
+                || !hasStartedPlaybackForSourceRef.current
+                || video.paused
+                || video.ended
+            ) {
+                return;
+            }
+
+            const msSinceLastProgress = Date.now() - lastPlaybackProgressAtRef.current;
+            if (lastPlaybackProgressAtRef.current !== 0 && msSinceLastProgress < BUFFERING_STALL_THRESHOLD_MS) {
+                return;
+            }
+
             setIsBuffering(true);
         };
 
         video.addEventListener('timeupdate', handleTimeUpdate);
         video.addEventListener('loadedmetadata', handleLoadedMetadata);
+        video.addEventListener('loadeddata', handleLoadedData);
         video.addEventListener('ended', handleEnded);
         video.addEventListener('seeking', handleSeeking);
         video.addEventListener('seeked', handleSeeked);
         video.addEventListener('waiting', handleWaiting);
         video.addEventListener('playing', handlePlaying);
         video.addEventListener('canplay', handleCanPlay);
+        video.addEventListener('canplaythrough', handleCanPlayThrough);
         video.addEventListener('stalled', handleStalled);
 
         return () => {
             video.removeEventListener('timeupdate', handleTimeUpdate);
             video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            video.removeEventListener('loadeddata', handleLoadedData);
             video.removeEventListener('ended', handleEnded);
             video.removeEventListener('seeking', handleSeeking);
             video.removeEventListener('seeked', handleSeeked);
             video.removeEventListener('waiting', handleWaiting);
             video.removeEventListener('playing', handlePlaying);
             video.removeEventListener('canplay', handleCanPlay);
+            video.removeEventListener('canplaythrough', handleCanPlayThrough);
             video.removeEventListener('stalled', handleStalled);
 
-            if (bufferingTimeoutRef.current) {
-                clearTimeout(bufferingTimeoutRef.current);
-            }
+            resetBufferingTimeout();
         };
-    }, [updatePlaybackSearchParams]);
+    }, [clearBufferingState, loading, resetBufferingTimeout, updatePlaybackSearchParams]);
 
     const handleSpeedChange = (speed) => {
         setPlaybackSpeed(speed);
@@ -690,11 +794,8 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         setIsBuffering(false);
         lastSeekTimeRef.current = 0;
         playbackSeekTargetRef.current = 0; // Reset saat diklik manual dari list agar selalu play dari awal segmen
-        if (bufferingTimeoutRef.current) {
-            clearTimeout(bufferingTimeoutRef.current);
-            bufferingTimeoutRef.current = null;
-        }
-    }, [selectedCamera, updatePlaybackSearchParams]);
+        resetSourcePlaybackState();
+    }, [resetSourcePlaybackState, selectedCamera, updatePlaybackSearchParams]);
 
     const formatTimestamp = (timestamp) => {
         return new Date(timestamp).toLocaleString('id-ID', {

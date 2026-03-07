@@ -43,10 +43,11 @@ vi.mock('../components/playback/PlaybackHeader', () => ({
 }));
 
 vi.mock('../components/playback/PlaybackVideo', () => ({
-    default: ({ selectedSegment, videoRef, isBuffering, autoPlayNotification }) => (
+    default: ({ selectedSegment, videoRef, isBuffering, isSeeking, autoPlayNotification }) => (
         <div>
             <div data-testid="video-segment">{selectedSegment?.id ?? 'none'}</div>
             <div data-testid="buffering-state">{String(isBuffering)}</div>
+            <div data-testid="seeking-state">{String(isSeeking)}</div>
             <div data-testid="autoplay-note">{autoPlayNotification?.message ?? ''}</div>
             <video data-testid="playback-video" ref={videoRef} />
         </div>
@@ -103,6 +104,10 @@ function buildSegments(prefix) {
     ];
 }
 
+function dispatchMediaEvent(element, name) {
+    fireEvent(element, new window.Event(name));
+}
+
 describe('Playback', () => {
     beforeEach(() => {
         getSegments.mockReset();
@@ -153,6 +158,16 @@ describe('Playback', () => {
             },
             set(value) {
                 this._currentTime = value;
+            },
+        });
+
+        Object.defineProperty(HTMLMediaElement.prototype, 'ended', {
+            configurable: true,
+            get() {
+                return this._ended ?? false;
+            },
+            set(value) {
+                this._ended = value;
             },
         });
 
@@ -557,6 +572,231 @@ describe('Playback', () => {
         });
 
         expect(screen.getByTestId('autoplay-note').textContent).toContain('Auto-play gagal');
+    });
+
+    it('waiting setelah playback berjalan dibersihkan oleh progress timeupdate', async () => {
+        render(
+            <TestRouter initialEntries={['/playback?mode=full&view=playback&cam=1']}>
+                <Playback
+                    cameras={[
+                        { id: 1, name: 'Lobby', enable_recording: 1 },
+                    ]}
+                />
+            </TestRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('video-segment').textContent).toBe('seg-2');
+        });
+
+        const video = screen.getByTestId('playback-video');
+        await waitFor(() => {
+            expect(video.getAttribute('src')).toBe('/stream/1/seg-2.mp4');
+        });
+        await act(async () => {
+            await Promise.resolve();
+        });
+        video.currentTime = 1;
+        act(() => {
+            dispatchMediaEvent(video, 'loadeddata');
+            dispatchMediaEvent(video, 'playing');
+        });
+
+        await waitFor(() => {
+            expect(screen.getByTestId('buffering-state').textContent).toBe('false');
+        });
+
+        video.paused = false;
+        act(() => {
+            dispatchMediaEvent(video, 'waiting');
+        });
+        expect(screen.getByTestId('buffering-state').textContent).toBe('true');
+
+        video.currentTime = 2;
+        act(() => {
+            dispatchMediaEvent(video, 'timeupdate');
+        });
+
+        await waitFor(() => {
+            expect(screen.getByTestId('buffering-state').textContent).toBe('false');
+        });
+    });
+
+    it('stalled singkat saat playback aktif dibersihkan oleh progress berikutnya tanpa reload source', async () => {
+        render(
+            <TestRouter initialEntries={['/playback?mode=full&view=playback&cam=1']}>
+                <Playback
+                    cameras={[
+                        { id: 1, name: 'Lobby', enable_recording: 1 },
+                    ]}
+                />
+            </TestRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('video-segment').textContent).toBe('seg-2');
+        });
+
+        const video = screen.getByTestId('playback-video');
+        const initialLoadCalls = HTMLMediaElement.prototype.load.mock.calls.length;
+        await waitFor(() => {
+            expect(video.getAttribute('src')).toBe('/stream/1/seg-2.mp4');
+        });
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        video.currentTime = 1;
+        act(() => {
+            dispatchMediaEvent(video, 'loadeddata');
+            dispatchMediaEvent(video, 'playing');
+        });
+
+        await waitFor(() => {
+            expect(screen.getByTestId('buffering-state').textContent).toBe('false');
+        });
+
+        await act(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 400));
+        });
+
+        video.paused = false;
+        act(() => {
+            dispatchMediaEvent(video, 'stalled');
+        });
+        expect(screen.getByTestId('buffering-state').textContent).toBe('true');
+
+        video.currentTime = 2;
+        act(() => {
+            dispatchMediaEvent(video, 'timeupdate');
+        });
+
+        await waitFor(() => {
+            expect(screen.getByTestId('buffering-state').textContent).toBe('false');
+        });
+        expect(HTMLMediaElement.prototype.load).toHaveBeenCalledTimes(initialLoadCalls);
+    });
+
+    it('startup buffering dibersihkan oleh loadeddata meski playing belum datang', async () => {
+        render(
+            <TestRouter initialEntries={['/playback?mode=full&view=playback&cam=1']}>
+                <Playback
+                    cameras={[
+                        { id: 1, name: 'Lobby', enable_recording: 1 },
+                    ]}
+                />
+            </TestRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('video-segment').textContent).toBe('seg-2');
+        });
+
+        expect(screen.getByTestId('buffering-state').textContent).toBe('true');
+
+        const video = screen.getByTestId('playback-video');
+        await waitFor(() => {
+            expect(video.getAttribute('src')).toBe('/stream/1/seg-2.mp4');
+        });
+        await act(async () => {
+            await Promise.resolve();
+        });
+        act(() => {
+            dispatchMediaEvent(video, 'loadeddata');
+        });
+
+        await waitFor(() => {
+            expect(screen.getByTestId('buffering-state').textContent).toBe('false');
+        });
+    });
+
+    it('seek overlay hilang setelah seek selesai dan progress kembali berjalan', async () => {
+        render(
+            <TestRouter initialEntries={['/playback?mode=full&view=playback&cam=1']}>
+                <Playback
+                    cameras={[
+                        { id: 1, name: 'Lobby', enable_recording: 1 },
+                    ]}
+                />
+            </TestRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('video-segment').textContent).toBe('seg-2');
+        });
+
+        const video = screen.getByTestId('playback-video');
+        await waitFor(() => {
+            expect(video.getAttribute('src')).toBe('/stream/1/seg-2.mp4');
+        });
+        await act(async () => {
+            await Promise.resolve();
+        });
+        video.currentTime = 10;
+        act(() => {
+            dispatchMediaEvent(video, 'seeking');
+        });
+
+        expect(screen.getByTestId('seeking-state').textContent).toBe('true');
+        expect(screen.getByTestId('buffering-state').textContent).toBe('true');
+
+        act(() => {
+            dispatchMediaEvent(video, 'seeked');
+        });
+
+        await waitFor(() => {
+            expect(screen.getByTestId('seeking-state').textContent).toBe('false');
+        });
+
+        video.currentTime = 11;
+        act(() => {
+            dispatchMediaEvent(video, 'timeupdate');
+        });
+
+        await waitFor(() => {
+            expect(screen.getByTestId('buffering-state').textContent).toBe('false');
+        });
+    });
+
+    it('waiting dan stalled saat manual pause tidak memunculkan buffering overlay', async () => {
+        render(
+            <TestRouter initialEntries={['/playback?mode=full&view=playback&cam=1']}>
+                <Playback
+                    cameras={[
+                        { id: 1, name: 'Lobby', enable_recording: 1 },
+                    ]}
+                />
+            </TestRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('video-segment').textContent).toBe('seg-2');
+        });
+
+        const video = screen.getByTestId('playback-video');
+        await waitFor(() => {
+            expect(video.getAttribute('src')).toBe('/stream/1/seg-2.mp4');
+        });
+        await act(async () => {
+            await Promise.resolve();
+        });
+        video.currentTime = 1;
+        act(() => {
+            dispatchMediaEvent(video, 'loadeddata');
+            dispatchMediaEvent(video, 'playing');
+        });
+
+        await waitFor(() => {
+            expect(screen.getByTestId('buffering-state').textContent).toBe('false');
+        });
+
+        video.paused = true;
+        act(() => {
+            dispatchMediaEvent(video, 'waiting');
+            dispatchMediaEvent(video, 'stalled');
+        });
+
+        expect(screen.getByTestId('buffering-state').textContent).toBe('false');
     });
 
 });
