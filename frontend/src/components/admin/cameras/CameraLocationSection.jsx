@@ -13,14 +13,19 @@ export default function CameraLocationSection({
     return (
         <>
             <div className="p-3 bg-sky-50 dark:bg-primary/10 border border-sky-200 dark:border-primary/20 rounded-xl">
-                <div className="flex items-center gap-2 mb-2">
-                    <div className="w-7 h-7 rounded-lg bg-sky-100 dark:bg-primary/20 flex items-center justify-center text-primary-600 dark:text-primary-400 shrink-0">
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
-                            <circle cx="12" cy="11" r="3" />
-                        </svg>
+                <div className="mb-3">
+                    <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-sky-100 dark:bg-primary/20 flex items-center justify-center text-primary-600 dark:text-primary-400 shrink-0">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
+                                <circle cx="12" cy="11" r="3" />
+                            </svg>
+                        </div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Lokasi Kamera</p>
                     </div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Lokasi Kamera</p>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Pilih lokasi dengan GPS atau buka peta untuk menentukan titik kamera.
+                    </p>
                 </div>
                 <Suspense fallback={<div className="h-10 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center"><span className="text-gray-500 dark:text-gray-400 text-xs">Loading...</span></div>}>
                     <LocationPicker

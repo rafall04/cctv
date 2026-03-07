@@ -54,6 +54,13 @@ describe('LocationPicker basemap toggle', () => {
 
         expect(screen.getByText('Belum ada koordinat').className)
             .toContain('dark:text-gray-400');
+        expect(screen.getByTestId('location-picker-collapsed-panel').className)
+            .toContain('dark:bg-gray-900/40');
+        expect(screen.getByRole('button', { name: 'Pilih di Peta' }).className)
+            .toContain('bg-sky-600');
+        expect(screen.getByRole('button', { name: 'GPS' }).className)
+            .toContain('dark:text-emerald-300');
+        expect(screen.queryByRole('button', { name: 'Hapus' })).toBeNull();
 
         fireEvent.click(screen.getByRole('button', { name: /pilih di peta/i }));
 
@@ -61,7 +68,6 @@ describe('LocationPicker basemap toggle', () => {
             expect(screen.getByTestId('location-picker-map-type')).toBeTruthy();
         });
 
-        expect(screen.getByTestId('location-picker-map').className).toContain('location-picker-map');
         expect(screen.getByText('Klik peta untuk pilih lokasi').className).toContain('dark:text-gray-200');
         expect(screen.getByTestId('location-picker-tile-url').textContent)
             .toBe('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}');
@@ -97,6 +103,25 @@ describe('LocationPicker basemap toggle', () => {
         expect(screen.getByText(/Lng: 111.881500/)).toBeTruthy();
         expect(screen.getByTestId('location-picker-marker').textContent)
             .toContain('-7.1507,111.8815');
+    });
+
+    it('menampilkan aksi hapus hanya saat koordinat tersedia dan hierarchy action tetap konsisten', () => {
+        render(
+            <LocationPicker
+                latitude="-7.150700"
+                longitude="111.881500"
+                onLocationChange={vi.fn()}
+            />
+        );
+
+        expect(screen.getByRole('button', { name: 'Hapus' }).className)
+            .toContain('dark:text-red-400');
+        expect(screen.getByRole('button', { name: 'GPS' }).className)
+            .toContain('border-emerald-200');
+        expect(screen.getByRole('button', { name: 'Edit Peta' }).className)
+            .toContain('bg-sky-600');
+        expect(screen.getByTestId('location-picker-actions').className)
+            .toContain('flex-wrap');
     });
 
     it('menjaga pilihan basemap saat map ditutup lalu dibuka kembali dalam sesi yang sama', async () => {
