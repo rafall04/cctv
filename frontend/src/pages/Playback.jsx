@@ -100,6 +100,38 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         selectedCameraIdRef.current = selectedCameraId;
     }, [selectedCameraId]);
 
+    const updatePlaybackSearchParams = useCallback(({
+        camera,
+        cameraId,
+        timestamp,
+        replace = false,
+    }) => {
+        setSearchParams((previous) => {
+            const next = new URLSearchParams(previous);
+            const nextMode = next.get('mode');
+
+            if (!nextMode || !['full', 'simple'].includes(nextMode)) {
+                next.set('mode', 'full');
+            }
+
+            next.set('view', 'playback');
+
+            if (camera) {
+                next.set('cam', createCameraSlug(camera));
+            } else if (cameraId) {
+                next.set('cam', String(cameraId));
+            }
+
+            if (timestamp) {
+                next.set('t', String(timestamp));
+            } else {
+                next.delete('t');
+            }
+
+            return next;
+        }, { replace });
+    }, [setSearchParams]);
+
     const handleAutoPlayToggle = useCallback(() => {
         const newValue = !autoPlayEnabled;
         setAutoPlayEnabled(newValue);
@@ -463,10 +495,11 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
                 setTimeout(() => setAutoPlayNotification(null), 3000);
                 setSelectedSegment(nextSegment);
                 const timestamp = new Date(nextSegment.start_time).getTime();
-                setSearchParams({
-                    cam: selectedCameraIdRef.current?.toString(),
-                    t: timestamp.toString()
-                }, { replace: false });
+                updatePlaybackSearchParams({
+                    cameraId: selectedCameraIdRef.current,
+                    timestamp,
+                    replace: false,
+                });
             } else {
                 setAutoPlayNotification({ type: 'complete', message: 'Playback selesai - tidak ada segment lagi' });
                 setTimeout(() => setAutoPlayNotification(null), 5000);
@@ -549,7 +582,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
                 clearTimeout(bufferingTimeoutRef.current);
             }
         };
-    }, [setSearchParams]);
+    }, [setSearchParams, updatePlaybackSearchParams]);
 
     const handleSpeedChange = (speed) => {
         setPlaybackSpeed(speed);
@@ -560,10 +593,12 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
 
     const handleSegmentClick = useCallback((segment) => {
         const timestamp = new Date(segment.start_time).getTime();
-        setSearchParams({
-            cam: selectedCamera?.id.toString(),
-            t: timestamp.toString()
-        }, { replace: false });
+        updatePlaybackSearchParams({
+            camera: selectedCamera,
+            cameraId: selectedCamera?.id,
+            timestamp,
+            replace: false,
+        });
         setSelectedSegment(segment);
         setSeekWarning(null);
         setAutoPlayNotification(null);
@@ -575,7 +610,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
             clearTimeout(bufferingTimeoutRef.current);
             bufferingTimeoutRef.current = null;
         }
-    }, [selectedCamera, setSearchParams]);
+    }, [selectedCamera, updatePlaybackSearchParams]);
 
     const formatTimestamp = (timestamp) => {
         return new Date(timestamp).toLocaleString('id-ID', {
@@ -723,14 +758,12 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         }
 
         setSelectedCameraId(camera.id);
-        if (camera) {
-            const timestamp = selectedSegment ? new Date(selectedSegment.start_time).getTime().toString() : '';
-            setSearchParams({
-                cam: createCameraSlug(camera),
-                t: timestamp || ''
-            }, { replace: false });
-        }
-    }, [selectedSegment, setSearchParams]);
+        updatePlaybackSearchParams({
+            camera,
+            timestamp: selectedSegment ? new Date(selectedSegment.start_time).getTime() : null,
+            replace: false,
+        });
+    }, [selectedSegment, updatePlaybackSearchParams]);
 
     // Handle share playback link - use timestamp instead of segment ID
     const handleShare = useCallback(async () => {

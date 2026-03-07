@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useLocation } from 'react-router-dom';
 import { TestRouter } from '../test/renderWithRouter';
 import Playback from './Playback';
 
@@ -23,7 +24,16 @@ vi.mock('../contexts/BrandingContext', () => ({
 }));
 
 vi.mock('../components/playback/PlaybackHeader', () => ({
-    default: () => <div>playback-header</div>,
+    default: ({ cameras, onCameraChange }) => (
+        <div>
+            <div>playback-header</div>
+            {cameras[1] && (
+                <button onClick={() => onCameraChange(cameras[1])} type="button">
+                    ganti-kamera
+                </button>
+            )}
+        </div>
+    ),
 }));
 
 vi.mock('../components/playback/PlaybackVideo', () => ({
@@ -41,12 +51,27 @@ vi.mock('../components/playback/PlaybackTimeline', () => ({
 }));
 
 vi.mock('../components/playback/PlaybackSegmentList', () => ({
-    default: ({ selectedSegment }) => <div data-testid="list-segment">{selectedSegment?.id ?? 'none'}</div>,
+    default: ({ selectedSegment, segments, onSegmentClick }) => (
+        <div>
+            <div data-testid="list-segment">{selectedSegment?.id ?? 'none'}</div>
+            {segments[0] && (
+                <button onClick={() => onSegmentClick(segments[0])} type="button">
+                    pilih-segmen-pertama
+                </button>
+            )}
+        </div>
+    ),
 }));
+
+function LocationProbe() {
+    const location = useLocation();
+    return <div data-testid="location-search">{location.search}</div>;
+}
 
 describe('Playback', () => {
     beforeEach(() => {
         getSegments.mockReset();
+        localStorage.clear();
         getSegments.mockResolvedValue({
             success: true,
             data: {
@@ -143,7 +168,8 @@ describe('Playback', () => {
         const closestSegmentTimestamp = Date.parse('2026-03-05T10:18:00.000Z').toString();
 
         render(
-            <TestRouter initialEntries={[`/playback?cam=1&t=${closestSegmentTimestamp}`]}>
+            <TestRouter initialEntries={[`/playback?mode=full&view=playback&cam=1&t=${closestSegmentTimestamp}`]}>
+                <LocationProbe />
                 <Playback
                     cameras={[
                         { id: 1, name: 'Lobby', enable_recording: 1 },
@@ -161,7 +187,8 @@ describe('Playback', () => {
 
     it('stall awal tidak langsung me-reload video dan timeout dibersihkan saat playback pulih', async () => {
         render(
-            <TestRouter initialEntries={['/playback?cam=1']}>
+            <TestRouter initialEntries={['/playback?mode=full&view=playback&cam=1']}>
+                <LocationProbe />
                 <Playback
                     cameras={[
                         { id: 1, name: 'Lobby', enable_recording: 1 },
@@ -174,19 +201,31 @@ describe('Playback', () => {
             expect(screen.getByTestId('video-segment').textContent).toBe('seg-2');
         });
 
+        await act(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 50));
+        });
+
         const video = screen.getByTestId('playback-video');
         const initialLoadCalls = HTMLMediaElement.prototype.load.mock.calls.length;
 
         video.readyState = 2;
-        fireEvent.stalled(video);
+        act(() => {
+            fireEvent.stalled(video);
+        });
 
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        await act(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+        });
         expect(HTMLMediaElement.prototype.load).toHaveBeenCalledTimes(initialLoadCalls);
 
         video.readyState = 4;
-        fireEvent.playing(video);
+        act(() => {
+            fireEvent.playing(video);
+        });
 
-        await new Promise((resolve) => setTimeout(resolve, 7000));
+        await act(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 7000));
+        });
         expect(HTMLMediaElement.prototype.load).toHaveBeenCalledTimes(initialLoadCalls);
         expect(screen.getByTestId('buffering-state').textContent).toBe('false');
     }, 15000);
@@ -197,7 +236,8 @@ describe('Playback', () => {
         ];
 
         const { rerender } = render(
-            <TestRouter initialEntries={['/playback?cam=1']}>
+            <TestRouter initialEntries={['/playback?mode=simple&view=playback&cam=1']}>
+                <LocationProbe />
                 <Playback cameras={initialCameras} />
             </TestRouter>
         );
@@ -210,7 +250,8 @@ describe('Playback', () => {
         const initialLoadCalls = HTMLMediaElement.prototype.load.mock.calls.length;
 
         rerender(
-            <TestRouter initialEntries={['/playback?cam=1']}>
+            <TestRouter initialEntries={['/playback?mode=simple&view=playback&cam=1']}>
+                <LocationProbe />
                 <Playback
                     cameras={[
                         { id: 1, name: 'Lobby Refresh', enable_recording: 1, location: 'Area B' },
@@ -226,5 +267,44 @@ describe('Playback', () => {
         expect(screen.getByTestId('list-segment').textContent).toBe('seg-2');
         expect(getSegments).toHaveBeenCalledTimes(initialGetSegmentsCalls);
         expect(HTMLMediaElement.prototype.load).toHaveBeenCalledTimes(initialLoadCalls);
+        expect(screen.getByTestId('location-search').textContent).toContain('view=playback');
+        expect(screen.getByTestId('location-search').textContent).toContain('mode=simple');
     });
+
+    it('tetap di playback saat ganti kamera dan pilih segmen', async () => {
+        render(
+            <TestRouter initialEntries={['/playback?mode=full&view=playback&cam=1']}>
+                <LocationProbe />
+                <Playback
+                    cameras={[
+                        { id: 1, name: 'Lobby', enable_recording: 1, location: 'Area A' },
+                        { id: 2, name: 'Gate', enable_recording: 1, location: 'Area B' },
+                    ]}
+                />
+            </TestRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('video-segment').textContent).toBe('seg-2');
+        });
+
+        fireEvent.click(screen.getByText('ganti-kamera'));
+
+        await waitFor(() => {
+            expect(screen.getByTestId('location-search').textContent).toContain('view=playback');
+        });
+
+        expect(screen.getByTestId('location-search').textContent).toContain('mode=full');
+        expect(screen.getByTestId('location-search').textContent).toContain('cam=2-gate');
+
+        fireEvent.click(screen.getByText('pilih-segmen-pertama'));
+
+        await waitFor(() => {
+            expect(screen.getByTestId('location-search').textContent).toContain('view=playback');
+        });
+
+        expect(screen.getByTestId('location-search').textContent).toContain('mode=full');
+        expect(screen.getByTestId('location-search').textContent).toContain('t=');
+    });
+
 });
