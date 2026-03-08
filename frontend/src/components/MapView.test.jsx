@@ -187,6 +187,11 @@ describe('MapView area filter visibility', () => {
     beforeEach(() => {
         vi.useRealTimers();
         window.URL.createObjectURL = vi.fn(() => 'blob:test');
+        Object.defineProperty(document, 'fullscreenElement', {
+            configurable: true,
+            writable: true,
+            value: null,
+        });
         fitBoundsMock.mockReset();
         setViewMock.mockReset();
         startSessionMock.mockClear();
@@ -239,6 +244,82 @@ describe('MapView area filter visibility', () => {
         });
 
         expect(screen.queryByText(/Perbaikan/i)).toBeNull();
+    });
+
+    it('langsung menampilkan status perbaikan saat kamera maintenance dibuka dari map tanpa loading', async () => {
+        await act(async () => {
+            render(<MapView cameras={statusCameras} areas={[]} showAreaFilter={false} />);
+        });
+
+        fireEvent.click(screen.getByTestId('marker--7.151-111.8818'));
+
+        await waitFor(() => {
+            expect(screen.getByText('Dalam Perbaikan')).toBeTruthy();
+        });
+
+        expect(screen.getByText('Perbaikan')).toBeTruthy();
+        expect(screen.queryByText('Menghubungkan...')).toBeNull();
+        expect(screen.queryByTitle('Zoom In')).toBeNull();
+        expect(screen.queryByTitle('Fullscreen')).toBeNull();
+        expect(screen.getByTitle('Tutup')).toBeTruthy();
+        expect(startSessionMock).not.toHaveBeenCalledWith(4);
+    });
+
+    it('langsung menampilkan status offline saat kamera offline dibuka dari map tanpa loading', async () => {
+        await act(async () => {
+            render(<MapView cameras={statusCameras} areas={[]} showAreaFilter={false} />);
+        });
+
+        fireEvent.click(screen.getByTestId('marker--7.1509-111.8817'));
+
+        await waitFor(() => {
+            expect(screen.getByText('Kamera Offline')).toBeTruthy();
+        });
+
+        expect(screen.getByText('Offline')).toBeTruthy();
+        expect(screen.queryByText('Menghubungkan...')).toBeNull();
+        expect(screen.queryByTitle('Zoom In')).toBeNull();
+        expect(screen.queryByTitle('Fullscreen')).toBeNull();
+        expect(screen.getByTitle('Tutup')).toBeTruthy();
+        expect(startSessionMock).not.toHaveBeenCalledWith(3);
+    });
+
+    it('menampilkan status perbaikan yang benar pada top bar fullscreen map', async () => {
+        await act(async () => {
+            render(<MapView cameras={statusCameras} areas={[]} showAreaFilter={false} />);
+        });
+
+        fireEvent.click(screen.getByTestId('marker--7.151-111.8818'));
+
+        await waitFor(() => {
+            expect(screen.getByText('Dalam Perbaikan')).toBeTruthy();
+        });
+
+        document.fullscreenElement = {};
+        fireEvent(document, new Event('fullscreenchange'));
+
+        await waitFor(() => {
+            expect(screen.getByText('PERBAIKAN')).toBeTruthy();
+        });
+    });
+
+    it('menampilkan status offline yang benar pada top bar fullscreen map', async () => {
+        await act(async () => {
+            render(<MapView cameras={statusCameras} areas={[]} showAreaFilter={false} />);
+        });
+
+        fireEvent.click(screen.getByTestId('marker--7.1509-111.8817'));
+
+        await waitFor(() => {
+            expect(screen.getByText('Kamera Offline')).toBeTruthy();
+        });
+
+        document.fullscreenElement = {};
+        fireEvent(document, new Event('fullscreenchange'));
+
+        await waitFor(() => {
+            expect(screen.getByText('OFFLINE')).toBeTruthy();
+        });
     });
 
     it('mengikuti area baru setelah marker dibuka lalu area internal diganti', async () => {

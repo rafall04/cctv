@@ -43,6 +43,44 @@ const getLoadingMessage = (stage) => {
     }
 };
 
+const getModalInitialStatus = (camera) => {
+    if (camera?.status === 'maintenance') return 'maintenance';
+    if (camera?.is_online === 0) return 'offline';
+    return 'connecting';
+};
+
+const getModalStatusBadge = ({ status, isTunnel, loadingStage }) => {
+    if (status === 'maintenance') {
+        return {
+            label: 'PERBAIKAN',
+            color: 'bg-red-500/20 text-red-400',
+            dotColor: 'bg-red-400',
+        };
+    }
+
+    if (status === 'offline') {
+        return {
+            label: 'OFFLINE',
+            color: 'bg-gray-500/20 text-gray-400',
+            dotColor: 'bg-gray-400',
+        };
+    }
+
+    if (status === 'playing') {
+        return {
+            label: 'LIVE',
+            color: isTunnel ? 'bg-orange-500/20 text-orange-400' : 'bg-emerald-500/20 text-emerald-400',
+            dotColor: isTunnel ? 'bg-orange-400' : 'bg-emerald-400',
+        };
+    }
+
+    return {
+        label: getLoadingMessage(loadingStage).toUpperCase(),
+        color: 'bg-sky-500/20 text-sky-400',
+        dotColor: 'bg-sky-400',
+    };
+};
+
 // Cache icon untuk menghindari pembuatan ulang
 const iconCache = new Map();
 
@@ -173,10 +211,16 @@ const VideoModal = memo(({ camera, onClose }) => {
     const transformThrottleRef = useRef(null);
     const playbackCheckRef = useRef(null);
     const { branding } = useBranding();
+    const isMaintenance = camera.status === 'maintenance';
+    const isOffline = camera.is_online === 0;
+    const isTunnel = camera.is_tunnel === 1 || camera.is_tunnel === true;
+    const isNonPlayable = isMaintenance || isOffline;
 
     // Status: 'connecting' | 'loading' | 'buffering' | 'playing' | 'maintenance' | 'offline' | 'error'
-    const [status, setStatus] = useState('connecting');
-    const [loadingStage, setLoadingStage] = useState(LoadingStage.CONNECTING);
+    const [status, setStatus] = useState(() => getModalInitialStatus(camera));
+    const [loadingStage, setLoadingStage] = useState(
+        isNonPlayable ? LoadingStage.ERROR : LoadingStage.CONNECTING
+    );
     const [errorType, setErrorType] = useState(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [snapshotNotification, setSnapshotNotification] = useState(null);
@@ -189,10 +233,7 @@ const VideoModal = memo(({ camera, onClose }) => {
         zoom: 1, panX: 0, panY: 0,
         dragging: false, startX: 0, startY: 0, startPanX: 0, startPanY: 0
     });
-
-    const isMaintenance = camera.status === 'maintenance';
-    const isOffline = camera.is_online === 0;
-    const isTunnel = camera.is_tunnel === 1 || camera.is_tunnel === true;
+    const statusBadge = getModalStatusBadge({ status, isTunnel, loadingStage });
     const MIN_ZOOM = 1;
     const MAX_ZOOM = 4;
 
@@ -284,7 +325,7 @@ const VideoModal = memo(({ camera, onClose }) => {
         } catch (err) {
             console.error('Fullscreen error:', err);
         }
-    }, []);
+    }, [handleResetZoom]);
 
     // Screenshot/snapshot with watermark
     const takeSnapshot = useCallback(async () => {
@@ -423,13 +464,17 @@ const VideoModal = memo(({ camera, onClose }) => {
         const s = stateRef.current;
         s.dragging = false;
         if (videoWrapperRef.current) videoWrapperRef.current.style.cursor = s.zoom > 1 ? 'grab' : 'default';
-        try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { }
+        try {
+            e.currentTarget.releasePointerCapture(e.pointerId);
+        } catch (error) {
+            // Ignore pointer capture release errors from already-released pointers
+        }
     }, []);
 
     // Viewer session tracking - track when user starts/stops watching
     useEffect(() => {
         // Don't track if camera is offline or in maintenance
-        if (isMaintenance || isOffline) return;
+        if (isNonPlayable) return;
 
         let sessionId = null;
 
@@ -452,12 +497,20 @@ const VideoModal = memo(({ camera, onClose }) => {
                 });
             }
         };
-    }, [camera.id, isMaintenance, isOffline]);
+    }, [camera.id, isNonPlayable]);
 
     // HLS setup - dengan progressive loading stages seperti grid view
     useEffect(() => {
-        if (isMaintenance) { setStatus('maintenance'); return; }
-        if (isOffline) { setStatus('offline'); return; }
+        if (isMaintenance) {
+            setStatus('maintenance');
+            setLoadingStage(LoadingStage.ERROR);
+            return;
+        }
+        if (isOffline) {
+            setStatus('offline');
+            setLoadingStage(LoadingStage.ERROR);
+            return;
+        }
         if (!camera?.streams?.hls || !videoRef.current) return;
 
         const video = videoRef.current;
@@ -765,7 +818,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                     )}
 
                     {/* Video with zoom/pan transform - optimized */}
-                    {!isMaintenance && (
+                    {!isNonPlayable && (
                         <div
                             ref={videoWrapperRef}
                             className="w-full h-full"
@@ -813,9 +866,9 @@ const VideoModal = memo(({ camera, onClose }) => {
                                         {camera.video_codec && (
                                             <CodecBadge codec={camera.video_codec} size="sm" showWarning={true} />
                                         )}
-                                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold text-white shadow bg-emerald-500/20">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                                            {status === 'playing' ? 'LIVE' : 'LOADING'}
+                                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold shadow ${statusBadge.color}`}>
+                                            <span className={`w-1.5 h-1.5 rounded-full ${statusBadge.dotColor}`} />
+                                            {statusBadge.label}
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -836,42 +889,44 @@ const VideoModal = memo(({ camera, onClose }) => {
                             </div>
 
                             {/* Bottom controls - Zoom only */}
-                            <div className="absolute bottom-4 right-4 z-50 flex items-center gap-1 bg-gray-200/90 dark:bg-gray-900/80 rounded-xl p-1 pointer-events-auto">
-                                <button
-                                    onClick={handleZoomOut}
-                                    disabled={zoomDisplay <= MIN_ZOOM}
-                                    className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 disabled:opacity-30 rounded-lg text-gray-900 dark:text-white"
-                                >
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
-                                    </svg>
-                                </button>
-                                <span className="text-gray-900 dark:text-white text-xs font-medium w-12 text-center">{Math.round(zoomDisplay * 100)}%</span>
-                                <button
-                                    onClick={handleZoomIn}
-                                    disabled={zoomDisplay >= MAX_ZOOM}
-                                    className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 disabled:opacity-30 rounded-lg text-gray-900 dark:text-white"
-                                >
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
-                                    </svg>
-                                </button>
-                                {zoomDisplay > 1 && (
+                            {!isNonPlayable && status !== 'error' && (
+                                <div className="absolute bottom-4 right-4 z-50 flex items-center gap-1 bg-gray-200/90 dark:bg-gray-900/80 rounded-xl p-1 pointer-events-auto">
                                     <button
-                                        onClick={handleResetZoom}
-                                        className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 rounded-lg text-gray-900 dark:text-white ml-1"
+                                        onClick={handleZoomOut}
+                                        disabled={zoomDisplay <= MIN_ZOOM}
+                                        className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 disabled:opacity-30 rounded-lg text-gray-900 dark:text-white"
                                     >
                                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                            <path d="M1 4v6h6" /><path d="M3.51 15a9 9 0 102.13-9.36L1 10" />
+                                            <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
                                         </svg>
                                     </button>
-                                )}
-                            </div>
+                                    <span className="text-gray-900 dark:text-white text-xs font-medium w-12 text-center">{Math.round(zoomDisplay * 100)}%</span>
+                                    <button
+                                        onClick={handleZoomIn}
+                                        disabled={zoomDisplay >= MAX_ZOOM}
+                                        className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 disabled:opacity-30 rounded-lg text-gray-900 dark:text-white"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
+                                        </svg>
+                                    </button>
+                                    {zoomDisplay > 1 && (
+                                        <button
+                                            onClick={handleResetZoom}
+                                            className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 rounded-lg text-gray-900 dark:text-white ml-1"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path d="M1 4v6h6" /><path d="M3.51 15a9 9 0 102.13-9.36L1 10" />
+                                            </svg>
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
 
                     {/* Zoom hint */}
-                    {zoomDisplay > 1 && (
+                    {!isNonPlayable && zoomDisplay > 1 && (
                         <div className="absolute bottom-2 left-2 px-2 py-1 bg-gray-200/80 dark:bg-gray-900/60 text-gray-900 dark:text-white text-xs rounded-lg z-20">
                             Geser untuk pan
                         </div>
@@ -892,8 +947,9 @@ const VideoModal = memo(({ camera, onClose }) => {
                         </div>
 
                         {/* Controls: Zoom + Screenshot + Fullscreen + Close */}
-                        {!isMaintenance && status !== 'error' && (
-                            <div className="flex items-center gap-1 shrink-0">
+                        <div className="flex items-center gap-1 shrink-0">
+                            {!isNonPlayable && status !== 'error' && (
+                                <>
                                 {/* Zoom Controls */}
                                 <div className="flex items-center gap-0.5 bg-gray-200/90 dark:bg-gray-800 rounded-lg p-0.5">
                                     <button
@@ -959,19 +1015,20 @@ const VideoModal = memo(({ camera, onClose }) => {
                                         )}
                                     </svg>
                                 </button>
+                                </>
+                            )}
 
-                                {/* Close Button */}
-                                <button
-                                    onClick={onClose}
-                                    className="p-1.5 bg-gray-200/80 dark:bg-gray-800 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded-lg text-gray-900 dark:text-white transition-colors"
-                                    title="Tutup"
-                                >
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            </div>
-                        )}
+                            {/* Close Button */}
+                            <button
+                                onClick={onClose}
+                                className="p-1.5 bg-gray-200/80 dark:bg-gray-800 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded-lg text-gray-900 dark:text-white transition-colors"
+                                title="Tutup"
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
                     </div>
 
                     {/* Codec Description - Simpel dan Jelas */}
