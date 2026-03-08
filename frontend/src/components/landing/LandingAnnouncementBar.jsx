@@ -5,19 +5,16 @@ const STYLE_CLASSES = {
         wrapper: 'border-sky-200/70 bg-sky-50/90 text-sky-800 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-200',
         icon: 'text-sky-500 dark:text-sky-300',
         accent: 'bg-sky-500',
-        fade: 'from-sky-50/95 via-sky-50/70 to-transparent dark:from-gray-950/95 dark:via-gray-950/70',
     },
     warning: {
         wrapper: 'border-amber-200/80 bg-amber-50/90 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200',
         icon: 'text-amber-500 dark:text-amber-300',
         accent: 'bg-amber-500',
-        fade: 'from-amber-50/95 via-amber-50/70 to-transparent dark:from-gray-950/95 dark:via-gray-950/70',
     },
     success: {
         wrapper: 'border-emerald-200/80 bg-emerald-50/90 text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200',
         icon: 'text-emerald-500 dark:text-emerald-300',
         accent: 'bg-emerald-500',
-        fade: 'from-emerald-50/95 via-emerald-50/70 to-transparent dark:from-gray-950/95 dark:via-gray-950/70',
     },
 };
 
@@ -134,24 +131,20 @@ export default function LandingAnnouncementBar({ announcement, layoutMode = 'ful
                                 data-testid={`landing-announcement-content-${layoutMode}`}
                             >
                                 {shouldTicker ? (
-                                    <>
-                                        <div className={`pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-gradient-to-r ${theme.fade}`}></div>
-                                        <div className={`pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l ${theme.fade}`}></div>
+                                    <div
+                                        className="announcement-marquee"
+                                        data-testid={`landing-announcement-ticker-${layoutMode}`}
+                                    >
                                         <div
-                                            className="announcement-marquee group-hover:[animation-play-state:paused]"
-                                            data-testid={`landing-announcement-ticker-${layoutMode}`}
+                                            className="announcement-marquee-track"
+                                            style={{ '--announcement-marquee-duration': marqueeDuration }}
                                         >
-                                            <div
-                                                className="announcement-marquee-track"
-                                                style={{ '--announcement-marquee-duration': marqueeDuration }}
-                                            >
-                                                <span className="announcement-marquee-item">{announcement.text}</span>
-                                                <span aria-hidden="true" className="announcement-marquee-item">
-                                                    {announcement.text}
-                                                </span>
-                                            </div>
+                                            <span className="announcement-marquee-item">{announcement.text}</span>
+                                            <span aria-hidden="true" className="announcement-marquee-item">
+                                                {announcement.text}
+                                            </span>
                                         </div>
-                                    </>
+                                    </div>
                                 ) : (
                                     <p
                                         className="announcement-static-copy text-sm leading-5 text-gray-700 dark:text-gray-200"

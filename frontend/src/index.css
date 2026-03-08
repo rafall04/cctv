@@ -196,7 +196,7 @@
     display: inline-flex;
     align-items: center;
     min-width: max-content;
-    gap: 3rem;
+    gap: 4rem;
     animation: announcementMarquee var(--announcement-marquee-duration, 18s) linear infinite;
     will-change: transform;
 }
@@ -213,6 +213,7 @@
     font-size: 0.875rem;
     line-height: 1.5rem;
     color: rgb(55 65 81);
+    padding-right: 0.25rem;
 }
 
 .dark .announcement-marquee-item {

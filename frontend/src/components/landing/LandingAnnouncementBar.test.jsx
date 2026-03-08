@@ -57,6 +57,13 @@ describe('LandingAnnouncementBar', () => {
         await waitFor(() => {
             expect(screen.getByTestId('landing-announcement-ticker-full')).toBeTruthy();
         });
+
+        expect(
+            screen.queryByTestId('landing-announcement-fade-left-full')
+        ).toBeNull();
+        expect(
+            screen.queryByTestId('landing-announcement-fade-right-full')
+        ).toBeNull();
     });
 
     it('fallback ke teks statis saat reduced motion aktif', async () => {
