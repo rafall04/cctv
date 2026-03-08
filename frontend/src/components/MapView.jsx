@@ -669,7 +669,8 @@ const VideoModal = memo(({ camera, onClose }) => {
         >
             <div
                 ref={modalRef}
-                className={`bg-white dark:bg-gray-900 overflow-hidden shadow-2xl border border-gray-200 dark:border-gray-800 ${isFullscreen ? 'w-full h-full' : 'rounded-xl w-full max-w-4xl'}`}
+                className={`bg-white dark:bg-gray-900 overflow-hidden shadow-2xl border border-gray-200 dark:border-gray-800 flex flex-col ${isFullscreen ? 'w-full h-full' : 'rounded-xl w-full max-w-4xl'}`}
+                style={isFullscreen ? undefined : { maxHeight: 'calc(100vh - 16px)' }}
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header Info - di atas video (hide in fullscreen) */}
@@ -722,10 +723,11 @@ const VideoModal = memo(({ camera, onClose }) => {
 
                 {/* Video Container - optimized dengan pointer events, no aspect-video constraint untuk support 4:3 */}
                 <div
-                    className={`relative bg-gray-100 dark:bg-black overflow-hidden ${isFullscreen ? 'w-full h-full' : 'w-full'}`}
+                    data-testid="map-video-body"
+                    className={`relative bg-gray-100 dark:bg-black overflow-hidden ${isFullscreen ? 'flex-1 min-h-0 w-full h-full' : 'w-full min-h-[220px] sm:min-h-[280px] md:min-h-[340px]'}`}
                     style={{
                         touchAction: 'none',
-                        aspectRatio: isFullscreen ? 'auto' : 'auto'
+                        aspectRatio: isFullscreen ? 'auto' : '16 / 7'
                     }}
                     onWheel={handleWheel}
                     onPointerDown={handlePointerDown}
