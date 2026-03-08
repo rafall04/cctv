@@ -124,8 +124,8 @@ export default function LandingPageSimple({
                 onLayoutToggle={onLayoutToggle}
             />
 
-            <LandingAnnouncementBar announcement={announcement} layoutMode="simple" />
             <LandingEventBanner banner={eventBanner} layoutMode="simple" />
+            <LandingAnnouncementBar announcement={announcement} layoutMode="simple" />
 
             <main className="flex-1 min-h-0 pb-4 sm:pb-6">
                 {CamerasSection && (

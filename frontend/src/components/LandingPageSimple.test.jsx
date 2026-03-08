@@ -72,6 +72,11 @@ describe('LandingPageSimple footer layout', () => {
         expect(screen.getByTestId('landing-announcement-simple')).toBeTruthy();
         expect(screen.getByTestId('landing-event-banner-simple')).toBeTruthy();
         expect(screen.getByText('Ramadan Kareem')).toBeTruthy();
+        expect(
+            screen.getByTestId('landing-event-banner-simple').compareDocumentPosition(
+                screen.getByTestId('landing-announcement-simple')
+            ) & Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy();
         expect(screen.getAllByText('RAF NET').length).toBeGreaterThan(0);
         expect(screen.getByRole('tab', { name: /full/i })).not.toBeNull();
         expect(screen.getByRole('tab', { name: /simple/i })).not.toBeNull();

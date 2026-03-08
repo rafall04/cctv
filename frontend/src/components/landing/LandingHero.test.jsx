@@ -22,16 +22,6 @@ const landingSettings = {
     area_coverage: 'Area coverage aktif',
 };
 
-const eventBanner = {
-    enabled: true,
-    title: 'Ramadan Kareem',
-    text: 'Selamat menunaikan ibadah puasa.',
-    theme: 'ramadan',
-    show_in_full: true,
-    show_in_simple: true,
-    isActive: true,
-};
-
 describe('LandingHero', () => {
     it('merender stack badge hero secara vertikal', () => {
         render(
@@ -39,19 +29,17 @@ describe('LandingHero', () => {
                 branding={baseBranding}
                 landingSettings={landingSettings}
                 disableHeavyEffects
-                eventBanner={eventBanner}
             />
         );
 
         const stack = screen.getByTestId('landing-hero-badge-stack');
         expect(stack.className).toContain('flex-col');
-        expect(screen.getByTestId('landing-event-banner-full')).toBeTruthy();
-        expect(screen.getByText('Ramadan Kareem')).not.toBeNull();
         expect(screen.getByText('Powered by RAF NET')).not.toBeNull();
         expect(screen.getByText('LIVE STREAMING 24 JAM')).not.toBeNull();
         expect(screen.queryByText('Streaming HD')).toBeNull();
         expect(screen.queryByText('Multi-View')).toBeNull();
         expect(screen.queryByText('Playback')).toBeNull();
+        expect(screen.queryByTestId('landing-event-banner-full')).toBeNull();
     });
 
     it('tidak merender powered by saat dinonaktifkan', () => {
@@ -60,7 +48,6 @@ describe('LandingHero', () => {
                 branding={{ ...baseBranding, show_powered_by: 'false' }}
                 landingSettings={landingSettings}
                 disableHeavyEffects
-                eventBanner={eventBanner}
             />
         );
 

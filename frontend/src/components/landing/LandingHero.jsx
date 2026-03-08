@@ -1,7 +1,6 @@
 import LandingStatsBar from './LandingStatsBar';
-import LandingEventBanner from './LandingEventBanner';
 
-export default function Hero({ branding, landingSettings, disableHeavyEffects, onCameraClick, eventBanner }) {
+export default function Hero({ branding, landingSettings, disableHeavyEffects, onCameraClick }) {
     return (
         <header className="relative overflow-hidden bg-gradient-to-br from-amber-50/80 via-transparent to-emerald-50/80 dark:from-amber-950/30 dark:via-transparent dark:to-emerald-950/30">
             {!disableHeavyEffects && (
@@ -22,7 +21,6 @@ export default function Hero({ branding, landingSettings, disableHeavyEffects, o
             )}
 
             <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 text-center">
-                <LandingEventBanner banner={eventBanner} layoutMode="full" />
                 <div
                     data-testid="landing-hero-badge-stack"
                     className="mx-auto mb-6 flex max-w-sm flex-col items-center gap-2.5 sm:gap-3"

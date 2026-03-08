@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { waitFor, act } from '@testing-library/react';
+import { screen, waitFor, act } from '@testing-library/react';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { renderWithRouter } from '../test/renderWithRouter';
 import LandingPage from './LandingPage';
@@ -84,7 +84,7 @@ vi.mock('../components/landing/LandingFooter', () => ({
 }));
 
 vi.mock('../components/landing/LandingHero', () => ({
-    default: () => <div>hero</div>,
+    default: () => <div data-testid="landing-hero">hero</div>,
 }));
 
 vi.mock('../components/landing/LandingCamerasSection', () => ({
@@ -96,7 +96,20 @@ vi.mock('../components/landing/LandingStatsBar', () => ({
 }));
 
 vi.mock('../components/LandingPageSimple', () => ({
-    default: () => <div>landing-simple</div>,
+    default: ({ announcement, eventBanner }) => (
+        <div>
+            <div data-testid="landing-simple-event">{eventBanner?.title || 'no-event'}</div>
+            <div data-testid="landing-simple-announcement">{announcement?.title || 'no-announcement'}</div>
+        </div>
+    ),
+}));
+
+vi.mock('../components/landing/LandingAnnouncementBar', () => ({
+    default: ({ layoutMode }) => <div data-testid={`announcement-${layoutMode}`}>announcement</div>,
+}));
+
+vi.mock('../components/landing/LandingEventBanner', () => ({
+    default: ({ layoutMode }) => <div data-testid={`event-banner-${layoutMode}`}>event-banner</div>,
 }));
 
 vi.mock('../components/MultiView/MultiViewButton', () => ({
@@ -134,7 +147,26 @@ describe('LandingPage connectivity recovery', () => {
             success: true,
             data: { enabled: false, saweria_link: null },
         });
-        getPublicLandingPageSettings.mockResolvedValue({ success: false });
+        getPublicLandingPageSettings.mockResolvedValue({
+            success: true,
+            data: {
+                area_coverage: 'Coverage',
+                hero_badge: 'Live',
+                section_title: 'CCTV Publik',
+                eventBanner: {
+                    title: 'Ramadan Kareem',
+                    show_in_full: true,
+                    show_in_simple: true,
+                    isActive: true,
+                },
+                announcement: {
+                    title: 'Info Layanan',
+                    show_in_full: true,
+                    show_in_simple: true,
+                    isActive: true,
+                },
+            },
+        });
 
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
             json: async () => ({ success: false }),
@@ -185,4 +217,23 @@ describe('LandingPage connectivity recovery', () => {
             expect(testBackendReachability).toHaveBeenCalledTimes(2);
         });
     }, 10000);
+
+    it('merender event banner sebelum announcement pada full mode', async () => {
+        renderWithRouter(<LandingPage />);
+
+        await waitFor(() => {
+            expect(screen.getByTestId('event-banner-full')).toBeTruthy();
+        });
+
+        expect(
+            screen.getByTestId('event-banner-full').compareDocumentPosition(
+                screen.getByTestId('announcement-full')
+            ) & Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy();
+        expect(
+            screen.getByTestId('announcement-full').compareDocumentPosition(
+                screen.getByTestId('landing-hero')
+            ) & Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy();
+    });
 });

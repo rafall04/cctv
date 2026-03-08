@@ -249,7 +249,7 @@ export default function GeneralSettingsPanel() {
 
                 <SectionCard
                     title="Event Banner"
-                    description="Banner tematik untuk momen seperti Ramadan, Idul Fitri, atau event khusus."
+                    description="Banner tematik untuk momen seperti Ramadan, Idul Fitri, atau event khusus. Selalu tampil paling atas di area landing page."
                 >
                     <CheckboxField
                         id="event_banner_enabled"
@@ -345,7 +345,7 @@ export default function GeneralSettingsPanel() {
 
                 <SectionCard
                     title="Announcement Bar"
-                    description="Bar informasi operasional yang muncul rapi di bawah header landing page."
+                    description="Bar informasi operasional yang muncul tepat di bawah event banner. Text akan berjalan otomatis jika terlalu panjang."
                 >
                     <CheckboxField
                         id="announcement_enabled"
@@ -448,13 +448,13 @@ export default function GeneralSettingsPanel() {
                         <div>
                             <span className="font-medium">Event Banner:</span>{' '}
                             {settings.event_banner_enabled
-                                ? `${settings.event_banner_title || 'Tanpa judul'} - ${settings.event_banner_text || 'Belum ada isi'}`
+                                ? `Paling atas - ${settings.event_banner_title || 'Tanpa judul'} - ${settings.event_banner_text || 'Belum ada isi'}`
                                 : 'Nonaktif'}
                         </div>
                         <div>
                             <span className="font-medium">Announcement:</span>{' '}
                             {settings.announcement_enabled
-                                ? `${settings.announcement_title || 'Pengumuman'} - ${settings.announcement_text || 'Belum ada isi'}`
+                                ? `Di bawah event banner - ${settings.announcement_title || 'Pengumuman'} - ${settings.announcement_text || 'Belum ada isi'}`
                                 : 'Nonaktif'}
                         </div>
                     </div>

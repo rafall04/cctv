@@ -58,7 +58,7 @@ export default function LandingEventBanner({ banner, layoutMode = 'full' }) {
                                     {banner.title}
                                 </div>
                             )}
-                            <p className={`${banner.title ? 'mt-2' : ''} text-sm font-medium leading-relaxed text-gray-900 dark:text-white ${isSimple ? '' : 'sm:text-base'}`}>
+                            <p className={`event-banner-copy ${banner.title ? 'mt-2' : ''} text-sm font-medium leading-relaxed text-gray-900 dark:text-white ${isSimple ? '' : 'sm:text-base'}`}>
                                 {banner.text}
                             </p>
                         </div>
