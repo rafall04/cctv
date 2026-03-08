@@ -17,6 +17,10 @@ import { createCameraSlug } from '../../utils/slugify';
 import { buildPublicCameraShareUrl } from '../../utils/publicShareUrl';
 import PublicStreamStatusOverlay from '../PublicStreamStatusOverlay.jsx';
 import {
+    getPublicPopupBodyStyle,
+    getVideoAspectRatio,
+} from '../../utils/publicPopupLayout.js';
+import {
     getPublicPopupErrorType,
     getPublicPopupInitialStatus,
     getPublicPopupOverlayState,
@@ -105,6 +109,7 @@ function VideoPopup({ camera, onClose }) {
     const [autoRetryCount, setAutoRetryCount] = useState(0);
     const [consecutiveFailures, setConsecutiveFailures] = useState(0);
     const [showTroubleshooting, setShowTroubleshooting] = useState(false);
+    const [videoAspectRatio, setVideoAspectRatio] = useState(null);
 
     const url = camera.streams?.hls;
     const deviceTier = detectDeviceTier();
@@ -116,6 +121,24 @@ function VideoPopup({ camera, onClose }) {
     useEffect(() => {
         autoRetryCountRef.current = autoRetryCount;
     }, [autoRetryCount]);
+
+    const syncVideoAspectRatio = useCallback(() => {
+        const nextAspectRatio = getVideoAspectRatio(videoRef.current);
+        if (nextAspectRatio) {
+            setVideoAspectRatio(nextAspectRatio);
+        }
+    }, []);
+    const requestVideoPlay = useCallback((target = videoRef.current) => {
+        if (!target?.play) return;
+        try {
+            const playAttempt = target.play();
+            if (playAttempt?.catch) {
+                playAttempt.catch(() => { });
+            }
+        } catch {
+            // Ignore autoplay/runtime failures; popup state machine handles recoverable errors separately.
+        }
+    }, []);
 
     // Track fullscreen state to disable animations and unlock orientation on exit
     useEffect(() => {
@@ -264,6 +287,7 @@ function VideoPopup({ camera, onClose }) {
         abortControllerRef.current = new AbortController();
         setStatus('connecting');
         setLoadingStage(LoadingStage.CONNECTING);
+        setVideoAspectRatio(null);
 
         // Start loading timeout - **Validates: Requirements 1.1**
         startTimeout(LoadingStage.CONNECTING);
@@ -278,6 +302,7 @@ function VideoPopup({ camera, onClose }) {
             setLoadingStage(LoadingStage.PLAYING);
             // Clear timeout on success
             clearStreamTimeout();
+            syncVideoAspectRatio();
             resetFailures();
             if (fallbackHandlerRef.current) {
                 fallbackHandlerRef.current.reset();
@@ -302,7 +327,7 @@ function VideoPopup({ camera, onClose }) {
                         handlePlaying();
                     } else {
                         // Try to play again
-                        video.play().catch(() => { });
+                        requestVideoPlay(video);
                     }
                 }
             }, 500);
@@ -316,7 +341,13 @@ function VideoPopup({ camera, onClose }) {
             setLoadingStage(LoadingStage.ERROR);
         };
 
+        const handleLoadedMetadata = () => {
+            if (cancelled) return;
+            syncVideoAspectRatio();
+        };
+
         video.addEventListener('playing', handlePlaying);
+        video.addEventListener('loadedmetadata', handleLoadedMetadata);
         video.addEventListener('error', handleError);
 
         // Direct HLS.js usage - no lazy loading needed
@@ -353,7 +384,7 @@ function VideoPopup({ camera, onClose }) {
                 // Update to buffering stage
                 setLoadingStage(LoadingStage.BUFFERING);
                 updateStreamStage(LoadingStage.BUFFERING);
-                video.play().catch(() => { });
+                requestVideoPlay(video);
             });
 
             // FRAG_LOADED fires when first fragment is loaded - more reliable than MANIFEST_PARSED
@@ -369,7 +400,7 @@ function VideoPopup({ camera, onClose }) {
                 });
                 // Try to play
                 if (video.paused) {
-                    video.play().catch(() => { });
+                    requestVideoPlay(video);
                 }
             });
 
@@ -437,7 +468,7 @@ function VideoPopup({ camera, onClose }) {
                             newHls.on(Hls.Events.MANIFEST_PARSED, () => {
                                 if (cancelled) return;
                                 setLoadingStage(LoadingStage.BUFFERING);
-                                video.play().catch(() => { });
+                                requestVideoPlay(video);
                             });
 
                             newHls.on(Hls.Events.ERROR, (_, d2) => {
@@ -464,18 +495,19 @@ function VideoPopup({ camera, onClose }) {
             });
         } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
             video.src = url;
-            video.addEventListener('loadedmetadata', () => video.play().catch(() => { }));
+            video.addEventListener('loadedmetadata', () => requestVideoPlay(video));
         }
 
         return () => {
             cancelled = true;
             clearInterval(playbackCheckInterval);
             video.removeEventListener('playing', handlePlaying);
+            video.removeEventListener('loadedmetadata', handleLoadedMetadata);
             video.removeEventListener('error', handleError);
             cleanupResources();
             if (hls) { hls.destroy(); hlsRef.current = null; }
         };
-    }, [camera.stream_source, cleanupResources, clearStreamTimeout, deviceTier, isMaintenance, isOffline, resetFailures, retryKey, startTimeout, updateStreamStage, url]);
+    }, [camera.stream_source, cleanupResources, clearStreamTimeout, deviceTier, isMaintenance, isOffline, requestVideoPlay, resetFailures, retryKey, startTimeout, syncVideoAspectRatio, updateStreamStage, url]);
 
     const handleRetry = useCallback(() => {
         cleanupResources();
@@ -583,6 +615,11 @@ function VideoPopup({ camera, onClose }) {
     const overlayState = getPublicPopupOverlayState({ status, loadingStage, errorType });
     const isPlaybackLocked = isPublicPopupPlaybackLocked(status);
     const canRetry = shouldShowPublicPopupRetry({ status, errorType });
+    const bodyStyle = getPublicPopupBodyStyle({
+        isFullscreen,
+        isPlaybackLocked,
+        videoAspectRatio,
+    });
 
     // Check if animations should be disabled on low-end devices - **Validates: Requirements 5.2**
     const disableAnimations = shouldDisableAnimations();
@@ -642,7 +679,7 @@ function VideoPopup({ camera, onClose }) {
                     ref={wrapperRef}
                     data-testid="grid-video-body"
                     className={`relative bg-gray-100 dark:bg-black overflow-hidden ${isFullscreen ? 'flex-1 min-h-0' : 'w-full min-h-[220px] sm:min-h-[280px] md:min-h-[340px]'}`}
-                    style={{ aspectRatio: isFullscreen ? 'auto' : '16 / 7' }}
+                    style={bodyStyle}
                     onDoubleClick={toggleFS}
                 >
                     <ZoomableVideo videoRef={videoRef} maxZoom={4} onZoomChange={setZoom} isFullscreen={isFullscreen} />

@@ -252,4 +252,35 @@ describe('VideoPopup non-live states', () => {
         expect(screen.queryByTitle('Zoom In')).toBeNull();
         expect(screen.queryByTitle('Fullscreen')).toBeNull();
     });
+
+    it('menyesuaikan rasio body live grid dari metadata video 4:3', async () => {
+        render(
+            <VideoPopup
+                camera={{ ...baseCamera, id: 16 }}
+                onClose={vi.fn()}
+            />
+        );
+
+        const video = await screen.findByTestId('grid-popup-video');
+        const body = screen.getByTestId('grid-video-body');
+
+        expect(body.style.aspectRatio).toBe(String(16 / 9));
+
+        Object.defineProperty(video, 'videoWidth', {
+            configurable: true,
+            value: 640,
+        });
+        Object.defineProperty(video, 'videoHeight', {
+            configurable: true,
+            value: 480,
+        });
+
+        await act(async () => {
+            video.dispatchEvent(new Event('loadedmetadata'));
+        });
+
+        await waitFor(() => {
+            expect(body.style.aspectRatio).toBe(String(4 / 3));
+        });
+    });
 });

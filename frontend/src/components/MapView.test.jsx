@@ -9,11 +9,13 @@ const {
     setViewMock,
     startSessionMock,
     stopSessionMock,
+    hlsInstances,
 } = vi.hoisted(() => ({
     fitBoundsMock: vi.fn(),
     setViewMock: vi.fn(),
     startSessionMock: vi.fn().mockResolvedValue('session-1'),
     stopSessionMock: vi.fn().mockResolvedValue(undefined),
+    hlsInstances: [],
 }));
 
 vi.mock('react-leaflet', () => ({
@@ -55,9 +57,39 @@ vi.mock('leaflet', () => ({
     },
 }));
 
-vi.mock('hls.js', () => ({
-    default: function Hls() {},
-}));
+vi.mock('hls.js', () => {
+    class HlsMock {
+        static isSupported() {
+            return true;
+        }
+
+        static Events = {
+            MANIFEST_PARSED: 'manifestParsed',
+            FRAG_LOADED: 'fragLoaded',
+            FRAG_BUFFERED: 'fragBuffered',
+            ERROR: 'error',
+        };
+
+        static ErrorTypes = {
+            NETWORK_ERROR: 'networkError',
+            MEDIA_ERROR: 'mediaError',
+        };
+
+        constructor() {
+            this.handlers = {};
+            hlsInstances.push(this);
+        }
+
+        loadSource = vi.fn();
+        attachMedia = vi.fn();
+        destroy = vi.fn();
+        on(event, handler) {
+            this.handlers[event] = handler;
+        }
+    }
+
+    return { default: HlsMock };
+});
 
 vi.mock('../services/settingsService', () => ({
     settingsService: {
@@ -100,6 +132,7 @@ vi.mock('../utils/snapshotHelper', () => ({
 }));
 
 describe('MapView area filter visibility', () => {
+    let playMock;
     const cameras = [
         {
             id: 1,
@@ -110,6 +143,7 @@ describe('MapView area filter visibility', () => {
             is_online: 1,
             status: 'active',
             is_tunnel: 0,
+            streams: { hls: 'https://example.com/live-1.m3u8' },
         },
     ];
 
@@ -123,6 +157,7 @@ describe('MapView area filter visibility', () => {
             is_online: 1,
             status: 'active',
             is_tunnel: 0,
+            streams: { hls: 'https://example.com/live-1.m3u8' },
         },
         {
             id: 2,
@@ -133,6 +168,7 @@ describe('MapView area filter visibility', () => {
             is_online: 1,
             status: 'active',
             is_tunnel: 1,
+            streams: { hls: 'https://example.com/live-2.m3u8' },
         },
         {
             id: 3,
@@ -143,6 +179,7 @@ describe('MapView area filter visibility', () => {
             is_online: 0,
             status: 'active',
             is_tunnel: 0,
+            streams: { hls: 'https://example.com/live-1.m3u8' },
         },
         {
             id: 4,
@@ -153,6 +190,7 @@ describe('MapView area filter visibility', () => {
             is_online: 1,
             status: 'maintenance',
             is_tunnel: 0,
+            streams: { hls: 'https://example.com/live-2.m3u8' },
         },
     ];
 
@@ -186,6 +224,7 @@ describe('MapView area filter visibility', () => {
 
     beforeEach(() => {
         vi.useRealTimers();
+        playMock = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
         window.URL.createObjectURL = vi.fn(() => 'blob:test');
         Object.defineProperty(document, 'fullscreenElement', {
             configurable: true,
@@ -196,9 +235,11 @@ describe('MapView area filter visibility', () => {
         setViewMock.mockReset();
         startSessionMock.mockClear();
         stopSessionMock.mockClear();
+        hlsInstances.length = 0;
     });
 
     afterEach(() => {
+        playMock?.mockRestore();
         vi.useRealTimers();
     });
 
@@ -432,5 +473,39 @@ describe('MapView area filter visibility', () => {
         });
 
         expect(screen.queryByText('Lobby')).toBeNull();
+    });
+
+    it('menyesuaikan rasio body live map dari metadata video 4:3', async () => {
+        await act(async () => {
+            render(<MapView cameras={cameras} areas={[]} showAreaFilter={false} />);
+        });
+
+        fireEvent.click(screen.getByTestId('marker--7.1507-111.8815'));
+
+        const body = await screen.findByTestId('map-video-body');
+        const video = document.querySelector('video');
+
+        expect(body.style.aspectRatio).toBe(String(16 / 9));
+        expect(video).toBeTruthy();
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        Object.defineProperty(video, 'videoWidth', {
+            configurable: true,
+            value: 640,
+        });
+        Object.defineProperty(video, 'videoHeight', {
+            configurable: true,
+            value: 480,
+        });
+
+        await act(async () => {
+            video.dispatchEvent(new Event('loadedmetadata'));
+        });
+
+        await waitFor(() => {
+            expect(body.style.aspectRatio).toBe(String(4 / 3));
+        });
     });
 });

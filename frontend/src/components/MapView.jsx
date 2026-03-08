@@ -14,6 +14,10 @@ import { useBranding } from '../contexts/BrandingContext';
 import { takeSnapshot as takeSnapshotUtil } from '../utils/snapshotHelper';
 import PublicStreamStatusOverlay from './PublicStreamStatusOverlay.jsx';
 import {
+    getPublicPopupBodyStyle,
+    getVideoAspectRatio,
+} from '../utils/publicPopupLayout.js';
+import {
     getPublicPopupErrorType,
     getPublicPopupInitialStatus,
     getPublicPopupOverlayState,
@@ -189,6 +193,7 @@ const VideoModal = memo(({ camera, onClose }) => {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [snapshotNotification, setSnapshotNotification] = useState(null);
     const [retryKey, setRetryKey] = useState(0);
+    const [videoAspectRatio, setVideoAspectRatio] = useState(null);
 
     // Zoom state - hanya untuk UI display
     const [zoomDisplay, setZoomDisplay] = useState(1);
@@ -202,11 +207,36 @@ const VideoModal = memo(({ camera, onClose }) => {
     const overlayState = getPublicPopupOverlayState({ status, loadingStage, errorType });
     const isPlaybackLocked = isPublicPopupPlaybackLocked(status);
     const canRetry = shouldShowPublicPopupRetry({ status, errorType });
+    const bodyStyle = {
+        touchAction: 'none',
+        ...getPublicPopupBodyStyle({
+            isFullscreen,
+            isPlaybackLocked,
+            videoAspectRatio,
+        }),
+    };
     const MIN_ZOOM = 1;
     const MAX_ZOOM = 4;
 
     const getMaxPan = (z) => z <= 1 ? 0 : ((z - 1) / (2 * z)) * 100;
     const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+    const syncVideoAspectRatio = useCallback(() => {
+        const nextAspectRatio = getVideoAspectRatio(videoRef.current);
+        if (nextAspectRatio) {
+            setVideoAspectRatio(nextAspectRatio);
+        }
+    }, []);
+    const requestVideoPlay = useCallback((target = videoRef.current) => {
+        if (!target?.play) return;
+        try {
+            const playAttempt = target.play();
+            if (playAttempt?.catch) {
+                playAttempt.catch(() => { });
+            }
+        } catch {
+            // Ignore autoplay/runtime failures; status handling will surface real issues.
+        }
+    }, []);
 
     // Initialize RAF throttle on mount - skip on low-end
     useEffect(() => {
@@ -545,6 +575,7 @@ const VideoModal = memo(({ camera, onClose }) => {
         // Reset state
         setStatus('connecting');
         setErrorType(null);
+        setVideoAspectRatio(null);
         updateStreamStage(LoadingStage.CONNECTING);
         startStreamTimeout(LoadingStage.CONNECTING);
 
@@ -559,6 +590,7 @@ const VideoModal = memo(({ camera, onClose }) => {
             setStatus('playing');
             setLoadingStage(LoadingStage.PLAYING);
             clearStreamTimeout();
+            syncVideoAspectRatio();
         };
 
         const startPlaybackCheck = () => {
@@ -571,7 +603,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                     if (!video.paused || video.currentTime > 0) {
                         handlePlaying();
                     } else {
-                        video.play().catch(() => { });
+                        requestVideoPlay(video);
                     }
                 }
             }, 500);
@@ -587,8 +619,9 @@ const VideoModal = memo(({ camera, onClose }) => {
 
         const handleNativeLoadedMetadata = () => {
             if (cancelled) return;
+            syncVideoAspectRatio();
             updateStreamStage(LoadingStage.BUFFERING);
-            video.play().catch(() => { });
+            requestVideoPlay(video);
         };
 
         const handleNativeError = () => {
@@ -683,6 +716,8 @@ const VideoModal = memo(({ camera, onClose }) => {
         isOffline,
         retryKey,
         startStreamTimeout,
+        syncVideoAspectRatio,
+        requestVideoPlay,
         updateStreamStage,
     ]);
 
@@ -742,10 +777,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                 <div
                     data-testid="map-video-body"
                     className={`relative bg-gray-100 dark:bg-black overflow-hidden ${isFullscreen ? 'flex-1 min-h-0 w-full h-full' : 'w-full min-h-[220px] sm:min-h-[280px] md:min-h-[340px]'}`}
-                    style={{
-                        touchAction: 'none',
-                        aspectRatio: isFullscreen ? 'auto' : '16 / 7'
-                    }}
+                    style={bodyStyle}
                     onWheel={handleWheel}
                     onPointerDown={handlePointerDown}
                     onPointerMove={handlePointerMove}
