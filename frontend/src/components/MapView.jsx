@@ -217,6 +217,7 @@ const VideoModal = memo(({ camera, onClose }) => {
     };
     const MIN_ZOOM = 1;
     const MAX_ZOOM = 4;
+    const isVideoActive = status === 'playing';
 
     const getMaxPan = (z) => z <= 1 ? 0 : ((z - 1) / (2 * z)) * 100;
     const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
@@ -776,7 +777,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                 {/* Video Container - optimized dengan pointer events, no aspect-video constraint untuk support 4:3 */}
                 <div
                     data-testid="map-video-body"
-                    className={`relative bg-gray-100 dark:bg-black overflow-hidden ${isFullscreen ? 'flex-1 min-h-0 w-full h-full' : 'w-full min-h-[220px] sm:min-h-[280px] md:min-h-[340px]'}`}
+                    className={`relative bg-gray-100 dark:bg-black overflow-hidden ${isFullscreen ? 'flex-1 min-h-0 w-full h-full' : `w-full ${!isVideoActive ? 'min-h-[220px] sm:min-h-[280px] md:min-h-[340px]' : ''}`}`}
                     style={bodyStyle}
                     onWheel={handleWheel}
                     onPointerDown={handlePointerDown}
@@ -925,70 +926,70 @@ const VideoModal = memo(({ camera, onClose }) => {
                         <div className="flex items-center gap-1 shrink-0">
                             {!isPlaybackLocked && (
                                 <>
-                                {/* Zoom Controls */}
-                                <div className="flex items-center gap-0.5 bg-gray-200/90 dark:bg-gray-800 rounded-lg p-0.5">
-                                    <button
-                                        onClick={handleZoomOut}
-                                        disabled={zoomDisplay <= MIN_ZOOM}
-                                        className="p-1.5 hover:bg-gray-300/50 dark:hover:bg-gray-700 disabled:opacity-30 rounded text-gray-900 dark:text-white transition-colors"
-                                        title="Zoom Out"
-                                    >
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                            <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
-                                        </svg>
-                                    </button>
-                                    <span className="text-gray-900 dark:text-white text-[10px] font-medium w-8 text-center">{Math.round(zoomDisplay * 100)}%</span>
-                                    <button
-                                        onClick={handleZoomIn}
-                                        disabled={zoomDisplay >= MAX_ZOOM}
-                                        className="p-1.5 hover:bg-gray-300/50 dark:hover:bg-gray-700 disabled:opacity-30 rounded text-gray-900 dark:text-white transition-colors"
-                                        title="Zoom In"
-                                    >
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                            <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
-                                        </svg>
-                                    </button>
-                                    {zoomDisplay > 1 && (
+                                    {/* Zoom Controls */}
+                                    <div className="flex items-center gap-0.5 bg-gray-200/90 dark:bg-gray-800 rounded-lg p-0.5">
                                         <button
-                                            onClick={handleResetZoom}
-                                            className="p-1.5 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-white transition-colors"
-                                            title="Reset Zoom"
+                                            onClick={handleZoomOut}
+                                            disabled={zoomDisplay <= MIN_ZOOM}
+                                            className="p-1.5 hover:bg-gray-300/50 dark:hover:bg-gray-700 disabled:opacity-30 rounded text-gray-900 dark:text-white transition-colors"
+                                            title="Zoom Out"
                                         >
                                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                <path d="M1 4v6h6" /><path d="M3.51 15a9 9 0 102.13-9.36L1 10" />
+                                                <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
+                                            </svg>
+                                        </button>
+                                        <span className="text-gray-900 dark:text-white text-[10px] font-medium w-8 text-center">{Math.round(zoomDisplay * 100)}%</span>
+                                        <button
+                                            onClick={handleZoomIn}
+                                            disabled={zoomDisplay >= MAX_ZOOM}
+                                            className="p-1.5 hover:bg-gray-300/50 dark:hover:bg-gray-700 disabled:opacity-30 rounded text-gray-900 dark:text-white transition-colors"
+                                            title="Zoom In"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
+                                            </svg>
+                                        </button>
+                                        {zoomDisplay > 1 && (
+                                            <button
+                                                onClick={handleResetZoom}
+                                                className="p-1.5 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-white transition-colors"
+                                                title="Reset Zoom"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                    <path d="M1 4v6h6" /><path d="M3.51 15a9 9 0 102.13-9.36L1 10" />
+                                                </svg>
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Screenshot Button */}
+                                    {status === 'playing' && (
+                                        <button
+                                            onClick={takeSnapshot}
+                                            className="p-1.5 bg-gray-200/80 dark:bg-gray-800 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded-lg text-gray-900 dark:text-white transition-colors"
+                                            title="Ambil Screenshot"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <rect x="3" y="3" width="18" height="18" rx="2" />
+                                                <circle cx="8.5" cy="8.5" r="1.5" />
+                                                <path d="M21 15l-5-5L5 21" />
                                             </svg>
                                         </button>
                                     )}
-                                </div>
 
-                                {/* Screenshot Button */}
-                                {status === 'playing' && (
                                     <button
-                                        onClick={takeSnapshot}
+                                        onClick={toggleFullscreen}
                                         className="p-1.5 bg-gray-200/80 dark:bg-gray-800 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded-lg text-gray-900 dark:text-white transition-colors"
-                                        title="Ambil Screenshot"
+                                        title={isFullscreen ? 'Keluar Fullscreen' : 'Fullscreen'}
                                     >
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                            <rect x="3" y="3" width="18" height="18" rx="2" />
-                                            <circle cx="8.5" cy="8.5" r="1.5" />
-                                            <path d="M21 15l-5-5L5 21" />
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            {isFullscreen ? (
+                                                <path d="M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3" />
+                                            ) : (
+                                                <path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                                            )}
                                         </svg>
                                     </button>
-                                )}
-
-                                <button
-                                    onClick={toggleFullscreen}
-                                    className="p-1.5 bg-gray-200/80 dark:bg-gray-800 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded-lg text-gray-900 dark:text-white transition-colors"
-                                    title={isFullscreen ? 'Keluar Fullscreen' : 'Fullscreen'}
-                                >
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        {isFullscreen ? (
-                                            <path d="M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3" />
-                                        ) : (
-                                            <path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                                        )}
-                                    </svg>
-                                </button>
                                 </>
                             )}
 

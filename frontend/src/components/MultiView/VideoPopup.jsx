@@ -444,13 +444,13 @@ function VideoPopup({ camera, onClose }) {
 
                 // Try auto-retry with FallbackHandler
                 if (fallbackHandlerRef.current) {
-                        const streamError = createStreamError({
-                            type: detectedErrorType,
-                            message: d.details || 'Stream error',
-                            stage: loadingStageRef.current,
-                            deviceTier,
-                            retryCount: autoRetryCountRef.current,
-                        });
+                    const streamError = createStreamError({
+                        type: detectedErrorType,
+                        message: d.details || 'Stream error',
+                        stage: loadingStageRef.current,
+                        deviceTier,
+                        retryCount: autoRetryCountRef.current,
+                    });
 
                     const result = fallbackHandlerRef.current.handleError(streamError, () => {
                         if (!cancelled && hls) {
@@ -623,6 +623,7 @@ function VideoPopup({ camera, onClose }) {
 
     // Check if animations should be disabled on low-end devices - **Validates: Requirements 5.2**
     const disableAnimations = shouldDisableAnimations();
+    const isVideoActive = status === 'live';
 
     return (
         <div ref={outerWrapperRef} className={`fixed inset-0 z-[9999] ${isFullscreen ? 'bg-black dark:bg-black' : 'flex items-center justify-center bg-black/95 dark:bg-black/95 p-2 sm:p-4'}`} onClick={onClose}>
@@ -649,12 +650,12 @@ function VideoPopup({ camera, onClose }) {
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                                     </svg>
                                 </button>
-                                        <span className={`inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold ${statusDisplay.color}`}>
-                                            <span className={`w-1.5 h-1.5 rounded-full ${statusDisplay.dotColor} ${status === 'live' && !disableAnimations ? 'animate-pulse' : ''}`} />
-                                            {statusDisplay.label}
-                                        </span>
-                                    </div>
-                                </div>
+                                <span className={`inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold ${statusDisplay.color}`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${statusDisplay.dotColor} ${status === 'live' && !disableAnimations ? 'animate-pulse' : ''}`} />
+                                    {statusDisplay.label}
+                                </span>
+                            </div>
+                        </div>
                         {/* Location + Area */}
                         {(camera.location || camera.area_name) && (
                             <div className="flex items-center gap-2 mt-1.5">
@@ -678,7 +679,7 @@ function VideoPopup({ camera, onClose }) {
                 <div
                     ref={wrapperRef}
                     data-testid="grid-video-body"
-                    className={`relative bg-gray-100 dark:bg-black overflow-hidden ${isFullscreen ? 'flex-1 min-h-0' : 'w-full min-h-[220px] sm:min-h-[280px] md:min-h-[340px]'}`}
+                    className={`relative bg-gray-100 dark:bg-black overflow-hidden ${isFullscreen ? 'flex-1 min-h-0' : `w-full ${!isVideoActive ? 'min-h-[220px] sm:min-h-[280px] md:min-h-[340px]' : ''}`}`}
                     style={bodyStyle}
                     onDoubleClick={toggleFS}
                 >
@@ -758,10 +759,10 @@ function VideoPopup({ camera, onClose }) {
 
                             {!isPlaybackLocked && (
                                 <div className="absolute bottom-4 right-4 z-50 flex items-center gap-1 bg-gray-200/90 dark:bg-gray-900/80 rounded-xl p-1 pointer-events-auto">
-                                <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 disabled:opacity-30 rounded-lg text-gray-900 dark:text-white"><Icons.ZoomOut /></button>
-                                <span className="text-gray-900 dark:text-white text-xs font-medium w-12 text-center">{Math.round(zoom * 100)}%</span>
-                                <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 4} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 disabled:opacity-30 rounded-lg text-gray-900 dark:text-white"><Icons.ZoomIn /></button>
-                                {zoom > 1 && <button onClick={() => getZoomableWrapper()?._reset?.()} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 rounded-lg text-gray-900 dark:text-white ml-1"><Icons.Reset /></button>}
+                                    <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 disabled:opacity-30 rounded-lg text-gray-900 dark:text-white"><Icons.ZoomOut /></button>
+                                    <span className="text-gray-900 dark:text-white text-xs font-medium w-12 text-center">{Math.round(zoom * 100)}%</span>
+                                    <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 4} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 disabled:opacity-30 rounded-lg text-gray-900 dark:text-white"><Icons.ZoomIn /></button>
+                                    {zoom > 1 && <button onClick={() => getZoomableWrapper()?._reset?.()} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 rounded-lg text-gray-900 dark:text-white ml-1"><Icons.Reset /></button>}
                                 </div>
                             )}
                         </>
