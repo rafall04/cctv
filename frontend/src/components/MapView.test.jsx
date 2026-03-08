@@ -257,7 +257,7 @@ describe('MapView area filter visibility', () => {
             expect(screen.getByText('Dalam Perbaikan')).toBeTruthy();
         });
 
-        expect(screen.getByText('Perbaikan')).toBeTruthy();
+        expect(screen.getByText('PERBAIKAN')).toBeTruthy();
         expect(screen.getByTestId('map-video-body')).toBeTruthy();
         expect(screen.queryByText('Menghubungkan...')).toBeNull();
         expect(screen.queryByTitle('Zoom In')).toBeNull();
@@ -277,7 +277,7 @@ describe('MapView area filter visibility', () => {
             expect(screen.getByText('Kamera Offline')).toBeTruthy();
         });
 
-        expect(screen.getByText('Offline')).toBeTruthy();
+        expect(screen.getByText('OFFLINE')).toBeTruthy();
         expect(screen.getByTestId('map-video-body')).toBeTruthy();
         expect(screen.queryByText('Menghubungkan...')).toBeNull();
         expect(screen.queryByTitle('Zoom In')).toBeNull();

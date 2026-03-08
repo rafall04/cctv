@@ -8,9 +8,19 @@ import { settingsService } from '../services/settingsService';
 import { getHLSConfig } from '../utils/hlsConfig';
 import { viewerService } from '../services/viewerService';
 import { createTransformThrottle } from '../utils/rafThrottle';
+import { getTimeoutDuration } from '../hooks/useStreamTimeout';
 import CodecBadge from './CodecBadge';
 import { useBranding } from '../contexts/BrandingContext';
 import { takeSnapshot as takeSnapshotUtil } from '../utils/snapshotHelper';
+import PublicStreamStatusOverlay from './PublicStreamStatusOverlay.jsx';
+import {
+    getPublicPopupErrorType,
+    getPublicPopupInitialStatus,
+    getPublicPopupOverlayState,
+    getPublicPopupStatusDisplay,
+    isPublicPopupPlaybackLocked,
+    shouldShowPublicPopupRetry,
+} from '../utils/publicPopupState.js';
 
 // Fix Leaflet icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -30,55 +40,8 @@ const LoadingStage = {
     LOADING: 'loading',
     BUFFERING: 'buffering',
     PLAYING: 'playing',
-    ERROR: 'error'
-};
-
-// Pesan loading berdasarkan stage
-const getLoadingMessage = (stage) => {
-    switch (stage) {
-        case LoadingStage.CONNECTING: return 'Menghubungkan...';
-        case LoadingStage.LOADING: return 'Memuat stream...';
-        case LoadingStage.BUFFERING: return 'Buffering...';
-        default: return 'Memuat...';
-    }
-};
-
-const getModalInitialStatus = (camera) => {
-    if (camera?.status === 'maintenance') return 'maintenance';
-    if (camera?.is_online === 0) return 'offline';
-    return 'connecting';
-};
-
-const getModalStatusBadge = ({ status, isTunnel, loadingStage }) => {
-    if (status === 'maintenance') {
-        return {
-            label: 'PERBAIKAN',
-            color: 'bg-red-500/20 text-red-400',
-            dotColor: 'bg-red-400',
-        };
-    }
-
-    if (status === 'offline') {
-        return {
-            label: 'OFFLINE',
-            color: 'bg-gray-500/20 text-gray-400',
-            dotColor: 'bg-gray-400',
-        };
-    }
-
-    if (status === 'playing') {
-        return {
-            label: 'LIVE',
-            color: isTunnel ? 'bg-orange-500/20 text-orange-400' : 'bg-emerald-500/20 text-emerald-400',
-            dotColor: isTunnel ? 'bg-orange-400' : 'bg-emerald-400',
-        };
-    }
-
-    return {
-        label: getLoadingMessage(loadingStage).toUpperCase(),
-        color: 'bg-sky-500/20 text-sky-400',
-        dotColor: 'bg-sky-400',
-    };
+    ERROR: 'error',
+    TIMEOUT: 'timeout',
 };
 
 // Cache icon untuk menghindari pembuatan ulang
@@ -210,20 +173,22 @@ const VideoModal = memo(({ camera, onClose }) => {
     const hlsRef = useRef(null);
     const transformThrottleRef = useRef(null);
     const playbackCheckRef = useRef(null);
+    const streamTimeoutRef = useRef(null);
     const { branding } = useBranding();
     const isMaintenance = camera.status === 'maintenance';
     const isOffline = camera.is_online === 0;
     const isTunnel = camera.is_tunnel === 1 || camera.is_tunnel === true;
     const isNonPlayable = isMaintenance || isOffline;
 
-    // Status: 'connecting' | 'loading' | 'buffering' | 'playing' | 'maintenance' | 'offline' | 'error'
-    const [status, setStatus] = useState(() => getModalInitialStatus(camera));
+    // Status: 'connecting' | 'loading' | 'buffering' | 'playing' | 'maintenance' | 'offline' | 'timeout' | 'error'
+    const [status, setStatus] = useState(() => getPublicPopupInitialStatus(camera));
     const [loadingStage, setLoadingStage] = useState(
         isNonPlayable ? LoadingStage.ERROR : LoadingStage.CONNECTING
     );
     const [errorType, setErrorType] = useState(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [snapshotNotification, setSnapshotNotification] = useState(null);
+    const [retryKey, setRetryKey] = useState(0);
 
     // Zoom state - hanya untuk UI display
     const [zoomDisplay, setZoomDisplay] = useState(1);
@@ -233,7 +198,10 @@ const VideoModal = memo(({ camera, onClose }) => {
         zoom: 1, panX: 0, panY: 0,
         dragging: false, startX: 0, startY: 0, startPanX: 0, startPanY: 0
     });
-    const statusBadge = getModalStatusBadge({ status, isTunnel, loadingStage });
+    const statusBadge = getPublicPopupStatusDisplay({ status, loadingStage, errorType, isTunnel });
+    const overlayState = getPublicPopupOverlayState({ status, loadingStage, errorType });
+    const isPlaybackLocked = isPublicPopupPlaybackLocked(status);
+    const canRetry = shouldShowPublicPopupRetry({ status, errorType });
     const MIN_ZOOM = 1;
     const MAX_ZOOM = 4;
 
@@ -348,6 +316,59 @@ const VideoModal = memo(({ camera, onClose }) => {
         setTimeout(() => setSnapshotNotification(null), 3000);
     }, [camera.name, status, branding]);
 
+    const clearStreamTimeout = useCallback(() => {
+        if (streamTimeoutRef.current) {
+            clearTimeout(streamTimeoutRef.current);
+            streamTimeoutRef.current = null;
+        }
+    }, []);
+
+    const cleanupResources = useCallback(() => {
+        clearStreamTimeout();
+        if (playbackCheckRef.current) {
+            clearInterval(playbackCheckRef.current);
+            playbackCheckRef.current = null;
+        }
+        if (hlsRef.current) {
+            hlsRef.current.destroy();
+            hlsRef.current = null;
+        }
+        if (videoRef.current) {
+            videoRef.current.pause();
+            videoRef.current.removeAttribute('src');
+            videoRef.current.load();
+        }
+    }, [clearStreamTimeout]);
+
+    const startStreamTimeout = useCallback((nextStage = LoadingStage.CONNECTING) => {
+        clearStreamTimeout();
+        if (isNonPlayable) return;
+        const duration = getTimeoutDuration(deviceTier);
+        streamTimeoutRef.current = setTimeout(() => {
+            cleanupResources();
+            setStatus('timeout');
+            setErrorType('timeout');
+            setLoadingStage(LoadingStage.TIMEOUT);
+        }, duration);
+        setLoadingStage(nextStage);
+    }, [cleanupResources, clearStreamTimeout, isNonPlayable]);
+
+    const updateStreamStage = useCallback((nextStage) => {
+        if (['playing', 'error', 'timeout'].includes(nextStage)) {
+            clearStreamTimeout();
+        } else {
+            startStreamTimeout(nextStage);
+        }
+    }, [clearStreamTimeout, startStreamTimeout]);
+
+    const handleRetry = useCallback(() => {
+        cleanupResources();
+        setStatus('connecting');
+        setErrorType(null);
+        setLoadingStage(LoadingStage.CONNECTING);
+        setRetryKey((current) => current + 1);
+    }, [cleanupResources]);
+
     // Track fullscreen state and unlock orientation on exit
     useEffect(() => {
         const handleFullscreenChange = () => {
@@ -383,9 +404,9 @@ const VideoModal = memo(({ camera, onClose }) => {
         document.body.style.overflow = 'hidden';
         return () => {
             document.body.style.overflow = '';
-            if (playbackCheckRef.current) clearInterval(playbackCheckRef.current);
+            cleanupResources();
         };
-    }, []);
+    }, [cleanupResources]);
 
     useEffect(() => {
         const handleEsc = (e) => e.key === 'Escape' && onClose();
@@ -499,31 +520,36 @@ const VideoModal = memo(({ camera, onClose }) => {
         };
     }, [camera.id, isNonPlayable]);
 
-    // HLS setup - dengan progressive loading stages seperti grid view
+    // HLS setup - samakan state non-live dengan grid view
     useEffect(() => {
         if (isMaintenance) {
+            cleanupResources();
             setStatus('maintenance');
             setLoadingStage(LoadingStage.ERROR);
+            setErrorType(null);
             return;
         }
         if (isOffline) {
+            cleanupResources();
             setStatus('offline');
             setLoadingStage(LoadingStage.ERROR);
+            setErrorType(null);
             return;
         }
         if (!camera?.streams?.hls || !videoRef.current) return;
 
         const video = videoRef.current;
         let cancelled = false;
+        let hls = null;
 
         // Reset state
         setStatus('connecting');
-        setLoadingStage(LoadingStage.CONNECTING);
         setErrorType(null);
+        updateStreamStage(LoadingStage.CONNECTING);
+        startStreamTimeout(LoadingStage.CONNECTING);
 
         const hlsConfig = getHLSConfig(deviceTier);
 
-        // Handler untuk video playing - hanya set sekali saat mulai play
         const handlePlaying = () => {
             if (cancelled) return;
             if (playbackCheckRef.current) {
@@ -532,9 +558,9 @@ const VideoModal = memo(({ camera, onClose }) => {
             }
             setStatus('playing');
             setLoadingStage(LoadingStage.PLAYING);
+            clearStreamTimeout();
         };
 
-        // Fallback: Check video state periodically untuk browser yang tidak fire event
         const startPlaybackCheck = () => {
             playbackCheckRef.current = setInterval(() => {
                 if (cancelled) {
@@ -551,23 +577,44 @@ const VideoModal = memo(({ camera, onClose }) => {
             }, 500);
         };
 
+        const handleFatalError = (nextErrorType) => {
+            if (cancelled) return;
+            cleanupResources();
+            setStatus('error');
+            setErrorType(nextErrorType);
+            setLoadingStage(LoadingStage.ERROR);
+        };
+
+        const handleNativeLoadedMetadata = () => {
+            if (cancelled) return;
+            updateStreamStage(LoadingStage.BUFFERING);
+            video.play().catch(() => { });
+        };
+
+        const handleNativeError = () => {
+            if (cancelled) return;
+            handleFatalError('media');
+        };
+
         video.addEventListener('playing', handlePlaying);
+        video.addEventListener('loadedmetadata', handleNativeLoadedMetadata);
+        video.addEventListener('error', handleNativeError);
 
         if (Hls.isSupported()) {
-            const hls = new Hls(hlsConfig);
+            hls = new Hls(hlsConfig);
             hlsRef.current = hls;
 
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
                 if (cancelled) return;
-                setLoadingStage(LoadingStage.BUFFERING);
+                updateStreamStage(LoadingStage.BUFFERING);
                 video.play().catch(() => { });
             });
 
-            // FRAG_LOADED - fragment pertama dimuat
             hls.on(Hls.Events.FRAG_LOADED, () => {
                 if (cancelled) return;
                 setLoadingStage(prev => {
                     if (prev === LoadingStage.CONNECTING || prev === LoadingStage.LOADING) {
+                        updateStreamStage(LoadingStage.BUFFERING);
                         return LoadingStage.BUFFERING;
                     }
                     return prev;
@@ -575,91 +622,69 @@ const VideoModal = memo(({ camera, onClose }) => {
                 if (video.paused) video.play().catch(() => { });
             });
 
-            // FRAG_BUFFERED - fragment sudah di-buffer, siap play
             hls.on(Hls.Events.FRAG_BUFFERED, () => {
                 if (cancelled) return;
-                setStatus('playing');
-                setLoadingStage(LoadingStage.PLAYING);
+                handlePlaying();
                 if (video.paused) video.play().catch(() => { });
             });
 
             hls.on(Hls.Events.ERROR, (_, data) => {
                 if (cancelled || !data.fatal) return;
-
-                setStatus('error');
-                setLoadingStage(LoadingStage.ERROR);
-
-                if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                    setErrorType('network');
-                } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                    if (data.details === 'fragParsingError' || data.details === 'bufferAppendError' ||
-                        data.details === 'manifestIncompatibleCodecsError' ||
-                        data.reason?.toLowerCase().includes('codec') ||
-                        data.reason?.toLowerCase().includes('hevc')) {
-                        setErrorType('codec');
-                    } else {
-                        setErrorType('media');
-                    }
-                } else {
-                    setErrorType('unknown');
-                }
+                const nextErrorType = getPublicPopupErrorType({
+                    hlsError: {
+                        ...data,
+                        type: data.type === Hls.ErrorTypes.NETWORK_ERROR
+                            ? 'networkError'
+                            : data.type === Hls.ErrorTypes.MEDIA_ERROR
+                                ? 'mediaError'
+                                : 'unknownError',
+                    },
+                    streamSource: camera.stream_source,
+                });
+                handleFatalError(nextErrorType);
             });
 
-            // Load source dan attach media
             hls.loadSource(camera.streams.hls);
-            setLoadingStage(LoadingStage.LOADING);
+            updateStreamStage(LoadingStage.LOADING);
 
-            // Delay attach untuk stabilitas
             setTimeout(() => {
-                if (!cancelled && hlsRef.current) {
+                if (!cancelled && hlsRef.current && videoRef.current) {
                     hls.attachMedia(video);
                     startPlaybackCheck();
                 }
             }, 50);
 
         } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            // Safari native HLS
             video.src = camera.streams.hls;
-            setLoadingStage(LoadingStage.LOADING);
-
-            video.addEventListener('loadedmetadata', () => {
-                if (cancelled) return;
-                setLoadingStage(LoadingStage.BUFFERING);
-                video.play().catch(() => { });
-            });
-            video.addEventListener('error', () => {
-                if (cancelled) return;
-                setStatus('error');
-                setErrorType('media');
-            });
-
+            updateStreamStage(LoadingStage.LOADING);
             startPlaybackCheck();
         }
 
         return () => {
             cancelled = true;
             video.removeEventListener('playing', handlePlaying);
+            video.removeEventListener('loadedmetadata', handleNativeLoadedMetadata);
+            video.removeEventListener('error', handleNativeError);
             if (playbackCheckRef.current) {
                 clearInterval(playbackCheckRef.current);
                 playbackCheckRef.current = null;
             }
-            if (hlsRef.current) {
-                hlsRef.current.destroy();
+            cleanupResources();
+            if (hls) {
+                hls.destroy();
                 hlsRef.current = null;
             }
         };
-    }, [camera, isMaintenance, isOffline]);
-
-    const getErrorMessage = useCallback(() => {
-        const errors = {
-            codec: { title: 'Codec Tidak Didukung', desc: 'Browser Anda tidak mendukung codec H.265/HEVC yang digunakan kamera ini. Coba gunakan browser lain seperti Safari.', color: 'yellow' },
-            network: { title: 'Koneksi Gagal', desc: 'Tidak dapat terhubung ke server stream.', color: 'orange' },
-            default: { title: 'Stream Tidak Tersedia', desc: 'Terjadi kesalahan saat memuat stream.', color: 'red' }
-        };
-        return errors[errorType] || errors.default;
-    }, [errorType]);
-
-    const errorInfo = getErrorMessage();
+    }, [
+        camera,
+        cleanupResources,
+        clearStreamTimeout,
+        isMaintenance,
+        isOffline,
+        retryKey,
+        startStreamTimeout,
+        updateStreamStage,
+    ]);
 
     return (
         <div
@@ -685,18 +710,10 @@ const VideoModal = memo(({ camera, onClose }) => {
                             </div>
                             {/* Status badges */}
                             <div className="flex items-center gap-1 shrink-0">
-                                {isMaintenance ? (
-                                    <span className="px-1.5 py-0.5 rounded bg-red-500 text-white text-[10px] font-bold">Perbaikan</span>
-                                ) : isOffline ? (
-                                    <span className="px-1.5 py-0.5 rounded bg-gray-500 text-white text-[10px] font-bold">Offline</span>
-                                ) : (
-                                    <>
-                                        <span className={`w-1.5 h-1.5 rounded-full bg-red-500 ${isLowEnd ? '' : 'animate-pulse'}`} />
-                                        <span className={`px-1.5 py-0.5 rounded text-white text-[10px] font-bold ${isTunnel ? 'bg-orange-500' : 'bg-emerald-500'}`}>
-                                            {isTunnel ? 'Tunnel' : 'Stabil'}
-                                        </span>
-                                    </>
-                                )}
+                                <span className={`inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold ${statusBadge.color}`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${statusBadge.dotColor} ${status === 'playing' && !isLowEnd ? 'animate-pulse' : ''}`} />
+                                    {statusBadge.label}
+                                </span>
                             </div>
                         </div>
                         {/* Location + Area */}
@@ -736,88 +753,12 @@ const VideoModal = memo(({ camera, onClose }) => {
                     onPointerCancel={handlePointerUp}
                     onPointerLeave={handlePointerUp}
                 >
-                    {/* Progressive Loading Overlay - dengan animasi buffering */}
-                    {(status === 'connecting' || status === 'loading' || status === 'buffering' ||
-                        (status !== 'playing' && status !== 'maintenance' && status !== 'offline' && status !== 'error')) && (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10 bg-gradient-to-br from-gray-800 via-gray-900 to-gray-800">
-                                {/* Animated shimmer background - disabled on low-end */}
-                                {!isLowEnd && (
-                                    <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                                        <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/5 to-transparent" />
-                                    </div>
-                                )}
-
-                                {/* Loading spinner dengan progress indicator */}
-                                <div className="relative">
-                                    <div className={`w-12 h-12 border-2 border-gray-700 rounded-full ${isLowEnd ? '' : 'animate-pulse'}`} />
-                                    <div
-                                        className={`absolute inset-0 w-12 h-12 border-2 border-transparent border-t-sky-500 rounded-full ${isLowEnd ? '' : 'animate-spin'}`}
-                                        style={isLowEnd ? { animation: 'spin 1.5s linear infinite' } : {}}
-                                    />
-                                    {/* Inner progress dot untuk buffering stage */}
-                                    {loadingStage === LoadingStage.BUFFERING && (
-                                        <div className="absolute inset-0 flex items-center justify-center">
-                                            <div className={`w-2 h-2 bg-sky-500 rounded-full ${isLowEnd ? '' : 'animate-ping'}`} />
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Loading message */}
-                                <div className="text-center">
-                                    <span className="text-white font-medium text-sm">{getLoadingMessage(loadingStage)}</span>
-                                    {/* Progress dots untuk visual feedback */}
-                                    <div className="flex items-center justify-center gap-1 mt-2">
-                                        <span className={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${loadingStage === LoadingStage.CONNECTING || loadingStage === LoadingStage.LOADING || loadingStage === LoadingStage.BUFFERING
-                                            ? 'bg-sky-500' : 'bg-gray-600'
-                                            }`} />
-                                        <span className={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${loadingStage === LoadingStage.LOADING || loadingStage === LoadingStage.BUFFERING
-                                            ? 'bg-sky-500' : 'bg-gray-600'
-                                            }`} />
-                                        <span className={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${loadingStage === LoadingStage.BUFFERING
-                                            ? 'bg-sky-500' : 'bg-gray-600'
-                                            }`} />
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                    {status === 'maintenance' && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-red-950/50 z-10">
-                            <svg className="w-16 h-16 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                                <path d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z" />
-                            </svg>
-                            <div className="text-center px-4">
-                                <h4 className="text-red-400 font-bold text-lg">Dalam Perbaikan</h4>
-                                <p className="text-gray-400 text-sm mt-1">Kamera ini sedang dalam masa perbaikan/maintenance</p>
-                            </div>
-                        </div>
-                    )}
-
-                    {status === 'offline' && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gray-100/95 dark:bg-gray-900/80 z-10">
-                            <div className="w-20 h-20 rounded-full bg-gray-700 flex items-center justify-center">
-                                <svg className="w-10 h-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M6 18L18 6" />
-                                </svg>
-                            </div>
-                            <div className="text-center px-4">
-                                <h4 className="text-gray-300 font-bold text-lg">Kamera Offline</h4>
-                                <p className="text-gray-500 text-sm mt-1">Kamera ini sedang tidak tersedia atau tidak dapat dijangkau</p>
-                            </div>
-                        </div>
-                    )}
-
-                    {status === 'error' && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 z-10">
-                            <svg className={`w-10 h-10 text-${errorInfo.color}-500`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                            </svg>
-                            <div className="text-center">
-                                <h4 className="text-gray-200 font-semibold">{errorInfo.title}</h4>
-                                <p className="text-gray-400 text-sm mt-1 max-w-md">{errorInfo.desc}</p>
-                            </div>
-                        </div>
-                    )}
+                    <PublicStreamStatusOverlay
+                        state={overlayState}
+                        onRetry={canRetry ? handleRetry : null}
+                        className="absolute inset-0 z-10"
+                        disableAnimations={isLowEnd}
+                    />
 
                     {/* Video with zoom/pan transform - optimized */}
                     {!isNonPlayable && (
@@ -891,7 +832,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                             </div>
 
                             {/* Bottom controls - Zoom only */}
-                            {!isNonPlayable && status !== 'error' && (
+                            {!isPlaybackLocked && (
                                 <div className="absolute bottom-4 right-4 z-50 flex items-center gap-1 bg-gray-200/90 dark:bg-gray-900/80 rounded-xl p-1 pointer-events-auto">
                                     <button
                                         onClick={handleZoomOut}
@@ -928,7 +869,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                     )}
 
                     {/* Zoom hint */}
-                    {!isNonPlayable && zoomDisplay > 1 && (
+                    {!isPlaybackLocked && zoomDisplay > 1 && (
                         <div className="absolute bottom-2 left-2 px-2 py-1 bg-gray-200/80 dark:bg-gray-900/60 text-gray-900 dark:text-white text-xs rounded-lg z-20">
                             Geser untuk pan
                         </div>
@@ -950,7 +891,7 @@ const VideoModal = memo(({ camera, onClose }) => {
 
                         {/* Controls: Zoom + Screenshot + Fullscreen + Close */}
                         <div className="flex items-center gap-1 shrink-0">
-                            {!isNonPlayable && status !== 'error' && (
+                            {!isPlaybackLocked && (
                                 <>
                                 {/* Zoom Controls */}
                                 <div className="flex items-center gap-0.5 bg-gray-200/90 dark:bg-gray-800 rounded-lg p-0.5">
@@ -1003,11 +944,10 @@ const VideoModal = memo(({ camera, onClose }) => {
                                     </button>
                                 )}
 
-                                {/* Fullscreen Button */}
                                 <button
                                     onClick={toggleFullscreen}
                                     className="p-1.5 bg-gray-200/80 dark:bg-gray-800 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded-lg text-gray-900 dark:text-white transition-colors"
-                                    title={isFullscreen ? "Keluar Fullscreen" : "Fullscreen"}
+                                    title={isFullscreen ? 'Keluar Fullscreen' : 'Fullscreen'}
                                 >
                                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                         {isFullscreen ? (
@@ -1018,6 +958,18 @@ const VideoModal = memo(({ camera, onClose }) => {
                                     </svg>
                                 </button>
                                 </>
+                            )}
+
+                            {canRetry && (
+                                <button
+                                    onClick={handleRetry}
+                                    className="p-1.5 bg-primary/90 hover:bg-primary text-white rounded-lg transition-colors"
+                                    title="Coba Lagi"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M5 9a7 7 0 0111.314-2.188M19 15a7 7 0 01-11.314 2.188" />
+                                    </svg>
+                                </button>
                             )}
 
                             {/* Close Button */}

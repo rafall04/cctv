@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback, memo } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Hls from 'hls.js';
 import { Icons } from '../ui/Icons.jsx';
@@ -6,7 +6,7 @@ import CodecBadge from '../CodecBadge.jsx';
 import ZoomableVideo from './ZoomableVideo';
 import { detectDeviceTier } from '../../utils/deviceDetector';
 import { shouldDisableAnimations } from '../../utils/animationControl';
-import { LoadingStage, getStageMessage, createStreamError } from '../../utils/streamLoaderTypes';
+import { LoadingStage, createStreamError } from '../../utils/streamLoaderTypes';
 import { createFallbackHandler } from '../../utils/fallbackHandler';
 import { getHLSConfig } from '../../utils/hlsConfig';
 import { useStreamTimeout } from '../../hooks/useStreamTimeout';
@@ -15,6 +15,15 @@ import { takeSnapshot as takeSnapshotUtil } from '../../utils/snapshotHelper';
 import { useBranding } from '../../contexts/BrandingContext';
 import { createCameraSlug } from '../../utils/slugify';
 import { buildPublicCameraShareUrl } from '../../utils/publicShareUrl';
+import PublicStreamStatusOverlay from '../PublicStreamStatusOverlay.jsx';
+import {
+    getPublicPopupErrorType,
+    getPublicPopupInitialStatus,
+    getPublicPopupOverlayState,
+    getPublicPopupStatusDisplay,
+    isPublicPopupPlaybackLocked,
+    shouldShowPublicPopupRetry,
+} from '../../utils/publicPopupState.js';
 
 // ============================================
 // VIDEO POPUP - Optimized with fullscreen detection, timeout handler, progressive stages, and auto-retry
@@ -29,6 +38,8 @@ function VideoPopup({ camera, onClose }) {
     const hlsRef = useRef(null);
     const fallbackHandlerRef = useRef(null);
     const abortControllerRef = useRef(null);
+    const loadingStageRef = useRef(LoadingStage.CONNECTING);
+    const autoRetryCountRef = useRef(0);
     const { branding } = useBranding(); // ← FIX: Add branding context
 
     // Handle close with fullscreen exit
@@ -84,14 +95,7 @@ function VideoPopup({ camera, onClose }) {
     const isMaintenance = camera.status === 'maintenance';
     const isOffline = camera.is_online === 0;
 
-    // Set initial status based on camera state
-    const getInitialStatus = () => {
-        if (isMaintenance) return 'maintenance';
-        if (isOffline) return 'offline';
-        return 'connecting';
-    };
-
-    const [status, setStatus] = useState(getInitialStatus);
+    const [status, setStatus] = useState(() => getPublicPopupInitialStatus(camera));
     const [loadingStage, setLoadingStage] = useState(LoadingStage.CONNECTING);
     const [errorType, setErrorType] = useState(null); // 'codec', 'network', 'timeout', 'media', 'unknown'
     const [snapshotNotification, setSnapshotNotification] = useState(null);
@@ -99,93 +103,19 @@ function VideoPopup({ camera, onClose }) {
     const [retryKey, setRetryKey] = useState(0);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [autoRetryCount, setAutoRetryCount] = useState(0);
-    const [isAutoRetrying, setIsAutoRetrying] = useState(false);
     const [consecutiveFailures, setConsecutiveFailures] = useState(0);
     const [showTroubleshooting, setShowTroubleshooting] = useState(false);
 
     const url = camera.streams?.hls;
     const deviceTier = detectDeviceTier();
 
-    // Error messages berdasarkan tipe - sama seperti MapView
-    const getErrorInfo = () => {
-        switch (errorType) {
-            case 'codec':
-                return {
-                    title: 'Codec Tidak Didukung',
-                    desc: 'Browser Anda tidak mendukung codec H.265/HEVC yang digunakan kamera ini. Coba gunakan browser lain seperti Safari.',
-                    color: 'yellow',
-                    icon: (
-                        <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                        </svg>
-                    )
-                };
-            case 'network':
-                return {
-                    title: 'Koneksi Gagal',
-                    desc: 'Tidak dapat terhubung ke server stream. Periksa koneksi internet Anda atau coba lagi nanti.',
-                    color: 'orange',
-                    icon: (
-                        <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
-                        </svg>
-                    )
-                };
-            case 'timeout':
-                return {
-                    title: 'Waktu Habis',
-                    desc: 'Stream terlalu lama merespons. Kamera mungkin sedang offline atau jaringan lambat.',
-                    color: 'gray',
-                    icon: (
-                        <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    )
-                };
-            case 'media':
-                return {
-                    title: 'Error Media',
-                    desc: 'Terjadi kesalahan saat memutar video. Format stream mungkin tidak kompatibel dengan browser.',
-                    color: 'purple',
-                    icon: (
-                        <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                    )
-                };
-            case 'cors':
-                return {
-                    title: 'Stream Eksternal Diblokir',
-                    desc: 'Server pihak ketiga tidak mengizinkan akses lintas domain (CORS). Hubungi penyedia stream atau coba akses langsung URL-nya.',
-                    color: 'blue',
-                    icon: (
-                        <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                        </svg>
-                    )
-                };
-            default:
-                return {
-                    title: 'CCTV Tidak Terkoneksi',
-                    desc: 'Kamera sedang offline atau terjadi kesalahan. Coba lagi nanti.',
-                    color: 'red',
-                    icon: (
-                        <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                    )
-                };
-        }
-    };
+    useEffect(() => {
+        loadingStageRef.current = loadingStage;
+    }, [loadingStage]);
 
-    const errorColorClasses = {
-        yellow: 'bg-yellow-500/20 text-yellow-400',
-        orange: 'bg-orange-500/20 text-orange-400',
-        gray: 'bg-gray-500/20 text-gray-400',
-        purple: 'bg-purple-500/20 text-purple-400',
-        red: 'bg-red-500/20 text-red-400',
-        blue: 'bg-blue-500/20 text-blue-400',
-    };
+    useEffect(() => {
+        autoRetryCountRef.current = autoRetryCount;
+    }, [autoRetryCount]);
 
     // Track fullscreen state to disable animations and unlock orientation on exit
     useEffect(() => {
@@ -261,7 +191,7 @@ function VideoPopup({ camera, onClose }) {
         getConsecutiveFailures,
     } = useStreamTimeout({
         deviceTier,
-        onTimeout: (stage) => {
+        onTimeout: () => {
             cleanupResources();
             setStatus('timeout');
             setErrorType('timeout');
@@ -278,12 +208,10 @@ function VideoPopup({ camera, onClose }) {
     useEffect(() => {
         fallbackHandlerRef.current = createFallbackHandler({
             maxAutoRetries: 3,
-            onAutoRetry: ({ attempt, maxAttempts, delay }) => {
-                setIsAutoRetrying(true);
+            onAutoRetry: ({ attempt }) => {
                 setAutoRetryCount(attempt);
             },
             onAutoRetryExhausted: ({ totalAttempts }) => {
-                setIsAutoRetrying(false);
                 setAutoRetryCount(totalAttempts);
             },
             onNetworkRestore: () => {
@@ -291,7 +219,6 @@ function VideoPopup({ camera, onClose }) {
                 // User can manually retry if needed
             },
             onManualRetryRequired: () => {
-                setIsAutoRetrying(false);
             },
         });
 
@@ -322,7 +249,7 @@ function VideoPopup({ camera, onClose }) {
         if (fallbackHandlerRef.current) {
             fallbackHandlerRef.current.clearPendingRetry();
         }
-    }, []);
+    }, [clearStreamTimeout]);
 
     useEffect(() => {
         // Skip HLS loading if camera is in maintenance or offline
@@ -461,33 +388,17 @@ function VideoPopup({ camera, onClose }) {
                 // Clear loading timeout
                 clearStreamTimeout();
 
-                // Check for CORS error on external streams
-                if (camera.stream_source === 'external' && d.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                    // Usually CORS errors manifest as network errors / manifestLoadError with 0 status
-                    // Even if it's a 404, we classify it as CORS/Blocked for external streams
-                    console.error('Stream eksternal diblokir (kemungkinan CORS atau Server Down).', d);
-                    setStatus('error');
-                    setErrorType('cors');
-                    setLoadingStage(LoadingStage.ERROR);
-                    return;
-                }
-
-                // Check for codec incompatibility - NOT recoverable
-                if (d.details === 'manifestIncompatibleCodecsError' ||
-                    d.details === 'fragParsingError' ||
-                    d.details === 'bufferAppendError' ||
-                    d.reason?.includes('codec') ||
-                    d.reason?.includes('HEVC') ||
-                    d.reason?.includes('h265')) {
-                    console.error('Browser tidak support codec H.265/HEVC. Ubah setting kamera ke H.264.');
-                    setStatus('error');
-                    setErrorType('codec');
-                    setLoadingStage(LoadingStage.ERROR);
-                    return;
-                }
-
-                const detectedErrorType = d.type === Hls.ErrorTypes.NETWORK_ERROR ? 'network' :
-                    d.type === Hls.ErrorTypes.MEDIA_ERROR ? 'media' : 'unknown';
+                const detectedErrorType = getPublicPopupErrorType({
+                    hlsError: {
+                        ...d,
+                        type: d.type === Hls.ErrorTypes.NETWORK_ERROR
+                            ? 'networkError'
+                            : d.type === Hls.ErrorTypes.MEDIA_ERROR
+                                ? 'mediaError'
+                                : 'unknownError',
+                    },
+                    streamSource: camera.stream_source,
+                });
 
                 // For media errors, try recovery (max 2 times)
                 if (d.type === Hls.ErrorTypes.MEDIA_ERROR) {
@@ -502,13 +413,13 @@ function VideoPopup({ camera, onClose }) {
 
                 // Try auto-retry with FallbackHandler
                 if (fallbackHandlerRef.current) {
-                    const streamError = createStreamError({
-                        type: detectedErrorType,
-                        message: d.details || 'Stream error',
-                        stage: loadingStage,
-                        deviceTier,
-                        retryCount: autoRetryCount,
-                    });
+                        const streamError = createStreamError({
+                            type: detectedErrorType,
+                            message: d.details || 'Stream error',
+                            stage: loadingStageRef.current,
+                            deviceTier,
+                            retryCount: autoRetryCountRef.current,
+                        });
 
                     const result = fallbackHandlerRef.current.handleError(streamError, () => {
                         if (!cancelled && hls) {
@@ -564,7 +475,7 @@ function VideoPopup({ camera, onClose }) {
             cleanupResources();
             if (hls) { hls.destroy(); hlsRef.current = null; }
         };
-    }, [url, retryKey, deviceTier, cleanupResources]);
+    }, [camera.stream_source, cleanupResources, clearStreamTimeout, deviceTier, isMaintenance, isOffline, resetFailures, retryKey, startTimeout, updateStreamStage, url]);
 
     const handleRetry = useCallback(() => {
         cleanupResources();
@@ -572,14 +483,13 @@ function VideoPopup({ camera, onClose }) {
         setErrorType(null);
         setLoadingStage(LoadingStage.CONNECTING);
         setAutoRetryCount(0);
-        setIsAutoRetrying(false);
         setShowTroubleshooting(false);
         resetFailures();
         if (fallbackHandlerRef.current) {
             fallbackHandlerRef.current.reset();
         }
         setRetryKey(k => k + 1);
-    }, [cleanupResources]);
+    }, [cleanupResources, resetFailures]);
 
     const toggleFS = async () => {
         try {
@@ -664,17 +574,15 @@ function VideoPopup({ camera, onClose }) {
     };
 
     // Get status display info - **Validates: Requirements 4.1, 4.2, 4.3, 4.4**
-    const getStatusDisplay = () => {
-        if (status === 'live') return { label: 'LIVE', color: 'bg-emerald-500/20 text-emerald-400', dotColor: 'bg-emerald-400' };
-        if (status === 'maintenance') return { label: 'PERBAIKAN', color: 'bg-red-500/20 text-red-400', dotColor: 'bg-red-400' };
-        if (status === 'offline') return { label: 'OFFLINE', color: 'bg-gray-500/20 text-gray-400', dotColor: 'bg-gray-400' };
-        if (status === 'timeout') return { label: 'TIMEOUT', color: 'bg-amber-500/20 text-amber-400', dotColor: 'bg-amber-400' };
-        if (status === 'error') return { label: 'ERROR', color: 'bg-red-500/20 text-red-400', dotColor: 'bg-red-400' };
-        // Connecting states with progressive messages
-        return { label: getStageMessage(loadingStage), color: 'bg-amber-500/20 text-amber-400', dotColor: 'bg-amber-400' };
-    };
-
-    const statusDisplay = getStatusDisplay();
+    const statusDisplay = getPublicPopupStatusDisplay({
+        status,
+        loadingStage,
+        errorType,
+        isTunnel: camera.is_tunnel === 1 || camera.is_tunnel === true,
+    });
+    const overlayState = getPublicPopupOverlayState({ status, loadingStage, errorType });
+    const isPlaybackLocked = isPublicPopupPlaybackLocked(status);
+    const canRetry = shouldShowPublicPopupRetry({ status, errorType });
 
     // Check if animations should be disabled on low-end devices - **Validates: Requirements 5.2**
     const disableAnimations = shouldDisableAnimations();
@@ -704,20 +612,12 @@ function VideoPopup({ camera, onClose }) {
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                                     </svg>
                                 </button>
-                                {isMaintenance ? (
-                                    <span className="px-1.5 py-0.5 rounded bg-red-500 text-white text-[10px] font-bold">Perbaikan</span>
-                                ) : isOffline ? (
-                                    <span className="px-1.5 py-0.5 rounded bg-gray-500 text-white text-[10px] font-bold">Offline</span>
-                                ) : (
-                                    <>
-                                        <span className={`w-1.5 h-1.5 rounded-full bg-red-500 ${disableAnimations ? '' : 'animate-pulse'}`} />
-                                        <span className={`px-1.5 py-0.5 rounded text-white text-[10px] font-bold ${camera.is_tunnel ? 'bg-orange-500' : 'bg-emerald-500'}`}>
-                                            {camera.is_tunnel ? 'Tunnel' : 'Stabil'}
+                                        <span className={`inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold ${statusDisplay.color}`}>
+                                            <span className={`w-1.5 h-1.5 rounded-full ${statusDisplay.dotColor} ${status === 'live' && !disableAnimations ? 'animate-pulse' : ''}`} />
+                                            {statusDisplay.label}
                                         </span>
-                                    </>
-                                )}
-                            </div>
-                        </div>
+                                    </div>
+                                </div>
                         {/* Location + Area */}
                         {(camera.location || camera.area_name) && (
                             <div className="flex items-center gap-2 mt-1.5">
@@ -738,7 +638,13 @@ function VideoPopup({ camera, onClose }) {
                 )}
 
                 {/* Video - expand to full screen in fullscreen mode */}
-                <div ref={wrapperRef} className={`relative bg-gray-100 dark:bg-black overflow-hidden ${isFullscreen ? 'flex-1' : 'flex-1 min-h-0'}`} onDoubleClick={toggleFS}>
+                <div
+                    ref={wrapperRef}
+                    data-testid="grid-video-body"
+                    className={`relative bg-gray-100 dark:bg-black overflow-hidden ${isFullscreen ? 'flex-1 min-h-0' : 'w-full min-h-[220px] sm:min-h-[280px] md:min-h-[340px]'}`}
+                    style={{ aspectRatio: isFullscreen ? 'auto' : '16 / 7' }}
+                    onDoubleClick={toggleFS}
+                >
                     <ZoomableVideo videoRef={videoRef} maxZoom={4} onZoomChange={setZoom} isFullscreen={isFullscreen} />
 
                     {/* Snapshot Notification */}
@@ -813,109 +719,23 @@ function VideoPopup({ camera, onClose }) {
                                 )}
                             </div>
 
-                            <div className="absolute bottom-4 right-4 z-50 flex items-center gap-1 bg-gray-200/90 dark:bg-gray-900/80 rounded-xl p-1 pointer-events-auto">
+                            {!isPlaybackLocked && (
+                                <div className="absolute bottom-4 right-4 z-50 flex items-center gap-1 bg-gray-200/90 dark:bg-gray-900/80 rounded-xl p-1 pointer-events-auto">
                                 <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 disabled:opacity-30 rounded-lg text-gray-900 dark:text-white"><Icons.ZoomOut /></button>
                                 <span className="text-gray-900 dark:text-white text-xs font-medium w-12 text-center">{Math.round(zoom * 100)}%</span>
                                 <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 4} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 disabled:opacity-30 rounded-lg text-gray-900 dark:text-white"><Icons.ZoomIn /></button>
                                 {zoom > 1 && <button onClick={() => getZoomableWrapper()?._reset?.()} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 rounded-lg text-gray-900 dark:text-white ml-1"><Icons.Reset /></button>}
-                            </div>
+                                </div>
+                            )}
                         </>
                     )}
-
-                    {/* Maintenance Overlay */}
-                    {status === 'maintenance' && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-950/80">
-                            <div className="w-20 h-20 rounded-full bg-red-500/20 flex items-center justify-center mb-4">
-                                <svg className="w-10 h-10 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z" />
-                                </svg>
-                            </div>
-                            <h3 className="text-red-300 font-bold text-xl mb-2">Dalam Perbaikan</h3>
-                            <p className="text-gray-400 text-sm text-center max-w-md px-4">Kamera ini sedang dalam masa perbaikan/maintenance</p>
-                        </div>
-                    )}
-
-                    {/* Offline Overlay */}
-                    {status === 'offline' && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100/95 dark:bg-gray-900/90">
-                            <div className="w-20 h-20 rounded-full bg-gray-700 flex items-center justify-center mb-4">
-                                <svg className="w-10 h-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M6 18L18 6" />
-                                </svg>
-                            </div>
-                            <h3 className="text-gray-300 font-bold text-xl mb-2">Kamera Offline</h3>
-                            <p className="text-gray-500 text-sm text-center max-w-md px-4">Kamera ini sedang tidak tersedia atau tidak dapat dijangkau</p>
-                        </div>
-                    )}
-
-                    {/* Progressive Loading Overlay - **Validates: Requirements 4.1, 4.2, 4.3, 4.4, 4.5, 5.2** */}
-                    {status === 'connecting' && (
-                        <div className="absolute inset-0 bg-gradient-to-br from-gray-800 via-gray-900 to-gray-800 flex flex-col items-center justify-center">
-                            <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mb-4">
-                                <div className={`w-8 h-8 border-2 border-white/30 border-t-primary rounded-full ${disableAnimations ? '' : 'animate-spin'}`} />
-                            </div>
-                            <p className="text-white font-medium mb-1">{getStageMessage(loadingStage)}</p>
-                            <p className="text-gray-400 text-sm">Please wait...</p>
-                        </div>
-                    )}
-
-                    {/* Timeout Error Overlay - **Validates: Requirements 1.2, 1.4** */}
-                    {status === 'timeout' && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100/95 dark:bg-black/90">
-                            <div className="text-center p-6">
-                                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-500/20 flex items-center justify-center">
-                                    <Icons.Clock />
-                                </div>
-                                <h3 className="text-white font-semibold text-lg mb-2">Loading Timeout</h3>
-                                <p className="text-gray-400 text-sm mb-2">Stream took too long to load</p>
-                                {consecutiveFailures >= 3 && showTroubleshooting && (
-                                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mb-4 text-left max-w-sm mx-auto">
-                                        <p className="text-amber-400 text-xs font-medium mb-1">Troubleshooting Tips:</p>
-                                        <ul className="text-gray-400 text-xs list-disc list-inside space-y-1">
-                                            <li>Check your internet connection</li>
-                                            <li>Camera may be offline</li>
-                                            <li>Try refreshing the page</li>
-                                        </ul>
-                                    </div>
-                                )}
-                                <button
-                                    onClick={handleRetry}
-                                    className="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-600 text-white rounded-lg font-medium transition-colors"
-                                >
-                                    <Icons.Reset />
-                                    Coba Lagi
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Error Overlay */}
-                    {status === 'error' && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100/95 dark:bg-black/90">
-                            <div className="text-center p-6">
-                                {(() => {
-                                    const info = getErrorInfo();
-                                    const colorClass = errorColorClasses[info.color] || errorColorClasses.red;
-                                    return (
-                                        <>
-                                            <div className={`w-16 h-16 mx-auto mb-4 rounded-full ${colorClass} flex items-center justify-center`}>
-                                                {info.icon}
-                                            </div>
-                                            <h3 className="text-white font-semibold text-lg mb-2">{info.title}</h3>
-                                            <p className="text-gray-400 text-sm mb-4 max-w-md">{info.desc}</p>
-                                        </>
-                                    );
-                                })()}
-                                <button
-                                    onClick={handleRetry}
-                                    className="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-600 text-white rounded-lg font-medium transition-colors"
-                                >
-                                    <Icons.Reset />
-                                    Coba Lagi
-                                </button>
-                            </div>
-                        </div>
-                    )}
+                    <PublicStreamStatusOverlay
+                        state={overlayState}
+                        onRetry={canRetry ? handleRetry : null}
+                        showTroubleshooting={showTroubleshooting}
+                        consecutiveFailures={consecutiveFailures}
+                        disableAnimations={disableAnimations}
+                    />
                 </div>
 
                 {/* Controls Panel + Codec Description - hide in fullscreen */}
@@ -931,34 +751,41 @@ function VideoPopup({ camera, onClose }) {
                             )}
                         </div>
 
-                        {/* Zoom Controls */}
                         <div className="flex items-center gap-1 shrink-0">
-                            <div className="flex items-center gap-0.5 bg-gray-200/90 dark:bg-gray-800 rounded-lg p-0.5">
-                                <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-1.5 hover:bg-gray-300/50 dark:hover:bg-gray-700 disabled:opacity-30 rounded text-gray-900 dark:text-white transition-colors" title="Zoom Out">
-                                    <Icons.ZoomOut />
-                                </button>
-                                <span className="text-gray-900 dark:text-white text-[10px] font-medium w-8 text-center">{Math.round(zoom * 100)}%</span>
-                                <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 4} className="p-1.5 hover:bg-gray-300/50 dark:hover:bg-gray-700 disabled:opacity-30 rounded text-gray-900 dark:text-white transition-colors" title="Zoom In">
-                                    <Icons.ZoomIn />
-                                </button>
-                                {zoom > 1 && (
-                                    <button onClick={() => getZoomableWrapper()?._reset?.()} className="p-1.5 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-white transition-colors" title="Reset Zoom">
-                                        <Icons.Reset />
-                                    </button>
-                                )}
-                            </div>
+                            {!isPlaybackLocked && (
+                                <>
+                                    <div className="flex items-center gap-0.5 bg-gray-200/90 dark:bg-gray-800 rounded-lg p-0.5">
+                                        <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-1.5 hover:bg-gray-300/50 dark:hover:bg-gray-700 disabled:opacity-30 rounded text-gray-900 dark:text-white transition-colors" title="Zoom Out">
+                                            <Icons.ZoomOut />
+                                        </button>
+                                        <span className="text-gray-900 dark:text-white text-[10px] font-medium w-8 text-center">{Math.round(zoom * 100)}%</span>
+                                        <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 4} className="p-1.5 hover:bg-gray-300/50 dark:hover:bg-gray-700 disabled:opacity-30 rounded text-gray-900 dark:text-white transition-colors" title="Zoom In">
+                                            <Icons.ZoomIn />
+                                        </button>
+                                        {zoom > 1 && (
+                                            <button onClick={() => getZoomableWrapper()?._reset?.()} className="p-1.5 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded text-gray-900 dark:text-white transition-colors" title="Reset Zoom">
+                                                <Icons.Reset />
+                                            </button>
+                                        )}
+                                    </div>
 
-                            {/* Screenshot Button */}
-                            {status === 'live' && (
-                                <button onClick={takeSnapshot} className="p-1.5 bg-gray-200/80 dark:bg-gray-800 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded-lg text-gray-900 dark:text-white transition-colors" title="Ambil Screenshot">
-                                    <Icons.Image />
-                                </button>
+                                    {status === 'live' && (
+                                        <button onClick={takeSnapshot} className="p-1.5 bg-gray-200/80 dark:bg-gray-800 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded-lg text-gray-900 dark:text-white transition-colors" title="Ambil Screenshot">
+                                            <Icons.Image />
+                                        </button>
+                                    )}
+
+                                    <button onClick={toggleFS} className="p-1.5 bg-gray-200/80 dark:bg-gray-800 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded-lg text-gray-900 dark:text-white transition-colors" title={isFullscreen ? "Keluar Fullscreen" : "Fullscreen"}>
+                                        <Icons.Fullscreen />
+                                    </button>
+                                </>
                             )}
 
-                            {/* Fullscreen Button */}
-                            <button onClick={toggleFS} className="p-1.5 bg-gray-200/80 dark:bg-gray-800 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded-lg text-gray-900 dark:text-white transition-colors" title={isFullscreen ? "Keluar Fullscreen" : "Fullscreen"}>
-                                <Icons.Fullscreen />
-                            </button>
+                            {canRetry && (
+                                <button onClick={handleRetry} className="p-1.5 bg-primary/90 hover:bg-primary text-white rounded-lg transition-colors" title="Coba Lagi">
+                                    <Icons.Reset />
+                                </button>
+                            )}
 
                             {/* Close Button */}
                             <button onClick={onClose} className="p-1.5 bg-gray-200/80 dark:bg-gray-800 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded-lg text-gray-900 dark:text-white transition-colors" title="Tutup">
