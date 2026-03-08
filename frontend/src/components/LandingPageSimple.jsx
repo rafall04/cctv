@@ -3,6 +3,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useBranding } from '../contexts/BrandingContext';
 import { shouldDisableAnimations } from '../utils/animationControl';
 import LayoutModeToggle from './landing/LayoutModeToggle';
+import LandingAnnouncementBar from './landing/LandingAnnouncementBar';
+import LandingEventBanner from './landing/LandingEventBanner';
 
 const FeedbackWidget = lazy(() => import('./FeedbackWidget'));
 const SaweriaSupport = lazy(() => import('./SaweriaSupport'));
@@ -108,7 +110,9 @@ export default function LandingPageSimple({
     isFavorite,
     viewMode,
     setViewMode,
-    hideFloatingWidgets = false
+    hideFloatingWidgets = false,
+    announcement,
+    eventBanner,
 }) {
     const { branding } = useBranding();
 
@@ -120,16 +124,10 @@ export default function LandingPageSimple({
                 onLayoutToggle={onLayoutToggle}
             />
 
-            <main className="flex-1 min-h-0 pb-4 sm:pb-6">
-                <div className="py-3 px-4 text-center bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/30 border-b border-emerald-200/30 dark:border-emerald-800/30">
-                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/80 dark:bg-gray-800/80 shadow-sm">
-                        <svg className="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z" />
-                        </svg>
-                        <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Ramadan Kareem 1447 H</span>
-                    </div>
-                </div>
+            <LandingAnnouncementBar announcement={announcement} layoutMode="simple" />
+            <LandingEventBanner banner={eventBanner} layoutMode="simple" />
 
+            <main className="flex-1 min-h-0 pb-4 sm:pb-6">
                 {CamerasSection && (
                     <CamerasSection
                         onCameraClick={onCameraClick}

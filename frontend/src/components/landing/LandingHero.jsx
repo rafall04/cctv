@@ -1,6 +1,7 @@
 import LandingStatsBar from './LandingStatsBar';
+import LandingEventBanner from './LandingEventBanner';
 
-export default function Hero({ branding, landingSettings, disableHeavyEffects, onCameraClick }) {
+export default function Hero({ branding, landingSettings, disableHeavyEffects, onCameraClick, eventBanner }) {
     return (
         <header className="relative overflow-hidden bg-gradient-to-br from-amber-50/80 via-transparent to-emerald-50/80 dark:from-amber-950/30 dark:via-transparent dark:to-emerald-950/30">
             {!disableHeavyEffects && (
@@ -21,17 +22,11 @@ export default function Hero({ branding, landingSettings, disableHeavyEffects, o
             )}
 
             <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 text-center">
+                <LandingEventBanner banner={eventBanner} layoutMode="full" />
                 <div
                     data-testid="landing-hero-badge-stack"
                     className="mx-auto mb-6 flex max-w-sm flex-col items-center gap-2.5 sm:gap-3"
                 >
-                    <div className="flex items-center gap-2 rounded-full bg-emerald-100 px-4 py-1.5 text-xs font-semibold text-emerald-600 shadow-sm dark:bg-emerald-500/20 dark:text-emerald-400">
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12z"/>
-                        </svg>
-                        <span>Ramadan Kareem 1447 H</span>
-                    </div>
-
                     {branding.show_powered_by === 'true' && (
                         <div className="flex items-center gap-2 rounded-full bg-sky-100 px-4 py-1.5 text-xs font-semibold text-primary-600 shadow-sm dark:bg-primary/20 dark:text-primary-400">
                             <div className="flex h-5 w-5 items-center justify-center rounded bg-gradient-to-br from-primary to-primary-600 text-[10px] font-bold text-white">{branding.logo_text}</div>

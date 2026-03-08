@@ -6,6 +6,28 @@ const DEFAULT_LANDING_SETTINGS = {
     area_coverage: 'Saat ini area coverage kami baru mencakup <strong>Dander</strong> dan <strong>Tanjungharjo</strong>',
     hero_badge: 'LIVE STREAMING 24 JAM',
     section_title: 'CCTV Publik',
+    eventBanner: {
+        enabled: false,
+        title: '',
+        text: '',
+        theme: 'neutral',
+        start_at: '',
+        end_at: '',
+        show_in_full: true,
+        show_in_simple: true,
+        isActive: false,
+    },
+    announcement: {
+        enabled: false,
+        title: '',
+        text: '',
+        style: 'info',
+        start_at: '',
+        end_at: '',
+        show_in_full: true,
+        show_in_simple: true,
+        isActive: false,
+    },
 };
 
 export function useLandingPublicConfig() {

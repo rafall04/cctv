@@ -15,6 +15,7 @@ import LandingHero from '../components/landing/LandingHero';
 import LandingFooter from '../components/landing/LandingFooter';
 import LandingCamerasSection from '../components/landing/LandingCamerasSection';
 import LandingPageSimple from '../components/LandingPageSimple';
+import LandingAnnouncementBar from '../components/landing/LandingAnnouncementBar';
 import MultiViewButton from '../components/MultiView/MultiViewButton';
 import MultiViewLayout from '../components/MultiView/MultiViewLayout';
 import VideoPopup from '../components/MultiView/VideoPopup';
@@ -98,6 +99,8 @@ function LandingPageContent() {
                     viewMode={viewMode}
                     setViewMode={setViewMode}
                     hideFloatingWidgets={shouldHideFloatingWidgets}
+                    announcement={landingSettings.announcement}
+                    eventBanner={landingSettings.eventBanner}
                 />
 
                 <MultiViewButton
@@ -123,12 +126,14 @@ function LandingPageContent() {
         <div key="full-mode">
             <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
                 <LandingNavbar branding={branding} layoutMode={layoutMode} onLayoutToggle={toggleLayoutMode} />
+                <LandingAnnouncementBar announcement={landingSettings.announcement} layoutMode="full" />
 
                 <LandingHero
                     branding={branding}
                     landingSettings={landingSettings}
                     disableHeavyEffects={disableHeavyEffects}
                     onCameraClick={setPopup}
+                    eventBanner={landingSettings.eventBanner}
                 />
 
                 <LandingCamerasSection

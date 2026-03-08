@@ -50,10 +50,28 @@ describe('LandingPageSimple footer layout', () => {
                 viewMode="map"
                 setViewMode={() => {}}
                 hideFloatingWidgets
+                eventBanner={{
+                    enabled: true,
+                    title: 'Ramadan Kareem',
+                    text: 'Selamat menunaikan ibadah puasa.',
+                    theme: 'ramadan',
+                    show_in_simple: true,
+                    isActive: true,
+                }}
+                announcement={{
+                    enabled: true,
+                    title: 'Info Layanan',
+                    text: 'Maintenance malam ini.',
+                    style: 'warning',
+                    show_in_simple: true,
+                    isActive: true,
+                }}
             />
         );
 
-        expect(screen.getAllByText('Ramadan Kareem 1447 H').length).toBe(1);
+        expect(screen.getByTestId('landing-announcement-simple')).toBeTruthy();
+        expect(screen.getByTestId('landing-event-banner-simple')).toBeTruthy();
+        expect(screen.getByText('Ramadan Kareem')).toBeTruthy();
         expect(screen.getAllByText('RAF NET').length).toBeGreaterThan(0);
         expect(screen.getByRole('tab', { name: /full/i })).not.toBeNull();
         expect(screen.getByRole('tab', { name: /simple/i })).not.toBeNull();
