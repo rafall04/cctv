@@ -508,4 +508,34 @@ describe('MapView area filter visibility', () => {
             expect(body.style.aspectRatio).toBe(String(4 / 3));
         });
     });
+    it('menormalkan rasio body live map yang padded dekat 16:9', async () => {
+        await act(async () => {
+            render(<MapView cameras={cameras} areas={[]} showAreaFilter={false} />);
+        });
+
+        fireEvent.click(screen.getByTestId('marker--7.1507-111.8815'));
+
+        const body = await screen.findByTestId('map-video-body');
+        const video = document.querySelector('video');
+
+        expect(video).toBeTruthy();
+
+        Object.defineProperty(video, 'videoWidth', {
+            configurable: true,
+            value: 1920,
+        });
+        Object.defineProperty(video, 'videoHeight', {
+            configurable: true,
+            value: 1088,
+        });
+
+        await act(async () => {
+            video.dispatchEvent(new Event('loadedmetadata'));
+        });
+
+        await waitFor(() => {
+            expect(body.style.aspectRatio).toBe(String(16 / 9));
+        });
+    });
 });
+

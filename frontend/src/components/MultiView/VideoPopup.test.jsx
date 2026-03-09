@@ -51,6 +51,8 @@ vi.mock('hls.js', () => {
 
         loadSource = vi.fn();
         attachMedia = vi.fn();
+        startLoad = vi.fn();
+        recoverMediaError = vi.fn();
         destroy = vi.fn();
         on(event, handler) {
             this.handlers[event] = handler;
@@ -206,6 +208,8 @@ describe('VideoPopup non-live states', () => {
             expect(hlsInstances).toHaveLength(1);
         });
 
+        hlsInstances[0]._networkErrorRecoveryCount = 5;
+
         await act(async () => {
             hlsInstances[0].emit('error', {}, {
                 fatal: true,
@@ -283,4 +287,35 @@ describe('VideoPopup non-live states', () => {
             expect(body.style.aspectRatio).toBe(String(4 / 3));
         });
     });
+    it('menormalkan rasio body live grid yang padded dekat 16:9', async () => {
+        render(
+            <VideoPopup
+                camera={{ ...baseCamera, id: 17 }}
+                onClose={vi.fn()}
+            />
+        );
+
+        const video = await screen.findByTestId('grid-popup-video');
+        const body = screen.getByTestId('grid-video-body');
+
+        Object.defineProperty(video, 'videoWidth', {
+            configurable: true,
+            value: 1920,
+        });
+        Object.defineProperty(video, 'videoHeight', {
+            configurable: true,
+            value: 1088,
+        });
+
+        await act(async () => {
+            video.dispatchEvent(new Event('loadedmetadata'));
+        });
+
+        await waitFor(() => {
+            expect(body.style.aspectRatio).toBe(String(16 / 9));
+        });
+    });
 });
+
+
+
