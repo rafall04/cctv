@@ -104,6 +104,126 @@ const removeFailedFile = (cameraId, filename) => {
     }
 };
 
+const EXTERNAL_RECORDING_PROTOCOL_WHITELIST = 'file,http,https,tcp,tls,crypto';
+
+export function maskRecordingSourceForLog(sourceUrl) {
+    if (!sourceUrl) return '';
+
+    try {
+        const url = new URL(sourceUrl);
+        if (url.username || url.password) {
+            url.username = '****';
+            url.password = '****';
+        }
+
+        if (url.search) {
+            for (const [key] of url.searchParams.entries()) {
+                url.searchParams.set(key, '***');
+            }
+        }
+
+        return url.toString();
+    } catch {
+        return sourceUrl.replace(/:[^:@]+@/, ':****@');
+    }
+}
+
+export function getRecordingSourceConfig(camera) {
+    const streamSource = (camera?.stream_source || 'internal').trim();
+
+    if (streamSource === 'external') {
+        const externalUrl = (camera?.external_hls_url || '').trim();
+        if (!externalUrl) {
+            return {
+                success: false,
+                reason: 'invalid_source',
+                message: 'External HLS URL is required for external recording',
+            };
+        }
+
+        if (!/^https?:\/\//i.test(externalUrl)) {
+            return {
+                success: false,
+                reason: 'invalid_source',
+                message: 'Invalid external HLS URL',
+            };
+        }
+
+        return {
+            success: true,
+            streamSource,
+            inputUrl: externalUrl,
+            logSource: maskRecordingSourceForLog(externalUrl),
+        };
+    }
+
+    const rtspUrl = (camera?.private_rtsp_url || '').trim();
+    if (!rtspUrl || !/^rtsp:\/\//i.test(rtspUrl)) {
+        return {
+            success: false,
+            reason: 'invalid_source',
+            message: 'Invalid RTSP URL',
+        };
+    }
+
+    return {
+        success: true,
+        streamSource,
+        inputUrl: rtspUrl,
+        logSource: maskRecordingSourceForLog(rtspUrl),
+    };
+}
+
+export function buildRecordingFfmpegArgs({ cameraDir, inputUrl, streamSource }) {
+    const outputPattern = join(cameraDir, '%Y%m%d_%H%M%S.mp4');
+    const inputArgs = streamSource === 'external'
+        ? [
+            '-protocol_whitelist', EXTERNAL_RECORDING_PROTOCOL_WHITELIST,
+            '-i', inputUrl,
+        ]
+        : [
+            '-rtsp_transport', 'tcp',
+            '-i', inputUrl,
+        ];
+
+    return [
+        ...inputArgs,
+        '-map', '0:v',
+        '-c:v', 'copy',
+        '-an',
+        '-f', 'segment',
+        '-segment_time', '600',
+        '-segment_format', 'mp4',
+        '-movflags', '+frag_keyframe+empty_moov+default_base_moof',
+        '-segment_atclocktime', '1',
+        '-reset_timestamps', '1',
+        '-strftime', '1',
+        outputPattern
+    ];
+}
+
+export function classifyRecordingFailure(ffmpegOutput = '', streamSource = 'internal') {
+    const output = ffmpegOutput.toLowerCase();
+
+    if (output.includes('http error 403') || output.includes('forbidden') || output.includes('access denied')) {
+        return 'upstream_unreachable';
+    }
+    if (output.includes('404 not found') || output.includes('server returned 404')) {
+        return 'upstream_unreachable';
+    }
+    if (output.includes('connection refused') || output.includes('connection timed out') || output.includes('timed out')) {
+        return 'upstream_unreachable';
+    }
+    if (streamSource === 'external' && (output.includes('invalid data found') || output.includes('failed to open segment') || output.includes('error when loading first segment'))) {
+        return 'unsupported_playlist';
+    }
+    if (output.includes('invalid argument') || output.includes('protocol not found') || output.includes('no such file or directory')) {
+        return 'invalid_source';
+    }
+
+    return 'ffmpeg_failed';
+}
+
 /**
  * Recording Service
  * Handles CCTV recording dengan stream copy (no re-encoding)
@@ -149,10 +269,10 @@ class RecordingService {
                 return { success: false, message: 'Camera not found' };
             }
 
-            // Validate RTSP URL
-            if (!camera.private_rtsp_url || !camera.private_rtsp_url.startsWith('rtsp://')) {
-                console.error(`Invalid RTSP URL for camera ${cameraId}: ${camera.private_rtsp_url}`);
-                return { success: false, message: 'Invalid RTSP URL' };
+            const sourceConfig = getRecordingSourceConfig(camera);
+            if (!sourceConfig.success) {
+                console.error(`[Recording] Invalid source for camera ${cameraId}: ${sourceConfig.message}`);
+                return { success: false, message: sourceConfig.message, reason: sourceConfig.reason };
             }
 
             // Check if camera is enabled
@@ -172,29 +292,15 @@ class RecordingService {
             }
 
             console.log(`Starting recording for camera ${cameraId} (${camera.name})`);
-            console.log(`RTSP URL: ${camera.private_rtsp_url.replace(/:[^:@]+@/, ':****@')}`); // Hide password
+            console.log(`[Recording] Source type: ${sourceConfig.streamSource}`);
+            console.log(`[Recording] Input URL: ${sourceConfig.logSource}`);
 
             // FFmpeg command - stream copy with optimized MP4 for seeking
-            const outputPattern = join(cameraDir, '%Y%m%d_%H%M%S.mp4');
-            const ffmpegArgs = [
-                '-rtsp_transport', 'tcp',
-                '-i', camera.private_rtsp_url,
-                '-map', '0:v',                   // Map video only (skip audio)
-                '-c:v', 'copy',                  // Copy video codec (0% CPU)
-                '-an',                           // No audio
-                '-f', 'segment',                 // Split ke segments
-                '-segment_time', '600',          // 10 menit per file (akan dipotong di keyframe terdekat)
-                '-segment_format', 'mp4',
-                // CRITICAL: Optimized for HTTP Range Requests and seeking
-                // - frag_keyframe: Create keyframe-aligned fragments
-                // - empty_moov: Put moov atom at start (enables seeking)
-                // - default_base_moof: Use default base for moof boxes
-                '-movflags', '+frag_keyframe+empty_moov+default_base_moof',
-                '-segment_atclocktime', '1',     // Align dengan clock time
-                '-reset_timestamps', '1',
-                '-strftime', '1',
-                outputPattern
-            ];
+            const ffmpegArgs = buildRecordingFfmpegArgs({
+                cameraDir,
+                inputUrl: sourceConfig.inputUrl,
+                streamSource: sourceConfig.streamSource,
+            });
 
             console.log(`FFmpeg recording: stream copy with web-compatible MP4 (0% CPU overhead)`);
 
@@ -206,7 +312,8 @@ class RecordingService {
                 process: ffmpeg,
                 startTime: new Date(),
                 camera: camera,
-                currentSegment: null
+                currentSegment: null,
+                streamSource: sourceConfig.streamSource,
             });
 
             // Initialize stream health
@@ -270,7 +377,9 @@ class RecordingService {
 
             ffmpeg.on('close', (code) => {
                 if (code !== 0 && code !== null) {
+                    const failureReason = classifyRecordingFailure(ffmpegOutput.join(''), sourceConfig.streamSource);
                     console.error(`FFmpeg process for camera ${cameraId} exited with code ${code}`);
+                    console.error(`[Recording] Failure reason (${sourceConfig.streamSource}): ${failureReason}`);
                     console.error(`Last FFmpeg output:\n${ffmpegOutput.join('').slice(-1000)}`); // Last 1000 chars
                     this.logRestart(cameraId, 'process_crashed', false);
                 } else {
