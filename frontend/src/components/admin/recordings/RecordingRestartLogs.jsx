@@ -31,10 +31,10 @@ function formatReason(reason) {
 
 function getReasonTone(reason) {
     if (reason === 'stream_frozen' || reason === 'timeout') {
-        return 'bg-amber-500/15 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300';
+        return 'bg-amber-500/15 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200';
     }
 
-    return 'bg-red-500/15 text-red-600 dark:bg-red-500/15 dark:text-red-300';
+    return 'bg-red-500/15 text-red-700 dark:bg-red-500/15 dark:text-red-200';
 }
 
 function getStatusInfo(success, recoveryTime) {
@@ -43,13 +43,13 @@ function getStatusInfo(success, recoveryTime) {
     if (success) {
         return {
             label: hasRecoveryTime ? 'Pulih' : 'Sukses',
-            className: 'bg-emerald-500/15 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300',
+            className: 'bg-emerald-500/15 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200',
         };
     }
 
     return {
         label: 'Belum Pulih',
-        className: 'bg-rose-500/15 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300',
+        className: 'bg-rose-500/15 text-rose-700 dark:bg-rose-500/15 dark:text-rose-200',
     };
 }
 
@@ -84,17 +84,17 @@ function renderRecovery(log) {
 
     if (recoveryLabel === '-') {
         return (
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-                {log.success ? 'Belum tersedia' : 'Belum pulih'}
-            </div>
-        );
+                <div className="text-sm text-gray-600 dark:text-gray-300">
+                    {log.success ? 'Belum tersedia' : 'Belum pulih'}
+                </div>
+            );
     }
 
     return (
         <div>
-            <div className="text-sm text-gray-700 dark:text-gray-200">{recoveryLabel}</div>
+                <div className="text-sm text-gray-700 dark:text-gray-200">{recoveryLabel}</div>
             {duration && (
-                <div className="text-xs text-gray-500 dark:text-gray-400">Pulih dalam {duration}</div>
+                <div className="text-xs text-gray-600 dark:text-gray-300">Pulih dalam {duration}</div>
             )}
         </div>
     );
@@ -110,16 +110,16 @@ export default function RecordingRestartLogs({ logs }) {
                     <table className="w-full">
                         <thead>
                             <tr className="border-b border-gray-200 dark:border-gray-700">
-                                <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Camera</th>
-                                <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Reason</th>
-                                <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Status</th>
-                                <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Restart</th>
-                                <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Recovery</th>
+                                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Camera</th>
+                                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Reason</th>
+                                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Status</th>
+                                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Restart</th>
+                                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Recovery</th>
                             </tr>
                         </thead>
                         <tbody>
                             {logs.slice(0, 20).map((log, index) => (
-                                <tr key={`${log.camera_name}-${log.restart_time || log.recovery_time || index}-${index}`} className="border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/40">
+                                <tr key={`${log.camera_name}-${log.restart_time || log.recovery_time || index}-${index}`} className="border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-700/30">
                                     <td className="px-4 py-3 text-gray-900 dark:text-white">{log.camera_name}</td>
                                     <td className="px-4 py-3">
                                         <span className={`px-2 py-1 rounded text-xs ${
@@ -141,7 +141,7 @@ export default function RecordingRestartLogs({ logs }) {
                     </table>
                 </div>
             ) : (
-                <p className="py-8 text-center text-gray-500 dark:text-gray-400">Belum ada restart logs</p>
+                <p className="py-8 text-center text-gray-600 dark:text-gray-300">Belum ada restart logs</p>
             )}
         </div>
     );

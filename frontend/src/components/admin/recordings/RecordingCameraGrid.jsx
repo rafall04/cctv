@@ -22,7 +22,7 @@ export default function RecordingCameraGrid({ recordings, onStartRecording, onSt
     if (recordings.length === 0) {
         return (
             <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center shadow-sm dark:border-gray-700/50 dark:bg-gray-800/60">
-                <p className="text-gray-500 dark:text-gray-400">Tidak ada kamera dengan recording enabled</p>
+                <p className="text-gray-600 dark:text-gray-300">Tidak ada kamera dengan recording enabled</p>
             </div>
         );
     }
@@ -42,10 +42,12 @@ export default function RecordingCameraGrid({ recordings, onStartRecording, onSt
                         <div className="flex items-start justify-between mb-4">
                             <div>
                                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{recording.name || recording.camera_name}</h3>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">{recording.location || 'No location'}</p>
+                                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">{recording.location || 'No location'}</p>
                             </div>
-                            <div className={`rounded-full px-3 py-1 text-xs font-medium ${
-                                isRecording ? 'bg-red-100 text-red-600 dark:bg-red-500/10 dark:text-red-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                            <div
+                                data-testid={`recording-status-${cameraId}`}
+                                className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                                isRecording ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-200' : 'bg-gray-100 text-gray-700 dark:bg-gray-700/80 dark:text-gray-100'
                             }`}>
                                 {isRecording ? 'Recording' : 'Stopped'}
                             </div>
@@ -53,26 +55,26 @@ export default function RecordingCameraGrid({ recordings, onStartRecording, onSt
 
                         <div className="space-y-2 mb-4">
                             <div className="flex justify-between text-sm">
-                                <span className="text-gray-500 dark:text-gray-400">Duration:</span>
+                                <span className="text-gray-600 dark:text-gray-300">Duration:</span>
                                 <span className="text-gray-900 dark:text-white">{recording.recording_duration_hours || 5}h</span>
                             </div>
                             <div className="flex justify-between text-sm">
-                                <span className="text-gray-500 dark:text-gray-400">Segments:</span>
+                                <span className="text-gray-600 dark:text-gray-300">Segments:</span>
                                 <span className="text-gray-900 dark:text-white">{segmentCount}</span>
                             </div>
                             <div className="flex justify-between text-sm">
-                                <span className="text-gray-500 dark:text-gray-400">Total Size:</span>
+                                <span className="text-gray-600 dark:text-gray-300">Total Size:</span>
                                 <span className="text-gray-900 dark:text-white">{formatFileSize(totalSize)}</span>
                             </div>
                             {oldestSegment && (
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-gray-500 dark:text-gray-400">Oldest:</span>
+                                    <span className="text-gray-600 dark:text-gray-300">Oldest:</span>
                                     <span className="text-gray-900 dark:text-white">{formatTimestamp(oldestSegment)}</span>
                                 </div>
                             )}
                             {newestSegment && (
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-gray-500 dark:text-gray-400">Newest:</span>
+                                    <span className="text-gray-600 dark:text-gray-300">Newest:</span>
                                     <span className="text-gray-900 dark:text-white">{formatTimestamp(newestSegment)}</span>
                                 </div>
                             )}

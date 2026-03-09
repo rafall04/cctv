@@ -76,17 +76,17 @@ export default function RecordingDashboard() {
                     <div>
                         <p className="text-sm font-semibold text-primary">Recording Overview</p>
                         <h1 className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">Recording Dashboard</h1>
-                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
                             Monitor recording aktif, kapasitas segmen, dan auto-restart kamera.
                         </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
-                        <span className="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                        <span className="rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700 dark:bg-gray-700/80 dark:text-gray-100">
                             Update terakhir: {formatLastUpdate(lastSuccessfulUpdate)}
                         </span>
                         <button
                             onClick={() => fetchData({ mode: 'initial' })}
-                            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
                         >
                             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
