@@ -113,6 +113,7 @@ function VideoPopup({ camera, onClose }) {
 
     const url = camera.streams?.hls;
     const deviceTier = detectDeviceTier();
+    const isExternal = camera.stream_source === 'external';
 
     useEffect(() => {
         loadingStageRef.current = loadingStage;
@@ -357,7 +358,12 @@ function VideoPopup({ camera, onClose }) {
         setLoadingStage(LoadingStage.LOADING);
         updateStreamStage(LoadingStage.LOADING);
 
-        if (Hls.isSupported()) {
+        const initNative = () => {
+            video.src = url;
+            video.addEventListener('loadedmetadata', () => requestVideoPlay(video));
+        };
+
+        const initHls = () => {
             const deviceTier = detectDeviceTier();
             const hlsConfig = getHLSConfig(deviceTier, {
                 isMobile: false,
@@ -431,6 +437,19 @@ function VideoPopup({ camera, onClose }) {
                     streamSource: camera.stream_source,
                 });
 
+                // Aggressive network error recovery for external streams
+                if (isExternal && d.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                    if (!hls._networkErrorRecoveryCount) hls._networkErrorRecoveryCount = 0;
+                    hls._networkErrorRecoveryCount++;
+
+                    if (hls._networkErrorRecoveryCount <= 5) {
+                        console.log(`[VideoPopup] Recovering external stream network error (${hls._networkErrorRecoveryCount}/5)`);
+                        hls.startLoad();
+                        requestVideoPlay(video);
+                        return;
+                    }
+                }
+
                 // For media errors, try recovery (max 2 times)
                 if (d.type === Hls.ErrorTypes.MEDIA_ERROR) {
                     if (!hls._mediaErrorRecoveryCount) hls._mediaErrorRecoveryCount = 0;
@@ -493,9 +512,22 @@ function VideoPopup({ camera, onClose }) {
                     setLoadingStage(LoadingStage.ERROR);
                 }
             });
-        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            video.src = url;
-            video.addEventListener('loadedmetadata', () => requestVideoPlay(video));
+        };
+
+        if (isExternal) {
+            // Prioritize Native Player for external streams (bypasses CORS on Mobile OS)
+            if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                initNative();
+            } else if (Hls.isSupported()) {
+                initHls();
+            }
+        } else {
+            // Standard priority for internal streams
+            if (Hls.isSupported()) {
+                initHls();
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                initNative();
+            }
         }
 
         return () => {

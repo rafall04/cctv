@@ -323,6 +323,7 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
         if (!streams || !videoRef.current || !deviceCapabilities) return;
 
         const video = videoRef.current;
+        const isExternal = camera?.stream_source === 'external';
         let hls = null;
         let isDestroyed = false;
 
@@ -356,8 +357,22 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                     mobileDeviceType: deviceCapabilities.mobileDeviceType,
                 });
 
-                // Try HLS first
-                if (Hls.isSupported() && streams.hls) {
+                let useNative = false;
+
+                if (isExternal) {
+                    // Prioritize Native Player for external streams to bypass CORS on Mobile OS
+                    if (video.canPlayType('application/vnd.apple.mpegurl') && streams.hls) {
+                        useNative = true;
+                    }
+                } else {
+                    // Regular order for internal streams
+                    if (!Hls.isSupported() && video.canPlayType('application/vnd.apple.mpegurl') && streams.hls) {
+                        useNative = true;
+                    }
+                }
+
+                // Try HLS first (unless prioritizing native for external)
+                if (!useNative && Hls.isSupported() && streams.hls) {
                     hls = new Hls(hlsConfig);
                     hlsRef.current = hls;
 
@@ -437,6 +452,19 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                                 retryCount: autoRetryCount,
                             });
 
+                            // Aggressive network error recovery for external streams
+                            if (isExternal && data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                                if (!hls._networkErrorRecoveryCount) hls._networkErrorRecoveryCount = 0;
+                                hls._networkErrorRecoveryCount++;
+
+                                if (hls._networkErrorRecoveryCount <= 5) {
+                                    console.log(`[VideoPlayer] Recovering external stream network error (${hls._networkErrorRecoveryCount}/5)`);
+                                    hls.startLoad();
+                                    if (video.paused) video.play().catch(() => { });
+                                    return;
+                                }
+                            }
+
                             // Try auto-retry with FallbackHandler
                             if (fallbackHandlerRef.current) {
                                 const result = fallbackHandlerRef.current.handleError(streamError, () => {
@@ -474,7 +502,7 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                             }
                         }
                     });
-                } else if (video.canPlayType('application/vnd.apple.mpegurl') && streams.hls) {
+                } else if (useNative) {
                     // Native HLS support (Safari)
                     video.src = streams.hls;
 

@@ -570,6 +570,7 @@ const VideoModal = memo(({ camera, onClose }) => {
         if (!camera?.streams?.hls || !videoRef.current) return;
 
         const video = videoRef.current;
+        const isExternal = camera.stream_source === 'external';
         let cancelled = false;
         let hls = null;
 
@@ -634,7 +635,13 @@ const VideoModal = memo(({ camera, onClose }) => {
         video.addEventListener('loadedmetadata', handleNativeLoadedMetadata);
         video.addEventListener('error', handleNativeError);
 
-        if (Hls.isSupported()) {
+        const initNative = () => {
+            video.src = camera.streams.hls;
+            updateStreamStage(LoadingStage.LOADING);
+            startPlaybackCheck();
+        };
+
+        const initHls = () => {
             hls = new Hls(hlsConfig);
             hlsRef.current = hls;
 
@@ -663,7 +670,23 @@ const VideoModal = memo(({ camera, onClose }) => {
             });
 
             hls.on(Hls.Events.ERROR, (_, data) => {
-                if (cancelled || !data.fatal) return;
+                if (cancelled) return;
+
+                // Aggressive network error recovery for external streams
+                if (isExternal && data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                    if (!hls._networkErrorRecoveryCount) hls._networkErrorRecoveryCount = 0;
+                    hls._networkErrorRecoveryCount++;
+
+                    if (hls._networkErrorRecoveryCount <= 5) {
+                        console.log(`[MapView] Recovering external stream network error (${hls._networkErrorRecoveryCount}/5)`);
+                        hls.startLoad();
+                        if (video.paused) video.play().catch(() => { });
+                        return;
+                    }
+                }
+
+                if (!data.fatal) return;
+
                 const nextErrorType = getPublicPopupErrorType({
                     hlsError: {
                         ...data,
@@ -687,11 +710,20 @@ const VideoModal = memo(({ camera, onClose }) => {
                     startPlaybackCheck();
                 }
             }, 50);
+        };
 
-        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            video.src = camera.streams.hls;
-            updateStreamStage(LoadingStage.LOADING);
-            startPlaybackCheck();
+        if (isExternal) {
+            if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                initNative();
+            } else if (Hls.isSupported()) {
+                initHls();
+            }
+        } else {
+            if (Hls.isSupported()) {
+                initHls();
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                initNative();
+            }
         }
 
         return () => {
