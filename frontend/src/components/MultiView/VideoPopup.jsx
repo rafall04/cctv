@@ -1,6 +1,5 @@
 import { useRef, useState, useEffect, useCallback, useLayoutEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import Hls from 'hls.js';
 import { Icons } from '../ui/Icons.jsx';
 import CodecBadge from '../CodecBadge.jsx';
 import ZoomableVideo from './ZoomableVideo';
@@ -9,6 +8,7 @@ import { shouldDisableAnimations } from '../../utils/animationControl';
 import { LoadingStage, createStreamError } from '../../utils/streamLoaderTypes';
 import { createFallbackHandler } from '../../utils/fallbackHandler';
 import { getHLSConfig } from '../../utils/hlsConfig';
+import { preloadHls } from '../../utils/preloadManager';
 import { useStreamTimeout } from '../../hooks/useStreamTimeout';
 import { viewerService } from '../../services/viewerService';
 import { takeSnapshot as takeSnapshotUtil } from '../../utils/snapshotHelper';
@@ -290,6 +290,7 @@ function VideoPopup({ camera, onClose }) {
         if (!url || !videoRef.current) return;
         const video = videoRef.current;
         let hls = null;
+        let HlsClass = null;
         let cancelled = false;
         let playbackCheckInterval = null;
         let isLive = false; // Flag to prevent setState after live
@@ -386,13 +387,16 @@ function VideoPopup({ camera, onClose }) {
             video.addEventListener('loadedmetadata', () => requestVideoPlay(video));
         };
 
-        const initHls = () => {
+        const initHls = async () => {
+            HlsClass = await preloadHls();
+            if (cancelled || !HlsClass) return;
+
             const deviceTier = detectDeviceTier();
             const hlsConfig = getHLSConfig(deviceTier, {
                 isMobile: false,
                 mobileDeviceType: null,
             });
-            hls = new Hls(hlsConfig);
+            hls = new HlsClass(hlsConfig);
             hlsRef.current = hls;
 
             // Load source first, then attach media with small delay
@@ -408,7 +412,7 @@ function VideoPopup({ camera, onClose }) {
             // Start playback check early - don't wait for events that may not fire
             startPlaybackCheck();
 
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            hls.on(HlsClass.Events.MANIFEST_PARSED, () => {
                 if (cancelled || isLive) return; // Skip if already live
                 // Update to buffering stage
                 setLoadingStage(LoadingStage.BUFFERING);
@@ -417,7 +421,7 @@ function VideoPopup({ camera, onClose }) {
             });
 
             // FRAG_LOADED fires when first fragment is loaded - more reliable than MANIFEST_PARSED
-            hls.on(Hls.Events.FRAG_LOADED, () => {
+            hls.on(HlsClass.Events.FRAG_LOADED, () => {
                 if (cancelled || isLive) return; // Skip if already live
                 // If still in LOADING stage, move to BUFFERING
                 setLoadingStage(prev => {
@@ -433,13 +437,13 @@ function VideoPopup({ camera, onClose }) {
                 }
             });
 
-            hls.on(Hls.Events.FRAG_BUFFERED, () => {
+            hls.on(HlsClass.Events.FRAG_BUFFERED, () => {
                 if (cancelled || isLive) return; // Skip if already live
                 // Langsung set PLAYING dan status live setelah buffered
                 handlePlaying(); // Use handlePlaying to set isLive flag
             });
 
-            hls.on(Hls.Events.ERROR, (_, d) => {
+            hls.on(HlsClass.Events.ERROR, (_, d) => {
                 if (cancelled || isLive) return; // Don't handle errors if already playing
 
                 // For non-fatal errors, just continue
@@ -451,9 +455,9 @@ function VideoPopup({ camera, onClose }) {
                 const detectedErrorType = getPublicPopupErrorType({
                     hlsError: {
                         ...d,
-                        type: d.type === Hls.ErrorTypes.NETWORK_ERROR
+                        type: d.type === HlsClass.ErrorTypes.NETWORK_ERROR
                             ? 'networkError'
-                            : d.type === Hls.ErrorTypes.MEDIA_ERROR
+                            : d.type === HlsClass.ErrorTypes.MEDIA_ERROR
                                 ? 'mediaError'
                                 : 'unknownError',
                     },
@@ -461,7 +465,7 @@ function VideoPopup({ camera, onClose }) {
                 });
 
                 // Aggressive network error recovery for external streams
-                if (isExternal && d.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                if (isExternal && d.type === HlsClass.ErrorTypes.NETWORK_ERROR) {
                     if (!hls._networkErrorRecoveryCount) hls._networkErrorRecoveryCount = 0;
                     hls._networkErrorRecoveryCount++;
 
@@ -480,7 +484,7 @@ function VideoPopup({ camera, onClose }) {
                 }
 
                 // For media errors, try recovery (max 2 times)
-                if (d.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                if (d.type === HlsClass.ErrorTypes.MEDIA_ERROR) {
                     if (!hls._mediaErrorRecoveryCount) hls._mediaErrorRecoveryCount = 0;
                     hls._mediaErrorRecoveryCount++;
 
@@ -508,18 +512,18 @@ function VideoPopup({ camera, onClose }) {
                                 isMobile: false,
                                 mobileDeviceType: null,
                             });
-                            const newHls = new Hls(newHlsConfig);
+                            const newHls = new HlsClass(newHlsConfig);
                             hlsRef.current = newHls;
                             newHls.loadSource(url);
                             newHls.attachMedia(video);
 
-                            newHls.on(Hls.Events.MANIFEST_PARSED, () => {
+                            newHls.on(HlsClass.Events.MANIFEST_PARSED, () => {
                                 if (cancelled) return;
                                 setLoadingStage(LoadingStage.BUFFERING);
                                 requestVideoPlay(video);
                             });
 
-                            newHls.on(Hls.Events.ERROR, (_, d2) => {
+                            newHls.on(HlsClass.Events.ERROR, (_, d2) => {
                                 if (cancelled) return;
                                 if (d2.fatal) {
                                     setStatus('error');
@@ -544,11 +548,19 @@ function VideoPopup({ camera, onClose }) {
         };
 
         // Standard priority for internal streams and external streams alike
-        if (Hls.isSupported()) {
-            initHls();
-        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            initNative();
-        }
+        const initializePlayback = async () => {
+            const loadedHls = await preloadHls();
+            if (cancelled) return;
+            HlsClass = loadedHls;
+
+            if (HlsClass?.isSupported()) {
+                await initHls();
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                initNative();
+            }
+        };
+
+        initializePlayback();
 
         return () => {
             cancelled = true;

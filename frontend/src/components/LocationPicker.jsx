@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import { settingsService } from '../services/settingsService';
 import 'leaflet/dist/leaflet.css';
+import '../styles/leaflet-overrides.css';
 
 const MAP_TYPES = {
     HYBRID: 'hybrid',

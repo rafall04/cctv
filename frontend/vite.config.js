@@ -30,19 +30,6 @@ export default defineConfig({
 
                     // Map libraries (Leaflet is large)
                     'map-vendor': ['leaflet', 'react-leaflet'],
-
-                    // Admin pages (lazy loaded)
-                    'admin-pages': [
-                        './src/pages/Dashboard.jsx',
-                        './src/pages/CameraManagement.jsx',
-                        './src/pages/AreaManagement.jsx',
-                        './src/pages/UserManagement.jsx',
-                        './src/pages/FeedbackManagement.jsx',
-                        './src/pages/ViewerAnalytics.jsx',
-                        './src/pages/UnifiedSettings.jsx',
-                        './src/pages/SponsorManagement.jsx',
-                        './src/pages/RecordingDashboard.jsx',
-                    ],
                 },
             },
         },

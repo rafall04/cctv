@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState, memo, useCallback, useMemo, useLayoutEffect } from 'react';
 import { MapContainer, TileLayer, Marker, useMap, ZoomControl, LayersControl } from 'react-leaflet';
 import L from 'leaflet';
-import Hls from 'hls.js';
 import 'leaflet/dist/leaflet.css';
+import '../styles/leaflet-overrides.css';
 import { detectDeviceTier } from '../utils/deviceDetector';
 import { settingsService } from '../services/settingsService';
 import { getHLSConfig } from '../utils/hlsConfig';
 import { viewerService } from '../services/viewerService';
 import { createTransformThrottle } from '../utils/rafThrottle';
 import { getTimeoutDuration } from '../hooks/useStreamTimeout';
+import { preloadHls } from '../utils/preloadManager';
 import CodecBadge from './CodecBadge';
 import { useBranding } from '../contexts/BrandingContext';
 import { takeSnapshot as takeSnapshotUtil } from '../utils/snapshotHelper';
@@ -609,6 +610,7 @@ const VideoModal = memo(({ camera, onClose }) => {
         const isExternal = camera.stream_source === 'external';
         let cancelled = false;
         let hls = null;
+        let HlsClass = null;
 
         // Reset state
         setStatus('connecting');
@@ -691,17 +693,20 @@ const VideoModal = memo(({ camera, onClose }) => {
             startPlaybackCheck();
         };
 
-        const initHls = () => {
-            hls = new Hls(hlsConfig);
+        const initHls = async () => {
+            HlsClass = await preloadHls();
+            if (cancelled || !HlsClass) return;
+
+            hls = new HlsClass(hlsConfig);
             hlsRef.current = hls;
 
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            hls.on(HlsClass.Events.MANIFEST_PARSED, () => {
                 if (cancelled) return;
                 updateStreamStage(LoadingStage.BUFFERING);
                 video.play().catch(() => { });
             });
 
-            hls.on(Hls.Events.FRAG_LOADED, () => {
+            hls.on(HlsClass.Events.FRAG_LOADED, () => {
                 if (cancelled) return;
                 setLoadingStage(prev => {
                     if (prev === LoadingStage.CONNECTING || prev === LoadingStage.LOADING) {
@@ -713,17 +718,17 @@ const VideoModal = memo(({ camera, onClose }) => {
                 if (video.paused) video.play().catch(() => { });
             });
 
-            hls.on(Hls.Events.FRAG_BUFFERED, () => {
+            hls.on(HlsClass.Events.FRAG_BUFFERED, () => {
                 if (cancelled) return;
                 handlePlaying();
                 if (video.paused) video.play().catch(() => { });
             });
 
-            hls.on(Hls.Events.ERROR, (_, data) => {
+            hls.on(HlsClass.Events.ERROR, (_, data) => {
                 if (cancelled) return;
 
                 // Aggressive network error recovery for external streams
-                if (isExternal && data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                if (isExternal && data.type === HlsClass.ErrorTypes.NETWORK_ERROR) {
                     if (!hls._networkErrorRecoveryCount) hls._networkErrorRecoveryCount = 0;
                     hls._networkErrorRecoveryCount++;
 
@@ -746,9 +751,9 @@ const VideoModal = memo(({ camera, onClose }) => {
                 const nextErrorType = getPublicPopupErrorType({
                     hlsError: {
                         ...data,
-                        type: data.type === Hls.ErrorTypes.NETWORK_ERROR
+                        type: data.type === HlsClass.ErrorTypes.NETWORK_ERROR
                             ? 'networkError'
-                            : data.type === Hls.ErrorTypes.MEDIA_ERROR
+                            : data.type === HlsClass.ErrorTypes.MEDIA_ERROR
                                 ? 'mediaError'
                                 : 'unknownError',
                     },
@@ -769,11 +774,19 @@ const VideoModal = memo(({ camera, onClose }) => {
         };
 
         // Standard priority for internal and external streams
-        if (Hls.isSupported()) {
-            initHls();
-        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            initNative();
-        }
+        const initializePlayback = async () => {
+            const loadedHls = await preloadHls();
+            if (cancelled) return;
+            HlsClass = loadedHls;
+
+            if (HlsClass?.isSupported()) {
+                await initHls();
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                initNative();
+            }
+        };
+
+        initializePlayback();
 
         return () => {
             cancelled = true;
