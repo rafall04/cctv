@@ -31,10 +31,10 @@ function formatReason(reason) {
 
 function getReasonTone(reason) {
     if (reason === 'stream_frozen' || reason === 'timeout') {
-        return 'bg-amber-500/15 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200';
+        return 'bg-amber-500/15 text-amber-700 dark:bg-amber-500/20 dark:text-amber-100';
     }
 
-    return 'bg-red-500/15 text-red-700 dark:bg-red-500/15 dark:text-red-200';
+    return 'bg-red-500/15 text-red-700 dark:bg-red-500/20 dark:text-red-100';
 }
 
 function getStatusInfo(success, recoveryTime) {
@@ -43,13 +43,13 @@ function getStatusInfo(success, recoveryTime) {
     if (success) {
         return {
             label: hasRecoveryTime ? 'Pulih' : 'Sukses',
-            className: 'bg-emerald-500/15 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200',
+            className: 'bg-emerald-500/15 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-100',
         };
     }
 
     return {
         label: 'Belum Pulih',
-        className: 'bg-rose-500/15 text-rose-700 dark:bg-rose-500/15 dark:text-rose-200',
+        className: 'bg-rose-500/15 text-rose-700 dark:bg-rose-500/20 dark:text-rose-100',
     };
 }
 
@@ -102,7 +102,7 @@ function renderRecovery(log) {
 
 export default function RecordingRestartLogs({ logs }) {
     return (
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700/50 dark:bg-gray-800/60">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700/70 dark:bg-gray-800/70 md:p-6">
             <h2 className="mb-4 text-xl font-bold text-gray-900 dark:text-white">Auto-Restart Logs</h2>
 
             {logs.length > 0 ? (
@@ -119,7 +119,7 @@ export default function RecordingRestartLogs({ logs }) {
                         </thead>
                         <tbody>
                             {logs.slice(0, 20).map((log, index) => (
-                                <tr key={`${log.camera_name}-${log.restart_time || log.recovery_time || index}-${index}`} className="border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-700/30">
+                                <tr key={`${log.camera_name}-${log.restart_time || log.recovery_time || index}-${index}`} className="border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-700/40">
                                     <td className="px-4 py-3 text-gray-900 dark:text-white">{log.camera_name}</td>
                                     <td className="px-4 py-3">
                                         <span className={`px-2 py-1 rounded text-xs ${

@@ -27,9 +27,9 @@ describe('RecordingCameraGrid', () => {
         );
 
         expect(screen.getByText('CCTV LAPANGAN DANDER')).toBeTruthy();
-        expect(screen.getByText('Dander').className).toContain('dark:text-gray-300');
-        expect(screen.getByText('Duration:').className).toContain('dark:text-gray-300');
-        expect(screen.getByTestId('recording-status-7').className).toContain('dark:text-red-200');
+        expect(screen.getByText('Dander').className).toContain('dark:text-gray-200');
+        expect(screen.getByText('Duration:').className).toContain('dark:text-gray-200');
+        expect(screen.getByTestId('recording-status-7').className).toContain('dark:text-red-100');
     });
 
     it('merender empty state yang tetap terbaca', () => {

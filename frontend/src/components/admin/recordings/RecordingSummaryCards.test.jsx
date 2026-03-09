@@ -18,9 +18,12 @@ describe('RecordingSummaryCards', () => {
         );
 
         const recordingLabel = screen.getByTestId('summary-label-kamera-recording');
+        const segmentsLabel = screen.getByTestId('summary-label-total-segmen');
         const storageLabel = screen.getByTestId('summary-label-total-storage');
 
         expect(recordingLabel.className).toContain('dark:text-red-200');
+        expect(segmentsLabel.className).toContain('dark:bg-sky-500/15');
+        expect(segmentsLabel.className).toContain('dark:text-sky-200');
         expect(storageLabel.className).toContain('dark:text-emerald-200');
         expect(screen.getByText('385')).toBeTruthy();
     });

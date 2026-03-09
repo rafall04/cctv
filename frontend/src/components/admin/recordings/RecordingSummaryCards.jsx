@@ -26,7 +26,7 @@ export default function RecordingSummaryCards({ summary }) {
             label: 'Total Segmen',
             value: summary.totalSegments,
             accent: 'text-primary-600 dark:text-primary-300',
-            tone: 'bg-sky-50 text-sky-700 dark:bg-primary/20 dark:text-sky-200',
+            tone: 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-200',
         },
         {
             label: 'Total Storage',
@@ -37,12 +37,12 @@ export default function RecordingSummaryCards({ summary }) {
     ];
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 lg:grid-cols-4">
             {items.map((item) => (
-                <div key={item.label} className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700/50 dark:bg-gray-800/60">
+                <div key={item.label} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700/70 dark:bg-gray-800/70 md:p-6">
                     <div
                         data-testid={`summary-label-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
-                        className={`mb-3 inline-flex rounded-xl px-3 py-1 text-xs font-semibold ${item.tone}`}
+                        className={`mb-3 inline-flex rounded-xl px-3 py-1 text-xs font-semibold tracking-wide ${item.tone}`}
                     >
                         {item.label}
                     </div>

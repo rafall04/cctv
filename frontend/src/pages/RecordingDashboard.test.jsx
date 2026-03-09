@@ -33,8 +33,8 @@ describe('RecordingDashboard', () => {
         render(<RecordingDashboard />);
 
         expect(screen.getByText('Recording Dashboard')).toBeTruthy();
-        expect(screen.getByText(/Monitor recording aktif/i).className).toContain('dark:text-gray-300');
-        expect(screen.getByText(/Update terakhir:/i).className).toContain('dark:text-gray-100');
+        expect(screen.getByText(/Monitor recording aktif/i).className).toContain('dark:text-gray-200');
+        expect(screen.getByText(/Update terakhir:/i).className).toContain('dark:text-gray-50');
         expect(screen.getByRole('button', { name: /Refresh/i }).className).toContain('dark:text-gray-100');
     });
 });
