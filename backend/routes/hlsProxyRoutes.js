@@ -43,12 +43,12 @@ function getRealIP(request) {
     if (forwardedFor) {
         return forwardedFor.split(',')[0].trim();
     }
-    
+
     const realIP = request.headers['x-real-ip'];
     if (realIP) {
         return realIP.trim();
     }
-    
+
     return request.ip || request.socket?.remoteAddress || 'unknown';
 }
 
@@ -67,7 +67,7 @@ function extractCameraId(streamPath) {
     if (cached && Date.now() - cached.timestamp < CAMERA_CACHE_TTL) {
         return cached.cameraId;
     }
-    
+
     // UUID format: lookup from database
     const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (uuidPattern.test(streamPath)) {
@@ -84,7 +84,7 @@ function extractCameraId(streamPath) {
             console.error('[HLSProxy] Error looking up camera by stream_key:', error.message);
         }
     }
-    
+
     return null;
 }
 
@@ -94,30 +94,30 @@ function extractCameraId(streamPath) {
 function getOrCreateSession(ip, cameraId, request) {
     const cacheKey = `${ip}_${cameraId}`;
     const cached = sessionCache.get(cacheKey);
-    
+
     if (cached) {
         // Update last access time
         cached.lastAccess = Date.now();
-        
+
         // Send heartbeat to keep session alive (async, don't wait)
         try {
             viewerSessionService.heartbeat(cached.sessionId);
         } catch (e) {
             // Ignore heartbeat errors
         }
-        
+
         return cached.sessionId;
     }
-    
+
     // Create new session
     try {
         const sessionId = viewerSessionService.startSession(cameraId, request);
-        
+
         sessionCache.set(cacheKey, {
             sessionId,
             lastAccess: Date.now()
         });
-        
+
         console.log(`[HLSProxy] New session: ${sessionId} for stream (camera ${cameraId}) from ${ip}`);
         return sessionId;
     } catch (error) {
@@ -138,24 +138,24 @@ function getOrCreateSession(ip, cameraId, request) {
 function verifyStreamToken(request, reply, done) {
     // Extract token from query parameter or Authorization header
     let token = request.query.token;
-    
+
     if (!token) {
         const authHeader = request.headers.authorization;
         if (authHeader && authHeader.startsWith('Bearer ')) {
             token = authHeader.substring(7);
         }
     }
-    
+
     // If no token provided, allow access (public streams)
     // Session tracking is handled separately
     if (!token) {
         return done();
     }
-    
+
     // If token provided, verify it
     try {
         const decoded = jwt.verify(token, config.jwt.secret);
-        
+
         // Validate token type
         if (decoded.type !== 'stream_access') {
             return reply.code(403).send({
@@ -163,7 +163,7 @@ function verifyStreamToken(request, reply, done) {
                 message: 'Invalid token type',
             });
         }
-        
+
         // Attach decoded token to request for later use
         request.streamToken = decoded;
         done();
@@ -174,7 +174,7 @@ function verifyStreamToken(request, reply, done) {
                 message: 'Stream token expired',
             });
         }
-        
+
         return reply.code(403).send({
             success: false,
             message: 'Invalid stream token',
@@ -182,12 +182,100 @@ function verifyStreamToken(request, reply, done) {
     }
 }
 
+/**
+ * Tunnel handler for external streams
+ * Fetches .m3u8 and .ts files from external servers without sending CORS headers
+ */
+async function handleExternalStreamProxy(request, reply) {
+    const { url } = request.query;
+
+    if (!url) {
+        return reply.code(400).send('Missing url parameter');
+    }
+
+    // Ensure URL is valid and absolute
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        return reply.code(400).send('Invalid url parameter');
+    }
+
+    try {
+        const isTextFile = url.includes('.m3u8');
+
+        const response = await axios.get(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                // Explicitly strip Origin and Referer
+            },
+            timeout: 15000,
+            responseType: isTextFile ? 'text' : 'arraybuffer',
+            validateStatus: () => true
+        });
+
+        if (response.status !== 200) {
+            reply.header('Content-Type', 'text/plain');
+            reply.header('Cache-Control', 'no-cache');
+            return reply.code(response.status).send('');
+        }
+
+        let contentType = 'application/octet-stream';
+        if (url.includes('.m3u8')) contentType = 'application/vnd.apple.mpegurl';
+        else if (url.includes('.ts')) contentType = 'video/mp2t';
+
+        reply.header('Content-Type', contentType);
+        reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+        reply.header('Pragma', 'no-cache');
+        reply.header('Expires', '0');
+
+        if (isTextFile) {
+            // Rewrite TS segment URLs inside the m3u8 playlist if they are absolute
+            // If they are relative, we need to make them absolute but rewrite them to point to our proxy
+            let m3u8Content = response.data;
+            const baseUrlMatch = url.match(/^(.*\/)/);
+            const baseUrl = baseUrlMatch ? baseUrlMatch[1] : '';
+
+            const lines = m3u8Content.split('\n');
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                // If it's a URL or path (not a tag or empty line)
+                if (line && !line.startsWith('#')) {
+                    let absoluteUrl = line;
+                    if (!line.startsWith('http')) {
+                        // Handle relative path (e.g., segment.ts or subfolder/segment.ts)
+                        absoluteUrl = line.startsWith('/')
+                            ? new URL(line, baseUrl).href
+                            : baseUrl + line;
+                    }
+
+                    // Rewrite it to point to our proxy
+                    // e.g., /hls/proxy?url=encoded_absolute_url
+                    // Note: Use the config hostname if available, but for now relative paths are better
+                    lines[i] = `/hls/proxy?url=${encodeURIComponent(absoluteUrl)}`;
+                }
+            }
+
+            return reply.send(lines.join('\n'));
+        } else {
+            return reply.send(Buffer.from(response.data));
+        }
+
+    } catch (error) {
+        console.error(`[HLS Proxy] External fetch error for ${url}:`, error.message);
+        return reply.code(502).send('');
+    }
+}
+
 export default async function hlsProxyRoutes(fastify, _options) {
     // IMPORTANT: Use internal URL to MediaMTX, not public URL
     const mediamtxHlsUrl = config.mediamtx?.hlsUrlInternal || 'http://localhost:8888';
-    
+
     /**
-     * Proxy ALL HLS requests to MediaMTX
+     * Proxy External HLS requests
+     * Must be declared before '/*' to avoid being caught by the catch-all
+     */
+    fastify.get('/proxy', handleExternalStreamProxy);
+
+    /**
+     * Proxy ALL Internal HLS requests to MediaMTX
      * Handles: index.m3u8, stream.m3u8, .ts, .mp4, .m4s files
      * 
      * SECURITY: Token validation enabled - requires valid JWT token
@@ -197,20 +285,20 @@ export default async function hlsProxyRoutes(fastify, _options) {
     fastify.get('/*', { preHandler: verifyStreamToken }, async (request, reply) => {
         // Get the full path after /hls/
         const fullPath = request.params['*'];
-        
+
         if (!fullPath) {
             return reply.code(400).send('Invalid path - use /hls/{cameraPath}/index.m3u8');
         }
-        
+
         // Extract camera path (first segment)
         const pathParts = fullPath.split('/');
         const cameraPath = pathParts[0];
         const fileName = pathParts[pathParts.length - 1];
-        
+
         // Extract camera ID for session tracking
         const cameraId = extractCameraId(cameraPath);
         const ip = getRealIP(request);
-        
+
         // Create/update session only for playlist requests (not segments)
         if (fileName.endsWith('.m3u8') && cameraId) {
             try {
@@ -219,7 +307,7 @@ export default async function hlsProxyRoutes(fastify, _options) {
                 console.error('[HLSProxy] Session error:', e.message);
             }
         }
-        
+
         // Update heartbeat for segment requests
         if (cameraId && !fileName.endsWith('.m3u8')) {
             try {
@@ -233,18 +321,18 @@ export default async function hlsProxyRoutes(fastify, _options) {
                 // Ignore heartbeat errors
             }
         }
-        
+
         // Proxy request to MediaMTX
         try {
             const targetUrl = `${mediamtxHlsUrl}/${fullPath}`;
             const isTextFile = fileName.endsWith('.m3u8');
-            
+
             // For init.mp4 files, retry a few times as they may not be ready yet
             const isInitFile = fileName.includes('init.mp4') || fileName.includes('_init.mp4');
             const maxRetries = isInitFile ? 3 : 1;
             let lastError = null;
             let response = null;
-            
+
             for (let attempt = 0; attempt < maxRetries; attempt++) {
                 try {
                     response = await axios.get(targetUrl, {
@@ -255,17 +343,17 @@ export default async function hlsProxyRoutes(fastify, _options) {
                         responseType: isTextFile ? 'text' : 'arraybuffer',
                         validateStatus: () => true
                     });
-                    
+
                     if (response.status === 200) {
                         break; // Success, exit retry loop
                     }
-                    
+
                     // For init files, wait and retry on 404
                     if (isInitFile && response.status === 404 && attempt < maxRetries - 1) {
                         await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms
                         continue;
                     }
-                    
+
                     break; // Non-retryable error
                 } catch (err) {
                     lastError = err;
@@ -274,11 +362,11 @@ export default async function hlsProxyRoutes(fastify, _options) {
                     }
                 }
             }
-            
+
             if (!response && lastError) {
                 throw lastError;
             }
-            
+
             // Determine content type based on extension
             let contentType = 'application/octet-stream';
             if (fileName.endsWith('.m3u8')) {
@@ -288,7 +376,7 @@ export default async function hlsProxyRoutes(fastify, _options) {
             } else if (fileName.endsWith('.mp4') || fileName.endsWith('.m4s')) {
                 contentType = 'video/mp4';
             }
-            
+
             // Pass through the actual status code from MediaMTX
             // NOTE: CORS headers handled by Fastify CORS plugin
             if (response.status !== 200) {
@@ -297,12 +385,12 @@ export default async function hlsProxyRoutes(fastify, _options) {
                 reply.header('Cache-Control', 'no-cache');
                 return reply.code(response.status).send('');
             }
-            
+
             reply.header('Content-Type', contentType);
             reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
             reply.header('Pragma', 'no-cache');
             reply.header('Expires', '0');
-            
+
             if (isTextFile) {
                 return reply.send(response.data);
             } else {

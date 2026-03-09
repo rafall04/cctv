@@ -44,6 +44,22 @@ const convertToProxyHlsUrl = (hlsUrl) => {
     return hlsUrl;
 };
 
+/**
+ * Convert external HLS URL to use backend proxy to evade Browser CORS restrictions
+ * Format: /hls/proxy?url={encoded_url}
+ */
+const convertToExternalProxyUrl = (externalUrl) => {
+    if (!externalUrl) return externalUrl;
+
+    // Only proxy http/https URLs (avoid modifying already proxied or local URLs)
+    if (!externalUrl.startsWith('http://') && !externalUrl.startsWith('https://')) {
+        return externalUrl;
+    }
+
+    const baseUrl = getApiBaseUrl();
+    return `${baseUrl}/hls/proxy?url=${encodeURIComponent(externalUrl)}`;
+};
+
 const makeStreamUrlsAbsolute = (streams) => {
     if (!streams) return streams;
 
@@ -79,12 +95,25 @@ export const streamService = {
         try {
             const response = await apiClient.get('/api/stream', getRequestPolicyConfig(policy, config));
             if (response.data?.success && response.data?.data) {
-                response.data.data = response.data.data.map(camera => ({
-                    ...camera,
-                    streams: camera.stream_source === 'external'
-                        ? camera.streams  // External: use URL as-is from backend (direct to third-party)
-                        : makeStreamUrlsAbsolute(camera.streams),
-                }));
+                response.data.data = response.data.data.map(camera => {
+                    let processedStreams = camera.streams;
+
+                    if (camera.stream_source === 'external') {
+                        if (processedStreams && processedStreams.hls) {
+                            processedStreams = {
+                                ...processedStreams,
+                                hls: convertToExternalProxyUrl(processedStreams.hls)
+                            };
+                        }
+                    } else {
+                        processedStreams = makeStreamUrlsAbsolute(processedStreams);
+                    }
+
+                    return {
+                        ...camera,
+                        streams: processedStreams
+                    };
+                });
             }
             return response.data;
         } catch (error) {
@@ -100,7 +129,21 @@ export const streamService = {
                 getRequestPolicyConfig(policy, config)
             );
             if (response.data?.success && response.data?.data?.streams) {
-                response.data.data.streams = makeStreamUrlsAbsolute(response.data.data.streams);
+                const camera = response.data.data;
+                let processedStreams = camera.streams;
+
+                if (camera.stream_source === 'external') {
+                    if (processedStreams && processedStreams.hls) {
+                        processedStreams = {
+                            ...processedStreams,
+                            hls: convertToExternalProxyUrl(processedStreams.hls)
+                        };
+                    }
+                } else {
+                    processedStreams = makeStreamUrlsAbsolute(processedStreams);
+                }
+
+                response.data.data.streams = processedStreams;
             }
             return response.data;
         } catch (error) {
