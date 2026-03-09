@@ -351,6 +351,20 @@ function VideoPopup({ camera, onClose }) {
         video.addEventListener('loadedmetadata', handleLoadedMetadata);
         video.addEventListener('error', handleError);
 
+        // Live Edge Synchronization Fix
+        const handlePlaySync = () => {
+            if (cancelled || !hls || !isExternal) return;
+            if (hls.liveSyncPosition) {
+                const latency = hls.liveSyncPosition - video.currentTime;
+                // If we are more than 10 seconds behind live edge, sync it
+                if (latency > 10) {
+                    console.log(`[VideoPopup] Stale buffer detected (Latency: ${latency.toFixed(1)}s). Syncing to live edge...`);
+                    video.currentTime = hls.liveSyncPosition;
+                }
+            }
+        };
+        video.addEventListener('play', handlePlaySync);
+
         // Direct HLS.js usage - no lazy loading needed
         if (cancelled) return;
 
@@ -445,6 +459,12 @@ function VideoPopup({ camera, onClose }) {
                     if (hls._networkErrorRecoveryCount <= 5) {
                         console.log(`[VideoPopup] Recovering external stream network error (${hls._networkErrorRecoveryCount}/5)`);
                         hls.startLoad();
+
+                        // Jump to live sync directly on network error recovery to avoid 404s
+                        if (hls.liveSyncPosition) {
+                            video.currentTime = hls.liveSyncPosition;
+                        }
+
                         requestVideoPlay(video);
                         return;
                     }
@@ -514,20 +534,11 @@ function VideoPopup({ camera, onClose }) {
             });
         };
 
-        if (isExternal) {
-            // Prioritize Native Player for external streams (bypasses CORS on Mobile OS)
-            if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                initNative();
-            } else if (Hls.isSupported()) {
-                initHls();
-            }
-        } else {
-            // Standard priority for internal streams
-            if (Hls.isSupported()) {
-                initHls();
-            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                initNative();
-            }
+        // Standard priority for internal streams and external streams alike
+        if (Hls.isSupported()) {
+            initHls();
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            initNative();
         }
 
         return () => {
@@ -536,6 +547,7 @@ function VideoPopup({ camera, onClose }) {
             video.removeEventListener('playing', handlePlaying);
             video.removeEventListener('loadedmetadata', handleLoadedMetadata);
             video.removeEventListener('error', handleError);
+            video.removeEventListener('play', handlePlaySync);
             cleanupResources();
             if (hls) { hls.destroy(); hlsRef.current = null; }
         };

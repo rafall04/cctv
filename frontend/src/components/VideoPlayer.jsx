@@ -359,19 +359,12 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
 
                 let useNative = false;
 
-                if (isExternal) {
-                    // Prioritize Native Player for external streams to bypass CORS on Mobile OS
-                    if (video.canPlayType('application/vnd.apple.mpegurl') && streams.hls) {
-                        useNative = true;
-                    }
-                } else {
-                    // Regular order for internal streams
-                    if (!Hls.isSupported() && video.canPlayType('application/vnd.apple.mpegurl') && streams.hls) {
-                        useNative = true;
-                    }
+                // Native HLS fallback (e.g. for Safari)
+                if (!Hls.isSupported() && video.canPlayType('application/vnd.apple.mpegurl') && streams.hls) {
+                    useNative = true;
                 }
 
-                // Try HLS first (unless prioritizing native for external)
+                // Try HLS first (unless defaulting to native fallback)
                 if (!useNative && Hls.isSupported() && streams.hls) {
                     hls = new Hls(hlsConfig);
                     hlsRef.current = hls;
@@ -429,6 +422,23 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                         }
                     });
 
+                    // Live Edge Synchronization Fix
+                    // Mobile autoplay constraints might cause the video to be paused on load,
+                    // allowing Hls.js to accumulate stale buffers that lead to 404 segment errors.
+                    // This forces the player to jump to the live edge when finally played.
+                    video.addEventListener('play', () => {
+                        if (isDestroyed || !hls || !isExternal) return;
+
+                        if (hls.liveSyncPosition) {
+                            const latency = hls.liveSyncPosition - video.currentTime;
+                            // If we are more than 10 seconds behind live edge, sync it
+                            if (latency > 10) {
+                                console.log(`[VideoPlayer] Stale buffer detected (Latency: ${latency.toFixed(1)}s). Syncing to live edge...`);
+                                video.currentTime = hls.liveSyncPosition;
+                            }
+                        }
+                    });
+
                     // Handle HLS errors with ErrorRecovery and FallbackHandler
                     // **Property 6: Exponential Backoff Recovery**
                     // **Validates: Requirements 6.1, 6.2, 6.3, 6.4**
@@ -460,6 +470,12 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                                 if (hls._networkErrorRecoveryCount <= 5) {
                                     console.log(`[VideoPlayer] Recovering external stream network error (${hls._networkErrorRecoveryCount}/5)`);
                                     hls.startLoad();
+
+                                    // Jump to live sync directly on network error recovery to avoid 404s
+                                    if (hls.liveSyncPosition) {
+                                        video.currentTime = hls.liveSyncPosition;
+                                    }
+
                                     if (video.paused) video.play().catch(() => { });
                                     return;
                                 }
