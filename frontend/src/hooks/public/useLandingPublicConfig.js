@@ -35,6 +35,7 @@ export function useLandingPublicConfig() {
     const [saweriaLeaderboardLink, setSaweriaLeaderboardLink] = useState('');
     const [saweriaEnabled, setSaweriaEnabled] = useState(false);
     const [landingSettings, setLandingSettings] = useState(DEFAULT_LANDING_SETTINGS);
+    const [publicConfigLoading, setPublicConfigLoading] = useState(true);
 
     useEffect(() => {
         let isMounted = true;
@@ -70,6 +71,10 @@ export function useLandingPublicConfig() {
                 if (isMounted) {
                     console.error('Failed to fetch public landing config:', err);
                 }
+            } finally {
+                if (isMounted) {
+                    setPublicConfigLoading(false);
+                }
             }
         };
 
@@ -85,6 +90,7 @@ export function useLandingPublicConfig() {
         saweriaLink,
         saweriaLeaderboardLink,
         landingSettings,
+        publicConfigLoading,
     };
 }
 

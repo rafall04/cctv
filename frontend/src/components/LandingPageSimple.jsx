@@ -3,8 +3,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useBranding } from '../contexts/BrandingContext';
 import { shouldDisableAnimations } from '../utils/animationControl';
 import LayoutModeToggle from './landing/LayoutModeToggle';
-import LandingAnnouncementBar from './landing/LandingAnnouncementBar';
-import LandingEventBanner from './landing/LandingEventBanner';
+import LandingPublicTopStack from './landing/LandingPublicTopStack';
 
 const FeedbackWidget = lazy(() => import('./FeedbackWidget'));
 const SaweriaSupport = lazy(() => import('./SaweriaSupport'));
@@ -113,6 +112,7 @@ export default function LandingPageSimple({
     hideFloatingWidgets = false,
     announcement,
     eventBanner,
+    publicConfigLoading = false,
 }) {
     const { branding } = useBranding();
 
@@ -124,8 +124,12 @@ export default function LandingPageSimple({
                 onLayoutToggle={onLayoutToggle}
             />
 
-            <LandingEventBanner banner={eventBanner} layoutMode="simple" />
-            <LandingAnnouncementBar announcement={announcement} layoutMode="simple" />
+            <LandingPublicTopStack
+                layoutMode="simple"
+                loading={publicConfigLoading}
+                eventBanner={eventBanner}
+                announcement={announcement}
+            />
 
             <main className="flex-1 min-h-0 pb-4 sm:pb-6">
                 {CamerasSection && (

@@ -187,6 +187,7 @@ export default function CamerasSection({
                 <LandingCameraToolbar
                     title={landingSettings.section_title}
                     camerasCount={cameras.length}
+                    isLoading={loading}
                     viewMode={viewMode}
                     onViewModeChange={setViewMode}
                     searchProps={{

@@ -14,19 +14,27 @@ import LandingNavbar from '../components/landing/LandingNavbar';
 import LandingHero from '../components/landing/LandingHero';
 import LandingFooter from '../components/landing/LandingFooter';
 import LandingCamerasSection from '../components/landing/LandingCamerasSection';
-import LandingPageSimple from '../components/LandingPageSimple';
-import LandingAnnouncementBar from '../components/landing/LandingAnnouncementBar';
-import LandingEventBanner from '../components/landing/LandingEventBanner';
+import LandingPublicTopStack from '../components/landing/LandingPublicTopStack';
 import MultiViewButton from '../components/MultiView/MultiViewButton';
-import MultiViewLayout from '../components/MultiView/MultiViewLayout';
-import VideoPopup from '../components/MultiView/VideoPopup';
-import SaweriaLeaderboard from '../components/SaweriaLeaderboard';
 
+const LandingPageSimple = lazy(() => import('../components/LandingPageSimple'));
+const MultiViewLayout = lazy(() => import('../components/MultiView/MultiViewLayout'));
+const VideoPopup = lazy(() => import('../components/MultiView/VideoPopup'));
+const SaweriaLeaderboard = lazy(() => import('../components/SaweriaLeaderboard'));
 const FeedbackWidget = lazy(() => import('../components/FeedbackWidget'));
 const SaweriaSupport = lazy(() => import('../components/SaweriaSupport'));
 
+function DeferredSurfaceFallback({ className = '' }) {
+    return (
+        <div
+            className={`rounded-3xl border border-gray-200/70 bg-white/80 shadow-sm dark:border-gray-700/60 dark:bg-gray-900/70 ${className}`}
+            aria-hidden="true"
+        />
+    );
+}
+
 function LandingPageContent() {
-    const { branding } = useBranding();
+    const { branding, loading: brandingLoading } = useBranding();
     const { cameras, deviceTier } = useCameras();
     const { addToast } = useToast();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -46,6 +54,7 @@ function LandingPageContent() {
         saweriaLink,
         saweriaLeaderboardLink,
         landingSettings,
+        publicConfigLoading,
     } = useLandingPublicConfig();
 
     const {
@@ -85,24 +94,27 @@ function LandingPageContent() {
     if (layoutMode === 'simple') {
         return (
             <div key="simple-mode">
-                <LandingPageSimple
-                    onCameraClick={handleCameraClick}
-                    onAddMulti={handleAddMulti}
-                    multiCameras={multiCameras}
-                    saweriaEnabled={saweriaEnabled}
-                    saweriaLink={saweriaLink}
-                    CamerasSection={LandingCamerasSection}
-                    layoutMode={layoutMode}
-                    onLayoutToggle={toggleLayoutMode}
-                    favorites={favorites}
-                    onToggleFavorite={toggleFavorite}
-                    isFavorite={isFavorite}
-                    viewMode={viewMode}
-                    setViewMode={setViewMode}
-                    hideFloatingWidgets={shouldHideFloatingWidgets}
-                    announcement={landingSettings.announcement}
-                    eventBanner={landingSettings.eventBanner}
-                />
+                <Suspense fallback={<div className="min-h-screen bg-gray-50 dark:bg-gray-950" />}>
+                    <LandingPageSimple
+                        onCameraClick={handleCameraClick}
+                        onAddMulti={handleAddMulti}
+                        multiCameras={multiCameras}
+                        saweriaEnabled={saweriaEnabled}
+                        saweriaLink={saweriaLink}
+                        CamerasSection={LandingCamerasSection}
+                        layoutMode={layoutMode}
+                        onLayoutToggle={toggleLayoutMode}
+                        favorites={favorites}
+                        onToggleFavorite={toggleFavorite}
+                        isFavorite={isFavorite}
+                        viewMode={viewMode}
+                        setViewMode={setViewMode}
+                        hideFloatingWidgets={shouldHideFloatingWidgets}
+                        announcement={landingSettings.announcement}
+                        eventBanner={landingSettings.eventBanner}
+                        publicConfigLoading={publicConfigLoading || brandingLoading}
+                    />
+                </Suspense>
 
                 <MultiViewButton
                     count={multiCameras.length}
@@ -111,13 +123,19 @@ function LandingPageContent() {
                     maxStreams={maxStreams}
                 />
 
-                {popup && <VideoPopup camera={popup} onClose={handlePopupClose} />}
+                {popup && (
+                    <Suspense fallback={null}>
+                        <VideoPopup camera={popup} onClose={handlePopupClose} />
+                    </Suspense>
+                )}
                 {showMulti && multiCameras.length > 0 && (
-                    <MultiViewLayout
-                        cameras={multiCameras}
-                        onRemove={handleRemoveMulti}
-                        onClose={() => setShowMulti(false)}
-                    />
+                    <Suspense fallback={null}>
+                        <MultiViewLayout
+                            cameras={multiCameras}
+                            onRemove={handleRemoveMulti}
+                            onClose={() => setShowMulti(false)}
+                        />
+                    </Suspense>
                 )}
             </div>
         );
@@ -127,8 +145,12 @@ function LandingPageContent() {
         <div key="full-mode">
             <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
                 <LandingNavbar branding={branding} layoutMode={layoutMode} onLayoutToggle={toggleLayoutMode} />
-                <LandingEventBanner banner={landingSettings.eventBanner} layoutMode="full" />
-                <LandingAnnouncementBar announcement={landingSettings.announcement} layoutMode="full" />
+                <LandingPublicTopStack
+                    layoutMode="full"
+                    loading={publicConfigLoading || brandingLoading}
+                    eventBanner={landingSettings.eventBanner}
+                    announcement={landingSettings.announcement}
+                />
 
                 <LandingHero
                     branding={branding}
@@ -151,7 +173,9 @@ function LandingPageContent() {
                 />
 
                 {saweriaEnabled && saweriaLeaderboardLink && (
-                    <SaweriaLeaderboard leaderboardLink={saweriaLeaderboardLink} />
+                    <Suspense fallback={<DeferredSurfaceFallback className="mx-auto mt-6 min-h-[140px] max-w-7xl" />}>
+                        <SaweriaLeaderboard leaderboardLink={saweriaLeaderboardLink} />
+                    </Suspense>
                 )}
 
                 <div className="flex-1" />
@@ -168,13 +192,19 @@ function LandingPageContent() {
                     maxStreams={maxStreams}
                 />
 
-                {popup && <VideoPopup camera={popup} onClose={handlePopupClose} />}
+                {popup && (
+                    <Suspense fallback={null}>
+                        <VideoPopup camera={popup} onClose={handlePopupClose} />
+                    </Suspense>
+                )}
                 {showMulti && multiCameras.length > 0 && (
-                    <MultiViewLayout
-                        cameras={multiCameras}
-                        onRemove={handleRemoveMulti}
-                        onClose={() => setShowMulti(false)}
-                    />
+                    <Suspense fallback={null}>
+                        <MultiViewLayout
+                            cameras={multiCameras}
+                            onRemove={handleRemoveMulti}
+                            onClose={() => setShowMulti(false)}
+                        />
+                    </Suspense>
                 )}
 
                 {!shouldHideFloatingWidgets && (

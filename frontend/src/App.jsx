@@ -10,9 +10,9 @@ import ErrorBoundary from './components/ui/ErrorBoundary';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import ProtectedRoute from './components/ProtectedRoute';
-import AdminLayout from './layouts/AdminLayout';
 
 // Lazy load admin pages for better code splitting
+const AdminLayout = lazy(() => import('./layouts/AdminLayout'));
 const CameraManagement = lazy(() => import('./pages/CameraManagement'));
 const AreaManagement = lazy(() => import('./pages/AreaManagement'));
 const UserManagement = lazy(() => import('./pages/UserManagement'));

@@ -20,7 +20,7 @@ export default function Hero({ branding, landingSettings, disableHeavyEffects, o
                 </>
             )}
 
-            <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 text-center">
+            <div className="relative mx-auto flex min-h-[30rem] max-w-7xl flex-col justify-center px-4 py-12 text-center sm:min-h-[34rem] sm:px-6 sm:py-16 lg:px-8">
                 <div
                     data-testid="landing-hero-badge-stack"
                     className="mx-auto mb-6 flex max-w-sm flex-col items-center gap-2.5 sm:gap-3"
