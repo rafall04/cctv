@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, memo, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, memo, useCallback, useMemo, useLayoutEffect } from 'react';
 import { MapContainer, TileLayer, Marker, useMap, ZoomControl, LayersControl } from 'react-leaflet';
 import L from 'leaflet';
 import Hls from 'hls.js';
@@ -15,6 +15,7 @@ import { takeSnapshot as takeSnapshotUtil } from '../utils/snapshotHelper';
 import PublicStreamStatusOverlay from './PublicStreamStatusOverlay.jsx';
 import {
     getPublicPopupBodyStyle,
+    getPublicPopupModalStyle,
     getVideoAspectRatio,
 } from '../utils/publicPopupLayout.js';
 import {
@@ -174,6 +175,8 @@ const VideoModal = memo(({ camera, onClose }) => {
     const videoWrapperRef = useRef(null);
     const modalRef = useRef(null);
     const outerWrapperRef = useRef(null);
+    const headerRef = useRef(null);
+    const footerRef = useRef(null);
     const hlsRef = useRef(null);
     const transformThrottleRef = useRef(null);
     const playbackCheckRef = useRef(null);
@@ -194,6 +197,12 @@ const VideoModal = memo(({ camera, onClose }) => {
     const [snapshotNotification, setSnapshotNotification] = useState(null);
     const [retryKey, setRetryKey] = useState(0);
     const [videoAspectRatio, setVideoAspectRatio] = useState(null);
+    const [layoutMetrics, setLayoutMetrics] = useState(() => ({
+        viewportWidth: typeof window !== 'undefined' ? window.innerWidth : 0,
+        viewportHeight: typeof window !== 'undefined' ? window.innerHeight : 0,
+        headerHeight: 0,
+        footerHeight: 0,
+    }));
 
     // Zoom state - hanya untuk UI display
     const [zoomDisplay, setZoomDisplay] = useState(1);
@@ -215,9 +224,36 @@ const VideoModal = memo(({ camera, onClose }) => {
             videoAspectRatio,
         }),
     };
+    const modalStyle = getPublicPopupModalStyle({
+        isFullscreen,
+        isPlaybackLocked,
+        videoAspectRatio,
+        viewportWidth: layoutMetrics.viewportWidth,
+        viewportHeight: layoutMetrics.viewportHeight,
+        headerHeight: layoutMetrics.headerHeight,
+        footerHeight: layoutMetrics.footerHeight,
+        maxDesktopWidth: 896,
+    });
     const MIN_ZOOM = 1;
     const MAX_ZOOM = 4;
     const isVideoActive = status === 'playing';
+
+    useLayoutEffect(() => {
+        if (typeof window === 'undefined') return undefined;
+
+        const updateLayoutMetrics = () => {
+            setLayoutMetrics({
+                viewportWidth: window.innerWidth,
+                viewportHeight: window.innerHeight,
+                headerHeight: headerRef.current?.offsetHeight || 0,
+                footerHeight: footerRef.current?.offsetHeight || 0,
+            });
+        };
+
+        updateLayoutMetrics();
+        window.addEventListener('resize', updateLayoutMetrics);
+        return () => window.removeEventListener('resize', updateLayoutMetrics);
+    }, [isFullscreen, isPlaybackLocked, isVideoActive, status, loadingStage, errorType, videoAspectRatio]);
 
     const getMaxPan = (z) => z <= 1 ? 0 : ((z - 1) / (2 * z)) * 100;
     const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
@@ -776,13 +812,14 @@ const VideoModal = memo(({ camera, onClose }) => {
         >
             <div
                 ref={modalRef}
+                data-testid="map-popup-modal"
                 className={`bg-white dark:bg-gray-900 overflow-hidden shadow-2xl border border-gray-200 dark:border-gray-800 flex flex-col ${isFullscreen ? 'w-full h-full' : 'rounded-xl w-full max-w-4xl'}`}
-                style={isFullscreen ? undefined : { maxHeight: 'calc(100vh - 16px)' }}
+                style={modalStyle}
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header Info - di atas video (hide in fullscreen) */}
                 {!isFullscreen && (
-                    <div className="p-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                    <div ref={headerRef} className="p-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
                         <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                                 <h3 className="text-gray-900 dark:text-white font-bold text-sm sm:text-base truncate">{camera.name}</h3>
@@ -956,7 +993,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                 </div>
 
                 {/* Controls Panel - hide in fullscreen */}
-                <div className={`border-t border-gray-200 dark:border-gray-800 ${isFullscreen ? 'hidden' : ''}`}>
+                <div ref={footerRef} className={`border-t border-gray-200 dark:border-gray-800 ${isFullscreen ? 'hidden' : ''}`}>
                     {/* Controls */}
                     <div className="p-3 flex items-center justify-between">
                         {/* Camera Description - Kiri Bawah */}

@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, useLayoutEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Hls from 'hls.js';
 import { Icons } from '../ui/Icons.jsx';
@@ -18,6 +18,7 @@ import { buildPublicCameraShareUrl } from '../../utils/publicShareUrl';
 import PublicStreamStatusOverlay from '../PublicStreamStatusOverlay.jsx';
 import {
     getPublicPopupBodyStyle,
+    getPublicPopupModalStyle,
     getVideoAspectRatio,
 } from '../../utils/publicPopupLayout.js';
 import {
@@ -39,6 +40,8 @@ function VideoPopup({ camera, onClose }) {
     const wrapperRef = useRef(null);
     const modalRef = useRef(null);
     const outerWrapperRef = useRef(null); // Add ref for outer wrapper
+    const headerRef = useRef(null);
+    const footerRef = useRef(null);
     const hlsRef = useRef(null);
     const fallbackHandlerRef = useRef(null);
     const abortControllerRef = useRef(null);
@@ -110,6 +113,12 @@ function VideoPopup({ camera, onClose }) {
     const [consecutiveFailures, setConsecutiveFailures] = useState(0);
     const [showTroubleshooting, setShowTroubleshooting] = useState(false);
     const [videoAspectRatio, setVideoAspectRatio] = useState(null);
+    const [layoutMetrics, setLayoutMetrics] = useState(() => ({
+        viewportWidth: typeof window !== 'undefined' ? window.innerWidth : 0,
+        viewportHeight: typeof window !== 'undefined' ? window.innerHeight : 0,
+        headerHeight: 0,
+        footerHeight: 0,
+    }));
 
     const url = camera.streams?.hls;
     const deviceTier = detectDeviceTier();
@@ -551,7 +560,7 @@ function VideoPopup({ camera, onClose }) {
             cleanupResources();
             if (hls) { hls.destroy(); hlsRef.current = null; }
         };
-    }, [camera.stream_source, cleanupResources, clearStreamTimeout, deviceTier, isMaintenance, isOffline, requestVideoPlay, resetFailures, retryKey, startTimeout, syncVideoAspectRatio, updateStreamStage, url]);
+    }, [camera.stream_source, cleanupResources, clearStreamTimeout, deviceTier, isExternal, isMaintenance, isOffline, requestVideoPlay, resetFailures, retryKey, startTimeout, syncVideoAspectRatio, updateStreamStage, url]);
 
     const handleRetry = useCallback(() => {
         cleanupResources();
@@ -664,18 +673,45 @@ function VideoPopup({ camera, onClose }) {
         isPlaybackLocked,
         videoAspectRatio,
     });
+    const modalStyle = getPublicPopupModalStyle({
+        isFullscreen,
+        isPlaybackLocked,
+        videoAspectRatio,
+        viewportWidth: layoutMetrics.viewportWidth,
+        viewportHeight: layoutMetrics.viewportHeight,
+        headerHeight: layoutMetrics.headerHeight,
+        footerHeight: layoutMetrics.footerHeight,
+        maxDesktopWidth: 1024,
+    });
 
     // Check if animations should be disabled on low-end devices - **Validates: Requirements 5.2**
     const disableAnimations = shouldDisableAnimations();
     const isVideoActive = status === 'live';
 
+    useLayoutEffect(() => {
+        if (typeof window === 'undefined') return undefined;
+
+        const updateLayoutMetrics = () => {
+            setLayoutMetrics({
+                viewportWidth: window.innerWidth,
+                viewportHeight: window.innerHeight,
+                headerHeight: headerRef.current?.offsetHeight || 0,
+                footerHeight: footerRef.current?.offsetHeight || 0,
+            });
+        };
+
+        updateLayoutMetrics();
+        window.addEventListener('resize', updateLayoutMetrics);
+        return () => window.removeEventListener('resize', updateLayoutMetrics);
+    }, [isFullscreen, isPlaybackLocked, isVideoActive, status, loadingStage, errorType, videoAspectRatio]);
+
     return (
         <div ref={outerWrapperRef} className={`fixed inset-0 z-[9999] ${isFullscreen ? 'bg-black dark:bg-black' : 'flex items-center justify-center bg-black/95 dark:bg-black/95 p-2 sm:p-4'}`} onClick={onClose}>
-            <div ref={modalRef} className={`relative bg-white dark:bg-gray-900 overflow-hidden shadow-2xl flex flex-col ${isFullscreen ? 'w-full h-full' : 'w-full max-w-5xl rounded-2xl border border-gray-200 dark:border-gray-800'}`} style={isFullscreen ? {} : { maxHeight: 'calc(100vh - 16px)' }} onClick={(e) => e.stopPropagation()}>
+            <div ref={modalRef} data-testid="grid-popup-modal" className={`relative bg-white dark:bg-gray-900 overflow-hidden shadow-2xl flex flex-col ${isFullscreen ? 'w-full h-full' : 'w-full max-w-5xl rounded-2xl border border-gray-200 dark:border-gray-800'}`} style={modalStyle} onClick={(e) => e.stopPropagation()}>
 
                 {/* Header Info - di atas video (hide in fullscreen) */}
                 {!isFullscreen && (
-                    <div className="p-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                    <div ref={headerRef} className="p-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
                         <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                                 <h3 className="text-gray-900 dark:text-white font-bold text-sm sm:text-base truncate">{camera.name}</h3>
@@ -821,7 +857,7 @@ function VideoPopup({ camera, onClose }) {
                 </div>
 
                 {/* Controls Panel + Codec Description - hide in fullscreen */}
-                <div className={`shrink-0 border-t border-gray-200 dark:border-gray-800 ${isFullscreen ? 'hidden' : ''}`}>
+                <div ref={footerRef} className={`shrink-0 border-t border-gray-200 dark:border-gray-800 ${isFullscreen ? 'hidden' : ''}`}>
                     {/* Controls */}
                     <div className="p-3 flex items-center justify-between">
                         {/* Camera Description - Kiri Bawah */}

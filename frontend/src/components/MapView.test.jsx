@@ -537,5 +537,22 @@ describe('MapView area filter visibility', () => {
             expect(body.style.aspectRatio).toBe(String(16 / 9));
         });
     });
+
+    it('membatasi lebar modal live map desktop berdasarkan tinggi viewport yang tersedia', async () => {
+        Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1366 });
+        Object.defineProperty(window, 'innerHeight', { configurable: true, value: 768 });
+
+        await act(async () => {
+            render(<MapView cameras={cameras} areas={[]} showAreaFilter={false} />);
+        });
+
+        fireEvent.click(screen.getByTestId('marker--7.1507-111.8815'));
+
+        const modal = await screen.findByTestId('map-popup-modal');
+
+        await waitFor(() => {
+            expect(modal.style.width).toBe('896px');
+        });
+    });
 });
 

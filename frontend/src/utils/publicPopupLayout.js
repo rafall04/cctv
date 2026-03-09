@@ -7,6 +7,11 @@ export const COMMON_PUBLIC_POPUP_ASPECT_RATIOS = [
     3 / 2,
 ];
 export const PUBLIC_POPUP_ASPECT_RATIO_SNAP_TOLERANCE = 0.025;
+export const PUBLIC_POPUP_DESKTOP_BREAKPOINT = 768;
+export const DEFAULT_PUBLIC_POPUP_VIEWPORT_VERTICAL_PADDING = 16;
+export const DEFAULT_PUBLIC_POPUP_VIEWPORT_HORIZONTAL_PADDING = 32;
+export const DEFAULT_PUBLIC_POPUP_HEADER_HEIGHT = 88;
+export const DEFAULT_PUBLIC_POPUP_FOOTER_HEIGHT = 64;
 
 export function getPublicPopupBodyStyle({ isFullscreen, isPlaybackLocked, videoAspectRatio }) {
     if (isFullscreen) {
@@ -20,6 +25,57 @@ export function getPublicPopupBodyStyle({ isFullscreen, isPlaybackLocked, videoA
     return {
         aspectRatio: String(nextAspectRatio),
     };
+}
+
+export function getPublicPopupModalStyle({
+    isFullscreen,
+    isPlaybackLocked,
+    videoAspectRatio,
+    viewportWidth,
+    viewportHeight,
+    headerHeight,
+    footerHeight,
+    maxDesktopWidth,
+    viewportVerticalPadding = DEFAULT_PUBLIC_POPUP_VIEWPORT_VERTICAL_PADDING,
+    viewportHorizontalPadding = DEFAULT_PUBLIC_POPUP_VIEWPORT_HORIZONTAL_PADDING,
+}) {
+    if (isFullscreen) {
+        return {};
+    }
+
+    const modalStyle = { maxHeight: 'calc(100vh - 16px)' };
+
+    if (isPlaybackLocked) {
+        return modalStyle;
+    }
+
+    const nextViewportWidth = Number(viewportWidth);
+    const nextViewportHeight = Number(viewportHeight);
+    if (!nextViewportWidth || !nextViewportHeight || nextViewportWidth < PUBLIC_POPUP_DESKTOP_BREAKPOINT) {
+        return modalStyle;
+    }
+
+    const nextAspectRatio = Number(videoAspectRatio) || DEFAULT_PUBLIC_POPUP_LIVE_ASPECT_RATIO;
+    const nextHeaderHeight = Number(headerHeight) || DEFAULT_PUBLIC_POPUP_HEADER_HEIGHT;
+    const nextFooterHeight = Number(footerHeight) || DEFAULT_PUBLIC_POPUP_FOOTER_HEIGHT;
+    const availableBodyHeight = nextViewportHeight - viewportVerticalPadding - nextHeaderHeight - nextFooterHeight;
+    const availableViewportWidth = nextViewportWidth - viewportHorizontalPadding;
+
+    if (availableBodyHeight <= 0 || availableViewportWidth <= 0) {
+        return modalStyle;
+    }
+
+    const computedModalWidth = Math.floor(Math.min(
+        Number(maxDesktopWidth) || availableViewportWidth,
+        availableViewportWidth,
+        availableBodyHeight * nextAspectRatio
+    ));
+
+    if (computedModalWidth > 0) {
+        modalStyle.width = `${computedModalWidth}px`;
+    }
+
+    return modalStyle;
 }
 
 export function getVideoAspectRatio(video) {

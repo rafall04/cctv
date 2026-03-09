@@ -3,6 +3,7 @@ import {
     DEFAULT_PUBLIC_POPUP_LIVE_ASPECT_RATIO,
     NON_LIVE_PUBLIC_POPUP_ASPECT_RATIO,
     getPublicPopupBodyStyle,
+    getPublicPopupModalStyle,
     getVideoAspectRatio,
     normalizePublicPopupAspectRatio,
 } from './publicPopupLayout.js';
@@ -50,6 +51,52 @@ describe('publicPopupLayout', () => {
             isPlaybackLocked: false,
             videoAspectRatio: null,
         })).toEqual({ aspectRatio: String(DEFAULT_PUBLIC_POPUP_LIVE_ASPECT_RATIO) });
+    });
+
+    it('menghitung lebar modal live desktop berdasarkan tinggi yang tersedia', () => {
+        expect(getPublicPopupModalStyle({
+            isFullscreen: false,
+            isPlaybackLocked: false,
+            videoAspectRatio: 16 / 9,
+            viewportWidth: 1366,
+            viewportHeight: 768,
+            headerHeight: 88,
+            footerHeight: 64,
+            maxDesktopWidth: 1024,
+        })).toEqual({
+            maxHeight: 'calc(100vh - 16px)',
+            width: '1024px',
+        });
+    });
+
+    it('tidak memaksa width desktop khusus pada mobile', () => {
+        expect(getPublicPopupModalStyle({
+            isFullscreen: false,
+            isPlaybackLocked: false,
+            videoAspectRatio: 16 / 9,
+            viewportWidth: 390,
+            viewportHeight: 844,
+            headerHeight: 88,
+            footerHeight: 64,
+            maxDesktopWidth: 1024,
+        })).toEqual({
+            maxHeight: 'calc(100vh - 16px)',
+        });
+    });
+
+    it('membiarkan modal non-live tetap memakai layout stabil lama', () => {
+        expect(getPublicPopupModalStyle({
+            isFullscreen: false,
+            isPlaybackLocked: true,
+            videoAspectRatio: 16 / 9,
+            viewportWidth: 1366,
+            viewportHeight: 768,
+            headerHeight: 88,
+            footerHeight: 64,
+            maxDesktopWidth: 1024,
+        })).toEqual({
+            maxHeight: 'calc(100vh - 16px)',
+        });
     });
 });
 

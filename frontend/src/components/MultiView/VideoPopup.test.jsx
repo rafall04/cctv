@@ -315,6 +315,24 @@ describe('VideoPopup non-live states', () => {
             expect(body.style.aspectRatio).toBe(String(16 / 9));
         });
     });
+
+    it('membatasi lebar modal live grid desktop berdasarkan tinggi viewport yang tersedia', async () => {
+        Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1366 });
+        Object.defineProperty(window, 'innerHeight', { configurable: true, value: 768 });
+
+        render(
+            <VideoPopup
+                camera={{ ...baseCamera, id: 18 }}
+                onClose={vi.fn()}
+            />
+        );
+
+        const modal = screen.getByTestId('grid-popup-modal');
+
+        await waitFor(() => {
+            expect(modal.style.width).toBe('1024px');
+        });
+    });
 });
 
 
