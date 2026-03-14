@@ -163,4 +163,45 @@ describe('HlsSessionStore', () => {
         await expect(secondPromise).resolves.toBe('session-race');
         expect(startSession).toHaveBeenCalledTimes(1);
     });
+    it('blocks new session creation after control limit is reached', async () => {
+        const store = new HlsSessionStore({
+            maxSessionCreatesPerWindow: 1,
+            controlWindowMs: 60000,
+        });
+        const startSession = vi.fn(async (cameraId) => `session-${cameraId}`);
+        const heartbeat = vi.fn(async () => false);
+
+        const first = await store.getOrCreateSession({
+            identity: 'viewer-limit',
+            cameraId: 20,
+            request: {},
+            startSession,
+            heartbeat,
+        });
+
+        const second = await store.getOrCreateSession({
+            identity: 'viewer-limit',
+            cameraId: 21,
+            request: {},
+            startSession,
+            heartbeat,
+        });
+
+        expect(first).toBe('session-20');
+        expect(second).toBe(null);
+        expect(startSession).toHaveBeenCalledTimes(1);
+    });
+
+    it('applies lookup miss limiter per identity and stream path', () => {
+        const store = new HlsSessionStore({
+            maxCameraLookupMissesPerWindow: 1,
+            controlWindowMs: 60000,
+        });
+
+        expect(store.isLookupMissAllowed('viewer-miss', 'stream-x', 0)).toBe(true);
+        expect(store.isLookupMissAllowed('viewer-miss', 'stream-x', 1)).toBe(false);
+        expect(store.isLookupMissAllowed('viewer-miss', 'stream-y', 1)).toBe(true);
+    });
+
+
 });

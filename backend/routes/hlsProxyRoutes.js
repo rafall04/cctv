@@ -322,13 +322,13 @@ export class HlsSessionStore {
     async cleanupExpired(endSession, now = Date.now()) {
         const expiredEntries = [];
 
-        for (const [dedupKey, entry] of this.entries.entries()) {
+        for (const entry of this.entries.values()) {
             if (entry.expiresAt <= now) {
-                expiredEntries.push({ dedupKey, entry });
+                expiredEntries.push(entry);
             }
         }
 
-        for (const { entry } of expiredEntries) {
+        for (const entry of expiredEntries) {
             this.removeSessionEntry(entry.identity, entry.cameraId);
             await endSession(entry.sessionId);
         }
@@ -342,6 +342,18 @@ export class HlsSessionStore {
         this.sessionCreateLimiter.cleanup(now);
         this.cameraLookupMissLimiter.cleanup(now);
         return expiredEntries.length;
+    }
+
+    async cleanupAll(endSession) {
+        const allEntries = Array.from(this.entries.values());
+        for (const entry of allEntries) {
+            this.removeSessionEntry(entry.identity, entry.cameraId);
+            await endSession(entry.sessionId);
+        }
+        this.cameraIdCache.clear();
+        this.sessionCreateLimiter.clear();
+        this.cameraLookupMissLimiter.clear();
+        return allEntries.length;
     }
 
     async getOrCreateSession({ identity, cameraId, request, startSession, heartbeat }) {
@@ -500,6 +512,7 @@ export function createHlsRouteState(options = {}) {
     const store = new HlsSessionStore(hlsOptions);
     const httpClient = createHlsHttpClient();
     let cleanupInterval = null;
+    let cleanupInProgress = false;
 
     const state = {
         options: hlsOptions,
@@ -512,10 +525,17 @@ export function createHlsRouteState(options = {}) {
             }
 
             cleanupInterval = setInterval(async () => {
+                if (cleanupInProgress) {
+                    return;
+                }
+
+                cleanupInProgress = true;
                 try {
                     await store.cleanupExpired((sessionId) => Promise.resolve(viewerSessionService.endSession(sessionId)));
                 } catch (error) {
                     console.error('[HLSProxy] Session cleanup error:', error.message);
+                } finally {
+                    cleanupInProgress = false;
                 }
             }, hlsOptions.sessionCleanupIntervalMs);
         },
@@ -524,7 +544,16 @@ export function createHlsRouteState(options = {}) {
                 clearInterval(cleanupInterval);
                 cleanupInterval = null;
             }
-            await store.cleanupExpired((sessionId) => Promise.resolve(viewerSessionService.endSession(sessionId)));
+
+            if (!cleanupInProgress) {
+                cleanupInProgress = true;
+                try {
+                    await store.cleanupAll((sessionId) => Promise.resolve(viewerSessionService.endSession(sessionId)));
+                } finally {
+                    cleanupInProgress = false;
+                }
+            }
+
             store.clear();
         },
         getViewerIdentity(request) {
@@ -788,4 +817,5 @@ export default async function hlsProxyRoutes(fastify, _options) {
         }
     });
 }
+
 
