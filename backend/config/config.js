@@ -10,27 +10,23 @@ dotenv.config({ path: join(__dirname, '..', '.env') });
 const buildPublicUrl = (path, defaultPath) => {
   const baseUrl = process.env.PUBLIC_STREAM_BASE_URL || '';
   const urlPath = path || defaultPath;
-  
+
   if (baseUrl) {
     const cleanBase = baseUrl.replace(/\/$/, '');
     const cleanPath = urlPath.startsWith('/') ? urlPath : `/${urlPath}`;
     return `${cleanBase}${cleanPath}`;
   }
-  
+
   return urlPath.startsWith('/') ? urlPath : `/${urlPath}`;
 };
 
-// Parse allowed origins from environment
 const parseAllowedOrigins = () => {
-  // If explicitly set, use it
   if (process.env.ALLOWED_ORIGINS && process.env.ALLOWED_ORIGINS.trim()) {
-    return process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim());
+    return process.env.ALLOWED_ORIGINS.split(',').map((origin) => origin.trim());
   }
-  
-  // Auto-generate from domain config
+
   const origins = [];
-  
-  // Frontend domain
+
   if (process.env.FRONTEND_DOMAIN) {
     origins.push(`https://${process.env.FRONTEND_DOMAIN}`);
     origins.push(`http://${process.env.FRONTEND_DOMAIN}`);
@@ -38,30 +34,24 @@ const parseAllowedOrigins = () => {
       origins.push(`http://${process.env.FRONTEND_DOMAIN}:${process.env.PORT_PUBLIC}`);
     }
   }
-  
-  // Server IP
+
   if (process.env.SERVER_IP) {
     origins.push(`http://${process.env.SERVER_IP}`);
     if (process.env.PORT_PUBLIC && process.env.PORT_PUBLIC !== '80') {
       origins.push(`http://${process.env.SERVER_IP}:${process.env.PORT_PUBLIC}`);
     }
   }
-  
-  // Development defaults
+
   if (process.env.NODE_ENV === 'development') {
     origins.push('http://localhost:5173');
     origins.push('http://localhost:3000');
     origins.push('http://localhost:3001');
   }
-  
-  // Fallback defaults if nothing configured
-  // CRITICAL: These should only be used in development
-  // Production MUST set environment variables!
+
   if (origins.length > 0) {
     return origins;
   }
-  
-  // Development-only fallback
+
   if (process.env.NODE_ENV === 'development') {
     return [
       'http://localhost:5173',
@@ -69,11 +59,31 @@ const parseAllowedOrigins = () => {
       'http://localhost:3001',
     ];
   }
-  
-  // Production without config - log warning
-  console.warn('⚠️  WARNING: No ALLOWED_ORIGINS configured! Set FRONTEND_DOMAIN, SERVER_IP in .env');
+
+  console.warn('WARNING: No ALLOWED_ORIGINS configured! Set FRONTEND_DOMAIN, SERVER_IP in .env');
   return [];
 };
+
+const parseList = (value) => {
+  if (!value || !value.trim()) {
+    return [];
+  }
+
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+};
+
+const defaultTrustedProxyCidrs = [
+  '127.0.0.1/32',
+  '::1/128',
+  '10.0.0.0/8',
+  '172.16.0.0/12',
+  '192.168.0.0/16',
+];
+
+const trustedProxyCidrs = parseList(process.env.TRUSTED_PROXY_CIDRS);
 
 export const config = {
   server: {
@@ -102,65 +112,63 @@ export const config = {
   },
 
   cors: {
-    origin: process.env.CORS_ORIGIN === '*' 
-      ? true 
-      : process.env.CORS_ORIGIN 
-        ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+    origin: process.env.CORS_ORIGIN === '*'
+      ? true
+      : process.env.CORS_ORIGIN
+        ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
         : true,
     credentials: true,
   },
 
-  // Security Configuration
   security: {
-    // Domain Configuration
     backendDomain: process.env.BACKEND_DOMAIN || '',
     frontendDomain: process.env.FRONTEND_DOMAIN || '',
     serverIp: process.env.SERVER_IP || '',
-    
-    // API Key Validation
+
     apiKeyValidationEnabled: process.env.API_KEY_VALIDATION_ENABLED !== 'false',
     apiKeySecret: process.env.API_KEY_SECRET || '',
-    
-    // CSRF Protection
+
     csrfSecret: process.env.CSRF_SECRET || '',
     csrfEnabled: process.env.CSRF_ENABLED !== 'false',
-    
-    // Rate Limiting
+
     rateLimitEnabled: process.env.RATE_LIMIT_ENABLED !== 'false',
     rateLimitPublic: parseInt(process.env.RATE_LIMIT_PUBLIC || '100', 10),
     rateLimitAuth: parseInt(process.env.RATE_LIMIT_AUTH || '30', 10),
     rateLimitAdmin: parseInt(process.env.RATE_LIMIT_ADMIN || '60', 10),
-    
-    // Brute Force Protection
+
     bruteForceEnabled: process.env.BRUTE_FORCE_ENABLED !== 'false',
     maxLoginAttempts: parseInt(process.env.MAX_LOGIN_ATTEMPTS || '5', 10),
     maxIpAttempts: parseInt(process.env.MAX_IP_ATTEMPTS || '10', 10),
     lockoutDurationMinutes: parseInt(process.env.LOCKOUT_DURATION_MINUTES || '30', 10),
     ipBlockDurationMinutes: parseInt(process.env.IP_BLOCK_DURATION_MINUTES || '60', 10),
-    
-    // Session Management
+
     sessionAbsoluteTimeoutHours: parseInt(process.env.SESSION_ABSOLUTE_TIMEOUT_HOURS || '24', 10),
-    
-    // Password Policy
+
     passwordMinLength: parseInt(process.env.PASSWORD_MIN_LENGTH || '12', 10),
     passwordMaxAgeDays: parseInt(process.env.PASSWORD_MAX_AGE_DAYS || '90', 10),
     passwordHistoryCount: parseInt(process.env.PASSWORD_HISTORY_COUNT || '5', 10),
-    
-    // Audit Logging
+
     auditLogRetentionDays: parseInt(process.env.AUDIT_LOG_RETENTION_DAYS || '90', 10),
-    
-    // Allowed Origins
+
     allowedOrigins: parseAllowedOrigins(),
+    trustedProxyCidrs: trustedProxyCidrs.length > 0 ? trustedProxyCidrs : defaultTrustedProxyCidrs,
+    hls: {
+      maxSessionCacheEntries: parseInt(process.env.HLS_MAX_SESSION_CACHE_ENTRIES || '5000', 10),
+      maxSessionCacheEntriesPerCamera: parseInt(process.env.HLS_MAX_SESSION_CACHE_ENTRIES_PER_CAMERA || '1000', 10),
+      sessionCacheTtlMs: parseInt(process.env.HLS_SESSION_CACHE_TTL_MS || '25000', 10),
+      sessionCleanupIntervalMs: parseInt(process.env.HLS_SESSION_CLEANUP_INTERVAL_MS || '10000', 10),
+      cameraIdCacheTtlMs: parseInt(process.env.HLS_CAMERA_ID_CACHE_TTL_MS || '300000', 10),
+      maxExternalPlaylistBytes: parseInt(process.env.HLS_MAX_EXTERNAL_PLAYLIST_BYTES || '1048576', 10),
+      maxSessionCreatesPerWindow: parseInt(process.env.HLS_MAX_SESSION_CREATES_PER_WINDOW || '12', 10),
+      maxCameraLookupMissesPerWindow: parseInt(process.env.HLS_MAX_CAMERA_LOOKUP_MISSES_PER_WINDOW || '30', 10),
+      controlWindowMs: parseInt(process.env.HLS_CONTROL_WINDOW_MS || '60000', 10),
+    },
   },
 
-  // Telegram Bot Configuration
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN || '',
-    // Chat ID untuk monitoring kamera (offline/online alerts)
     monitoringChatId: process.env.TELEGRAM_MONITORING_CHAT_ID || '',
-    // Chat ID untuk kritik & saran
     feedbackChatId: process.env.TELEGRAM_FEEDBACK_CHAT_ID || '',
-    // Legacy support - fallback to single chat ID
     enabled: !!(process.env.TELEGRAM_BOT_TOKEN && (process.env.TELEGRAM_MONITORING_CHAT_ID || process.env.TELEGRAM_FEEDBACK_CHAT_ID)),
   },
 };

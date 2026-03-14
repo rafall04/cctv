@@ -1,15 +1,6 @@
 /**
  * HLS Proxy Routes
- * Proxies HLS stream requests to MediaMTX while tracking viewer sessions
- * 
- * Routes:
- * - GET /hls/:streamKey/* - Proxy HLS requests (creates/updates session)
- * 
- * Stream key format: UUID (e.g., 04bd5387-9db4-4cf0-9f8d-7fb42cc76263)
- * 
- * Security: Stream token authentication via JWT
- * - Token can be passed via query parameter (?token=xxx) for HLS players
- * - Or via Authorization header for API calls
+ * Proxies HLS stream requests to MediaMTX while tracking viewer sessions.
  */
 
 import axios from 'axios';
@@ -18,125 +9,572 @@ import { config } from '../config/config.js';
 import viewerSessionService from '../services/viewerSessionService.js';
 import { queryOne } from '../database/connectionPool.js';
 
-// Session cache to avoid creating duplicate sessions for same IP+camera
-// Key: `${ip}_${cameraId}`, Value: { sessionId, lastAccess }
-const sessionCache = new Map();
+const IPV4_MAPPED_PREFIX = '::ffff:';
+const DEFAULT_HLS_CONFIG = {
+    maxSessionCacheEntries: 5000,
+    maxSessionCacheEntriesPerCamera: 1000,
+    sessionCacheTtlMs: 25000,
+    sessionCleanupIntervalMs: 10000,
+    cameraIdCacheTtlMs: 300000,
+    maxExternalPlaylistBytes: 1024 * 1024,
+    maxSessionCreatesPerWindow: 12,
+    maxCameraLookupMissesPerWindow: 30,
+    controlWindowMs: 60000,
+};
 
-// Cleanup old cache entries every 60 seconds
-const CACHE_CLEANUP_INTERVAL = 60000;
-const SESSION_CACHE_TTL = 45000; // 45 seconds - slightly longer than heartbeat interval
-
-setInterval(() => {
-    const now = Date.now();
-    for (const [key, value] of sessionCache.entries()) {
-        if (now - value.lastAccess > SESSION_CACHE_TTL) {
-            sessionCache.delete(key);
-        }
-    }
-}, CACHE_CLEANUP_INTERVAL);
-
-/**
- * Extract real IP from request (handles proxy headers)
- */
-function getRealIP(request) {
-    const forwardedFor = request.headers['x-forwarded-for'];
-    if (forwardedFor) {
-        return forwardedFor.split(',')[0].trim();
+function normalizeIp(ip) {
+    if (!ip || typeof ip !== 'string') {
+        return 'unknown';
     }
 
-    const realIP = request.headers['x-real-ip'];
-    if (realIP) {
-        return realIP.trim();
+    let normalized = ip.trim();
+    if (!normalized) {
+        return 'unknown';
     }
 
-    return request.ip || request.socket?.remoteAddress || 'unknown';
+    if (normalized.includes(',')) {
+        normalized = normalized.split(',')[0].trim();
+    }
+
+    if (normalized.startsWith(IPV4_MAPPED_PREFIX)) {
+        normalized = normalized.slice(IPV4_MAPPED_PREFIX.length);
+    }
+
+    if (normalized === '::1') {
+        return '::1';
+    }
+
+    if (/^\d+\.\d+\.\d+\.\d+:\d+$/.test(normalized)) {
+        normalized = normalized.split(':')[0];
+    }
+
+    return normalized;
 }
 
-// Cache for stream_key -> camera_id mapping to avoid repeated DB queries
-const cameraIdCache = new Map();
-const CAMERA_CACHE_TTL = 300000; // 5 minutes
+function ipToInt(ip) {
+    const parts = normalizeIp(ip).split('.');
+    if (parts.length !== 4) {
+        return null;
+    }
 
-/**
- * Extract camera ID from stream path (UUID stream_key)
- * @param {string} streamPath - The stream path (UUID format)
- * @returns {number|null} Camera ID or null if not found
- */
-function extractCameraId(streamPath) {
-    // Check cache first
-    const cached = cameraIdCache.get(streamPath);
-    if (cached && Date.now() - cached.timestamp < CAMERA_CACHE_TTL) {
+    let result = 0;
+    for (const part of parts) {
+        const value = Number(part);
+        if (!Number.isInteger(value) || value < 0 || value > 255) {
+            return null;
+        }
+        result = (result << 8) + value;
+    }
+
+    return result >>> 0;
+}
+
+function ipv4Mask(bits) {
+    if (bits <= 0) {
+        return 0;
+    }
+    if (bits >= 32) {
+        return 0xFFFFFFFF;
+    }
+    return (0xFFFFFFFF << (32 - bits)) >>> 0;
+}
+
+export function isTrustedProxy(ip, trustedProxyCidrs = []) {
+    const normalizedIp = normalizeIp(ip);
+    if (normalizedIp === 'unknown') {
+        return false;
+    }
+
+    for (const cidr of trustedProxyCidrs) {
+        if (!cidr) {
+            continue;
+        }
+
+        if (!cidr.includes('/')) {
+            if (normalizeIp(cidr) === normalizedIp) {
+                return true;
+            }
+            continue;
+        }
+
+        const [network, bitString] = cidr.split('/');
+        const bits = Number(bitString);
+
+        if (network.includes(':')) {
+            if (bits === 128 && normalizeIp(network) === normalizedIp) {
+                return true;
+            }
+            continue;
+        }
+
+        const ipInt = ipToInt(normalizedIp);
+        const networkInt = ipToInt(network);
+        if (ipInt === null || networkInt === null || !Number.isInteger(bits)) {
+            continue;
+        }
+
+        const mask = ipv4Mask(bits);
+        if ((ipInt & mask) === (networkInt & mask)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+export function getViewerIdentity(request, trustedProxyCidrs = []) {
+    const remoteIp = normalizeIp(request.ip || request.socket?.remoteAddress || request.raw?.socket?.remoteAddress);
+    if (isTrustedProxy(remoteIp, trustedProxyCidrs)) {
+        const forwardedFor = normalizeIp(request.headers['x-forwarded-for']);
+        if (forwardedFor !== 'unknown') {
+            return forwardedFor;
+        }
+
+        const realIp = normalizeIp(request.headers['x-real-ip']);
+        if (realIp !== 'unknown') {
+            return realIp;
+        }
+    }
+
+    return remoteIp;
+}
+
+export class FixedWindowLimiter {
+    constructor(limit, windowMs) {
+        this.limit = limit;
+        this.windowMs = windowMs;
+        this.entries = new Map();
+    }
+
+    isAllowed(key, now = Date.now()) {
+        let entry = this.entries.get(key);
+        if (!entry || now - entry.windowStart >= this.windowMs) {
+            entry = { count: 0, windowStart: now, lastSeen: now };
+            this.entries.set(key, entry);
+        }
+
+        entry.lastSeen = now;
+        if (entry.count >= this.limit) {
+            return false;
+        }
+
+        entry.count += 1;
+        return true;
+    }
+
+    cleanup(now = Date.now()) {
+        for (const [key, entry] of this.entries.entries()) {
+            if (now - entry.lastSeen >= this.windowMs) {
+                this.entries.delete(key);
+            }
+        }
+    }
+
+    size() {
+        return this.entries.size;
+    }
+
+    clear() {
+        this.entries.clear();
+    }
+}
+
+export class HlsSessionStore {
+    constructor(options = {}) {
+        this.options = {
+            ...DEFAULT_HLS_CONFIG,
+            ...options,
+        };
+        this.entries = new Map();
+        this.entriesByCamera = new Map();
+        this.inflight = new Map();
+        this.cameraIdCache = new Map();
+        this.sessionCreateLimiter = new FixedWindowLimiter(
+            this.options.maxSessionCreatesPerWindow,
+            this.options.controlWindowMs
+        );
+        this.cameraLookupMissLimiter = new FixedWindowLimiter(
+            this.options.maxCameraLookupMissesPerWindow,
+            this.options.controlWindowMs
+        );
+    }
+
+    buildDedupKey(identity, cameraId) {
+        return `${identity}:${cameraId}`;
+    }
+
+    getStats() {
+        return {
+            sessionEntries: this.entries.size,
+            inflightEntries: this.inflight.size,
+            cameraIdCacheEntries: this.cameraIdCache.size,
+            sessionCreateLimiterEntries: this.sessionCreateLimiter.size(),
+            cameraLookupMissLimiterEntries: this.cameraLookupMissLimiter.size(),
+        };
+    }
+
+    getSessionEntry(identity, cameraId) {
+        return this.entries.get(this.buildDedupKey(identity, cameraId)) || null;
+    }
+
+    touchSession(identity, cameraId, type, now = Date.now()) {
+        const dedupKey = this.buildDedupKey(identity, cameraId);
+        const entry = this.entries.get(dedupKey);
+        if (!entry) {
+            return null;
+        }
+
+        if (type === 'playlist') {
+            entry.lastPlaylistAt = now;
+        } else {
+            entry.lastSegmentAt = now;
+        }
+        entry.lastTouchedAt = now;
+        entry.expiresAt = now + this.options.sessionCacheTtlMs;
+        return entry;
+    }
+
+    removeSessionEntry(identity, cameraId) {
+        const dedupKey = this.buildDedupKey(identity, cameraId);
+        const entry = this.entries.get(dedupKey);
+        if (!entry) {
+            return null;
+        }
+
+        this.entries.delete(dedupKey);
+        const cameraEntries = this.entriesByCamera.get(entry.cameraId);
+        if (cameraEntries) {
+            cameraEntries.delete(dedupKey);
+            if (cameraEntries.size === 0) {
+                this.entriesByCamera.delete(entry.cameraId);
+            }
+        }
+
+        return entry;
+    }
+
+    setSessionEntry(identity, cameraId, sessionId, now = Date.now()) {
+        const dedupKey = this.buildDedupKey(identity, cameraId);
+        const entry = {
+            identity,
+            cameraId,
+            sessionId,
+            lastPlaylistAt: now,
+            lastSegmentAt: 0,
+            lastTouchedAt: now,
+            expiresAt: now + this.options.sessionCacheTtlMs,
+        };
+
+        this.entries.set(dedupKey, entry);
+        if (!this.entriesByCamera.has(cameraId)) {
+            this.entriesByCamera.set(cameraId, new Set());
+        }
+        this.entriesByCamera.get(cameraId).add(dedupKey);
+        this.enforceBounds(cameraId);
+        return entry;
+    }
+
+    evictOldestEntry(cameraId = null) {
+        let oldestKey = null;
+        let oldestEntry = null;
+        const keys = cameraId === null
+            ? this.entries.keys()
+            : (this.entriesByCamera.get(cameraId) || []).values();
+
+        for (const key of keys) {
+            const entry = this.entries.get(key);
+            if (!entry) {
+                continue;
+            }
+            if (!oldestEntry || entry.lastTouchedAt < oldestEntry.lastTouchedAt) {
+                oldestEntry = entry;
+                oldestKey = key;
+            }
+        }
+
+        if (!oldestKey || !oldestEntry) {
+            return null;
+        }
+
+        this.entries.delete(oldestKey);
+        const cameraEntries = this.entriesByCamera.get(oldestEntry.cameraId);
+        if (cameraEntries) {
+            cameraEntries.delete(oldestKey);
+            if (cameraEntries.size === 0) {
+                this.entriesByCamera.delete(oldestEntry.cameraId);
+            }
+        }
+
+        return oldestEntry;
+    }
+
+    enforceBounds(cameraId) {
+        while (this.entries.size > this.options.maxSessionCacheEntries) {
+            this.evictOldestEntry();
+        }
+
+        const cameraEntries = this.entriesByCamera.get(cameraId);
+        while (cameraEntries && cameraEntries.size > this.options.maxSessionCacheEntriesPerCamera) {
+            this.evictOldestEntry(cameraId);
+        }
+    }
+
+    async cleanupExpired(endSession, now = Date.now()) {
+        const expiredEntries = [];
+
+        for (const [dedupKey, entry] of this.entries.entries()) {
+            if (entry.expiresAt <= now) {
+                expiredEntries.push({ dedupKey, entry });
+            }
+        }
+
+        for (const { entry } of expiredEntries) {
+            this.removeSessionEntry(entry.identity, entry.cameraId);
+            await endSession(entry.sessionId);
+        }
+
+        for (const [key, value] of this.cameraIdCache.entries()) {
+            if (now - value.lastAccessAt >= this.options.cameraIdCacheTtlMs) {
+                this.cameraIdCache.delete(key);
+            }
+        }
+
+        this.sessionCreateLimiter.cleanup(now);
+        this.cameraLookupMissLimiter.cleanup(now);
+        return expiredEntries.length;
+    }
+
+    async getOrCreateSession({ identity, cameraId, request, startSession, heartbeat }) {
+        const now = Date.now();
+        const dedupKey = this.buildDedupKey(identity, cameraId);
+        const existing = this.entries.get(dedupKey);
+
+        if (existing) {
+            const alive = await heartbeat(existing.sessionId);
+            if (alive) {
+                this.touchSession(identity, cameraId, 'playlist', now);
+                return existing.sessionId;
+            }
+            this.removeSessionEntry(identity, cameraId);
+        }
+
+        if (this.inflight.has(dedupKey)) {
+            return this.inflight.get(dedupKey);
+        }
+
+        if (!this.sessionCreateLimiter.isAllowed(identity, now)) {
+            return null;
+        }
+
+        const createPromise = (async () => {
+            const sessionId = await startSession(cameraId, request);
+            this.setSessionEntry(identity, cameraId, sessionId, now);
+            return sessionId;
+        })().finally(() => {
+            this.inflight.delete(dedupKey);
+        });
+
+        this.inflight.set(dedupKey, createPromise);
+        return createPromise;
+    }
+
+    async recordSegmentAccess(identity, cameraId, heartbeat) {
+        const entry = this.getSessionEntry(identity, cameraId);
+        if (!entry) {
+            return null;
+        }
+
+        const alive = await heartbeat(entry.sessionId);
+        if (!alive) {
+            this.removeSessionEntry(identity, cameraId);
+            return null;
+        }
+
+        this.touchSession(identity, cameraId, 'segment');
+        return entry.sessionId;
+    }
+
+    getCameraId(streamPath) {
+        const cached = this.cameraIdCache.get(streamPath);
+        if (!cached) {
+            return null;
+        }
+
+        if (Date.now() - cached.lastAccessAt >= this.options.cameraIdCacheTtlMs) {
+            this.cameraIdCache.delete(streamPath);
+            return null;
+        }
+
+        cached.lastAccessAt = Date.now();
         return cached.cameraId;
     }
 
-    // UUID format: lookup from database
-    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (uuidPattern.test(streamPath)) {
-        try {
-            const camera = queryOne('SELECT id FROM cameras WHERE stream_key = ?', [streamPath]);
-            if (camera) {
-                cameraIdCache.set(streamPath, {
-                    cameraId: camera.id,
-                    timestamp: Date.now()
-                });
-                return camera.id;
+    setCameraId(streamPath, cameraId, now = Date.now()) {
+        this.cameraIdCache.set(streamPath, { cameraId, lastAccessAt: now });
+    }
+
+    isLookupMissAllowed(identity, streamPath, now = Date.now()) {
+        return this.cameraLookupMissLimiter.isAllowed(`${identity}:${streamPath}`, now);
+    }
+
+    clear() {
+        this.entries.clear();
+        this.entriesByCamera.clear();
+        this.inflight.clear();
+        this.cameraIdCache.clear();
+        this.sessionCreateLimiter.clear();
+        this.cameraLookupMissLimiter.clear();
+    }
+}
+
+function createHlsHttpClient() {
+    return axios.create({
+        timeout: 10000,
+        validateStatus: () => true,
+        maxRedirects: 0,
+    });
+}
+
+function attachStreamAbortHandlers({ request, reply, controller, upstreamStream }) {
+    let finished = false;
+
+    const cleanup = () => {
+        if (finished) {
+            return;
+        }
+        finished = true;
+        controller.abort();
+        if (upstreamStream && !upstreamStream.destroyed) {
+            upstreamStream.destroy();
+        }
+        request.raw.off('aborted', onAbort);
+        reply.raw.off('close', onAbort);
+        reply.raw.off('error', onAbort);
+    };
+
+    const onAbort = () => {
+        cleanup();
+    };
+
+    request.raw.on('aborted', onAbort);
+    reply.raw.on('close', onAbort);
+    reply.raw.on('error', onAbort);
+    if (upstreamStream) {
+        upstreamStream.once('end', cleanup);
+        upstreamStream.once('error', cleanup);
+        upstreamStream.once('close', cleanup);
+    }
+}
+
+function rewriteExternalPlaylist(playlistText, sourceUrl) {
+    const baseUrlMatch = sourceUrl.match(/^(.*\/)/);
+    const baseUrl = baseUrlMatch ? baseUrlMatch[1] : '';
+    const lines = String(playlistText || '').split('\n');
+
+    for (let index = 0; index < lines.length; index++) {
+        const line = lines[index].trim();
+        if (!line || line.startsWith('#')) {
+            continue;
+        }
+
+        let absoluteUrl = line;
+        if (!line.startsWith('http://') && !line.startsWith('https://')) {
+            absoluteUrl = line.startsWith('/')
+                ? new URL(line, baseUrl).href
+                : baseUrl + line;
+        }
+
+        lines[index] = `/hls/proxy?url=${encodeURIComponent(absoluteUrl)}`;
+    }
+
+    return lines.join('\n');
+}
+
+export function createHlsRouteState(options = {}) {
+    const hlsOptions = {
+        ...DEFAULT_HLS_CONFIG,
+        ...(config.security?.hls || {}),
+        ...options,
+    };
+
+    const store = new HlsSessionStore(hlsOptions);
+    const httpClient = createHlsHttpClient();
+    let cleanupInterval = null;
+
+    const state = {
+        options: hlsOptions,
+        store,
+        httpClient,
+        trustedProxyCidrs: options.trustedProxyCidrs || config.security?.trustedProxyCidrs || [],
+        start() {
+            if (cleanupInterval) {
+                return;
             }
-        } catch (error) {
-            console.error('[HLSProxy] Error looking up camera by stream_key:', error.message);
-        }
-    }
 
-    return null;
+            cleanupInterval = setInterval(async () => {
+                try {
+                    await store.cleanupExpired((sessionId) => Promise.resolve(viewerSessionService.endSession(sessionId)));
+                } catch (error) {
+                    console.error('[HLSProxy] Session cleanup error:', error.message);
+                }
+            }, hlsOptions.sessionCleanupIntervalMs);
+        },
+        async stop() {
+            if (cleanupInterval) {
+                clearInterval(cleanupInterval);
+                cleanupInterval = null;
+            }
+            await store.cleanupExpired((sessionId) => Promise.resolve(viewerSessionService.endSession(sessionId)));
+            store.clear();
+        },
+        getViewerIdentity(request) {
+            return getViewerIdentity(request, state.trustedProxyCidrs);
+        },
+        extractCameraId(streamPath, identity) {
+            const cachedCameraId = store.getCameraId(streamPath);
+            if (cachedCameraId !== null) {
+                return cachedCameraId;
+            }
+
+            const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (!uuidPattern.test(streamPath)) {
+                return null;
+            }
+
+            if (!store.isLookupMissAllowed(identity, streamPath)) {
+                return null;
+            }
+
+            try {
+                const camera = queryOne('SELECT id FROM cameras WHERE stream_key = ?', [streamPath]);
+                if (camera) {
+                    store.setCameraId(streamPath, camera.id);
+                    return camera.id;
+                }
+            } catch (error) {
+                console.error('[HLSProxy] Error looking up camera by stream_key:', error.message);
+            }
+
+            return null;
+        },
+        async getOrCreateSession(identity, cameraId, request) {
+            return store.getOrCreateSession({
+                identity,
+                cameraId,
+                request,
+                startSession: async (resolvedCameraId, resolvedRequest) => viewerSessionService.startSession(resolvedCameraId, resolvedRequest),
+                heartbeat: async (sessionId) => viewerSessionService.heartbeat(sessionId),
+            });
+        },
+        async recordSegmentAccess(identity, cameraId) {
+            return store.recordSegmentAccess(identity, cameraId, async (sessionId) => viewerSessionService.heartbeat(sessionId));
+        },
+    };
+
+    return state;
 }
 
-/**
- * Get or create session for this viewer
- */
-function getOrCreateSession(ip, cameraId, request) {
-    const cacheKey = `${ip}_${cameraId}`;
-    const cached = sessionCache.get(cacheKey);
-
-    if (cached) {
-        // Update last access time
-        cached.lastAccess = Date.now();
-
-        // Send heartbeat to keep session alive (async, don't wait)
-        try {
-            viewerSessionService.heartbeat(cached.sessionId);
-        } catch (e) {
-            // Ignore heartbeat errors
-        }
-
-        return cached.sessionId;
-    }
-
-    // Create new session
-    try {
-        const sessionId = viewerSessionService.startSession(cameraId, request);
-
-        sessionCache.set(cacheKey, {
-            sessionId,
-            lastAccess: Date.now()
-        });
-
-        console.log(`[HLSProxy] New session: ${sessionId} for stream (camera ${cameraId}) from ${ip}`);
-        return sessionId;
-    } catch (error) {
-        console.error('[HLSProxy] Error creating session:', error.message);
-        return null;
-    }
-}
-
-/**
- * Verify stream access token (OPTIONAL for public streams)
- * Supports both query parameter (for HLS players) and header (for API calls)
- * 
- * Token format: JWT with payload { cameraId, streamKey, type: 'stream_access' }
- * Valid for 1 hour
- * 
- * NOTE: Token is optional - viewer session tracking is used instead
- */
 function verifyStreamToken(request, reply, done) {
-    // Extract token from query parameter or Authorization header
     let token = request.query.token;
 
     if (!token) {
@@ -146,17 +584,12 @@ function verifyStreamToken(request, reply, done) {
         }
     }
 
-    // If no token provided, allow access (public streams)
-    // Session tracking is handled separately
     if (!token) {
         return done();
     }
 
-    // If token provided, verify it
     try {
         const decoded = jwt.verify(token, config.jwt.secret);
-
-        // Validate token type
         if (decoded.type !== 'stream_access') {
             return reply.code(403).send({
                 success: false,
@@ -164,7 +597,6 @@ function verifyStreamToken(request, reply, done) {
             });
         }
 
-        // Attach decoded token to request for later use
         request.streamToken = decoded;
         done();
     } catch (error) {
@@ -182,33 +614,27 @@ function verifyStreamToken(request, reply, done) {
     }
 }
 
-/**
- * Tunnel handler for external streams
- * Fetches .m3u8 and .ts files from external servers without sending CORS headers
- */
-async function handleExternalStreamProxy(request, reply) {
+async function handleExternalStreamProxy(state, request, reply) {
     const { url } = request.query;
-
     if (!url) {
         return reply.code(400).send('Missing url parameter');
     }
 
-    // Ensure URL is valid and absolute
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
         return reply.code(400).send('Invalid url parameter');
     }
 
     try {
         const isTextFile = url.includes('.m3u8');
-
-        const response = await axios.get(url, {
+        const controller = new AbortController();
+        const response = await state.httpClient.get(url, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                // Explicitly strip Origin and Referer
             },
-            timeout: 15000,
             responseType: isTextFile ? 'text' : 'stream',
-            validateStatus: () => true
+            maxContentLength: isTextFile ? state.options.maxExternalPlaylistBytes : Infinity,
+            maxBodyLength: isTextFile ? state.options.maxExternalPlaylistBytes : Infinity,
+            signal: controller.signal,
         });
 
         if (response.status !== 200) {
@@ -218,8 +644,11 @@ async function handleExternalStreamProxy(request, reply) {
         }
 
         let contentType = 'application/octet-stream';
-        if (url.includes('.m3u8')) contentType = 'application/vnd.apple.mpegurl';
-        else if (url.includes('.ts')) contentType = 'video/mp2t';
+        if (url.includes('.m3u8')) {
+            contentType = 'application/vnd.apple.mpegurl';
+        } else if (url.includes('.ts')) {
+            contentType = 'video/mp2t';
+        }
 
         reply.header('Content-Type', contentType);
         reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -227,37 +656,16 @@ async function handleExternalStreamProxy(request, reply) {
         reply.header('Expires', '0');
 
         if (isTextFile) {
-            // Rewrite TS segment URLs inside the m3u8 playlist if they are absolute
-            // If they are relative, we need to make them absolute but rewrite them to point to our proxy
-            let m3u8Content = response.data;
-            const baseUrlMatch = url.match(/^(.*\/)/);
-            const baseUrl = baseUrlMatch ? baseUrlMatch[1] : '';
-
-            const lines = m3u8Content.split('\n');
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i].trim();
-                // If it's a URL or path (not a tag or empty line)
-                if (line && !line.startsWith('#')) {
-                    let absoluteUrl = line;
-                    if (!line.startsWith('http')) {
-                        // Handle relative path (e.g., segment.ts or subfolder/segment.ts)
-                        absoluteUrl = line.startsWith('/')
-                            ? new URL(line, baseUrl).href
-                            : baseUrl + line;
-                    }
-
-                    // Rewrite it to point to our proxy
-                    // e.g., /hls/proxy?url=encoded_absolute_url
-                    // Note: Use the config hostname if available, but for now relative paths are better
-                    lines[i] = `/hls/proxy?url=${encodeURIComponent(absoluteUrl)}`;
-                }
-            }
-
-            return reply.send(lines.join('\n'));
-        } else {
-            return reply.send(response.data);
+            return reply.send(rewriteExternalPlaylist(response.data, url));
         }
 
+        attachStreamAbortHandlers({
+            request,
+            reply,
+            controller,
+            upstreamStream: response.data,
+        });
+        return reply.send(response.data);
     } catch (error) {
         console.error(`[HLS Proxy] External fetch error for ${url}:`, error.message);
         return reply.code(502).send('');
@@ -265,100 +673,76 @@ async function handleExternalStreamProxy(request, reply) {
 }
 
 export default async function hlsProxyRoutes(fastify, _options) {
-    // IMPORTANT: Use internal URL to MediaMTX, not public URL
     const mediamtxHlsUrl = config.mediamtx?.hlsUrlInternal || 'http://localhost:8888';
+    const state = createHlsRouteState();
+    state.start();
 
-    /**
-     * Proxy External HLS requests
-     * Must be declared before '/*' to avoid being caught by the catch-all
-     */
-    fastify.get('/proxy', handleExternalStreamProxy);
+    fastify.addHook('onClose', async () => {
+        await state.stop();
+    });
 
-    /**
-     * Proxy ALL Internal HLS requests to MediaMTX
-     * Handles: index.m3u8, stream.m3u8, .ts, .mp4, .m4s files
-     * 
-     * SECURITY: Token validation enabled - requires valid JWT token
-     * NOTE: CORS headers are handled by Fastify CORS plugin in server.js
-     * Do NOT add manual CORS headers here to avoid duplicate header issues
-     */
+    fastify.get('/proxy', async (request, reply) => handleExternalStreamProxy(state, request, reply));
+
     fastify.get('/*', { preHandler: verifyStreamToken }, async (request, reply) => {
-        // Get the full path after /hls/
         const fullPath = request.params['*'];
-
         if (!fullPath) {
             return reply.code(400).send('Invalid path - use /hls/{cameraPath}/index.m3u8');
         }
 
-        // Extract camera path (first segment)
         const pathParts = fullPath.split('/');
         const cameraPath = pathParts[0];
         const fileName = pathParts[pathParts.length - 1];
+        const isTextFile = fileName.endsWith('.m3u8');
+        const identity = state.getViewerIdentity(request);
+        const cameraId = state.extractCameraId(cameraPath, identity);
 
-        // Extract camera ID for session tracking
-        const cameraId = extractCameraId(cameraPath);
-        const ip = getRealIP(request);
-
-        // Create/update session only for playlist requests (not segments)
-        if (fileName.endsWith('.m3u8') && cameraId) {
+        if (cameraId && isTextFile) {
             try {
-                getOrCreateSession(ip, cameraId, request);
-            } catch (e) {
-                console.error('[HLSProxy] Session error:', e.message);
+                await state.getOrCreateSession(identity, cameraId, request);
+            } catch (error) {
+                console.error('[HLSProxy] Session error:', error.message);
+            }
+        } else if (cameraId && !isTextFile) {
+            try {
+                await state.recordSegmentAccess(identity, cameraId);
+            } catch {
+                // Ignore heartbeat errors in streaming path.
             }
         }
 
-        // Update heartbeat for segment requests
-        if (cameraId && !fileName.endsWith('.m3u8')) {
-            try {
-                const cacheKey = `${ip}_${cameraId}`;
-                const cached = sessionCache.get(cacheKey);
-                if (cached) {
-                    cached.lastAccess = Date.now();
-                    viewerSessionService.heartbeat(cached.sessionId);
-                }
-            } catch (e) {
-                // Ignore heartbeat errors
-            }
-        }
-
-        // Proxy request to MediaMTX
         try {
             const targetUrl = `${mediamtxHlsUrl}/${fullPath}`;
-            const isTextFile = fileName.endsWith('.m3u8');
-
-            // For init.mp4 files, retry a few times as they may not be ready yet
             const isInitFile = fileName.includes('init.mp4') || fileName.includes('_init.mp4');
             const maxRetries = isInitFile ? 3 : 1;
-            let lastError = null;
             let response = null;
+            let lastError = null;
+            let controller = null;
 
             for (let attempt = 0; attempt < maxRetries; attempt++) {
                 try {
-                    response = await axios.get(targetUrl, {
+                    controller = new AbortController();
+                    response = await state.httpClient.get(targetUrl, {
                         headers: {
                             'User-Agent': request.headers['user-agent'] || 'HLSProxy',
                         },
-                        timeout: 10000,
                         responseType: isTextFile ? 'text' : 'stream',
-                        validateStatus: () => true
+                        signal: controller.signal,
                     });
 
                     if (response.status === 200) {
-                        break; // Success, exit retry loop
+                        break;
                     }
 
-                    // For init files, wait and retry on 404
                     if (isInitFile && response.status === 404 && attempt < maxRetries - 1) {
-                        await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms
+                        await new Promise((resolve) => setTimeout(resolve, 500));
                         continue;
                     }
 
-                    break; // Non-retryable error
-                } catch (err) {
-                    lastError = err;
+                    break;
+                } catch (error) {
+                    lastError = error;
                     if (attempt < maxRetries - 1) {
-                        await new Promise(resolve => setTimeout(resolve, 500));
+                        await new Promise((resolve) => setTimeout(resolve, 500));
                     }
                 }
             }
@@ -367,7 +751,6 @@ export default async function hlsProxyRoutes(fastify, _options) {
                 throw lastError;
             }
 
-            // Determine content type based on extension
             let contentType = 'application/octet-stream';
             if (fileName.endsWith('.m3u8')) {
                 contentType = 'application/vnd.apple.mpegurl';
@@ -377,10 +760,7 @@ export default async function hlsProxyRoutes(fastify, _options) {
                 contentType = 'video/mp4';
             }
 
-            // Pass through the actual status code from MediaMTX
-            // NOTE: CORS headers handled by Fastify CORS plugin
             if (response.status !== 200) {
-                // For non-200 responses, pass through status but with proper headers
                 reply.header('Content-Type', 'text/plain');
                 reply.header('Cache-Control', 'no-cache');
                 return reply.code(response.status).send('');
@@ -393,12 +773,19 @@ export default async function hlsProxyRoutes(fastify, _options) {
 
             if (isTextFile) {
                 return reply.send(response.data);
-            } else {
-                return reply.send(response.data);
             }
+
+            attachStreamAbortHandlers({
+                request,
+                reply,
+                controller,
+                upstreamStream: response.data,
+            });
+            return reply.send(response.data);
         } catch (error) {
             console.error(`[HLSProxy] Error proxying ${fullPath}:`, error.message);
             return reply.code(502).send('');
         }
     });
 }
+
