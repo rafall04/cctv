@@ -207,7 +207,7 @@ async function handleExternalStreamProxy(request, reply) {
                 // Explicitly strip Origin and Referer
             },
             timeout: 15000,
-            responseType: isTextFile ? 'text' : 'arraybuffer',
+            responseType: isTextFile ? 'text' : 'stream',
             validateStatus: () => true
         });
 
@@ -255,7 +255,7 @@ async function handleExternalStreamProxy(request, reply) {
 
             return reply.send(lines.join('\n'));
         } else {
-            return reply.send(Buffer.from(response.data));
+            return reply.send(response.data);
         }
 
     } catch (error) {
@@ -340,7 +340,7 @@ export default async function hlsProxyRoutes(fastify, _options) {
                             'User-Agent': request.headers['user-agent'] || 'HLSProxy',
                         },
                         timeout: 10000,
-                        responseType: isTextFile ? 'text' : 'arraybuffer',
+                        responseType: isTextFile ? 'text' : 'stream',
                         validateStatus: () => true
                     });
 
@@ -394,7 +394,7 @@ export default async function hlsProxyRoutes(fastify, _options) {
             if (isTextFile) {
                 return reply.send(response.data);
             } else {
-                return reply.send(Buffer.from(response.data));
+                return reply.send(response.data);
             }
         } catch (error) {
             console.error(`[HLSProxy] Error proxying ${fullPath}:`, error.message);

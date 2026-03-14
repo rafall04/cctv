@@ -134,26 +134,28 @@ export function generateRateLimitKey(ip, endpointType) {
  */
 export function checkRateLimit(key, limit, windowMs) {
     const now = Date.now();
-    const windowStart = now - windowMs;
     
     // Get or create entry
     let entry = rateLimitStore.get(key);
     if (!entry) {
-        entry = { timestamps: [] };
+        entry = { count: 0, windowStart: now };
         rateLimitStore.set(key, entry);
     }
     
-    // Remove timestamps outside the current window (sliding window)
-    entry.timestamps = entry.timestamps.filter(ts => ts > windowStart);
+    // RAM FIX: Use fixed window counter instead of timestamp array
+    // Reset window if expired
+    if (now - entry.windowStart > windowMs) {
+        entry.count = 0;
+        entry.windowStart = now;
+    }
     
     // Count requests in current window
-    const requestCount = entry.timestamps.length;
+    const requestCount = entry.count;
     const remaining = Math.max(0, limit - requestCount);
     
-    // Calculate when the oldest request will expire
-    const oldestTimestamp = entry.timestamps[0] || now;
-    const resetAt = oldestTimestamp + windowMs;
-    const retryAfter = Math.ceil((resetAt - now) / 1000);
+    // Calculate reset time
+    const resetAt = entry.windowStart + windowMs;
+    const retryAfter = Math.max(1, Math.ceil((resetAt - now) / 1000));
     
     // Check if limit exceeded
     if (requestCount >= limit) {
@@ -161,17 +163,17 @@ export function checkRateLimit(key, limit, windowMs) {
             allowed: false,
             remaining: 0,
             resetAt,
-            retryAfter: Math.max(1, retryAfter)
+            retryAfter
         };
     }
     
-    // Add current request timestamp
-    entry.timestamps.push(now);
+    // Increment counter for current request
+    entry.count++;
     
     return {
         allowed: true,
         remaining: remaining - 1,
-        resetAt: now + windowMs,
+        resetAt,
         retryAfter: 0
     };
 }
@@ -200,20 +202,20 @@ export function clearAllRateLimits() {
  */
 export function getRateLimitStatus(key, limit, windowMs) {
     const now = Date.now();
-    const windowStart = now - windowMs;
     
     const entry = rateLimitStore.get(key);
     if (!entry) {
         return { count: 0, remaining: limit };
     }
     
-    // Count requests in current window
-    const validTimestamps = entry.timestamps.filter(ts => ts > windowStart);
-    const count = validTimestamps.length;
+    // If window has expired, count is effectively 0
+    if (now - entry.windowStart > windowMs) {
+        return { count: 0, remaining: limit };
+    }
     
     return {
-        count,
-        remaining: Math.max(0, limit - count)
+        count: entry.count,
+        remaining: Math.max(0, limit - entry.count)
     };
 }
 
@@ -227,14 +229,10 @@ export function cleanupExpiredEntries() {
         RATE_LIMIT_CONFIG.auth.window,
         RATE_LIMIT_CONFIG.admin.window
     );
-    const cutoff = now - maxWindow;
     
     for (const [key, entry] of rateLimitStore.entries()) {
-        // Remove timestamps older than the max window
-        entry.timestamps = entry.timestamps.filter(ts => ts > cutoff);
-        
-        // Remove entry if no timestamps remain
-        if (entry.timestamps.length === 0) {
+        // RAM FIX: Remove entry if window has expired
+        if (now - entry.windowStart > maxWindow) {
             rateLimitStore.delete(key);
         }
     }

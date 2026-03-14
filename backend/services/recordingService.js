@@ -23,6 +23,10 @@ const streamHealthMap = new Map();
 // CRITICAL: Track files being processed (prevent deletion during remux)
 const filesBeingProcessed = new Set();
 
+// RAM FIX: Limit concurrent re-mux operations to prevent memory spike
+const MAX_CONCURRENT_REMUX = 3;
+let activeRemuxCount = 0;
+
 // Cleanup ffmpeg processes on Node.js exit to prevent zombie processes
 const cleanupAllFfmpeg = () => {
     console.log('[Service] Cleaning up FFmpeg zombie processes...');
@@ -512,6 +516,14 @@ class RecordingService {
                     return;
                 }
 
+                // RAM FIX: Wait if too many concurrent re-mux operations
+                while (activeRemuxCount >= MAX_CONCURRENT_REMUX) {
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                }
+                activeRemuxCount++;
+
+                try {
+
                 // CRITICAL FIX: Re-mux file to create proper MP4 index for seeking
                 console.log(`[Segment] Re-muxing file to fix MP4 index: ${filename}`);
                 const tempPath = filePath + '.remux.mp4';
@@ -577,8 +589,13 @@ class RecordingService {
                     ]);
 
                     let ffmpegError = '';
+                    let errorLength = 0;
                     ffmpeg.stderr.on('data', (data) => {
-                        ffmpegError += data.toString();
+                        // RAM FIX: Cap stderr buffer at 10KB to prevent unbounded growth
+                        if (errorLength < 10000) {
+                            ffmpegError += data.toString();
+                            errorLength += data.length;
+                        }
                     });
 
                     ffmpeg.on('close', (code) => {
@@ -697,6 +714,10 @@ class RecordingService {
                 // NOTE: Cleanup is now handled by scheduled cleanup (every 30 minutes)
                 // No per-segment cleanup to prevent aggressive deletion
 
+                } finally {
+                    activeRemuxCount--;
+                }
+
             } catch (error) {
                 console.error(`[Segment] Error handling segment creation:`, error);
 
@@ -754,24 +775,27 @@ class RecordingService {
             );
 
             let orphanedCount = 0;
-            const orphanPromises = allSegments.map(async (segment) => {
-                const segmentAge = Date.now() - new Date(segment.start_time).getTime();
-                const isOldEnough = segmentAge > 30 * 60 * 1000; // 30 minutes
+            // RAM FIX: Process orphan cleanup in batches of 50 instead of all-at-once
+            const ORPHAN_BATCH_SIZE = 50;
+            for (let i = 0; i < allSegments.length; i += ORPHAN_BATCH_SIZE) {
+                const batch = allSegments.slice(i, i + ORPHAN_BATCH_SIZE);
+                const batchResults = await Promise.allSettled(batch.map(async (segment) => {
+                    const segmentAge = Date.now() - new Date(segment.start_time).getTime();
+                    const isOldEnough = segmentAge > 30 * 60 * 1000; // 30 minutes
 
-                if (isOldEnough) {
-                    let fileExists = true;
-                    try { await fsPromises.access(segment.file_path); } catch { fileExists = false; }
+                    if (isOldEnough) {
+                        let fileExists = true;
+                        try { await fsPromises.access(segment.file_path); } catch { fileExists = false; }
 
-                    if (!fileExists) {
-                        execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
-                        return true;
+                        if (!fileExists) {
+                            execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
+                            return true;
+                        }
                     }
-                }
-                return false;
-            });
-
-            const orphanResults = await Promise.allSettled(orphanPromises);
-            orphanedCount = orphanResults.filter(r => r.status === 'fulfilled' && r.value).length;
+                    return false;
+                }));
+                orphanedCount += batchResults.filter(r => r.status === 'fulfilled' && r.value).length;
+            }
 
             if (orphanedCount > 0) {
                 console.log(`[Cleanup] ✓ Cleaned ${orphanedCount} orphaned database entries`);
@@ -814,53 +838,54 @@ class RecordingService {
             let dbDeletedSize = 0;
 
             if (filesToDelete.length > 0) {
-                console.log(`[Cleanup] Deleting ${filesToDelete.length} old DB-tracked segments in parallel...`);
+                console.log(`[Cleanup] Deleting ${filesToDelete.length} old DB-tracked segments in batches...`);
 
-                const deletePromises = filesToDelete.map(async ({ segment, segmentAge }) => {
-                    try {
-                        let fileExists = true;
-                        try { await fsPromises.access(segment.file_path); } catch { fileExists = false; }
+                // RAM FIX: Process deletions in batches of 50 instead of all-at-once
+                const DELETE_BATCH_SIZE = 50;
 
-                        if (!fileExists) {
+                for (let i = 0; i < filesToDelete.length; i += DELETE_BATCH_SIZE) {
+                    const batch = filesToDelete.slice(i, i + DELETE_BATCH_SIZE);
+                    const batchResults = await Promise.allSettled(batch.map(async ({ segment, segmentAge }) => {
+                        try {
+                            let fileExists = true;
+                            try { await fsPromises.access(segment.file_path); } catch { fileExists = false; }
+
+                            if (!fileExists) {
+                                execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
+                                return { success: true, size: 0, nonExistent: true };
+                            }
+
+                            const stats = await fsPromises.stat(segment.file_path);
+                            const fileSizeMB = (stats.size / (1024 * 1024)).toFixed(2);
+
+                            // Non-blocking async delete
+                            await fsPromises.unlink(segment.file_path);
+
+                            console.log(`[Cleanup] ✓ Deleted: ${segment.filename} (age: ${Math.round(segmentAge / 3600000)}h, size: ${fileSizeMB}MB)`);
+
+                            // Delete from database
                             execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
-                            return { success: true, size: 0, nonExistent: true };
+
+                            return { success: true, size: stats.size };
+                        } catch (error) {
+                            console.error(`[Cleanup] ✗ Error deleting ${segment.filename}:`, error.message);
+                            if (error.code === 'ENOENT') {
+                                execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
+                            }
+                            return { success: false, error: error.message };
                         }
+                    }));
 
-                        const stats = await fsPromises.stat(segment.file_path);
-                        const fileSizeMB = (stats.size / (1024 * 1024)).toFixed(2);
-
-                        // Non-blocking async delete
-                        await fsPromises.unlink(segment.file_path);
-
-                        console.log(`[Cleanup] ✓ Deleted: ${segment.filename} (age: ${Math.round(segmentAge / 3600000)}h, size: ${fileSizeMB}MB)`);
-
-                        // Delete from database
-                        execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
-
-                        return { success: true, size: stats.size };
-                    } catch (error) {
-                        console.error(`[Cleanup] ✗ Error deleting ${segment.filename}:`, error.message);
-                        if (error.code === 'ENOENT') {
-                            execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
+                    batchResults.forEach((result) => {
+                        if (result.status === 'fulfilled' && result.value.success) {
+                            dbDeletedCount++;
+                            dbDeletedSize += result.value.size;
                         }
-                        return { success: false, error: error.message };
-                    }
-                });
-
-                // Wait for all deletions to complete (or fail)
-                const results = await Promise.allSettled(deletePromises);
-
-                let failedCount = 0;
-                results.forEach((result) => {
-                    if (result.status === 'fulfilled' && result.value.success) {
-                        dbDeletedCount++;
-                        dbDeletedSize += result.value.size;
-                    } else {
-                        failedCount++;
-                    }
-                });
+                    });
+                }
 
                 const totalSizeMB = (dbDeletedSize / (1024 * 1024)).toFixed(2);
+                const failedCount = filesToDelete.length - dbDeletedCount;
                 const remainingSegments = segments.length - dbDeletedCount - skippedCount - failedCount;
 
                 console.log(`[Cleanup] Camera ${cameraId} DB segments summary:`);

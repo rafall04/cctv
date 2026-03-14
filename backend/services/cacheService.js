@@ -137,8 +137,7 @@ export function cacheStats() {
     return {
         ...stats,
         hitRate: `${hitRate}%`,
-        size: cache.size,
-        keys: Array.from(cache.keys())
+        size: cache.size
     };
 }
 
