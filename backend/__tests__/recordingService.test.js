@@ -50,6 +50,22 @@ function createSpawnProcess() {
     return process;
 }
 
+function createCamera(overrides = {}) {
+    return {
+        id: 1,
+        name: 'Camera Test',
+        stream_source: 'internal',
+        private_rtsp_url: 'rtsp://user:pass@10.0.0.2/stream',
+        external_hls_url: '',
+        enabled: 1,
+        enable_recording: 1,
+        is_online: 1,
+        is_tunnel: 0,
+        recording_status: 'recording',
+        ...overrides,
+    };
+}
+
 describe('recordingService external recording support', () => {
     beforeEach(() => {
         vi.useFakeTimers();
@@ -191,5 +207,120 @@ describe('recordingService external recording support', () => {
             reason: 'invalid_source',
         });
         expect(spawnMock).not.toHaveBeenCalled();
+    });
+
+    it('exports deterministic recording cooldown that grows and caps', async () => {
+        const { computeRecordingCooldownMs } = await import('../services/recordingService.js');
+
+        expect(computeRecordingCooldownMs(1)).toBe(15000);
+        expect(computeRecordingCooldownMs(2)).toBe(30000);
+        expect(computeRecordingCooldownMs(3)).toBe(60000);
+        expect(computeRecordingCooldownMs(10)).toBe(300000);
+    });
+
+    it('restarts a frozen recording when the camera is still online', async () => {
+        const { recordingService } = await import('../services/recordingService.js');
+        const camera = createCamera({ id: 11 });
+
+        queryOneMock.mockImplementation((sql) => {
+            if (sql.includes('SELECT * FROM cameras')) {
+                return camera;
+            }
+            if (sql.includes('SELECT is_tunnel, is_online, enabled, enable_recording, recording_status')) {
+                return {
+                    is_tunnel: 0,
+                    is_online: 1,
+                    enabled: 1,
+                    enable_recording: 1,
+                    recording_status: 'recording',
+                };
+            }
+            return null;
+        });
+
+        await recordingService.startRecording(11);
+        vi.advanceTimersByTime(31000);
+
+        const restartSpy = vi.spyOn(recordingService, 'restartRecording').mockResolvedValue({
+            success: true,
+            message: 'Recording restarted',
+        });
+
+        await recordingService.tickHealthMonitoring(Date.now());
+
+        expect(restartSpy).toHaveBeenCalledWith(11, 'stream_frozen');
+        expect(recordingService.getRecordingStatus(11).restartCount).toBe(1);
+    });
+
+    it('suspends recovery instead of restarting when the camera is confirmed offline', async () => {
+        const { recordingService } = await import('../services/recordingService.js');
+        const camera = createCamera({ id: 12 });
+
+        queryOneMock.mockImplementation((sql) => {
+            if (sql.includes('SELECT * FROM cameras')) {
+                return camera;
+            }
+            if (sql.includes('SELECT is_tunnel, is_online, enabled, enable_recording, recording_status')) {
+                return {
+                    is_tunnel: 0,
+                    is_online: 0,
+                    enabled: 1,
+                    enable_recording: 1,
+                    recording_status: 'recording',
+                };
+            }
+            return null;
+        });
+
+        await recordingService.startRecording(12);
+        vi.advanceTimersByTime(31000);
+
+        const restartSpy = vi.spyOn(recordingService, 'restartRecording');
+
+        await recordingService.tickHealthMonitoring(Date.now());
+
+        expect(restartSpy).not.toHaveBeenCalled();
+        expect(recordingService.getRecordingStatus(12)).toMatchObject({
+            isRecording: false,
+            status: 'suspended_offline',
+            suspendedReason: 'camera_offline',
+        });
+    });
+
+    it('keeps waiting during cooldown and only retries recovery once the camera is back online', async () => {
+        const { recordingService } = await import('../services/recordingService.js');
+        const camera = createCamera({ id: 13 });
+        let onlineState = 0;
+
+        queryOneMock.mockImplementation((sql) => {
+            if (sql.includes('SELECT * FROM cameras')) {
+                return camera;
+            }
+            if (sql.includes('SELECT is_tunnel, is_online, enabled, enable_recording, recording_status')) {
+                return {
+                    is_tunnel: 0,
+                    is_online: onlineState,
+                    enabled: 1,
+                    enable_recording: 1,
+                    recording_status: 'recording',
+                };
+            }
+            return null;
+        });
+
+        await recordingService.startRecording(13);
+        vi.advanceTimersByTime(31000);
+        await recordingService.tickHealthMonitoring(Date.now());
+
+        expect(recordingService.getRecordingStatus(13).status).toBe('suspended_offline');
+
+        onlineState = 1;
+        const recoverySpy = vi.spyOn(recordingService, 'attemptRecordingRecovery');
+
+        await recordingService.tickHealthMonitoring(Date.now() + 1000);
+        expect(recoverySpy).not.toHaveBeenCalled();
+
+        await recordingService.tickHealthMonitoring(Date.now() + 61000);
+        expect(recoverySpy).toHaveBeenCalledTimes(1);
     });
 });

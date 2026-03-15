@@ -109,6 +109,22 @@ const removeFailedFile = (cameraId, filename) => {
 };
 
 const EXTERNAL_RECORDING_PROTOCOL_WHITELIST = 'file,http,https,tcp,tls,crypto';
+const RECORDING_RETRY_BASE_COOLDOWN_MS = 15000;
+const RECORDING_RETRY_MAX_COOLDOWN_MS = 5 * 60 * 1000;
+const RECORDING_OFFLINE_COOLDOWN_MS = 60 * 1000;
+const RECORDING_FAILURE_SUSPEND_THRESHOLD = 3;
+
+export function computeRecordingCooldownMs(consecutiveFailureCount = 0) {
+    if (consecutiveFailureCount <= 1) {
+        return RECORDING_RETRY_BASE_COOLDOWN_MS;
+    }
+
+    const exponent = Math.max(0, consecutiveFailureCount - 1);
+    return Math.min(
+        RECORDING_RETRY_BASE_COOLDOWN_MS * (2 ** exponent),
+        RECORDING_RETRY_MAX_COOLDOWN_MS
+    );
+}
 
 export function maskRecordingSourceForLog(sourceUrl) {
     if (!sourceUrl) return '';
@@ -256,6 +272,87 @@ class RecordingService {
         this.startScheduledCleanup();
     }
 
+    ensureRuntimeHealthState(cameraId) {
+        const existingState = streamHealthMap.get(cameraId);
+        if (existingState) {
+            return existingState;
+        }
+
+        const nextState = {
+            lastDataTime: Date.now(),
+            restartCount: 0,
+            consecutiveFailureCount: 0,
+            cooldownUntil: 0,
+            suspendedReason: null,
+            lastRestartAt: null,
+            inFlightAction: false,
+        };
+
+        streamHealthMap.set(cameraId, nextState);
+        return nextState;
+    }
+
+    clearRuntimeHealthState(cameraId) {
+        streamHealthMap.delete(cameraId);
+    }
+
+    markRecordingRecovered(cameraId, now = Date.now()) {
+        const health = this.ensureRuntimeHealthState(cameraId);
+        health.lastDataTime = now;
+        health.consecutiveFailureCount = 0;
+        health.cooldownUntil = 0;
+        health.suspendedReason = null;
+        health.inFlightAction = false;
+        return health;
+    }
+
+    markRecordingFailure(cameraId, reason = 'process_crashed', now = Date.now()) {
+        const health = this.ensureRuntimeHealthState(cameraId);
+        health.consecutiveFailureCount += 1;
+        health.lastRestartAt = now;
+        health.inFlightAction = false;
+
+        const cooldownMs = computeRecordingCooldownMs(health.consecutiveFailureCount);
+        health.cooldownUntil = now + cooldownMs;
+        health.suspendedReason = health.consecutiveFailureCount >= RECORDING_FAILURE_SUSPEND_THRESHOLD
+            ? 'waiting_retry'
+            : reason;
+
+        return health;
+    }
+
+    suspendRecordingForOffline(cameraId, now = Date.now()) {
+        const health = this.ensureRuntimeHealthState(cameraId);
+        health.cooldownUntil = Math.max(health.cooldownUntil || 0, now + RECORDING_OFFLINE_COOLDOWN_MS);
+        health.suspendedReason = 'camera_offline';
+        health.inFlightAction = false;
+        return health;
+    }
+
+    async attemptRecordingRecovery(cameraId, reason = 'waiting_retry', now = Date.now()) {
+        const health = this.ensureRuntimeHealthState(cameraId);
+        if (health.inFlightAction || now < (health.cooldownUntil || 0)) {
+            return { success: false, skipped: true, reason: 'cooldown_active' };
+        }
+
+        health.inFlightAction = true;
+
+        try {
+            const result = await this.startRecording(cameraId);
+            if (result.success) {
+                this.markRecordingRecovered(cameraId, now);
+            } else {
+                this.markRecordingFailure(cameraId, reason, now);
+            }
+            return result;
+        } finally {
+            const latestHealth = streamHealthMap.get(cameraId);
+            if (latestHealth) {
+                latestHealth.inFlightAction = false;
+            }
+        }
+    }
+
     /**
      * Start recording untuk camera
      */
@@ -321,10 +418,7 @@ class RecordingService {
             });
 
             // Initialize stream health
-            streamHealthMap.set(cameraId, {
-                lastDataTime: Date.now(),
-                restartCount: 0
-            });
+            this.markRecordingRecovered(cameraId, Date.now());
 
             // Handle ffmpeg output (using array ring buffer to prevent memory leak)
             const ffmpegOutput = [];
@@ -377,6 +471,7 @@ class RecordingService {
             ffmpeg.on('error', (error) => {
                 console.error(`FFmpeg spawn error for camera ${cameraId}:`, error);
                 activeRecordings.delete(cameraId);
+                this.markRecordingFailure(cameraId, 'spawn_error');
             });
 
             ffmpeg.on('close', (code) => {
@@ -385,6 +480,7 @@ class RecordingService {
                     console.error(`FFmpeg process for camera ${cameraId} exited with code ${code}`);
                     console.error(`[Recording] Failure reason (${sourceConfig.streamSource}): ${failureReason}`);
                     console.error(`Last FFmpeg output:\n${ffmpegOutput.join('').slice(-1000)}`); // Last 1000 chars
+                    this.markRecordingFailure(cameraId, failureReason);
                     this.logRestart(cameraId, 'process_crashed', false);
                 } else {
                     console.log(`FFmpeg process for camera ${cameraId} stopped normally`);
@@ -410,8 +506,9 @@ class RecordingService {
     /**
      * Stop recording untuk camera
      */
-    async stopRecording(cameraId) {
+    async stopRecording(cameraId, options = {}) {
         try {
+            const shouldRemoveHealthState = options.removeHealthState !== false;
             const recording = activeRecordings.get(cameraId);
             if (!recording) {
                 return { success: false, message: 'Not recording' };
@@ -420,7 +517,9 @@ class RecordingService {
             // Kill ffmpeg process
             recording.process.kill('SIGTERM');
             activeRecordings.delete(cameraId);
-            streamHealthMap.delete(cameraId);
+            if (shouldRemoveHealthState) {
+                this.clearRuntimeHealthState(cameraId);
+            }
 
             // Update camera status
             execute(
@@ -444,15 +543,20 @@ class RecordingService {
         console.log(`Restarting recording for camera ${cameraId}, reason: ${reason}`);
 
         const restartTime = new Date();
+        const health = this.ensureRuntimeHealthState(cameraId);
+        health.lastRestartAt = restartTime.getTime();
 
         // Stop current recording
-        await this.stopRecording(cameraId);
+        await this.stopRecording(cameraId, { removeHealthState: reason === 'manual' });
 
         // Wait 3 seconds
         await new Promise(resolve => setTimeout(resolve, 3000));
 
         // Start recording again
         const result = await this.startRecording(cameraId);
+        if (!result.success && reason !== 'manual') {
+            this.markRecordingFailure(cameraId, reason, Date.now());
+        }
 
         // Log restart event
         const recoveryTime = new Date();
@@ -1011,28 +1115,76 @@ class RecordingService {
      */
     startHealthMonitoring() {
         setInterval(() => {
-            streamHealthMap.forEach((health, cameraId) => {
-                const timeSinceData = Date.now() - health.lastDataTime;
-
-                // Get camera info
-                const camera = queryOne('SELECT is_tunnel FROM cameras WHERE id = ?', [cameraId]);
-                if (!camera) return;
-
-                // Timeout threshold
-                const timeout = camera.is_tunnel === 1 ? 10000 : 30000; // 10s untuk tunnel, 30s untuk normal
-
-                // Check if stream frozen
-                if (timeSinceData > timeout) {
-                    console.log(`⚠️ Camera ${cameraId} stream frozen (${timeSinceData}ms), restarting...`);
-
-                    // Increment restart count
-                    health.restartCount++;
-
-                    // Restart recording
-                    this.restartRecording(cameraId, 'stream_frozen');
-                }
+            this.tickHealthMonitoring().catch((error) => {
+                console.error('[Recording Health] Error during monitor tick:', error);
             });
         }, 5000); // Check every 5 seconds
+    }
+
+    async tickHealthMonitoring(now = Date.now()) {
+        for (const [cameraId, health] of streamHealthMap.entries()) {
+            const camera = queryOne(
+                'SELECT is_tunnel, is_online, enabled, enable_recording, recording_status FROM cameras WHERE id = ?',
+                [cameraId]
+            );
+
+            if (!camera) {
+                this.clearRuntimeHealthState(cameraId);
+                continue;
+            }
+
+            if (!camera.enabled || !camera.enable_recording) {
+                if (!activeRecordings.has(cameraId)) {
+                    this.clearRuntimeHealthState(cameraId);
+                }
+                continue;
+            }
+
+            const activeRecording = activeRecordings.get(cameraId);
+            if (!activeRecording) {
+                if (camera.is_online === 1 && health.suspendedReason && now >= (health.cooldownUntil || 0)) {
+                    await this.attemptRecordingRecovery(cameraId, health.suspendedReason, now);
+                } else if (camera.is_online !== 1) {
+                    this.suspendRecordingForOffline(cameraId, now);
+                }
+                continue;
+            }
+
+            if (health.inFlightAction) {
+                continue;
+            }
+
+            const timeout = camera.is_tunnel === 1 ? 10000 : 30000;
+            const timeSinceData = now - health.lastDataTime;
+            if (timeSinceData <= timeout) {
+                continue;
+            }
+
+            if (camera.is_online !== 1) {
+                console.log(`[Recording Health] Camera ${cameraId} confirmed offline, suspending recording recovery`);
+                this.suspendRecordingForOffline(cameraId, now);
+                await this.stopRecording(cameraId, { removeHealthState: false });
+                continue;
+            }
+
+            if (now < (health.cooldownUntil || 0)) {
+                continue;
+            }
+
+            console.log(`⚠️ Camera ${cameraId} stream frozen (${timeSinceData}ms), restarting...`);
+            health.restartCount += 1;
+            health.lastRestartAt = now;
+            health.inFlightAction = true;
+
+            try {
+                await this.restartRecording(cameraId, 'stream_frozen');
+            } finally {
+                const latestHealth = streamHealthMap.get(cameraId);
+                if (latestHealth) {
+                    latestHealth.inFlightAction = false;
+                }
+            }
+        }
     }
 
     /**
@@ -1243,6 +1395,17 @@ class RecordingService {
         const health = streamHealthMap.get(cameraId);
 
         if (!recording) {
+            if (health?.suspendedReason) {
+                return {
+                    isRecording: false,
+                    status: health.suspendedReason === 'camera_offline' ? 'suspended_offline' : 'waiting_retry',
+                    restartCount: health.restartCount || 0,
+                    consecutiveFailureCount: health.consecutiveFailureCount || 0,
+                    cooldownUntil: health.cooldownUntil || 0,
+                    suspendedReason: health.suspendedReason,
+                };
+            }
+
             return {
                 isRecording: false,
                 status: 'stopped'
@@ -1254,7 +1417,10 @@ class RecordingService {
             status: 'recording',
             startTime: recording.startTime,
             duration: Math.floor((Date.now() - recording.startTime.getTime()) / 1000),
-            restartCount: health ? health.restartCount : 0
+            restartCount: health ? health.restartCount : 0,
+            consecutiveFailureCount: health ? health.consecutiveFailureCount || 0 : 0,
+            cooldownUntil: health ? health.cooldownUntil || 0 : 0,
+            suspendedReason: health ? health.suspendedReason || null : null,
         };
     }
 
@@ -1645,3 +1811,4 @@ class RecordingService {
 
 // Export singleton instance
 export const recordingService = new RecordingService();
+export { RecordingService };
