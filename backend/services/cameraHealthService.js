@@ -1,4 +1,5 @@
 import axios from 'axios';
+import https from 'https';
 import net from 'net';
 import { config } from '../config/config.js';
 import { query, queryOne, execute } from '../database/connectionPool.js';
@@ -16,6 +17,15 @@ const OFFLINE_FAIL_THRESHOLD = 3;
 const EXTERNAL_REQUEST_TIMEOUT_MS = 10000;
 const EXTERNAL_MAX_PDT_AGE_SEC = 120;
 const EXTERNAL_STALE_SEQUENCE_THRESHOLD = 2;
+const TLS_VERIFICATION_ERROR_CODES = new Set([
+    'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+    'UNABLE_TO_GET_ISSUER_CERT',
+    'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
+    'DEPTH_ZERO_SELF_SIGNED_CERT',
+    'SELF_SIGNED_CERT_IN_CHAIN',
+    'CERT_HAS_EXPIRED',
+    'ERR_TLS_CERT_ALTNAME_INVALID',
+]);
 
 function getTimestamp() {
     const timezone = getTimezone();
@@ -111,6 +121,28 @@ function resolvePlaylistUrl(baseUrl, childPath) {
     }
 }
 
+function normalizeExternalTlsMode(value) {
+    return value === 'insecure' ? 'insecure' : 'strict';
+}
+
+function buildExternalRequestOptions(externalTlsMode) {
+    const normalizedTlsMode = normalizeExternalTlsMode(externalTlsMode);
+    return {
+        externalTlsMode: normalizedTlsMode,
+        httpsAgent: normalizedTlsMode === 'insecure'
+            ? new https.Agent({ rejectUnauthorized: false })
+            : undefined
+    };
+}
+
+function mapExternalFetchError(error) {
+    const errorCode = error?.code || '';
+    if (TLS_VERIFICATION_ERROR_CODES.has(errorCode)) {
+        return 'tls_verification_failed';
+    }
+    return errorCode || 'request_error';
+}
+
 class CameraHealthService {
     constructor() {
         this.checkInterval = null;
@@ -168,8 +200,13 @@ class CameraHealthService {
         return this.healthState.get(cameraId);
     }
 
-    async fetchPlaylist(url) {
+    getExternalRequestOptions(camera) {
+        return buildExternalRequestOptions(camera?.external_tls_mode);
+    }
+
+    async fetchPlaylist(url, requestOptions = {}) {
         try {
+            const isHttpsRequest = typeof url === 'string' && url.startsWith('https://');
             const response = await axios.get(url, {
                 timeout: EXTERNAL_REQUEST_TIMEOUT_MS,
                 responseType: 'text',
@@ -178,7 +215,8 @@ class CameraHealthService {
                     Accept: 'application/vnd.apple.mpegurl,application/x-mpegURL,*/*',
                     'User-Agent': 'cctv-healthcheck/1.0'
                 },
-                validateStatus: (status) => status < 500
+                validateStatus: (status) => status < 500,
+                httpsAgent: isHttpsRequest ? requestOptions.httpsAgent : undefined
             });
 
             if (response.status >= 400) {
@@ -197,7 +235,7 @@ class CameraHealthService {
         } catch (error) {
             return {
                 ok: false,
-                reason: error.code || 'request_error',
+                reason: mapExternalFetchError(error),
                 status: error.response?.status || null
             };
         }
@@ -250,7 +288,7 @@ class CameraHealthService {
         return { ok: true, reason: 'segment_present_no_freshness_marker' };
     }
 
-    async probeExternalStream(cameraId, externalHlsUrl) {
+    async probeExternalStream(cameraId, externalHlsUrl, requestOptions = {}) {
         if (!externalHlsUrl) {
             return { online: false, reason: 'missing_external_hls_url' };
         }
@@ -259,7 +297,7 @@ class CameraHealthService {
         let parsedMedia = null;
 
         for (let depth = 0; depth < 3; depth += 1) {
-            const playlistResponse = await this.fetchPlaylist(currentUrl);
+            const playlistResponse = await this.fetchPlaylist(currentUrl, requestOptions);
             if (!playlistResponse.ok) {
                 return {
                     online: false,
@@ -383,7 +421,11 @@ class CameraHealthService {
 
     async evaluateCameraRaw(camera, activePaths) {
         if ((camera.stream_source || 'internal') === 'external') {
-            return this.probeExternalStream(camera.id, camera.external_hls_url);
+            return this.probeExternalStream(
+                camera.id,
+                camera.external_hls_url,
+                this.getExternalRequestOptions(camera)
+            );
         }
 
         const pathName = camera.stream_key || `camera${camera.id}`;
@@ -446,7 +488,12 @@ class CameraHealthService {
         try {
             const activePaths = await this.getActivePaths();
             const cameras = query(`
-                SELECT id, name, location, is_online, stream_key, private_rtsp_url, stream_source, external_hls_url
+                SELECT id, name, location, is_online, stream_key, private_rtsp_url, stream_source, external_hls_url,
+                       COALESCE(external_use_proxy, 1) as external_use_proxy,
+                       CASE
+                           WHEN external_tls_mode IN ('strict', 'insecure') THEN external_tls_mode
+                           ELSE 'strict'
+                       END as external_tls_mode
                 FROM cameras
                 WHERE enabled = 1
             `);
@@ -575,7 +622,12 @@ class CameraHealthService {
         try {
             const activePaths = await this.getActivePaths();
             const camera = queryOne(
-                `SELECT id, name, location, is_online, stream_key, private_rtsp_url, stream_source, external_hls_url
+                `SELECT id, name, location, is_online, stream_key, private_rtsp_url, stream_source, external_hls_url,
+                        COALESCE(external_use_proxy, 1) as external_use_proxy,
+                        CASE
+                            WHEN external_tls_mode IN ('strict', 'insecure') THEN external_tls_mode
+                            ELSE 'strict'
+                        END as external_tls_mode
                  FROM cameras
                  WHERE id = ?`,
                 [cameraId]
@@ -606,7 +658,13 @@ class CameraHealthService {
 
 const cameraHealthService = new CameraHealthService();
 
-export { CameraHealthService, parsePlaylist };
+export {
+    CameraHealthService,
+    buildExternalRequestOptions,
+    mapExternalFetchError,
+    normalizeExternalTlsMode,
+    parsePlaylist
+};
 export default cameraHealthService;
 
 

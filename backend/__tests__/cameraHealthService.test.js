@@ -1,5 +1,18 @@
-import { describe, it, expect } from 'vitest';
-import { CameraHealthService, parsePlaylist } from '../services/cameraHealthService.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import axios from 'axios';
+import {
+    CameraHealthService,
+    buildExternalRequestOptions,
+    mapExternalFetchError,
+    normalizeExternalTlsMode,
+    parsePlaylist
+} from '../services/cameraHealthService.js';
+
+vi.mock('axios', () => ({
+    default: {
+        get: vi.fn()
+    }
+}));
 
 describe('cameraHealthService.parsePlaylist', () => {
     it('parses master playlist and detects variants', () => {
@@ -70,5 +83,131 @@ describe('cameraHealthService hysteresis', () => {
 
         expect(service.applyHysteresis(camera, { online: true, reason: 'ok' })).toBe(0);
         expect(service.applyHysteresis(camera, { online: true, reason: 'ok' })).toBe(1);
+    });
+});
+
+describe('cameraHealthService external TLS policy', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('normalizes invalid TLS mode to strict', () => {
+        expect(normalizeExternalTlsMode('insecure')).toBe('insecure');
+        expect(normalizeExternalTlsMode('strict')).toBe('strict');
+        expect(normalizeExternalTlsMode('invalid')).toBe('strict');
+        expect(normalizeExternalTlsMode(undefined)).toBe('strict');
+    });
+
+    it('maps TLS verification errors to a stable reason', () => {
+        expect(mapExternalFetchError({ code: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' })).toBe('tls_verification_failed');
+        expect(mapExternalFetchError({ code: 'DEPTH_ZERO_SELF_SIGNED_CERT' })).toBe('tls_verification_failed');
+        expect(mapExternalFetchError({ code: 'ECONNABORTED' })).toBe('ECONNABORTED');
+    });
+
+    it('builds an insecure HTTPS agent only for insecure mode', () => {
+        const strictOptions = buildExternalRequestOptions('strict');
+        const insecureOptions = buildExternalRequestOptions('insecure');
+
+        expect(strictOptions.externalTlsMode).toBe('strict');
+        expect(strictOptions.httpsAgent).toBeUndefined();
+        expect(insecureOptions.externalTlsMode).toBe('insecure');
+        expect(insecureOptions.httpsAgent).toBeTruthy();
+    });
+
+    it('keeps strict TLS for strict external camera checks', async () => {
+        axios.get.mockResolvedValueOnce({
+            status: 200,
+            data: '#EXTM3U\n#EXT-X-MEDIA-SEQUENCE:1\n#EXTINF:2.0,\nseg1.ts'
+        });
+
+        const service = new CameraHealthService();
+        const result = await service.evaluateCameraRaw({
+            id: 10,
+            is_online: 1,
+            stream_source: 'external',
+            external_hls_url: 'https://example.com/live.m3u8',
+            external_tls_mode: 'strict'
+        }, new Map());
+
+        expect(result.online).toBe(true);
+        expect(axios.get).toHaveBeenCalledWith(
+            'https://example.com/live.m3u8',
+            expect.objectContaining({
+                httpsAgent: undefined
+            })
+        );
+    });
+
+    it('uses insecure HTTPS agent for insecure external camera checks', async () => {
+        axios.get.mockResolvedValueOnce({
+            status: 200,
+            data: '#EXTM3U\n#EXT-X-MEDIA-SEQUENCE:1\n#EXTINF:2.0,\nseg1.ts'
+        });
+
+        const service = new CameraHealthService();
+        const result = await service.evaluateCameraRaw({
+            id: 11,
+            is_online: 1,
+            stream_source: 'external',
+            external_hls_url: 'https://example.com/live.m3u8',
+            external_tls_mode: 'insecure'
+        }, new Map());
+
+        expect(result.online).toBe(true);
+        expect(axios.get).toHaveBeenCalledWith(
+            'https://example.com/live.m3u8',
+            expect.objectContaining({
+                httpsAgent: expect.any(Object)
+            })
+        );
+    });
+
+    it('keeps TLS policy consistent from master to media playlist', async () => {
+        axios.get
+            .mockResolvedValueOnce({
+                status: 200,
+                data: '#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1280000\nvariant/index.m3u8'
+            })
+            .mockResolvedValueOnce({
+                status: 200,
+                data: '#EXTM3U\n#EXT-X-MEDIA-SEQUENCE:2\n#EXTINF:2.0,\nseg2.ts'
+            });
+
+        const service = new CameraHealthService();
+        const result = await service.evaluateCameraRaw({
+            id: 12,
+            is_online: 1,
+            stream_source: 'external',
+            external_hls_url: 'https://example.com/master.m3u8',
+            external_tls_mode: 'insecure'
+        }, new Map());
+
+        expect(result.online).toBe(true);
+        expect(axios.get).toHaveBeenNthCalledWith(
+            1,
+            'https://example.com/master.m3u8',
+            expect.objectContaining({ httpsAgent: expect.any(Object) })
+        );
+        expect(axios.get).toHaveBeenNthCalledWith(
+            2,
+            'https://example.com/variant/index.m3u8',
+            expect.objectContaining({ httpsAgent: expect.any(Object) })
+        );
+    });
+
+    it('returns a TLS-specific offline reason in strict mode', async () => {
+        axios.get.mockRejectedValueOnce({ code: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' });
+
+        const service = new CameraHealthService();
+        const result = await service.evaluateCameraRaw({
+            id: 13,
+            is_online: 1,
+            stream_source: 'external',
+            external_hls_url: 'https://example.com/live.m3u8',
+            external_tls_mode: 'strict'
+        }, new Map());
+
+        expect(result.online).toBe(false);
+        expect(result.reason).toBe('tls_verification_failed');
     });
 });
