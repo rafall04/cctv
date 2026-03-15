@@ -88,10 +88,14 @@ class RecordingPlaybackService {
             SELECT 
                 id, 
                 name, 
+                location,
+                enabled,
+                status,
                 enable_recording, 
                 recording_status, 
                 recording_duration_hours,
-                last_recording_start
+                last_recording_start,
+                stream_source
             FROM cameras 
             WHERE enabled = 1
             ORDER BY id ASC

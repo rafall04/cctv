@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import recordingService from '../services/recordingService';
 import { useNotification } from '../contexts/NotificationContext';
 import { TableSkeleton, StatCardSkeleton } from '../components/ui/Skeleton';
@@ -22,6 +23,7 @@ function RecordingLoadingState() {
 
 export default function RecordingDashboard() {
     const { showNotification } = useNotification();
+    const [updatingCameraId, setUpdatingCameraId] = useState(null);
     const {
         recordings,
         restartLogs,
@@ -62,6 +64,22 @@ export default function RecordingDashboard() {
             }
         } catch (error) {
             showNotification(error.response?.data?.message || 'Failed to stop recording', 'error');
+        }
+    };
+
+    const handleUpdateSettings = async (cameraId, settings) => {
+        try {
+            setUpdatingCameraId(cameraId);
+            const response = await recordingService.updateRecordingSettings(cameraId, settings);
+            if (response.success) {
+                showNotification('Recording settings updated successfully', 'success');
+                await fetchData({ mode: 'initial' });
+            }
+        } catch (error) {
+            showNotification(error.response?.data?.message || 'Failed to update recording settings', 'error');
+            throw error;
+        } finally {
+            setUpdatingCameraId(null);
         }
     };
 
@@ -128,6 +146,8 @@ export default function RecordingDashboard() {
                 recordings={recordings}
                 onStartRecording={handleStartRecording}
                 onStopRecording={handleStopRecording}
+                onUpdateSettings={handleUpdateSettings}
+                updatingCameraId={updatingCameraId}
             />
             <RecordingRestartLogs logs={restartLogs} />
         </div>

@@ -1,18 +1,45 @@
 // @vitest-environment jsdom
-
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import RecordingDashboard from './RecordingDashboard.jsx';
+import recordingService from '../services/recordingService';
+
+const showNotification = vi.fn();
+const fetchData = vi.fn();
 
 vi.mock('../contexts/NotificationContext', () => ({
     useNotification: () => ({
-        showNotification: vi.fn(),
+        showNotification,
     }),
+}));
+
+vi.mock('../services/recordingService', () => ({
+    default: {
+        startRecording: vi.fn(),
+        stopRecording: vi.fn(),
+        updateRecordingSettings: vi.fn(),
+    },
 }));
 
 vi.mock('../hooks/admin/useRecordingDashboardData', () => ({
     useRecordingDashboardData: () => ({
-        recordings: [],
+        recordings: [
+            {
+                id: 3,
+                name: 'CCTV TERMINAL',
+                location: 'Terminal',
+                enabled: 1,
+                status: 'active',
+                stream_source: 'internal',
+                enable_recording: 1,
+                recording_status: 'stopped',
+                recording_duration_hours: 5,
+                storage: {
+                    segmentCount: 3,
+                    totalSize: 9000,
+                },
+            },
+        ],
         restartLogs: [],
         loading: false,
         error: null,
@@ -24,7 +51,7 @@ vi.mock('../hooks/admin/useRecordingDashboardData', () => ({
             totalSegments: 385,
             totalSize: 46100000000,
         },
-        fetchData: vi.fn(),
+        fetchData,
     }),
 }));
 
@@ -36,5 +63,26 @@ describe('RecordingDashboard', () => {
         expect(screen.getByText(/Monitor recording aktif/i).className).toContain('dark:text-gray-200');
         expect(screen.getByText(/Update terakhir:/i).className).toContain('dark:text-gray-50');
         expect(screen.getByRole('button', { name: /Refresh/i }).className).toContain('dark:text-gray-100');
+    });
+
+    it('menyimpan quick edit recording lalu me-refresh dashboard', async () => {
+        recordingService.updateRecordingSettings.mockResolvedValue({ success: true });
+
+        render(<RecordingDashboard />);
+
+        fireEvent.click(screen.getByRole('button', { name: /Pengaturan Rekaman/i }));
+        fireEvent.change(screen.getByLabelText('Durasi Penyimpanan'), { target: { value: '24' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Simpan' }));
+
+        await waitFor(() => {
+            expect(recordingService.updateRecordingSettings).toHaveBeenCalledWith(3, {
+                enable_recording: true,
+                recording_duration_hours: 24,
+            });
+        });
+        await waitFor(() => {
+            expect(fetchData).toHaveBeenCalledWith({ mode: 'initial' });
+        });
+        expect(showNotification).toHaveBeenCalledWith('Recording settings updated successfully', 'success');
     });
 });
