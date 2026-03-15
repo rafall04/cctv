@@ -28,6 +28,7 @@ class ThumbnailService {
         this.isGenerating = false;
         this.generationInterval = null;
         this.ffmpegAvailable = null;
+        this.inFlightCameraIds = new Set();
     }
 
     async checkFFmpeg() {
@@ -94,13 +95,27 @@ class ThumbnailService {
     }
 
     async processCamera(camera) {
+        if (camera.is_online === 0) {
+            return { skipped: true, reason: 'camera_offline' };
+        }
+
+        if (this.inFlightCameraIds.has(camera.id)) {
+            return { skipped: true, reason: 'already_in_progress' };
+        }
+
         const hlsUrl = this.resolveCameraHlsUrl(camera);
 
         if (!hlsUrl) {
             throw new Error('No valid HLS URL for camera source');
         }
 
-        await this.generateThumbnail(camera.id, hlsUrl);
+        this.inFlightCameraIds.add(camera.id);
+        try {
+            await this.generateThumbnail(camera.id, hlsUrl);
+            return { skipped: false };
+        } finally {
+            this.inFlightCameraIds.delete(camera.id);
+        }
     }
 
     async generateAllThumbnails() {
@@ -118,9 +133,9 @@ class ThumbnailService {
 
         try {
             const cameras = query(`
-                SELECT id, name, stream_key, stream_source, external_hls_url
+                SELECT id, name, is_online, stream_key, stream_source, external_hls_url
                 FROM cameras
-                WHERE enabled = 1
+                WHERE enabled = 1 AND is_online = 1
             `);
 
             if (cameras.length === 0) {
@@ -146,8 +161,10 @@ class ThumbnailService {
 
                     const camera = cameras[currentIndex];
                     try {
-                        await this.processCamera(camera);
-                        success += 1;
+                        const result = await this.processCamera(camera);
+                        if (!result?.skipped) {
+                            success += 1;
+                        }
                     } catch (error) {
                         failed += 1;
                         console.error(`[Thumbnail] Camera ${camera.id} (${camera.name}) failed:`, error.message);
@@ -230,6 +247,34 @@ class ThumbnailService {
             console.error(`[Thumbnail] On-demand generation failed for ${cameraId}:`, error.message);
             return { success: false, error: error.message };
         }
+    }
+
+    async refreshCameraThumbnail(cameraId) {
+        if (this.ffmpegAvailable === false) {
+            return { success: false, skipped: true, reason: 'ffmpeg_unavailable' };
+        }
+
+        const camera = query(
+            `SELECT id, name, enabled, is_online, stream_key, stream_source, external_hls_url
+             FROM cameras
+             WHERE id = ?`,
+            [cameraId]
+        )?.[0];
+
+        if (!camera || !camera.enabled) {
+            return { success: false, skipped: true, reason: 'camera_unavailable' };
+        }
+
+        if (camera.is_online !== 1) {
+            return { success: false, skipped: true, reason: 'camera_offline' };
+        }
+
+        const result = await this.processCamera(camera);
+        if (result?.skipped) {
+            return { success: false, skipped: true, reason: result.reason };
+        }
+
+        return { success: true };
     }
 }
 

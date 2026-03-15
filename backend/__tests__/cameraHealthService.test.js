@@ -1,5 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import axios from 'axios';
+
+const {
+    handleCameraBecameOnlineMock,
+    handleCameraBecameOfflineMock,
+    refreshCameraThumbnailMock,
+} = vi.hoisted(() => ({
+    handleCameraBecameOnlineMock: vi.fn(),
+    handleCameraBecameOfflineMock: vi.fn(),
+    refreshCameraThumbnailMock: vi.fn(),
+}));
+
+vi.mock('../services/recordingService.js', () => ({
+    recordingService: {
+        handleCameraBecameOnline: handleCameraBecameOnlineMock,
+        handleCameraBecameOffline: handleCameraBecameOfflineMock,
+    },
+}));
+
+vi.mock('../services/thumbnailService.js', () => ({
+    default: {
+        refreshCameraThumbnail: refreshCameraThumbnailMock,
+    },
+}));
+
 import {
     CameraHealthService,
     buildExternalRequestOptions,
@@ -209,5 +233,55 @@ describe('cameraHealthService external TLS policy', () => {
 
         expect(result.online).toBe(false);
         expect(result.reason).toBe('tls_verification_failed');
+    });
+});
+
+describe('cameraHealthService status transitions', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('suspends recording when a camera transitions offline', async () => {
+        const service = new CameraHealthService();
+
+        await service.handleCameraStatusTransition(
+            { id: 41, enabled: 1, enable_recording: 1 },
+            1,
+            0,
+            'http_404'
+        );
+
+        expect(handleCameraBecameOfflineMock).toHaveBeenCalledWith(41);
+        expect(handleCameraBecameOnlineMock).not.toHaveBeenCalled();
+        expect(refreshCameraThumbnailMock).not.toHaveBeenCalled();
+    });
+
+    it('resumes recording and refreshes thumbnail when a camera transitions online', async () => {
+        const service = new CameraHealthService();
+
+        await service.handleCameraStatusTransition(
+            { id: 42, enabled: 1, enable_recording: 1 },
+            0,
+            1,
+            'stream_recovered'
+        );
+
+        expect(handleCameraBecameOnlineMock).toHaveBeenCalledWith(42);
+        expect(refreshCameraThumbnailMock).toHaveBeenCalledWith(42);
+        expect(handleCameraBecameOfflineMock).not.toHaveBeenCalled();
+    });
+
+    it('does not trigger recording resume for cameras without recording enabled', async () => {
+        const service = new CameraHealthService();
+
+        await service.handleCameraStatusTransition(
+            { id: 43, enabled: 1, enable_recording: 0 },
+            0,
+            1,
+            'stream_recovered'
+        );
+
+        expect(handleCameraBecameOnlineMock).not.toHaveBeenCalled();
+        expect(refreshCameraThumbnailMock).toHaveBeenCalledWith(43);
     });
 });

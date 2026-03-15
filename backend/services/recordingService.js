@@ -353,6 +353,30 @@ class RecordingService {
         }
     }
 
+    async handleCameraBecameOffline(cameraId, now = Date.now()) {
+        this.suspendRecordingForOffline(cameraId, now);
+
+        if (activeRecordings.has(cameraId)) {
+            await this.stopRecording(cameraId, { removeHealthState: false });
+        }
+
+        return this.getRecordingStatus(cameraId);
+    }
+
+    async handleCameraBecameOnline(cameraId, now = Date.now()) {
+        if (activeRecordings.has(cameraId)) {
+            return this.getRecordingStatus(cameraId);
+        }
+
+        const health = this.ensureRuntimeHealthState(cameraId);
+        if (!health.suspendedReason) {
+            health.suspendedReason = 'waiting_retry';
+        }
+        health.cooldownUntil = 0;
+
+        return this.attemptRecordingRecovery(cameraId, health.suspendedReason, now);
+    }
+
     /**
      * Start recording untuk camera
      */
@@ -1755,7 +1779,9 @@ class RecordingService {
      */
     async autoStartRecordings() {
         try {
-            const cameras = query('SELECT id FROM cameras WHERE enable_recording = 1 AND enabled = 1');
+            const cameras = query(
+                'SELECT id, COALESCE(is_online, 1) as is_online FROM cameras WHERE enable_recording = 1 AND enabled = 1'
+            );
 
             console.log(`[Recording] Found ${cameras.length} cameras with recording enabled`);
 
@@ -1768,6 +1794,12 @@ class RecordingService {
             let failCount = 0;
 
             for (const camera of cameras) {
+                if (camera.is_online !== 1) {
+                    this.suspendRecordingForOffline(camera.id);
+                    console.log(`[Recording] Skipping camera ${camera.id} auto-start because source is currently offline`);
+                    continue;
+                }
+
                 let retries = 3;
                 let success = false;
 

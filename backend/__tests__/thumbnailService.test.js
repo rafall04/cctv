@@ -77,4 +77,63 @@ describe('thumbnailService external thumbnails', () => {
             ['/api/thumbnails/18.jpg', 18]
         );
     });
+
+    it('skips offline cameras during background generation', async () => {
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        queryMock.mockReturnValue([
+            {
+                id: 21,
+                name: 'Online Camera',
+                is_online: 1,
+                stream_key: 'camera21',
+                stream_source: 'internal',
+                external_hls_url: null,
+            },
+        ]);
+
+        await thumbnailService.generateAllThumbnails();
+
+        expect(execFileMock).toHaveBeenCalledTimes(1);
+        expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('WHERE enabled = 1 AND is_online = 1'));
+    });
+
+    it('refreshes a single camera only when it is eligible and online', async () => {
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        queryMock.mockImplementation((sql, params) => {
+            if (params?.[0] === 31) {
+                return [{
+                    id: 31,
+                    name: 'Recovered Camera',
+                    enabled: 1,
+                    is_online: 1,
+                    stream_key: 'camera31',
+                    stream_source: 'internal',
+                    external_hls_url: null,
+                }];
+            }
+
+            if (params?.[0] === 32) {
+                return [{
+                    id: 32,
+                    name: 'Offline Camera',
+                    enabled: 1,
+                    is_online: 0,
+                    stream_key: 'camera32',
+                    stream_source: 'internal',
+                    external_hls_url: null,
+                }];
+            }
+
+            return [];
+        });
+
+        const onlineResult = await thumbnailService.refreshCameraThumbnail(31);
+        const offlineResult = await thumbnailService.refreshCameraThumbnail(32);
+
+        expect(onlineResult).toEqual({ success: true });
+        expect(offlineResult).toEqual({ success: false, skipped: true, reason: 'camera_offline' });
+        expect(execFileMock).toHaveBeenCalledTimes(1);
+    });
 });

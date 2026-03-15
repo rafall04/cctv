@@ -323,4 +323,35 @@ describe('recordingService external recording support', () => {
         await recordingService.tickHealthMonitoring(Date.now() + 61000);
         expect(recoverySpy).toHaveBeenCalledTimes(1);
     });
+
+    it('suspends an active recording immediately when the health service marks it offline', async () => {
+        const { recordingService } = await import('../services/recordingService.js');
+
+        queryOneMock.mockReturnValue(createCamera({ id: 14 }));
+
+        await recordingService.startRecording(14);
+        const status = await recordingService.handleCameraBecameOffline(14);
+
+        expect(status).toMatchObject({
+            isRecording: false,
+            status: 'suspended_offline',
+            suspendedReason: 'camera_offline',
+        });
+    });
+
+    it('tries to resume recording immediately when the health service marks it online again', async () => {
+        const { recordingService } = await import('../services/recordingService.js');
+        const camera = createCamera({ id: 15 });
+
+        queryOneMock.mockReturnValue(camera);
+
+        await recordingService.handleCameraBecameOffline(15);
+        const result = await recordingService.handleCameraBecameOnline(15);
+
+        expect(result).toMatchObject({ success: true, message: 'Recording started' });
+        expect(recordingService.getRecordingStatus(15)).toMatchObject({
+            isRecording: true,
+            status: 'recording',
+        });
+    });
 });

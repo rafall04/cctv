@@ -9,6 +9,8 @@ import {
     isTelegramConfigured
 } from './telegramService.js';
 import { getTimezone } from './timezoneService.js';
+import { recordingService } from './recordingService.js';
+import thumbnailService from './thumbnailService.js';
 
 const mediaMtxApiBaseUrl = `${(config.mediamtx?.apiUrl || 'http://localhost:9997').replace(/\/$/, '')}/v3`;
 
@@ -202,6 +204,36 @@ class CameraHealthService {
 
     getExternalRequestOptions(camera) {
         return buildExternalRequestOptions(camera?.external_tls_mode);
+    }
+
+    async handleCameraStatusTransition(camera, previousOnline, nextOnline, rawReason) {
+        if (previousOnline === nextOnline) {
+            return;
+        }
+
+        if (nextOnline === 1) {
+            try {
+                if (camera.enabled && camera.enable_recording) {
+                    await recordingService.handleCameraBecameOnline(camera.id);
+                }
+            } catch (error) {
+                console.error(`[CameraHealth] Failed to auto-resume recording for camera ${camera.id}:`, error.message);
+            }
+
+            try {
+                await thumbnailService.refreshCameraThumbnail(camera.id);
+            } catch (error) {
+                console.error(`[CameraHealth] Failed to refresh thumbnail for camera ${camera.id}:`, error.message);
+            }
+
+            return;
+        }
+
+        try {
+            await recordingService.handleCameraBecameOffline(camera.id);
+        } catch (error) {
+            console.error(`[CameraHealth] Failed to suspend recording for camera ${camera.id}:`, error.message);
+        }
     }
 
     async fetchPlaylist(url, requestOptions = {}) {
@@ -488,7 +520,7 @@ class CameraHealthService {
         try {
             const activePaths = await this.getActivePaths();
             const cameras = query(`
-                SELECT id, name, location, is_online, stream_key, private_rtsp_url, stream_source, external_hls_url,
+                SELECT id, name, location, is_online, enabled, enable_recording, stream_key, private_rtsp_url, stream_source, external_hls_url,
                        COALESCE(external_use_proxy, 1) as external_use_proxy,
                        CASE
                            WHEN external_tls_mode IN ('strict', 'insecure') THEN external_tls_mode
@@ -531,6 +563,7 @@ class CameraHealthService {
 
                 const statusChanged = camera.is_online !== isOnline;
                 if (statusChanged) {
+                    await this.handleCameraStatusTransition(camera, camera.is_online, isOnline, rawReason);
                     changedCount += 1;
 
                     if (isTelegramConfigured()) {
@@ -622,7 +655,7 @@ class CameraHealthService {
         try {
             const activePaths = await this.getActivePaths();
             const camera = queryOne(
-                `SELECT id, name, location, is_online, stream_key, private_rtsp_url, stream_source, external_hls_url,
+                `SELECT id, name, location, is_online, enabled, enable_recording, stream_key, private_rtsp_url, stream_source, external_hls_url,
                         COALESCE(external_use_proxy, 1) as external_use_proxy,
                         CASE
                             WHEN external_tls_mode IN ('strict', 'insecure') THEN external_tls_mode
@@ -646,6 +679,10 @@ class CameraHealthService {
                 'UPDATE cameras SET is_online = ?, last_online_check = ? WHERE id = ?',
                 [isOnline, timestamp, camera.id]
             );
+
+            if (camera.is_online !== isOnline) {
+                await this.handleCameraStatusTransition(camera, camera.is_online, isOnline, rawResult.reason);
+            }
 
             this.lastCheck = new Date();
             return isOnline === 1;
