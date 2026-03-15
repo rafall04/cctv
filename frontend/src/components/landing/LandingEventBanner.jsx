@@ -26,9 +26,18 @@ function resolveTheme(theme) {
 }
 
 export default function LandingEventBanner({ banner, layoutMode = 'full' }) {
-    const shouldRender = banner?.isActive && (
-        (layoutMode === 'full' && banner?.show_in_full) ||
-        (layoutMode === 'simple' && banner?.show_in_simple)
+    const resolvedBanner = {
+        title: typeof banner?.title === 'string' ? banner.title : '',
+        text: typeof banner?.text === 'string' ? banner.text : '',
+        theme: typeof banner?.theme === 'string' ? banner.theme : 'neutral',
+        show_in_full: banner?.show_in_full !== false,
+        show_in_simple: banner?.show_in_simple !== false,
+        isActive: banner?.isActive === true,
+    };
+
+    const shouldRender = resolvedBanner.isActive && resolvedBanner.text.trim() && (
+        (layoutMode === 'full' && resolvedBanner.show_in_full) ||
+        (layoutMode === 'simple' && resolvedBanner.show_in_simple)
     );
 
     if (!shouldRender) {
@@ -36,7 +45,7 @@ export default function LandingEventBanner({ banner, layoutMode = 'full' }) {
     }
 
     const isSimple = layoutMode === 'simple';
-    const theme = resolveTheme(banner.theme);
+    const theme = resolveTheme(resolvedBanner.theme);
 
     return (
         <section
@@ -53,13 +62,13 @@ export default function LandingEventBanner({ banner, layoutMode = 'full' }) {
                         </div>
 
                         <div className="min-w-0 flex-1">
-                            {banner.title && (
+                            {resolvedBanner.title && (
                                 <div className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${theme.badge}`}>
-                                    {banner.title}
+                                    {resolvedBanner.title}
                                 </div>
                             )}
-                            <p className={`event-banner-copy ${banner.title ? 'mt-2' : ''} text-sm font-medium leading-relaxed text-gray-900 dark:text-white ${isSimple ? '' : 'sm:text-base'}`}>
-                                {banner.text}
+                            <p className={`event-banner-copy ${resolvedBanner.title ? 'mt-2' : ''} text-sm font-medium leading-relaxed text-gray-900 dark:text-white ${isSimple ? '' : 'sm:text-base'}`}>
+                                {resolvedBanner.text}
                             </p>
                         </div>
                     </div>

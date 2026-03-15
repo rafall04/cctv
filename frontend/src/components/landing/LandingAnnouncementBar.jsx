@@ -52,10 +52,18 @@ export default function LandingAnnouncementBar({ announcement, layoutMode = 'ful
     const measureRef = useRef(null);
     const prefersReducedMotion = usePrefersReducedMotion();
     const [shouldTicker, setShouldTicker] = useState(false);
+    const resolvedAnnouncement = useMemo(() => ({
+        title: typeof announcement?.title === 'string' ? announcement.title : '',
+        text: typeof announcement?.text === 'string' ? announcement.text : '',
+        style: typeof announcement?.style === 'string' ? announcement.style : 'info',
+        show_in_full: announcement?.show_in_full !== false,
+        show_in_simple: announcement?.show_in_simple !== false,
+        isActive: announcement?.isActive === true,
+    }), [announcement]);
 
-    const shouldRender = announcement?.isActive && (
-        (layoutMode === 'full' && announcement?.show_in_full) ||
-        (layoutMode === 'simple' && announcement?.show_in_simple)
+    const shouldRender = resolvedAnnouncement.isActive && resolvedAnnouncement.text.trim() && (
+        (layoutMode === 'full' && resolvedAnnouncement.show_in_full) ||
+        (layoutMode === 'simple' && resolvedAnnouncement.show_in_simple)
     );
 
     useEffect(() => {
@@ -80,16 +88,16 @@ export default function LandingAnnouncementBar({ announcement, layoutMode = 'ful
 
         window.addEventListener('resize', evaluateTicker);
         return () => window.removeEventListener('resize', evaluateTicker);
-    }, [announcement?.text, prefersReducedMotion, shouldRender]);
+    }, [prefersReducedMotion, resolvedAnnouncement.text, shouldRender]);
 
-    const theme = resolveStyle(announcement?.style);
+    const theme = resolveStyle(resolvedAnnouncement.style);
     const isSimple = layoutMode === 'simple';
-    const announcementTitle = announcement?.title || 'Pengumuman';
+    const announcementTitle = resolvedAnnouncement.title || 'Pengumuman';
     const marqueeDuration = useMemo(() => {
-        const textLength = announcement?.text?.length || 0;
+        const textLength = resolvedAnnouncement.text.length || 0;
         const base = isSimple ? 18 : 16;
         return `${Math.max(base, Math.min(base + 12, Math.ceil(textLength / 5)))}s`;
-    }, [announcement?.text, isSimple]);
+    }, [resolvedAnnouncement.text, isSimple]);
 
     if (!shouldRender) {
         return null;
@@ -122,7 +130,7 @@ export default function LandingAnnouncementBar({ announcement, layoutMode = 'ful
                                 aria-hidden="true"
                                 className="pointer-events-none absolute -left-[9999px] top-0 whitespace-nowrap text-sm"
                             >
-                                {announcement.text}
+                                {resolvedAnnouncement.text}
                             </span>
 
                             <div
@@ -139,9 +147,9 @@ export default function LandingAnnouncementBar({ announcement, layoutMode = 'ful
                                             className="announcement-marquee-track"
                                             style={{ '--announcement-marquee-duration': marqueeDuration }}
                                         >
-                                            <span className="announcement-marquee-item">{announcement.text}</span>
+                                            <span className="announcement-marquee-item">{resolvedAnnouncement.text}</span>
                                             <span aria-hidden="true" className="announcement-marquee-item">
-                                                {announcement.text}
+                                                {resolvedAnnouncement.text}
                                             </span>
                                         </div>
                                     </div>
@@ -150,7 +158,7 @@ export default function LandingAnnouncementBar({ announcement, layoutMode = 'ful
                                         className="announcement-static-copy text-sm leading-5 text-gray-700 dark:text-gray-200"
                                         data-testid={`landing-announcement-static-${layoutMode}`}
                                     >
-                                        {announcement.text}
+                                        {resolvedAnnouncement.text}
                                     </p>
                                 )}
                             </div>

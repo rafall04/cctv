@@ -33,4 +33,33 @@ describe('LandingEventBanner', () => {
 
         expect(screen.queryByTestId('landing-event-banner-simple')).toBeNull();
     });
+
+    it('aman saat banner menjadi tidak aktif setelah sebelumnya tampil', () => {
+        const { rerender } = render(<LandingEventBanner banner={banner} layoutMode="full" />);
+
+        expect(screen.getByTestId('landing-event-banner-full')).toBeTruthy();
+
+        rerender(
+            <LandingEventBanner
+                banner={{ ...banner, isActive: false }}
+                layoutMode="full"
+            />
+        );
+
+        expect(screen.queryByTestId('landing-event-banner-full')).toBeNull();
+    });
+
+    it('tidak crash saat banner null atau text kosong', () => {
+        const { rerender } = render(<LandingEventBanner banner={null} layoutMode="full" />);
+        expect(screen.queryByTestId('landing-event-banner-full')).toBeNull();
+
+        rerender(
+            <LandingEventBanner
+                banner={{ ...banner, text: '', isActive: true }}
+                layoutMode="full"
+            />
+        );
+
+        expect(screen.queryByTestId('landing-event-banner-full')).toBeNull();
+    });
 });

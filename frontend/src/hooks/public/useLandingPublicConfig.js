@@ -1,41 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { getPublicSaweriaConfig } from '../../services/saweriaService';
 import { settingsService } from '../../services/settingsService';
-
-const DEFAULT_LANDING_SETTINGS = {
-    area_coverage: 'Saat ini area coverage kami baru mencakup <strong>Dander</strong> dan <strong>Tanjungharjo</strong>',
-    hero_badge: 'LIVE STREAMING 24 JAM',
-    section_title: 'CCTV Publik',
-    eventBanner: {
-        enabled: false,
-        title: '',
-        text: '',
-        theme: 'neutral',
-        start_at: '',
-        end_at: '',
-        show_in_full: true,
-        show_in_simple: true,
-        isActive: false,
-    },
-    announcement: {
-        enabled: false,
-        title: '',
-        text: '',
-        style: 'info',
-        start_at: '',
-        end_at: '',
-        show_in_full: true,
-        show_in_simple: true,
-        isActive: false,
-    },
-};
+import {
+    DEFAULT_LANDING_SETTINGS,
+    LANDING_SCHEDULE_RECHECK_MS,
+    normalizeLandingSettings,
+} from './landingScheduledContent';
 
 export function useLandingPublicConfig() {
     const [saweriaLink, setSaweriaLink] = useState('https://saweria.co/raflialdi');
     const [saweriaLeaderboardLink, setSaweriaLeaderboardLink] = useState('');
     const [saweriaEnabled, setSaweriaEnabled] = useState(false);
-    const [landingSettings, setLandingSettings] = useState(DEFAULT_LANDING_SETTINGS);
+    const [rawLandingSettings, setRawLandingSettings] = useState(DEFAULT_LANDING_SETTINGS);
     const [publicConfigLoading, setPublicConfigLoading] = useState(true);
+    const [scheduleNow, setScheduleNow] = useState(() => Date.now());
 
     useEffect(() => {
         let isMounted = true;
@@ -65,7 +43,7 @@ export function useLandingPublicConfig() {
                 }
 
                 if (landingRes?.success && landingRes?.data) {
-                    setLandingSettings(landingRes.data);
+                    setRawLandingSettings(landingRes.data);
                 }
             } catch (err) {
                 if (isMounted) {
@@ -84,6 +62,20 @@ export function useLandingPublicConfig() {
             isMounted = false;
         };
     }, []);
+
+    useEffect(() => {
+        const intervalId = window.setInterval(() => {
+            setScheduleNow(Date.now());
+        }, LANDING_SCHEDULE_RECHECK_MS);
+
+        return () => {
+            window.clearInterval(intervalId);
+        };
+    }, []);
+
+    const landingSettings = useMemo(() => {
+        return normalizeLandingSettings(rawLandingSettings, scheduleNow);
+    }, [rawLandingSettings, scheduleNow]);
 
     return {
         saweriaEnabled,

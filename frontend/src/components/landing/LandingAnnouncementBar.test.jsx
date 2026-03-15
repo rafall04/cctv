@@ -92,4 +92,33 @@ describe('LandingAnnouncementBar', () => {
         );
         expect(screen.queryByTestId('landing-announcement-simple')).toBeNull();
     });
+
+    it('aman saat announcement menjadi tidak aktif setelah sebelumnya tampil', () => {
+        const { rerender } = render(<LandingAnnouncementBar announcement={announcement} layoutMode="full" />);
+
+        expect(screen.getByTestId('landing-announcement-full')).toBeTruthy();
+
+        rerender(
+            <LandingAnnouncementBar
+                announcement={{ ...announcement, isActive: false }}
+                layoutMode="full"
+            />
+        );
+
+        expect(screen.queryByTestId('landing-announcement-full')).toBeNull();
+    });
+
+    it('tidak crash saat announcement null atau text kosong', () => {
+        const { rerender } = render(<LandingAnnouncementBar announcement={null} layoutMode="full" />);
+        expect(screen.queryByTestId('landing-announcement-full')).toBeNull();
+
+        rerender(
+            <LandingAnnouncementBar
+                announcement={{ ...announcement, text: '', isActive: true }}
+                layoutMode="full"
+            />
+        );
+
+        expect(screen.queryByTestId('landing-announcement-full')).toBeNull();
+    });
 });
