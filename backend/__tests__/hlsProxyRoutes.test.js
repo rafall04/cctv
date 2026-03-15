@@ -8,6 +8,7 @@ import {
     FixedWindowLimiter,
     HlsSessionStore,
     getViewerIdentity,
+    isExternalProxyTargetAllowed,
     isTrustedProxy,
 } from '../routes/hlsProxyRoutes.js';
 
@@ -142,6 +143,22 @@ describe('HlsSessionStore', () => {
         expect(endSession).toHaveBeenCalledWith('session-10');
         expect(store.getSessionEntry('viewer-4', 10)).toBe(null);
         expect(store.getCameraId('abc-stream')).toBe(null);
+    });
+
+    it('drains pending session closes in batches', async () => {
+        const store = new HlsSessionStore({ sessionCloseBatchSize: 2 });
+        const endSession = vi.fn(async () => true);
+
+        store.queueSessionClose('session-1');
+        store.queueSessionClose('session-2');
+        store.queueSessionClose('session-3');
+
+        const firstBatch = await store.drainPendingSessionCloses(endSession);
+        const secondBatch = await store.drainPendingSessionCloses(endSession);
+
+        expect(firstBatch).toBe(2);
+        expect(secondBatch).toBe(1);
+        expect(endSession).toHaveBeenCalledTimes(3);
     });
 
     it('evicts stale entries when camera cap is exceeded and queues session close', async () => {
@@ -298,6 +315,45 @@ describe('upstream stream cleanup', () => {
         expect(request.raw.listenerCount('aborted')).toBe(0);
     });
 
+    it('aborts upstream on reply close before stream end', () => {
+        const request = createRequest();
+        const reply = { raw: new EventEmitter() };
+        const controller = new AbortController();
+        const stream = createStream();
+
+        attachAbortCleanup({
+            request,
+            reply,
+            controller,
+            upstreamStream: stream,
+        }).attach();
+
+        reply.raw.emit('close');
+
+        expect(controller.signal.aborted).toBe(true);
+        expect(stream.destroy).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not abort upstream on reply close after finish', () => {
+        const request = createRequest();
+        const reply = { raw: new EventEmitter() };
+        const controller = new AbortController();
+        const stream = createStream();
+
+        attachAbortCleanup({
+            request,
+            reply,
+            controller,
+            upstreamStream: stream,
+        }).attach();
+
+        reply.raw.emit('finish');
+        reply.raw.emit('close');
+
+        expect(controller.signal.aborted).toBe(false);
+        expect(stream.destroy).toHaveBeenCalledTimes(0);
+    });
+
     it('cleans up failed binary retry attempts before retrying', async () => {
         const firstStream = createStream();
         const secondStream = createStream();
@@ -363,5 +419,29 @@ describe('upstream stream cleanup', () => {
             maxContentLength: 100,
             maxBodyLength: 100,
         });
+    });
+});
+
+describe('external proxy validation', () => {
+    it('rejects localhost and private targets by default', () => {
+        expect(isExternalProxyTargetAllowed('http://127.0.0.1/test.m3u8')).toBe(false);
+        expect(isExternalProxyTargetAllowed('http://192.168.1.20/test.m3u8')).toBe(false);
+        expect(isExternalProxyTargetAllowed('http://localhost/test.m3u8')).toBe(false);
+    });
+
+    it('accepts public targets and explicit allowlist entries', () => {
+        expect(isExternalProxyTargetAllowed('https://example.com/test.m3u8')).toBe(true);
+        expect(isExternalProxyTargetAllowed('https://stream.public.test/live.m3u8', {
+            allowedHosts: ['stream.public.test'],
+        })).toBe(true);
+        expect(isExternalProxyTargetAllowed('https://other.test/live.m3u8', {
+            allowedHosts: ['stream.public.test'],
+        })).toBe(false);
+    });
+
+    it('allows private targets only when explicitly configured', () => {
+        expect(isExternalProxyTargetAllowed('http://10.1.2.3/test.m3u8', {
+            allowPrivateHosts: true,
+        })).toBe(true);
     });
 });

@@ -160,6 +160,9 @@ export const config = {
       maxCameraLookupMissesPerWindow: parseInt(process.env.HLS_MAX_CAMERA_LOOKUP_MISSES_PER_WINDOW || '30', 10),
       controlWindowMs: parseInt(process.env.HLS_CONTROL_WINDOW_MS || '60000', 10),
       maxLimiterKeys: parseInt(process.env.HLS_MAX_LIMITER_KEYS || '5000', 10),
+      externalProxyAllowPrivateHosts: process.env.HLS_EXTERNAL_PROXY_ALLOW_PRIVATE_HOSTS === 'true',
+      externalProxyAllowedHosts: parseList(process.env.HLS_EXTERNAL_PROXY_ALLOWED_HOSTS),
+      externalProxyTimeoutMs: parseInt(process.env.HLS_EXTERNAL_PROXY_TIMEOUT_MS || '10000', 10),
     },
   },
 

@@ -5,6 +5,7 @@
 
 import axios from 'axios';
 import jwt from 'jsonwebtoken';
+import { isIP } from 'net';
 import { config } from '../config/config.js';
 import viewerSessionService from '../services/viewerSessionService.js';
 import { queryOne } from '../database/connectionPool.js';
@@ -21,6 +22,11 @@ const DEFAULT_HLS_CONFIG = {
     maxCameraLookupMissesPerWindow: 30,
     controlWindowMs: 60000,
     maxLimiterKeys: 5000,
+    externalProxyAllowPrivateHosts: false,
+    externalProxyAllowedHosts: [],
+    externalProxyTimeoutMs: 10000,
+    sessionCloseBatchSize: 25,
+    sessionCloseTimeoutMs: 2000,
 };
 
 function normalizeIp(ip) {
@@ -463,13 +469,17 @@ export class HlsSessionStore {
         }
     }
 
-    async drainPendingSessionCloses(endSession) {
+    async drainPendingSessionCloses(endSession, options = {}) {
         if (this.pendingSessionCloses.size === 0) {
             return 0;
         }
 
-        const sessionIds = Array.from(this.pendingSessionCloses);
-        this.pendingSessionCloses.clear();
+        const batchSize = options.batchSize || this.options.sessionCloseBatchSize || this.pendingSessionCloses.size;
+        const sessionIds = Array.from(this.pendingSessionCloses).slice(0, batchSize);
+        for (const sessionId of sessionIds) {
+            this.pendingSessionCloses.delete(sessionId);
+        }
+
         for (const sessionId of sessionIds) {
             await endSession(sessionId);
         }
@@ -487,9 +497,9 @@ export class HlsSessionStore {
     }
 }
 
-function createHlsHttpClient() {
+function createHlsHttpClient(timeout = DEFAULT_HLS_CONFIG.externalProxyTimeoutMs) {
     return axios.create({
-        timeout: 10000,
+        timeout,
         validateStatus: () => true,
         maxRedirects: 0,
     });
@@ -523,15 +533,88 @@ function safeDestroyStream(stream) {
     }
 }
 
+function isPrivateOrLocalIp(hostname) {
+    const ipVersion = isIP(hostname);
+    if (ipVersion === 4) {
+        const value = ipToInt(hostname);
+        if (value === null) {
+            return false;
+        }
+
+        return (
+            (value >>> 24) === 10 ||
+            (value >>> 24) === 127 ||
+            (((value & 0xFFF00000) >>> 0) === 0xAC100000) ||
+            (((value & 0xFFFF0000) >>> 0) === 0xC0A80000) ||
+            (((value & 0xFFFF0000) >>> 0) === 0xA9FE0000)
+        );
+    }
+
+    if (ipVersion === 6) {
+        const normalized = hostname.toLowerCase();
+        return (
+            normalized === '::1' ||
+            normalized === '::' ||
+            normalized.startsWith('fc') ||
+            normalized.startsWith('fd') ||
+            normalized.startsWith('fe80:')
+        );
+    }
+
+    return false;
+}
+
+export function isExternalProxyTargetAllowed(rawUrl, options = {}) {
+    let parsedUrl;
+    try {
+        parsedUrl = new URL(rawUrl);
+    } catch {
+        return false;
+    }
+
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+        return false;
+    }
+
+    if (!parsedUrl.hostname) {
+        return false;
+    }
+
+    const hostname = parsedUrl.hostname.toLowerCase();
+    const allowPrivateHosts = options.allowPrivateHosts === true;
+    const allowedHosts = new Set((options.allowedHosts || []).map((host) => host.toLowerCase()));
+
+    if (allowedHosts.size > 0 && !allowedHosts.has(hostname)) {
+        return false;
+    }
+
+    if (allowPrivateHosts) {
+        return true;
+    }
+
+    if (hostname === 'localhost' || hostname.endsWith('.localhost')) {
+        return false;
+    }
+
+    if (isPrivateOrLocalIp(hostname)) {
+        return false;
+    }
+
+    return true;
+}
+
 export function cleanupUpstreamResponse({ controller, response, upstreamStream } = {}) {
     safeAbort(controller);
     safeDestroyStream(upstreamStream || response?.data);
 }
 
+// Only attach this to successful binary streams that are being piped to the client.
 export function attachAbortCleanup({ request, reply, controller, upstreamStream }) {
     let cleanedUp = false;
     let listenersAttached = false;
     let upstreamEnded = false;
+    let replyCompleted = false;
+    let replyErrored = false;
 
     const removeListeners = () => {
         if (!listenersAttached) {
@@ -539,6 +622,8 @@ export function attachAbortCleanup({ request, reply, controller, upstreamStream 
         }
 
         request.raw.off('aborted', onRequestAborted);
+        reply.raw.off('close', onReplyClose);
+        reply.raw.off('finish', onReplyFinish);
         reply.raw.off('error', onReplyError);
         if (isReadableStream(upstreamStream)) {
             upstreamStream.off('end', onStreamEnd);
@@ -567,8 +652,18 @@ export function attachAbortCleanup({ request, reply, controller, upstreamStream 
         cleanup({ abortController: true, destroyStream: true });
     };
 
+    const onReplyFinish = () => {
+        replyCompleted = true;
+    };
+
     const onReplyError = () => {
+        replyErrored = true;
         cleanup({ abortController: true, destroyStream: true });
+    };
+
+    const onReplyClose = () => {
+        const shouldAbort = !replyCompleted && !replyErrored && !upstreamEnded;
+        cleanup({ abortController: shouldAbort, destroyStream: shouldAbort });
     };
 
     const onStreamEnd = () => {
@@ -590,6 +685,8 @@ export function attachAbortCleanup({ request, reply, controller, upstreamStream 
         }
 
         request.raw.on('aborted', onRequestAborted);
+        reply.raw.on('close', onReplyClose);
+        reply.raw.on('finish', onReplyFinish);
         reply.raw.on('error', onReplyError);
         if (isReadableStream(upstreamStream)) {
             upstreamStream.on('end', onStreamEnd);
@@ -603,6 +700,7 @@ export function attachAbortCleanup({ request, reply, controller, upstreamStream 
     return { attach, cleanup };
 }
 
+// Text helpers are only for playlist-like responses and never manage stream lifecycle.
 export async function fetchTextUpstream({
     httpClient,
     targetUrl,
@@ -618,6 +716,7 @@ export async function fetchTextUpstream({
     });
 }
 
+// Binary helper only fetches/retries upstream responses and cleans failed attempts.
 export async function fetchBinaryUpstream({
     httpClient,
     targetUrl,
@@ -690,6 +789,28 @@ function applyHlsCorsHeaders(request, reply) {
     reply.header('Vary', 'Origin');
 }
 
+async function endSessionWithTimeout(sessionId, options = {}) {
+    const timeoutMs = options.timeoutMs || DEFAULT_HLS_CONFIG.sessionCloseTimeoutMs;
+    const endSession = options.endSession;
+
+    if (typeof endSession !== 'function') {
+        return false;
+    }
+
+    try {
+        await Promise.race([
+            Promise.resolve(endSession(sessionId)),
+            new Promise((_, reject) => {
+                setTimeout(() => reject(new Error(`Timed out ending session ${sessionId}`)), timeoutMs);
+            }),
+        ]);
+        return true;
+    } catch (error) {
+        console.error('[HLSProxy] Session close error:', error.message);
+        return false;
+    }
+}
+
 function rewriteExternalPlaylist(playlistText, sourceUrl) {
     const baseUrlMatch = sourceUrl.match(/^(.*\/)/);
     const baseUrl = baseUrlMatch ? baseUrlMatch[1] : '';
@@ -722,18 +843,34 @@ export function createHlsRouteState(options = {}) {
     };
 
     const store = new HlsSessionStore(hlsOptions);
-    const httpClient = createHlsHttpClient();
+    const httpClient = createHlsHttpClient(hlsOptions.externalProxyTimeoutMs);
     let cleanupInterval = null;
     let sessionCleanupQueue = Promise.resolve();
+    const cleanupMetrics = {
+        queueDepth: 0,
+        lastCleanupDurationMs: 0,
+    };
 
     const runSessionCleanup = (task) => {
+        cleanupMetrics.queueDepth += 1;
         sessionCleanupQueue = sessionCleanupQueue
             .catch(() => {})
-            .then(task);
+            .then(async () => {
+                const startedAt = Date.now();
+                try {
+                    return await task();
+                } finally {
+                    cleanupMetrics.queueDepth = Math.max(0, cleanupMetrics.queueDepth - 1);
+                    cleanupMetrics.lastCleanupDurationMs = Date.now() - startedAt;
+                }
+            });
         return sessionCleanupQueue;
     };
 
-    const endSession = (sessionId) => Promise.resolve(viewerSessionService.endSession(sessionId));
+    const endSession = (sessionId) => endSessionWithTimeout(sessionId, {
+        timeoutMs: hlsOptions.sessionCloseTimeoutMs,
+        endSession: (activeSessionId) => viewerSessionService.endSession(activeSessionId),
+    });
 
     const state = {
         options: hlsOptions,
@@ -764,6 +901,14 @@ export function createHlsRouteState(options = {}) {
         },
         flushPendingSessionCloses() {
             return runSessionCleanup(() => store.drainPendingSessionCloses(endSession));
+        },
+        getStats() {
+            return {
+                ...store.getStats(),
+                pendingSessionCloses: store.pendingSessionCloses.size,
+                sessionCleanupQueueDepth: cleanupMetrics.queueDepth,
+                lastCleanupDurationMs: cleanupMetrics.lastCleanupDurationMs,
+            };
         },
         getViewerIdentity(request) {
             return getViewerIdentity(request, state.trustedProxyCidrs);
@@ -873,7 +1018,10 @@ async function handleExternalStreamProxy(state, request, reply) {
         return reply.code(400).send('Missing url parameter');
     }
 
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    if (!isExternalProxyTargetAllowed(url, {
+        allowPrivateHosts: state.options.externalProxyAllowPrivateHosts,
+        allowedHosts: state.options.externalProxyAllowedHosts,
+    })) {
         return reply.code(400).send('Invalid url parameter');
     }
 
