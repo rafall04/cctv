@@ -37,6 +37,11 @@ class StreamService {
         const camera = queryOne(
             `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel,
                     c.latitude, c.longitude, c.stream_key, c.video_codec, c.stream_source, c.external_hls_url,
+                    COALESCE(c.external_use_proxy, 1) as external_use_proxy,
+                    CASE
+                        WHEN c.external_tls_mode IN ('strict', 'insecure') THEN c.external_tls_mode
+                        ELSE 'strict'
+                    END as external_tls_mode,
                     a.name as area_name, a.rt, a.rw, a.kelurahan, a.kecamatan
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 
@@ -69,11 +74,15 @@ class StreamService {
                 rw: camera.rw,
                 kelurahan: camera.kelurahan,
                 kecamatan: camera.kecamatan,
+                external_use_proxy: camera.external_use_proxy,
+                external_tls_mode: camera.external_tls_mode,
             },
             streams: camera.stream_source === 'external' && camera.external_hls_url
                 ? { hls: camera.external_hls_url, webrtc: null }
                 : this.buildStreamUrls(streamPath, requestHost),
             stream_source: camera.stream_source || 'internal',
+            external_use_proxy: camera.external_use_proxy,
+            external_tls_mode: camera.external_tls_mode,
         };
     }
 
@@ -82,6 +91,11 @@ class StreamService {
             `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel,
                     c.latitude, c.longitude, c.status, c.is_online, c.last_online_check, c.stream_key, c.video_codec,
                     c.thumbnail_path, c.thumbnail_updated_at, c.stream_source, c.external_hls_url,
+                    COALESCE(c.external_use_proxy, 1) as external_use_proxy,
+                    CASE
+                        WHEN c.external_tls_mode IN ('strict', 'insecure') THEN c.external_tls_mode
+                        ELSE 'strict'
+                    END as external_tls_mode,
                     a.name as area_name, a.rt, a.rw, a.kelurahan, a.kecamatan
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 

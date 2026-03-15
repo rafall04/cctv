@@ -45,7 +45,8 @@ const MIGRATIONS = [
     'create_recordings_table.js',
     'add_core_indexes.js',
     'add_analytics_indexes.js',
-    'add_external_stream.js'
+    'add_external_stream.js',
+    'add_external_proxy_controls.js'
 ];
 
 console.log('🚀 Starting migration process...\n');

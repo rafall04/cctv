@@ -4,6 +4,7 @@
  */
 
 import axios from 'axios';
+import https from 'https';
 import jwt from 'jsonwebtoken';
 import { isIP } from 'net';
 import { config } from '../config/config.js';
@@ -497,12 +498,17 @@ export class HlsSessionStore {
     }
 }
 
-function createHlsHttpClient(timeout = DEFAULT_HLS_CONFIG.externalProxyTimeoutMs) {
+function createHlsHttpClient(timeout = DEFAULT_HLS_CONFIG.externalProxyTimeoutMs, extraConfig = {}) {
     return axios.create({
         timeout,
         validateStatus: () => true,
         maxRedirects: 0,
+        ...extraConfig,
     });
+}
+
+function normalizeExternalTlsMode(value) {
+    return value === 'insecure' ? 'insecure' : 'strict';
 }
 
 function safeAbort(controller) {
@@ -601,6 +607,42 @@ export function isExternalProxyTargetAllowed(rawUrl, options = {}) {
     }
 
     return true;
+}
+
+export function isExternalProxyUrlCompatible(cameraExternalUrl, requestedUrl) {
+    try {
+        const configuredUrl = new URL(cameraExternalUrl);
+        const targetUrl = new URL(requestedUrl);
+
+        if (
+            configuredUrl.protocol !== targetUrl.protocol ||
+            configuredUrl.hostname.toLowerCase() !== targetUrl.hostname.toLowerCase() ||
+            configuredUrl.port !== targetUrl.port
+        ) {
+            return false;
+        }
+
+        const configuredBaseUrl = new URL('.', configuredUrl).href;
+        return targetUrl.href === configuredUrl.href || targetUrl.href.startsWith(configuredBaseUrl);
+    } catch {
+        return false;
+    }
+}
+
+export function resolveExternalCameraProxyConfig(camera, requestedUrl) {
+    if (!camera || camera.stream_source !== 'external' || !camera.external_hls_url) {
+        return null;
+    }
+
+    if (!isExternalProxyUrlCompatible(camera.external_hls_url, requestedUrl)) {
+        return null;
+    }
+
+    return {
+        cameraId: camera.id,
+        externalUseProxy: camera.external_use_proxy !== 0 && camera.external_use_proxy !== false,
+        externalTlsMode: normalizeExternalTlsMode(camera.external_tls_mode),
+    };
 }
 
 export function cleanupUpstreamResponse({ controller, response, upstreamStream } = {}) {
@@ -811,7 +853,7 @@ async function endSessionWithTimeout(sessionId, options = {}) {
     }
 }
 
-function rewriteExternalPlaylist(playlistText, sourceUrl) {
+function rewriteExternalPlaylist(playlistText, sourceUrl, cameraId = null) {
     const baseUrlMatch = sourceUrl.match(/^(.*\/)/);
     const baseUrl = baseUrlMatch ? baseUrlMatch[1] : '';
     const lines = String(playlistText || '').split('\n');
@@ -829,7 +871,12 @@ function rewriteExternalPlaylist(playlistText, sourceUrl) {
                 : baseUrl + line;
         }
 
-        lines[index] = `/hls/proxy?url=${encodeURIComponent(absoluteUrl)}`;
+        const query = new URLSearchParams({ url: absoluteUrl });
+        if (cameraId !== null && cameraId !== undefined) {
+            query.set('cameraId', String(cameraId));
+        }
+
+        lines[index] = `/hls/proxy?${query.toString()}`;
     }
 
     return lines.join('\n');
@@ -940,6 +987,35 @@ export function createHlsRouteState(options = {}) {
 
             return null;
         },
+        getExternalCameraProxyConfig(cameraId, rawUrl) {
+            if (!cameraId) {
+                return null;
+            }
+
+            const parsedCameraId = parseInt(cameraId, 10);
+            if (!Number.isInteger(parsedCameraId) || parsedCameraId <= 0) {
+                return null;
+            }
+
+            try {
+                const camera = queryOne(
+                    `SELECT id, stream_source, external_hls_url,
+                            COALESCE(external_use_proxy, 1) as external_use_proxy,
+                            CASE
+                                WHEN external_tls_mode IN ('strict', 'insecure') THEN external_tls_mode
+                                ELSE 'strict'
+                            END as external_tls_mode
+                     FROM cameras
+                     WHERE id = ?`,
+                    [parsedCameraId]
+                );
+
+                return resolveExternalCameraProxyConfig(camera, rawUrl);
+            } catch (error) {
+                console.error('[HLSProxy] Error looking up external camera proxy config:', error.message);
+                return null;
+            }
+        },
         async getOrCreateSession(identity, cameraId, request) {
             const sessionId = await store.getOrCreateSession({
                 identity,
@@ -1013,7 +1089,7 @@ function verifyStreamToken(request, reply, done) {
 
 async function handleExternalStreamProxy(state, request, reply) {
     applyHlsCorsHeaders(request, reply);
-    const { url } = request.query;
+    const { url, cameraId } = request.query;
     if (!url) {
         return reply.code(400).send('Missing url parameter');
     }
@@ -1026,6 +1102,19 @@ async function handleExternalStreamProxy(state, request, reply) {
     }
 
     try {
+        const externalCameraConfig = cameraId
+            ? state.getExternalCameraProxyConfig(cameraId, url)
+            : null;
+        if (cameraId && !externalCameraConfig) {
+            return reply.code(400).send('Invalid cameraId parameter');
+        }
+
+        const externalTlsMode = externalCameraConfig?.externalTlsMode || 'strict';
+        const requestHttpClient = externalTlsMode === 'insecure'
+            ? createHlsHttpClient(state.options.externalProxyTimeoutMs, {
+                httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+            })
+            : state.httpClient;
         const isTextFile = url.includes('.m3u8');
         const headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -1033,7 +1122,7 @@ async function handleExternalStreamProxy(state, request, reply) {
 
         if (isTextFile) {
             const response = await fetchTextUpstream({
-                httpClient: state.httpClient,
+                httpClient: requestHttpClient,
                 targetUrl: url,
                 headers,
                 maxContentLength: state.options.maxExternalPlaylistBytes,
@@ -1050,11 +1139,11 @@ async function handleExternalStreamProxy(state, request, reply) {
             reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
             reply.header('Pragma', 'no-cache');
             reply.header('Expires', '0');
-            return reply.send(rewriteExternalPlaylist(response.data, url));
+            return reply.send(rewriteExternalPlaylist(response.data, url, externalCameraConfig?.cameraId ?? null));
         }
 
         const { controller, response } = await fetchBinaryUpstream({
-            httpClient: state.httpClient,
+            httpClient: requestHttpClient,
             targetUrl: url,
             headers,
         });

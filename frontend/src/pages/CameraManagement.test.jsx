@@ -85,6 +85,8 @@ describe('CameraManagement', () => {
         fireEvent.change(screen.getByLabelText(/URL HLS Eksternal/i), {
             target: { value: 'https://example.com/live.m3u8' },
         });
+        expect(screen.getByLabelText(/Mode TLS/i)).toBeTruthy();
+        expect(screen.getByLabelText(/Gunakan Proxy/i).disabled).toBe(true);
         fireEvent.submit(screen.getByRole('button', { name: 'Create' }).closest('form'));
 
         await waitFor(() => {
@@ -96,6 +98,8 @@ describe('CameraManagement', () => {
             stream_source: 'external',
             external_hls_url: 'https://example.com/live.m3u8',
             private_rtsp_url: null,
+            external_use_proxy: 1,
+            external_tls_mode: 'strict',
         }));
     });
 

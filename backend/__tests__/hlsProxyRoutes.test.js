@@ -8,8 +8,10 @@ import {
     FixedWindowLimiter,
     HlsSessionStore,
     getViewerIdentity,
+    isExternalProxyUrlCompatible,
     isExternalProxyTargetAllowed,
     isTrustedProxy,
+    resolveExternalCameraProxyConfig,
 } from '../routes/hlsProxyRoutes.js';
 
 function createRequest(overrides = {}) {
@@ -443,5 +445,45 @@ describe('external proxy validation', () => {
         expect(isExternalProxyTargetAllowed('http://10.1.2.3/test.m3u8', {
             allowPrivateHosts: true,
         })).toBe(true);
+    });
+
+    it('accepts compatible external URLs under the configured camera base path', () => {
+        expect(isExternalProxyUrlCompatible(
+            'https://stream.example.com/live/cam/index.m3u8',
+            'https://stream.example.com/live/cam/segment1.ts'
+        )).toBe(true);
+    });
+
+    it('rejects external URLs outside the configured camera origin/base path', () => {
+        expect(isExternalProxyUrlCompatible(
+            'https://stream.example.com/live/cam/index.m3u8',
+            'https://stream.example.com/other/path/segment1.ts'
+        )).toBe(false);
+        expect(isExternalProxyUrlCompatible(
+            'https://stream.example.com/live/cam/index.m3u8',
+            'https://other.example.com/live/cam/segment1.ts'
+        )).toBe(false);
+    });
+
+    it('resolves strict and insecure camera proxy config only for matching external cameras', () => {
+        expect(resolveExternalCameraProxyConfig({
+            id: 44,
+            stream_source: 'external',
+            external_hls_url: 'https://stream.example.com/live/cam/index.m3u8',
+            external_use_proxy: 1,
+            external_tls_mode: 'insecure',
+        }, 'https://stream.example.com/live/cam/video1_init.mp4')).toEqual({
+            cameraId: 44,
+            externalUseProxy: true,
+            externalTlsMode: 'insecure',
+        });
+
+        expect(resolveExternalCameraProxyConfig({
+            id: 45,
+            stream_source: 'external',
+            external_hls_url: 'https://stream.example.com/live/cam/index.m3u8',
+            external_use_proxy: 1,
+            external_tls_mode: 'strict',
+        }, 'https://evil.example.com/live/cam/video1_init.mp4')).toBe(null);
     });
 });

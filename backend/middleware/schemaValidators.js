@@ -73,6 +73,13 @@ export const createCameraSchema = {
             external_hls_url: {
                 anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }]
             },
+            external_use_proxy: {
+                anyOf: [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }]
+            },
+            external_tls_mode: {
+                type: 'string',
+                enum: ['strict', 'insecure']
+            },
             video_codec: {
                 type: 'string',
                 enum: ['h264', 'h265'],
@@ -153,6 +160,13 @@ export const updateCameraSchema = {
             },
             external_hls_url: {
                 anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }]
+            },
+            external_use_proxy: {
+                anyOf: [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }]
+            },
+            external_tls_mode: {
+                type: 'string',
+                enum: ['strict', 'insecure']
             },
             video_codec: {
                 type: 'string',

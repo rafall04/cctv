@@ -17,6 +17,8 @@ export const defaultCameraFormValues = {
     recording_duration_hours: 5,
     stream_source: 'internal',
     external_hls_url: '',
+    external_use_proxy: true,
+    external_tls_mode: 'strict',
 };
 
 export const recordingDurationOptions = [
@@ -100,6 +102,16 @@ export function getCameraValidationRules(streamSource = 'internal') {
                 return undefined;
             },
         },
+        external_tls_mode: {
+            custom: (value) => {
+                if (streamSource === 'internal') return undefined;
+                if (!value) return undefined;
+                if (!['strict', 'insecure'].includes(value)) {
+                    return 'TLS mode must be strict or insecure';
+                }
+                return undefined;
+            },
+        },
     };
 }
 
@@ -122,6 +134,8 @@ export function mapCameraToFormValues(camera) {
         recording_duration_hours: camera.recording_duration_hours || 5,
         stream_source: camera.stream_source || 'internal',
         external_hls_url: camera.external_hls_url || '',
+        external_use_proxy: camera.external_use_proxy !== false && camera.external_use_proxy !== 0,
+        external_tls_mode: camera.external_tls_mode || 'strict',
     };
 }
 
@@ -140,5 +154,7 @@ export function buildCameraPayload(formData) {
         stream_source: formData.stream_source || 'internal',
         external_hls_url: formData.stream_source === 'external' ? formData.external_hls_url : null,
         private_rtsp_url: formData.stream_source === 'internal' ? formData.private_rtsp_url : null,
+        external_use_proxy: formData.stream_source === 'external' ? (formData.external_use_proxy ? 1 : 0) : 1,
+        external_tls_mode: formData.stream_source === 'external' ? (formData.external_tls_mode || 'strict') : 'strict',
     };
 }

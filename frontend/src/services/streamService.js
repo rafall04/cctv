@@ -48,7 +48,7 @@ const convertToProxyHlsUrl = (hlsUrl) => {
  * Convert external HLS URL to use backend proxy to evade Browser CORS restrictions
  * Format: /hls/proxy?url={encoded_url}
  */
-const convertToExternalProxyUrl = (externalUrl) => {
+const convertToExternalProxyUrl = (externalUrl, cameraId = null) => {
     if (!externalUrl) return externalUrl;
 
     // Only proxy http/https URLs (avoid modifying already proxied or local URLs)
@@ -57,7 +57,15 @@ const convertToExternalProxyUrl = (externalUrl) => {
     }
 
     const baseUrl = getApiBaseUrl();
-    return `${baseUrl}/hls/proxy?url=${encodeURIComponent(externalUrl)}`;
+    const query = new URLSearchParams({
+        url: externalUrl,
+    });
+
+    if (cameraId !== null && cameraId !== undefined) {
+        query.set('cameraId', String(cameraId));
+    }
+
+    return `${baseUrl}/hls/proxy?${query.toString()}`;
 };
 
 const makeStreamUrlsAbsolute = (streams) => {
@@ -102,7 +110,7 @@ export const streamService = {
                         if (processedStreams && processedStreams.hls) {
                             processedStreams = {
                                 ...processedStreams,
-                                hls: convertToExternalProxyUrl(processedStreams.hls)
+                                hls: convertToExternalProxyUrl(processedStreams.hls, camera.id)
                             };
                         }
                     } else {
@@ -136,7 +144,7 @@ export const streamService = {
                     if (processedStreams && processedStreams.hls) {
                         processedStreams = {
                             ...processedStreams,
-                            hls: convertToExternalProxyUrl(processedStreams.hls)
+                            hls: convertToExternalProxyUrl(processedStreams.hls, camera.id)
                         };
                     }
                 } else {

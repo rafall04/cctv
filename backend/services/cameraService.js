@@ -29,6 +29,11 @@ class CameraService {
             `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel, 
                     c.latitude, c.longitude, c.status, c.enable_recording, c.video_codec, c.stream_key, 
                     c.thumbnail_path, c.thumbnail_updated_at, c.stream_source, c.external_hls_url,
+                    COALESCE(c.external_use_proxy, 1) as external_use_proxy,
+                    CASE
+                        WHEN c.external_tls_mode IN ('strict', 'insecure') THEN c.external_tls_mode
+                        ELSE 'strict'
+                    END as external_tls_mode,
                     a.name as area_name 
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 
@@ -54,9 +59,30 @@ class CameraService {
     }
 
     async createCamera(data, request) {
-        const { name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, enable_recording, recording_duration_hours, video_codec, stream_source, external_hls_url } = data;
+        const {
+            name,
+            private_rtsp_url,
+            description,
+            location,
+            group_name,
+            area_id,
+            enabled,
+            is_tunnel,
+            latitude,
+            longitude,
+            status,
+            enable_recording,
+            recording_duration_hours,
+            video_codec,
+            stream_source,
+            external_hls_url,
+            external_use_proxy,
+            external_tls_mode,
+        } = data;
 
         const sourceType = stream_source === 'external' ? 'external' : 'internal';
+        const externalUseProxy = external_use_proxy === false || external_use_proxy === 0 ? 0 : 1;
+        const externalTlsMode = external_tls_mode === 'insecure' ? 'insecure' : 'strict';
 
         if (!name) {
             const err = new Error('Camera name is required');
@@ -77,6 +103,11 @@ class CameraService {
         }
         if (sourceType === 'external' && external_hls_url && !external_hls_url.startsWith('http')) {
             const err = new Error('External HLS URL must start with http:// or https://');
+            err.statusCode = 400;
+            throw err;
+        }
+        if (external_tls_mode !== undefined && !['strict', 'insecure'].includes(external_tls_mode)) {
+            const err = new Error('Invalid external TLS mode. Must be strict or insecure');
             err.statusCode = 400;
             throw err;
         }
@@ -112,8 +143,28 @@ class CameraService {
         const cameraStatus = status || 'active';
 
         const result = execute(
-            'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, recording_duration_hours, video_codec, stream_source, external_hls_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [name, sourceType === 'internal' ? private_rtsp_url : '', description || null, location || null, group_name || null, finalAreaId, isEnabled, isTunnel, lat, lng, cameraStatus, streamKey, isRecordingEnabled, recordingDuration, codecValue, sourceType, sourceType === 'external' ? external_hls_url : null]
+            'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, recording_duration_hours, video_codec, stream_source, external_hls_url, external_use_proxy, external_tls_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+                name,
+                sourceType === 'internal' ? private_rtsp_url : '',
+                description || null,
+                location || null,
+                group_name || null,
+                finalAreaId,
+                isEnabled,
+                isTunnel,
+                lat,
+                lng,
+                cameraStatus,
+                streamKey,
+                isRecordingEnabled,
+                recordingDuration,
+                codecValue,
+                sourceType,
+                sourceType === 'external' ? external_hls_url : null,
+                externalUseProxy,
+                externalTlsMode,
+            ]
         );
 
         execute(
@@ -159,9 +210,37 @@ class CameraService {
     }
 
     async updateCamera(id, data, request) {
-        const { name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, enable_recording, recording_duration_hours, video_codec, stream_source, external_hls_url } = data;
+        const {
+            name,
+            private_rtsp_url,
+            description,
+            location,
+            group_name,
+            area_id,
+            enabled,
+            is_tunnel,
+            latitude,
+            longitude,
+            status,
+            enable_recording,
+            recording_duration_hours,
+            video_codec,
+            stream_source,
+            external_hls_url,
+            external_use_proxy,
+            external_tls_mode,
+        } = data;
 
-        const existingCamera = queryOne('SELECT id, name, private_rtsp_url, enabled, stream_key, enable_recording, stream_source, external_hls_url FROM cameras WHERE id = ?', [id]);
+        const existingCamera = queryOne(
+            `SELECT id, name, private_rtsp_url, enabled, stream_key, enable_recording, stream_source,
+                    external_hls_url, COALESCE(external_use_proxy, 1) as external_use_proxy,
+                    CASE
+                        WHEN external_tls_mode IN ('strict', 'insecure') THEN external_tls_mode
+                        ELSE 'strict'
+                    END as external_tls_mode
+             FROM cameras WHERE id = ?`,
+            [id]
+        );
 
         if (!existingCamera) {
             const err = new Error('Camera not found');
@@ -275,6 +354,19 @@ class CameraService {
         if (external_hls_url !== undefined) {
             updates.push('external_hls_url = ?');
             values.push(external_hls_url || null);
+        }
+        if (external_use_proxy !== undefined) {
+            updates.push('external_use_proxy = ?');
+            values.push(external_use_proxy === false || external_use_proxy === 0 ? 0 : 1);
+        }
+        if (external_tls_mode !== undefined) {
+            if (!['strict', 'insecure'].includes(external_tls_mode)) {
+                const err = new Error('Invalid external TLS mode. Must be strict or insecure');
+                err.statusCode = 400;
+                throw err;
+            }
+            updates.push('external_tls_mode = ?');
+            values.push(external_tls_mode);
         }
 
         if (updates.length === 0) {

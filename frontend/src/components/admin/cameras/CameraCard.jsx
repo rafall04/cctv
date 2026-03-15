@@ -34,6 +34,20 @@ export default function CameraCard({
                     <CameraBadge condition={camera.stream_source === 'external'} className="bg-blue-500/90 text-white" title="Stream Eksternal (Dishub/Pihak Ketiga)">
                         External
                     </CameraBadge>
+                    <CameraBadge
+                        condition={camera.stream_source === 'external' && (camera.external_use_proxy === 1 || camera.external_use_proxy === true)}
+                        className="bg-slate-700/90 text-white"
+                        title="External stream tetap melewati proxy backend"
+                    >
+                        Proxy
+                    </CameraBadge>
+                    <CameraBadge
+                        condition={camera.stream_source === 'external'}
+                        className={`${camera.external_tls_mode === 'insecure' ? 'bg-amber-500/90 text-white' : 'bg-emerald-500/90 text-white'}`}
+                        title={camera.external_tls_mode === 'insecure' ? 'TLS Insecure darurat' : 'TLS Strict default'}
+                    >
+                        {camera.external_tls_mode === 'insecure' ? 'TLS Insecure' : 'TLS Strict'}
+                    </CameraBadge>
                     <CameraBadge condition={camera.status === 'maintenance'} className="bg-red-500/90 text-white" title="Dalam Perbaikan">
                         Perbaikan
                     </CameraBadge>
