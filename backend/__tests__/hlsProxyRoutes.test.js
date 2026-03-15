@@ -1,9 +1,10 @@
 import { EventEmitter } from 'events';
 import { describe, expect, it, vi } from 'vitest';
 import {
+    attachAbortCleanup,
     cleanupUpstreamResponse,
-    createStreamLifecycleManager,
-    fetchBinaryUpstreamWithRetry,
+    fetchBinaryUpstream,
+    fetchTextUpstream,
     FixedWindowLimiter,
     HlsSessionStore,
     getViewerIdentity,
@@ -253,13 +254,13 @@ describe('upstream stream cleanup', () => {
         expect(stream.destroy).toHaveBeenCalledTimes(1);
     });
 
-    it('removes listeners and destroys upstream stream on disconnect', () => {
+    it('destroys upstream stream on request abort', () => {
         const request = createRequest();
         const reply = { raw: new EventEmitter() };
         const controller = new AbortController();
         const stream = createStream();
 
-        const lifecycle = createStreamLifecycleManager({
+        const lifecycle = attachAbortCleanup({
             request,
             reply,
             controller,
@@ -267,13 +268,34 @@ describe('upstream stream cleanup', () => {
         });
 
         lifecycle.attach();
-        reply.raw.emit('close');
+        request.raw.emit('aborted');
         lifecycle.cleanup();
 
         expect(controller.signal.aborted).toBe(true);
         expect(stream.destroy).toHaveBeenCalledTimes(1);
         expect(request.raw.listenerCount('aborted')).toBe(0);
-        expect(reply.raw.listenerCount('close')).toBe(0);
+        expect(reply.raw.listenerCount('error')).toBe(0);
+    });
+
+    it('does not abort a stream that ends normally', () => {
+        const request = createRequest();
+        const reply = { raw: new EventEmitter() };
+        const controller = new AbortController();
+        const stream = createStream();
+
+        attachAbortCleanup({
+            request,
+            reply,
+            controller,
+            upstreamStream: stream,
+        }).attach();
+
+        stream.emit('end');
+        stream.emit('close');
+
+        expect(controller.signal.aborted).toBe(false);
+        expect(stream.destroy).toHaveBeenCalledTimes(0);
+        expect(request.raw.listenerCount('aborted')).toBe(0);
     });
 
     it('cleans up failed binary retry attempts before retrying', async () => {
@@ -285,7 +307,7 @@ describe('upstream stream cleanup', () => {
                 .mockResolvedValueOnce({ status: 200, data: secondStream }),
         };
 
-        const result = await fetchBinaryUpstreamWithRetry({
+        const result = await fetchBinaryUpstream({
             httpClient,
             targetUrl: 'http://localhost/test_init.mp4',
             headers: {},
@@ -305,7 +327,7 @@ describe('upstream stream cleanup', () => {
             get: vi.fn().mockResolvedValueOnce({ status: 404, data: responseStream }),
         };
 
-        const result = await fetchBinaryUpstreamWithRetry({
+        const result = await fetchBinaryUpstream({
             httpClient,
             targetUrl: 'http://localhost/segment.ts',
             headers: {},
@@ -318,5 +340,28 @@ describe('upstream stream cleanup', () => {
 
         expect(result.response.status).toBe(404);
         expect(responseStream.destroy).toHaveBeenCalledTimes(1);
+    });
+
+    it('reads text upstream without changing response type behavior', async () => {
+        const httpClient = {
+            get: vi.fn().mockResolvedValueOnce({ status: 200, data: '#EXTM3U' }),
+        };
+
+        const response = await fetchTextUpstream({
+            httpClient,
+            targetUrl: 'http://localhost/index.m3u8',
+            headers: { 'User-Agent': 'test' },
+            maxContentLength: 100,
+            maxBodyLength: 100,
+        });
+
+        expect(response.status).toBe(200);
+        expect(response.data).toBe('#EXTM3U');
+        expect(httpClient.get).toHaveBeenCalledWith('http://localhost/index.m3u8', {
+            headers: { 'User-Agent': 'test' },
+            responseType: 'text',
+            maxContentLength: 100,
+            maxBodyLength: 100,
+        });
     });
 });

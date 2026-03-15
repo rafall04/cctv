@@ -528,38 +528,60 @@ export function cleanupUpstreamResponse({ controller, response, upstreamStream }
     safeDestroyStream(upstreamStream || response?.data);
 }
 
-export function createStreamLifecycleManager({ request, reply, controller, upstreamStream }) {
+export function attachAbortCleanup({ request, reply, controller, upstreamStream }) {
     let cleanedUp = false;
     let listenersAttached = false;
-
-    const onAbort = () => {
-        cleanup();
-    };
+    let upstreamEnded = false;
 
     const removeListeners = () => {
         if (!listenersAttached) {
             return;
         }
 
-        request.raw.off('aborted', onAbort);
-        reply.raw.off('close', onAbort);
-        reply.raw.off('error', onAbort);
+        request.raw.off('aborted', onRequestAborted);
+        reply.raw.off('error', onReplyError);
         if (isReadableStream(upstreamStream)) {
-            upstreamStream.off('end', onAbort);
-            upstreamStream.off('error', onAbort);
-            upstreamStream.off('close', onAbort);
+            upstreamStream.off('end', onStreamEnd);
+            upstreamStream.off('error', onStreamError);
+            upstreamStream.off('close', onStreamClose);
         }
         listenersAttached = false;
     };
 
-    const cleanup = () => {
+    const cleanup = ({ abortController = false, destroyStream = false } = {}) => {
         if (cleanedUp) {
             return;
         }
 
         cleanedUp = true;
         removeListeners();
-        cleanupUpstreamResponse({ controller, upstreamStream });
+        if (abortController) {
+            safeAbort(controller);
+        }
+        if (destroyStream) {
+            safeDestroyStream(upstreamStream);
+        }
+    };
+
+    const onRequestAborted = () => {
+        cleanup({ abortController: true, destroyStream: true });
+    };
+
+    const onReplyError = () => {
+        cleanup({ abortController: true, destroyStream: true });
+    };
+
+    const onStreamEnd = () => {
+        upstreamEnded = true;
+        cleanup();
+    };
+
+    const onStreamError = () => {
+        cleanup({ abortController: true, destroyStream: true });
+    };
+
+    const onStreamClose = () => {
+        cleanup({ abortController: !upstreamEnded, destroyStream: !upstreamEnded });
     };
 
     const attach = () => {
@@ -567,25 +589,36 @@ export function createStreamLifecycleManager({ request, reply, controller, upstr
             return cleanup;
         }
 
-        request.raw.on('aborted', onAbort);
-        reply.raw.on('close', onAbort);
-        reply.raw.on('error', onAbort);
+        request.raw.on('aborted', onRequestAborted);
+        reply.raw.on('error', onReplyError);
         if (isReadableStream(upstreamStream)) {
-            upstreamStream.on('end', onAbort);
-            upstreamStream.on('error', onAbort);
-            upstreamStream.on('close', onAbort);
+            upstreamStream.on('end', onStreamEnd);
+            upstreamStream.on('error', onStreamError);
+            upstreamStream.on('close', onStreamClose);
         }
         listenersAttached = true;
         return cleanup;
     };
 
-    return {
-        attach,
-        cleanup,
-    };
+    return { attach, cleanup };
 }
 
-export async function fetchBinaryUpstreamWithRetry({
+export async function fetchTextUpstream({
+    httpClient,
+    targetUrl,
+    headers,
+    maxContentLength,
+    maxBodyLength,
+}) {
+    return httpClient.get(targetUrl, {
+        headers,
+        responseType: 'text',
+        ...(Number.isFinite(maxContentLength) ? { maxContentLength } : {}),
+        ...(Number.isFinite(maxBodyLength) ? { maxBodyLength } : {}),
+    });
+}
+
+export async function fetchBinaryUpstream({
     httpClient,
     targetUrl,
     headers,
@@ -607,12 +640,22 @@ export async function fetchBinaryUpstreamWithRetry({
             });
 
             if (response.status === 200) {
-                return { controller, response };
+                return {
+                    controller,
+                    response,
+                    status: response.status,
+                    stream: response.data,
+                };
             }
 
             const shouldRetry = response.status === 404 && attempt < maxRetries - 1;
             if (!shouldRetry) {
-                return { controller, response };
+                return {
+                    controller,
+                    response,
+                    status: response.status,
+                    stream: response.data,
+                };
             }
 
             cleanupUpstreamResponse({ controller, response });
@@ -629,6 +672,22 @@ export async function fetchBinaryUpstreamWithRetry({
     }
 
     throw lastError || new Error('Failed to fetch upstream binary response');
+}
+
+function applyHlsCorsHeaders(request, reply) {
+    const origin = request.headers.origin;
+    if (!origin) {
+        return;
+    }
+
+    const allowedOrigins = config.security?.allowedOrigins || [];
+    if (!allowedOrigins.includes(origin)) {
+        return;
+    }
+
+    reply.header('Access-Control-Allow-Origin', origin);
+    reply.header('Access-Control-Allow-Credentials', 'true');
+    reply.header('Vary', 'Origin');
 }
 
 function rewriteExternalPlaylist(playlistText, sourceUrl) {
@@ -808,6 +867,7 @@ function verifyStreamToken(request, reply, done) {
 }
 
 async function handleExternalStreamProxy(state, request, reply) {
+    applyHlsCorsHeaders(request, reply);
     const { url } = request.query;
     if (!url) {
         return reply.code(400).send('Missing url parameter');
@@ -824,9 +884,10 @@ async function handleExternalStreamProxy(state, request, reply) {
         };
 
         if (isTextFile) {
-            const response = await state.httpClient.get(url, {
+            const response = await fetchTextUpstream({
+                httpClient: state.httpClient,
+                targetUrl: url,
                 headers,
-                responseType: 'text',
                 maxContentLength: state.options.maxExternalPlaylistBytes,
                 maxBodyLength: state.options.maxExternalPlaylistBytes,
             });
@@ -844,7 +905,7 @@ async function handleExternalStreamProxy(state, request, reply) {
             return reply.send(rewriteExternalPlaylist(response.data, url));
         }
 
-        const { controller, response } = await fetchBinaryUpstreamWithRetry({
+        const { controller, response } = await fetchBinaryUpstream({
             httpClient: state.httpClient,
             targetUrl: url,
             headers,
@@ -869,7 +930,7 @@ async function handleExternalStreamProxy(state, request, reply) {
         reply.header('Pragma', 'no-cache');
         reply.header('Expires', '0');
 
-        createStreamLifecycleManager({
+        attachAbortCleanup({
             request,
             reply,
             controller,
@@ -889,6 +950,10 @@ export default async function hlsProxyRoutes(fastify, _options) {
 
     fastify.addHook('onClose', async () => {
         await state.stop();
+    });
+
+    fastify.addHook('onRequest', async (request, reply) => {
+        applyHlsCorsHeaders(request, reply);
     });
 
     fastify.get('/proxy', async (request, reply) => handleExternalStreamProxy(state, request, reply));
@@ -937,9 +1002,10 @@ export default async function hlsProxyRoutes(fastify, _options) {
             }
 
             if (isTextFile) {
-                const response = await state.httpClient.get(targetUrl, {
+                const response = await fetchTextUpstream({
+                    httpClient: state.httpClient,
+                    targetUrl,
                     headers,
-                    responseType: 'text',
                 });
 
                 if (response.status !== 200) {
@@ -955,7 +1021,7 @@ export default async function hlsProxyRoutes(fastify, _options) {
                 return reply.send(response.data);
             }
 
-            const { controller, response } = await fetchBinaryUpstreamWithRetry({
+            const { controller, response } = await fetchBinaryUpstream({
                 httpClient: state.httpClient,
                 targetUrl,
                 headers,
@@ -974,7 +1040,7 @@ export default async function hlsProxyRoutes(fastify, _options) {
             reply.header('Pragma', 'no-cache');
             reply.header('Expires', '0');
 
-            createStreamLifecycleManager({
+            attachAbortCleanup({
                 request,
                 reply,
                 controller,
