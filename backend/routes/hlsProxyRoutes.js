@@ -20,6 +20,7 @@ const DEFAULT_HLS_CONFIG = {
     maxSessionCreatesPerWindow: 12,
     maxCameraLookupMissesPerWindow: 30,
     controlWindowMs: 60000,
+    maxLimiterKeys: 5000,
 };
 
 function normalizeIp(ip) {
@@ -140,15 +141,19 @@ export function getViewerIdentity(request, trustedProxyCidrs = []) {
 }
 
 export class FixedWindowLimiter {
-    constructor(limit, windowMs) {
+    constructor(limit, windowMs, maxEntries = Infinity) {
         this.limit = limit;
         this.windowMs = windowMs;
+        this.maxEntries = maxEntries;
         this.entries = new Map();
     }
 
     isAllowed(key, now = Date.now()) {
         let entry = this.entries.get(key);
         if (!entry || now - entry.windowStart >= this.windowMs) {
+            if (!entry && this.entries.size >= this.maxEntries) {
+                this.evictOldestEntry();
+            }
             entry = { count: 0, windowStart: now, lastSeen: now };
             this.entries.set(key, entry);
         }
@@ -160,6 +165,22 @@ export class FixedWindowLimiter {
 
         entry.count += 1;
         return true;
+    }
+
+    evictOldestEntry() {
+        let oldestKey = null;
+        let oldestEntry = null;
+
+        for (const [key, entry] of this.entries.entries()) {
+            if (!oldestEntry || entry.lastSeen < oldestEntry.lastSeen) {
+                oldestEntry = entry;
+                oldestKey = key;
+            }
+        }
+
+        if (oldestKey !== null) {
+            this.entries.delete(oldestKey);
+        }
     }
 
     cleanup(now = Date.now()) {
@@ -189,13 +210,16 @@ export class HlsSessionStore {
         this.entriesByCamera = new Map();
         this.inflight = new Map();
         this.cameraIdCache = new Map();
+        this.pendingSessionCloses = new Set();
         this.sessionCreateLimiter = new FixedWindowLimiter(
             this.options.maxSessionCreatesPerWindow,
-            this.options.controlWindowMs
+            this.options.controlWindowMs,
+            this.options.maxLimiterKeys
         );
         this.cameraLookupMissLimiter = new FixedWindowLimiter(
             this.options.maxCameraLookupMissesPerWindow,
-            this.options.controlWindowMs
+            this.options.controlWindowMs,
+            this.options.maxLimiterKeys
         );
     }
 
@@ -305,6 +329,8 @@ export class HlsSessionStore {
             }
         }
 
+        this.queueSessionClose(oldestEntry.sessionId);
+
         return oldestEntry;
     }
 
@@ -330,7 +356,7 @@ export class HlsSessionStore {
 
         for (const entry of expiredEntries) {
             this.removeSessionEntry(entry.identity, entry.cameraId);
-            await endSession(entry.sessionId);
+            this.queueSessionClose(entry.sessionId);
         }
 
         for (const [key, value] of this.cameraIdCache.entries()) {
@@ -341,6 +367,7 @@ export class HlsSessionStore {
 
         this.sessionCreateLimiter.cleanup(now);
         this.cameraLookupMissLimiter.cleanup(now);
+        await this.drainPendingSessionCloses(endSession);
         return expiredEntries.length;
     }
 
@@ -348,11 +375,12 @@ export class HlsSessionStore {
         const allEntries = Array.from(this.entries.values());
         for (const entry of allEntries) {
             this.removeSessionEntry(entry.identity, entry.cameraId);
-            await endSession(entry.sessionId);
+            this.queueSessionClose(entry.sessionId);
         }
         this.cameraIdCache.clear();
         this.sessionCreateLimiter.clear();
         this.cameraLookupMissLimiter.clear();
+        await this.drainPendingSessionCloses(endSession);
         return allEntries.length;
     }
 
@@ -429,11 +457,31 @@ export class HlsSessionStore {
         return this.cameraLookupMissLimiter.isAllowed(`${identity}:${streamPath}`, now);
     }
 
+    queueSessionClose(sessionId) {
+        if (sessionId) {
+            this.pendingSessionCloses.add(sessionId);
+        }
+    }
+
+    async drainPendingSessionCloses(endSession) {
+        if (this.pendingSessionCloses.size === 0) {
+            return 0;
+        }
+
+        const sessionIds = Array.from(this.pendingSessionCloses);
+        this.pendingSessionCloses.clear();
+        for (const sessionId of sessionIds) {
+            await endSession(sessionId);
+        }
+        return sessionIds.length;
+    }
+
     clear() {
         this.entries.clear();
         this.entriesByCamera.clear();
         this.inflight.clear();
         this.cameraIdCache.clear();
+        this.pendingSessionCloses.clear();
         this.sessionCreateLimiter.clear();
         this.cameraLookupMissLimiter.clear();
     }
@@ -447,35 +495,140 @@ function createHlsHttpClient() {
     });
 }
 
-function attachStreamAbortHandlers({ request, reply, controller, upstreamStream }) {
-    let finished = false;
+function safeAbort(controller) {
+    if (!controller || controller.signal?.aborted) {
+        return;
+    }
 
-    const cleanup = () => {
-        if (finished) {
-            return;
-        }
-        finished = true;
+    try {
         controller.abort();
-        if (upstreamStream && !upstreamStream.destroyed) {
-            upstreamStream.destroy();
-        }
-        request.raw.off('aborted', onAbort);
-        reply.raw.off('close', onAbort);
-        reply.raw.off('error', onAbort);
-    };
+    } catch {
+        // Ignore repeated aborts from already-settled upstream requests.
+    }
+}
+
+function isReadableStream(value) {
+    return !!value && typeof value.pipe === 'function' && typeof value.destroy === 'function';
+}
+
+function safeDestroyStream(stream) {
+    if (!isReadableStream(stream) || stream.destroyed) {
+        return;
+    }
+
+    try {
+        stream.destroy();
+    } catch {
+        // Ignore stream destroy errors during cleanup.
+    }
+}
+
+export function cleanupUpstreamResponse({ controller, response, upstreamStream } = {}) {
+    safeAbort(controller);
+    safeDestroyStream(upstreamStream || response?.data);
+}
+
+export function createStreamLifecycleManager({ request, reply, controller, upstreamStream }) {
+    let cleanedUp = false;
+    let listenersAttached = false;
 
     const onAbort = () => {
         cleanup();
     };
 
-    request.raw.on('aborted', onAbort);
-    reply.raw.on('close', onAbort);
-    reply.raw.on('error', onAbort);
-    if (upstreamStream) {
-        upstreamStream.once('end', cleanup);
-        upstreamStream.once('error', cleanup);
-        upstreamStream.once('close', cleanup);
+    const removeListeners = () => {
+        if (!listenersAttached) {
+            return;
+        }
+
+        request.raw.off('aborted', onAbort);
+        reply.raw.off('close', onAbort);
+        reply.raw.off('error', onAbort);
+        if (isReadableStream(upstreamStream)) {
+            upstreamStream.off('end', onAbort);
+            upstreamStream.off('error', onAbort);
+            upstreamStream.off('close', onAbort);
+        }
+        listenersAttached = false;
+    };
+
+    const cleanup = () => {
+        if (cleanedUp) {
+            return;
+        }
+
+        cleanedUp = true;
+        removeListeners();
+        cleanupUpstreamResponse({ controller, upstreamStream });
+    };
+
+    const attach = () => {
+        if (listenersAttached || !request?.raw || !reply?.raw) {
+            return cleanup;
+        }
+
+        request.raw.on('aborted', onAbort);
+        reply.raw.on('close', onAbort);
+        reply.raw.on('error', onAbort);
+        if (isReadableStream(upstreamStream)) {
+            upstreamStream.on('end', onAbort);
+            upstreamStream.on('error', onAbort);
+            upstreamStream.on('close', onAbort);
+        }
+        listenersAttached = true;
+        return cleanup;
+    };
+
+    return {
+        attach,
+        cleanup,
+    };
+}
+
+export async function fetchBinaryUpstreamWithRetry({
+    httpClient,
+    targetUrl,
+    headers,
+    maxRetries = 1,
+    retryDelayMs = 500,
+    sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+}) {
+    let lastError = null;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        const controller = new AbortController();
+        let response = null;
+
+        try {
+            response = await httpClient.get(targetUrl, {
+                headers,
+                responseType: 'stream',
+                signal: controller.signal,
+            });
+
+            if (response.status === 200) {
+                return { controller, response };
+            }
+
+            const shouldRetry = response.status === 404 && attempt < maxRetries - 1;
+            if (!shouldRetry) {
+                return { controller, response };
+            }
+
+            cleanupUpstreamResponse({ controller, response });
+            await sleep(retryDelayMs);
+        } catch (error) {
+            cleanupUpstreamResponse({ controller, response, upstreamStream: error?.response?.data });
+            lastError = error;
+
+            if (attempt < maxRetries - 1) {
+                await sleep(retryDelayMs);
+                continue;
+            }
+        }
     }
+
+    throw lastError || new Error('Failed to fetch upstream binary response');
 }
 
 function rewriteExternalPlaylist(playlistText, sourceUrl) {
@@ -512,7 +665,16 @@ export function createHlsRouteState(options = {}) {
     const store = new HlsSessionStore(hlsOptions);
     const httpClient = createHlsHttpClient();
     let cleanupInterval = null;
-    let cleanupInProgress = false;
+    let sessionCleanupQueue = Promise.resolve();
+
+    const runSessionCleanup = (task) => {
+        sessionCleanupQueue = sessionCleanupQueue
+            .catch(() => {})
+            .then(task);
+        return sessionCleanupQueue;
+    };
+
+    const endSession = (sessionId) => Promise.resolve(viewerSessionService.endSession(sessionId));
 
     const state = {
         options: hlsOptions,
@@ -524,19 +686,10 @@ export function createHlsRouteState(options = {}) {
                 return;
             }
 
-            cleanupInterval = setInterval(async () => {
-                if (cleanupInProgress) {
-                    return;
-                }
-
-                cleanupInProgress = true;
-                try {
-                    await store.cleanupExpired((sessionId) => Promise.resolve(viewerSessionService.endSession(sessionId)));
-                } catch (error) {
+            cleanupInterval = setInterval(() => {
+                runSessionCleanup(() => store.cleanupExpired(endSession)).catch((error) => {
                     console.error('[HLSProxy] Session cleanup error:', error.message);
-                } finally {
-                    cleanupInProgress = false;
-                }
+                });
             }, hlsOptions.sessionCleanupIntervalMs);
         },
         async stop() {
@@ -545,16 +698,13 @@ export function createHlsRouteState(options = {}) {
                 cleanupInterval = null;
             }
 
-            if (!cleanupInProgress) {
-                cleanupInProgress = true;
-                try {
-                    await store.cleanupAll((sessionId) => Promise.resolve(viewerSessionService.endSession(sessionId)));
-                } finally {
-                    cleanupInProgress = false;
-                }
-            }
-
+            await runSessionCleanup(async () => {
+                await store.cleanupAll(endSession);
+            });
             store.clear();
+        },
+        flushPendingSessionCloses() {
+            return runSessionCleanup(() => store.drainPendingSessionCloses(endSession));
         },
         getViewerIdentity(request) {
             return getViewerIdentity(request, state.trustedProxyCidrs);
@@ -587,16 +737,30 @@ export function createHlsRouteState(options = {}) {
             return null;
         },
         async getOrCreateSession(identity, cameraId, request) {
-            return store.getOrCreateSession({
+            const sessionId = await store.getOrCreateSession({
                 identity,
                 cameraId,
                 request,
-                startSession: async (resolvedCameraId, resolvedRequest) => viewerSessionService.startSession(resolvedCameraId, resolvedRequest),
-                heartbeat: async (sessionId) => viewerSessionService.heartbeat(sessionId),
+                startSession: async (resolvedCameraId, resolvedRequest) => (
+                    viewerSessionService.startSession(resolvedCameraId, resolvedRequest)
+                ),
+                heartbeat: async (activeSessionId) => viewerSessionService.heartbeat(activeSessionId),
             });
+            void state.flushPendingSessionCloses().catch((error) => {
+                console.error('[HLSProxy] Pending session close error:', error.message);
+            });
+            return sessionId;
         },
         async recordSegmentAccess(identity, cameraId) {
-            return store.recordSegmentAccess(identity, cameraId, async (sessionId) => viewerSessionService.heartbeat(sessionId));
+            const sessionId = await store.recordSegmentAccess(
+                identity,
+                cameraId,
+                async (activeSessionId) => viewerSessionService.heartbeat(activeSessionId)
+            );
+            void state.flushPendingSessionCloses().catch((error) => {
+                console.error('[HLSProxy] Pending session close error:', error.message);
+            });
+            return sessionId;
         },
     };
 
@@ -655,28 +819,49 @@ async function handleExternalStreamProxy(state, request, reply) {
 
     try {
         const isTextFile = url.includes('.m3u8');
-        const controller = new AbortController();
-        const response = await state.httpClient.get(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            },
-            responseType: isTextFile ? 'text' : 'stream',
-            maxContentLength: isTextFile ? state.options.maxExternalPlaylistBytes : Infinity,
-            maxBodyLength: isTextFile ? state.options.maxExternalPlaylistBytes : Infinity,
-            signal: controller.signal,
+        const headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        };
+
+        if (isTextFile) {
+            const response = await state.httpClient.get(url, {
+                headers,
+                responseType: 'text',
+                maxContentLength: state.options.maxExternalPlaylistBytes,
+                maxBodyLength: state.options.maxExternalPlaylistBytes,
+            });
+
+            if (response.status !== 200) {
+                reply.header('Content-Type', 'text/plain');
+                reply.header('Cache-Control', 'no-cache');
+                return reply.code(response.status).send('');
+            }
+
+            reply.header('Content-Type', 'application/vnd.apple.mpegurl');
+            reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+            reply.header('Pragma', 'no-cache');
+            reply.header('Expires', '0');
+            return reply.send(rewriteExternalPlaylist(response.data, url));
+        }
+
+        const { controller, response } = await fetchBinaryUpstreamWithRetry({
+            httpClient: state.httpClient,
+            targetUrl: url,
+            headers,
         });
 
         if (response.status !== 200) {
+            cleanupUpstreamResponse({ controller, response });
             reply.header('Content-Type', 'text/plain');
             reply.header('Cache-Control', 'no-cache');
             return reply.code(response.status).send('');
         }
 
         let contentType = 'application/octet-stream';
-        if (url.includes('.m3u8')) {
-            contentType = 'application/vnd.apple.mpegurl';
-        } else if (url.includes('.ts')) {
+        if (url.includes('.ts')) {
             contentType = 'video/mp2t';
+        } else if (url.includes('.mp4') || url.includes('.m4s')) {
+            contentType = 'video/mp4';
         }
 
         reply.header('Content-Type', contentType);
@@ -684,16 +869,12 @@ async function handleExternalStreamProxy(state, request, reply) {
         reply.header('Pragma', 'no-cache');
         reply.header('Expires', '0');
 
-        if (isTextFile) {
-            return reply.send(rewriteExternalPlaylist(response.data, url));
-        }
-
-        attachStreamAbortHandlers({
+        createStreamLifecycleManager({
             request,
             reply,
             controller,
             upstreamStream: response.data,
-        });
+        }).attach();
         return reply.send(response.data);
     } catch (error) {
         console.error(`[HLS Proxy] External fetch error for ${url}:`, error.message);
@@ -742,43 +923,9 @@ export default async function hlsProxyRoutes(fastify, _options) {
         try {
             const targetUrl = `${mediamtxHlsUrl}/${fullPath}`;
             const isInitFile = fileName.includes('init.mp4') || fileName.includes('_init.mp4');
-            const maxRetries = isInitFile ? 3 : 1;
-            let response = null;
-            let lastError = null;
-            let controller = null;
-
-            for (let attempt = 0; attempt < maxRetries; attempt++) {
-                try {
-                    controller = new AbortController();
-                    response = await state.httpClient.get(targetUrl, {
-                        headers: {
-                            'User-Agent': request.headers['user-agent'] || 'HLSProxy',
-                        },
-                        responseType: isTextFile ? 'text' : 'stream',
-                        signal: controller.signal,
-                    });
-
-                    if (response.status === 200) {
-                        break;
-                    }
-
-                    if (isInitFile && response.status === 404 && attempt < maxRetries - 1) {
-                        await new Promise((resolve) => setTimeout(resolve, 500));
-                        continue;
-                    }
-
-                    break;
-                } catch (error) {
-                    lastError = error;
-                    if (attempt < maxRetries - 1) {
-                        await new Promise((resolve) => setTimeout(resolve, 500));
-                    }
-                }
-            }
-
-            if (!response && lastError) {
-                throw lastError;
-            }
+            const headers = {
+                'User-Agent': request.headers['user-agent'] || 'HLSProxy',
+            };
 
             let contentType = 'application/octet-stream';
             if (fileName.endsWith('.m3u8')) {
@@ -789,7 +936,34 @@ export default async function hlsProxyRoutes(fastify, _options) {
                 contentType = 'video/mp4';
             }
 
+            if (isTextFile) {
+                const response = await state.httpClient.get(targetUrl, {
+                    headers,
+                    responseType: 'text',
+                });
+
+                if (response.status !== 200) {
+                    reply.header('Content-Type', 'text/plain');
+                    reply.header('Cache-Control', 'no-cache');
+                    return reply.code(response.status).send('');
+                }
+
+                reply.header('Content-Type', contentType);
+                reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+                reply.header('Pragma', 'no-cache');
+                reply.header('Expires', '0');
+                return reply.send(response.data);
+            }
+
+            const { controller, response } = await fetchBinaryUpstreamWithRetry({
+                httpClient: state.httpClient,
+                targetUrl,
+                headers,
+                maxRetries: isInitFile ? 3 : 1,
+            });
+
             if (response.status !== 200) {
+                cleanupUpstreamResponse({ controller, response });
                 reply.header('Content-Type', 'text/plain');
                 reply.header('Cache-Control', 'no-cache');
                 return reply.code(response.status).send('');
@@ -800,16 +974,12 @@ export default async function hlsProxyRoutes(fastify, _options) {
             reply.header('Pragma', 'no-cache');
             reply.header('Expires', '0');
 
-            if (isTextFile) {
-                return reply.send(response.data);
-            }
-
-            attachStreamAbortHandlers({
+            createStreamLifecycleManager({
                 request,
                 reply,
                 controller,
                 upstreamStream: response.data,
-            });
+            }).attach();
             return reply.send(response.data);
         } catch (error) {
             console.error(`[HLSProxy] Error proxying ${fullPath}:`, error.message);

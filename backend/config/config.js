@@ -78,9 +78,6 @@ const parseList = (value) => {
 const defaultTrustedProxyCidrs = [
   '127.0.0.1/32',
   '::1/128',
-  '10.0.0.0/8',
-  '172.16.0.0/12',
-  '192.168.0.0/16',
 ];
 
 const trustedProxyCidrs = parseList(process.env.TRUSTED_PROXY_CIDRS);
@@ -162,6 +159,7 @@ export const config = {
       maxSessionCreatesPerWindow: parseInt(process.env.HLS_MAX_SESSION_CREATES_PER_WINDOW || '12', 10),
       maxCameraLookupMissesPerWindow: parseInt(process.env.HLS_MAX_CAMERA_LOOKUP_MISSES_PER_WINDOW || '30', 10),
       controlWindowMs: parseInt(process.env.HLS_CONTROL_WINDOW_MS || '60000', 10),
+      maxLimiterKeys: parseInt(process.env.HLS_MAX_LIMITER_KEYS || '5000', 10),
     },
   },
 
