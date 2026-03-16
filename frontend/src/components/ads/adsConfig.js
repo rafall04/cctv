@@ -16,6 +16,13 @@ export const DEFAULT_PUBLIC_ADS_CONFIG = {
         },
     },
     slots: {
+        playbackPopunder: {
+            enabled: false,
+            devices: {
+                desktop: true,
+                mobile: true,
+            },
+        },
         socialBar: { enabled: false },
         topBanner: { enabled: false },
         afterCamerasNative: { enabled: false },
@@ -40,16 +47,18 @@ export function shouldRenderAdSlot(config, slotKey, isMobile) {
     const desktopEnabled = config.devices?.desktop !== false;
     const mobileEnabled = config.devices?.mobile !== false;
     const slot = config.slots?.[slotKey];
+    const slotDesktopEnabled = slot?.devices?.desktop !== false;
+    const slotMobileEnabled = slot?.devices?.mobile !== false;
 
     if (!slot?.enabled || !slot?.script) {
         return false;
     }
 
     if (isMobile) {
-        return mobileEnabled;
+        return mobileEnabled && slotMobileEnabled;
     }
 
-    return desktopEnabled;
+    return desktopEnabled && slotDesktopEnabled;
 }
 
 export function getPopupMaxHeight(config, isMobile) {

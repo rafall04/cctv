@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useBranding } from '../contexts/BrandingContext';
 import { updateMetaTags } from '../utils/metaUpdater';
@@ -41,6 +41,7 @@ function LandingPageContent() {
     const { cameras, deviceTier } = useCameras();
     const { addToast } = useToast();
     const [searchParams, setSearchParams] = useSearchParams();
+    const [isMapPopupOpen, setIsMapPopupOpen] = useState(false);
     const { favorites, toggleFavorite, isFavorite, addRecentCamera } = useCameraHistory();
 
     const {
@@ -88,9 +89,10 @@ function LandingPageContent() {
 
     const disableHeavyEffects = deviceTier === 'low';
     const isMobileAdsViewport = isAdsMobileViewport();
-    const shouldHideFixedUiForPopup = Boolean(popup) && adsConfig?.popup?.hideFloatingWidgetsOnPopup !== false;
+    const isPublicModalActive = Boolean(popup) || isMapPopupOpen;
+    const shouldHideFixedUiForPopup = isPublicModalActive && adsConfig?.popup?.hideFloatingWidgetsOnPopup !== false;
     const shouldHideFloatingWidgets = (showMulti && viewMode === 'grid') || shouldHideFixedUiForPopup;
-    const shouldSuspendSocialBar = Boolean(popup) && adsConfig?.popup?.hideSocialBarOnPopup !== false;
+    const shouldSuspendSocialBar = isPublicModalActive && adsConfig?.popup?.hideSocialBarOnPopup !== false;
     const showSocialBar = !shouldSuspendSocialBar && shouldRenderAdSlot(adsConfig, 'socialBar', isMobileAdsViewport);
     const showTopBanner = shouldRenderAdSlot(adsConfig, 'topBanner', isMobileAdsViewport);
     const showAfterCamerasNative = shouldRenderAdSlot(adsConfig, 'afterCamerasNative', isMobileAdsViewport);
@@ -100,6 +102,12 @@ function LandingPageContent() {
             updateMetaTags(branding);
         }
     }, [branding]);
+
+    useEffect(() => {
+        if (viewMode !== 'map' && isMapPopupOpen) {
+            setIsMapPopupOpen(false);
+        }
+    }, [isMapPopupOpen, viewMode]);
 
     if (layoutMode === 'simple') {
         return (
@@ -120,6 +128,8 @@ function LandingPageContent() {
                         isFavorite={isFavorite}
                         viewMode={viewMode}
                         setViewMode={setViewMode}
+                        adsConfig={adsConfig}
+                        onMapPopupStateChange={setIsMapPopupOpen}
                         hideFloatingWidgets={shouldHideFloatingWidgets}
                         announcement={landingSettings.announcement}
                         eventBanner={landingSettings.eventBanner}
@@ -189,6 +199,8 @@ function LandingPageContent() {
                     setViewMode={setViewMode}
                     landingSettings={landingSettings}
                     selectedCamera={popup}
+                    adsConfig={adsConfig}
+                    onMapPopupStateChange={setIsMapPopupOpen}
                     favorites={favorites}
                     onToggleFavorite={toggleFavorite}
                     isFavorite={isFavorite}

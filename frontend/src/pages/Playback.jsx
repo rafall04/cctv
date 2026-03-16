@@ -6,6 +6,8 @@ import { useBranding } from '../contexts/BrandingContext';
 import { createCameraSlug, parseCameraIdFromSlug } from '../utils/slugify';
 import { buildPublicPlaybackShareUrl } from '../utils/publicShareUrl';
 import { REQUEST_POLICY } from '../services/requestPolicy';
+import GlobalAdScript from '../components/ads/GlobalAdScript';
+import { isAdsMobileViewport, shouldRenderAdSlot } from '../components/ads/adsConfig.js';
 
 import PlaybackHeader from '../components/playback/PlaybackHeader';
 import PlaybackVideo from '../components/playback/PlaybackVideo';
@@ -27,7 +29,7 @@ function getSegmentKey(segment) {
     return `${segment.filename || 'no-file'}:${segment.start_time || 'no-start'}`;
 }
 
-function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) {
+function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, adsConfig = null }) {
     const [searchParams, setSearchParams] = useSearchParams();
     const cameraIdFromUrl = searchParams.get('cam');
     const { branding } = useBranding();
@@ -92,6 +94,8 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
         return cameras.find((camera) => camera.id === selectedCameraId)
             || (propSelectedCamera?.id === selectedCameraId ? propSelectedCamera : null);
     }, [cameras, propSelectedCamera, selectedCameraId]);
+    const isMobileAdsViewport = isAdsMobileViewport();
+    const showPlaybackPopunder = shouldRenderAdSlot(adsConfig, 'playbackPopunder', isMobileAdsViewport);
 
     // Keep refs in sync
     useEffect(() => {
@@ -1036,7 +1040,14 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-2 sm:py-6 md:py-8 px-2 sm:px-4">
+        <>
+            {showPlaybackPopunder && (
+                <GlobalAdScript
+                    slotKey="playback-popunder"
+                    script={adsConfig.slots.playbackPopunder.script}
+                />
+            )}
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-2 sm:py-6 md:py-8 px-2 sm:px-4">
             <div className="max-w-7xl mx-auto space-y-3 sm:space-y-4 md:space-y-6">
                 <PlaybackHeader
                     cameras={cameras}
@@ -1116,7 +1127,8 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera }) 
                     formatTimestamp={formatTimestamp}
                 />
             </div>
-        </div>
+            </div>
+        </>
     );
 }
 

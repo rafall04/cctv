@@ -13,6 +13,10 @@ const DEFAULT_SETTINGS = {
     ads_hide_floating_widgets_on_popup: true,
     ads_popup_desktop_max_height: 160,
     ads_popup_mobile_max_height: 220,
+    ads_playback_popunder_enabled: false,
+    ads_playback_popunder_script: '',
+    ads_playback_popunder_desktop_enabled: true,
+    ads_playback_popunder_mobile_enabled: true,
     ads_social_bar_enabled: false,
     ads_social_bar_script: '',
     ads_top_banner_enabled: false,
@@ -36,6 +40,10 @@ const SETTING_DESCRIPTIONS = {
     ads_hide_floating_widgets_on_popup: 'Sembunyikan widget fixed internal saat popup live terbuka',
     ads_popup_desktop_max_height: 'Batas tinggi slot popup pada desktop',
     ads_popup_mobile_max_height: 'Batas tinggi slot popup pada mobile',
+    ads_playback_popunder_enabled: 'Aktifkan popunder saat user masuk playback',
+    ads_playback_popunder_script: 'Raw script popunder untuk mode playback',
+    ads_playback_popunder_desktop_enabled: 'Aktifkan popunder playback pada desktop',
+    ads_playback_popunder_mobile_enabled: 'Aktifkan popunder playback pada mobile',
     ads_social_bar_enabled: 'Aktifkan script social bar global',
     ads_social_bar_script: 'Raw script social bar untuk halaman publik',
     ads_top_banner_enabled: 'Aktifkan banner setelah hero landing page',
@@ -119,6 +127,10 @@ function mapSettingsResponse(data = {}) {
         ads_popup_mobile_max_height: Number.parseInt(data.ads_popup_mobile_max_height, 10) > 0
             ? Number.parseInt(data.ads_popup_mobile_max_height, 10)
             : 220,
+        ads_playback_popunder_enabled: normalizeBoolean(data.ads_playback_popunder_enabled, false),
+        ads_playback_popunder_script: data.ads_playback_popunder_script || '',
+        ads_playback_popunder_desktop_enabled: normalizeBoolean(data.ads_playback_popunder_desktop_enabled, true),
+        ads_playback_popunder_mobile_enabled: normalizeBoolean(data.ads_playback_popunder_mobile_enabled, true),
         ads_social_bar_enabled: normalizeBoolean(data.ads_social_bar_enabled, false),
         ads_social_bar_script: data.ads_social_bar_script || '',
         ads_top_banner_enabled: normalizeBoolean(data.ads_top_banner_enabled, false),
@@ -391,6 +403,48 @@ export default function AdsSettingsPanel() {
 
                     <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-100">
                         Gunakan creative compact atau vertikal untuk slot popup. Pada desktop, hanya satu slot popup yang diprioritaskan agar player tetap terbaca.
+                    </div>
+                </SectionCard>
+
+                <SectionCard
+                    title="Playback Popunder"
+                    description="Popunder ini dipicu setiap kali user masuk ke mode playback dan tidak akan diulang oleh rerender internal playback."
+                >
+                    <CheckboxField
+                        id="ads_playback_popunder_enabled"
+                        name="ads_playback_popunder_enabled"
+                        checked={settings.ads_playback_popunder_enabled}
+                        onChange={handleChange}
+                        label="Aktifkan popunder playback"
+                    />
+
+                    <div className="grid gap-3 md:grid-cols-2">
+                        <CheckboxField
+                            id="ads_playback_popunder_desktop_enabled"
+                            name="ads_playback_popunder_desktop_enabled"
+                            checked={settings.ads_playback_popunder_desktop_enabled}
+                            onChange={handleChange}
+                            label="Tampilkan di desktop"
+                        />
+                        <CheckboxField
+                            id="ads_playback_popunder_mobile_enabled"
+                            name="ads_playback_popunder_mobile_enabled"
+                            checked={settings.ads_playback_popunder_mobile_enabled}
+                            onChange={handleChange}
+                            label="Tampilkan di mobile"
+                        />
+                    </div>
+
+                    <div>
+                        <label htmlFor="ads_playback_popunder_script" className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Script
+                        </label>
+                        <ScriptField
+                            id="ads_playback_popunder_script"
+                            name="ads_playback_popunder_script"
+                            value={settings.ads_playback_popunder_script}
+                            onChange={handleChange}
+                        />
                     </div>
                 </SectionCard>
 

@@ -413,6 +413,54 @@ describe('Playback', () => {
         expect(sharedUrl).toContain('cam=1-lobby');
     });
 
+    it('memicu popunder playback sekali per mount dan membersihkan saat unmount', async () => {
+        const adsConfig = {
+            enabled: true,
+            devices: {
+                desktop: true,
+                mobile: true,
+            },
+            slots: {
+                playbackPopunder: {
+                    enabled: true,
+                    script: '<div id="playback-popunder-marker"></div>',
+                    devices: {
+                        desktop: true,
+                        mobile: true,
+                    },
+                },
+            },
+        };
+
+        const renderTree = () => (
+            <TestRouter initialEntries={['/playback?mode=full&view=playback&cam=1']}>
+                <Playback
+                    cameras={[
+                        { id: 1, name: 'Lobby', enable_recording: 1 },
+                    ]}
+                    adsConfig={adsConfig}
+                />
+            </TestRouter>
+        );
+
+        const { rerender, unmount } = render(renderTree());
+
+        await waitFor(() => {
+            expect(document.body.querySelectorAll('#playback-popunder-marker')).toHaveLength(1);
+        });
+
+        rerender(renderTree());
+        expect(document.body.querySelectorAll('#playback-popunder-marker')).toHaveLength(1);
+
+        unmount();
+        expect(document.body.querySelectorAll('#playback-popunder-marker')).toHaveLength(0);
+
+        render(renderTree());
+        await waitFor(() => {
+            expect(document.body.querySelectorAll('#playback-popunder-marker')).toHaveLength(1);
+        });
+    });
+
     it('ganti kamera tidak pernah membangun source dengan kamera baru dan filename lama', async () => {
         const cameraTwoDeferred = createDeferred();
 

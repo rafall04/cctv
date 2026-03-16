@@ -34,6 +34,10 @@ const ADS_SETTINGS_KEYS = [
     'ads_hide_floating_widgets_on_popup',
     'ads_popup_desktop_max_height',
     'ads_popup_mobile_max_height',
+    'ads_playback_popunder_enabled',
+    'ads_playback_popunder_script',
+    'ads_playback_popunder_desktop_enabled',
+    'ads_playback_popunder_mobile_enabled',
     'ads_social_bar_enabled',
     'ads_social_bar_script',
     'ads_top_banner_enabled',
@@ -92,6 +96,14 @@ const ADS_DEFAULTS = {
         },
     },
     slots: {
+        playbackPopunder: {
+            enabled: false,
+            script: '',
+            devices: {
+                desktop: true,
+                mobile: true,
+            },
+        },
         socialBar: {
             enabled: false,
             script: '',
@@ -338,6 +350,10 @@ class SettingsService {
                 maxHeight: { ...ADS_DEFAULTS.popup.maxHeight },
             },
             slots: {
+                playbackPopunder: {
+                    ...ADS_DEFAULTS.slots.playbackPopunder,
+                    devices: { ...ADS_DEFAULTS.slots.playbackPopunder.devices },
+                },
                 socialBar: { ...ADS_DEFAULTS.slots.socialBar },
                 topBanner: { ...ADS_DEFAULTS.slots.topBanner },
                 afterCamerasNative: { ...ADS_DEFAULTS.slots.afterCamerasNative },
@@ -383,6 +399,18 @@ class SettingsService {
                         setting.value,
                         ADS_DEFAULTS.popup.maxHeight.mobile
                     );
+                    break;
+                case 'ads_playback_popunder_enabled':
+                    result.slots.playbackPopunder.enabled = parseBoolean(setting.value);
+                    break;
+                case 'ads_playback_popunder_script':
+                    result.slots.playbackPopunder.script = setting.value || '';
+                    break;
+                case 'ads_playback_popunder_desktop_enabled':
+                    result.slots.playbackPopunder.devices.desktop = parseBoolean(setting.value, true);
+                    break;
+                case 'ads_playback_popunder_mobile_enabled':
+                    result.slots.playbackPopunder.devices.mobile = parseBoolean(setting.value, true);
                     break;
                 case 'ads_social_bar_enabled':
                     result.slots.socialBar.enabled = parseBoolean(setting.value);

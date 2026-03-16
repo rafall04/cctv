@@ -186,6 +186,13 @@ describe('LandingPage connectivity recovery', () => {
                     },
                 },
                 slots: {
+                    playbackPopunder: {
+                        enabled: false,
+                        devices: {
+                            desktop: true,
+                            mobile: true,
+                        },
+                    },
                     socialBar: { enabled: false },
                     topBanner: { enabled: false },
                     afterCamerasNative: { enabled: false },

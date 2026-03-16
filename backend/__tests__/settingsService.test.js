@@ -121,6 +121,13 @@ describe('settingsService.getPublicAdsSettings', () => {
         }));
         expect(result.slots.socialBar).toEqual({ enabled: false });
         expect(result.slots.topBanner).toEqual({ enabled: false });
+        expect(result.slots.playbackPopunder).toEqual({
+            enabled: false,
+            devices: {
+                desktop: true,
+                mobile: true,
+            },
+        });
     });
 
     it('hanya mengirim script untuk slot yang aktif dan punya isi', () => {
@@ -131,6 +138,10 @@ describe('settingsService.getPublicAdsSettings', () => {
             { key: 'ads_popup_preferred_slot', value: 'top' },
             { key: 'ads_hide_social_bar_on_popup', value: 'false' },
             { key: 'ads_popup_desktop_max_height', value: '180' },
+            { key: 'ads_playback_popunder_enabled', value: 'true' },
+            { key: 'ads_playback_popunder_script', value: '<script src=\"https://pl.example.com/pop.js\"></script>' },
+            { key: 'ads_playback_popunder_desktop_enabled', value: 'true' },
+            { key: 'ads_playback_popunder_mobile_enabled', value: 'false' },
             { key: 'ads_social_bar_enabled', value: 'true' },
             { key: 'ads_social_bar_script', value: '<script src=\"https://pl.example.com/social.js\"></script>' },
             { key: 'ads_top_banner_enabled', value: 'true' },
@@ -155,6 +166,14 @@ describe('settingsService.getPublicAdsSettings', () => {
         expect(result.slots.socialBar).toEqual({
             enabled: true,
             script: '<script src=\"https://pl.example.com/social.js\"></script>',
+        });
+        expect(result.slots.playbackPopunder).toEqual({
+            enabled: true,
+            script: '<script src=\"https://pl.example.com/pop.js\"></script>',
+            devices: {
+                desktop: true,
+                mobile: false,
+            },
         });
         expect(result.slots.topBanner).toEqual({ enabled: false });
         expect(result.slots.popupTopBanner).toEqual({

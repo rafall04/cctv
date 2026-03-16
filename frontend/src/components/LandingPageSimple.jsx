@@ -109,6 +109,8 @@ export default function LandingPageSimple({
     isFavorite,
     viewMode,
     setViewMode,
+    adsConfig = null,
+    onMapPopupStateChange = null,
     hideFloatingWidgets = false,
     announcement,
     eventBanner,
@@ -137,12 +139,14 @@ export default function LandingPageSimple({
                         onCameraClick={onCameraClick}
                         onAddMulti={onAddMulti}
                         multiCameras={multiCameras}
-                        viewMode={viewMode}
-                        setViewMode={setViewMode}
-                        favorites={favorites}
-                        onToggleFavorite={onToggleFavorite}
-                        isFavorite={isFavorite}
-                    />
+                    viewMode={viewMode}
+                    setViewMode={setViewMode}
+                    adsConfig={adsConfig}
+                    onMapPopupStateChange={onMapPopupStateChange}
+                    favorites={favorites}
+                    onToggleFavorite={onToggleFavorite}
+                    isFavorite={isFavorite}
+                />
                 )}
             </main>
 

@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 
-export default function LandingPlaybackPanel({ Playback, cameras, selectedCamera }) {
+export default function LandingPlaybackPanel({ Playback, cameras, selectedCamera, adsConfig = null }) {
     return (
         <Suspense
             fallback={
@@ -9,7 +9,7 @@ export default function LandingPlaybackPanel({ Playback, cameras, selectedCamera
                 </div>
             }
         >
-            <Playback cameras={cameras} selectedCamera={selectedCamera} />
+            <Playback cameras={cameras} selectedCamera={selectedCamera} adsConfig={adsConfig} />
         </Suspense>
     );
 }

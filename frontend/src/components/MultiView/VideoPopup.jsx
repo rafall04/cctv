@@ -36,7 +36,13 @@ import {
 // VIDEO POPUP - Optimized with fullscreen detection, timeout handler, progressive stages, and auto-retry
 // **Validates: Requirements 1.1, 1.2, 1.3, 1.4, 2.3, 3.1, 3.2, 4.1, 4.2, 4.3, 4.4, 6.1, 6.2, 6.3, 6.4, 7.1, 7.2, 7.3**
 // ============================================
-function VideoPopup({ camera, onClose, adsConfig = null }) {
+function VideoPopup({
+    camera,
+    onClose,
+    adsConfig = null,
+    modalTestId = 'grid-popup-modal',
+    bodyTestId = 'grid-video-body',
+}) {
     const [searchParams] = useSearchParams();
     const videoRef = useRef(null);
     const wrapperRef = useRef(null);
@@ -752,7 +758,7 @@ function VideoPopup({ camera, onClose, adsConfig = null }) {
 
     return (
         <div ref={outerWrapperRef} className={`fixed inset-0 z-[1000000] ${isFullscreen ? 'bg-black dark:bg-black' : 'flex items-center justify-center bg-black/95 dark:bg-black/95 p-2 sm:p-4'}`} onClick={onClose}>
-            <div ref={modalRef} data-testid="grid-popup-modal" className={`relative bg-white dark:bg-gray-900 overflow-hidden shadow-2xl flex flex-col ${isFullscreen ? 'w-full h-full' : 'w-full max-w-5xl rounded-2xl border border-gray-200 dark:border-gray-800'}`} style={modalStyle} onClick={(e) => e.stopPropagation()}>
+            <div ref={modalRef} data-testid={modalTestId} className={`relative bg-white dark:bg-gray-900 overflow-hidden shadow-2xl flex flex-col ${isFullscreen ? 'w-full h-full' : 'w-full max-w-5xl rounded-2xl border border-gray-200 dark:border-gray-800'}`} style={modalStyle} onClick={(e) => e.stopPropagation()}>
 
                 {showPopupTopBanner && (
                     <InlineAdSlot
@@ -816,7 +822,7 @@ function VideoPopup({ camera, onClose, adsConfig = null }) {
                 {/* Video - expand to full screen in fullscreen mode */}
                 <div
                     ref={wrapperRef}
-                    data-testid="grid-video-body"
+                    data-testid={bodyTestId}
                     className={`relative bg-gray-100 dark:bg-black overflow-hidden ${isFullscreen ? 'flex-1 min-h-0' : `w-full ${!isVideoActive ? 'min-h-[220px] sm:min-h-[280px] md:min-h-[340px]' : ''}`}`}
                     style={bodyStyle}
                     onDoubleClick={toggleFS}

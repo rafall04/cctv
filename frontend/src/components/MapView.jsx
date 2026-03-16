@@ -11,6 +11,7 @@ import { createTransformThrottle } from '../utils/rafThrottle';
 import { getTimeoutDuration } from '../hooks/useStreamTimeout';
 import { preloadHls } from '../utils/preloadManager';
 import CodecBadge from './CodecBadge';
+import VideoPopup from './MultiView/VideoPopup.jsx';
 import { useBranding } from '../contexts/BrandingContext';
 import { takeSnapshot as takeSnapshotUtil } from '../utils/snapshotHelper';
 import PublicStreamStatusOverlay from './PublicStreamStatusOverlay.jsx';
@@ -1185,6 +1186,8 @@ const MapView = memo(({
     selectedArea: controlledSelectedArea = undefined,
     onAreaChange = null,
     showAreaFilter = true,
+    adsConfig = null,
+    onPopupStateChange = null,
 }) => {
     const [internalSelectedArea, setInternalSelectedArea] = useState('all');
     const selectedAreaValue = controlledSelectedArea ?? internalSelectedArea;
@@ -1372,6 +1375,18 @@ const MapView = memo(({
         // preserveMapPosition tetap true agar map tidak reset
     }, []);
 
+    useEffect(() => {
+        if (typeof onPopupStateChange === 'function') {
+            onPopupStateChange(Boolean(modalCamera));
+        }
+
+        return () => {
+            if (typeof onPopupStateChange === 'function') {
+                onPopupStateChange(false);
+            }
+        };
+    }, [modalCamera, onPopupStateChange]);
+
     const handleAreaChange = (e) => {
         const nextArea = e?.target?.value || 'all';
         setSelectedAreaValue(nextArea);
@@ -1470,7 +1485,15 @@ const MapView = memo(({
                 </div>
             </div>
 
-            {modalCamera && <VideoModal camera={modalCamera} onClose={closeModal} />}
+            {modalCamera && (
+                <VideoPopup
+                    camera={modalCamera}
+                    onClose={closeModal}
+                    adsConfig={adsConfig}
+                    modalTestId="map-popup-modal"
+                    bodyTestId="map-video-body"
+                />
+            )}
         </div>
     );
 });

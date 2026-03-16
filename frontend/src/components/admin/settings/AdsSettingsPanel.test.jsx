@@ -44,6 +44,10 @@ describe('AdsSettingsPanel', () => {
                 ads_hide_floating_widgets_on_popup: 'true',
                 ads_popup_desktop_max_height: '160',
                 ads_popup_mobile_max_height: '220',
+                ads_playback_popunder_enabled: 'true',
+                ads_playback_popunder_script: '<script src="https://pl.example.com/popunder.js"></script>',
+                ads_playback_popunder_desktop_enabled: 'true',
+                ads_playback_popunder_mobile_enabled: 'false',
                 ads_social_bar_enabled: 'true',
                 ads_social_bar_script: '<script src="https://pl.example.com/social.js"></script>',
             },
@@ -59,6 +63,7 @@ describe('AdsSettingsPanel', () => {
         });
 
         expect(screen.getByDisplayValue('<script src="https://pl.example.com/social.js"></script>')).toBeTruthy();
+        expect(screen.getByDisplayValue('<script src="https://pl.example.com/popunder.js"></script>')).toBeTruthy();
         expect(screen.getByDisplayValue('160')).toBeTruthy();
         expect(screen.getByLabelText('Prioritas slot desktop').value).toBe('bottom');
     });
@@ -76,6 +81,7 @@ describe('AdsSettingsPanel', () => {
         fireEvent.change(screen.getByLabelText('Prioritas slot desktop'), {
             target: { value: 'top' },
         });
+        fireEvent.click(screen.getByLabelText('Tampilkan di mobile'));
         fireEvent.change(screen.getByLabelText('Script', { selector: '#ads_top_banner_script' }), {
             target: { value: '<div>top banner</div>' },
         });
@@ -93,6 +99,11 @@ describe('AdsSettingsPanel', () => {
         expect(updateSettingMock).toHaveBeenCalledWith(
             'ads_popup_preferred_slot',
             'top',
+            expect.any(String)
+        );
+        expect(updateSettingMock).toHaveBeenCalledWith(
+            'ads_playback_popunder_mobile_enabled',
+            'true',
             expect.any(String)
         );
         expect(updateSettingMock).toHaveBeenCalledWith(

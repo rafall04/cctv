@@ -9,13 +9,25 @@ const {
     setViewMock,
     startSessionMock,
     stopSessionMock,
+    startTimeoutMock,
+    clearTimeoutMock,
+    updateStageMock,
+    resetFailuresMock,
     hlsInstances,
 } = vi.hoisted(() => ({
     fitBoundsMock: vi.fn(),
     setViewMock: vi.fn(),
     startSessionMock: vi.fn().mockResolvedValue('session-1'),
     stopSessionMock: vi.fn().mockResolvedValue(undefined),
+    startTimeoutMock: vi.fn(),
+    clearTimeoutMock: vi.fn(),
+    updateStageMock: vi.fn(),
+    resetFailuresMock: vi.fn(),
     hlsInstances: [],
+}));
+
+vi.mock('react-router-dom', () => ({
+    useSearchParams: () => [new URLSearchParams('mode=simple&view=map')],
 }));
 
 vi.mock('react-leaflet', () => ({
@@ -119,8 +131,31 @@ vi.mock('../utils/rafThrottle', () => ({
     createTransformThrottle: () => ({ update: vi.fn(), cancel: vi.fn() }),
 }));
 
+vi.mock('../utils/fallbackHandler', () => ({
+    createFallbackHandler: () => ({
+        handleError: () => ({ action: 'manual-retry-required' }),
+        destroy: vi.fn(),
+        clearPendingRetry: vi.fn(),
+        reset: vi.fn(),
+    }),
+}));
+
+vi.mock('../hooks/useStreamTimeout', () => ({
+    useStreamTimeout: () => ({
+        startTimeout: startTimeoutMock,
+        clearTimeout: clearTimeoutMock,
+        updateStage: updateStageMock,
+        resetFailures: resetFailuresMock,
+        getConsecutiveFailures: () => 1,
+    }),
+}));
+
 vi.mock('./CodecBadge', () => ({
     default: () => <div />,
+}));
+
+vi.mock('./MultiView/ZoomableVideo', () => ({
+    default: ({ videoRef }) => <video ref={videoRef} data-testid="map-popup-video" />,
 }));
 
 vi.mock('../contexts/BrandingContext', () => ({
@@ -545,7 +580,7 @@ describe('MapView area filter visibility', () => {
         });
     });
 
-    it('membatasi lebar modal live map desktop berdasarkan tinggi viewport yang tersedia', async () => {
+    it('mengikuti lebar modal popup shared yang dipakai grid view pada desktop', async () => {
         Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1366 });
         Object.defineProperty(window, 'innerHeight', { configurable: true, value: 768 });
 
@@ -558,7 +593,7 @@ describe('MapView area filter visibility', () => {
         const modal = await screen.findByTestId('map-popup-modal');
 
         await waitFor(() => {
-            expect(modal.style.width).toBe('896px');
+            expect(modal.style.width).toBe('1024px');
         });
     });
 
@@ -575,6 +610,50 @@ describe('MapView area filter visibility', () => {
         await waitFor(() => {
             expect(requestFullscreenMock).toHaveBeenCalled();
         });
+    });
+
+    it('merender slot ads popup map dengan contract yang sama seperti grid saat adsConfig aktif', async () => {
+        await act(async () => {
+            render(
+                <MapView
+                    cameras={cameras}
+                    areas={[]}
+                    showAreaFilter={false}
+                    adsConfig={{
+                        enabled: true,
+                        devices: { desktop: true, mobile: true },
+                        popup: {
+                            enabled: true,
+                            preferredSlot: 'bottom',
+                            hideSocialBarOnPopup: true,
+                            hideFloatingWidgetsOnPopup: true,
+                            maxHeight: {
+                                desktop: 160,
+                                mobile: 220,
+                            },
+                        },
+                        slots: {
+                            popupTopBanner: {
+                                enabled: true,
+                                script: '<div>popup top ad map</div>',
+                            },
+                            popupBottomNative: {
+                                enabled: true,
+                                script: '<div>popup bottom ad map</div>',
+                            },
+                        },
+                    }}
+                />
+            );
+        });
+
+        fireEvent.click(screen.getByTestId('marker--7.1507-111.8815'));
+
+        await waitFor(() => {
+            expect(screen.getByText('popup bottom ad map')).toBeTruthy();
+        });
+
+        expect(screen.queryByText('popup top ad map')).toBeNull();
     });
 });
 
