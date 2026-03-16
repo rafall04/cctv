@@ -5,21 +5,24 @@ import { testBackendReachability } from '../../utils/connectionTester';
 function resolveHealthUrl() {
     const hostname = window.location.hostname;
     const protocol = window.location.protocol;
+    const apiBaseUrl = getApiUrl().replace(/\/$/, '');
 
-    if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) {
-        return '/api/health';
+    if (!apiBaseUrl) {
+        return '/health';
     }
 
     if (protocol === 'https:') {
         const frontendDomain = import.meta.env.VITE_FRONTEND_DOMAIN || hostname;
         if (hostname === frontendDomain) {
-            return `${getApiUrl().replace(/\/$/, '')}/health`;
+            return `${apiBaseUrl}/health`;
         }
         return `${protocol}//${hostname.replace('cctv.', 'api-cctv.')}/health`;
     }
 
-    return `${getApiUrl().replace(/\/$/, '')}/health`;
+    return `${apiBaseUrl}/health`;
 }
+
+export { resolveHealthUrl };
 
 export function useLandingReachability() {
     const mountedRef = useRef(true);
