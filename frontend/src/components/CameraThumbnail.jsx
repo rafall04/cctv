@@ -31,8 +31,7 @@ export default function CameraThumbnail({
         </div>
     );
     
-    // Maintenance tetap memblok preview, tetapi offline masih boleh menampilkan thumbnail terakhir.
-    if (isMaintenance || !thumbnailPath || error) {
+    if (isMaintenance || isOffline || !thumbnailPath || error) {
         return <FallbackIcon />;
     }
     

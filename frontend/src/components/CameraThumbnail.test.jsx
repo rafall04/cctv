@@ -21,7 +21,7 @@ describe('CameraThumbnail', () => {
         expect(image.getAttribute('src')).toBe('/api/thumbnails/1.jpg');
     });
 
-    it('still renders the thumbnail image when camera is offline but a thumbnail path exists', () => {
+    it('falls back to the offline icon when camera is offline even if a thumbnail path exists', () => {
         render(
             <CameraThumbnail
                 cameraId={2}
@@ -31,8 +31,7 @@ describe('CameraThumbnail', () => {
             />
         );
 
-        const image = screen.getByAltText('Gerbang preview');
-        expect(image.getAttribute('src')).toBe('/api/thumbnails/2.jpg');
+        expect(screen.queryByAltText('Gerbang preview')).toBeNull();
     });
 
     it('falls back when the image fails to load', () => {
@@ -41,7 +40,6 @@ describe('CameraThumbnail', () => {
                 cameraId={3}
                 thumbnailPath="/api/thumbnails/3.jpg"
                 cameraName="Pos"
-                isOffline={true}
             />
         );
 
@@ -49,5 +47,18 @@ describe('CameraThumbnail', () => {
         fireEvent.error(image);
 
         expect(screen.queryByAltText('Pos preview')).toBeNull();
+    });
+
+    it('falls back to the maintenance icon when camera is in maintenance mode', () => {
+        render(
+            <CameraThumbnail
+                cameraId={4}
+                thumbnailPath="/api/thumbnails/4.jpg"
+                cameraName="Simpang"
+                isMaintenance={true}
+            />
+        );
+
+        expect(screen.queryByAltText('Simpang preview')).toBeNull();
     });
 });
