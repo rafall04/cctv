@@ -7,6 +7,7 @@ import {
     logCameraDeleted
 } from './securityAuditLogger.js';
 import { invalidateCache } from '../middleware/cacheMiddleware.js';
+import { sanitizeCameraThumbnail, sanitizeCameraThumbnailList } from './thumbnailPathService.js';
 
 class CameraService {
     invalidateCameraCache() {
@@ -16,16 +17,16 @@ class CameraService {
     }
 
     getAllCameras() {
-        return query(
+        return sanitizeCameraThumbnailList(query(
             `SELECT c.*, a.name as area_name 
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 
              ORDER BY c.id ASC`
-        );
+        ));
     }
 
     getActiveCameras() {
-        return query(
+        return sanitizeCameraThumbnailList(query(
             `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel, 
                     c.latitude, c.longitude, c.status, c.enable_recording, c.video_codec, c.stream_key, 
                     c.thumbnail_path, c.thumbnail_updated_at, c.stream_source, c.external_hls_url,
@@ -39,7 +40,7 @@ class CameraService {
              LEFT JOIN areas a ON c.area_id = a.id 
              WHERE c.enabled = 1 
              ORDER BY c.is_tunnel ASC, c.id ASC`
-        );
+        ));
     }
 
     getCameraById(id) {
@@ -55,7 +56,7 @@ class CameraService {
             err.statusCode = 404;
             throw err;
         }
-        return camera;
+        return sanitizeCameraThumbnail(camera);
     }
 
     async createCamera(data, request) {

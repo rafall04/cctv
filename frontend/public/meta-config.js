@@ -6,6 +6,17 @@
  */
 
 (function() {
+  const normalizeApiBase = (value) => {
+    const normalized = String(value || '').trim().replace(/\/$/, '');
+    if (!normalized || normalized === '/api') {
+      return '';
+    }
+    return normalized;
+  };
+
+  const apiBase = normalizeApiBase(window.__ENV__ && window.__ENV__.VITE_API_URL);
+  const buildApiUrl = (path) => apiBase ? `${apiBase}${path}` : path;
+
   // Get frontend domain from environment or current hostname
   const getFrontendDomain = () => {
     // Try to get from window.__ENV__ (injected by build process)
@@ -176,9 +187,7 @@
   console.log('✅ URLs updated for domain:', domain);
   
   // Fetch branding data from API
-  const apiUrl = window.__ENV__?.VITE_API_URL || `${protocol}//${domain.replace(':5173', ':3000')}`;
-  
-  fetch(`${apiUrl}/api/branding/public`)
+  fetch(buildApiUrl('/api/branding/public'))
     .then(response => response.json())
     .then(data => {
       if (data) {
@@ -200,6 +209,6 @@
   // Update manifest link to use dynamic endpoint
   const manifestLink = document.querySelector('link[rel="manifest"]');
   if (manifestLink) {
-    manifestLink.href = `${apiUrl}/api/config/manifest`;
+    manifestLink.href = buildApiUrl('/api/config/manifest');
   }
 })();

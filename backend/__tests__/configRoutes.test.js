@@ -1,10 +1,20 @@
 import Fastify from 'fastify';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import configRoutes from '../routes/configRoutes.js';
+const queryMock = vi.fn();
+
+vi.mock('../database/connectionPool.js', () => ({
+    query: queryMock,
+}));
 
 describe('configRoutes', () => {
+    beforeEach(() => {
+        vi.resetModules();
+        queryMock.mockReset();
+    });
+
     it('serves public runtime config for same-origin frontend bootstrapping', async () => {
+        const { default: configRoutes } = await import('../routes/configRoutes.js');
         const fastify = Fastify();
         await fastify.register(configRoutes);
 
@@ -29,21 +39,14 @@ describe('configRoutes', () => {
     });
 
     it('serves the dynamic PWA manifest from branding settings', async () => {
-        const fastify = Fastify();
-        fastify.decorate('db', {
-            prepare() {
-                return {
-                    all() {
-                        return [
-                            { key: 'company_name', value: 'RAF NET CCTV' },
-                            { key: 'meta_title', value: 'Monitor CCTV' },
-                            { key: 'meta_description', value: 'Pantau CCTV publik' },
-                        ];
-                    },
-                };
-            },
-        });
+        queryMock.mockReturnValue([
+            { key: 'company_name', value: 'RAF NET CCTV' },
+            { key: 'meta_title', value: 'Monitor CCTV' },
+            { key: 'meta_description', value: 'Pantau CCTV publik' },
+        ]);
 
+        const { default: configRoutes } = await import('../routes/configRoutes.js');
+        const fastify = Fastify();
         await fastify.register(configRoutes);
 
         const response = await fastify.inject({
@@ -56,6 +59,31 @@ describe('configRoutes', () => {
         expect(response.json()).toMatchObject({
             name: 'Monitor CCTV',
             short_name: 'RAF NET CCTV',
+            start_url: '/',
+            display: 'standalone',
+        });
+
+        await fastify.close();
+    });
+
+    it('falls back to a valid default manifest when branding lookup fails', async () => {
+        queryMock.mockImplementation(() => {
+            throw new Error('db unavailable');
+        });
+
+        const { default: configRoutes } = await import('../routes/configRoutes.js');
+        const fastify = Fastify();
+        await fastify.register(configRoutes);
+
+        const response = await fastify.inject({
+            method: 'GET',
+            url: '/api/config/manifest',
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.json()).toMatchObject({
+            name: 'CCTV System',
+            short_name: 'CCTV',
             start_url: '/',
             display: 'standalone',
         });

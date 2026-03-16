@@ -1,6 +1,7 @@
 import { query, queryOne } from '../database/connectionPool.js';
 import { config } from '../config/config.js';
 import jwt from 'jsonwebtoken';
+import { sanitizeCameraThumbnailList } from './thumbnailPathService.js';
 
 class StreamService {
     buildStreamUrls(streamKey, requestHost) {
@@ -115,7 +116,7 @@ class StreamService {
             };
         });
 
-        return camerasWithStreams;
+        return sanitizeCameraThumbnailList(camerasWithStreams);
     }
 
     generateStreamToken(cameraId, requestHost) {
