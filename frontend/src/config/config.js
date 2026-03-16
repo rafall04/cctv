@@ -1,69 +1,39 @@
 /**
  * Frontend Configuration
- * Central configuration file for all environment variables
- * 
- * All values are loaded from .env file via import.meta.env
- * No hardcoded values - everything configurable via .env
- * 
- * CRITICAL: All API URLs must be configured in .env file
- * - Development: VITE_API_URL=http://localhost:3000
- * - Production: VITE_API_URL=https://api.your-domain.com
+ * Central configuration file for runtime-aware URL helpers.
  */
 
-/**
- * Get API Base URL from environment variable
- * @returns {string} Backend API URL
- * @throws {Error} If VITE_API_URL is not configured
- */
-export const getApiUrl = () => {
-    // Return empty string for Nginx Proxy setup (relative path)
-    // For development, it will fall back to Vite Server proxy (see vite.config.js)
-    let url = import.meta.env.VITE_API_URL || '';
+import { getApiUrl as getRuntimeApiUrl } from './runtimeConfig.js';
 
-    if (!import.meta.env.VITE_API_URL && import.meta.env.DEV) {
-        console.warn('⚠️ VITE_API_URL not set in DEV. Falling back to /api');
-        url = '/api';
+export const getApiUrl = () => getRuntimeApiUrl();
+
+export const getApiKey = () => import.meta.env.VITE_API_KEY || '';
+
+export const buildApiAssetUrl = (path) => {
+    if (!path) {
+        return path;
     }
 
-    return url;
+    if (/^https?:\/\//i.test(path)) {
+        return path;
+    }
+
+    const apiBaseUrl = getApiUrl();
+    if (!apiBaseUrl) {
+        return path;
+    }
+
+    const cleanBase = apiBaseUrl.replace(/\/$/, '');
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    return `${cleanBase}${cleanPath}`;
 };
 
-/**
- * Get API Key from environment variable
- * @returns {string} API Key for authentication
- */
-export const getApiKey = () => {
-    return import.meta.env.VITE_API_KEY || '';
-};
+export const isDevelopment = () => import.meta.env.DEV;
 
-/**
- * Check if running in development mode
- * @returns {boolean}
- */
-export const isDevelopment = () => {
-    return import.meta.env.DEV;
-};
+export const isProduction = () => import.meta.env.PROD;
 
-/**
- * Check if running in production mode
- * @returns {boolean}
- */
-export const isProduction = () => {
-    return import.meta.env.PROD;
-};
+export const getMode = () => import.meta.env.MODE;
 
-/**
- * Get environment mode
- * @returns {string} 'development' or 'production'
- */
-export const getMode = () => {
-    return import.meta.env.MODE;
-};
-
-/**
- * Configuration object
- * All values loaded from .env file - no hardcoded defaults
- */
 export const config = {
     api: {
         baseUrl: getApiUrl(),

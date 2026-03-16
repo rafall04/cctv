@@ -17,6 +17,24 @@
 let runtimeConfig = null;
 let loadPromise = null;
 
+export const normalizeApiBaseUrl = (url) => {
+    const normalized = String(url || '').trim().replace(/\/$/, '');
+
+    if (!normalized || normalized === '/api') {
+        return '';
+    }
+
+    return normalized;
+};
+
+function getFallbackApiUrl() {
+    if (import.meta.env.DEV) {
+        return normalizeApiBaseUrl(import.meta.env.VITE_API_URL || '');
+    }
+
+    return '';
+}
+
 /**
  * Load runtime configuration from backend
  * 
@@ -53,7 +71,7 @@ export const loadRuntimeConfig = async () => {
             console.log('✅ Runtime config loaded from backend:', config);
 
             runtimeConfig = {
-                apiUrl: config.apiUrl,
+                apiUrl: normalizeApiBaseUrl(config.apiUrl),
                 frontendDomain: config.frontendDomain,
                 serverIp: config.serverIp,
                 portPublic: config.portPublic,
@@ -67,9 +85,9 @@ export const loadRuntimeConfig = async () => {
             console.warn('⚠️ Failed to load runtime config from backend:', error.message);
             console.warn('⚠️ Falling back to .env configuration');
 
-            // Fallback to .env or relative path
+            // In production, prefer current-origin relative routing instead of a baked-in host.
             runtimeConfig = {
-                apiUrl: import.meta.env.VITE_API_URL || '',
+                apiUrl: getFallbackApiUrl(),
                 frontendDomain: import.meta.env.VITE_FRONTEND_DOMAIN || window.location.hostname,
                 serverIp: '',
                 portPublic: window.location.port || '800',
@@ -95,12 +113,7 @@ export const loadRuntimeConfig = async () => {
 export const getApiUrl = () => {
     if (!runtimeConfig) {
         console.warn('⚠️ Runtime config not loaded yet! Call loadRuntimeConfig() first');
-        // Return fallback
-        let url = import.meta.env.VITE_API_URL || '';
-        if (!import.meta.env.VITE_API_URL && import.meta.env.DEV) {
-            url = '/api';
-        }
-        return url;
+        return getFallbackApiUrl();
     }
 
     return runtimeConfig.apiUrl;

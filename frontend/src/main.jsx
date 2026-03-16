@@ -1,10 +1,19 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App.jsx';
+import { loadRuntimeConfig } from './config/runtimeConfig.js';
 import './index.css';
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-    <React.StrictMode>
-        <App />
-    </React.StrictMode>
-);
+async function bootstrap() {
+    await loadRuntimeConfig();
+    const { default: App } = await import('./App.jsx');
+
+    ReactDOM.createRoot(document.getElementById('root')).render(
+        <React.StrictMode>
+            <App />
+        </React.StrictMode>
+    );
+}
+
+bootstrap().catch((error) => {
+    console.error('Failed to bootstrap app:', error);
+});

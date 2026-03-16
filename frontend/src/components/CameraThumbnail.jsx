@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { buildApiAssetUrl } from '../config/config.js';
 
 export default function CameraThumbnail({ 
     cameraId, 
@@ -35,9 +36,7 @@ export default function CameraThumbnail({
         return <FallbackIcon />;
     }
     
-    // Get API base URL from env (VITE_API_URL is the correct env var)
-    const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-    const thumbnailUrl = `${apiBaseUrl}${thumbnailPath}`;
+    const thumbnailUrl = buildApiAssetUrl(thumbnailPath);
     
     return (
         <img
