@@ -875,6 +875,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                     data-testid="map-video-body"
                     className={`relative bg-gray-100 dark:bg-black overflow-hidden ${isFullscreen ? 'flex-1 min-h-0 w-full h-full' : `w-full ${!isVideoActive ? 'min-h-[220px] sm:min-h-[280px] md:min-h-[340px]' : ''}`}`}
                     style={bodyStyle}
+                    onDoubleClick={toggleFullscreen}
                     onWheel={handleWheel}
                     onPointerDown={handlePointerDown}
                     onPointerMove={handlePointerMove}

@@ -133,6 +133,7 @@ vi.mock('../utils/snapshotHelper', () => ({
 
 describe('MapView area filter visibility', () => {
     let playMock;
+    let requestFullscreenMock;
     const cameras = [
         {
             id: 1,
@@ -225,11 +226,17 @@ describe('MapView area filter visibility', () => {
     beforeEach(() => {
         vi.useRealTimers();
         playMock = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+        requestFullscreenMock = vi.fn().mockResolvedValue(undefined);
         window.URL.createObjectURL = vi.fn(() => 'blob:test');
         Object.defineProperty(document, 'fullscreenElement', {
             configurable: true,
             writable: true,
             value: null,
+        });
+        Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
+            configurable: true,
+            writable: true,
+            value: requestFullscreenMock,
         });
         fitBoundsMock.mockReset();
         setViewMock.mockReset();
@@ -552,6 +559,21 @@ describe('MapView area filter visibility', () => {
 
         await waitFor(() => {
             expect(modal.style.width).toBe('896px');
+        });
+    });
+
+    it('double click pada body video map memicu fullscreen seperti grid view', async () => {
+        await act(async () => {
+            render(<MapView cameras={cameras} areas={[]} showAreaFilter={false} />);
+        });
+
+        fireEvent.click(screen.getByTestId('marker--7.1507-111.8815'));
+
+        const body = await screen.findByTestId('map-video-body');
+        fireEvent.doubleClick(body);
+
+        await waitFor(() => {
+            expect(requestFullscreenMock).toHaveBeenCalled();
         });
     });
 });
