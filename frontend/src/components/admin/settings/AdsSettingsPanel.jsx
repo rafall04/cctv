@@ -79,13 +79,13 @@ const SLOT_DEFINITIONS = [
         enabledKey: 'ads_popup_top_banner_enabled',
         scriptKey: 'ads_popup_top_banner_script',
         title: 'Popup Top Banner',
-        description: 'Banner inline di bagian atas modal popup video, di luar body video.',
+        description: 'Banner tambahan di bagian atas popup video. Slot ini opsional dan akan disembunyikan lebih dulu bila ruang popup tidak cukup.',
     },
     {
         enabledKey: 'ads_popup_bottom_native_enabled',
         scriptKey: 'ads_popup_bottom_native_script',
         title: 'Popup Bottom Native',
-        description: 'Native/banner inline di bagian bawah popup video, di luar panel kontrol inti.',
+        description: 'Sponsor utama di bagian bawah popup video, setelah panel kontrol. Slot ini diprioritaskan untuk tetap tampil di grid dan map.',
     },
 ];
 

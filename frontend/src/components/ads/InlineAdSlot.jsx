@@ -69,6 +69,7 @@ export default function InlineAdSlot({
     variant = 'page-inline',
     maxHeight = null,
     onHeightChange = null,
+    suppressWhenOversize = true,
 }) {
     const sectionRef = useRef(null);
     const containerRef = useRef(null);
@@ -117,6 +118,7 @@ export default function InlineAdSlot({
             const popupMaxHeight = Number(maxHeight) || 0;
             const shouldSuppress =
                 variant === 'popup-inline' &&
+                suppressWhenOversize &&
                 popupMaxHeight > 0 &&
                 contentHeight > popupMaxHeight + 8;
 
@@ -144,7 +146,7 @@ export default function InlineAdSlot({
             resizeObserverRef.current?.disconnect();
             resizeObserverRef.current = null;
         };
-    }, [maxHeight, onHeightChange, signature, script, variant]);
+    }, [maxHeight, onHeightChange, signature, script, suppressWhenOversize, variant]);
 
     useEffect(() => {
         return () => {
@@ -163,7 +165,7 @@ export default function InlineAdSlot({
         ? `w-full ${className}`
         : `mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 ${className}`;
     const containerClassName = isPopupVariant
-        ? `w-full overflow-hidden rounded-xl border border-gray-200/70 bg-white/70 px-3 py-3 shadow-sm dark:border-gray-700/70 dark:bg-gray-900/60 [&_*]:max-w-full [&_iframe]:mx-auto [&_iframe]:block [&_img]:h-auto ${minHeightClassName}`
+        ? `w-full overflow-x-hidden overflow-y-auto rounded-xl border border-gray-200/70 bg-white/70 px-3 py-3 shadow-sm dark:border-gray-700/70 dark:bg-gray-900/60 [&_*]:max-w-full [&_iframe]:mx-auto [&_iframe]:block [&_img]:h-auto ${minHeightClassName}`
         : `overflow-hidden rounded-2xl border border-gray-200/70 bg-white/70 p-3 shadow-sm dark:border-gray-700/70 dark:bg-gray-900/60 ${minHeightClassName}`;
     const containerStyle = isPopupVariant && maxHeight
         ? { maxHeight: `${maxHeight}px` }

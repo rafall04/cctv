@@ -692,7 +692,6 @@ function VideoPopup({
     const isPlaybackLocked = isPublicPopupPlaybackLocked(status);
     const canRetry = shouldShowPublicPopupRetry({ status, errorType });
     const popupAdsEnabled = adsConfig?.popup?.enabled !== false;
-    const popupPreferredSlot = adsConfig?.popup?.preferredSlot === 'top' ? 'top' : 'bottom';
     const popupMaxHeight = isMobileAdsViewport
         ? (adsConfig?.popup?.maxHeight?.mobile || 220)
         : (adsConfig?.popup?.maxHeight?.desktop || 160);
@@ -704,9 +703,11 @@ function VideoPopup({
         popupAdsEnabled &&
         !isFullscreen &&
         shouldRenderAdSlot(adsConfig, 'popupBottomNative', isMobileAdsViewport);
-    const restrictDesktopPopupSlots = !isMobileAdsViewport && popupTopEligible && popupBottomEligible;
-    const showPopupTopBanner = popupTopEligible && (!restrictDesktopPopupSlots || popupPreferredSlot === 'top');
-    const showPopupBottomNative = popupBottomEligible && (!restrictDesktopPopupSlots || popupPreferredSlot === 'bottom');
+    const showPopupBottomNative = popupBottomEligible;
+    const showPopupTopBanner = popupTopEligible && (isMobileAdsViewport || !showPopupBottomNative);
+    const bodyMinHeightClass = showPopupBottomNative
+        ? 'min-h-[180px] sm:min-h-[220px] md:min-h-[280px]'
+        : 'min-h-[220px] sm:min-h-[280px] md:min-h-[340px]';
     const bodyStyle = getPublicPopupBodyStyle({
         isFullscreen,
         isPlaybackLocked,
@@ -758,7 +759,7 @@ function VideoPopup({
 
     return (
         <div ref={outerWrapperRef} className={`fixed inset-0 z-[1000000] ${isFullscreen ? 'bg-black dark:bg-black' : 'flex items-center justify-center bg-black/95 dark:bg-black/95 p-2 sm:p-4'}`} onClick={onClose}>
-            <div ref={modalRef} data-testid={modalTestId} className={`relative bg-white dark:bg-gray-900 overflow-hidden shadow-2xl flex flex-col ${isFullscreen ? 'w-full h-full' : 'w-full max-w-5xl rounded-2xl border border-gray-200 dark:border-gray-800'}`} style={modalStyle} onClick={(e) => e.stopPropagation()}>
+            <div ref={modalRef} data-testid={modalTestId} className={`relative bg-white dark:bg-gray-900 shadow-2xl flex flex-col ${isFullscreen ? 'w-full h-full overflow-hidden' : 'w-full max-w-5xl overflow-x-hidden overflow-y-auto rounded-2xl border border-gray-200 dark:border-gray-800'}`} style={modalStyle} onClick={(e) => e.stopPropagation()}>
 
                 {showPopupTopBanner && (
                     <InlineAdSlot
@@ -823,7 +824,7 @@ function VideoPopup({
                 <div
                     ref={wrapperRef}
                     data-testid={bodyTestId}
-                    className={`relative bg-gray-100 dark:bg-black overflow-hidden ${isFullscreen ? 'flex-1 min-h-0' : `w-full ${!isVideoActive ? 'min-h-[220px] sm:min-h-[280px] md:min-h-[340px]' : ''}`}`}
+                    className={`relative bg-gray-100 dark:bg-black overflow-hidden ${isFullscreen ? 'flex-1 min-h-0' : `w-full ${!isVideoActive ? bodyMinHeightClass : ''}`}`}
                     style={bodyStyle}
                     onDoubleClick={toggleFS}
                 >
@@ -1001,6 +1002,7 @@ function VideoPopup({
                         minHeightClassName="min-h-[96px]"
                         maxHeight={popupMaxHeight}
                         onHeightChange={setPopupBottomAdHeight}
+                        suppressWhenOversize={false}
                     />
                 )}
             </div>

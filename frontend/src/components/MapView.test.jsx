@@ -612,7 +612,7 @@ describe('MapView area filter visibility', () => {
         });
     });
 
-    it('merender slot ads popup map dengan contract yang sama seperti grid saat adsConfig aktif', async () => {
+    it('tetap memprioritaskan sponsor bawah popup map pada desktop saat kedua slot aktif', async () => {
         await act(async () => {
             render(
                 <MapView
@@ -624,7 +624,7 @@ describe('MapView area filter visibility', () => {
                         devices: { desktop: true, mobile: true },
                         popup: {
                             enabled: true,
-                            preferredSlot: 'bottom',
+                            preferredSlot: 'top',
                             hideSocialBarOnPopup: true,
                             hideFloatingWidgetsOnPopup: true,
                             maxHeight: {

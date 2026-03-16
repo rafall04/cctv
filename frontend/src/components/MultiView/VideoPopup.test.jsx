@@ -334,7 +334,7 @@ describe('VideoPopup non-live states', () => {
         });
     });
 
-    it('memprioritaskan slot popup bawah pada desktop saat kedua slot aktif', async () => {
+    it('tetap memprioritaskan slot popup bawah pada desktop meski preferensi diset ke top', async () => {
         render(
             <VideoPopup
                 camera={{ ...baseCamera, id: 20 }}
@@ -344,7 +344,7 @@ describe('VideoPopup non-live states', () => {
                     devices: { desktop: true, mobile: true },
                     popup: {
                         enabled: true,
-                        preferredSlot: 'bottom',
+                        preferredSlot: 'top',
                         maxHeight: {
                             desktop: 160,
                             mobile: 220,
@@ -369,6 +369,45 @@ describe('VideoPopup non-live states', () => {
         });
 
         expect(screen.queryByText('popup top ad')).toBeNull();
+    });
+
+    it('menempatkan sponsor bawah setelah panel kontrol popup', async () => {
+        render(
+            <VideoPopup
+                camera={{ ...baseCamera, id: 22 }}
+                onClose={vi.fn()}
+                adsConfig={{
+                    enabled: true,
+                    devices: { desktop: true, mobile: true },
+                    popup: {
+                        enabled: true,
+                        preferredSlot: 'bottom',
+                        maxHeight: {
+                            desktop: 160,
+                            mobile: 220,
+                        },
+                    },
+                    slots: {
+                        popupBottomNative: {
+                            enabled: true,
+                            script: '<div>popup bottom order ad</div>',
+                        },
+                    },
+                }}
+            />
+        );
+
+        const footer = screen.getByTitle('Tutup').closest('.shrink-0');
+
+        await waitFor(() => {
+            expect(screen.getByText('popup bottom order ad')).toBeTruthy();
+        });
+
+        const adSlot = screen.getByTestId('ad-slot-popup-bottom-native');
+        expect(footer).toBeTruthy();
+        expect(
+            footer.compareDocumentPosition(adSlot) & Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy();
     });
 
     it('mengizinkan kedua slot popup tampil pada viewport mobile', async () => {
