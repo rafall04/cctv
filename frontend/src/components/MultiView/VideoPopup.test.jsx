@@ -334,7 +334,7 @@ describe('VideoPopup non-live states', () => {
         });
     });
 
-    it('merender slot iklan popup atas dan bawah saat ads config aktif', async () => {
+    it('memprioritaskan slot popup bawah pada desktop saat kedua slot aktif', async () => {
         render(
             <VideoPopup
                 camera={{ ...baseCamera, id: 20 }}
@@ -342,6 +342,14 @@ describe('VideoPopup non-live states', () => {
                 adsConfig={{
                     enabled: true,
                     devices: { desktop: true, mobile: true },
+                    popup: {
+                        enabled: true,
+                        preferredSlot: 'bottom',
+                        maxHeight: {
+                            desktop: 160,
+                            mobile: 220,
+                        },
+                    },
                     slots: {
                         popupTopBanner: {
                             enabled: true,
@@ -357,10 +365,49 @@ describe('VideoPopup non-live states', () => {
         );
 
         await waitFor(() => {
-            expect(screen.getByText('popup top ad')).toBeTruthy();
+            expect(screen.getByText('popup bottom ad')).toBeTruthy();
         });
 
-        expect(screen.getByText('popup bottom ad')).toBeTruthy();
+        expect(screen.queryByText('popup top ad')).toBeNull();
+    });
+
+    it('mengizinkan kedua slot popup tampil pada viewport mobile', async () => {
+        Object.defineProperty(window, 'innerWidth', { configurable: true, value: 375 });
+
+        render(
+            <VideoPopup
+                camera={{ ...baseCamera, id: 21 }}
+                onClose={vi.fn()}
+                adsConfig={{
+                    enabled: true,
+                    devices: { desktop: true, mobile: true },
+                    popup: {
+                        enabled: true,
+                        preferredSlot: 'bottom',
+                        maxHeight: {
+                            desktop: 160,
+                            mobile: 220,
+                        },
+                    },
+                    slots: {
+                        popupTopBanner: {
+                            enabled: true,
+                            script: '<div>popup top ad mobile</div>',
+                        },
+                        popupBottomNative: {
+                            enabled: true,
+                            script: '<div>popup bottom ad mobile</div>',
+                        },
+                    },
+                }}
+            />
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText('popup top ad mobile')).toBeTruthy();
+        });
+
+        expect(screen.getByText('popup bottom ad mobile')).toBeTruthy();
     });
 });
 

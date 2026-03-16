@@ -38,6 +38,12 @@ describe('AdsSettingsPanel', () => {
                 ads_provider: 'adsterra',
                 ads_desktop_enabled: 'true',
                 ads_mobile_enabled: 'true',
+                ads_popup_slots_enabled: 'true',
+                ads_popup_preferred_slot: 'bottom',
+                ads_hide_social_bar_on_popup: 'true',
+                ads_hide_floating_widgets_on_popup: 'true',
+                ads_popup_desktop_max_height: '160',
+                ads_popup_mobile_max_height: '220',
                 ads_social_bar_enabled: 'true',
                 ads_social_bar_script: '<script src="https://pl.example.com/social.js"></script>',
             },
@@ -53,6 +59,8 @@ describe('AdsSettingsPanel', () => {
         });
 
         expect(screen.getByDisplayValue('<script src="https://pl.example.com/social.js"></script>')).toBeTruthy();
+        expect(screen.getByDisplayValue('160')).toBeTruthy();
+        expect(screen.getByLabelText('Prioritas slot desktop').value).toBe('bottom');
     });
 
     it('menyimpan perubahan slot iklan ke settings store', async () => {
@@ -64,6 +72,9 @@ describe('AdsSettingsPanel', () => {
 
         fireEvent.change(screen.getByLabelText('Provider'), {
             target: { value: 'adsterra-custom' },
+        });
+        fireEvent.change(screen.getByLabelText('Prioritas slot desktop'), {
+            target: { value: 'top' },
         });
         fireEvent.change(screen.getByLabelText('Script', { selector: '#ads_top_banner_script' }), {
             target: { value: '<div>top banner</div>' },
@@ -77,6 +88,11 @@ describe('AdsSettingsPanel', () => {
         expect(updateSettingMock).toHaveBeenCalledWith(
             'ads_provider',
             'adsterra-custom',
+            expect.any(String)
+        );
+        expect(updateSettingMock).toHaveBeenCalledWith(
+            'ads_popup_preferred_slot',
+            'top',
             expect.any(String)
         );
         expect(updateSettingMock).toHaveBeenCalledWith(

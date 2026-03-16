@@ -35,6 +35,8 @@ export function getPublicPopupModalStyle({
     viewportHeight,
     headerHeight,
     footerHeight,
+    topAdHeight = 0,
+    bottomAdHeight = 0,
     maxDesktopWidth,
     viewportVerticalPadding = DEFAULT_PUBLIC_POPUP_VIEWPORT_VERTICAL_PADDING,
     viewportHorizontalPadding = DEFAULT_PUBLIC_POPUP_VIEWPORT_HORIZONTAL_PADDING,
@@ -58,7 +60,14 @@ export function getPublicPopupModalStyle({
     const nextAspectRatio = Number(videoAspectRatio) || DEFAULT_PUBLIC_POPUP_LIVE_ASPECT_RATIO;
     const nextHeaderHeight = Number(headerHeight) || DEFAULT_PUBLIC_POPUP_HEADER_HEIGHT;
     const nextFooterHeight = Number(footerHeight) || DEFAULT_PUBLIC_POPUP_FOOTER_HEIGHT;
-    const availableBodyHeight = nextViewportHeight - viewportVerticalPadding - nextHeaderHeight - nextFooterHeight;
+    const nextTopAdHeight = Math.max(0, Number(topAdHeight) || 0);
+    const nextBottomAdHeight = Math.max(0, Number(bottomAdHeight) || 0);
+    const availableBodyHeight = nextViewportHeight
+        - viewportVerticalPadding
+        - nextHeaderHeight
+        - nextFooterHeight
+        - nextTopAdHeight
+        - nextBottomAdHeight;
     const availableViewportWidth = nextViewportWidth - viewportHorizontalPadding;
 
     if (availableBodyHeight <= 0 || availableViewportWidth <= 0) {

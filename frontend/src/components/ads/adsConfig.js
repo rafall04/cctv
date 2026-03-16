@@ -5,6 +5,16 @@ export const DEFAULT_PUBLIC_ADS_CONFIG = {
         desktop: true,
         mobile: true,
     },
+    popup: {
+        enabled: true,
+        preferredSlot: 'bottom',
+        hideSocialBarOnPopup: true,
+        hideFloatingWidgetsOnPopup: true,
+        maxHeight: {
+            desktop: 160,
+            mobile: 220,
+        },
+    },
     slots: {
         socialBar: { enabled: false },
         topBanner: { enabled: false },
@@ -40,4 +50,17 @@ export function shouldRenderAdSlot(config, slotKey, isMobile) {
     }
 
     return desktopEnabled;
+}
+
+export function getPopupMaxHeight(config, isMobile) {
+    const popupConfig = config?.popup;
+    if (!popupConfig?.maxHeight) {
+        return isMobile
+            ? DEFAULT_PUBLIC_ADS_CONFIG.popup.maxHeight.mobile
+            : DEFAULT_PUBLIC_ADS_CONFIG.popup.maxHeight.desktop;
+    }
+
+    return isMobile
+        ? popupConfig.maxHeight.mobile || DEFAULT_PUBLIC_ADS_CONFIG.popup.maxHeight.mobile
+        : popupConfig.maxHeight.desktop || DEFAULT_PUBLIC_ADS_CONFIG.popup.maxHeight.desktop;
 }

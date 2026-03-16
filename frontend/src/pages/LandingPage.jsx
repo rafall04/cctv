@@ -87,9 +87,11 @@ function LandingPageContent() {
     useCameraStatusTracker(cameras, addToast);
 
     const disableHeavyEffects = deviceTier === 'low';
-    const shouldHideFloatingWidgets = showMulti && viewMode === 'grid';
     const isMobileAdsViewport = isAdsMobileViewport();
-    const showSocialBar = shouldRenderAdSlot(adsConfig, 'socialBar', isMobileAdsViewport);
+    const shouldHideFixedUiForPopup = Boolean(popup) && adsConfig?.popup?.hideFloatingWidgetsOnPopup !== false;
+    const shouldHideFloatingWidgets = (showMulti && viewMode === 'grid') || shouldHideFixedUiForPopup;
+    const shouldSuspendSocialBar = Boolean(popup) && adsConfig?.popup?.hideSocialBarOnPopup !== false;
+    const showSocialBar = !shouldSuspendSocialBar && shouldRenderAdSlot(adsConfig, 'socialBar', isMobileAdsViewport);
     const showTopBanner = shouldRenderAdSlot(adsConfig, 'topBanner', isMobileAdsViewport);
     const showAfterCamerasNative = shouldRenderAdSlot(adsConfig, 'afterCamerasNative', isMobileAdsViewport);
 

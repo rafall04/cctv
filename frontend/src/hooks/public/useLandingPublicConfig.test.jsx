@@ -54,6 +54,16 @@ describe('useLandingPublicConfig', () => {
                     desktop: true,
                     mobile: true,
                 },
+                popup: {
+                    enabled: true,
+                    preferredSlot: 'bottom',
+                    hideSocialBarOnPopup: true,
+                    hideFloatingWidgetsOnPopup: true,
+                    maxHeight: {
+                        desktop: 160,
+                        mobile: 220,
+                    },
+                },
                 slots: {
                     socialBar: { enabled: false },
                     topBanner: { enabled: false },

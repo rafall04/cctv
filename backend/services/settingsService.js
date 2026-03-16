@@ -28,6 +28,12 @@ const ADS_SETTINGS_KEYS = [
     'ads_provider',
     'ads_desktop_enabled',
     'ads_mobile_enabled',
+    'ads_popup_slots_enabled',
+    'ads_popup_preferred_slot',
+    'ads_hide_social_bar_on_popup',
+    'ads_hide_floating_widgets_on_popup',
+    'ads_popup_desktop_max_height',
+    'ads_popup_mobile_max_height',
     'ads_social_bar_enabled',
     'ads_social_bar_script',
     'ads_top_banner_enabled',
@@ -74,6 +80,16 @@ const ADS_DEFAULTS = {
     devices: {
         desktop: true,
         mobile: true,
+    },
+    popup: {
+        enabled: true,
+        preferredSlot: 'bottom',
+        hideSocialBarOnPopup: true,
+        hideFloatingWidgetsOnPopup: true,
+        maxHeight: {
+            desktop: 160,
+            mobile: 220,
+        },
     },
     slots: {
         socialBar: {
@@ -141,6 +157,15 @@ function normalizeScheduleValue(value) {
 
 function hasScriptValue(value) {
     return typeof value === 'string' && value.trim().length > 0;
+}
+
+function parsePositiveInt(value, fallback) {
+    const parsed = Number.parseInt(value, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+        return parsed;
+    }
+
+    return fallback;
 }
 
 function getComparableNow(timezone) {
@@ -308,6 +333,10 @@ class SettingsService {
         const result = {
             ...ADS_DEFAULTS,
             devices: { ...ADS_DEFAULTS.devices },
+            popup: {
+                ...ADS_DEFAULTS.popup,
+                maxHeight: { ...ADS_DEFAULTS.popup.maxHeight },
+            },
             slots: {
                 socialBar: { ...ADS_DEFAULTS.slots.socialBar },
                 topBanner: { ...ADS_DEFAULTS.slots.topBanner },
@@ -330,6 +359,30 @@ class SettingsService {
                     break;
                 case 'ads_mobile_enabled':
                     result.devices.mobile = parseBoolean(setting.value, true);
+                    break;
+                case 'ads_popup_slots_enabled':
+                    result.popup.enabled = parseBoolean(setting.value, true);
+                    break;
+                case 'ads_popup_preferred_slot':
+                    result.popup.preferredSlot = setting.value === 'top' ? 'top' : 'bottom';
+                    break;
+                case 'ads_hide_social_bar_on_popup':
+                    result.popup.hideSocialBarOnPopup = parseBoolean(setting.value, true);
+                    break;
+                case 'ads_hide_floating_widgets_on_popup':
+                    result.popup.hideFloatingWidgetsOnPopup = parseBoolean(setting.value, true);
+                    break;
+                case 'ads_popup_desktop_max_height':
+                    result.popup.maxHeight.desktop = parsePositiveInt(
+                        setting.value,
+                        ADS_DEFAULTS.popup.maxHeight.desktop
+                    );
+                    break;
+                case 'ads_popup_mobile_max_height':
+                    result.popup.maxHeight.mobile = parsePositiveInt(
+                        setting.value,
+                        ADS_DEFAULTS.popup.maxHeight.mobile
+                    );
                     break;
                 case 'ads_social_bar_enabled':
                     result.slots.socialBar.enabled = parseBoolean(setting.value);
@@ -372,6 +425,13 @@ class SettingsService {
                 delete slot.script;
             }
         });
+
+        if (!result.popup.enabled) {
+            result.slots.popupTopBanner.enabled = false;
+            delete result.slots.popupTopBanner.script;
+            result.slots.popupBottomNative.enabled = false;
+            delete result.slots.popupBottomNative.script;
+        }
 
         if (!result.enabled) {
             Object.values(result.slots).forEach((slot) => {

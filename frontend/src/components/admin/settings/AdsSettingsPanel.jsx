@@ -7,6 +7,12 @@ const DEFAULT_SETTINGS = {
     ads_provider: 'adsterra',
     ads_desktop_enabled: true,
     ads_mobile_enabled: true,
+    ads_popup_slots_enabled: true,
+    ads_popup_preferred_slot: 'bottom',
+    ads_hide_social_bar_on_popup: true,
+    ads_hide_floating_widgets_on_popup: true,
+    ads_popup_desktop_max_height: 160,
+    ads_popup_mobile_max_height: 220,
     ads_social_bar_enabled: false,
     ads_social_bar_script: '',
     ads_top_banner_enabled: false,
@@ -24,6 +30,12 @@ const SETTING_DESCRIPTIONS = {
     ads_provider: 'Provider iklan aktif untuk seluruh placement',
     ads_desktop_enabled: 'Aktifkan iklan untuk viewport desktop',
     ads_mobile_enabled: 'Aktifkan iklan untuk viewport mobile',
+    ads_popup_slots_enabled: 'Aktifkan slot iklan popup video',
+    ads_popup_preferred_slot: 'Slot popup yang diprioritaskan pada desktop',
+    ads_hide_social_bar_on_popup: 'Sembunyikan social bar saat popup live terbuka',
+    ads_hide_floating_widgets_on_popup: 'Sembunyikan widget fixed internal saat popup live terbuka',
+    ads_popup_desktop_max_height: 'Batas tinggi slot popup pada desktop',
+    ads_popup_mobile_max_height: 'Batas tinggi slot popup pada mobile',
     ads_social_bar_enabled: 'Aktifkan script social bar global',
     ads_social_bar_script: 'Raw script social bar untuk halaman publik',
     ads_top_banner_enabled: 'Aktifkan banner setelah hero landing page',
@@ -97,6 +109,16 @@ function mapSettingsResponse(data = {}) {
         ads_provider: data.ads_provider || 'adsterra',
         ads_desktop_enabled: normalizeBoolean(data.ads_desktop_enabled, true),
         ads_mobile_enabled: normalizeBoolean(data.ads_mobile_enabled, true),
+        ads_popup_slots_enabled: normalizeBoolean(data.ads_popup_slots_enabled, true),
+        ads_popup_preferred_slot: data.ads_popup_preferred_slot === 'top' ? 'top' : 'bottom',
+        ads_hide_social_bar_on_popup: normalizeBoolean(data.ads_hide_social_bar_on_popup, true),
+        ads_hide_floating_widgets_on_popup: normalizeBoolean(data.ads_hide_floating_widgets_on_popup, true),
+        ads_popup_desktop_max_height: Number.parseInt(data.ads_popup_desktop_max_height, 10) > 0
+            ? Number.parseInt(data.ads_popup_desktop_max_height, 10)
+            : 160,
+        ads_popup_mobile_max_height: Number.parseInt(data.ads_popup_mobile_max_height, 10) > 0
+            ? Number.parseInt(data.ads_popup_mobile_max_height, 10)
+            : 220,
         ads_social_bar_enabled: normalizeBoolean(data.ads_social_bar_enabled, false),
         ads_social_bar_script: data.ads_social_bar_script || '',
         ads_top_banner_enabled: normalizeBoolean(data.ads_top_banner_enabled, false),
@@ -150,6 +172,48 @@ function ScriptField({ id, name, value, onChange }) {
             placeholder="<script src=&quot;https://...&quot;></script>"
             className="w-full resize-y rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-xs text-gray-900 outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
         />
+    );
+}
+
+function SelectField({ id, name, value, onChange, options, label }) {
+    return (
+        <div>
+            <label htmlFor={id} className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                {label}
+            </label>
+            <select
+                id={id}
+                name={name}
+                value={value}
+                onChange={onChange}
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-gray-900 outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+            >
+                {options.map((option) => (
+                    <option key={option.value} value={option.value}>
+                        {option.label}
+                    </option>
+                ))}
+            </select>
+        </div>
+    );
+}
+
+function NumberField({ id, name, value, onChange, label, min = 1 }) {
+    return (
+        <div>
+            <label htmlFor={id} className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                {label}
+            </label>
+            <input
+                id={id}
+                name={name}
+                type="number"
+                min={min}
+                value={value}
+                onChange={onChange}
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-gray-900 outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+            />
+        </div>
     );
 }
 
@@ -265,6 +329,68 @@ export default function AdsSettingsPanel() {
                             onChange={handleChange}
                             className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-gray-900 outline-none transition-all focus:border-transparent focus:ring-2 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                         />
+                    </div>
+                </SectionCard>
+
+                <SectionCard
+                    title="Popup Layout Policy"
+                    description="Atur perilaku iklan saat popup video dibuka agar player tetap menjadi fokus utama."
+                >
+                    <CheckboxField
+                        id="ads_popup_slots_enabled"
+                        name="ads_popup_slots_enabled"
+                        checked={settings.ads_popup_slots_enabled}
+                        onChange={handleChange}
+                        label="Aktifkan slot iklan popup"
+                    />
+
+                    <div className="grid gap-3 md:grid-cols-2">
+                        <CheckboxField
+                            id="ads_hide_social_bar_on_popup"
+                            name="ads_hide_social_bar_on_popup"
+                            checked={settings.ads_hide_social_bar_on_popup}
+                            onChange={handleChange}
+                            label="Sembunyikan social bar saat popup aktif"
+                        />
+                        <CheckboxField
+                            id="ads_hide_floating_widgets_on_popup"
+                            name="ads_hide_floating_widgets_on_popup"
+                            checked={settings.ads_hide_floating_widgets_on_popup}
+                            onChange={handleChange}
+                            label="Sembunyikan widget fixed internal saat popup aktif"
+                        />
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-3">
+                        <SelectField
+                            id="ads_popup_preferred_slot"
+                            name="ads_popup_preferred_slot"
+                            value={settings.ads_popup_preferred_slot}
+                            onChange={handleChange}
+                            label="Prioritas slot desktop"
+                            options={[
+                                { value: 'bottom', label: 'Bottom slot' },
+                                { value: 'top', label: 'Top slot' },
+                            ]}
+                        />
+                        <NumberField
+                            id="ads_popup_desktop_max_height"
+                            name="ads_popup_desktop_max_height"
+                            value={settings.ads_popup_desktop_max_height}
+                            onChange={handleChange}
+                            label="Max height desktop (px)"
+                        />
+                        <NumberField
+                            id="ads_popup_mobile_max_height"
+                            name="ads_popup_mobile_max_height"
+                            value={settings.ads_popup_mobile_max_height}
+                            onChange={handleChange}
+                            label="Max height mobile (px)"
+                        />
+                    </div>
+
+                    <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-100">
+                        Gunakan creative compact atau vertikal untuk slot popup. Pada desktop, hanya satu slot popup yang diprioritaskan agar player tetap terbaca.
                     </div>
                 </SectionCard>
 

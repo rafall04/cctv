@@ -116,6 +116,8 @@ function VideoPopup({ camera, onClose, adsConfig = null }) {
     const [consecutiveFailures, setConsecutiveFailures] = useState(0);
     const [showTroubleshooting, setShowTroubleshooting] = useState(false);
     const [videoAspectRatio, setVideoAspectRatio] = useState(null);
+    const [popupTopAdHeight, setPopupTopAdHeight] = useState(0);
+    const [popupBottomAdHeight, setPopupBottomAdHeight] = useState(0);
     const [layoutMetrics, setLayoutMetrics] = useState(() => ({
         viewportWidth: typeof window !== 'undefined' ? window.innerWidth : 0,
         viewportHeight: typeof window !== 'undefined' ? window.innerHeight : 0,
@@ -683,8 +685,22 @@ function VideoPopup({ camera, onClose, adsConfig = null }) {
     const overlayState = getPublicPopupOverlayState({ status, loadingStage, errorType });
     const isPlaybackLocked = isPublicPopupPlaybackLocked(status);
     const canRetry = shouldShowPublicPopupRetry({ status, errorType });
-    const showPopupTopBanner = !isFullscreen && shouldRenderAdSlot(adsConfig, 'popupTopBanner', isMobileAdsViewport);
-    const showPopupBottomNative = !isFullscreen && shouldRenderAdSlot(adsConfig, 'popupBottomNative', isMobileAdsViewport);
+    const popupAdsEnabled = adsConfig?.popup?.enabled !== false;
+    const popupPreferredSlot = adsConfig?.popup?.preferredSlot === 'top' ? 'top' : 'bottom';
+    const popupMaxHeight = isMobileAdsViewport
+        ? (adsConfig?.popup?.maxHeight?.mobile || 220)
+        : (adsConfig?.popup?.maxHeight?.desktop || 160);
+    const popupTopEligible =
+        popupAdsEnabled &&
+        !isFullscreen &&
+        shouldRenderAdSlot(adsConfig, 'popupTopBanner', isMobileAdsViewport);
+    const popupBottomEligible =
+        popupAdsEnabled &&
+        !isFullscreen &&
+        shouldRenderAdSlot(adsConfig, 'popupBottomNative', isMobileAdsViewport);
+    const restrictDesktopPopupSlots = !isMobileAdsViewport && popupTopEligible && popupBottomEligible;
+    const showPopupTopBanner = popupTopEligible && (!restrictDesktopPopupSlots || popupPreferredSlot === 'top');
+    const showPopupBottomNative = popupBottomEligible && (!restrictDesktopPopupSlots || popupPreferredSlot === 'bottom');
     const bodyStyle = getPublicPopupBodyStyle({
         isFullscreen,
         isPlaybackLocked,
@@ -698,6 +714,8 @@ function VideoPopup({ camera, onClose, adsConfig = null }) {
         viewportHeight: layoutMetrics.viewportHeight,
         headerHeight: layoutMetrics.headerHeight,
         footerHeight: layoutMetrics.footerHeight,
+        topAdHeight: popupTopAdHeight,
+        bottomAdHeight: popupBottomAdHeight,
         maxDesktopWidth: 1024,
     });
 
@@ -720,22 +738,33 @@ function VideoPopup({ camera, onClose, adsConfig = null }) {
         updateLayoutMetrics();
         window.addEventListener('resize', updateLayoutMetrics);
         return () => window.removeEventListener('resize', updateLayoutMetrics);
-    }, [isFullscreen, isPlaybackLocked, isVideoActive, status, loadingStage, errorType, videoAspectRatio]);
+    }, [
+        isFullscreen,
+        isPlaybackLocked,
+        isVideoActive,
+        status,
+        loadingStage,
+        errorType,
+        videoAspectRatio,
+        popupTopAdHeight,
+        popupBottomAdHeight,
+    ]);
 
     return (
-        <div ref={outerWrapperRef} className={`fixed inset-0 z-[9999] ${isFullscreen ? 'bg-black dark:bg-black' : 'flex items-center justify-center bg-black/95 dark:bg-black/95 p-2 sm:p-4'}`} onClick={onClose}>
+        <div ref={outerWrapperRef} className={`fixed inset-0 z-[1000000] ${isFullscreen ? 'bg-black dark:bg-black' : 'flex items-center justify-center bg-black/95 dark:bg-black/95 p-2 sm:p-4'}`} onClick={onClose}>
             <div ref={modalRef} data-testid="grid-popup-modal" className={`relative bg-white dark:bg-gray-900 overflow-hidden shadow-2xl flex flex-col ${isFullscreen ? 'w-full h-full' : 'w-full max-w-5xl rounded-2xl border border-gray-200 dark:border-gray-800'}`} style={modalStyle} onClick={(e) => e.stopPropagation()}>
 
                 {showPopupTopBanner && (
-                    <div className="border-b border-gray-200 bg-white/90 px-3 py-3 dark:border-gray-800 dark:bg-gray-900/90">
-                        <InlineAdSlot
-                            slotKey="popup-top-banner"
-                            label="Sponsored"
-                            script={adsConfig.slots.popupTopBanner.script}
-                            className="px-0"
-                            minHeightClassName="min-h-[96px]"
-                        />
-                    </div>
+                    <InlineAdSlot
+                        slotKey="popup-top-banner"
+                        label="Sponsored"
+                        script={adsConfig.slots.popupTopBanner.script}
+                        variant="popup-inline"
+                        className="border-b border-gray-200 bg-white/90 px-3 py-3 dark:border-gray-800 dark:bg-gray-900/90"
+                        minHeightClassName="min-h-[96px]"
+                        maxHeight={popupMaxHeight}
+                        onHeightChange={setPopupTopAdHeight}
+                    />
                 )}
 
                 {/* Header Info - di atas video (hide in fullscreen) */}
@@ -957,15 +986,16 @@ function VideoPopup({ camera, onClose, adsConfig = null }) {
                 </div>
 
                 {showPopupBottomNative && (
-                    <div className="border-t border-gray-200 bg-white/90 px-3 py-3 dark:border-gray-800 dark:bg-gray-900/90">
-                        <InlineAdSlot
-                            slotKey="popup-bottom-native"
-                            label="Sponsored"
-                            script={adsConfig.slots.popupBottomNative.script}
-                            className="px-0"
-                            minHeightClassName="min-h-[96px]"
-                        />
-                    </div>
+                    <InlineAdSlot
+                        slotKey="popup-bottom-native"
+                        label="Sponsored"
+                        script={adsConfig.slots.popupBottomNative.script}
+                        variant="popup-inline"
+                        className="border-t border-gray-200 bg-white/90 px-3 py-3 dark:border-gray-800 dark:bg-gray-900/90"
+                        minHeightClassName="min-h-[96px]"
+                        maxHeight={popupMaxHeight}
+                        onHeightChange={setPopupBottomAdHeight}
+                    />
                 )}
             </div>
         </div>
