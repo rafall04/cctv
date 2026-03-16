@@ -5,9 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useLandingPublicConfig } from './useLandingPublicConfig';
 import { LANDING_SCHEDULE_RECHECK_MS } from './landingScheduledContent';
 
-const { getPublicSaweriaConfig, getPublicLandingPageSettings } = vi.hoisted(() => ({
+const { getPublicSaweriaConfig, getPublicLandingPageSettings, getPublicAdsSettings } = vi.hoisted(() => ({
     getPublicSaweriaConfig: vi.fn(),
     getPublicLandingPageSettings: vi.fn(),
+    getPublicAdsSettings: vi.fn(),
 }));
 
 vi.mock('../../services/saweriaService', () => ({
@@ -17,6 +18,7 @@ vi.mock('../../services/saweriaService', () => ({
 vi.mock('../../services/settingsService', () => ({
     settingsService: {
         getPublicLandingPageSettings,
+        getPublicAdsSettings,
     },
 }));
 
@@ -34,12 +36,31 @@ describe('useLandingPublicConfig', () => {
 
         getPublicSaweriaConfig.mockReset();
         getPublicLandingPageSettings.mockReset();
+        getPublicAdsSettings.mockReset();
 
         getPublicSaweriaConfig.mockResolvedValue({
             success: true,
             data: {
                 enabled: false,
                 saweria_link: null,
+            },
+        });
+        getPublicAdsSettings.mockResolvedValue({
+            success: true,
+            data: {
+                enabled: false,
+                provider: 'adsterra',
+                devices: {
+                    desktop: true,
+                    mobile: true,
+                },
+                slots: {
+                    socialBar: { enabled: false },
+                    topBanner: { enabled: false },
+                    afterCamerasNative: { enabled: false },
+                    popupTopBanner: { enabled: false },
+                    popupBottomNative: { enabled: false },
+                },
             },
         });
     });
@@ -76,6 +97,7 @@ describe('useLandingPublicConfig', () => {
 
         expect(result.current.publicConfigLoading).toBe(false);
         expect(result.current.landingSettings.announcement.isActive).toBe(true);
+        expect(result.current.adsConfig.enabled).toBe(false);
         expect(getPublicLandingPageSettings).toHaveBeenCalledTimes(1);
 
         await act(async () => {
@@ -116,5 +138,6 @@ describe('useLandingPublicConfig', () => {
         expect(result.current.landingSettings.eventBanner.theme).toBe('neutral');
         expect(result.current.landingSettings.announcement.title).toBe('');
         expect(result.current.landingSettings.announcement.text).toBe('');
+        expect(result.current.adsConfig.provider).toBe('adsterra');
     });
 });

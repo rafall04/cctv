@@ -333,6 +333,35 @@ describe('VideoPopup non-live states', () => {
             expect(modal.style.width).toBe('1024px');
         });
     });
+
+    it('merender slot iklan popup atas dan bawah saat ads config aktif', async () => {
+        render(
+            <VideoPopup
+                camera={{ ...baseCamera, id: 20 }}
+                onClose={vi.fn()}
+                adsConfig={{
+                    enabled: true,
+                    devices: { desktop: true, mobile: true },
+                    slots: {
+                        popupTopBanner: {
+                            enabled: true,
+                            script: '<div>popup top ad</div>',
+                        },
+                        popupBottomNative: {
+                            enabled: true,
+                            script: '<div>popup bottom ad</div>',
+                        },
+                    },
+                }}
+            />
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText('popup top ad')).toBeTruthy();
+        });
+
+        expect(screen.getByText('popup bottom ad')).toBeTruthy();
+    });
 });
 
 

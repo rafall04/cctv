@@ -148,6 +148,11 @@ export const config = {
     auditLogRetentionDays: parseInt(process.env.AUDIT_LOG_RETENTION_DAYS || '90', 10),
 
     allowedOrigins: parseAllowedOrigins(),
+    ads: {
+      scriptAllowedHosts: parseList(process.env.ADS_SCRIPT_ALLOWED_HOSTS),
+      frameAllowedHosts: parseList(process.env.ADS_FRAME_ALLOWED_HOSTS),
+      connectAllowedHosts: parseList(process.env.ADS_CONNECT_ALLOWED_HOSTS),
+    },
     trustedProxyCidrs: trustedProxyCidrs.length > 0 ? trustedProxyCidrs : defaultTrustedProxyCidrs,
     hls: {
       maxSessionCacheEntries: parseInt(process.env.HLS_MAX_SESSION_CACHE_ENTRIES || '5000', 10),

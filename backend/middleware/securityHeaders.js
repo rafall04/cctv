@@ -12,6 +12,46 @@
  * Requirements: 8.1, 8.2, 8.3, 8.5, 8.6, 8.7
  */
 
+import { config } from '../config/config.js';
+
+const DEFAULT_AD_SCRIPT_SOURCES = [
+    'http://www.topcreativeformat.com',
+    'https://www.topcreativeformat.com',
+    'https://inklinkor.com',
+    'https://*.effectivegatecpm.com',
+    'https://*.topcreativeformat.com',
+];
+
+const DEFAULT_AD_FRAME_SOURCES = [
+    'http://www.topcreativeformat.com',
+    'https://www.topcreativeformat.com',
+    'https://*.effectivegatecpm.com',
+    'https://*.topcreativeformat.com',
+];
+
+const DEFAULT_AD_CONNECT_SOURCES = [
+    'https://*.effectivegatecpm.com',
+    'https://*.topcreativeformat.com',
+    'https://inklinkor.com',
+];
+
+function uniqueSources(...sourceGroups) {
+    return [...new Set(sourceGroups.flat().filter(Boolean))];
+}
+
+const adScriptSources = uniqueSources(
+    DEFAULT_AD_SCRIPT_SOURCES,
+    config.security?.ads?.scriptAllowedHosts || []
+);
+const adFrameSources = uniqueSources(
+    DEFAULT_AD_FRAME_SOURCES,
+    config.security?.ads?.frameAllowedHosts || []
+);
+const adConnectSources = uniqueSources(
+    DEFAULT_AD_CONNECT_SOURCES,
+    config.security?.ads?.connectAllowedHosts || []
+);
+
 /**
  * Security headers configuration
  */
@@ -28,13 +68,13 @@ export const SECURITY_HEADERS_CONFIG = {
     // Content-Security-Policy restricts resource origins
     contentSecurityPolicy: [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://www.topcreativeformat.com https://inklinkor.com",
+        `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${adScriptSources.join(' ')}`,
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: blob: https: http:",
         "font-src 'self' data:",
-        "connect-src 'self' ws: wss: http: https:",
+        `connect-src 'self' ws: wss: http: https: ${adConnectSources.join(' ')}`,
         "media-src 'self' blob: http: https:",
-        "frame-src http://www.topcreativeformat.com",
+        `frame-src ${adFrameSources.join(' ')}`,
         "frame-ancestors 'none'"
     ].join('; '),
     

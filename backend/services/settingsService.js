@@ -23,6 +23,23 @@ const LANDING_PAGE_KEYS = [
     'announcement_show_in_simple',
 ];
 
+const ADS_SETTINGS_KEYS = [
+    'ads_enabled',
+    'ads_provider',
+    'ads_desktop_enabled',
+    'ads_mobile_enabled',
+    'ads_social_bar_enabled',
+    'ads_social_bar_script',
+    'ads_top_banner_enabled',
+    'ads_top_banner_script',
+    'ads_after_cameras_native_enabled',
+    'ads_after_cameras_native_script',
+    'ads_popup_top_banner_enabled',
+    'ads_popup_top_banner_script',
+    'ads_popup_bottom_native_enabled',
+    'ads_popup_bottom_native_script',
+];
+
 const LANDING_PAGE_DEFAULTS = {
     area_coverage: 'Saat ini area coverage kami baru mencakup <strong>Dander</strong> dan <strong>Tanjungharjo</strong>',
     hero_badge: 'LIVE STREAMING 24 JAM',
@@ -48,6 +65,37 @@ const LANDING_PAGE_DEFAULTS = {
         show_in_full: true,
         show_in_simple: true,
         isActive: false,
+    },
+};
+
+const ADS_DEFAULTS = {
+    enabled: false,
+    provider: 'adsterra',
+    devices: {
+        desktop: true,
+        mobile: true,
+    },
+    slots: {
+        socialBar: {
+            enabled: false,
+            script: '',
+        },
+        topBanner: {
+            enabled: false,
+            script: '',
+        },
+        afterCamerasNative: {
+            enabled: false,
+            script: '',
+        },
+        popupTopBanner: {
+            enabled: false,
+            script: '',
+        },
+        popupBottomNative: {
+            enabled: false,
+            script: '',
+        },
     },
 };
 
@@ -89,6 +137,10 @@ function normalizeScheduleValue(value) {
     }
 
     return normalized.slice(0, 19);
+}
+
+function hasScriptValue(value) {
+    return typeof value === 'string' && value.trim().length > 0;
 }
 
 function getComparableNow(timezone) {
@@ -242,6 +294,91 @@ class SettingsService {
 
         result.eventBanner.isActive = isScheduledContentActive(result.eventBanner, timezone);
         result.announcement.isActive = isScheduledContentActive(result.announcement, timezone);
+
+        return result;
+    }
+
+    getPublicAdsSettings() {
+        const placeholders = ADS_SETTINGS_KEYS.map(() => '?').join(', ');
+        const settings = query(
+            `SELECT key, value FROM settings WHERE key IN (${placeholders})`,
+            ADS_SETTINGS_KEYS
+        );
+
+        const result = {
+            ...ADS_DEFAULTS,
+            devices: { ...ADS_DEFAULTS.devices },
+            slots: {
+                socialBar: { ...ADS_DEFAULTS.slots.socialBar },
+                topBanner: { ...ADS_DEFAULTS.slots.topBanner },
+                afterCamerasNative: { ...ADS_DEFAULTS.slots.afterCamerasNative },
+                popupTopBanner: { ...ADS_DEFAULTS.slots.popupTopBanner },
+                popupBottomNative: { ...ADS_DEFAULTS.slots.popupBottomNative },
+            },
+        };
+
+        settings.forEach((setting) => {
+            switch (setting.key) {
+                case 'ads_enabled':
+                    result.enabled = parseBoolean(setting.value);
+                    break;
+                case 'ads_provider':
+                    result.provider = setting.value || ADS_DEFAULTS.provider;
+                    break;
+                case 'ads_desktop_enabled':
+                    result.devices.desktop = parseBoolean(setting.value, true);
+                    break;
+                case 'ads_mobile_enabled':
+                    result.devices.mobile = parseBoolean(setting.value, true);
+                    break;
+                case 'ads_social_bar_enabled':
+                    result.slots.socialBar.enabled = parseBoolean(setting.value);
+                    break;
+                case 'ads_social_bar_script':
+                    result.slots.socialBar.script = setting.value || '';
+                    break;
+                case 'ads_top_banner_enabled':
+                    result.slots.topBanner.enabled = parseBoolean(setting.value);
+                    break;
+                case 'ads_top_banner_script':
+                    result.slots.topBanner.script = setting.value || '';
+                    break;
+                case 'ads_after_cameras_native_enabled':
+                    result.slots.afterCamerasNative.enabled = parseBoolean(setting.value);
+                    break;
+                case 'ads_after_cameras_native_script':
+                    result.slots.afterCamerasNative.script = setting.value || '';
+                    break;
+                case 'ads_popup_top_banner_enabled':
+                    result.slots.popupTopBanner.enabled = parseBoolean(setting.value);
+                    break;
+                case 'ads_popup_top_banner_script':
+                    result.slots.popupTopBanner.script = setting.value || '';
+                    break;
+                case 'ads_popup_bottom_native_enabled':
+                    result.slots.popupBottomNative.enabled = parseBoolean(setting.value);
+                    break;
+                case 'ads_popup_bottom_native_script':
+                    result.slots.popupBottomNative.script = setting.value || '';
+                    break;
+                default:
+                    break;
+            }
+        });
+
+        Object.values(result.slots).forEach((slot) => {
+            if (!slot.enabled || !hasScriptValue(slot.script)) {
+                slot.enabled = false;
+                delete slot.script;
+            }
+        });
+
+        if (!result.enabled) {
+            Object.values(result.slots).forEach((slot) => {
+                slot.enabled = false;
+                delete slot.script;
+            });
+        }
 
         return result;
     }

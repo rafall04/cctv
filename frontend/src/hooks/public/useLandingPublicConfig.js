@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getPublicSaweriaConfig } from '../../services/saweriaService';
 import { settingsService } from '../../services/settingsService';
+import { DEFAULT_PUBLIC_ADS_CONFIG } from '../../components/ads/adsConfig';
 import {
     DEFAULT_LANDING_SETTINGS,
     LANDING_SCHEDULE_RECHECK_MS,
@@ -12,6 +13,7 @@ export function useLandingPublicConfig() {
     const [saweriaLeaderboardLink, setSaweriaLeaderboardLink] = useState('');
     const [saweriaEnabled, setSaweriaEnabled] = useState(false);
     const [rawLandingSettings, setRawLandingSettings] = useState(DEFAULT_LANDING_SETTINGS);
+    const [adsConfig, setAdsConfig] = useState(DEFAULT_PUBLIC_ADS_CONFIG);
     const [publicConfigLoading, setPublicConfigLoading] = useState(true);
     const [scheduleNow, setScheduleNow] = useState(() => Date.now());
 
@@ -20,12 +22,13 @@ export function useLandingPublicConfig() {
 
         const loadPublicConfig = async () => {
             try {
-                const [saweriaRes, landingRes] = await Promise.all([
+                const [saweriaRes, landingRes, adsRes] = await Promise.all([
                     getPublicSaweriaConfig().catch((err) => {
                         console.warn('Saweria config fetch failed, using defaults:', err);
                         return { success: true, data: { enabled: false, saweria_link: null } };
                     }),
                     settingsService.getPublicLandingPageSettings().catch(() => ({ success: false })),
+                    settingsService.getPublicAdsSettings().catch(() => ({ success: false })),
                 ]);
 
                 if (!isMounted) {
@@ -44,6 +47,10 @@ export function useLandingPublicConfig() {
 
                 if (landingRes?.success && landingRes?.data) {
                     setRawLandingSettings(landingRes.data);
+                }
+
+                if (adsRes?.success && adsRes?.data) {
+                    setAdsConfig(adsRes.data);
                 }
             } catch (err) {
                 if (isMounted) {
@@ -82,6 +89,7 @@ export function useLandingPublicConfig() {
         saweriaLink,
         saweriaLeaderboardLink,
         landingSettings,
+        adsConfig,
         publicConfigLoading,
     };
 }

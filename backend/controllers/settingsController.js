@@ -92,3 +92,20 @@ export async function getLandingPageSettings(request, reply) {
         });
     }
 }
+
+export async function getPublicAdsSettings(request, reply) {
+    try {
+        const data = settingsService.getPublicAdsSettings();
+
+        return reply.send({
+            success: true,
+            data,
+        });
+    } catch (error) {
+        console.error('Get public ads settings error:', error);
+        return reply.code(500).send({
+            success: false,
+            message: 'Internal server error',
+        });
+    }
+}

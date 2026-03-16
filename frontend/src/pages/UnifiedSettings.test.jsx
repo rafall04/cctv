@@ -16,6 +16,10 @@ vi.mock('../components/admin/settings/SaweriaSettingsPanel', () => ({
     default: () => <div>saweria-panel</div>,
 }));
 
+vi.mock('../components/admin/settings/AdsSettingsPanel', () => ({
+    default: () => <div>ads-panel</div>,
+}));
+
 vi.mock('../components/admin/settings/BrandingSettingsPanel', () => ({
     default: () => <div>branding-panel</div>,
 }));
@@ -40,6 +44,9 @@ describe('UnifiedSettings', () => {
 
         fireEvent.click(screen.getByText('Telegram Bot'));
         expect(screen.getByText('telegram-panel')).toBeTruthy();
+
+        fireEvent.click(screen.getByText('Ads'));
+        expect(screen.getByText('ads-panel')).toBeTruthy();
 
         fireEvent.click(screen.getByText('Branding'));
         expect(screen.getByText('branding-panel')).toBeTruthy();

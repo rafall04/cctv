@@ -16,6 +16,8 @@ import { useBranding } from '../../contexts/BrandingContext';
 import { createCameraSlug } from '../../utils/slugify';
 import { buildPublicCameraShareUrl } from '../../utils/publicShareUrl';
 import PublicStreamStatusOverlay from '../PublicStreamStatusOverlay.jsx';
+import InlineAdSlot from '../ads/InlineAdSlot.jsx';
+import { isAdsMobileViewport, shouldRenderAdSlot } from '../ads/adsConfig.js';
 import {
     getPublicPopupBodyStyle,
     getPublicPopupModalStyle,
@@ -34,7 +36,7 @@ import {
 // VIDEO POPUP - Optimized with fullscreen detection, timeout handler, progressive stages, and auto-retry
 // **Validates: Requirements 1.1, 1.2, 1.3, 1.4, 2.3, 3.1, 3.2, 4.1, 4.2, 4.3, 4.4, 6.1, 6.2, 6.3, 6.4, 7.1, 7.2, 7.3**
 // ============================================
-function VideoPopup({ camera, onClose }) {
+function VideoPopup({ camera, onClose, adsConfig = null }) {
     const [searchParams] = useSearchParams();
     const videoRef = useRef(null);
     const wrapperRef = useRef(null);
@@ -101,6 +103,7 @@ function VideoPopup({ camera, onClose }) {
     // Check camera status first
     const isMaintenance = camera.status === 'maintenance';
     const isOffline = camera.is_online === 0;
+    const isMobileAdsViewport = isAdsMobileViewport();
 
     const [status, setStatus] = useState(() => getPublicPopupInitialStatus(camera));
     const [loadingStage, setLoadingStage] = useState(LoadingStage.CONNECTING);
@@ -680,6 +683,8 @@ function VideoPopup({ camera, onClose }) {
     const overlayState = getPublicPopupOverlayState({ status, loadingStage, errorType });
     const isPlaybackLocked = isPublicPopupPlaybackLocked(status);
     const canRetry = shouldShowPublicPopupRetry({ status, errorType });
+    const showPopupTopBanner = !isFullscreen && shouldRenderAdSlot(adsConfig, 'popupTopBanner', isMobileAdsViewport);
+    const showPopupBottomNative = !isFullscreen && shouldRenderAdSlot(adsConfig, 'popupBottomNative', isMobileAdsViewport);
     const bodyStyle = getPublicPopupBodyStyle({
         isFullscreen,
         isPlaybackLocked,
@@ -720,6 +725,18 @@ function VideoPopup({ camera, onClose }) {
     return (
         <div ref={outerWrapperRef} className={`fixed inset-0 z-[9999] ${isFullscreen ? 'bg-black dark:bg-black' : 'flex items-center justify-center bg-black/95 dark:bg-black/95 p-2 sm:p-4'}`} onClick={onClose}>
             <div ref={modalRef} data-testid="grid-popup-modal" className={`relative bg-white dark:bg-gray-900 overflow-hidden shadow-2xl flex flex-col ${isFullscreen ? 'w-full h-full' : 'w-full max-w-5xl rounded-2xl border border-gray-200 dark:border-gray-800'}`} style={modalStyle} onClick={(e) => e.stopPropagation()}>
+
+                {showPopupTopBanner && (
+                    <div className="border-b border-gray-200 bg-white/90 px-3 py-3 dark:border-gray-800 dark:bg-gray-900/90">
+                        <InlineAdSlot
+                            slotKey="popup-top-banner"
+                            label="Sponsored"
+                            script={adsConfig.slots.popupTopBanner.script}
+                            className="px-0"
+                            minHeightClassName="min-h-[96px]"
+                        />
+                    </div>
+                )}
 
                 {/* Header Info - di atas video (hide in fullscreen) */}
                 {!isFullscreen && (
@@ -938,6 +955,18 @@ function VideoPopup({ camera, onClose }) {
                         </div>
                     )}
                 </div>
+
+                {showPopupBottomNative && (
+                    <div className="border-t border-gray-200 bg-white/90 px-3 py-3 dark:border-gray-800 dark:bg-gray-900/90">
+                        <InlineAdSlot
+                            slotKey="popup-bottom-native"
+                            label="Sponsored"
+                            script={adsConfig.slots.popupBottomNative.script}
+                            className="px-0"
+                            minHeightClassName="min-h-[96px]"
+                        />
+                    </div>
+                )}
             </div>
         </div>
     );

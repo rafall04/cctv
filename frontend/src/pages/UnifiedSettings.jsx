@@ -3,6 +3,7 @@ import TelegramSettingsPanel from '../components/admin/settings/TelegramSettings
 import SaweriaSettingsPanel from '../components/admin/settings/SaweriaSettingsPanel';
 import BrandingSettingsPanel from '../components/admin/settings/BrandingSettingsPanel';
 import GeneralSettingsPanel from '../components/admin/settings/GeneralSettingsPanel';
+import AdsSettingsPanel from '../components/admin/settings/AdsSettingsPanel';
 import ApiKeySettings from '../components/settings/ApiKeySettings';
 import TimezoneSettingsTab from '../components/settings/TimezoneSettingsTab';
 import BackupSettingsTab from '../components/settings/BackupSettingsTab';
@@ -22,6 +23,11 @@ const Icons = {
     Saweria: () => (
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+    ),
+    Ads: () => (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M11 5h2m-1 0v14m-6-9h12M6 9h12a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4a2 2 0 012-2z" />
         </svg>
     ),
     Branding: () => (
@@ -55,6 +61,7 @@ export default function UnifiedSettings() {
         { id: 'backup', label: 'Backup', icon: <Icons.Backup /> },
         { id: 'telegram', label: 'Telegram Bot', icon: <Icons.Telegram /> },
         { id: 'saweria', label: 'Saweria', icon: <Icons.Saweria /> },
+        { id: 'ads', label: 'Ads', icon: <Icons.Ads /> },
         { id: 'branding', label: 'Branding', icon: <Icons.Branding /> },
         { id: 'apikey', label: 'API Keys', icon: <Icons.ApiKey /> },
     ];
@@ -100,6 +107,7 @@ export default function UnifiedSettings() {
                 {activeTab === 'backup' && <BackupSettingsTab />}
                 {activeTab === 'telegram' && <TelegramSettingsPanel />}
                 {activeTab === 'saweria' && <SaweriaSettingsPanel />}
+                {activeTab === 'ads' && <AdsSettingsPanel />}
                 {activeTab === 'branding' && <BrandingSettingsPanel />}
                 {activeTab === 'apikey' && <ApiKeySettings />}
             </div>

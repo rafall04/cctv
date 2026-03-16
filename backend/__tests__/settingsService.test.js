@@ -90,3 +90,52 @@ describe('settingsService.getLandingPageSettings', () => {
         vi.useRealTimers();
     });
 });
+
+describe('settingsService.getPublicAdsSettings', () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it('mengembalikan fallback ads config saat settings kosong', () => {
+        vi.spyOn(database, 'query').mockReturnValue([]);
+
+        const result = settingsService.getPublicAdsSettings();
+
+        expect(result).toEqual(expect.objectContaining({
+            enabled: false,
+            provider: 'adsterra',
+            devices: {
+                desktop: true,
+                mobile: true,
+            },
+        }));
+        expect(result.slots.socialBar).toEqual({ enabled: false });
+        expect(result.slots.topBanner).toEqual({ enabled: false });
+    });
+
+    it('hanya mengirim script untuk slot yang aktif dan punya isi', () => {
+        vi.spyOn(database, 'query').mockReturnValue([
+            { key: 'ads_enabled', value: 'true' },
+            { key: 'ads_provider', value: 'adsterra' },
+            { key: 'ads_social_bar_enabled', value: 'true' },
+            { key: 'ads_social_bar_script', value: '<script src=\"https://pl.example.com/social.js\"></script>' },
+            { key: 'ads_top_banner_enabled', value: 'true' },
+            { key: 'ads_top_banner_script', value: '   ' },
+            { key: 'ads_popup_top_banner_enabled', value: 'true' },
+            { key: 'ads_popup_top_banner_script', value: '<div>popup</div>' },
+        ]);
+
+        const result = settingsService.getPublicAdsSettings();
+
+        expect(result.enabled).toBe(true);
+        expect(result.slots.socialBar).toEqual({
+            enabled: true,
+            script: '<script src=\"https://pl.example.com/social.js\"></script>',
+        });
+        expect(result.slots.topBanner).toEqual({ enabled: false });
+        expect(result.slots.popupTopBanner).toEqual({
+            enabled: true,
+            script: '<div>popup</div>',
+        });
+    });
+});

@@ -5,11 +5,12 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { renderWithRouter } from '../test/renderWithRouter';
 import LandingPage from './LandingPage';
 
-const { getPublicSaweriaConfig, testBackendReachability, updateMetaTags, getPublicLandingPageSettings } = vi.hoisted(() => ({
+const { getPublicSaweriaConfig, testBackendReachability, updateMetaTags, getPublicLandingPageSettings, getPublicAdsSettings } = vi.hoisted(() => ({
     getPublicSaweriaConfig: vi.fn(),
     testBackendReachability: vi.fn(),
     updateMetaTags: vi.fn(),
     getPublicLandingPageSettings: vi.fn(),
+    getPublicAdsSettings: vi.fn(),
 }));
 
 vi.mock('../services/saweriaService', () => ({
@@ -41,6 +42,7 @@ vi.mock('../config/config.js', () => ({
 vi.mock('../services/settingsService', () => ({
     settingsService: {
         getPublicLandingPageSettings,
+        getPublicAdsSettings,
     },
 }));
 
@@ -142,6 +144,7 @@ describe('LandingPage connectivity recovery', () => {
         testBackendReachability.mockReset();
         updateMetaTags.mockReset();
         getPublicLandingPageSettings.mockReset();
+        getPublicAdsSettings.mockReset();
 
         getPublicSaweriaConfig.mockResolvedValue({
             success: true,
@@ -164,6 +167,20 @@ describe('LandingPage connectivity recovery', () => {
                     show_in_full: true,
                     show_in_simple: true,
                     isActive: true,
+                },
+            },
+        });
+        getPublicAdsSettings.mockResolvedValue({
+            success: true,
+            data: {
+                enabled: false,
+                devices: { desktop: true, mobile: true },
+                slots: {
+                    socialBar: { enabled: false },
+                    topBanner: { enabled: false },
+                    afterCamerasNative: { enabled: false },
+                    popupTopBanner: { enabled: false },
+                    popupBottomNative: { enabled: false },
                 },
             },
         });

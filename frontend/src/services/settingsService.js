@@ -16,6 +16,14 @@ export const settingsService = {
         return response.data;
     },
 
+    getPublicAdsSettings: async () => {
+        const response = await apiClient.get(
+            '/api/settings/public-ads',
+            getRequestPolicyConfig(REQUEST_POLICY.SILENT_PUBLIC)
+        );
+        return response.data;
+    },
+
     // Admin - get all settings
     getAllSettings: async () => {
         const response = await apiClient.get('/api/settings');

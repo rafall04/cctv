@@ -16,6 +16,9 @@ import LandingFooter from '../components/landing/LandingFooter';
 import LandingCamerasSection from '../components/landing/LandingCamerasSection';
 import LandingPublicTopStack from '../components/landing/LandingPublicTopStack';
 import MultiViewButton from '../components/MultiView/MultiViewButton';
+import InlineAdSlot from '../components/ads/InlineAdSlot';
+import GlobalAdScript from '../components/ads/GlobalAdScript';
+import { isAdsMobileViewport, shouldRenderAdSlot } from '../components/ads/adsConfig';
 
 const LandingPageSimple = lazy(() => import('../components/LandingPageSimple'));
 const MultiViewLayout = lazy(() => import('../components/MultiView/MultiViewLayout'));
@@ -54,6 +57,7 @@ function LandingPageContent() {
         saweriaLink,
         saweriaLeaderboardLink,
         landingSettings,
+        adsConfig,
         publicConfigLoading,
     } = useLandingPublicConfig();
 
@@ -84,6 +88,10 @@ function LandingPageContent() {
 
     const disableHeavyEffects = deviceTier === 'low';
     const shouldHideFloatingWidgets = showMulti && viewMode === 'grid';
+    const isMobileAdsViewport = isAdsMobileViewport();
+    const showSocialBar = shouldRenderAdSlot(adsConfig, 'socialBar', isMobileAdsViewport);
+    const showTopBanner = shouldRenderAdSlot(adsConfig, 'topBanner', isMobileAdsViewport);
+    const showAfterCamerasNative = shouldRenderAdSlot(adsConfig, 'afterCamerasNative', isMobileAdsViewport);
 
     useEffect(() => {
         if (branding) {
@@ -94,6 +102,7 @@ function LandingPageContent() {
     if (layoutMode === 'simple') {
         return (
             <div key="simple-mode">
+                {showSocialBar && <GlobalAdScript slotKey="social-bar" script={adsConfig.slots.socialBar.script} />}
                 <Suspense fallback={<div className="min-h-screen bg-gray-50 dark:bg-gray-950" />}>
                     <LandingPageSimple
                         onCameraClick={handleCameraClick}
@@ -125,7 +134,7 @@ function LandingPageContent() {
 
                 {popup && (
                     <Suspense fallback={null}>
-                        <VideoPopup camera={popup} onClose={handlePopupClose} />
+                        <VideoPopup camera={popup} onClose={handlePopupClose} adsConfig={adsConfig} />
                     </Suspense>
                 )}
                 {showMulti && multiCameras.length > 0 && (
@@ -143,6 +152,7 @@ function LandingPageContent() {
 
     return (
         <div key="full-mode">
+            {showSocialBar && <GlobalAdScript slotKey="social-bar" script={adsConfig.slots.socialBar.script} />}
             <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
                 <LandingNavbar branding={branding} layoutMode={layoutMode} onLayoutToggle={toggleLayoutMode} />
                 <LandingPublicTopStack
@@ -159,6 +169,16 @@ function LandingPageContent() {
                     onCameraClick={setPopup}
                 />
 
+                {showTopBanner && (
+                    <InlineAdSlot
+                        slotKey="top-banner"
+                        label="Sponsored"
+                        script={adsConfig.slots.topBanner.script}
+                        className="mt-6"
+                        minHeightClassName="min-h-[120px]"
+                    />
+                )}
+
                 <LandingCamerasSection
                     onCameraClick={handleCameraClick}
                     onAddMulti={handleAddMulti}
@@ -171,6 +191,16 @@ function LandingPageContent() {
                     onToggleFavorite={toggleFavorite}
                     isFavorite={isFavorite}
                 />
+
+                {showAfterCamerasNative && (
+                    <InlineAdSlot
+                        slotKey="after-cameras-native"
+                        label="Sponsored"
+                        script={adsConfig.slots.afterCamerasNative.script}
+                        className="mt-2"
+                        minHeightClassName="min-h-[120px]"
+                    />
+                )}
 
                 {saweriaEnabled && saweriaLeaderboardLink && (
                     <Suspense fallback={<DeferredSurfaceFallback className="mx-auto mt-6 min-h-[140px] max-w-7xl" />}>
@@ -194,7 +224,7 @@ function LandingPageContent() {
 
                 {popup && (
                     <Suspense fallback={null}>
-                        <VideoPopup camera={popup} onClose={handlePopupClose} />
+                        <VideoPopup camera={popup} onClose={handlePopupClose} adsConfig={adsConfig} />
                     </Suspense>
                 )}
                 {showMulti && multiCameras.length > 0 && (
