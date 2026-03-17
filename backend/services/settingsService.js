@@ -34,6 +34,10 @@ const ADS_SETTINGS_KEYS = [
     'ads_hide_floating_widgets_on_popup',
     'ads_popup_desktop_max_height',
     'ads_popup_mobile_max_height',
+    'ads_playback_native_enabled',
+    'ads_playback_native_script',
+    'ads_playback_native_desktop_enabled',
+    'ads_playback_native_mobile_enabled',
     'ads_playback_popunder_enabled',
     'ads_playback_popunder_script',
     'ads_playback_popunder_desktop_enabled',
@@ -96,6 +100,14 @@ const ADS_DEFAULTS = {
         },
     },
     slots: {
+        playbackNative: {
+            enabled: false,
+            script: '',
+            devices: {
+                desktop: true,
+                mobile: true,
+            },
+        },
         playbackPopunder: {
             enabled: false,
             script: '',
@@ -350,6 +362,10 @@ class SettingsService {
                 maxHeight: { ...ADS_DEFAULTS.popup.maxHeight },
             },
             slots: {
+                playbackNative: {
+                    ...ADS_DEFAULTS.slots.playbackNative,
+                    devices: { ...ADS_DEFAULTS.slots.playbackNative.devices },
+                },
                 playbackPopunder: {
                     ...ADS_DEFAULTS.slots.playbackPopunder,
                     devices: { ...ADS_DEFAULTS.slots.playbackPopunder.devices },
@@ -399,6 +415,18 @@ class SettingsService {
                         setting.value,
                         ADS_DEFAULTS.popup.maxHeight.mobile
                     );
+                    break;
+                case 'ads_playback_native_enabled':
+                    result.slots.playbackNative.enabled = parseBoolean(setting.value);
+                    break;
+                case 'ads_playback_native_script':
+                    result.slots.playbackNative.script = setting.value || '';
+                    break;
+                case 'ads_playback_native_desktop_enabled':
+                    result.slots.playbackNative.devices.desktop = parseBoolean(setting.value, true);
+                    break;
+                case 'ads_playback_native_mobile_enabled':
+                    result.slots.playbackNative.devices.mobile = parseBoolean(setting.value, true);
                     break;
                 case 'ads_playback_popunder_enabled':
                     result.slots.playbackPopunder.enabled = parseBoolean(setting.value);

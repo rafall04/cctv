@@ -16,6 +16,13 @@ export const DEFAULT_PUBLIC_ADS_CONFIG = {
         },
     },
     slots: {
+        playbackNative: {
+            enabled: false,
+            devices: {
+                desktop: true,
+                mobile: true,
+            },
+        },
         playbackPopunder: {
             enabled: false,
             devices: {

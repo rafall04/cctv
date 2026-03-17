@@ -7,6 +7,7 @@ import { createCameraSlug, parseCameraIdFromSlug } from '../utils/slugify';
 import { buildPublicPlaybackShareUrl } from '../utils/publicShareUrl';
 import { REQUEST_POLICY } from '../services/requestPolicy';
 import GlobalAdScript from '../components/ads/GlobalAdScript';
+import InlineAdSlot from '../components/ads/InlineAdSlot';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../components/ads/adsConfig.js';
 
 import PlaybackHeader from '../components/playback/PlaybackHeader';
@@ -79,6 +80,8 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
     const lastPlaybackProgressAtRef = useRef(0);
     const hasLoadedDataForSourceRef = useRef(false);
     const hasStartedPlaybackForSourceRef = useRef(false);
+    const queuedPlaybackPopunderRef = useRef(null);
+    const hasTriggeredInitialPlaybackPopunderRef = useRef(false);
 
     // Refs to avoid stale closures in event handlers
     const selectedSegmentRef = useRef(selectedSegment);
@@ -95,7 +98,9 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
             || (propSelectedCamera?.id === selectedCameraId ? propSelectedCamera : null);
     }, [cameras, propSelectedCamera, selectedCameraId]);
     const isMobileAdsViewport = isAdsMobileViewport();
+    const showPlaybackNative = shouldRenderAdSlot(adsConfig, 'playbackNative', isMobileAdsViewport);
     const showPlaybackPopunder = shouldRenderAdSlot(adsConfig, 'playbackPopunder', isMobileAdsViewport);
+    const [playbackPopunderTriggerId, setPlaybackPopunderTriggerId] = useState(0);
 
     // Keep refs in sync
     useEffect(() => {
@@ -113,6 +118,12 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
     useEffect(() => {
         selectedCameraIdRef.current = selectedCameraId;
     }, [selectedCameraId]);
+
+    useEffect(() => {
+        if (!showPlaybackPopunder) {
+            queuedPlaybackPopunderRef.current = null;
+        }
+    }, [showPlaybackPopunder]);
 
     const updatePlaybackSearchParams = useCallback(({
         camera,
@@ -329,6 +340,27 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
 
         return segmentExists ? segmentKey : null;
     }, [segments, segmentsCameraId, selectedCameraId, selectedSegment]);
+
+    useEffect(() => {
+        if (!showPlaybackPopunder || !selectedSegmentKey) {
+            return;
+        }
+
+        if (!hasTriggeredInitialPlaybackPopunderRef.current && !queuedPlaybackPopunderRef.current) {
+            queuedPlaybackPopunderRef.current = {
+                segmentKey: selectedSegmentKey,
+                reason: 'initial-play',
+            };
+            return;
+        }
+
+        if (queuedPlaybackPopunderRef.current && !queuedPlaybackPopunderRef.current.segmentKey) {
+            queuedPlaybackPopunderRef.current = {
+                ...queuedPlaybackPopunderRef.current,
+                segmentKey: selectedSegmentKey,
+            };
+        }
+    }, [selectedSegmentKey, showPlaybackPopunder]);
 
     // Effect to select segment from URL or auto-select latest when segments are loaded
     useEffect(() => {
@@ -708,6 +740,17 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
 
             hasLoadedDataForSourceRef.current = true;
             markPlaybackProgress();
+
+            const queuedPlaybackPopunder = queuedPlaybackPopunderRef.current;
+            if (
+                showPlaybackPopunder
+                && queuedPlaybackPopunder?.segmentKey
+                && queuedPlaybackPopunder.segmentKey === selectedSegmentKey
+            ) {
+                hasTriggeredInitialPlaybackPopunderRef.current = true;
+                queuedPlaybackPopunderRef.current = null;
+                setPlaybackPopunderTriggerId((previous) => previous + 1);
+            }
         };
 
         const handleCanPlay = () => {
@@ -774,7 +817,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
 
             resetBufferingTimeout();
         };
-    }, [clearBufferingState, loading, resetBufferingTimeout, updatePlaybackSearchParams]);
+    }, [clearBufferingState, loading, resetBufferingTimeout, selectedSegmentKey, showPlaybackPopunder, updatePlaybackSearchParams]);
 
     const handleSpeedChange = (speed) => {
         setPlaybackSpeed(speed);
@@ -784,6 +827,12 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
     };
 
     const handleSegmentClick = useCallback((segment) => {
+        if (showPlaybackPopunder) {
+            queuedPlaybackPopunderRef.current = {
+                segmentKey: getSegmentKey(segment),
+                reason: 'manual-segment-change',
+            };
+        }
         const timestamp = new Date(segment.start_time).getTime();
         updatePlaybackSearchParams({
             camera: selectedCamera,
@@ -799,7 +848,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
         lastSeekTimeRef.current = 0;
         playbackSeekTargetRef.current = 0; // Reset saat diklik manual dari list agar selalu play dari awal segmen
         resetSourcePlaybackState();
-    }, [resetSourcePlaybackState, selectedCamera, updatePlaybackSearchParams]);
+    }, [resetSourcePlaybackState, selectedCamera, showPlaybackPopunder, updatePlaybackSearchParams]);
 
     const formatTimestamp = (timestamp) => {
         return new Date(timestamp).toLocaleString('id-ID', {
@@ -946,6 +995,12 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
             return;
         }
 
+        if (showPlaybackPopunder) {
+            queuedPlaybackPopunderRef.current = {
+                segmentKey: null,
+                reason: 'manual-camera-change',
+            };
+        }
         resetPlaybackSession({
             clearSegment: true,
             clearSegments: true,
@@ -956,7 +1011,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
             timestamp: null,
             replace: false,
         });
-    }, [resetPlaybackSession, updatePlaybackSearchParams]);
+    }, [resetPlaybackSession, showPlaybackPopunder, updatePlaybackSearchParams]);
 
     // Handle share playback link - use timestamp instead of segment ID
     const handleShare = useCallback(async () => {
@@ -1041,9 +1096,10 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
 
     return (
         <>
-            {showPlaybackPopunder && (
+            {showPlaybackPopunder && playbackPopunderTriggerId > 0 && (
                 <GlobalAdScript
-                    slotKey="playback-popunder"
+                    key={playbackPopunderTriggerId}
+                    slotKey={`playback-popunder-${playbackPopunderTriggerId}`}
                     script={adsConfig.slots.playbackPopunder.script}
                 />
             )}
@@ -1081,6 +1137,15 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
                     snapshotNotification={snapshotNotification}
                     formatTimestamp={formatTimestamp}
                 />
+
+                {showPlaybackNative && (
+                    <InlineAdSlot
+                        slotKey="playback-native"
+                        label="Sponsored"
+                        script={adsConfig.slots.playbackNative.script}
+                        minHeightClassName="min-h-[120px]"
+                    />
+                )}
 
                 <div className="flex justify-center">
                     <button

@@ -13,6 +13,10 @@ const DEFAULT_SETTINGS = {
     ads_hide_floating_widgets_on_popup: true,
     ads_popup_desktop_max_height: 160,
     ads_popup_mobile_max_height: 220,
+    ads_playback_native_enabled: false,
+    ads_playback_native_script: '',
+    ads_playback_native_desktop_enabled: true,
+    ads_playback_native_mobile_enabled: true,
     ads_playback_popunder_enabled: false,
     ads_playback_popunder_script: '',
     ads_playback_popunder_desktop_enabled: true,
@@ -40,6 +44,10 @@ const SETTING_DESCRIPTIONS = {
     ads_hide_floating_widgets_on_popup: 'Sembunyikan widget fixed internal saat popup live terbuka',
     ads_popup_desktop_max_height: 'Batas tinggi slot popup pada desktop',
     ads_popup_mobile_max_height: 'Batas tinggi slot popup pada mobile',
+    ads_playback_native_enabled: 'Aktifkan native banner di bawah video playback',
+    ads_playback_native_script: 'Raw script native banner untuk bawah video playback',
+    ads_playback_native_desktop_enabled: 'Aktifkan native banner playback pada desktop',
+    ads_playback_native_mobile_enabled: 'Aktifkan native banner playback pada mobile',
     ads_playback_popunder_enabled: 'Aktifkan popunder saat user masuk playback',
     ads_playback_popunder_script: 'Raw script popunder untuk mode playback',
     ads_playback_popunder_desktop_enabled: 'Aktifkan popunder playback pada desktop',
@@ -76,6 +84,12 @@ const SLOT_DEFINITIONS = [
         description: 'Native banner setelah section kamera dan sebelum blok Saweria/footer.',
     },
     {
+        enabledKey: 'ads_playback_native_enabled',
+        scriptKey: 'ads_playback_native_script',
+        title: 'Playback Native Banner',
+        description: 'Native banner khusus playback yang tampil tepat di bawah video dan di atas timeline/segment list.',
+    },
+    {
         enabledKey: 'ads_popup_top_banner_enabled',
         scriptKey: 'ads_popup_top_banner_script',
         title: 'Popup Top Banner',
@@ -84,8 +98,8 @@ const SLOT_DEFINITIONS = [
     {
         enabledKey: 'ads_popup_bottom_native_enabled',
         scriptKey: 'ads_popup_bottom_native_script',
-        title: 'Popup Bottom Native',
-        description: 'Sponsor utama di bagian bawah popup video, setelah panel kontrol. Slot ini diprioritaskan untuk tetap tampil di grid dan map.',
+        title: 'Popup Bottom Banner',
+        description: 'Banner utama di bagian bawah popup video, setelah panel kontrol. Slot ini diprioritaskan untuk tetap tampil di grid dan map.',
     },
 ];
 
@@ -127,6 +141,10 @@ function mapSettingsResponse(data = {}) {
         ads_popup_mobile_max_height: Number.parseInt(data.ads_popup_mobile_max_height, 10) > 0
             ? Number.parseInt(data.ads_popup_mobile_max_height, 10)
             : 220,
+        ads_playback_native_enabled: normalizeBoolean(data.ads_playback_native_enabled, false),
+        ads_playback_native_script: data.ads_playback_native_script || '',
+        ads_playback_native_desktop_enabled: normalizeBoolean(data.ads_playback_native_desktop_enabled, true),
+        ads_playback_native_mobile_enabled: normalizeBoolean(data.ads_playback_native_mobile_enabled, true),
         ads_playback_popunder_enabled: normalizeBoolean(data.ads_playback_popunder_enabled, false),
         ads_playback_popunder_script: data.ads_playback_popunder_script || '',
         ads_playback_popunder_desktop_enabled: normalizeBoolean(data.ads_playback_popunder_desktop_enabled, true),
@@ -407,8 +425,48 @@ export default function AdsSettingsPanel() {
                 </SectionCard>
 
                 <SectionCard
+                    title="Playback Native Banner"
+                    description="Slot native banner ini muncul di bawah video playback. Format ini dipisahkan dari popup supaya playback tetap terasa seperti halaman utilitas, bukan modal live."
+                >
+                    <CheckboxField
+                        id="ads_playback_native_enabled"
+                        name="ads_playback_native_enabled"
+                        checked={settings.ads_playback_native_enabled}
+                        onChange={handleChange}
+                        label="Aktifkan native banner playback"
+                    />
+                    <div className="grid gap-3 md:grid-cols-2">
+                        <CheckboxField
+                            id="ads_playback_native_desktop_enabled"
+                            name="ads_playback_native_desktop_enabled"
+                            checked={settings.ads_playback_native_desktop_enabled}
+                            onChange={handleChange}
+                            label="Tampilkan di desktop"
+                        />
+                        <CheckboxField
+                            id="ads_playback_native_mobile_enabled"
+                            name="ads_playback_native_mobile_enabled"
+                            checked={settings.ads_playback_native_mobile_enabled}
+                            onChange={handleChange}
+                            label="Tampilkan di mobile"
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="ads_playback_native_script" className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Script Native Playback
+                        </label>
+                        <ScriptField
+                            id="ads_playback_native_script"
+                            name="ads_playback_native_script"
+                            value={settings.ads_playback_native_script}
+                            onChange={handleChange}
+                        />
+                    </div>
+                </SectionCard>
+
+                <SectionCard
                     title="Playback Popunder"
-                    description="Popunder ini dipicu setiap kali user masuk ke mode playback dan tidak akan diulang oleh rerender internal playback."
+                    description="Popunder ini dipicu saat video playback pertama benar-benar mulai diputar, lalu dipicu lagi saat user berpindah ke segmen rekaman lain. Seek, buffering, dan rerender biasa tidak akan memicu ulang."
                 >
                     <CheckboxField
                         id="ads_playback_popunder_enabled"

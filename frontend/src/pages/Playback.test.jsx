@@ -6,9 +6,10 @@ import { useLocation } from 'react-router-dom';
 import { TestRouter } from '../test/renderWithRouter';
 import Playback from './Playback';
 
-const { getSegments, getSegmentStreamUrl } = vi.hoisted(() => ({
+const { getSegments, getSegmentStreamUrl, globalAdScriptSpy } = vi.hoisted(() => ({
     getSegments: vi.fn(),
     getSegmentStreamUrl: vi.fn(),
+    globalAdScriptSpy: vi.fn(),
 }));
 
 vi.mock('../services/recordingService', () => ({
@@ -22,6 +23,13 @@ vi.mock('../contexts/BrandingContext', () => ({
     useBranding: () => ({
         branding: { company_name: 'Test CCTV' },
     }),
+}));
+
+vi.mock('../components/ads/GlobalAdScript', () => ({
+    default: ({ slotKey, script }) => {
+        globalAdScriptSpy({ slotKey, script });
+        return <div data-testid="global-ad-script">{slotKey}</div>;
+    },
 }));
 
 vi.mock('../components/playback/PlaybackHeader', () => ({
@@ -108,10 +116,21 @@ function dispatchMediaEvent(element, name) {
     fireEvent(element, new window.Event(name));
 }
 
+function getTriggeredPopunderKeys() {
+    return Array.from(
+        new Set(
+            globalAdScriptSpy.mock.calls
+                .map(([payload]) => payload?.slotKey)
+                .filter((slotKey) => typeof slotKey === 'string' && slotKey.startsWith('playback-popunder-'))
+        )
+    );
+}
+
 describe('Playback', () => {
     beforeEach(() => {
         getSegments.mockReset();
         getSegmentStreamUrl.mockReset();
+        globalAdScriptSpy.mockReset();
         localStorage.clear();
         getSegments.mockResolvedValue({
             success: true,
@@ -413,7 +432,48 @@ describe('Playback', () => {
         expect(sharedUrl).toContain('cam=1-lobby');
     });
 
-    it('memicu popunder playback sekali per mount dan membersihkan saat unmount', async () => {
+    it('menampilkan native banner playback tepat di bawah video saat slot aktif', async () => {
+        const adsConfig = {
+            enabled: true,
+            devices: {
+                desktop: true,
+                mobile: true,
+            },
+            slots: {
+                playbackNative: {
+                    enabled: true,
+                    script: '<div>native playback ad</div>',
+                    devices: {
+                        desktop: true,
+                        mobile: true,
+                    },
+                },
+            },
+        };
+
+        render(
+            <TestRouter initialEntries={['/playback?mode=full&view=playback&cam=1']}>
+                <Playback
+                    cameras={[
+                        { id: 1, name: 'Lobby', enable_recording: 1 },
+                    ]}
+                    adsConfig={adsConfig}
+                />
+            </TestRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText('native playback ad')).toBeTruthy();
+        });
+
+        const video = screen.getByTestId('playback-video');
+        const adSlot = screen.getByTestId('ad-slot-playback-native');
+        expect(
+            video.compareDocumentPosition(adSlot) & Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy();
+    });
+
+    it('memicu popunder playback saat video pertama mulai play dan saat user ganti segmen', async () => {
         const adsConfig = {
             enabled: true,
             devices: {
@@ -443,22 +503,89 @@ describe('Playback', () => {
             </TestRouter>
         );
 
-        const { rerender, unmount } = render(renderTree());
-
-        await waitFor(() => {
-            expect(document.body.querySelectorAll('#playback-popunder-marker')).toHaveLength(1);
-        });
-
-        rerender(renderTree());
-        expect(document.body.querySelectorAll('#playback-popunder-marker')).toHaveLength(1);
-
-        unmount();
-        expect(document.body.querySelectorAll('#playback-popunder-marker')).toHaveLength(0);
+        globalAdScriptSpy.mockClear();
 
         render(renderTree());
+
         await waitFor(() => {
-            expect(document.body.querySelectorAll('#playback-popunder-marker')).toHaveLength(1);
+            expect(screen.getByTestId('video-segment').textContent).toBe('seg-2');
         });
+
+        expect(screen.queryByTestId('global-ad-script')).toBeNull();
+
+        const video = screen.getByTestId('playback-video');
+        fireEvent.playing(video);
+
+        await waitFor(() => {
+            expect(screen.getByTestId('global-ad-script').textContent).toContain('playback-popunder-1');
+        });
+
+        expect(getTriggeredPopunderKeys()).toEqual(['playback-popunder-1']);
+
+        fireEvent.playing(video);
+        expect(getTriggeredPopunderKeys()).toEqual(['playback-popunder-1']);
+
+        fireEvent.click(screen.getByText('pilih-segmen-pertama'));
+
+        await waitFor(() => {
+            expect(screen.getByTestId('video-segment').textContent).toBe('seg-1');
+        });
+
+        fireEvent.playing(video);
+
+        await waitFor(() => {
+            expect(screen.getByTestId('global-ad-script').textContent).toContain('playback-popunder-2');
+        });
+
+        expect(getTriggeredPopunderKeys()).toEqual(['playback-popunder-1', 'playback-popunder-2']);
+    });
+
+    it('tidak memicu popunder playback saat seek dalam segmen yang sama', async () => {
+        const adsConfig = {
+            enabled: true,
+            devices: {
+                desktop: true,
+                mobile: true,
+            },
+            slots: {
+                playbackPopunder: {
+                    enabled: true,
+                    script: '<script src="https://pl.example.com/popunder.js"></script>',
+                    devices: {
+                        desktop: true,
+                        mobile: true,
+                    },
+                },
+            },
+        };
+
+        render(
+            <TestRouter initialEntries={['/playback?mode=full&view=playback&cam=1']}>
+                <Playback
+                    cameras={[
+                        { id: 1, name: 'Lobby', enable_recording: 1 },
+                    ]}
+                    adsConfig={adsConfig}
+                />
+            </TestRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('video-segment').textContent).toBe('seg-2');
+        });
+
+        const video = screen.getByTestId('playback-video');
+        fireEvent.playing(video);
+
+        await waitFor(() => {
+            expect(getTriggeredPopunderKeys()).toEqual(['playback-popunder-1']);
+        });
+
+        fireEvent.seeking(video);
+        fireEvent.seeked(video);
+        fireEvent.playing(video);
+
+        expect(getTriggeredPopunderKeys()).toEqual(['playback-popunder-1']);
     });
 
     it('ganti kamera tidak pernah membangun source dengan kamera baru dan filename lama', async () => {

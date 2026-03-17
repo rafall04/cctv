@@ -121,6 +121,13 @@ describe('settingsService.getPublicAdsSettings', () => {
         }));
         expect(result.slots.socialBar).toEqual({ enabled: false });
         expect(result.slots.topBanner).toEqual({ enabled: false });
+        expect(result.slots.playbackNative).toEqual({
+            enabled: false,
+            devices: {
+                desktop: true,
+                mobile: true,
+            },
+        });
         expect(result.slots.playbackPopunder).toEqual({
             enabled: false,
             devices: {
@@ -138,6 +145,10 @@ describe('settingsService.getPublicAdsSettings', () => {
             { key: 'ads_popup_preferred_slot', value: 'top' },
             { key: 'ads_hide_social_bar_on_popup', value: 'false' },
             { key: 'ads_popup_desktop_max_height', value: '180' },
+            { key: 'ads_playback_native_enabled', value: 'true' },
+            { key: 'ads_playback_native_script', value: '<div>playback native</div>' },
+            { key: 'ads_playback_native_desktop_enabled', value: 'true' },
+            { key: 'ads_playback_native_mobile_enabled', value: 'true' },
             { key: 'ads_playback_popunder_enabled', value: 'true' },
             { key: 'ads_playback_popunder_script', value: '<script src=\"https://pl.example.com/pop.js\"></script>' },
             { key: 'ads_playback_popunder_desktop_enabled', value: 'true' },
@@ -166,6 +177,14 @@ describe('settingsService.getPublicAdsSettings', () => {
         expect(result.slots.socialBar).toEqual({
             enabled: true,
             script: '<script src=\"https://pl.example.com/social.js\"></script>',
+        });
+        expect(result.slots.playbackNative).toEqual({
+            enabled: true,
+            script: '<div>playback native</div>',
+            devices: {
+                desktop: true,
+                mobile: true,
+            },
         });
         expect(result.slots.playbackPopunder).toEqual({
             enabled: true,
