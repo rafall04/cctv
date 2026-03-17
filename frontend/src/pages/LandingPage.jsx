@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useBranding } from '../contexts/BrandingContext';
 import { updateMetaTags } from '../utils/metaUpdater';
@@ -41,7 +41,7 @@ function LandingPageContent() {
     const { cameras, deviceTier } = useCameras();
     const { addToast } = useToast();
     const [searchParams, setSearchParams] = useSearchParams();
-    const [isMapPopupOpen, setIsMapPopupOpen] = useState(false);
+    const [activePopupSource, setActivePopupSource] = useState('grid');
     const { favorites, toggleFavorite, isFavorite, addRecentCamera } = useCameraHistory();
 
     const {
@@ -89,7 +89,7 @@ function LandingPageContent() {
 
     const disableHeavyEffects = deviceTier === 'low';
     const isMobileAdsViewport = isAdsMobileViewport();
-    const isPublicModalActive = Boolean(popup) || isMapPopupOpen;
+    const isPublicModalActive = Boolean(popup);
     const shouldHideFixedUiForPopup = isPublicModalActive && adsConfig?.popup?.hideFloatingWidgetsOnPopup !== false;
     const shouldHideFloatingWidgets = (showMulti && viewMode === 'grid') || shouldHideFixedUiForPopup;
     const shouldSuspendSocialBar = isPublicModalActive && adsConfig?.popup?.hideSocialBarOnPopup !== false;
@@ -104,10 +104,25 @@ function LandingPageContent() {
     }, [branding]);
 
     useEffect(() => {
-        if (viewMode !== 'map' && isMapPopupOpen) {
-            setIsMapPopupOpen(false);
+        if (!popup && activePopupSource !== 'grid') {
+            setActivePopupSource('grid');
         }
-    }, [isMapPopupOpen, viewMode]);
+    }, [activePopupSource, popup]);
+
+    const handleGridPopupOpen = useCallback((camera) => {
+        setActivePopupSource('grid');
+        handleCameraClick(camera);
+    }, [handleCameraClick]);
+
+    const handleMapPopupOpen = useCallback((camera) => {
+        setActivePopupSource('map');
+        handleCameraClick(camera);
+    }, [handleCameraClick]);
+
+    const handleUnifiedPopupClose = useCallback(() => {
+        handlePopupClose();
+        setActivePopupSource('grid');
+    }, [handlePopupClose]);
 
     if (layoutMode === 'simple') {
         return (
@@ -115,7 +130,7 @@ function LandingPageContent() {
                 {showSocialBar && <GlobalAdScript slotKey="social-bar" script={adsConfig.slots.socialBar.script} />}
                 <Suspense fallback={<div className="min-h-screen bg-gray-50 dark:bg-gray-950" />}>
                     <LandingPageSimple
-                        onCameraClick={handleCameraClick}
+                        onCameraClick={handleGridPopupOpen}
                         onAddMulti={handleAddMulti}
                         multiCameras={multiCameras}
                         saweriaEnabled={saweriaEnabled}
@@ -129,7 +144,7 @@ function LandingPageContent() {
                         viewMode={viewMode}
                         setViewMode={setViewMode}
                         adsConfig={adsConfig}
-                        onMapPopupStateChange={setIsMapPopupOpen}
+                        onMapCameraOpen={handleMapPopupOpen}
                         hideFloatingWidgets={shouldHideFloatingWidgets}
                         announcement={landingSettings.announcement}
                         eventBanner={landingSettings.eventBanner}
@@ -146,7 +161,13 @@ function LandingPageContent() {
 
                 {popup && (
                     <Suspense fallback={null}>
-                        <VideoPopup camera={popup} onClose={handlePopupClose} adsConfig={adsConfig} />
+                        <VideoPopup
+                            camera={popup}
+                            onClose={handleUnifiedPopupClose}
+                            adsConfig={adsConfig}
+                            modalTestId={activePopupSource === 'map' ? 'map-popup-modal' : 'grid-popup-modal'}
+                            bodyTestId={activePopupSource === 'map' ? 'map-video-body' : 'grid-video-body'}
+                        />
                     </Suspense>
                 )}
                 {showMulti && multiCameras.length > 0 && (
@@ -192,7 +213,7 @@ function LandingPageContent() {
                 )}
 
                 <LandingCamerasSection
-                    onCameraClick={handleCameraClick}
+                    onCameraClick={handleGridPopupOpen}
                     onAddMulti={handleAddMulti}
                     multiCameras={multiCameras}
                     viewMode={viewMode}
@@ -200,7 +221,7 @@ function LandingPageContent() {
                     landingSettings={landingSettings}
                     selectedCamera={popup}
                     adsConfig={adsConfig}
-                    onMapPopupStateChange={setIsMapPopupOpen}
+                    onMapCameraOpen={handleMapPopupOpen}
                     favorites={favorites}
                     onToggleFavorite={toggleFavorite}
                     isFavorite={isFavorite}
@@ -238,7 +259,13 @@ function LandingPageContent() {
 
                 {popup && (
                     <Suspense fallback={null}>
-                        <VideoPopup camera={popup} onClose={handlePopupClose} adsConfig={adsConfig} />
+                        <VideoPopup
+                            camera={popup}
+                            onClose={handleUnifiedPopupClose}
+                            adsConfig={adsConfig}
+                            modalTestId={activePopupSource === 'map' ? 'map-popup-modal' : 'grid-popup-modal'}
+                            bodyTestId={activePopupSource === 'map' ? 'map-video-body' : 'grid-video-body'}
+                        />
                     </Suspense>
                 )}
                 {showMulti && multiCameras.length > 0 && (

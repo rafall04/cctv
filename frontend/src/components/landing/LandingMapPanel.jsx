@@ -9,7 +9,7 @@ export default function LandingMapPanel({
     focusedCameraId,
     onFocusHandled,
     adsConfig,
-    onPopupStateChange,
+    onCameraOpen,
 }) {
     return (
         <Suspense
@@ -29,7 +29,7 @@ export default function LandingMapPanel({
                 focusedCameraId={focusedCameraId}
                 onFocusHandled={onFocusHandled}
                 adsConfig={adsConfig}
-                onPopupStateChange={onPopupStateChange}
+                onCameraOpen={onCameraOpen}
             />
         </Suspense>
     );

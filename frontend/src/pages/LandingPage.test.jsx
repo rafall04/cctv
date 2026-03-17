@@ -5,12 +5,13 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { renderWithRouter } from '../test/renderWithRouter';
 import LandingPage from './LandingPage';
 
-const { getPublicSaweriaConfig, testBackendReachability, updateMetaTags, getPublicLandingPageSettings, getPublicAdsSettings } = vi.hoisted(() => ({
+const { getPublicSaweriaConfig, testBackendReachability, updateMetaTags, getPublicLandingPageSettings, getPublicAdsSettings, videoPopupPropsSpy } = vi.hoisted(() => ({
     getPublicSaweriaConfig: vi.fn(),
     testBackendReachability: vi.fn(),
     updateMetaTags: vi.fn(),
     getPublicLandingPageSettings: vi.fn(),
     getPublicAdsSettings: vi.fn(),
+    videoPopupPropsSpy: vi.fn(),
 }));
 
 vi.mock('../services/saweriaService', () => ({
@@ -90,7 +91,21 @@ vi.mock('../components/landing/LandingHero', () => ({
 }));
 
 vi.mock('../components/landing/LandingCamerasSection', () => ({
-    default: () => <div>cameras-section</div>,
+    default: ({ onMapCameraOpen }) => (
+        <button
+            type="button"
+            data-testid="open-map-popup"
+            onClick={() => onMapCameraOpen?.({
+                id: 99,
+                name: 'Map Camera',
+                streams: { hls: 'https://example.com/map.m3u8' },
+                status: 'active',
+                is_online: 1,
+            })}
+        >
+            cameras-section
+        </button>
+    ),
 }));
 
 vi.mock('../components/landing/LandingStatsBar', () => ({
@@ -123,7 +138,10 @@ vi.mock('../components/MultiView/MultiViewLayout', () => ({
 }));
 
 vi.mock('../components/MultiView/VideoPopup', () => ({
-    default: () => <div>video-popup</div>,
+    default: (props) => {
+        videoPopupPropsSpy(props);
+        return <div data-testid={props.modalTestId || 'grid-popup-modal'}>video-popup</div>;
+    },
 }));
 
 vi.mock('../components/SaweriaLeaderboard', () => ({
@@ -145,6 +163,7 @@ describe('LandingPage connectivity recovery', () => {
         updateMetaTags.mockReset();
         getPublicLandingPageSettings.mockReset();
         getPublicAdsSettings.mockReset();
+        videoPopupPropsSpy.mockReset();
 
         getPublicSaweriaConfig.mockResolvedValue({
             success: true,
@@ -269,5 +288,27 @@ describe('LandingPage connectivity recovery', () => {
                 screen.getByTestId('landing-hero')
             ) & Node.DOCUMENT_POSITION_FOLLOWING
         ).toBeTruthy();
+    });
+
+    it('merender popup map dari host halaman dengan test id map saat map membuka kamera', async () => {
+        renderWithRouter(<LandingPage />);
+
+        await waitFor(() => {
+            expect(screen.getByTestId('open-map-popup')).toBeTruthy();
+        });
+
+        await act(async () => {
+            screen.getByTestId('open-map-popup').click();
+        });
+
+        await waitFor(() => {
+            expect(screen.getByTestId('map-popup-modal')).toBeTruthy();
+        });
+
+        expect(videoPopupPropsSpy).toHaveBeenLastCalledWith(expect.objectContaining({
+            modalTestId: 'map-popup-modal',
+            bodyTestId: 'map-video-body',
+            camera: expect.objectContaining({ id: 99, name: 'Map Camera' }),
+        }));
     });
 });

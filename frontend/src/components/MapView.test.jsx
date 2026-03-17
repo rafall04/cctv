@@ -612,6 +612,32 @@ describe('MapView area filter visibility', () => {
         });
     });
 
+    it('mengirim kamera ke host halaman dan tidak merender popup lokal saat onCameraOpen tersedia', async () => {
+        const onCameraOpen = vi.fn();
+
+        await act(async () => {
+            render(
+                <MapView
+                    cameras={cameras}
+                    areas={[]}
+                    showAreaFilter={false}
+                    onCameraOpen={onCameraOpen}
+                />
+            );
+        });
+
+        fireEvent.click(screen.getByTestId('marker--7.1507-111.8815'));
+
+        await waitFor(() => {
+            expect(onCameraOpen).toHaveBeenCalledWith(expect.objectContaining({
+                id: 1,
+                name: 'Lobby',
+            }));
+        });
+
+        expect(screen.queryByTestId('map-popup-modal')).toBeNull();
+    });
+
     it('tetap memprioritaskan sponsor bawah popup map pada desktop saat kedua slot aktif', async () => {
         await act(async () => {
             render(

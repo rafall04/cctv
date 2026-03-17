@@ -123,7 +123,7 @@ export default function CamerasSection({
     landingSettings = { section_title: 'CCTV Publik' },
     selectedCamera,
     adsConfig = null,
-    onMapPopupStateChange,
+    onMapCameraOpen,
     favorites = [],
     onToggleFavorite,
     isFavorite,
@@ -253,7 +253,7 @@ export default function CamerasSection({
                         focusedCameraId={focusedCameraId}
                         onFocusHandled={handleFocusHandled}
                         adsConfig={adsConfig}
-                        onPopupStateChange={onMapPopupStateChange}
+                        onCameraOpen={onMapCameraOpen}
                     />
                 ) : (
                     <LandingResultsGrid

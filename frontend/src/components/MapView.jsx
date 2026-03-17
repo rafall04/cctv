@@ -1187,7 +1187,7 @@ const MapView = memo(({
     onAreaChange = null,
     showAreaFilter = true,
     adsConfig = null,
-    onPopupStateChange = null,
+    onCameraOpen = null,
 }) => {
     const [internalSelectedArea, setInternalSelectedArea] = useState('all');
     const selectedAreaValue = controlledSelectedArea ?? internalSelectedArea;
@@ -1247,12 +1247,16 @@ const MapView = memo(({
         if (pendingFocusCamera) {
             // Delay opening modal to let map animate to position first
             const timer = setTimeout(() => {
-                setModalCamera(pendingFocusCamera);
+                if (typeof onCameraOpen === 'function') {
+                    onCameraOpen(pendingFocusCamera);
+                } else {
+                    setModalCamera(pendingFocusCamera);
+                }
                 setPendingFocusCamera(null);
             }, 600); // 600ms delay for map animation
             return () => clearTimeout(timer);
         }
-    }, [pendingFocusCamera]);
+    }, [onCameraOpen, pendingFocusCamera]);
 
     useEffect(() => {
         const previousSelectedArea = previousSelectedAreaRef.current;
@@ -1366,26 +1370,12 @@ const MapView = memo(({
     const openModal = useCallback((camera) => {
         // Set preserve position saat buka modal dari klik marker
         setPreserveMapPosition(true);
-        setModalCamera(camera);
-    }, []);
-
-    const closeModal = useCallback(() => {
-        // Simple close - no fullscreen handling needed
-        setModalCamera(null);
-        // preserveMapPosition tetap true agar map tidak reset
-    }, []);
-
-    useEffect(() => {
-        if (typeof onPopupStateChange === 'function') {
-            onPopupStateChange(Boolean(modalCamera));
+        if (typeof onCameraOpen === 'function') {
+            onCameraOpen(camera);
+            return;
         }
-
-        return () => {
-            if (typeof onPopupStateChange === 'function') {
-                onPopupStateChange(false);
-            }
-        };
-    }, [modalCamera, onPopupStateChange]);
+        setModalCamera(camera);
+    }, [onCameraOpen]);
 
     const handleAreaChange = (e) => {
         const nextArea = e?.target?.value || 'all';
@@ -1485,10 +1475,10 @@ const MapView = memo(({
                 </div>
             </div>
 
-            {modalCamera && (
+            {modalCamera && typeof onCameraOpen !== 'function' && (
                 <VideoPopup
                     camera={modalCamera}
-                    onClose={closeModal}
+                    onClose={() => setModalCamera(null)}
                     adsConfig={adsConfig}
                     modalTestId="map-popup-modal"
                     bodyTestId="map-video-body"
