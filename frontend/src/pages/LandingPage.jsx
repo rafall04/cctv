@@ -94,7 +94,7 @@ function LandingPageContent() {
     const shouldHideFloatingWidgets = (showMulti && viewMode === 'grid') || shouldHideFixedUiForPopup;
     const shouldSuspendSocialBar = isPublicModalActive && adsConfig?.popup?.hideSocialBarOnPopup !== false;
     const showSocialBar = !shouldSuspendSocialBar && shouldRenderAdSlot(adsConfig, 'socialBar', isMobileAdsViewport);
-    const showTopBanner = shouldRenderAdSlot(adsConfig, 'topBanner', isMobileAdsViewport);
+    const showFooterBanner = shouldRenderAdSlot(adsConfig, 'footerBanner', isMobileAdsViewport);
     const showAfterCamerasNative = shouldRenderAdSlot(adsConfig, 'afterCamerasNative', isMobileAdsViewport);
 
     useEffect(() => {
@@ -202,16 +202,6 @@ function LandingPageContent() {
                     onCameraClick={setPopup}
                 />
 
-                {showTopBanner && (
-                    <InlineAdSlot
-                        slotKey="top-banner"
-                        label="Sponsored"
-                        script={adsConfig.slots.topBanner.script}
-                        className="mt-6"
-                        minHeightClassName="min-h-[120px]"
-                    />
-                )}
-
                 <LandingCamerasSection
                     onCameraClick={handleGridPopupOpen}
                     onAddMulti={handleAddMulti}
@@ -244,6 +234,17 @@ function LandingPageContent() {
                 )}
 
                 <div className="flex-1" />
+
+                {showFooterBanner && (
+                    <InlineAdSlot
+                        slotKey="footer-banner"
+                        label="Sponsored"
+                        script={adsConfig.slots.footerBanner.script}
+                        className="mt-6"
+                        minHeightClassName="min-h-[120px]"
+                    />
+                )}
+
                 <LandingFooter
                     saweriaEnabled={saweriaEnabled}
                     saweriaLink={saweriaLink}

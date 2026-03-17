@@ -120,7 +120,7 @@ describe('settingsService.getPublicAdsSettings', () => {
             },
         }));
         expect(result.slots.socialBar).toEqual({ enabled: false });
-        expect(result.slots.topBanner).toEqual({ enabled: false });
+        expect(result.slots.footerBanner).toEqual({ enabled: false });
         expect(result.slots.playbackNative).toEqual({
             enabled: false,
             devices: {
@@ -194,7 +194,7 @@ describe('settingsService.getPublicAdsSettings', () => {
                 mobile: false,
             },
         });
-        expect(result.slots.topBanner).toEqual({ enabled: false });
+        expect(result.slots.footerBanner).toEqual({ enabled: false });
         expect(result.slots.popupTopBanner).toEqual({
             enabled: true,
             script: '<div>popup</div>',

@@ -73,7 +73,7 @@ describe('useLandingPublicConfig', () => {
                         },
                     },
                     socialBar: { enabled: false },
-                    topBanner: { enabled: false },
+                    footerBanner: { enabled: false },
                     afterCamerasNative: { enabled: false },
                     popupTopBanner: { enabled: false },
                     popupBottomNative: { enabled: false },

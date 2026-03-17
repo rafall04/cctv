@@ -5,13 +5,14 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { renderWithRouter } from '../test/renderWithRouter';
 import LandingPage from './LandingPage';
 
-const { getPublicSaweriaConfig, testBackendReachability, updateMetaTags, getPublicLandingPageSettings, getPublicAdsSettings, videoPopupPropsSpy } = vi.hoisted(() => ({
+const { getPublicSaweriaConfig, testBackendReachability, updateMetaTags, getPublicLandingPageSettings, getPublicAdsSettings, videoPopupPropsSpy, landingPageSimplePropsSpy } = vi.hoisted(() => ({
     getPublicSaweriaConfig: vi.fn(),
     testBackendReachability: vi.fn(),
     updateMetaTags: vi.fn(),
     getPublicLandingPageSettings: vi.fn(),
     getPublicAdsSettings: vi.fn(),
     videoPopupPropsSpy: vi.fn(),
+    landingPageSimplePropsSpy: vi.fn(),
 }));
 
 vi.mock('../services/saweriaService', () => ({
@@ -113,12 +114,19 @@ vi.mock('../components/landing/LandingStatsBar', () => ({
 }));
 
 vi.mock('../components/LandingPageSimple', () => ({
-    default: ({ announcement, eventBanner }) => (
-        <div>
-            <div data-testid="landing-simple-event">{eventBanner?.title || 'no-event'}</div>
-            <div data-testid="landing-simple-announcement">{announcement?.title || 'no-announcement'}</div>
-        </div>
-    ),
+    default: (props) => {
+        landingPageSimplePropsSpy(props);
+        return (
+            <div>
+                <div data-testid="landing-simple-event">{props.eventBanner?.title || 'no-event'}</div>
+                <div data-testid="landing-simple-announcement">{props.announcement?.title || 'no-announcement'}</div>
+            </div>
+        );
+    },
+}));
+
+vi.mock('../components/ads/InlineAdSlot', () => ({
+    default: ({ slotKey }) => <div data-testid={`ad-slot-${slotKey}`}>{slotKey}</div>,
 }));
 
 vi.mock('../components/landing/LandingAnnouncementBar', () => ({
@@ -164,6 +172,7 @@ describe('LandingPage connectivity recovery', () => {
         getPublicLandingPageSettings.mockReset();
         getPublicAdsSettings.mockReset();
         videoPopupPropsSpy.mockReset();
+        landingPageSimplePropsSpy.mockReset();
 
         getPublicSaweriaConfig.mockResolvedValue({
             success: true,
@@ -213,7 +222,7 @@ describe('LandingPage connectivity recovery', () => {
                         },
                     },
                     socialBar: { enabled: false },
-                    topBanner: { enabled: false },
+                    footerBanner: { enabled: false },
                     afterCamerasNative: { enabled: false },
                     popupTopBanner: { enabled: false },
                     popupBottomNative: { enabled: false },
@@ -309,6 +318,91 @@ describe('LandingPage connectivity recovery', () => {
             modalTestId: 'map-popup-modal',
             bodyTestId: 'map-video-body',
             camera: expect.objectContaining({ id: 99, name: 'Map Camera' }),
+        }));
+    });
+
+    it('merender footer banner di bawah halaman pada full mode', async () => {
+        getPublicAdsSettings.mockResolvedValueOnce({
+            success: true,
+            data: {
+                enabled: true,
+                devices: { desktop: true, mobile: true },
+                popup: {
+                    enabled: true,
+                    preferredSlot: 'bottom',
+                    hideSocialBarOnPopup: true,
+                    hideFloatingWidgetsOnPopup: true,
+                    maxHeight: {
+                        desktop: 160,
+                        mobile: 220,
+                    },
+                },
+                slots: {
+                    playbackPopunder: { enabled: false, devices: { desktop: true, mobile: true } },
+                    socialBar: { enabled: false },
+                    footerBanner: { enabled: true, script: '<div>footer ad</div>' },
+                    afterCamerasNative: { enabled: false },
+                    popupTopBanner: { enabled: false },
+                    popupBottomNative: { enabled: false },
+                },
+            },
+        });
+
+        renderWithRouter(<LandingPage />);
+
+        await waitFor(() => {
+            expect(screen.getByTestId('ad-slot-footer-banner')).toBeTruthy();
+        });
+
+        expect(
+            screen.getByTestId('ad-slot-footer-banner').compareDocumentPosition(
+                screen.getByText('footer')
+            ) & Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy();
+    });
+
+    it('meneruskan config footer banner ke simple mode', async () => {
+        getPublicAdsSettings.mockResolvedValueOnce({
+            success: true,
+            data: {
+                enabled: true,
+                devices: { desktop: true, mobile: true },
+                popup: {
+                    enabled: true,
+                    preferredSlot: 'bottom',
+                    hideSocialBarOnPopup: true,
+                    hideFloatingWidgetsOnPopup: true,
+                    maxHeight: {
+                        desktop: 160,
+                        mobile: 220,
+                    },
+                },
+                slots: {
+                    playbackPopunder: { enabled: false, devices: { desktop: true, mobile: true } },
+                    socialBar: { enabled: false },
+                    footerBanner: { enabled: true, script: '<div>simple footer ad</div>' },
+                    afterCamerasNative: { enabled: false },
+                    popupTopBanner: { enabled: false },
+                    popupBottomNative: { enabled: false },
+                },
+            },
+        });
+
+        renderWithRouter(<LandingPage />, { initialEntries: ['/?mode=simple'] });
+
+        await waitFor(() => {
+            expect(screen.getByTestId('landing-simple-event')).toBeTruthy();
+        });
+
+        expect(landingPageSimplePropsSpy).toHaveBeenCalledWith(expect.objectContaining({
+            adsConfig: expect.objectContaining({
+                slots: expect.objectContaining({
+                    footerBanner: expect.objectContaining({
+                        enabled: true,
+                        script: '<div>simple footer ad</div>',
+                    }),
+                }),
+            }),
         }));
     });
 });

@@ -31,7 +31,7 @@ export const DEFAULT_PUBLIC_ADS_CONFIG = {
             },
         },
         socialBar: { enabled: false },
-        topBanner: { enabled: false },
+        footerBanner: { enabled: false },
         afterCamerasNative: { enabled: false },
         popupTopBanner: { enabled: false },
         popupBottomNative: { enabled: false },

@@ -1,6 +1,8 @@
 import { lazy, Suspense } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useBranding } from '../contexts/BrandingContext';
+import InlineAdSlot from './ads/InlineAdSlot';
+import { isAdsMobileViewport, shouldRenderAdSlot } from './ads/adsConfig';
 import { shouldDisableAnimations } from '../utils/animationControl';
 import LayoutModeToggle from './landing/LayoutModeToggle';
 import LandingPublicTopStack from './landing/LandingPublicTopStack';
@@ -117,6 +119,7 @@ export default function LandingPageSimple({
     publicConfigLoading = false,
 }) {
     const { branding } = useBranding();
+    const showFooterBanner = shouldRenderAdSlot(adsConfig, 'footerBanner', isAdsMobileViewport());
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
@@ -149,6 +152,16 @@ export default function LandingPageSimple({
                 />
                 )}
             </main>
+
+            {showFooterBanner && (
+                <InlineAdSlot
+                    slotKey="footer-banner-simple"
+                    label="Sponsored"
+                    script={adsConfig.slots.footerBanner.script}
+                    className="mt-2"
+                    minHeightClassName="min-h-[120px]"
+                />
+            )}
 
             <SimpleFooter
                 branding={branding}

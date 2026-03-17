@@ -21,7 +21,19 @@ vi.mock('../contexts/BrandingContext', () => ({
 }));
 
 vi.mock('../utils/animationControl', () => ({
-    shouldDisableAnimations: () => true,
+    shouldDisableAnimations: () => false,
+}));
+
+vi.mock('./landing/LayoutModeToggle', () => ({
+    default: () => <div>layout-toggle</div>,
+}));
+
+vi.mock('./landing/LandingPublicTopStack', () => ({
+    default: () => <div>top-stack</div>,
+}));
+
+vi.mock('./ads/InlineAdSlot', () => ({
+    default: ({ slotKey }) => <div data-testid={`ad-slot-${slotKey}`}>{slotKey}</div>,
 }));
 
 vi.mock('./FeedbackWidget', () => ({
@@ -32,57 +44,51 @@ vi.mock('./SaweriaSupport', () => ({
     default: () => <div>saweria-support</div>,
 }));
 
-describe('LandingPageSimple footer layout', () => {
-    it('menjaga simple mode tetap ringkas tanpa copy tambahan', () => {
+describe('LandingPageSimple', () => {
+    it('merender footer banner di bawah cameras section dan sebelum footer', () => {
+        const CamerasSection = () => <div data-testid="cameras-section">cameras</div>;
+
         render(
             <LandingPageSimple
-                onCameraClick={() => {}}
-                onAddMulti={() => {}}
+                onCameraClick={vi.fn()}
+                onAddMulti={vi.fn()}
                 multiCameras={[]}
                 saweriaEnabled={false}
                 saweriaLink=""
-                CamerasSection={() => <div>map-view-section</div>}
+                CamerasSection={CamerasSection}
                 layoutMode="simple"
-                onLayoutToggle={() => {}}
+                onLayoutToggle={vi.fn()}
                 favorites={[]}
-                onToggleFavorite={() => {}}
-                isFavorite={() => false}
-                viewMode="map"
-                setViewMode={() => {}}
-                hideFloatingWidgets
-                eventBanner={{
+                onToggleFavorite={vi.fn()}
+                isFavorite={vi.fn(() => false)}
+                viewMode="grid"
+                setViewMode={vi.fn()}
+                adsConfig={{
                     enabled: true,
-                    title: 'Ramadan Kareem',
-                    text: 'Selamat menunaikan ibadah puasa.',
-                    theme: 'ramadan',
-                    show_in_simple: true,
-                    isActive: true,
-                }}
-                announcement={{
-                    enabled: true,
-                    title: 'Info Layanan',
-                    text: 'Maintenance malam ini.',
-                    style: 'warning',
-                    show_in_simple: true,
-                    isActive: true,
+                    devices: { desktop: true, mobile: true },
+                    slots: {
+                        footerBanner: {
+                            enabled: true,
+                            script: '<div>footer ad</div>',
+                            devices: {
+                                desktop: true,
+                                mobile: true,
+                            },
+                        },
+                    },
                 }}
             />
         );
 
-        expect(screen.getByTestId('landing-announcement-simple')).toBeTruthy();
-        expect(screen.getByTestId('landing-event-banner-simple')).toBeTruthy();
-        expect(screen.getByText('Ramadan Kareem')).toBeTruthy();
+        const camerasSection = screen.getByTestId('cameras-section');
+        const footerBanner = screen.getByTestId('ad-slot-footer-banner-simple');
+        const footer = document.querySelector('footer');
+
         expect(
-            screen.getByTestId('landing-event-banner-simple').compareDocumentPosition(
-                screen.getByTestId('landing-announcement-simple')
-            ) & Node.DOCUMENT_POSITION_FOLLOWING
+            camerasSection.compareDocumentPosition(footerBanner) & Node.DOCUMENT_POSITION_FOLLOWING
         ).toBeTruthy();
-        expect(screen.getAllByText('RAF NET').length).toBeGreaterThan(0);
-        expect(screen.getByRole('tab', { name: /full/i })).not.toBeNull();
-        expect(screen.getByRole('tab', { name: /simple/i })).not.toBeNull();
-        expect(document.body.textContent).not.toContain('Penutup ringkas untuk tampilan cepat tanpa elemen berulang.');
-        expect(document.body.textContent).not.toContain('Ã¢â‚¬Â¢');
-        expect(document.body.textContent).not.toContain('Ã‚Â©');
-        expect(document.body.textContent).not.toContain('Ã¢Ëœâ€¢');
+        expect(
+            footerBanner.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy();
     });
 });

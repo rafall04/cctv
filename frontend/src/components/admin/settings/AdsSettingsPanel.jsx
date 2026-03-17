@@ -54,8 +54,8 @@ const SETTING_DESCRIPTIONS = {
     ads_playback_popunder_mobile_enabled: 'Aktifkan popunder playback pada mobile',
     ads_social_bar_enabled: 'Aktifkan script social bar global',
     ads_social_bar_script: 'Raw script social bar untuk halaman publik',
-    ads_top_banner_enabled: 'Aktifkan banner setelah hero landing page',
-    ads_top_banner_script: 'Raw script banner untuk slot setelah hero',
+    ads_top_banner_enabled: 'Aktifkan footer banner di bagian bawah landing page',
+    ads_top_banner_script: 'Raw script banner untuk slot footer landing page',
     ads_after_cameras_native_enabled: 'Aktifkan native banner setelah cameras section',
     ads_after_cameras_native_script: 'Raw script native untuk slot setelah cameras section',
     ads_popup_top_banner_enabled: 'Aktifkan banner di atas popup video',
@@ -74,8 +74,8 @@ const SLOT_DEFINITIONS = [
     {
         enabledKey: 'ads_top_banner_enabled',
         scriptKey: 'ads_top_banner_script',
-        title: 'Top Banner',
-        description: 'Banner inline setelah hero dan sebelum daftar kamera pada full mode.',
+        title: 'Footer Banner',
+        description: 'Banner inline di bagian bawah halaman publik. Slot ini tampil sebelum footer pada full mode dan simple mode.',
     },
     {
         enabledKey: 'ads_after_cameras_native_enabled',

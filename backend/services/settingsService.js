@@ -120,7 +120,7 @@ const ADS_DEFAULTS = {
             enabled: false,
             script: '',
         },
-        topBanner: {
+        footerBanner: {
             enabled: false,
             script: '',
         },
@@ -371,7 +371,7 @@ class SettingsService {
                     devices: { ...ADS_DEFAULTS.slots.playbackPopunder.devices },
                 },
                 socialBar: { ...ADS_DEFAULTS.slots.socialBar },
-                topBanner: { ...ADS_DEFAULTS.slots.topBanner },
+                footerBanner: { ...ADS_DEFAULTS.slots.footerBanner },
                 afterCamerasNative: { ...ADS_DEFAULTS.slots.afterCamerasNative },
                 popupTopBanner: { ...ADS_DEFAULTS.slots.popupTopBanner },
                 popupBottomNative: { ...ADS_DEFAULTS.slots.popupBottomNative },
@@ -447,10 +447,10 @@ class SettingsService {
                     result.slots.socialBar.script = setting.value || '';
                     break;
                 case 'ads_top_banner_enabled':
-                    result.slots.topBanner.enabled = parseBoolean(setting.value);
+                    result.slots.footerBanner.enabled = parseBoolean(setting.value);
                     break;
                 case 'ads_top_banner_script':
-                    result.slots.topBanner.script = setting.value || '';
+                    result.slots.footerBanner.script = setting.value || '';
                     break;
                 case 'ads_after_cameras_native_enabled':
                     result.slots.afterCamerasNative.enabled = parseBoolean(setting.value);
