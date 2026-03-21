@@ -154,7 +154,9 @@ export function buildCameraPayload(formData) {
         stream_source: formData.stream_source || 'internal',
         external_hls_url: formData.stream_source === 'external' ? formData.external_hls_url : null,
         private_rtsp_url: formData.stream_source === 'internal' ? formData.private_rtsp_url : null,
-        external_use_proxy: formData.stream_source === 'external' ? (formData.external_use_proxy ? 1 : 0) : 1,
+        external_use_proxy: formData.stream_source === 'external' 
+            ? (formData.external_tls_mode === 'insecure' ? 1 : (formData.external_use_proxy ? 1 : 0)) 
+            : 1,
         external_tls_mode: formData.stream_source === 'external' ? (formData.external_tls_mode || 'strict') : 'strict',
     };
 }

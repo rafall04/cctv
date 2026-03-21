@@ -127,22 +127,26 @@ export default function CameraSourceFields({
                     <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4 dark:border-amber-500/20 dark:bg-amber-500/10">
                         <div className="flex items-start justify-between gap-3">
                             <div>
-                                <p className="text-sm font-medium text-gray-900 dark:text-white">Gunakan Proxy</p>
+                                <p className="text-sm font-medium text-gray-900 dark:text-white">Gunakan Proxy Backend</p>
                                 <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
-                                    Proxy backend tetap diaktifkan pada v1 untuk menjaga kompatibilitas playback, CORS, dan tracking stream external.
+                                    {formData.external_tls_mode === 'insecure' 
+                                        ? "Proxy WAJIB aktif karena Mode TLS Insecure. Browser akan memblokir stream secara langsung jika sertifikat SSL target cacat."
+                                        : "Nonaktifkan untuk mempercepat streaming (Direct Stream). Pastikan server CCTV mengizinkan CORS dan memiliki sertifikat TLS yang valid."}
                                 </p>
                             </div>
-                            <label className="inline-flex items-center gap-2 text-xs font-semibold text-amber-700 dark:text-amber-300">
+                            <label className={`inline-flex items-center gap-2 text-xs font-semibold ${formData.external_tls_mode === 'insecure' ? 'text-amber-700 dark:text-amber-300' : 'text-gray-700 dark:text-gray-300'}`}>
                                 <input
                                     type="checkbox"
                                     name="external_use_proxy"
                                     aria-label="Gunakan Proxy"
-                                    checked={formData.external_use_proxy !== false}
+                                    checked={formData.external_tls_mode === 'insecure' ? true : formData.external_use_proxy}
                                     onChange={onChange}
-                                    disabled
-                                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary disabled:cursor-not-allowed disabled:opacity-70"
+                                    disabled={formData.external_tls_mode === 'insecure' || isSubmitting}
+                                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
                                 />
-                                Terkunci Aktif
+                                {formData.external_tls_mode === 'insecure' 
+                                    ? "Wajib Aktif" 
+                                    : (formData.external_use_proxy ? "Aktif" : "Nonaktif")}
                             </label>
                         </div>
                     </div>
