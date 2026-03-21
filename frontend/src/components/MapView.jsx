@@ -10,6 +10,7 @@ import { viewerService } from '../services/viewerService';
 import { createTransformThrottle } from '../utils/rafThrottle';
 import { getTimeoutDuration } from '../hooks/useStreamTimeout';
 import { preloadHls } from '../utils/preloadManager';
+import { resolveStreamUrl } from '../utils/directStreamHelper';
 import CodecBadge from './CodecBadge';
 import VideoPopup from './MultiView/VideoPopup.jsx';
 import { useBranding } from '../contexts/BrandingContext';
@@ -199,6 +200,7 @@ const VideoModal = memo(({ camera, onClose }) => {
     const [snapshotNotification, setSnapshotNotification] = useState(null);
     const [retryKey, setRetryKey] = useState(0);
     const [videoAspectRatio, setVideoAspectRatio] = useState(null);
+    const [forceProxyFallback, setForceProxyFallback] = useState(false);
     const [layoutMetrics, setLayoutMetrics] = useState(() => ({
         viewportWidth: typeof window !== 'undefined' ? window.innerWidth : 0,
         viewportHeight: typeof window !== 'undefined' ? window.innerHeight : 0,
@@ -605,10 +607,12 @@ const VideoModal = memo(({ camera, onClose }) => {
             setErrorType(null);
             return;
         }
-        if (!camera?.streams?.hls || !videoRef.current) return;
+        if (!camera?.streams?.hls && !camera?.external_hls_url) return;
+        if (!videoRef.current) return;
 
         const video = videoRef.current;
         const isExternal = camera.stream_source === 'external';
+        const { targetUrl, proxyFallbackUrl, isDirectStream } = resolveStreamUrl(camera, { forceProxy: forceProxyFallback });
         let cancelled = false;
         let hls = null;
         let HlsClass = null;
@@ -689,7 +693,7 @@ const VideoModal = memo(({ camera, onClose }) => {
         video.addEventListener('play', handlePlaySync);
 
         const initNative = () => {
-            video.src = camera.streams.hls;
+            video.src = targetUrl;
             updateStreamStage(LoadingStage.LOADING);
             startPlaybackCheck();
         };
@@ -745,6 +749,13 @@ const VideoModal = memo(({ camera, onClose }) => {
                         if (video.paused) video.play().catch(() => { });
                         return;
                     }
+
+                    // CORS Fallback: if direct stream failed after 5 retries, switch to proxy
+                    if (isDirectStream && proxyFallbackUrl) {
+                        console.log('[MapView] Direct stream failed, falling back to proxy');
+                        setForceProxyFallback(true);
+                        return;
+                    }
                 }
 
                 if (!data.fatal) return;
@@ -763,7 +774,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                 handleFatalError(nextErrorType);
             });
 
-            hls.loadSource(camera.streams.hls);
+            hls.loadSource(targetUrl);
             updateStreamStage(LoadingStage.LOADING);
 
             setTimeout(() => {
@@ -809,6 +820,7 @@ const VideoModal = memo(({ camera, onClose }) => {
         camera,
         cleanupResources,
         clearStreamTimeout,
+        forceProxyFallback,
         isMaintenance,
         isOffline,
         retryKey,

@@ -9,6 +9,7 @@ import { LoadingStage, createStreamError } from '../../utils/streamLoaderTypes';
 import { createFallbackHandler } from '../../utils/fallbackHandler';
 import { getHLSConfig } from '../../utils/hlsConfig';
 import { preloadHls } from '../../utils/preloadManager';
+import { resolveStreamUrl } from '../../utils/directStreamHelper';
 import { useStreamTimeout } from '../../hooks/useStreamTimeout';
 import { viewerService } from '../../services/viewerService';
 import { takeSnapshot as takeSnapshotUtil } from '../../utils/snapshotHelper';
@@ -121,6 +122,7 @@ function VideoPopup({
     const [autoRetryCount, setAutoRetryCount] = useState(0);
     const [consecutiveFailures, setConsecutiveFailures] = useState(0);
     const [showTroubleshooting, setShowTroubleshooting] = useState(false);
+    const [forceProxyFallback, setForceProxyFallback] = useState(false);
     const [videoAspectRatio, setVideoAspectRatio] = useState(null);
     const [popupTopAdHeight, setPopupTopAdHeight] = useState(0);
     const [popupBottomAdHeight, setPopupBottomAdHeight] = useState(0);
@@ -134,6 +136,8 @@ function VideoPopup({
     const url = camera.streams?.hls;
     const deviceTier = detectDeviceTier();
     const isExternal = camera.stream_source === 'external';
+    const { targetUrl: resolvedUrl, proxyFallbackUrl, isDirectStream } = resolveStreamUrl(camera, { forceProxy: forceProxyFallback });
+    const effectiveUrl = resolvedUrl || url;
 
     useEffect(() => {
         loadingStageRef.current = loadingStage;
@@ -233,7 +237,7 @@ function VideoPopup({
         updateStage: updateStreamStage,
         resetFailures,
         getConsecutiveFailures,
-    } = useStreamTimeout({
+     } = useStreamTimeout({
         deviceTier,
         onTimeout: () => {
             cleanupResources();
@@ -298,7 +302,7 @@ function VideoPopup({
     useEffect(() => {
         // Skip HLS loading if camera is in maintenance or offline
         if (isMaintenance || isOffline) return;
-        if (!url || !videoRef.current) return;
+        if (!effectiveUrl || !videoRef.current) return;
         const video = videoRef.current;
         let hls = null;
         let HlsClass = null;
@@ -394,7 +398,7 @@ function VideoPopup({
         updateStreamStage(LoadingStage.LOADING);
 
         const initNative = () => {
-            video.src = url;
+            video.src = effectiveUrl;
             video.addEventListener('loadedmetadata', () => requestVideoPlay(video));
         };
 
@@ -412,7 +416,7 @@ function VideoPopup({
 
             // Load source first, then attach media with small delay
             // This helps prevent media errors on some browsers
-            hls.loadSource(url);
+            hls.loadSource(effectiveUrl);
             setTimeout(() => {
                 if (!cancelled && hlsRef.current) {
                     hls.attachMedia(video);
@@ -462,7 +466,6 @@ function VideoPopup({
 
                 // Clear loading timeout
                 clearStreamTimeout();
-
                 const detectedErrorType = getPublicPopupErrorType({
                     hlsError: {
                         ...d,
@@ -492,8 +495,14 @@ function VideoPopup({
                         requestVideoPlay(video);
                         return;
                     }
-                }
 
+                    // CORS Fallback: if direct stream failed after 5 retries, switch to proxy
+                    if (isDirectStream && proxyFallbackUrl) {
+                        console.log('[VideoPopup] Direct stream failed, falling back to proxy');
+                        setForceProxyFallback(true);
+                        return;
+                    }
+                }
                 // For media errors, try recovery (max 2 times)
                 if (d.type === HlsClass.ErrorTypes.MEDIA_ERROR) {
                     if (!hls._mediaErrorRecoveryCount) hls._mediaErrorRecoveryCount = 0;
@@ -525,7 +534,7 @@ function VideoPopup({
                             });
                             const newHls = new HlsClass(newHlsConfig);
                             hlsRef.current = newHls;
-                            newHls.loadSource(url);
+                            newHls.loadSource(effectiveUrl);
                             newHls.attachMedia(video);
 
                             newHls.on(HlsClass.Events.MANIFEST_PARSED, () => {
@@ -583,7 +592,7 @@ function VideoPopup({
             cleanupResources();
             if (hls) { hls.destroy(); hlsRef.current = null; }
         };
-    }, [camera.stream_source, cleanupResources, clearStreamTimeout, deviceTier, isExternal, isMaintenance, isOffline, requestVideoPlay, resetFailures, retryKey, startTimeout, syncVideoAspectRatio, updateStreamStage, url]);
+    }, [camera.stream_source, cleanupResources, clearStreamTimeout, deviceTier, isExternal, isMaintenance, isOffline, requestVideoPlay, resetFailures, retryKey, startTimeout, syncVideoAspectRatio, updateStreamStage, effectiveUrl, forceProxyFallback, isDirectStream, proxyFallbackUrl]);
 
     const handleRetry = useCallback(() => {
         cleanupResources();

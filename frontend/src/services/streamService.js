@@ -105,9 +105,11 @@ export const streamService = {
             if (response.data?.success && response.data?.data) {
                 response.data.data = response.data.data.map(camera => {
                     let processedStreams = camera.streams;
+                    const rawExternalHlsUrl = camera.external_hls_url || null;
 
                     if (camera.stream_source === 'external') {
-                        if (processedStreams && processedStreams.hls) {
+                        const useProxy = camera.external_use_proxy !== 0 && camera.external_use_proxy !== false;
+                        if (useProxy && processedStreams && processedStreams.hls) {
                             processedStreams = {
                                 ...processedStreams,
                                 hls: convertToExternalProxyUrl(processedStreams.hls, camera.id)
@@ -119,7 +121,8 @@ export const streamService = {
 
                     return {
                         ...camera,
-                        streams: processedStreams
+                        streams: processedStreams,
+                        _rawExternalHlsUrl: rawExternalHlsUrl,
                     };
                 });
             }
@@ -139,9 +142,11 @@ export const streamService = {
             if (response.data?.success && response.data?.data?.streams) {
                 const camera = response.data.data;
                 let processedStreams = camera.streams;
+                const rawExternalHlsUrl = camera.external_hls_url || null;
 
                 if (camera.stream_source === 'external') {
-                    if (processedStreams && processedStreams.hls) {
+                    const useProxy = camera.external_use_proxy !== 0 && camera.external_use_proxy !== false;
+                    if (useProxy && processedStreams && processedStreams.hls) {
                         processedStreams = {
                             ...processedStreams,
                             hls: convertToExternalProxyUrl(processedStreams.hls, camera.id)
@@ -152,6 +157,7 @@ export const streamService = {
                 }
 
                 response.data.data.streams = processedStreams;
+                response.data.data._rawExternalHlsUrl = rawExternalHlsUrl;
             }
             return response.data;
         } catch (error) {

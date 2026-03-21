@@ -13,6 +13,7 @@ import { viewerService } from '../../services/viewerService';
 import { takeSnapshot as takeSnapshotUtil } from '../../utils/snapshotHelper';
 import { useBranding } from '../../contexts/BrandingContext';
 import { useStreamTimeout } from '../../hooks/useStreamTimeout';
+import { resolveStreamUrl } from '../../utils/directStreamHelper';
 
 // Now handles offline/maintenance cameras properly
 // **Validates: Requirements 1.1, 1.2, 1.3, 2.3, 4.1, 4.2, 4.3, 4.4, 6.1, 6.2, 6.3, 6.4, 7.1, 7.2, 7.3**
@@ -58,9 +59,12 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [autoRetryCount, setAutoRetryCount] = useState(0);
     const [isAutoRetrying, setIsAutoRetrying] = useState(false);
+    const [forceProxyFallback, setForceProxyFallback] = useState(false);
 
     const url = camera.streams?.hls;
     const deviceTier = detectDeviceTier();
+    const { targetUrl: resolvedUrl, proxyFallbackUrl, isDirectStream } = resolveStreamUrl(camera, { forceProxy: forceProxyFallback });
+    const effectiveUrl = resolvedUrl || url;
 
     // Track fullscreen state to disable animations and unlock orientation on exit
     useEffect(() => {
@@ -202,7 +206,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         // Skip HLS loading if camera is in maintenance or offline
         if (isMaintenance || isOffline) return;
 
-        if (!url || !videoRef.current) return;
+        if (!effectiveUrl || !videoRef.current) return;
         const video = videoRef.current;
         let hls = null;
         let cancelled = false;
@@ -288,7 +292,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 hlsRef.current = hls;
 
                 // Load source first, then attach media with small delay
-                hls.loadSource(url);
+                hls.loadSource(effectiveUrl);
                 await new Promise(r => setTimeout(r, 50));
                 if (cancelled) return;
                 hls.attachMedia(video);
@@ -347,6 +351,26 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                     const errorType = d.type === Hls.ErrorTypes.NETWORK_ERROR ? 'network' :
                         d.type === Hls.ErrorTypes.MEDIA_ERROR ? 'media' : 'unknown';
 
+                    // Aggressive network error recovery for external streams with CORS fallback
+                    if (camera.stream_source === 'external' && d.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                        if (!hls._networkErrorRecoveryCount) hls._networkErrorRecoveryCount = 0;
+                        hls._networkErrorRecoveryCount++;
+
+                        if (hls._networkErrorRecoveryCount <= 5) {
+                            console.log(`[MultiViewVideoItem] Recovering external stream network error (${hls._networkErrorRecoveryCount}/5)`);
+                            hls.startLoad();
+                            if (video.paused) video.play().catch(() => { });
+                            return;
+                        }
+
+                        // CORS Fallback: if direct stream failed after 5 retries, switch to proxy
+                        if (isDirectStream && proxyFallbackUrl) {
+                            console.log('[MultiViewVideoItem] Direct stream failed, falling back to proxy');
+                            setForceProxyFallback(true);
+                            return;
+                        }
+                    }
+
                     // For media errors, try recovery (max 2 times)
                     if (d.type === Hls.ErrorTypes.MEDIA_ERROR) {
                         if (!hls._mediaErrorRecoveryCount) hls._mediaErrorRecoveryCount = 0;
@@ -391,7 +415,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                     }
                 });
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = url;
+                video.src = effectiveUrl;
                 video.addEventListener('loadedmetadata', () => video.play().catch(() => { }));
             }
         };
@@ -440,7 +464,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 hlsRef.current = null;
             }
         };
-    }, [url, retryKey, initDelay, camera.id, onError, deviceTier, cleanupResources, isMaintenance, isOffline]);
+    }, [effectiveUrl, retryKey, initDelay, camera.id, onError, deviceTier, cleanupResources, isMaintenance, isOffline, forceProxyFallback]);
 
     const handleRetry = useCallback(() => {
         cleanupResources();
