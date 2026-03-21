@@ -4,6 +4,7 @@
  */
 
 import axios from 'axios';
+import http from 'http';
 import https from 'https';
 import jwt from 'jsonwebtoken';
 import { isIP } from 'net';
@@ -25,7 +26,7 @@ const DEFAULT_HLS_CONFIG = {
     maxLimiterKeys: 5000,
     externalProxyAllowPrivateHosts: false,
     externalProxyAllowedHosts: [],
-    externalProxyTimeoutMs: 10000,
+    externalProxyTimeoutMs: 30000,
     sessionCloseBatchSize: 25,
     sessionCloseTimeoutMs: 2000,
 };
@@ -498,11 +499,16 @@ export class HlsSessionStore {
     }
 }
 
+const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 50 });
+const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 50 });
+
 function createHlsHttpClient(timeout = DEFAULT_HLS_CONFIG.externalProxyTimeoutMs, extraConfig = {}) {
     return axios.create({
         timeout,
         validateStatus: () => true,
         maxRedirects: 0,
+        httpAgent,
+        httpsAgent,
         ...extraConfig,
     });
 }

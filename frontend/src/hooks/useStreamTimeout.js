@@ -4,8 +4,8 @@ import { useRef, useCallback, useEffect } from 'react';
  * Timeout configuration constants
  */
 export const TIMEOUT_CONFIG = {
-    LOW_END_TIMEOUT: 15000,    // 15 seconds for low-end devices
-    HIGH_END_TIMEOUT: 10000,   // 10 seconds for medium/high-end devices
+    LOW_END_TIMEOUT: 45000,    // 45 seconds to tolerate slow external proxy/streams
+    HIGH_END_TIMEOUT: 30000,   // 30 seconds to tolerate slow external proxy/streams
     MAX_CONSECUTIVE_FAILURES: 3, // Suggest troubleshooting after 3 failures
 };
 

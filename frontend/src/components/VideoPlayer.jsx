@@ -57,6 +57,8 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
     // Stream status - now using LoadingStage for progressive feedback
     const [status, setStatus] = useState('loading'); // loading, playing, paused, error, timeout
     const [loadingStage, setLoadingStage] = useState(LoadingStage.CONNECTING);
+    const [forceProxyFallback, setForceProxyFallback] = useState(false);
+    const [sessionTelemetryId, setSessionTelemetryId] = useState(null);
     const [error, setError] = useState(null);
     const [retryCount, setRetryCount] = useState(0);
     const [showSpinner, setShowSpinner] = useState(true);
@@ -300,6 +302,7 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
         setLoadingStage(LoadingStage.CONNECTING);
         setShowSpinner(true);
         setShowTroubleshooting(false);
+        setForceProxyFallback(false);
 
         // Reset handlers
         if (errorRecoveryRef.current) {
@@ -324,6 +327,11 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
 
         const video = videoRef.current;
         const isExternal = camera?.stream_source === 'external';
+
+        // Smart Routing Logic: Bypass proxy if configured, unless fallback tripped
+        const useDirectStream = isExternal && (camera.external_use_proxy === 0 || camera.external_use_proxy === false) && !forceProxyFallback;
+        const targetHlsUrl = useDirectStream && camera.external_hls_url ? camera.external_hls_url : streams.hls;
+
         let hls = null;
         let isDestroyed = false;
 
@@ -360,16 +368,16 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                 let useNative = false;
 
                 // Native HLS fallback (e.g. for Safari)
-                if (!Hls.isSupported() && video.canPlayType('application/vnd.apple.mpegurl') && streams.hls) {
+                if (!Hls.isSupported() && video.canPlayType('application/vnd.apple.mpegurl') && targetHlsUrl) {
                     useNative = true;
                 }
 
                 // Try HLS first (unless defaulting to native fallback)
-                if (!useNative && Hls.isSupported() && streams.hls) {
+                if (!useNative && Hls.isSupported() && targetHlsUrl) {
                     hls = new Hls(hlsConfig);
                     hlsRef.current = hls;
 
-                    hls.loadSource(streams.hls);
+                    hls.loadSource(targetHlsUrl);
                     hls.attachMedia(video);
 
                     hls.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -464,6 +472,13 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
 
                             // Aggressive network error recovery for external streams
                             if (isExternal && data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                                // Smart Fallback: if Direct Stream fails (CORS block/timeout), fallback to backend proxy
+                                if (useDirectStream) {
+                                    console.warn(`[VideoPlayer] Direct stream failed (CORS/Timeout). Falling back to proxy...`);
+                                    setForceProxyFallback(true);
+                                    return;
+                                }
+
                                 if (!hls._networkErrorRecoveryCount) hls._networkErrorRecoveryCount = 0;
                                 hls._networkErrorRecoveryCount++;
 
@@ -518,9 +533,9 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                             }
                         }
                     });
-                } else if (useNative) {
+                } else if (useNative && targetHlsUrl) {
                     // Native HLS support (Safari)
-                    video.src = streams.hls;
+                    video.src = targetHlsUrl;
 
                     video.addEventListener('loadedmetadata', () => {
                         if (isDestroyed) return;
@@ -584,7 +599,68 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                 hlsRef.current = null;
             }
         };
-    }, [streams, deviceCapabilities, deviceTier, cleanupResources, loadingStage]);
+    }, [streams, deviceCapabilities, deviceTier, cleanupResources, loadingStage, camera?.external_hls_url, camera?.external_use_proxy, camera?.stream_source, forceProxyFallback]);
+
+    // Out-of-band Telemetry Tracking for Direct Streams
+    useEffect(() => {
+        const isExternal = camera?.stream_source === 'external';
+        const useDirectStream = isExternal && (camera?.external_use_proxy === 0 || camera?.external_use_proxy === false) && !forceProxyFallback;
+
+        // Only run telemetry if proxy is bypassed and stream is actively playing
+        if (!useDirectStream || status !== 'playing' || !camera?.id) {
+            return;
+        }
+
+        let telemetryInterval = null;
+        let activeSessionId = null;
+
+        const startSession = async () => {
+            try {
+                // Determine base URL depending on deployment environment if necessary, but relative paths usually work
+                const response = await fetch('/api/viewer/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cameraId: camera.id })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.data?.sessionId) {
+                        activeSessionId = data.data.sessionId;
+                        setSessionTelemetryId(activeSessionId);
+                        
+                        // Start heartbeat loop
+                        telemetryInterval = setInterval(async () => {
+                            try {
+                                await fetch('/api/viewer/heartbeat', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ sessionId: activeSessionId })
+                                });
+                            } catch (e) {
+                                console.error('[Telemetry] Heartbeat failed:', e);
+                            }
+                        }, 10000); // 10s ping matches proxy behavior
+                    }
+                }
+            } catch (e) {
+                console.error('[Telemetry] Failed to start direct session:', e);
+            }
+        };
+
+        startSession();
+
+        return () => {
+            if (telemetryInterval) clearInterval(telemetryInterval);
+            if (activeSessionId) {
+                fetch('/api/viewer/stop', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId: activeSessionId })
+                }).catch(() => {});
+            }
+        };
+    }, [useDirectStream, status, camera?.id, forceProxyFallback]);
 
     // Handle buffering events - **Property 8: Brief Buffer No Spinner**
     // Don't show spinner for brief buffers (< 2 seconds)
