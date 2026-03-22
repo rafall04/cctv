@@ -26,7 +26,7 @@ export default function DiscoveryDashboard() {
     const fetchItems = async () => {
         try {
             setLoading(true);
-            const response = await apiClient.get('/admin/discovery');
+            const response = await apiClient.get('/api/admin/discovery');
             if (response.data.success) {
                 setItems(response.data.data);
             }
@@ -39,7 +39,7 @@ export default function DiscoveryDashboard() {
 
     const fetchAreas = async () => {
         try {
-            const response = await apiClient.get('/areas');
+            const response = await apiClient.get('/api/areas');
             if (response.data.success) {
                 setAreas(response.data.data);
             }
@@ -54,7 +54,7 @@ export default function DiscoveryDashboard() {
         try {
             setIsScraping(true);
             showNotification('info', 'Menjalankan Scraper...', 3000);
-            const response = await apiClient.post('/admin/discovery/scrape', {
+            const response = await apiClient.post('/api/admin/discovery/scrape', {
                 source_type: 'jogja_atcs'
             });
             
@@ -94,7 +94,7 @@ export default function DiscoveryDashboard() {
 
         try {
             setIsImporting(true);
-            const response = await apiClient.post('/admin/discovery/import', {
+            const response = await apiClient.post('/api/admin/discovery/import', {
                 ids: Array.from(selectedIds),
                 target_area_id: parseInt(selectedAreaId)
             });
@@ -116,7 +116,7 @@ export default function DiscoveryDashboard() {
         if (!confirm(`Tolak (Reject) ${selectedIds.size} kamera yang dipilih? Data ini tidak akan di-import.`)) return;
         
         try {
-            const response = await apiClient.post('/admin/discovery/reject', {
+            const response = await apiClient.post('/api/admin/discovery/reject', {
                 ids: Array.from(selectedIds)
             });
             
