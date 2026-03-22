@@ -66,6 +66,7 @@ export default function AdminLayout({ children }) {
         { label: 'Dashboard', path: '/admin/dashboard', icon: <Icons.Dashboard /> },
         { label: 'Analytics', path: '/admin/analytics', icon: <Icons.Analytics /> },
         { label: 'Cameras', path: '/admin/cameras', icon: <Icons.Camera /> },
+        { label: 'Discovery', path: '/admin/discovery', icon: <Icons.Analytics /> },
         { label: 'Recordings', path: '/admin/recordings', icon: <Icons.Camera /> },
         { label: 'Areas', path: '/admin/areas', icon: <Icons.MapPin /> },
         { label: 'Sponsors', path: '/admin/sponsors', icon: <Icons.Feedback /> },

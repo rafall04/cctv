@@ -14,6 +14,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 // Lazy load admin pages for better code splitting
 const AdminLayout = lazy(() => import('./layouts/AdminLayout'));
 const CameraManagement = lazy(() => import('./pages/CameraManagement'));
+const DiscoveryDashboard = lazy(() => import('./pages/admin/DiscoveryDashboard'));
 const AreaManagement = lazy(() => import('./pages/AreaManagement'));
 const UserManagement = lazy(() => import('./pages/UserManagement'));
 const FeedbackManagement = lazy(() => import('./pages/FeedbackManagement'));
@@ -64,6 +65,18 @@ function App() {
                             <AdminLayout>
                                 <Suspense fallback={<div className="p-6">Loading...</div>}>
                                     <CameraManagement />
+                                </Suspense>
+                            </AdminLayout>
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/admin/discovery"
+                    element={
+                        <ProtectedRoute>
+                            <AdminLayout>
+                                <Suspense fallback={<div className="p-6">Loading...</div>}>
+                                    <DiscoveryDashboard />
                                 </Suspense>
                             </AdminLayout>
                         </ProtectedRoute>

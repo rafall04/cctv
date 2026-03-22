@@ -1,5 +1,6 @@
 import { getDashboardStats, getTodayStats, testTelegramNotification, getTelegramConfig, updateTelegramConfig, getViewerAnalytics, getRealTimeViewers, getCacheStats, clearCache, getTimezoneConfig, updateTimezoneConfig, exportDatabaseBackup, importDatabaseBackup, getBackupPreview } from '../controllers/adminController.js';
 import { generateApiKey, listApiKeys, deleteApiKey } from '../controllers/apiKeyController.js';
+import { getDiscoveryItems, runScraper, importSelected, rejectSelected } from '../controllers/discoveryController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 import { createApiKeySchema, apiKeyIdParamSchema } from '../middleware/schemaValidators.js';
 import mediaMtxService from '../services/mediaMtxService.js';
@@ -236,5 +237,26 @@ export default async function adminRoutes(fastify, options) {
     fastify.post('/backup/preview', {
         onRequest: [authMiddleware],
         handler: getBackupPreview,
+    });
+
+    // Discovery & Sync Endpoints
+    fastify.get('/discovery', {
+        onRequest: [authMiddleware],
+        handler: getDiscoveryItems,
+    });
+
+    fastify.post('/discovery/scrape', {
+        onRequest: [authMiddleware],
+        handler: runScraper,
+    });
+
+    fastify.post('/discovery/import', {
+        onRequest: [authMiddleware],
+        handler: importSelected,
+    });
+
+    fastify.post('/discovery/reject', {
+        onRequest: [authMiddleware],
+        handler: rejectSelected,
     });
 }

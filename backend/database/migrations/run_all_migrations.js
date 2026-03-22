@@ -46,7 +46,8 @@ const MIGRATIONS = [
     'add_core_indexes.js',
     'add_analytics_indexes.js',
     'add_external_stream.js',
-    'add_external_proxy_controls.js'
+    'add_external_proxy_controls.js',
+    'create_camera_discovery_table.js'
 ];
 
 console.log('🚀 Starting migration process...\n');
