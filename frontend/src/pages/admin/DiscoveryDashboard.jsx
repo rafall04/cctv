@@ -156,7 +156,9 @@ export default function DiscoveryDashboard() {
                     disabled={isScraping}
                     className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors shadow-sm font-medium"
                 >
-                    <Icons.Refresh className={`w-5 h-5 mr-2 ${isScraping ? 'animate-spin' : ''}`} />
+                    <span className={`flex items-center justify-center mr-2 w-5 h-5 ${isScraping ? 'animate-spin' : ''}`}>
+                        <Icons.Reset />
+                    </span>
                     {isScraping ? 'Mencari...' : 'Run Auto-Discovery'}
                 </button>
             </div>
@@ -216,7 +218,9 @@ export default function DiscoveryDashboard() {
                                 <tr>
                                     <td colSpan="6" className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                                         <div className="flex flex-col items-center">
-                                            <Icons.Inbox className="w-12 h-12 text-gray-300 dark:text-gray-600 mb-3" />
+                                            <div className="text-gray-300 dark:text-gray-600 mb-3">
+                                                <Icons.Camera />
+                                            </div>
                                             <p>Belum ada data di Ruang Karantina</p>
                                             <p className="text-sm mt-1">Klik &quot;Run Auto-Discovery&quot; untuk memindai kamera publik.</p>
                                         </div>
@@ -303,7 +307,9 @@ export default function DiscoveryDashboard() {
                             
                             <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-100 dark:border-yellow-800">
                                 <p className="text-sm text-yellow-800 dark:text-yellow-300 flex items-start">
-                                    <Icons.Info className="w-5 h-5 mr-2 shrink-0 mt-0.5" />
+                                    <span className="mr-2 shrink-0 mt-0.5">
+                                        <Icons.MapPin />
+                                    </span>
                                     <span>Kamera yang di-import akan otomatis dikonfigurasi sebagai <strong>External Stream</strong> dengan mode <strong>Proxy Aktif</strong> (CORS Safe).</span>
                                 </p>
                             </div>
@@ -324,7 +330,9 @@ export default function DiscoveryDashboard() {
                             >
                                 {isImporting ? (
                                     <>
-                                        <Icons.Refresh className="w-4 h-4 mr-2 animate-spin" />
+                                        <span className="mr-2 animate-spin">
+                                            <Icons.Reset />
+                                        </span>
                                         Mengunggah...
                                     </>
                                 ) : 'Konfirmasi Import'}
