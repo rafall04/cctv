@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../../../contexts/AuthContext';
-import { useNotification } from '../../../contexts/NotificationContext';
-import { Icons } from '../../../components/ui/Icons';
-import apiClient from '../../../services/apiClient';
+import { useNotification } from '../../contexts/NotificationContext';
+import { Icons } from '../../components/ui/Icons';
+import apiClient from '../../services/apiClient';
 
 export default function DiscoveryDashboard() {
-    const { token } = useAuth();
     const { showNotification } = useNotification();
     
     const [items, setItems] = useState([]);
@@ -20,19 +18,15 @@ export default function DiscoveryDashboard() {
     const [selectedAreaId, setSelectedAreaId] = useState('');
 
     useEffect(() => {
-        if (token) {
-            fetchItems();
-            fetchAreas();
-        }
+        fetchItems();
+        fetchAreas();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [token]);
+    }, []);
 
     const fetchItems = async () => {
         try {
             setLoading(true);
-            const response = await apiClient.get('/admin/discovery', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const response = await apiClient.get('/admin/discovery');
             if (response.data.success) {
                 setItems(response.data.data);
             }
@@ -45,9 +39,7 @@ export default function DiscoveryDashboard() {
 
     const fetchAreas = async () => {
         try {
-            const response = await apiClient.get('/areas', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const response = await apiClient.get('/areas');
             if (response.data.success) {
                 setAreas(response.data.data);
             }
@@ -64,8 +56,6 @@ export default function DiscoveryDashboard() {
             showNotification('info', 'Menjalankan Scraper...', 3000);
             const response = await apiClient.post('/admin/discovery/scrape', {
                 source_type: 'jogja_atcs'
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
             });
             
             if (response.data.success) {
@@ -107,8 +97,6 @@ export default function DiscoveryDashboard() {
             const response = await apiClient.post('/admin/discovery/import', {
                 ids: Array.from(selectedIds),
                 target_area_id: parseInt(selectedAreaId)
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
             });
             
             if (response.data.success) {
@@ -130,8 +118,6 @@ export default function DiscoveryDashboard() {
         try {
             const response = await apiClient.post('/admin/discovery/reject', {
                 ids: Array.from(selectedIds)
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
             });
             
             if (response.data.success) {
