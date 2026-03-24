@@ -489,6 +489,55 @@ class CameraService {
         }
     }
 
+    async bulkDeleteArea(areaId, request) {
+        if (!areaId) {
+            const err = new Error('Area ID is required');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const area = queryOne('SELECT name FROM areas WHERE id = ?', [areaId]);
+        if (!area) {
+            const err = new Error('Area not found');
+            err.statusCode = 404;
+            throw err;
+        }
+
+        const cameras = query('SELECT id, name, stream_key FROM cameras WHERE area_id = ?', [areaId]);
+        if (cameras.length === 0) return { deletedCount: 0 };
+
+        transaction(() => {
+            execute('DELETE FROM cameras WHERE area_id = ?', [areaId]);
+            
+            execute(
+                'INSERT INTO audit_logs (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)',
+                [request.user.id, 'DELETE_BULK_CAMERAS', `Deleted ${cameras.length} cameras from area: ${area.name}`, request.ip]
+            );
+        })();
+
+        this.invalidateCameraCache();
+
+        // Async cleanup (like MediaMTX paths)
+        for (const camera of cameras) {
+            logCameraDeleted({
+                cameraId: camera.id,
+                cameraName: camera.name,
+                deletedByUserId: request.user.id,
+                deletedByUsername: request.user.username
+            }, request);
+
+            if (camera.stream_key) {
+                try {
+                    await mediaMtxService.removeCameraPathByKey(camera.stream_key);
+                } catch (err) {
+                    console.error(`MediaMTX remove path error for ${camera.stream_key}:`, err.message);
+                }
+            }
+        }
+
+        return { deletedCount: cameras.length };
+    }
+
     bulkUpdateArea(areaId, updates, request) {
         if (!areaId) {
             const err = new Error('Area ID is required');

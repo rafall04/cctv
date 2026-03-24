@@ -5,9 +5,9 @@ import {
     createCamera,
     updateCamera,
     deleteCamera,
-    exportCameras,
     importCameras,
     bulkUpdateByArea,
+    bulkDeleteByArea,
 } from '../controllers/cameraController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 import { 
@@ -70,5 +70,11 @@ export default async function cameraRoutes(fastify, options) {
     fastify.patch('/bulk/area', {
         onRequest: [authMiddleware],
         handler: bulkUpdateByArea,
+    });
+
+    // Bulk Delete By Area
+    fastify.delete('/bulk/area/:areaId', {
+        onRequest: [authMiddleware],
+        handler: bulkDeleteByArea,
     });
 }

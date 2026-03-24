@@ -100,6 +100,24 @@ export async function exportCameras(request, reply) {
     }
 }
 
+// Bulk delete by Area (admin only)
+export async function bulkDeleteByArea(request, reply) {
+    try {
+        const { areaId } = request.params;
+        const result = await cameraService.bulkDeleteArea(areaId, request);
+        return reply.send({ success: true, message: 'Bulk delete successful', data: result });
+    } catch (error) {
+        console.error('Bulk delete error:', error);
+        if (error.statusCode === 400) {
+            return reply.code(400).send({ success: false, message: error.message });
+        }
+        if (error.statusCode === 404) {
+            return reply.code(404).send({ success: false, message: error.message });
+        }
+        return reply.code(500).send({ success: false, message: 'Internal server error' });
+    }
+}
+
 // Bulk update by Area (admin only)
 export async function bulkUpdateByArea(request, reply) {
     try {

@@ -100,6 +100,17 @@ export const cameraService = {
             throw error;
         }
     },
+
+    // Bulk delete area cameras (admin only)
+    async bulkDeleteByArea(areaId) {
+        try {
+            const response = await apiClient.delete(`/api/cameras/bulk/area/${areaId}`);
+            return response.data;
+        } catch (error) {
+            console.error('Bulk delete area cameras error:', error);
+            throw error;
+        }
+    },
 };
 
 export default cameraService;
