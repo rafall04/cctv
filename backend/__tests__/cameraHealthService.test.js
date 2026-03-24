@@ -138,12 +138,15 @@ describe('cameraHealthService weighted scoring', () => {
         expect(service.healthState.get(camera.id).failureScore).toBeCloseTo(3.0);
     });
 
-    it('flags needsConfirmation after 3 stale_media_sequence (weight=1.0)', () => {
+    it('flags needsConfirmation after 6 stale_media_sequence (weight=0.5)', () => {
         const service = new CameraHealthService();
         const camera = { id: 5, is_online: 1 };
 
         service.ensureCameraState(camera.id, camera.is_online);
 
+        expect(service.applyWeightedScoring(camera, { online: false, reason: 'stale_media_sequence' })).toBe(1);
+        expect(service.applyWeightedScoring(camera, { online: false, reason: 'stale_media_sequence' })).toBe(1);
+        expect(service.applyWeightedScoring(camera, { online: false, reason: 'stale_media_sequence' })).toBe(1);
         expect(service.applyWeightedScoring(camera, { online: false, reason: 'stale_media_sequence' })).toBe(1);
         expect(service.applyWeightedScoring(camera, { online: false, reason: 'stale_media_sequence' })).toBe(1);
         expect(service.applyWeightedScoring(camera, { online: false, reason: 'stale_media_sequence' })).toBe(1);
