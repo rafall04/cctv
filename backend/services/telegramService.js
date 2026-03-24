@@ -222,6 +222,24 @@ ${cameraList}
     return sendMonitoringMessage(message);
 }
 
+export async function sendMultipleCamerasOnlineNotification(cameras) {
+    if (cameras.length === 0) return false;
+    if (cameras.length === 1) return sendCameraOnlineNotification(cameras[0]);
+
+    const cameraList = cameras.map(c => `• ${c.name}`).join('\n');
+    
+    const message = `
+🟢 <b>${cameras.length} KAMERA ONLINE</b>
+━━━━━━━━━━━━━━━━━━━━
+${cameraList}
+━━━━━━━━━━━━━━━━━━━━
+⏰ ${formatDateTime(new Date())}
+<i>Semua kamera kembali normal.</i>
+    `.trim();
+
+    return sendMonitoringMessage(message);
+}
+
 export async function sendFeedbackNotification(feedback) {
     const message = `
 📬 <b>Kritik & Saran Baru</b>
@@ -283,6 +301,7 @@ export default {
     sendCameraOfflineNotification,
     sendCameraOnlineNotification,
     sendMultipleCamerasOfflineNotification,
+    sendMultipleCamerasOnlineNotification,
     sendFeedbackNotification,
     sendTestNotification,
     isTelegramConfigured,

@@ -87,26 +87,69 @@ describe('cameraHealthService.parsePlaylist', () => {
     });
 });
 
-describe('cameraHealthService hysteresis', () => {
-    it('switches offline after 3 consecutive failures', () => {
+describe('cameraHealthService weighted scoring', () => {
+    it('flags needsConfirmation after 3 ECONNREFUSED (weight=1.0)', () => {
         const service = new CameraHealthService();
         const camera = { id: 1, is_online: 1 };
 
         service.ensureCameraState(camera.id, camera.is_online);
 
-        expect(service.applyHysteresis(camera, { online: false, reason: 'timeout' })).toBe(1);
-        expect(service.applyHysteresis(camera, { online: false, reason: 'timeout' })).toBe(1);
-        expect(service.applyHysteresis(camera, { online: false, reason: 'timeout' })).toBe(0);
+        expect(service.applyWeightedScoring(camera, { online: false, reason: 'ECONNREFUSED' })).toBe(1);
+        expect(service.applyWeightedScoring(camera, { online: false, reason: 'ECONNREFUSED' })).toBe(1);
+        expect(service.applyWeightedScoring(camera, { online: false, reason: 'ECONNREFUSED' })).toBe(1);
+        
+        const state = service.healthState.get(camera.id);
+        expect(state.needsConfirmation).toBe(true);
+        expect(state.failureScore).toBe(3);
+        // It stays technically online until confirmed
+        expect(state.effectiveOnline).toBe(true);
     });
 
-    it('switches online after 2 consecutive successes', () => {
+    it('flags needsConfirmation after 15 timeouts (weight=0.2)', () => {
         const service = new CameraHealthService();
-        const camera = { id: 2, is_online: 0 };
+        const camera = { id: 2, is_online: 1 };
 
         service.ensureCameraState(camera.id, camera.is_online);
 
-        expect(service.applyHysteresis(camera, { online: true, reason: 'ok' })).toBe(0);
-        expect(service.applyHysteresis(camera, { online: true, reason: 'ok' })).toBe(1);
+        for (let i = 0; i < 14; i++) {
+            expect(service.applyWeightedScoring(camera, { online: false, reason: 'ECONNABORTED' })).toBe(1);
+        }
+        
+        expect(service.healthState.get(camera.id).needsConfirmation).toBe(false);
+        expect(service.applyWeightedScoring(camera, { online: false, reason: 'ECONNABORTED' })).toBe(1);
+        expect(service.healthState.get(camera.id).needsConfirmation).toBe(true);
+        expect(service.healthState.get(camera.id).failureScore).toBeCloseTo(3.0);
+    });
+
+    it('switches online immediately after 1 success when score drops to 0', () => {
+        const service = new CameraHealthService();
+        const camera = { id: 3, is_online: 0 };
+
+        service.ensureCameraState(camera.id, camera.is_online);
+        // Set an initial small score
+        service.healthState.get(camera.id).failureScore = 0.4;
+
+        expect(service.applyWeightedScoring(camera, { online: true, reason: 'ok' })).toBe(1); // Score becomes 0, online
+        expect(service.healthState.get(camera.id).effectiveOnline).toBe(true);
+    });
+
+    it('decays score properly on intermittent success', () => {
+        const service = new CameraHealthService();
+        const camera = { id: 4, is_online: 1 };
+
+        service.ensureCameraState(camera.id, camera.is_online);
+
+        service.applyWeightedScoring(camera, { online: false, reason: 'ECONNREFUSED' }); // score = 1
+        expect(service.healthState.get(camera.id).failureScore).toBe(1);
+
+        service.applyWeightedScoring(camera, { online: true, reason: 'ok' }); // score drops by 0.5
+        expect(service.healthState.get(camera.id).failureScore).toBe(0.5);
+
+        service.applyWeightedScoring(camera, { online: true, reason: 'ok' }); // score drops to 0
+        expect(service.healthState.get(camera.id).failureScore).toBe(0);
+        
+        service.applyWeightedScoring(camera, { online: true, reason: 'ok' }); // score cannot be less than 0
+        expect(service.healthState.get(camera.id).failureScore).toBe(0);
     });
 });
 
