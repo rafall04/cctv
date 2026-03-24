@@ -31,8 +31,9 @@ const FAILURE_WEIGHTS = {
     'master_has_no_variant':    0.7,
     'media_playlist_has_no_segments': 0.6,
     'internal_stream_unreachable': 0.8,
+    'stream_ended':             1.0,
     'stale_program_date_time':  0.4,
-    'stale_media_sequence':     0.15, // Low weight for CDN cache false alarm tolerance
+    'stale_media_sequence':     1.0,
     'ECONNABORTED':             0.2,  // Timeout
     'ETIMEDOUT':                0.2,
     'ENOTFOUND':                0.15,
@@ -106,9 +107,12 @@ function parsePlaylist(playlistText) {
     let targetDuration = null;
     let mediaSequence = null;
     let lastProgramDateTimeMs = null;
+    let hasEndList = false;
 
     for (const line of lines) {
-        if (line.startsWith('#EXT-X-TARGETDURATION:')) {
+        if (line === '#EXT-X-ENDLIST') {
+            hasEndList = true;
+        } else if (line.startsWith('#EXT-X-TARGETDURATION:')) {
             const value = parseInt(line.split(':')[1], 10);
             if (!Number.isNaN(value)) {
                 targetDuration = value;
@@ -133,7 +137,8 @@ function parsePlaylist(playlistText) {
         entries,
         targetDuration,
         mediaSequence,
-        lastProgramDateTimeMs
+        lastProgramDateTimeMs,
+        hasEndList
     };
 }
 
@@ -344,6 +349,10 @@ class CameraHealthService {
 
     evaluateExternalFreshness(cameraId, mediaInfo) {
         const state = this.healthState.get(cameraId);
+
+        if (mediaInfo.hasEndList) {
+            return { ok: false, reason: 'stream_ended' };
+        }
 
         if (mediaInfo.lastProgramDateTimeMs) {
             const ageSec = Math.max(0, (Date.now() - mediaInfo.lastProgramDateTimeMs) / 1000);

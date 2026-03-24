@@ -85,6 +85,23 @@ describe('cameraHealthService.parsePlaylist', () => {
         expect(result.ok).toBe(false);
         expect(result.reason).toBe('invalid_m3u8');
     });
+
+    it('detects #EXT-X-ENDLIST for stream ended streams', () => {
+        const input = [
+            '#EXTM3U',
+            '#EXT-X-TARGETDURATION:6',
+            '#EXT-X-MEDIA-SEQUENCE:2134',
+            '#EXTINF:6.0,',
+            'file2134.ts',
+            '#EXT-X-ENDLIST'
+        ].join('\n');
+
+        const result = parsePlaylist(input);
+
+        expect(result.ok).toBe(true);
+        expect(result.hasEndList).toBe(true);
+        expect(result.mediaSequence).toBe(2134);
+    });
 });
 
 describe('cameraHealthService weighted scoring', () => {
@@ -117,6 +134,34 @@ describe('cameraHealthService weighted scoring', () => {
         
         expect(service.healthState.get(camera.id).needsConfirmation).toBe(false);
         expect(service.applyWeightedScoring(camera, { online: false, reason: 'ECONNABORTED' })).toBe(1);
+        expect(service.healthState.get(camera.id).needsConfirmation).toBe(true);
+        expect(service.healthState.get(camera.id).failureScore).toBeCloseTo(3.0);
+    });
+
+    it('flags needsConfirmation after 3 stale_media_sequence (weight=1.0)', () => {
+        const service = new CameraHealthService();
+        const camera = { id: 5, is_online: 1 };
+
+        service.ensureCameraState(camera.id, camera.is_online);
+
+        expect(service.applyWeightedScoring(camera, { online: false, reason: 'stale_media_sequence' })).toBe(1);
+        expect(service.applyWeightedScoring(camera, { online: false, reason: 'stale_media_sequence' })).toBe(1);
+        expect(service.applyWeightedScoring(camera, { online: false, reason: 'stale_media_sequence' })).toBe(1);
+        
+        expect(service.healthState.get(camera.id).needsConfirmation).toBe(true);
+        expect(service.healthState.get(camera.id).failureScore).toBeCloseTo(3.0);
+    });
+
+    it('flags needsConfirmation after 3 stream_ended (weight=1.0)', () => {
+        const service = new CameraHealthService();
+        const camera = { id: 6, is_online: 1 };
+
+        service.ensureCameraState(camera.id, camera.is_online);
+
+        expect(service.applyWeightedScoring(camera, { online: false, reason: 'stream_ended' })).toBe(1);
+        expect(service.applyWeightedScoring(camera, { online: false, reason: 'stream_ended' })).toBe(1);
+        expect(service.applyWeightedScoring(camera, { online: false, reason: 'stream_ended' })).toBe(1);
+        
         expect(service.healthState.get(camera.id).needsConfirmation).toBe(true);
         expect(service.healthState.get(camera.id).failureScore).toBeCloseTo(3.0);
     });
