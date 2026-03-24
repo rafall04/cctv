@@ -89,6 +89,17 @@ export const cameraService = {
             throw error;
         }
     },
+
+    // Bulk update area (admin only)
+    async bulkUpdateByArea(areaId, updates) {
+        try {
+            const response = await apiClient.patch('/api/cameras/bulk/area', { areaId, updates });
+            return response.data;
+        } catch (error) {
+            console.error('Bulk update area error:', error);
+            throw error;
+        }
+    },
 };
 
 export default cameraService;

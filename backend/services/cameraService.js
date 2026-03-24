@@ -489,6 +489,47 @@ class CameraService {
         }
     }
 
+    bulkUpdateArea(areaId, updates, request) {
+        if (!areaId) {
+            const err = new Error('Area ID is required');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const allowedUpdates = ['external_use_proxy', 'enable_recording', 'enabled'];
+        const setClauses = [];
+        const params = [];
+
+        for (const [key, value] of Object.entries(updates)) {
+            if (allowedUpdates.includes(key)) {
+                setClauses.push(`${key} = ?`);
+                params.push(value);
+            }
+        }
+
+        if (setClauses.length === 0) {
+            const err = new Error('No valid update fields provided');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        params.push(areaId);
+        
+        const result = execute(
+            `UPDATE cameras SET ${setClauses.join(', ')} WHERE area_id = ?`,
+            params
+        );
+
+        execute(
+            'INSERT INTO audit_logs (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)',
+            [request.user.id, 'BULK_UPDATE_AREA', `Updated ${result.changes} cameras in Area ID ${areaId}`, request.ip || 'Unknown']
+        );
+
+        this.invalidateCameraCache();
+
+        return { success: true, changes: result.changes };
+    }
+
     importCamerasTransaction(cameras, targetAreaName, request) {
         if (!cameras || !Array.isArray(cameras) || cameras.length === 0) return { imported: 0, skipped: 0, errors: [] };
 
@@ -560,7 +601,7 @@ class CameraService {
                         cam.enable_recording === true || cam.enable_recording === 1 ? 1 : 0,
                         cam.stream_source || 'external',
                         hlsUrl,
-                        1, // external_use_proxy = 1
+                        cam.external_use_proxy !== undefined ? cam.external_use_proxy : 1, // dynamically read from frontend overlay
                         'strict' // external_tls_mode
                     ]
                 );

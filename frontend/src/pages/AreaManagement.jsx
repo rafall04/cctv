@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { areaService } from '../services/areaService';
+import { cameraService } from '../services/cameraService';
 import { settingsService } from '../services/settingsService';
 import { useNotification } from '../contexts/NotificationContext';
 import { StatCardSkeleton, CameraCardSkeleton, NoAreasEmptyState, Alert } from '../components/ui';
@@ -28,6 +29,15 @@ export default function AreaManagement() {
     const [showMapCenterModal, setShowMapCenterModal] = useState(false);
     const [mapCenter, setMapCenter] = useState({ latitude: '', longitude: '', zoom: 13, name: 'Bojonegoro' });
     const [savingMapCenter, setSavingMapCenter] = useState(false);
+    
+    // Bulk Config Modal
+    const [bulkConfigArea, setBulkConfigArea] = useState(null);
+    const [bulkUpdates, setBulkUpdates] = useState({ 
+        external_use_proxy: true,
+        enable_recording: false,
+        enabled: true
+    });
+    const [applyingBulk, setApplyingBulk] = useState(false);
 
     const { success, error: showError } = useNotification();
 
@@ -151,6 +161,30 @@ export default function AreaManagement() {
 
     const handleMapCenterChange = (lat, lng) => {
         setMapCenter({ ...mapCenter, latitude: parseFloat(lat), longitude: parseFloat(lng) });
+    };
+
+    const handleBulkUpdate = async () => {
+        if (!bulkConfigArea) return;
+        setApplyingBulk(true);
+        try {
+            const updates = {
+                external_use_proxy: bulkUpdates.external_use_proxy ? 1 : 0,
+                enable_recording: bulkUpdates.enable_recording ? 1 : 0,
+                enabled: bulkUpdates.enabled ? 1 : 0
+            };
+            const result = await cameraService.bulkUpdateByArea(bulkConfigArea.id, updates);
+            if (result.success) {
+                setBulkConfigArea(null);
+                loadAreas(); // refresh counts potentially
+                success('Pembaruan Massal Berhasil', `Berhasil memperbarui ${result.data?.changes || 0} kamera di area ${bulkConfigArea.name}.`);
+            } else {
+                showError('Gagal', result.message);
+            }
+        } catch (err) {
+            showError('Gagal Memperbarui Massal', err.response?.data?.message || err.message);
+        } finally {
+            setApplyingBulk(false);
+        }
     };
 
     const saveMapCenter = async () => {
@@ -286,6 +320,12 @@ export default function AreaManagement() {
                                     </svg>
                                 </div>
                                 <div className="flex gap-1">
+                                    <button title="Pengaturan Massal Kamera" onClick={() => setBulkConfigArea(area)} className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-all">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                    </button>
                                     <button onClick={() => openEditModal(area)} className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 hover:text-primary hover:bg-sky-50 dark:hover:bg-primary/10 transition-all">
                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -396,6 +436,74 @@ export default function AreaManagement() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Bulk Config Modal */}
+            {bulkConfigArea && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700/50">
+                        <div className="p-6 border-b border-gray-200 dark:border-gray-700/50 flex justify-between items-center bg-amber-50 dark:bg-amber-900/20 rounded-t-2xl">
+                            <div>
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Pengaturan Massal Area</h3>
+                                <p className="text-sm text-amber-600 dark:text-amber-400 font-medium">Area: {bulkConfigArea.name}</p>
+                            </div>
+                            <button onClick={() => setBulkConfigArea(null)} className="p-2 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-800/30 text-gray-600 dark:text-gray-300">
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-5">
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Atur setelan di bawah ini untuk diterapkan secara serentak pada semua kamera di area ini.</p>
+                            
+                            <div className="space-y-4">
+                                <label className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/80 transition-colors border border-gray-200 dark:border-gray-700">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={bulkUpdates.external_use_proxy} 
+                                        onChange={(e) => setBulkUpdates({...bulkUpdates, external_use_proxy: e.target.checked})}
+                                        className="w-5 h-5 text-primary bg-white border-gray-300 rounded focus:ring-primary"
+                                    />
+                                    <div>
+                                        <p className="text-sm font-semibold text-gray-900 dark:text-white">Gunakan Proxy Server</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Sembunyikan URL asli (mengkonsumsi bandwidth server lokal)</p>
+                                    </div>
+                                </label>
+                                
+                                <label className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/80 transition-colors border border-gray-200 dark:border-gray-700">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={bulkUpdates.enable_recording} 
+                                        onChange={(e) => setBulkUpdates({...bulkUpdates, enable_recording: e.target.checked})}
+                                        className="w-5 h-5 text-primary bg-white border-gray-300 rounded focus:ring-primary"
+                                    />
+                                    <div>
+                                        <p className="text-sm font-semibold text-gray-900 dark:text-white">Aktifkan Perekaman Dasar</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Mulai atau hentikan rekaman ke disk server</p>
+                                    </div>
+                                </label>
+                                
+                                <label className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/80 transition-colors border border-gray-200 dark:border-gray-700">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={bulkUpdates.enabled} 
+                                        onChange={(e) => setBulkUpdates({...bulkUpdates, enabled: e.target.checked})}
+                                        className="w-5 h-5 text-primary bg-white border-gray-300 rounded focus:ring-primary"
+                                    />
+                                    <div>
+                                        <p className="text-sm font-semibold text-gray-900 dark:text-white">Status Publik Aktif</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Tampilkan semua kamera milik Area ini ke beranda publik</p>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                        <div className="flex gap-3 p-6 pt-0 border-t border-gray-100 dark:border-gray-800/50 mt-2">
+                            <button onClick={() => setBulkConfigArea(null)} className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700" disabled={applyingBulk}>Batal</button>
+                            <button onClick={handleBulkUpdate} className="flex-[2] px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-amber-500/30" disabled={applyingBulk}>
+                                {applyingBulk && <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>}
+                                {applyingBulk ? 'Memproses...' : 'Terapkan Segera'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

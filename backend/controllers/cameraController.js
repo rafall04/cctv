@@ -100,6 +100,21 @@ export async function exportCameras(request, reply) {
     }
 }
 
+// Bulk update by Area (admin only)
+export async function bulkUpdateByArea(request, reply) {
+    try {
+        const { areaId, updates } = request.body;
+        const result = cameraService.bulkUpdateArea(areaId, updates, request);
+        return reply.send({ success: true, message: 'Bulk update successful', data: result });
+    } catch (error) {
+        console.error('Bulk update error:', error);
+        if (error.statusCode === 400) {
+            return reply.code(400).send({ success: false, message: error.message });
+        }
+        return reply.code(500).send({ success: false, message: 'Internal server error' });
+    }
+}
+
 // Import cameras (admin only)
 export async function importCameras(request, reply) {
     try {

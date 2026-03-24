@@ -17,6 +17,8 @@ export default function ImportExport() {
     const [overrideArea, setOverrideArea] = useState('DI YOGYAKARTA');
     const [overrideWatermark, setOverrideWatermark] = useState('');
     const [syncLocationWithName, setSyncLocationWithName] = useState(true);
+    const [overrideProxy, setOverrideProxy] = useState(true);
+    const [overrideEnabled, setOverrideEnabled] = useState(true);
 
     const fileInputRef = useRef(null);
 
@@ -99,10 +101,11 @@ export default function ImportExport() {
                 longitude: resolvedLng,
                 stream_source: item.stream_source || 'external',
                 enable_recording: item.enable_recording || 0,
-                enabled: 1
+                external_use_proxy: overrideProxy ? 1 : 0,
+                enabled: overrideEnabled ? 1 : 0
             };
         });
-    }, [rawPayload, overrideWatermark, syncLocationWithName]);
+    }, [rawPayload, overrideWatermark, syncLocationWithName, overrideProxy, overrideEnabled]);
 
     // Apply Overrides Handler
     const handleImportSubmit = async () => {
@@ -230,17 +233,43 @@ export default function ImportExport() {
                                     />
                                 </div>
                                 
-                                <div className="flex items-center gap-2">
-                                    <input 
-                                        type="checkbox" 
-                                        id="syncLoc" 
-                                        checked={syncLocationWithName} 
-                                        onChange={(e) => setSyncLocationWithName(e.target.checked)}
-                                        className="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary dark:focus:ring-primary dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-                                    />
-                                    <label htmlFor="syncLoc" className="text-sm font-medium text-gray-900 dark:text-gray-300">
-                                        Use Camera Name as Location
-                                    </label>
+                                <div className="space-y-3">
+                                    <div className="flex items-center gap-2">
+                                        <input 
+                                            type="checkbox" 
+                                            id="syncLoc" 
+                                            checked={syncLocationWithName} 
+                                            onChange={(e) => setSyncLocationWithName(e.target.checked)}
+                                            className="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary dark:focus:ring-primary dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                                        />
+                                        <label htmlFor="syncLoc" className="text-sm font-medium text-gray-900 dark:text-gray-300">
+                                            Use Camera Name as Location
+                                        </label>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <input 
+                                            type="checkbox" 
+                                            id="useProxy" 
+                                            checked={overrideProxy} 
+                                            onChange={(e) => setOverrideProxy(e.target.checked)}
+                                            className="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary dark:focus:ring-primary dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                                        />
+                                        <label htmlFor="useProxy" className="text-sm font-medium text-gray-900 dark:text-gray-300">
+                                            Enable Built-in Proxy (Mask Stream URL)
+                                        </label>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <input 
+                                            type="checkbox" 
+                                            id="startActive" 
+                                            checked={overrideEnabled} 
+                                            onChange={(e) => setOverrideEnabled(e.target.checked)}
+                                            className="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary dark:focus:ring-primary dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                                        />
+                                        <label htmlFor="startActive" className="text-sm font-medium text-gray-900 dark:text-gray-300">
+                                            Import as Active (Visible to public)
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
                         )}
