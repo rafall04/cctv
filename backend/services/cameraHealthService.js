@@ -33,15 +33,15 @@ const FAILURE_WEIGHTS = {
     'internal_stream_unreachable': 0.8,
     'stream_ended':             1.0,
     'stale_program_date_time':  0.4,
-    'stale_media_sequence':     1.0,
+    'stale_media_sequence':     0.5,
     'ECONNABORTED':             0.2,  // Timeout
     'ETIMEDOUT':                0.2,
     'ENOTFOUND':                0.15,
     'request_error':            0.3
 };
 
-const BATCH_CONCURRENCY_PER_DOMAIN = 5;
-const BATCH_DELAY_MS = 200;
+const BATCH_CONCURRENCY_PER_DOMAIN = 2;
+const BATCH_DELAY_MS = 1500;
 const TLS_VERIFICATION_ERROR_CODES = new Set([
     'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
     'UNABLE_TO_GET_ISSUER_CERT',
