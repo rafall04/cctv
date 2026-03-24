@@ -67,6 +67,28 @@ export const cameraService = {
             throw error;
         }
     },
+
+    // Export cameras (admin only)
+    async exportCameras() {
+        try {
+            const response = await apiClient.get('/api/cameras/export');
+            return response.data;
+        } catch (error) {
+            console.error('Export cameras error:', error);
+            throw error;
+        }
+    },
+
+    // Import cameras (admin only)
+    async importCameras(payload) {
+        try {
+            const response = await apiClient.post('/api/cameras/import', payload);
+            return response.data;
+        } catch (error) {
+            console.error('Import cameras error:', error);
+            throw error;
+        }
+    },
 };
 
 export default cameraService;

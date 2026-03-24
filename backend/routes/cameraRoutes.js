@@ -5,6 +5,8 @@ import {
     createCamera,
     updateCamera,
     deleteCamera,
+    exportCameras,
+    importCameras,
 } from '../controllers/cameraController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 import { 
@@ -49,5 +51,17 @@ export default async function cameraRoutes(fastify, options) {
         schema: cameraIdParamSchema,
         onRequest: [authMiddleware],
         handler: deleteCamera,
+    });
+    
+    // Bulk Export
+    fastify.get('/export', {
+        onRequest: [authMiddleware],
+        handler: exportCameras,
+    });
+
+    // Bulk Import
+    fastify.post('/import', {
+        onRequest: [authMiddleware],
+        handler: importCameras,
     });
 }

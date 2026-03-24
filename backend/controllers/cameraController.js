@@ -87,3 +87,34 @@ export async function deleteCamera(request, reply) {
         return reply.code(500).send({ success: false, message: 'Internal server error' });
     }
 }
+
+// Export cameras (admin only)
+export async function exportCameras(request, reply) {
+    try {
+        const cameras = cameraService.getAllCameras();
+        // Option to strip sensitive stuff like IDs, or keep them if needed, we'll keep them as is for now for full exports.
+        return reply.send({ success: true, data: cameras });
+    } catch (error) {
+        console.error('Export cameras error:', error);
+        return reply.code(500).send({ success: false, message: 'Internal server error' });
+    }
+}
+
+// Import cameras (admin only)
+export async function importCameras(request, reply) {
+    try {
+        const { targetArea, cameras } = request.body;
+        if (!Array.isArray(cameras) || cameras.length === 0) {
+             return reply.code(400).send({ success: false, message: 'Cameras array is required and cannot be empty' });
+        }
+        if (!targetArea) {
+             return reply.code(400).send({ success: false, message: 'Target area is required' });
+        }
+
+        const result = cameraService.importCamerasTransaction(cameras, targetArea, request);
+        return reply.send({ success: true, message: 'Import successful', result });
+    } catch (error) {
+        console.error('Import cameras error:', error);
+        return reply.code(500).send({ success: false, message: error.message || 'Internal server error' });
+    }
+}

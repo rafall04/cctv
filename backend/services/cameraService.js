@@ -1,4 +1,4 @@
-import { query, queryOne, execute } from '../database/connectionPool.js';
+import { query, queryOne, execute, transaction } from '../database/connectionPool.js';
 import { v4 as uuidv4 } from 'uuid';
 import mediaMtxService from './mediaMtxService.js';
 import {
@@ -488,7 +488,106 @@ class CameraService {
             console.error('MediaMTX remove path error:', err.message);
         }
     }
+
+    importCamerasTransaction(cameras, targetAreaName, request) {
+        if (!cameras || !Array.isArray(cameras) || cameras.length === 0) return { imported: 0, skipped: 0, errors: [] };
+
+        // 1. Ensure target area exists
+        let areaId = null;
+        const existingArea = queryOne('SELECT id FROM areas WHERE name = ? COLLATE NOCASE', [targetAreaName]);
+        if (existingArea) {
+            areaId = existingArea.id;
+        } else {
+            const insertArea = execute('INSERT INTO areas (name, description) VALUES (?, ?)', [targetAreaName, 'Auto-created during bulk import']);
+            areaId = insertArea.lastInsertRowid;
+        }
+
+        // 2. Fetch existing cameras for duplicate checking (O(1) lookups)
+        const allCameras = query('SELECT name, private_rtsp_url, external_hls_url FROM cameras');
+        const existingNames = new Set(allCameras.map(c => c.name ? c.name.toLowerCase() : ''));
+        const existingUrls = new Set();
+        allCameras.forEach(c => {
+            if (c.private_rtsp_url) existingUrls.add(c.private_rtsp_url.toLowerCase());
+            if (c.external_hls_url) existingUrls.add(c.external_hls_url.toLowerCase());
+        });
+
+        // 3. Define the bulk insert operation via transaction
+        const performImport = transaction((cameraList) => {
+            let importedCount = 0;
+            let skippedCount = 0;
+            const errors = [];
+
+            for (const cam of cameraList) {
+                const name = cam.name ? String(cam.name).trim() : '';
+                const hlsUrl = cam.external_hls_url ? String(cam.external_hls_url).trim() : null;
+                const rtspUrl = cam.private_rtsp_url ? String(cam.private_rtsp_url).trim() : null;
+                
+                // Duplicate Validation
+                if (!name) {
+                    errors.push(`Skipped: Missing name`);
+                    skippedCount++;
+                    continue;
+                }
+                
+                if (existingNames.has(name.toLowerCase())) {
+                    errors.push(`Skipped '${name}': Name already exists in database`);
+                    skippedCount++;
+                    continue;
+                }
+
+                const urlToCheck = hlsUrl || rtspUrl;
+                if (urlToCheck && existingUrls.has(urlToCheck.toLowerCase())) {
+                    errors.push(`Skipped '${name}': Stream URL is already used by another camera`);
+                    skippedCount++;
+                    continue;
+                }
+
+                const streamKey = uuidv4();
+                execute(
+                    'INSERT INTO cameras (name, private_rtsp_url, description, location, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, stream_source, external_hls_url, external_use_proxy, external_tls_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    [
+                        name,
+                        rtspUrl || '',
+                        cam.description || null,
+                        cam.location || null,
+                        areaId,
+                        cam.enabled === false || cam.enabled === 0 ? 0 : 1,
+                        0, // is_tunnel
+                        cam.latitude ? parseFloat(cam.latitude) : null,
+                        cam.longitude ? parseFloat(cam.longitude) : null,
+                        'active',
+                        streamKey,
+                        cam.enable_recording === true || cam.enable_recording === 1 ? 1 : 0,
+                        cam.stream_source || 'external',
+                        hlsUrl,
+                        1, // external_use_proxy = 1
+                        'strict' // external_tls_mode
+                    ]
+                );
+                
+                // Prevent duplicates within the import payload itself
+                existingNames.add(name.toLowerCase());
+                if (urlToCheck) existingUrls.add(urlToCheck.toLowerCase());
+                importedCount++;
+            }
+
+            return { imported: importedCount, skipped: skippedCount, errors };
+        });
+
+        // Execute transaction
+        const result = performImport(cameras);
+
+        // Audit Log and Cache Invalidations (outside transaction)
+        if (result.imported > 0) {
+            execute(
+                'INSERT INTO audit_logs (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)',
+                [request.user.id, 'IMPORT_CAMERAS', `Bulk imported ${result.imported} cameras to area: ${targetAreaName}`, request.ip || 'Unknown']
+            );
+            this.invalidateCameraCache();
+        }
+
+        return result;
+    }
 }
 
 export default new CameraService();
-
