@@ -19,6 +19,7 @@ export default function ImportExport() {
     const [syncLocationWithName, setSyncLocationWithName] = useState(true);
     const [overrideProxy, setOverrideProxy] = useState(true);
     const [overrideEnabled, setOverrideEnabled] = useState(true);
+    const [overrideTls, setOverrideTls] = useState('strict');
 
     const fileInputRef = useRef(null);
 
@@ -68,7 +69,7 @@ export default function ImportExport() {
                 setRawPayload(camerasArray);
                 success('File Parsed', `Successfully loaded ${camerasArray.length} items from JSON.`);
             } catch (err) {
-                showError('Parse Error', 'Invalid JSON file structure.');
+                showError('Parse Error', `Invalid JSON file structure: ${err.message}`);
             }
         };
         reader.readAsText(file);
@@ -102,10 +103,11 @@ export default function ImportExport() {
                 stream_source: item.stream_source || 'external',
                 enable_recording: item.enable_recording || 0,
                 external_use_proxy: overrideProxy ? 1 : 0,
+                external_tls_mode: overrideTls,
                 enabled: overrideEnabled ? 1 : 0
             };
         });
-    }, [rawPayload, overrideWatermark, syncLocationWithName, overrideProxy, overrideEnabled]);
+    }, [rawPayload, overrideWatermark, syncLocationWithName, overrideProxy, overrideTls, overrideEnabled]);
 
     // Apply Overrides Handler
     const handleImportSubmit = async () => {
@@ -269,6 +271,18 @@ export default function ImportExport() {
                                         <label htmlFor="startActive" className="text-sm font-medium text-gray-900 dark:text-gray-300">
                                             Import as Active (Visible to public)
                                         </label>
+                                    </div>
+
+                                    <div className="flex flex-col gap-1 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                                        <label className="text-xs font-medium text-gray-900 dark:text-gray-300">Mode Keamanan TLS</label>
+                                        <select 
+                                            value={overrideTls}
+                                            onChange={(e) => setOverrideTls(e.target.value)}
+                                            className="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary block p-2 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                        >
+                                            <option value="strict">Strict (Wajib SSL Valid)</option>
+                                            <option value="insecure">Insecure (Abaikan SSL kedaluwarsa)</option>
+                                        </select>
                                     </div>
                                 </div>
                             </div>

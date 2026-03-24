@@ -559,9 +559,15 @@ class CameraService {
             const errors = [];
 
             for (const cam of cameraList) {
-                const name = cam.name ? String(cam.name).trim() : '';
-                const hlsUrl = cam.external_hls_url ? String(cam.external_hls_url).trim() : null;
-                const rtspUrl = cam.private_rtsp_url ? String(cam.private_rtsp_url).trim() : null;
+                const rawName = cam.name || cam.title || cam.cctv_title || '';
+                const rawHlsUrl = cam.external_hls_url || cam.url || cam.stream || cam.cctv_link || null;
+                const rawRtspUrl = cam.private_rtsp_url || null;
+                const rawLat = cam.latitude !== undefined ? cam.latitude : (cam.lat !== undefined ? cam.lat : null);
+                const rawLng = cam.longitude !== undefined ? cam.longitude : (cam.lng !== undefined ? cam.lng : null);
+
+                const name = rawName ? String(rawName).trim() : '';
+                const hlsUrl = rawHlsUrl ? String(rawHlsUrl).trim() : null;
+                const rtspUrl = rawRtspUrl ? String(rawRtspUrl).trim() : null;
                 
                 // Duplicate Validation
                 if (!name) {
@@ -594,15 +600,16 @@ class CameraService {
                         areaId,
                         cam.enabled === false || cam.enabled === 0 ? 0 : 1,
                         0, // is_tunnel
-                        cam.latitude ? parseFloat(cam.latitude) : null,
-                        cam.longitude ? parseFloat(cam.longitude) : null,
+                        rawLat !== null ? parseFloat(rawLat) : null,
+                        rawLng !== null ? parseFloat(rawLng) : null,
                         'active',
                         streamKey,
                         cam.enable_recording === true || cam.enable_recording === 1 ? 1 : 0,
                         cam.stream_source || 'external',
                         hlsUrl,
                         cam.external_use_proxy !== undefined ? cam.external_use_proxy : 1, // dynamically read from frontend overlay
-                        'strict' // external_tls_mode
+                        cam.external_tls_mode || 'strict' // external_tls_mode
+
                     ]
                 );
                 

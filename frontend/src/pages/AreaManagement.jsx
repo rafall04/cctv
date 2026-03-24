@@ -33,9 +33,10 @@ export default function AreaManagement() {
     // Bulk Config Modal
     const [bulkConfigArea, setBulkConfigArea] = useState(null);
     const [bulkUpdates, setBulkUpdates] = useState({ 
-        external_use_proxy: true,
-        enable_recording: false,
-        enabled: true
+        external_use_proxy: 'ignore',
+        enable_recording: 'ignore',
+        enabled: 'ignore',
+        external_tls_mode: 'ignore'
     });
     const [applyingBulk, setApplyingBulk] = useState(false);
 
@@ -167,11 +168,17 @@ export default function AreaManagement() {
         if (!bulkConfigArea) return;
         setApplyingBulk(true);
         try {
-            const updates = {
-                external_use_proxy: bulkUpdates.external_use_proxy ? 1 : 0,
-                enable_recording: bulkUpdates.enable_recording ? 1 : 0,
-                enabled: bulkUpdates.enabled ? 1 : 0
-            };
+            const updates = {};
+            if (bulkUpdates.external_use_proxy !== 'ignore') updates.external_use_proxy = parseInt(bulkUpdates.external_use_proxy);
+            if (bulkUpdates.enable_recording !== 'ignore') updates.enable_recording = parseInt(bulkUpdates.enable_recording);
+            if (bulkUpdates.enabled !== 'ignore') updates.enabled = parseInt(bulkUpdates.enabled);
+            if (bulkUpdates.external_tls_mode !== 'ignore') updates.external_tls_mode = bulkUpdates.external_tls_mode;
+
+            if (Object.keys(updates).length === 0) {
+                setApplyingBulk(false);
+                success('Info', 'Tidak ada perubahan yang dipilih.');
+                return;
+            }
             const result = await cameraService.bulkUpdateByArea(bulkConfigArea.id, updates);
             if (result.success) {
                 setBulkConfigArea(null);
@@ -457,44 +464,61 @@ export default function AreaManagement() {
                             <p className="text-sm text-gray-500 dark:text-gray-400">Atur setelan di bawah ini untuk diterapkan secara serentak pada semua kamera di area ini.</p>
                             
                             <div className="space-y-4">
-                                <label className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/80 transition-colors border border-gray-200 dark:border-gray-700">
-                                    <input 
-                                        type="checkbox" 
-                                        checked={bulkUpdates.external_use_proxy} 
-                                        onChange={(e) => setBulkUpdates({...bulkUpdates, external_use_proxy: e.target.checked})}
-                                        className="w-5 h-5 text-primary bg-white border-gray-300 rounded focus:ring-primary"
-                                    />
-                                    <div>
-                                        <p className="text-sm font-semibold text-gray-900 dark:text-white">Gunakan Proxy Server</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">Sembunyikan URL asli (mengkonsumsi bandwidth server lokal)</p>
-                                    </div>
-                                </label>
+                                <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
+                                    <label className="text-sm font-semibold text-gray-900 dark:text-white">Gunakan Proxy Server</label>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Sembunyikan URL asli (mengkonsumsi bandwidth server lokal)</p>
+                                    <select 
+                                        value={bulkUpdates.external_use_proxy} 
+                                        onChange={(e) => setBulkUpdates({...bulkUpdates, external_use_proxy: e.target.value})}
+                                        className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                    >
+                                        <option value="ignore">Biarkan Seperti Semula (Abaikan)</option>
+                                        <option value="1">Aktifkan (ON)</option>
+                                        <option value="0">Matikan (OFF)</option>
+                                    </select>
+                                </div>
+
+                                <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
+                                    <label className="text-sm font-semibold text-gray-900 dark:text-white">Mode Keamanan TLS</label>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Pilih mode SSL untuk koneksi stream</p>
+                                    <select 
+                                        value={bulkUpdates.external_tls_mode} 
+                                        onChange={(e) => setBulkUpdates({...bulkUpdates, external_tls_mode: e.target.value})}
+                                        className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                    >
+                                        <option value="ignore">Biarkan Seperti Semula (Abaikan)</option>
+                                        <option value="strict">Strict (Wajib SSL Valid)</option>
+                                        <option value="insecure">Insecure (Abaikan SSL kedaluwarsa)</option>
+                                    </select>
+                                </div>
                                 
-                                <label className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/80 transition-colors border border-gray-200 dark:border-gray-700">
-                                    <input 
-                                        type="checkbox" 
-                                        checked={bulkUpdates.enable_recording} 
-                                        onChange={(e) => setBulkUpdates({...bulkUpdates, enable_recording: e.target.checked})}
-                                        className="w-5 h-5 text-primary bg-white border-gray-300 rounded focus:ring-primary"
-                                    />
-                                    <div>
-                                        <p className="text-sm font-semibold text-gray-900 dark:text-white">Aktifkan Perekaman Dasar</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">Mulai atau hentikan rekaman ke disk server</p>
-                                    </div>
-                                </label>
+                                <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
+                                    <label className="text-sm font-semibold text-gray-900 dark:text-white">Aktifkan Perekaman Dasar</label>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Mulai atau hentikan rekaman ke disk server</p>
+                                    <select 
+                                        value={bulkUpdates.enable_recording} 
+                                        onChange={(e) => setBulkUpdates({...bulkUpdates, enable_recording: e.target.value})}
+                                        className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                    >
+                                        <option value="ignore">Biarkan Seperti Semula (Abaikan)</option>
+                                        <option value="1">Aktifkan (ON)</option>
+                                        <option value="0">Matikan (OFF)</option>
+                                    </select>
+                                </div>
                                 
-                                <label className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/80 transition-colors border border-gray-200 dark:border-gray-700">
-                                    <input 
-                                        type="checkbox" 
-                                        checked={bulkUpdates.enabled} 
-                                        onChange={(e) => setBulkUpdates({...bulkUpdates, enabled: e.target.checked})}
-                                        className="w-5 h-5 text-primary bg-white border-gray-300 rounded focus:ring-primary"
-                                    />
-                                    <div>
-                                        <p className="text-sm font-semibold text-gray-900 dark:text-white">Status Publik Aktif</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">Tampilkan semua kamera milik Area ini ke beranda publik</p>
-                                    </div>
-                                </label>
+                                <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
+                                    <label className="text-sm font-semibold text-gray-900 dark:text-white">Status Publik Aktif</label>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Tampilkan semua kamera milik Area ini ke beranda publik</p>
+                                    <select 
+                                        value={bulkUpdates.enabled} 
+                                        onChange={(e) => setBulkUpdates({...bulkUpdates, enabled: e.target.value})}
+                                        className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                    >
+                                        <option value="ignore">Biarkan Seperti Semula (Abaikan)</option>
+                                        <option value="1">Aktifkan (ON)</option>
+                                        <option value="0">Matikan (OFF)</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
                         <div className="flex gap-3 p-6 pt-0 border-t border-gray-100 dark:border-gray-800/50 mt-2">
