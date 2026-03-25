@@ -181,7 +181,7 @@ describe('cameraHealthService weighted scoring', () => {
         expect(service.healthState.get(camera.id).effectiveOnline).toBe(true);
     });
 
-    it('decays score properly on intermittent success', () => {
+    it('wipes out failure score instantly on success', () => {
         const service = new CameraHealthService();
         const camera = { id: 4, is_online: 1 };
 
@@ -190,14 +190,9 @@ describe('cameraHealthService weighted scoring', () => {
         service.applyWeightedScoring(camera, { online: false, reason: 'ECONNREFUSED' }); // score = 1
         expect(service.healthState.get(camera.id).failureScore).toBe(1);
 
-        service.applyWeightedScoring(camera, { online: true, reason: 'ok' }); // score drops by 0.5
-        expect(service.healthState.get(camera.id).failureScore).toBe(0.5);
-
-        service.applyWeightedScoring(camera, { online: true, reason: 'ok' }); // score drops to 0
+        service.applyWeightedScoring(camera, { online: true, reason: 'ok' }); // instant heal
         expect(service.healthState.get(camera.id).failureScore).toBe(0);
-        
-        service.applyWeightedScoring(camera, { online: true, reason: 'ok' }); // score cannot be less than 0
-        expect(service.healthState.get(camera.id).failureScore).toBe(0);
+        expect(service.healthState.get(camera.id).effectiveOnline).toBe(true);
     });
 });
 

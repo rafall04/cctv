@@ -572,12 +572,10 @@ class CameraHealthService {
         const state = this.ensureCameraState(camera.id, camera.is_online);
 
         if (rawResult.online) {
-            state.failureScore = Math.max(0, state.failureScore - SCORE_DECAY_ON_SUCCESS);
+            // Instant Recovery! A single success wipes out the failure memory completely.
+            state.failureScore = 0;
             state.needsConfirmation = false;
-            
-            if (state.failureScore === 0) {
-                state.effectiveOnline = true;
-            }
+            state.effectiveOnline = true;
         } else {
             const weight = FAILURE_WEIGHTS[rawResult.reason] ?? 0.3;
             state.failureScore += weight;
