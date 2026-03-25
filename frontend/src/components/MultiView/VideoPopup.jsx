@@ -64,6 +64,8 @@ function VideoPopup({
     const abortControllerRef = useRef(null);
     const loadingStageRef = useRef(LoadingStage.CONNECTING);
     const autoRetryCountRef = useRef(0);
+    const internalWarmupRetryCountRef = useRef(0);
+    const internalWarmupRetryTimeoutRef = useRef(null);
     const { branding } = useBranding(); // ← FIX: Add branding context
 
     // Handle close with fullscreen exit
@@ -161,6 +163,18 @@ function VideoPopup({
         autoRetryCountRef.current = autoRetryCount;
     }, [autoRetryCount]);
 
+    const clearInternalWarmupRetry = useCallback(() => {
+        if (internalWarmupRetryTimeoutRef.current) {
+            clearTimeout(internalWarmupRetryTimeoutRef.current);
+            internalWarmupRetryTimeoutRef.current = null;
+        }
+    }, []);
+
+    useEffect(() => {
+        internalWarmupRetryCountRef.current = 0;
+        clearInternalWarmupRetry();
+    }, [camera.id, effectiveUrl, clearInternalWarmupRetry]);
+
     useEffect(() => {
         if (isMaintenance || isOffline) {
             return;
@@ -227,21 +241,28 @@ function VideoPopup({
         // Don't track if camera is offline, in maintenance, or not popup-capable
         if (isMaintenance || isOffline || !streamCapabilities.popup) return;
 
+        let isActive = true;
         let sessionId = null;
 
         // Start viewer session
         const startTracking = async () => {
-            try {
-                sessionId = await viewerService.startSession(camera.id);
-            } catch (error) {
-                console.error('[VideoPopup] Failed to start viewer session:', error);
+            const nextSessionId = await viewerService.startSession(camera.id);
+
+            if (!isActive) {
+                if (nextSessionId) {
+                    viewerService.stopSession(nextSessionId).catch(() => { });
+                }
+                return;
             }
+
+            sessionId = nextSessionId;
         };
 
         startTracking();
 
         // Cleanup: stop session when popup closes
         return () => {
+            isActive = false;
             if (sessionId) {
                 viewerService.stopSession(sessionId).catch(err => {
                     console.error('[VideoPopup] Failed to stop viewer session:', err);
@@ -310,6 +331,7 @@ function VideoPopup({
             abortControllerRef.current.abort();
             abortControllerRef.current = null;
         }
+        clearInternalWarmupRetry();
         if (hlsRef.current) {
             hlsRef.current.destroy();
             hlsRef.current = null;
@@ -323,7 +345,7 @@ function VideoPopup({
         if (fallbackHandlerRef.current) {
             fallbackHandlerRef.current.clearPendingRetry();
         }
-    }, [clearStreamTimeout]);
+    }, [clearInternalWarmupRetry, clearStreamTimeout]);
 
     useEffect(() => {
         // Skip HLS loading if camera is in maintenance or offline
@@ -356,6 +378,8 @@ function VideoPopup({
             clearStreamTimeout();
             syncVideoAspectRatio();
             resetFailures();
+            internalWarmupRetryCountRef.current = 0;
+            clearInternalWarmupRetry();
             if (fallbackHandlerRef.current) {
                 fallbackHandlerRef.current.reset();
             }
@@ -504,6 +528,31 @@ function VideoPopup({
                     streamSource: camera.stream_source,
                 });
 
+                const isInternalManifestWarmup404 =
+                    !isExternal &&
+                    d.type === HlsClass.ErrorTypes.NETWORK_ERROR &&
+                    d.response?.code === 404 &&
+                    (
+                        d.details === 'manifestLoadError' ||
+                        d.details === 'levelLoadError'
+                    );
+
+                if (isInternalManifestWarmup404 && internalWarmupRetryCountRef.current < 3) {
+                    internalWarmupRetryCountRef.current += 1;
+                    setStatus('connecting');
+                    setErrorType(null);
+                    setLoadingStage(LoadingStage.CONNECTING);
+                    updateStreamStage(LoadingStage.CONNECTING);
+                    clearInternalWarmupRetry();
+                    internalWarmupRetryTimeoutRef.current = setTimeout(() => {
+                        internalWarmupRetryTimeoutRef.current = null;
+                        if (!cancelled) {
+                            setRetryKey((current) => current + 1);
+                        }
+                    }, 1200);
+                    return;
+                }
+
                 // Aggressive network error recovery for external streams
                 if (isExternal && d.type === HlsClass.ErrorTypes.NETWORK_ERROR) {
                     if (!hls._networkErrorRecoveryCount) hls._networkErrorRecoveryCount = 0;
@@ -618,7 +667,7 @@ function VideoPopup({
             cleanupResources();
             if (hls) { hls.destroy(); hlsRef.current = null; }
         };
-    }, [camera.stream_source, cleanupResources, clearStreamTimeout, deviceTier, isExternal, isMaintenance, isOffline, requestVideoPlay, resetFailures, retryKey, startTimeout, syncVideoAspectRatio, updateStreamStage, effectiveUrl, forceProxyFallback, isDirectStream, proxyFallbackUrl]);
+    }, [camera.id, camera.stream_source, cleanupResources, clearInternalWarmupRetry, clearStreamTimeout, deviceTier, isExternal, isHlsCamera, isMaintenance, isOffline, requestVideoPlay, resetFailures, retryKey, startTimeout, syncVideoAspectRatio, updateStreamStage, effectiveUrl, forceProxyFallback, isDirectStream, proxyFallbackUrl]);
 
     const handleRetry = useCallback(() => {
         cleanupResources();
@@ -627,6 +676,7 @@ function VideoPopup({
         setLoadingStage(LoadingStage.CONNECTING);
         setAutoRetryCount(0);
         setShowTroubleshooting(false);
+        internalWarmupRetryCountRef.current = 0;
         resetFailures();
         if (fallbackHandlerRef.current) {
             fallbackHandlerRef.current.reset();

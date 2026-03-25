@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getApiUrl, loadRuntimeConfig, normalizeApiBaseUrl, resetConfig } from './runtimeConfig';
+import { getApiUrl, getRuntimeConfig, loadRuntimeConfig, normalizeApiBaseUrl, resetConfig } from './runtimeConfig';
 
 describe('runtimeConfig', () => {
     beforeEach(() => {
@@ -23,11 +23,17 @@ describe('runtimeConfig', () => {
                 portPublic: '80',
                 protocol: 'http',
                 wsProtocol: 'ws',
+                appVersion: '1.0.0',
+                buildId: 'build-123',
             }),
         }));
 
         await loadRuntimeConfig();
 
         expect(getApiUrl()).toBe('');
+        expect(getRuntimeConfig()).toMatchObject({
+            appVersion: '1.0.0',
+            buildId: 'build-123',
+        });
     });
 });

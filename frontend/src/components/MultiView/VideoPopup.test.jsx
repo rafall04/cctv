@@ -150,6 +150,9 @@ describe('VideoPopup non-live states', () => {
         clearTimeoutMock.mockClear();
         updateStageMock.mockClear();
         resetFailuresMock.mockClear();
+        vi.useRealTimers();
+        vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+        vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
     });
 
     afterEach(() => {
@@ -256,6 +259,38 @@ describe('VideoPopup non-live states', () => {
         expect(screen.queryByTitle('Zoom In')).toBeNull();
         expect(screen.queryByTitle('Fullscreen')).toBeNull();
     });
+
+    it('memperlakukan 404 manifest internal sebagai warmup sementara sebelum retry ulang', async () => {
+        render(
+            <VideoPopup
+                camera={{ ...baseCamera, id: 19 }}
+                onClose={vi.fn()}
+            />
+        );
+
+        await waitFor(() => {
+            expect(hlsInstances).toHaveLength(1);
+        });
+
+        await act(async () => {
+            hlsInstances[0].emit('error', {}, {
+                fatal: true,
+                type: 'networkError',
+                details: 'manifestLoadError',
+                response: { code: 404 },
+            });
+        });
+
+        expect(screen.queryByText('Koneksi Gagal')).toBeNull();
+
+        await act(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 1300));
+        });
+
+        await waitFor(() => {
+            expect(hlsInstances.length).toBeGreaterThanOrEqual(2);
+        });
+    }, 10000);
 
     it('menyesuaikan rasio body live grid dari metadata video 4:3', async () => {
         render(

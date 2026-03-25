@@ -59,8 +59,15 @@ class ViewerService {
             
             throw new Error(response.data.message || 'Failed to start session');
         } catch (error) {
+            const statusCode = error?.response?.status || null;
+
+            if (statusCode && statusCode < 500) {
+                console.warn('[ViewerService] Session tracking unavailable for camera', cameraId, statusCode);
+                return null;
+            }
+
             console.error('[ViewerService] Error starting session:', error);
-            throw error;
+            return null;
         }
     }
 

@@ -19,50 +19,61 @@ function normalizeUrl(url) {
     return typeof url === 'string' ? url.trim() : '';
 }
 
-export function getEffectiveDeliveryType(camera = {}) {
-    if (DELIVERY_TYPES.includes(camera.delivery_type)) {
-        return camera.delivery_type;
-    }
-
-    const streamSource = typeof camera.stream_source === 'string'
-        ? camera.stream_source.trim().toLowerCase()
-        : '';
+function inferLegacyExternalDeliveryType(camera = {}) {
     const externalHlsUrl = normalizeUrl(camera.external_hls_url);
     const externalStreamUrl = normalizeUrl(camera.external_stream_url);
     const externalEmbedUrl = normalizeUrl(camera.external_embed_url);
     const externalUrl = externalStreamUrl || externalHlsUrl;
+    const hasExternalFields = Boolean(externalHlsUrl || externalStreamUrl || externalEmbedUrl);
+    const streamSource = typeof camera.stream_source === 'string'
+        ? camera.stream_source.trim().toLowerCase()
+        : '';
 
-    if (streamSource === 'external') {
-        if (externalHlsUrl && DELIVERY_TYPE_PATTERNS.http.test(externalHlsUrl)) {
-            return 'external_hls';
-        }
-
-        if (externalUrl && DELIVERY_TYPE_PATTERNS.websocket.test(externalUrl)) {
-            return DELIVERY_TYPE_PATTERNS.jsmpegHint.test(externalUrl)
-                ? 'external_jsmpeg'
-                : 'external_custom_ws';
-        }
-
-        if (externalUrl && DELIVERY_TYPE_PATTERNS.zoneminderMjpeg.test(externalUrl)) {
-            return 'external_mjpeg';
-        }
-
-        if (externalUrl && DELIVERY_TYPE_PATTERNS.http.test(externalUrl)) {
-            if (DELIVERY_TYPE_PATTERNS.hlsHint.test(externalUrl)) {
-                return 'external_hls';
-            }
-
-            return 'external_mjpeg';
-        }
-
-        if (externalEmbedUrl && DELIVERY_TYPE_PATTERNS.http.test(externalEmbedUrl)) {
-            return 'external_embed';
-        }
-
+    if (externalHlsUrl && DELIVERY_TYPE_PATTERNS.http.test(externalHlsUrl)) {
         return 'external_hls';
     }
 
-    return 'internal_hls';
+    if (externalUrl && DELIVERY_TYPE_PATTERNS.websocket.test(externalUrl)) {
+        return DELIVERY_TYPE_PATTERNS.jsmpegHint.test(externalUrl)
+            ? 'external_jsmpeg'
+            : 'external_custom_ws';
+    }
+
+    if (externalUrl && DELIVERY_TYPE_PATTERNS.zoneminderMjpeg.test(externalUrl)) {
+        return 'external_mjpeg';
+    }
+
+    if (externalUrl && DELIVERY_TYPE_PATTERNS.http.test(externalUrl)) {
+        return DELIVERY_TYPE_PATTERNS.hlsHint.test(externalUrl)
+            ? 'external_hls'
+            : 'external_mjpeg';
+    }
+
+    if (externalEmbedUrl && DELIVERY_TYPE_PATTERNS.http.test(externalEmbedUrl)) {
+        return 'external_embed';
+    }
+
+    if (hasExternalFields || streamSource === 'external') {
+        return 'external_hls';
+    }
+
+    return null;
+}
+
+export function getEffectiveDeliveryType(cameraOrDeliveryType = {}) {
+    if (typeof cameraOrDeliveryType === 'string') {
+        return DELIVERY_TYPES.includes(cameraOrDeliveryType)
+            ? cameraOrDeliveryType
+            : 'internal_hls';
+    }
+
+    const camera = cameraOrDeliveryType || {};
+
+    if (DELIVERY_TYPES.includes(camera.delivery_type)) {
+        return camera.delivery_type;
+    }
+
+    return inferLegacyExternalDeliveryType(camera) || 'internal_hls';
 }
 
 export function getPrimaryExternalStreamUrl(camera = {}) {
@@ -85,7 +96,9 @@ export function isHlsDeliveryType(deliveryType) {
     return deliveryType === 'internal_hls' || deliveryType === 'external_hls';
 }
 
-export function getStreamCapabilities(deliveryType) {
+export function getStreamCapabilities(cameraOrDeliveryType = {}) {
+    const deliveryType = getEffectiveDeliveryType(cameraOrDeliveryType);
+
     switch (deliveryType) {
         case 'internal_hls':
             return {

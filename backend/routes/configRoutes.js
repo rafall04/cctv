@@ -8,6 +8,17 @@
 import { config } from '../config/config.js';
 import { query } from '../database/connectionPool.js';
 
+function getAppVersionInfo() {
+    return {
+        appVersion: process.env.APP_VERSION || '1.0.0',
+        buildId: process.env.APP_BUILD_ID
+            || process.env.GIT_COMMIT_SHA
+            || process.env.RENDER_GIT_COMMIT
+            || process.env.SOURCE_COMMIT
+            || 'unknown',
+    };
+}
+
 export function buildManifestFromBranding(branding = {}) {
     return {
         name: branding.meta_title || branding.company_name || 'CCTV System',
@@ -86,6 +97,7 @@ export default async function configRoutes(fastify) {
 
         // WebSocket protocol
         const wsProtocol = protocol === 'https' ? 'wss' : 'ws';
+        const versionInfo = getAppVersionInfo();
 
         return {
             apiUrl,
@@ -94,6 +106,8 @@ export default async function configRoutes(fastify) {
             portPublic: process.env.PORT_PUBLIC || '800',
             protocol,
             wsProtocol,
+            appVersion: versionInfo.appVersion,
+            buildId: versionInfo.buildId,
             timestamp: new Date().toISOString(),
         };
     });
@@ -105,9 +119,11 @@ export default async function configRoutes(fastify) {
      * No authentication required
      */
     fastify.get('/api/config/version', async (request, reply) => {
+        const versionInfo = getAppVersionInfo();
         return {
             name: 'RAF NET CCTV',
-            version: '1.0.0',
+            version: versionInfo.appVersion,
+            buildId: versionInfo.buildId,
             environment: config.server.env,
             timestamp: new Date().toISOString(),
         };

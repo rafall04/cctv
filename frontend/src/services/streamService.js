@@ -106,8 +106,10 @@ export const streamService = {
             if (response.data?.success && response.data?.data) {
                 response.data.data = response.data.data.map(camera => {
                     let processedStreams = camera.streams;
-                    const deliveryType = getEffectiveDeliveryType(camera);
-                    const rawExternalHlsUrl = camera.external_hls_url || camera.external_stream_url || null;
+                    const deliveryType = camera.delivery_type || getEffectiveDeliveryType(camera);
+                    const rawExternalHlsUrl = deliveryType === 'external_hls'
+                        ? (camera.external_stream_url || camera.external_hls_url || null)
+                        : null;
 
                     if (deliveryType === 'external_hls') {
                         const useProxy = camera.external_use_proxy !== 0 && camera.external_use_proxy !== false;
@@ -146,8 +148,10 @@ export const streamService = {
             if (response.data?.success && response.data?.data?.streams) {
                 const camera = response.data.data;
                 let processedStreams = camera.streams;
-                const deliveryType = getEffectiveDeliveryType(camera);
-                const rawExternalHlsUrl = camera.external_hls_url || camera.external_stream_url || null;
+                const deliveryType = camera.delivery_type || getEffectiveDeliveryType(camera);
+                const rawExternalHlsUrl = deliveryType === 'external_hls'
+                    ? (camera.external_stream_url || camera.external_hls_url || null)
+                    : null;
 
                 if (deliveryType === 'external_hls') {
                     const useProxy = camera.external_use_proxy !== 0 && camera.external_use_proxy !== false;

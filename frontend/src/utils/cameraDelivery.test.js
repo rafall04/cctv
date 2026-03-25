@@ -16,6 +16,13 @@ describe('cameraDelivery compat inference', () => {
         })).toBe('external_hls');
     });
 
+    it('maps dirty legacy rows with external URLs to external_hls even when stream_source is wrong', () => {
+        expect(getEffectiveDeliveryType({
+            stream_source: 'internal',
+            external_stream_url: 'https://example.com/live/index.m3u8?token=abc',
+        })).toBe('external_hls');
+    });
+
     it('maps ZoneMinder MJPEG cameras to external_mjpeg', () => {
         expect(getEffectiveDeliveryType({
             stream_source: 'external',

@@ -25,7 +25,7 @@ export async function startViewerSession(request, reply) {
         }
 
         const camera = cameraService.getCameraById(cameraId);
-        const capabilities = getStreamCapabilities(camera);
+        const capabilities = getStreamCapabilities(camera.delivery_type || camera);
 
         if (!camera.enabled) {
             return reply.code(400).send({

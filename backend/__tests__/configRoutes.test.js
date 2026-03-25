@@ -32,6 +32,8 @@ describe('configRoutes', () => {
             apiUrl: '/api',
             protocol: 'http',
             wsProtocol: 'ws',
+            appVersion: '1.0.0',
+            buildId: 'unknown',
         });
         expect(response.json().portPublic).toBeTruthy();
 

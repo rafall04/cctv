@@ -77,6 +77,8 @@ export const loadRuntimeConfig = async () => {
                 portPublic: config.portPublic,
                 protocol: config.protocol,
                 wsProtocol: config.wsProtocol,
+                appVersion: config.appVersion || 'unknown',
+                buildId: config.buildId || 'unknown',
                 source: 'backend',
             };
 
@@ -93,6 +95,8 @@ export const loadRuntimeConfig = async () => {
                 portPublic: window.location.port || '800',
                 protocol: window.location.protocol.replace(':', ''),
                 wsProtocol: window.location.protocol === 'https:' ? 'wss' : 'ws',
+                appVersion: import.meta.env.VITE_APP_VERSION || 'unknown',
+                buildId: import.meta.env.VITE_BUILD_ID || 'env-fallback',
                 source: 'env',
             };
 
