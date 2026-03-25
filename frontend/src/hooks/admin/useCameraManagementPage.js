@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cameraService } from '../../services/cameraService';
 import { areaService } from '../../services/areaService';
+import { adminService } from '../../services/adminService';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useFormValidation } from '../useFormValidation';
 import { useAdminReconnectRefresh } from './useAdminReconnectRefresh';
@@ -26,6 +27,9 @@ export function useCameraManagementPage() {
     const [areas, setAreas] = useState([]);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState(null);
+    const [healthDebugItems, setHealthDebugItems] = useState([]);
+    const [healthDebugLoading, setHealthDebugLoading] = useState(true);
+    const [healthDebugError, setHealthDebugError] = useState(null);
     const [showModal, setShowModal] = useState(false);
     const [editingCamera, setEditingCamera] = useState(null);
     const [modalError, setModalError] = useState('');
@@ -77,6 +81,36 @@ export function useCameraManagementPage() {
         }
     }, []);
 
+    const loadHealthDebug = useCallback(async ({ mode = 'initial' } = {}) => {
+        const isBackgroundMode = mode === 'background' || mode === 'resume';
+
+        try {
+            if (!isBackgroundMode) {
+                setHealthDebugLoading(true);
+                setHealthDebugError(null);
+            }
+
+            const response = await adminService.getCameraHealthDebug(
+                isBackgroundMode ? REQUEST_POLICY.BACKGROUND : REQUEST_POLICY.BLOCKING
+            );
+
+            if (response.success) {
+                setHealthDebugItems(Array.isArray(response.data) ? response.data : []);
+                setHealthDebugError(null);
+            } else if (!isBackgroundMode) {
+                setHealthDebugError(response.message || 'Failed to load health diagnostics');
+            }
+        } catch (error) {
+            if (!isBackgroundMode) {
+                setHealthDebugError(error.response?.data?.message || 'Failed to load health diagnostics');
+            }
+        } finally {
+            if (!isBackgroundMode) {
+                setHealthDebugLoading(false);
+            }
+        }
+    }, []);
+
     const loadCameras = useCallback(async ({ mode = 'initial' } = {}) => {
         const isBackgroundMode = mode === 'background' || mode === 'resume';
         const requestId = ++camerasRequestIdRef.current;
@@ -121,11 +155,13 @@ export function useCameraManagementPage() {
     useEffect(() => {
         loadCameras({ mode: 'initial' });
         loadAreas({ mode: 'initial' });
-    }, [loadAreas, loadCameras]);
+        loadHealthDebug({ mode: 'initial' });
+    }, [loadAreas, loadCameras, loadHealthDebug]);
 
     useAdminReconnectRefresh(() => Promise.all([
         loadCameras({ mode: 'resume' }),
         loadAreas({ mode: 'resume' }),
+        loadHealthDebug({ mode: 'resume' }),
     ]));
 
     const closeModal = useCallback(() => {
@@ -320,6 +356,9 @@ export function useCameraManagementPage() {
         areas,
         loading,
         loadError,
+        healthDebugItems,
+        healthDebugLoading,
+        healthDebugError,
         showModal,
         editingCamera,
         deletingId,
@@ -329,6 +368,7 @@ export function useCameraManagementPage() {
         formData,
         isSubmitting,
         loadCameras,
+        loadHealthDebug,
         openAddModal,
         openEditModal,
         closeModal,

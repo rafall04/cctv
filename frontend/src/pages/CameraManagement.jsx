@@ -1,5 +1,6 @@
 import CameraFormModal from '../components/admin/cameras/CameraFormModal';
 import CameraGrid from '../components/admin/cameras/CameraGrid';
+import CameraHealthDebugPanel from '../components/admin/cameras/CameraHealthDebugPanel.jsx';
 import CameraManagementHeader from '../components/admin/cameras/CameraManagementHeader';
 import {
     CameraManagementEmptyState,
@@ -14,6 +15,9 @@ export default function CameraManagement() {
         areas,
         loading,
         loadError,
+        healthDebugItems,
+        healthDebugLoading,
+        healthDebugError,
         showModal,
         editingCamera,
         deletingId,
@@ -40,6 +44,11 @@ export default function CameraManagement() {
     return (
         <div className="space-y-8">
             <CameraManagementHeader onAddCamera={openAddModal} />
+            <CameraHealthDebugPanel
+                items={healthDebugItems}
+                loading={healthDebugLoading}
+                error={healthDebugError}
+            />
 
             {loading ? (
                 <CameraManagementLoadingState />

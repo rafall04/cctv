@@ -13,6 +13,7 @@ import cache from '../services/cacheService.js';
 import { getTimezone, setTimezone, TIMEZONE_MAP, formatDateTime } from '../services/timezoneService.js';
 import { logAdminAction } from '../services/securityAuditLogger.js';
 import backupService from '../services/backupService.js';
+import cameraHealthService from '../services/cameraHealthService.js';
 
 export async function getDashboardStats(request, reply) {
     try {
@@ -196,6 +197,21 @@ export async function getRealTimeViewers(request, reply) {
         });
     } catch (error) {
         console.error('Get real-time viewers error:', error);
+        return reply.code(500).send({
+            success: false,
+            message: 'Internal server error',
+        });
+    }
+}
+
+export async function getCameraHealthDebug(request, reply) {
+    try {
+        return reply.send({
+            success: true,
+            data: cameraHealthService.getHealthDebugSnapshot(),
+        });
+    } catch (error) {
+        console.error('Get camera health debug error:', error);
         return reply.code(500).send({
             success: false,
             message: 'Internal server error',

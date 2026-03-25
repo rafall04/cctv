@@ -34,7 +34,8 @@ import {
 
 vi.mock('axios', () => ({
     default: {
-        get: vi.fn()
+        get: vi.fn(),
+        head: vi.fn()
     }
 }));
 
@@ -319,6 +320,54 @@ describe('cameraHealthService external TLS policy', () => {
 
         expect(result.online).toBe(false);
         expect(result.reason).toBe('tls_verification_failed');
+    });
+
+    it('recovers external MJPEG cameras from offline when snapshot target is reachable', async () => {
+        axios.head.mockResolvedValueOnce({ status: 200 });
+
+        const service = new CameraHealthService();
+        const result = await service.evaluateCameraStatus({
+            id: 14,
+            name: 'Snapshot Cam',
+            enabled: 1,
+            is_online: 0,
+            delivery_type: 'external_mjpeg',
+            external_snapshot_url: 'https://example.com/snapshot.jpg',
+            external_stream_url: 'https://example.com/mjpeg',
+        }, new Map());
+
+        expect(result.isOnline).toBe(1);
+        expect(result.rawReason).toBe('snapshot_reachable');
+    });
+
+    it('treats embed cameras with embed url as embed health checks instead of missing HLS', async () => {
+        axios.head.mockResolvedValueOnce({ status: 200 });
+
+        const service = new CameraHealthService();
+        const result = await service.evaluateCameraRaw({
+            id: 15,
+            enabled: 1,
+            is_online: 1,
+            stream_source: 'internal',
+            external_embed_url: 'https://example.com/embed-page',
+        }, new Map());
+
+        expect(result.online).toBe(true);
+        expect(result.reason).toBe('embed_reachable');
+    });
+
+    it('keeps websocket external cameras online by default when no probe target exists', async () => {
+        const service = new CameraHealthService();
+        const result = await service.evaluateCameraStatus({
+            id: 16,
+            enabled: 1,
+            is_online: 0,
+            delivery_type: 'external_custom_ws',
+            external_stream_url: 'wss://example.com/stream',
+        }, new Map());
+
+        expect(result.isOnline).toBe(1);
+        expect(result.rawReason).toBe('assumed_online_no_probe_target');
     });
 });
 

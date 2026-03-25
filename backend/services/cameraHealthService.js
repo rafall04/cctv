@@ -12,6 +12,7 @@ import { getTimezone } from './timezoneService.js';
 import { recordingService } from './recordingService.js';
 import thumbnailService from './thumbnailService.js';
 import { getEffectiveDeliveryType, getPrimaryExternalStreamUrl } from '../utils/cameraDelivery.js';
+import { SHARED_CAMERA_STREAM_PROJECTION } from '../utils/cameraProjection.js';
 
 const mediaMtxApiBaseUrl = `${(config.mediamtx?.apiUrl || 'http://localhost:9997').replace(/\/$/, '')}/v3`;
 
@@ -160,8 +161,15 @@ function buildExternalRequestOptions(externalTlsMode) {
     return {
         externalTlsMode: normalizedTlsMode,
         httpsAgent: normalizedTlsMode === 'insecure'
-            ? new https.Agent({ rejectUnauthorized: false })
+            ? new https.Agent({ rejectUnauthorized: false, keepAlive: true })
             : undefined
+    };
+}
+
+function buildExternalRequestHeaders(accept = '*/*') {
+    return {
+        Accept: accept,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     };
 }
 
@@ -177,8 +185,13 @@ async function batchProbe(cameras, probeFn) {
     const domainGroups = new Map();
     for (const camera of cameras) {
         let hostname = '_internal_';
-        if (getEffectiveDeliveryType(camera) === 'external_hls') {
-            try { hostname = new URL(getPrimaryExternalStreamUrl(camera)).hostname; } catch {}
+        const deliveryType = getEffectiveDeliveryType(camera);
+        const primaryTarget = camera.external_snapshot_url
+            || camera.external_embed_url
+            || getPrimaryExternalStreamUrl(camera);
+
+        if (deliveryType !== 'internal_hls' && primaryTarget) {
+            try { hostname = new URL(primaryTarget).hostname; } catch {}
         }
         if (!domainGroups.has(hostname)) domainGroups.set(hostname, []);
         domainGroups.get(hostname).push(camera);
@@ -281,6 +294,34 @@ class CameraHealthService {
         return buildExternalRequestOptions(camera?.external_tls_mode);
     }
 
+    getHealthStrategy(camera) {
+        const deliveryType = getEffectiveDeliveryType(camera);
+
+        if (deliveryType === 'internal_hls') {
+            return 'internal_hls';
+        }
+
+        if (deliveryType === 'external_hls') {
+            return 'external_hls_playlist';
+        }
+
+        if (deliveryType === 'external_mjpeg') {
+            return camera.external_snapshot_url ? 'external_snapshot' : 'external_mjpeg_stream';
+        }
+
+        if (deliveryType === 'external_embed' || deliveryType === 'external_jsmpeg' || deliveryType === 'external_custom_ws') {
+            if (camera.external_snapshot_url) {
+                return 'external_snapshot';
+            }
+            if (camera.external_embed_url) {
+                return 'external_embed_probe';
+            }
+            return 'passive_external';
+        }
+
+        return 'unsupported';
+    }
+
     async handleCameraStatusTransition(camera, previousOnline, nextOnline, rawReason) {
         if (previousOnline === nextOnline) {
             return;
@@ -318,11 +359,9 @@ class CameraHealthService {
                 timeout: timeoutMs || EXTERNAL_REQUEST_TIMEOUT_MS,
                 responseType: 'text',
                 transformResponse: [(data) => data],
-                headers: {
-                    Accept: 'application/vnd.apple.mpegurl,application/x-mpegURL,*/*',
-                    'User-Agent': 'cctv-healthcheck/1.0'
-                },
+                headers: buildExternalRequestHeaders('application/vnd.apple.mpegurl,application/x-mpegURL,*/*'),
                 validateStatus: (status) => status < 500,
+                maxRedirects: 0,
                 httpsAgent: isHttpsRequest ? requestOptions.httpsAgent : undefined
             });
 
@@ -344,6 +383,81 @@ class CameraHealthService {
                 ok: false,
                 reason: mapExternalFetchError(error),
                 status: error.response?.status || null
+            };
+        }
+    }
+
+    async probeHttpAvailability(url, requestOptions = {}, options = {}) {
+        if (!url) {
+            return { online: false, reason: 'missing_external_probe_target' };
+        }
+
+        const timeoutMs = options.timeoutMs || EXTERNAL_REQUEST_TIMEOUT_MS;
+        const acceptHeader = options.acceptHeader || '*/*';
+        const isHttpsRequest = typeof url === 'string' && url.startsWith('https://');
+        const baseConfig = {
+            timeout: timeoutMs,
+            validateStatus: (status) => status < 500,
+            headers: buildExternalRequestHeaders(acceptHeader),
+            maxRedirects: options.maxRedirects ?? 5,
+            httpsAgent: isHttpsRequest ? requestOptions.httpsAgent : undefined,
+        };
+
+        try {
+            const headResponse = await axios.head(url, baseConfig);
+            if (headResponse.status >= 400) {
+                if (headResponse.status !== 405 && headResponse.status !== 501) {
+                    return {
+                        online: false,
+                        reason: `http_${headResponse.status}`,
+                        details: { method: 'HEAD', status: headResponse.status }
+                    };
+                }
+            } else {
+                return {
+                    online: true,
+                    reason: options.successReason || 'http_reachable',
+                    details: { method: 'HEAD', status: headResponse.status }
+                };
+            }
+        } catch (error) {
+            const mappedReason = mapExternalFetchError(error);
+            if (mappedReason !== 'request_error') {
+                return { online: false, reason: mappedReason };
+            }
+        }
+
+        try {
+            const response = await axios.get(url, {
+                ...baseConfig,
+                responseType: 'stream',
+            });
+
+            if (response.status >= 400) {
+                if (response.data?.destroy) {
+                    response.data.destroy();
+                }
+                return {
+                    online: false,
+                    reason: `http_${response.status}`,
+                    details: { method: 'GET', status: response.status }
+                };
+            }
+
+            if (response.data?.destroy) {
+                response.data.destroy();
+            }
+
+            return {
+                online: true,
+                reason: options.successReason || 'http_reachable',
+                details: { method: 'GET', status: response.status }
+            };
+        } catch (error) {
+            return {
+                online: false,
+                reason: mapExternalFetchError(error),
+                details: { method: 'GET', status: error.response?.status || null }
             };
         }
     }
@@ -546,8 +660,40 @@ class CameraHealthService {
             );
         }
 
+        if (deliveryType === 'external_mjpeg') {
+            return this.probeHttpAvailability(
+                camera.external_snapshot_url || getPrimaryExternalStreamUrl(camera),
+                this.getExternalRequestOptions(camera),
+                {
+                    timeoutMs: options.timeoutMs,
+                    acceptHeader: 'image/*,*/*;q=0.8',
+                    successReason: camera.external_snapshot_url ? 'snapshot_reachable' : 'mjpeg_reachable',
+                }
+            );
+        }
+
+        if (deliveryType === 'external_embed' || deliveryType === 'external_jsmpeg' || deliveryType === 'external_custom_ws') {
+            const probeTarget = camera.external_snapshot_url || camera.external_embed_url;
+            if (!probeTarget) {
+                return {
+                    online: camera.enabled === 1,
+                    reason: 'assumed_online_no_probe_target',
+                };
+            }
+
+            return this.probeHttpAvailability(
+                probeTarget,
+                this.getExternalRequestOptions(camera),
+                {
+                    timeoutMs: options.timeoutMs,
+                    acceptHeader: camera.external_snapshot_url ? 'image/*,*/*;q=0.8' : 'text/html,*/*;q=0.8',
+                    successReason: camera.external_snapshot_url ? 'snapshot_reachable' : 'embed_reachable',
+                }
+            );
+        }
+
         if (deliveryType !== 'internal_hls') {
-            return { online: camera.is_online === 1, reason: 'unsupported_external_delivery' };
+            return { online: camera.enabled === 1, reason: 'assumed_online_unknown_delivery' };
         }
 
         const pathName = camera.stream_key || `camera${camera.id}`;
@@ -620,6 +766,37 @@ class CameraHealthService {
         return { confirmed: true, rawResult: null };
     }
 
+    async evaluateCameraStatus(camera, activePaths, options = {}) {
+        this.ensureCameraState(camera.id, camera.is_online);
+        const rawResult = await this.evaluateCameraRaw(camera, activePaths, options);
+        const state = this.healthState.get(camera.id);
+        let isOnline = this.applyWeightedScoring(camera, rawResult);
+        let effectiveRawResult = rawResult;
+
+        if (state?.needsConfirmation && state.effectiveOnline) {
+            const { confirmed, rawResult: confirmationRawResult } = await this.confirmationProbe(camera, activePaths);
+            if (confirmed) {
+                state.effectiveOnline = false;
+                state.needsConfirmation = false;
+                isOnline = 0;
+            } else {
+                state.failureScore = Math.max(0, state.failureScore - SCORE_DECAY_ON_SUCCESS);
+                state.needsConfirmation = false;
+                if (confirmationRawResult) {
+                    effectiveRawResult = confirmationRawResult;
+                    isOnline = this.applyWeightedScoring(camera, confirmationRawResult);
+                }
+            }
+        }
+
+        return {
+            camera,
+            isOnline,
+            rawReason: effectiveRawResult.reason,
+            rawDetails: effectiveRawResult.details || null,
+        };
+    }
+
     async checkAllCameras() {
         if (this.isChecking) {
             console.log('[CameraHealth] Previous check still running, skipping this tick');
@@ -631,12 +808,7 @@ class CameraHealthService {
         try {
             const activePaths = await this.getActivePaths();
             const cameras = query(`
-                SELECT id, name, location, is_online, enabled, enable_recording, stream_key, private_rtsp_url, stream_source, delivery_type, external_hls_url, external_stream_url,
-                       COALESCE(external_use_proxy, 1) as external_use_proxy,
-                       CASE
-                           WHEN external_tls_mode IN ('strict', 'insecure') THEN external_tls_mode
-                           ELSE 'strict'
-                       END as external_tls_mode
+                SELECT ${SHARED_CAMERA_STREAM_PROJECTION}
                 FROM cameras
                 WHERE enabled = 1
             `);
@@ -645,47 +817,13 @@ class CameraHealthService {
             const activeCameraIds = new Set(cameras.map((camera) => camera.id));
 
             const probeResults = await batchProbe(cameras, async (camera) => {
-                this.ensureCameraState(camera.id, camera.is_online);
-                const rawResult = await this.evaluateCameraRaw(camera, activePaths);
-                const isOnline = this.applyWeightedScoring(camera, rawResult);
-                return { camera, isOnline, rawReason: rawResult.reason };
+                return this.evaluateCameraStatus(camera, activePaths);
             });
-
-            const needsConfirmation = [];
-            for (const { result, camera } of probeResults) {
-                if (result.status === 'fulfilled') {
-                    const state = this.healthState.get(camera.id);
-                    if (state?.needsConfirmation && state.effectiveOnline) {
-                        needsConfirmation.push(camera);
-                    }
-                }
-            }
-
-            for (const camera of needsConfirmation) {
-                const { confirmed, rawResult } = await this.confirmationProbe(camera, activePaths);
-                const state = this.healthState.get(camera.id);
-                if (confirmed) {
-                    state.effectiveOnline = false;
-                    state.needsConfirmation = false;
-                } else {
-                    state.failureScore = Math.max(0, state.failureScore - SCORE_DECAY_ON_SUCCESS);
-                    state.needsConfirmation = false;
-                    if (rawResult) this.applyWeightedScoring(camera, rawResult);
-                }
-                
-                const pResult = probeResults.find(p => p.camera.id === camera.id);
-                if (pResult && pResult.result.status === 'fulfilled') {
-                    pResult.result.value.isOnline = state.effectiveOnline ? 1 : 0;
-                    if (rawResult && !confirmed) {
-                        pResult.result.value.rawReason = rawResult.reason;
-                    }
-                }
-            }
 
             const finalResults = probeResults
                 .filter(p => p.result.status === 'fulfilled')
                 .map(p => ({
-                    cameraId: p.camera.id,
+                    cameraId: p.result.value.camera.id,
                     isOnline: p.result.value.isOnline,
                     timestamp
                 }));
@@ -706,8 +844,11 @@ class CameraHealthService {
             const wentOffline = [];
             const wentOnline = [];
 
-            for (const { result } of probeResults) {
-                if (result.status !== 'fulfilled') continue;
+            for (const { result, camera } of probeResults) {
+                if (result.status !== 'fulfilled') {
+                    console.error(`[CameraHealth] Camera ${camera.id} (${camera.name}) probe failed:`, result.reason?.message || result.reason);
+                    continue;
+                }
 
                 const { camera, isOnline, rawReason } = result.value;
                 const statusChanged = camera.is_online !== isOnline;
@@ -796,18 +937,41 @@ class CameraHealthService {
         }
     }
 
+    getHealthDebugSnapshot() {
+        const cameras = query(`
+            SELECT ${SHARED_CAMERA_STREAM_PROJECTION}
+            FROM cameras c
+            ORDER BY c.enabled DESC, c.id ASC
+        `);
+
+        return cameras.map((camera) => {
+            const deliveryType = getEffectiveDeliveryType(camera);
+            const state = this.ensureCameraState(camera.id, camera.is_online);
+
+            return {
+                cameraId: camera.id,
+                cameraName: camera.name,
+                enabled: camera.enabled,
+                lastOnlineCheck: camera.last_online_check || null,
+                dbOnline: camera.is_online === 1,
+                delivery_type: deliveryType,
+                healthStrategy: this.getHealthStrategy(camera),
+                effectiveOnline: state.effectiveOnline,
+                lastReason: state.lastReason,
+                lastDetails: state.lastDetails,
+                failureScore: state.failureScore,
+                needsConfirmation: state.needsConfirmation,
+            };
+        });
+    }
+
     async checkCamera(cameraId) {
         try {
             const activePaths = await this.getActivePaths();
             const camera = queryOne(
-                `SELECT id, name, location, is_online, enabled, enable_recording, stream_key, private_rtsp_url, stream_source, delivery_type, external_hls_url, external_stream_url,
-                        COALESCE(external_use_proxy, 1) as external_use_proxy,
-                        CASE
-                            WHEN external_tls_mode IN ('strict', 'insecure') THEN external_tls_mode
-                            ELSE 'strict'
-                        END as external_tls_mode
+                `SELECT ${SHARED_CAMERA_STREAM_PROJECTION}
                  FROM cameras
-                 WHERE id = ?`,
+                 WHERE id = ? AND enabled = 1`,
                 [cameraId]
             );
 
@@ -815,22 +979,20 @@ class CameraHealthService {
                 return false;
             }
 
-            this.ensureCameraState(camera.id, camera.is_online);
-            const rawResult = await this.evaluateCameraRaw(camera, activePaths);
-            const isOnline = this.applyHysteresis(camera, rawResult);
+            const result = await this.evaluateCameraStatus(camera, activePaths, { bustCache: true });
             const timestamp = getTimestamp();
 
             execute(
                 'UPDATE cameras SET is_online = ?, last_online_check = ? WHERE id = ?',
-                [isOnline, timestamp, camera.id]
+                [result.isOnline, timestamp, camera.id]
             );
 
-            if (camera.is_online !== isOnline) {
-                await this.handleCameraStatusTransition(camera, camera.is_online, isOnline, rawResult.reason);
+            if (camera.is_online !== result.isOnline) {
+                await this.handleCameraStatusTransition(camera, camera.is_online, result.isOnline, result.rawReason);
             }
 
             this.lastCheck = new Date();
-            return isOnline === 1;
+            return result.isOnline === 1;
         } catch (error) {
             console.error(`[CameraHealth] Check camera ${cameraId} failed:`, error.message);
             return false;

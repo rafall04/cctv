@@ -6,6 +6,7 @@ import {
     getEffectiveDeliveryType,
     getStreamCapabilities,
 } from '../utils/cameraDelivery.js';
+import { SHARED_CAMERA_STREAM_PROJECTION, SHARED_CAMERA_STREAM_WITH_AREA_PROJECTION } from '../utils/cameraProjection.js';
 
 class StreamService {
     buildCameraResponse(camera) {
@@ -62,19 +63,7 @@ class StreamService {
 
     getStreamUrls(cameraId, requestHost) {
         const camera = queryOne(
-            `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel,
-                    c.latitude, c.longitude, c.stream_key, c.video_codec, c.stream_source, c.external_hls_url,
-                    c.delivery_type, c.external_stream_url, c.external_embed_url, c.external_snapshot_url,
-                    CASE
-                        WHEN c.external_origin_mode IN ('direct', 'embed') THEN c.external_origin_mode
-                        ELSE 'direct'
-                    END as external_origin_mode,
-                    COALESCE(c.external_use_proxy, 1) as external_use_proxy,
-                    CASE
-                        WHEN c.external_tls_mode IN ('strict', 'insecure') THEN c.external_tls_mode
-                        ELSE 'strict'
-                    END as external_tls_mode,
-                    a.name as area_name, a.rt, a.rw, a.kelurahan, a.kecamatan
+            `SELECT ${SHARED_CAMERA_STREAM_WITH_AREA_PROJECTION}
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 
              WHERE c.id = ? AND c.enabled = 1`,
@@ -133,20 +122,7 @@ class StreamService {
 
     getAllActiveStreams(requestHost) {
         const cameras = query(
-            `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel,
-                    c.latitude, c.longitude, c.status, c.is_online, c.last_online_check, c.stream_key, c.video_codec,
-                    c.thumbnail_path, c.thumbnail_updated_at, c.stream_source, c.external_hls_url,
-                    c.delivery_type, c.external_stream_url, c.external_embed_url, c.external_snapshot_url,
-                    CASE
-                        WHEN c.external_origin_mode IN ('direct', 'embed') THEN c.external_origin_mode
-                        ELSE 'direct'
-                    END as external_origin_mode,
-                    COALESCE(c.external_use_proxy, 1) as external_use_proxy,
-                    CASE
-                        WHEN c.external_tls_mode IN ('strict', 'insecure') THEN c.external_tls_mode
-                        ELSE 'strict'
-                    END as external_tls_mode,
-                    a.name as area_name, a.rt, a.rw, a.kelurahan, a.kecamatan
+            `SELECT ${SHARED_CAMERA_STREAM_WITH_AREA_PROJECTION}
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 
              WHERE c.enabled = 1 

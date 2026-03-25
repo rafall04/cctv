@@ -63,6 +63,22 @@ export const adminService = {
         }
     },
 
+    async getCameraHealthDebug(policy = REQUEST_POLICY.BLOCKING, config = {}) {
+        try {
+            const response = await apiClient.get(
+                '/api/admin/debug/camera-health',
+                getRequestPolicyConfig(policy, config)
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Get camera health debug error:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to fetch camera health debug'
+            };
+        }
+    },
+
     async getTelegramStatus() {
         try {
             const response = await apiClient.get('/api/admin/telegram/status');
