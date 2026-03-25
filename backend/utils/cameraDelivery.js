@@ -7,6 +7,11 @@ export const DELIVERY_TYPES = [
     'external_custom_ws',
 ];
 
+export const CAMERA_DELIVERY_CLASSIFICATIONS = [
+    ...DELIVERY_TYPES,
+    'external_unresolved',
+];
+
 export const DELIVERY_TYPE_PATTERNS = {
     websocket: /^wss?:\/\//i,
     http: /^https?:\/\//i,
@@ -19,15 +24,32 @@ function normalizeUrl(url) {
     return typeof url === 'string' ? url.trim() : '';
 }
 
+function normalizeStreamSource(streamSource) {
+    return typeof streamSource === 'string'
+        ? streamSource.trim().toLowerCase()
+        : '';
+}
+
+function hasInternalRtsp(camera = {}) {
+    return Boolean(normalizeUrl(camera.private_rtsp_url));
+}
+
+function hasExternalSourceMetadata(camera = {}) {
+    return Boolean(
+        normalizeUrl(camera.external_hls_url)
+        || normalizeUrl(camera.external_stream_url)
+        || normalizeUrl(camera.external_embed_url)
+        || normalizeUrl(camera.external_snapshot_url)
+    );
+}
+
 function inferLegacyExternalDeliveryType(camera = {}) {
     const externalHlsUrl = normalizeUrl(camera.external_hls_url);
     const externalStreamUrl = normalizeUrl(camera.external_stream_url);
     const externalEmbedUrl = normalizeUrl(camera.external_embed_url);
     const externalUrl = externalStreamUrl || externalHlsUrl;
     const hasExternalFields = Boolean(externalHlsUrl || externalStreamUrl || externalEmbedUrl);
-    const streamSource = typeof camera.stream_source === 'string'
-        ? camera.stream_source.trim().toLowerCase()
-        : '';
+    const streamSource = normalizeStreamSource(camera.stream_source);
 
     if (externalHlsUrl && DELIVERY_TYPE_PATTERNS.http.test(externalHlsUrl)) {
         return 'external_hls';
@@ -60,6 +82,42 @@ function inferLegacyExternalDeliveryType(camera = {}) {
     return null;
 }
 
+export function getCameraDeliveryProfile(camera = {}) {
+    const streamSource = normalizeStreamSource(camera.stream_source);
+    const deliveryType = DELIVERY_TYPES.includes(camera.delivery_type)
+        ? camera.delivery_type
+        : null;
+    const inferredDeliveryType = inferLegacyExternalDeliveryType(camera);
+    const internalRtsp = hasInternalRtsp(camera);
+    const externalSourceMetadata = hasExternalSourceMetadata(camera);
+
+    if (
+        streamSource === 'external'
+        && !internalRtsp
+        && !externalSourceMetadata
+    ) {
+        return {
+            classification: 'external_unresolved',
+            effectiveDeliveryType: deliveryType || inferredDeliveryType || 'external_hls',
+            compatStreamSource: 'external',
+            hasInternalRtsp: internalRtsp,
+            hasExternalSourceMetadata: externalSourceMetadata,
+            inferredDeliveryType,
+        };
+    }
+
+    const effectiveDeliveryType = deliveryType || inferredDeliveryType || 'internal_hls';
+
+    return {
+        classification: effectiveDeliveryType,
+        effectiveDeliveryType,
+        compatStreamSource: effectiveDeliveryType === 'internal_hls' ? 'internal' : 'external',
+        hasInternalRtsp: internalRtsp,
+        hasExternalSourceMetadata: externalSourceMetadata,
+        inferredDeliveryType,
+    };
+}
+
 export function getEffectiveDeliveryType(cameraOrDeliveryType = {}) {
     if (typeof cameraOrDeliveryType === 'string') {
         return DELIVERY_TYPES.includes(cameraOrDeliveryType)
@@ -67,13 +125,7 @@ export function getEffectiveDeliveryType(cameraOrDeliveryType = {}) {
             : 'internal_hls';
     }
 
-    const camera = cameraOrDeliveryType || {};
-
-    if (DELIVERY_TYPES.includes(camera.delivery_type)) {
-        return camera.delivery_type;
-    }
-
-    return inferLegacyExternalDeliveryType(camera) || 'internal_hls';
+    return getCameraDeliveryProfile(cameraOrDeliveryType).effectiveDeliveryType;
 }
 
 export function getPrimaryExternalStreamUrl(camera = {}) {

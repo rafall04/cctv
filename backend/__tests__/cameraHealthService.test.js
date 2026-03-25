@@ -369,6 +369,25 @@ describe('cameraHealthService external TLS policy', () => {
         expect(result.isOnline).toBe(1);
         expect(result.rawReason).toBe('assumed_online_no_probe_target');
     });
+
+    it('marks legacy external cameras without source metadata as unresolved', async () => {
+        const service = new CameraHealthService();
+        const result = await service.evaluateCameraStatus({
+            id: 17,
+            enabled: 1,
+            is_online: 1,
+            stream_source: 'external',
+            delivery_type: 'internal_hls',
+            private_rtsp_url: '',
+            external_hls_url: null,
+            external_stream_url: null,
+            external_embed_url: null,
+            external_snapshot_url: null,
+        }, new Map());
+
+        expect(result.isOnline).toBe(1);
+        expect(result.rawReason).toBe('missing_external_source_metadata');
+    });
 });
 
 describe('cameraHealthService status transitions', () => {

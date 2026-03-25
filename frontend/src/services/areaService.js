@@ -12,6 +12,10 @@ export const areaService = {
         const response = await apiClient.get('/api/areas', getRequestPolicyConfig(policy, config));
         return response.data;
     },
+    getAreaSummary: async () => {
+        const response = await apiClient.get('/api/areas/summary');
+        return response.data;
+    },
     getAreaById: async (id) => {
         const response = await apiClient.get(`/api/areas/${id}`);
         return response.data;

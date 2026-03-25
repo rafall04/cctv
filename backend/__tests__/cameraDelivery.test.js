@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getEffectiveDeliveryType, getPrimaryExternalStreamUrl } from '../utils/cameraDelivery.js';
+import { getCameraDeliveryProfile, getEffectiveDeliveryType, getPrimaryExternalStreamUrl } from '../utils/cameraDelivery.js';
 
 describe('cameraDelivery compat inference', () => {
     it('maps legacy external_hls_url cameras to external_hls', () => {
@@ -48,6 +48,21 @@ describe('cameraDelivery compat inference', () => {
         expect(getEffectiveDeliveryType({
             stream_source: 'external',
         })).toBe('external_hls');
+    });
+
+    it('classifies legacy external cameras without metadata as external_unresolved', () => {
+        const profile = getCameraDeliveryProfile({
+            stream_source: 'external',
+            delivery_type: 'internal_hls',
+            private_rtsp_url: '',
+            external_hls_url: null,
+            external_stream_url: null,
+            external_embed_url: null,
+            external_snapshot_url: null,
+        });
+
+        expect(profile.classification).toBe('external_unresolved');
+        expect(profile.effectiveDeliveryType).toBe('internal_hls');
     });
 
     it('prefers external_stream_url as the primary external URL', () => {

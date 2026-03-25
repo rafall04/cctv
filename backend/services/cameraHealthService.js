@@ -11,7 +11,7 @@ import {
 import { getTimezone } from './timezoneService.js';
 import { recordingService } from './recordingService.js';
 import thumbnailService from './thumbnailService.js';
-import { getEffectiveDeliveryType, getPrimaryExternalStreamUrl } from '../utils/cameraDelivery.js';
+import { getCameraDeliveryProfile, getEffectiveDeliveryType, getPrimaryExternalStreamUrl } from '../utils/cameraDelivery.js';
 import { SHARED_CAMERA_STREAM_PROJECTION } from '../utils/cameraProjection.js';
 
 const mediaMtxApiBaseUrl = `${(config.mediamtx?.apiUrl || 'http://localhost:9997').replace(/\/$/, '')}/v3`;
@@ -295,7 +295,7 @@ class CameraHealthService {
     }
 
     getHealthStrategy(camera) {
-        const deliveryType = getEffectiveDeliveryType(camera);
+        const deliveryType = getCameraDeliveryProfile(camera).classification;
 
         if (deliveryType === 'internal_hls') {
             return 'internal_hls';
@@ -317,6 +317,10 @@ class CameraHealthService {
                 return 'external_embed_probe';
             }
             return 'passive_external';
+        }
+
+        if (deliveryType === 'external_unresolved') {
+            return 'external_unresolved_metadata';
         }
 
         return 'unsupported';
@@ -645,7 +649,7 @@ class CameraHealthService {
     }
 
     async evaluateCameraRaw(camera, activePaths, options = {}) {
-        const deliveryType = getEffectiveDeliveryType(camera);
+        const deliveryType = getCameraDeliveryProfile(camera).classification;
         if (deliveryType === 'external_hls') {
             let hlsUrl = getPrimaryExternalStreamUrl(camera);
             if (options.bustCache && hlsUrl) {
@@ -690,6 +694,22 @@ class CameraHealthService {
                     successReason: camera.external_snapshot_url ? 'snapshot_reachable' : 'embed_reachable',
                 }
             );
+        }
+
+        if (deliveryType === 'external_unresolved') {
+            return {
+                online: false,
+                reason: 'missing_external_source_metadata',
+                details: {
+                    stream_source: camera.stream_source || null,
+                    delivery_type: camera.delivery_type || null,
+                    has_private_rtsp: Boolean(camera.private_rtsp_url),
+                    has_external_hls_url: Boolean(camera.external_hls_url),
+                    has_external_stream_url: Boolean(camera.external_stream_url),
+                    has_external_embed_url: Boolean(camera.external_embed_url),
+                    has_external_snapshot_url: Boolean(camera.external_snapshot_url),
+                },
+            };
         }
 
         if (deliveryType !== 'internal_hls') {
@@ -945,16 +965,19 @@ class CameraHealthService {
         `);
 
         return cameras.map((camera) => {
-            const deliveryType = getEffectiveDeliveryType(camera);
+            const deliveryProfile = getCameraDeliveryProfile(camera);
             const state = this.ensureCameraState(camera.id, camera.is_online);
 
             return {
                 cameraId: camera.id,
                 cameraName: camera.name,
+                areaId: camera.area_id || null,
+                areaName: camera.area_name || null,
                 enabled: camera.enabled,
                 lastOnlineCheck: camera.last_online_check || null,
                 dbOnline: camera.is_online === 1,
-                delivery_type: deliveryType,
+                delivery_type: deliveryProfile.effectiveDeliveryType,
+                delivery_classification: deliveryProfile.classification,
                 healthStrategy: this.getHealthStrategy(camera),
                 effectiveOnline: state.effectiveOnline,
                 lastReason: state.lastReason,

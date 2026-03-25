@@ -11,11 +11,28 @@ import { sanitizeCameraThumbnail, sanitizeCameraThumbnailList } from './thumbnai
 import {
     DELIVERY_TYPES,
     DELIVERY_TYPE_PATTERNS,
+    getCameraDeliveryProfile,
     getCompatStreamSource,
     getEffectiveDeliveryType,
     getPrimaryExternalStreamUrl,
     normalizeExternalOriginMode,
 } from '../utils/cameraDelivery.js';
+
+const BULK_AREA_TARGET_FILTERS = [
+    'all',
+    'internal_only',
+    'external_only',
+    'external_unresolved_only',
+    'online_only',
+    'offline_only',
+    'recording_enabled_only',
+];
+
+const BULK_AREA_OPERATIONS = [
+    'policy_update',
+    'normalization',
+    'maintenance',
+];
 
 function getNormalizedDeliveryType(data = {}) {
     return getEffectiveDeliveryType(data);
@@ -145,6 +162,96 @@ function normalizeCameraPersistencePayload(data = {}, existingCamera = null) {
         externalOriginMode,
         externalHlsUrl,
     };
+}
+
+function toNullableRtspValue(value) {
+    if (value === undefined) {
+        return undefined;
+    }
+
+    return value || null;
+}
+
+function normalizeBulkAreaRequest(bulkRequest = {}) {
+    if (bulkRequest && bulkRequest.updates && bulkRequest.operation === undefined && bulkRequest.payload === undefined) {
+        return {
+            targetFilter: 'all',
+            operation: 'policy_update',
+            payload: bulkRequest.updates,
+            preview: Boolean(bulkRequest.preview),
+        };
+    }
+
+    return {
+        targetFilter: bulkRequest.targetFilter || 'all',
+        operation: bulkRequest.operation || 'policy_update',
+        payload: bulkRequest.payload || {},
+        preview: Boolean(bulkRequest.preview),
+    };
+}
+
+function matchesBulkTargetFilter(camera, targetFilter) {
+    const deliveryProfile = getCameraDeliveryProfile(camera);
+
+    switch (targetFilter) {
+        case 'all':
+            return true;
+        case 'internal_only':
+            return deliveryProfile.classification === 'internal_hls';
+        case 'external_only':
+            return deliveryProfile.classification !== 'internal_hls';
+        case 'external_unresolved_only':
+            return deliveryProfile.classification === 'external_unresolved';
+        case 'online_only':
+            return camera.is_online === 1 || camera.is_online === true;
+        case 'offline_only':
+            return camera.is_online === 0 || camera.is_online === false;
+        case 'recording_enabled_only':
+            return camera.enable_recording === 1 || camera.enable_recording === true;
+        default:
+            return false;
+    }
+}
+
+function buildBulkTargetSummary(targetCameras = []) {
+    const summary = {
+        total: targetCameras.length,
+        internalCount: 0,
+        externalCount: 0,
+        unresolvedCount: 0,
+        onlineCount: 0,
+        offlineCount: 0,
+        recordingEnabledCount: 0,
+        examples: targetCameras.slice(0, 10).map((camera) => ({
+            id: camera.id,
+            name: camera.name,
+            delivery_type: getCameraDeliveryProfile(camera).effectiveDeliveryType,
+            delivery_classification: getCameraDeliveryProfile(camera).classification,
+            is_online: camera.is_online === 1 || camera.is_online === true,
+        })),
+    };
+
+    for (const camera of targetCameras) {
+        const deliveryProfile = getCameraDeliveryProfile(camera);
+        if (deliveryProfile.classification === 'internal_hls') {
+            summary.internalCount += 1;
+        } else {
+            summary.externalCount += 1;
+        }
+        if (deliveryProfile.classification === 'external_unresolved') {
+            summary.unresolvedCount += 1;
+        }
+        if (camera.is_online === 1 || camera.is_online === true) {
+            summary.onlineCount += 1;
+        } else {
+            summary.offlineCount += 1;
+        }
+        if (camera.enable_recording === 1 || camera.enable_recording === true) {
+            summary.recordingEnabledCount += 1;
+        }
+    }
+
+    return summary;
 }
 
 class CameraService {
@@ -710,45 +817,182 @@ class CameraService {
         return { deletedCount: cameras.length };
     }
 
-    bulkUpdateArea(areaId, updates, request) {
+    async bulkUpdateArea(areaId, bulkRequest, request) {
         if (!areaId) {
             const err = new Error('Area ID is required');
             err.statusCode = 400;
             throw err;
         }
 
-        const allowedUpdates = ['external_use_proxy', 'enable_recording', 'enabled'];
-        const setClauses = [];
-        const params = [];
-
-        for (const [key, value] of Object.entries(updates)) {
-            if (allowedUpdates.includes(key)) {
-                setClauses.push(`${key} = ?`);
-                params.push(value);
-            }
+        const area = queryOne('SELECT id, name FROM areas WHERE id = ?', [areaId]);
+        if (!area) {
+            const err = new Error('Area not found');
+            err.statusCode = 404;
+            throw err;
         }
 
-        if (setClauses.length === 0) {
-            const err = new Error('No valid update fields provided');
+        const { targetFilter, operation, payload, preview } = normalizeBulkAreaRequest(bulkRequest);
+
+        if (!BULK_AREA_TARGET_FILTERS.includes(targetFilter)) {
+            const err = new Error('Invalid bulk target filter');
             err.statusCode = 400;
             throw err;
         }
 
-        params.push(areaId);
-        
-        const result = execute(
-            `UPDATE cameras SET ${setClauses.join(', ')} WHERE area_id = ?`,
-            params
+        if (!BULK_AREA_OPERATIONS.includes(operation)) {
+            const err = new Error('Invalid bulk area operation');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const cameras = query(
+            `SELECT c.*
+             FROM cameras c
+             WHERE c.area_id = ?
+             ORDER BY c.id ASC`,
+            [areaId]
         );
+
+        const targetCameras = cameras.filter((camera) => matchesBulkTargetFilter(camera, targetFilter));
+        const summary = buildBulkTargetSummary(targetCameras);
+
+        if (targetCameras.length === 0) {
+            const err = new Error('No cameras matched the selected bulk target filter');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const patches = [];
+
+        for (const camera of targetCameras) {
+            const deliveryProfile = getCameraDeliveryProfile(camera);
+            const patch = {};
+
+            if (operation === 'policy_update' || operation === 'maintenance') {
+                if (payload.enabled !== undefined) {
+                    patch.enabled = payload.enabled;
+                }
+                if (payload.enable_recording !== undefined) {
+                    if (deliveryProfile.classification !== 'internal_hls') {
+                        const err = new Error(`Recording policy can only be updated for internal cameras. Camera ${camera.id} is ${deliveryProfile.classification}.`);
+                        err.statusCode = 400;
+                        throw err;
+                    }
+                    patch.enable_recording = payload.enable_recording;
+                }
+                if (payload.video_codec !== undefined) {
+                    if (deliveryProfile.classification !== 'internal_hls') {
+                        const err = new Error(`Video codec can only be updated for internal cameras. Camera ${camera.id} is ${deliveryProfile.classification}.`);
+                        err.statusCode = 400;
+                        throw err;
+                    }
+                    patch.video_codec = payload.video_codec;
+                }
+                if (payload.delivery_type !== undefined) {
+                    if (!DELIVERY_TYPES.includes(payload.delivery_type) || payload.delivery_type === 'internal_hls') {
+                        const err = new Error('Bulk policy delivery type must be one of the persisted external delivery types.');
+                        err.statusCode = 400;
+                        throw err;
+                    }
+                    patch.delivery_type = payload.delivery_type;
+                    patch.stream_source = 'external';
+                }
+                if (payload.external_origin_mode !== undefined) {
+                    patch.external_origin_mode = payload.external_origin_mode;
+                }
+                if (payload.external_use_proxy !== undefined) {
+                    if ((patch.delivery_type || deliveryProfile.effectiveDeliveryType) !== 'external_hls') {
+                        const err = new Error(`Proxy policy can only be updated for external HLS cameras. Camera ${camera.id} is ${(patch.delivery_type || deliveryProfile.classification)}.`);
+                        err.statusCode = 400;
+                        throw err;
+                    }
+                    patch.external_use_proxy = payload.external_use_proxy;
+                }
+                if (payload.external_tls_mode !== undefined) {
+                    if ((patch.delivery_type || deliveryProfile.effectiveDeliveryType) !== 'external_hls') {
+                        const err = new Error(`TLS mode can only be updated for external HLS cameras. Camera ${camera.id} is ${(patch.delivery_type || deliveryProfile.classification)}.`);
+                        err.statusCode = 400;
+                        throw err;
+                    }
+                    patch.external_tls_mode = payload.external_tls_mode;
+                }
+            }
+
+            if (operation === 'normalization') {
+                patch.stream_source = 'external';
+                if (payload.clear_internal_rtsp) {
+                    patch.private_rtsp_url = null;
+                }
+
+                if (payload.delivery_type !== undefined) {
+                    if (!DELIVERY_TYPES.includes(payload.delivery_type) || payload.delivery_type === 'internal_hls') {
+                        const err = new Error('Normalization delivery type must be one of the persisted external delivery types.');
+                        err.statusCode = 400;
+                        throw err;
+                    }
+
+                    const validationCandidate = {
+                        ...camera,
+                        stream_source: 'external',
+                        delivery_type: payload.delivery_type,
+                        private_rtsp_url: payload.clear_internal_rtsp ? null : camera.private_rtsp_url,
+                    };
+
+                    normalizeCameraPersistencePayload(validationCandidate, camera);
+                    patch.delivery_type = payload.delivery_type;
+                }
+            }
+
+            if (Object.keys(patch).length > 0) {
+                patches.push({ camera, patch });
+            }
+        }
+
+        if (patches.length === 0) {
+            const err = new Error('No valid bulk changes were produced for the selected cameras');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        if (preview) {
+            return {
+                preview: true,
+                area: { id: area.id, name: area.name },
+                targetFilter,
+                operation,
+                summary,
+            };
+        }
+
+        let changes = 0;
+        for (const item of patches) {
+            await this.updateCamera(item.camera.id, {
+                ...item.patch,
+                private_rtsp_url: toNullableRtspValue(item.patch.private_rtsp_url),
+            }, request);
+            changes += 1;
+        }
 
         execute(
             'INSERT INTO audit_logs (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)',
-            [request.user.id, 'BULK_UPDATE_AREA', `Updated ${result.changes} cameras in Area ID ${areaId}`, request.ip || 'Unknown']
+            [
+                request.user.id,
+                'BULK_UPDATE_AREA',
+                `Bulk ${operation} on area ${area.name} (${area.id}) with target ${targetFilter}. Updated ${changes} cameras.`,
+                request.ip || 'Unknown'
+            ]
         );
 
         this.invalidateCameraCache();
 
-        return { success: true, changes: result.changes };
+        return {
+            success: true,
+            area: { id: area.id, name: area.name },
+            targetFilter,
+            operation,
+            changes,
+            summary,
+        };
     }
 
     importCamerasTransaction(cameras, targetAreaName, request) {

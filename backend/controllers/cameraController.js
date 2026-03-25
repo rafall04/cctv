@@ -121,13 +121,16 @@ export async function bulkDeleteByArea(request, reply) {
 // Bulk update by Area (admin only)
 export async function bulkUpdateByArea(request, reply) {
     try {
-        const { areaId, updates } = request.body;
-        const result = cameraService.bulkUpdateArea(areaId, updates, request);
+        const { areaId, ...bulkRequest } = request.body;
+        const result = await cameraService.bulkUpdateArea(areaId, bulkRequest, request);
         return reply.send({ success: true, message: 'Bulk update successful', data: result });
     } catch (error) {
         console.error('Bulk update error:', error);
         if (error.statusCode === 400) {
             return reply.code(400).send({ success: false, message: error.message });
+        }
+        if (error.statusCode === 404) {
+            return reply.code(404).send({ success: false, message: error.message });
         }
         return reply.code(500).send({ success: false, message: 'Internal server error' });
     }

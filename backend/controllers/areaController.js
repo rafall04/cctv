@@ -28,6 +28,20 @@ export async function getAreaFilters(request, reply) {
     }
 }
 
+export async function getAreaSummary(request, reply) {
+    try {
+        const result = areaService.getAreaSummary();
+        return reply.send({
+            success: true,
+            data: result.data,
+            cached: result.isCached,
+        });
+    } catch (error) {
+        console.error('Get area summary error:', error);
+        return reply.code(500).send({ success: false, message: 'Internal server error' });
+    }
+}
+
 export async function getAreaById(request, reply) {
     try {
         const { id } = request.params;

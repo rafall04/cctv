@@ -9,8 +9,22 @@ import { StatCardSkeleton, CameraCardSkeleton, NoAreasEmptyState, Alert } from '
 // Lazy load LocationPicker to avoid conflicts with CameraManagement
 const LocationPicker = lazy(() => import('../components/LocationPicker'));
 
+const defaultBulkConfig = {
+    targetFilter: 'all',
+    operation: 'policy_update',
+    delivery_type: 'ignore',
+    external_use_proxy: 'ignore',
+    enable_recording: 'ignore',
+    enabled: 'ignore',
+    external_tls_mode: 'ignore',
+    external_origin_mode: 'ignore',
+    video_codec: 'ignore',
+    clear_internal_rtsp: false,
+};
+
 export default function AreaManagement() {
     const [areas, setAreas] = useState([]);
+    const [areaSummaries, setAreaSummaries] = useState([]);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState(null);
     const [showModal, setShowModal] = useState(false);
@@ -32,12 +46,9 @@ export default function AreaManagement() {
     
     // Bulk Config Modal
     const [bulkConfigArea, setBulkConfigArea] = useState(null);
-    const [bulkUpdates, setBulkUpdates] = useState({ 
-        external_use_proxy: 'ignore',
-        enable_recording: 'ignore',
-        enabled: 'ignore',
-        external_tls_mode: 'ignore'
-    });
+    const [bulkConfig, setBulkConfig] = useState(defaultBulkConfig);
+    const [bulkPreview, setBulkPreview] = useState(null);
+    const [bulkPreviewLoading, setBulkPreviewLoading] = useState(false);
     const [applyingBulk, setApplyingBulk] = useState(false);
 
     const [bulkDeleteAreaConfirm, setBulkDeleteAreaConfirm] = useState(null);
@@ -49,8 +60,12 @@ export default function AreaManagement() {
         try {
             setLoading(true);
             setLoadError(null);
-            const response = await areaService.getAllAreas();
-            if (response.success) setAreas(response.data);
+            const [areasResponse, summaryResponse] = await Promise.all([
+                areaService.getAllAreas(),
+                areaService.getAreaSummary(),
+            ]);
+            if (areasResponse.success) setAreas(areasResponse.data);
+            if (summaryResponse.success) setAreaSummaries(summaryResponse.data);
         } catch (err) {
             console.error('Load areas error:', err);
             setLoadError('Gagal memuat data area.');
@@ -167,24 +182,84 @@ export default function AreaManagement() {
         setMapCenter({ ...mapCenter, latitude: parseFloat(lat), longitude: parseFloat(lng) });
     };
 
+    const openBulkConfigModal = (area) => {
+        const summary = areaSummaries.find((item) => item.areaId === area.id);
+        setBulkConfigArea(area);
+        setBulkConfig({
+            ...defaultBulkConfig,
+            targetFilter: summary?.externalUnresolved ? 'external_unresolved_only' : 'all',
+            operation: summary?.externalUnresolved ? 'normalization' : 'policy_update',
+        });
+        setBulkPreview(null);
+    };
+
+    const buildBulkPayload = useCallback(() => {
+        const payload = {};
+
+        if (bulkConfig.operation === 'policy_update' || bulkConfig.operation === 'maintenance') {
+            if (bulkConfig.delivery_type !== 'ignore') payload.delivery_type = bulkConfig.delivery_type;
+            if (bulkConfig.external_use_proxy !== 'ignore') payload.external_use_proxy = parseInt(bulkConfig.external_use_proxy, 10);
+            if (bulkConfig.enable_recording !== 'ignore') payload.enable_recording = parseInt(bulkConfig.enable_recording, 10);
+            if (bulkConfig.enabled !== 'ignore') payload.enabled = parseInt(bulkConfig.enabled, 10);
+            if (bulkConfig.external_tls_mode !== 'ignore') payload.external_tls_mode = bulkConfig.external_tls_mode;
+            if (bulkConfig.external_origin_mode !== 'ignore') payload.external_origin_mode = bulkConfig.external_origin_mode;
+            if (bulkConfig.video_codec !== 'ignore') payload.video_codec = bulkConfig.video_codec;
+        }
+
+        if (bulkConfig.operation === 'normalization') {
+            if (bulkConfig.delivery_type !== 'ignore') payload.delivery_type = bulkConfig.delivery_type;
+            if (bulkConfig.clear_internal_rtsp) payload.clear_internal_rtsp = true;
+        }
+
+        return payload;
+    }, [bulkConfig]);
+
+    const loadBulkPreview = useCallback(async () => {
+        if (!bulkConfigArea) return;
+
+        setBulkPreviewLoading(true);
+        try {
+            const payload = buildBulkPayload();
+            const result = await cameraService.bulkUpdateByArea(bulkConfigArea.id, {
+                targetFilter: bulkConfig.targetFilter,
+                operation: bulkConfig.operation,
+                payload,
+                preview: true,
+            });
+
+            if (result.success) {
+                setBulkPreview(result.data);
+            } else {
+                setBulkPreview(null);
+                showError('Preview Gagal', result.message);
+            }
+        } catch (err) {
+            setBulkPreview(null);
+            showError('Preview Gagal', err.response?.data?.message || err.message);
+        } finally {
+            setBulkPreviewLoading(false);
+        }
+    }, [buildBulkPayload, bulkConfig.operation, bulkConfig.targetFilter, bulkConfigArea, showError]);
+
     const handleBulkUpdate = async () => {
         if (!bulkConfigArea) return;
         setApplyingBulk(true);
         try {
-            const updates = {};
-            if (bulkUpdates.external_use_proxy !== 'ignore') updates.external_use_proxy = parseInt(bulkUpdates.external_use_proxy);
-            if (bulkUpdates.enable_recording !== 'ignore') updates.enable_recording = parseInt(bulkUpdates.enable_recording);
-            if (bulkUpdates.enabled !== 'ignore') updates.enabled = parseInt(bulkUpdates.enabled);
-            if (bulkUpdates.external_tls_mode !== 'ignore') updates.external_tls_mode = bulkUpdates.external_tls_mode;
+            const payload = buildBulkPayload();
 
-            if (Object.keys(updates).length === 0) {
+            if (Object.keys(payload).length === 0) {
                 setApplyingBulk(false);
                 success('Info', 'Tidak ada perubahan yang dipilih.');
                 return;
             }
-            const result = await cameraService.bulkUpdateByArea(bulkConfigArea.id, updates);
+            const result = await cameraService.bulkUpdateByArea(bulkConfigArea.id, {
+                targetFilter: bulkConfig.targetFilter,
+                operation: bulkConfig.operation,
+                payload,
+            });
             if (result.success) {
                 setBulkConfigArea(null);
+                setBulkPreview(null);
                 loadAreas(); // refresh counts potentially
                 success('Pembaruan Massal Berhasil', `Berhasil memperbarui ${result.data?.changes || 0} kamera di area ${bulkConfigArea.name}.`);
             } else {
@@ -231,6 +306,7 @@ export default function AreaManagement() {
 
     const kecamatans = [...new Set(areas.map(a => a.kecamatan).filter(Boolean))].sort();
     const filteredAreas = filterKecamatan ? areas.filter(a => a.kecamatan === filterKecamatan) : areas;
+    const areaSummaryMap = new Map(areaSummaries.map((item) => [item.areaId, item]));
 
     const getLocationString = (area) => {
         const parts = [];
@@ -341,6 +417,10 @@ export default function AreaManagement() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredAreas.map((area) => (
                         <div key={area.id} className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6 hover:shadow-xl hover:border-primary/30 transition-all group">
+                            {(() => {
+                                const areaSummary = areaSummaryMap.get(area.id);
+                                return (
+                                    <>
                             <div className="flex justify-between items-start mb-4">
                                 <div className="w-12 h-12 bg-gradient-to-br from-primary-400 to-primary-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/30 group-hover:scale-110 transition-transform">
                                     <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -349,7 +429,7 @@ export default function AreaManagement() {
                                     </svg>
                                 </div>
                                 <div className="flex gap-1">
-                                    <button title="Pengaturan Massal Kamera" onClick={() => setBulkConfigArea(area)} className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-all">
+                                    <button title="Pengaturan Massal Kamera" onClick={() => openBulkConfigModal(area)} className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-all">
                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -386,13 +466,30 @@ export default function AreaManagement() {
                             <div className="flex flex-wrap gap-2 mb-4">
                                 {area.kecamatan && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-blue-100 dark:bg-primary/20 text-primary-600 dark:text-blue-400">{area.kecamatan}</span>}
                                 {area.kelurahan && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400">{area.kelurahan}</span>}
+                                {areaSummary?.externalUnresolved > 0 && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300">{areaSummary.externalUnresolved} unresolved</span>}
+                                {areaSummary?.offline > 0 && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300">{areaSummary.offline} offline</span>}
                             </div>
+                            {areaSummary && (
+                                <div className="grid grid-cols-2 gap-2 mb-4 text-xs">
+                                    <div className="rounded-xl border border-gray-200 dark:border-gray-700/50 bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
+                                        <div className="text-gray-500 dark:text-gray-400">Internal</div>
+                                        <div className="font-semibold text-gray-900 dark:text-white">{areaSummary.internalValid}</div>
+                                    </div>
+                                    <div className="rounded-xl border border-gray-200 dark:border-gray-700/50 bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
+                                        <div className="text-gray-500 dark:text-gray-400">External</div>
+                                        <div className="font-semibold text-gray-900 dark:text-white">{areaSummary.externalValid}</div>
+                                    </div>
+                                </div>
+                            )}
                             <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700/50">
                                 <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{area.camera_count || 0} Kamera</span>
                                 <Link to="/admin/cameras" className="text-sm font-semibold text-primary hover:text-primary-600 flex items-center gap-1">
                                     Lihat <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
                                 </Link>
                             </div>
+                                    </>
+                                );
+                            })()}
                         </div>
                     ))}
                 </div>
@@ -478,74 +575,208 @@ export default function AreaManagement() {
             {/* Bulk Config Modal */}
             {bulkConfigArea && (
                 <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700/50 max-h-[90vh] flex flex-col">
+                    <div className="bg-white dark:bg-gray-800 w-full max-w-3xl rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700/50 max-h-[90vh] flex flex-col">
                         <div className="p-6 border-b border-gray-200 dark:border-gray-700/50 flex justify-between items-center bg-amber-50 dark:bg-amber-900/20 rounded-t-2xl shrink-0">
                             <div>
-                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Pengaturan Massal Area</h3>
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Bulk Policy Center</h3>
                                 <p className="text-sm text-amber-600 dark:text-amber-400 font-medium">Area: {bulkConfigArea.name}</p>
                             </div>
                             <button onClick={() => setBulkConfigArea(null)} className="p-2 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-800/30 text-gray-600 dark:text-gray-300">
                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M6 18L18 6M6 6l12 12"/></svg>
                             </button>
                         </div>
-                        <div className="p-6 space-y-5 overflow-y-auto">
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Atur setelan di bawah ini untuk diterapkan secara serentak pada semua kamera di area ini.</p>
-                            
+                        <div className="p-6 grid lg:grid-cols-[1.1fr_0.9fr] gap-6 overflow-y-auto">
                             <div className="space-y-4">
-                                <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
-                                    <label className="text-sm font-semibold text-gray-900 dark:text-white">Gunakan Proxy Server</label>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Sembunyikan URL asli (mengkonsumsi bandwidth server lokal)</p>
-                                    <select 
-                                        value={bulkUpdates.external_use_proxy} 
-                                        onChange={(e) => setBulkUpdates({...bulkUpdates, external_use_proxy: e.target.value})}
-                                        className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-                                    >
-                                        <option value="ignore">Biarkan Seperti Semula (Abaikan)</option>
-                                        <option value="1">Aktifkan (ON)</option>
-                                        <option value="0">Matikan (OFF)</option>
-                                    </select>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">Gunakan bulk tools untuk policy massal, normalisasi unresolved, dan maintenance per area.</p>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
+                                        <label className="text-sm font-semibold text-gray-900 dark:text-white">Mode Operasi</label>
+                                        <select
+                                            value={bulkConfig.operation}
+                                            onChange={(e) => setBulkConfig({ ...bulkConfig, operation: e.target.value })}
+                                            className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                        >
+                                            <option value="policy_update">Bulk Policy Update</option>
+                                            <option value="normalization">Bulk Normalization</option>
+                                            <option value="maintenance">Bulk Maintenance</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
+                                        <label className="text-sm font-semibold text-gray-900 dark:text-white">Target Kamera</label>
+                                        <select
+                                            value={bulkConfig.targetFilter}
+                                            onChange={(e) => setBulkConfig({ ...bulkConfig, targetFilter: e.target.value })}
+                                            className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                        >
+                                            <option value="all">Semua Kamera Area</option>
+                                            <option value="internal_only">Hanya Internal</option>
+                                            <option value="external_only">Hanya External</option>
+                                            <option value="external_unresolved_only">Hanya External Unresolved</option>
+                                            <option value="online_only">Hanya Online</option>
+                                            <option value="offline_only">Hanya Offline</option>
+                                            <option value="recording_enabled_only">Hanya Recording Enabled</option>
+                                        </select>
+                                    </div>
                                 </div>
 
-                                <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
-                                    <label className="text-sm font-semibold text-gray-900 dark:text-white">Mode Keamanan TLS</label>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Pilih mode SSL untuk koneksi stream</p>
-                                    <select 
-                                        value={bulkUpdates.external_tls_mode} 
-                                        onChange={(e) => setBulkUpdates({...bulkUpdates, external_tls_mode: e.target.value})}
-                                        className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-                                    >
-                                        <option value="ignore">Biarkan Seperti Semula (Abaikan)</option>
-                                        <option value="strict">Strict (Wajib SSL Valid)</option>
-                                        <option value="insecure">Insecure (Abaikan SSL kedaluwarsa)</option>
-                                    </select>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
+                                        <label className="text-sm font-semibold text-gray-900 dark:text-white">Delivery Type</label>
+                                        <select
+                                            value={bulkConfig.delivery_type}
+                                            onChange={(e) => setBulkConfig({ ...bulkConfig, delivery_type: e.target.value })}
+                                            className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                        >
+                                            <option value="ignore">Biarkan Seperti Semula</option>
+                                            <option value="external_hls">External HLS</option>
+                                            <option value="external_mjpeg">External MJPEG</option>
+                                            <option value="external_embed">External Embed</option>
+                                            <option value="external_jsmpeg">External JSMpeg</option>
+                                            <option value="external_custom_ws">Custom WebSocket</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
+                                        <label className="text-sm font-semibold text-gray-900 dark:text-white">Origin Mode</label>
+                                        <select
+                                            value={bulkConfig.external_origin_mode}
+                                            onChange={(e) => setBulkConfig({ ...bulkConfig, external_origin_mode: e.target.value })}
+                                            className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                        >
+                                            <option value="ignore">Biarkan Seperti Semula</option>
+                                            <option value="direct">Direct</option>
+                                            <option value="embed">Embed</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
+                                        <label className="text-sm font-semibold text-gray-900 dark:text-white">Gunakan Proxy Server</label>
+                                        <select
+                                            value={bulkConfig.external_use_proxy}
+                                            onChange={(e) => setBulkConfig({ ...bulkConfig, external_use_proxy: e.target.value })}
+                                            className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                        >
+                                            <option value="ignore">Biarkan Seperti Semula</option>
+                                            <option value="1">Aktifkan</option>
+                                            <option value="0">Matikan</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
+                                        <label className="text-sm font-semibold text-gray-900 dark:text-white">Mode TLS</label>
+                                        <select
+                                            value={bulkConfig.external_tls_mode}
+                                            onChange={(e) => setBulkConfig({ ...bulkConfig, external_tls_mode: e.target.value })}
+                                            className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                        >
+                                            <option value="ignore">Biarkan Seperti Semula</option>
+                                            <option value="strict">Strict</option>
+                                            <option value="insecure">Insecure</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
+                                        <label className="text-sm font-semibold text-gray-900 dark:text-white">Recording</label>
+                                        <select
+                                            value={bulkConfig.enable_recording}
+                                            onChange={(e) => setBulkConfig({ ...bulkConfig, enable_recording: e.target.value })}
+                                            className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                        >
+                                            <option value="ignore">Biarkan Seperti Semula</option>
+                                            <option value="1">Aktifkan</option>
+                                            <option value="0">Matikan</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
+                                        <label className="text-sm font-semibold text-gray-900 dark:text-white">Status Publik</label>
+                                        <select
+                                            value={bulkConfig.enabled}
+                                            onChange={(e) => setBulkConfig({ ...bulkConfig, enabled: e.target.value })}
+                                            className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                        >
+                                            <option value="ignore">Biarkan Seperti Semula</option>
+                                            <option value="1">Aktifkan</option>
+                                            <option value="0">Matikan</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
+                                        <label className="text-sm font-semibold text-gray-900 dark:text-white">Video Codec</label>
+                                        <select
+                                            value={bulkConfig.video_codec}
+                                            onChange={(e) => setBulkConfig({ ...bulkConfig, video_codec: e.target.value })}
+                                            className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                        >
+                                            <option value="ignore">Biarkan Seperti Semula</option>
+                                            <option value="h264">H.264</option>
+                                            <option value="h265">H.265</option>
+                                        </select>
+                                    </div>
                                 </div>
-                                
-                                <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
-                                    <label className="text-sm font-semibold text-gray-900 dark:text-white">Aktifkan Perekaman Dasar</label>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Mulai atau hentikan rekaman ke disk server</p>
-                                    <select 
-                                        value={bulkUpdates.enable_recording} 
-                                        onChange={(e) => setBulkUpdates({...bulkUpdates, enable_recording: e.target.value})}
-                                        className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-                                    >
-                                        <option value="ignore">Biarkan Seperti Semula (Abaikan)</option>
-                                        <option value="1">Aktifkan (ON)</option>
-                                        <option value="0">Matikan (OFF)</option>
-                                    </select>
-                                </div>
-                                
-                                <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
-                                    <label className="text-sm font-semibold text-gray-900 dark:text-white">Status Publik Aktif</label>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Tampilkan semua kamera milik Area ini ke beranda publik</p>
-                                    <select 
-                                        value={bulkUpdates.enabled} 
-                                        onChange={(e) => setBulkUpdates({...bulkUpdates, enabled: e.target.value})}
-                                        className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-                                    >
-                                        <option value="ignore">Biarkan Seperti Semula (Abaikan)</option>
-                                        <option value="1">Aktifkan (ON)</option>
-                                        <option value="0">Matikan (OFF)</option>
-                                    </select>
+
+                                <label className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40">
+                                    <input
+                                        type="checkbox"
+                                        checked={bulkConfig.clear_internal_rtsp}
+                                        onChange={(e) => setBulkConfig({ ...bulkConfig, clear_internal_rtsp: e.target.checked })}
+                                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                    />
+                                    <div>
+                                        <div className="text-sm font-semibold text-gray-900 dark:text-white">Clear internal RTSP saat normalisasi</div>
+                                        <div className="text-xs text-gray-500 dark:text-gray-400">Dipakai untuk merapikan legacy row external yang masih menyimpan jejak konfigurasi internal.</div>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="rounded-2xl border border-gray-200 dark:border-gray-700/50 bg-gray-50 dark:bg-gray-900/40 p-4">
+                                    <div className="flex items-center justify-between gap-3 mb-3">
+                                        <div>
+                                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Preview Dampak</h4>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400">Lihat target kamera dan breakdown sebelum apply.</p>
+                                        </div>
+                                        <button
+                                            onClick={loadBulkPreview}
+                                            className="px-3 py-2 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary-600 disabled:opacity-50"
+                                            disabled={bulkPreviewLoading}
+                                        >
+                                            {bulkPreviewLoading ? 'Memuat...' : 'Preview'}
+                                        </button>
+                                    </div>
+
+                                    {bulkPreview ? (
+                                        <div className="space-y-3 text-sm">
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-2 border border-gray-200 dark:border-gray-700">
+                                                    <div className="text-gray-500 dark:text-gray-400 text-xs">Target</div>
+                                                    <div className="font-semibold text-gray-900 dark:text-white">{bulkPreview.summary?.total || 0}</div>
+                                                </div>
+                                                <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-2 border border-gray-200 dark:border-gray-700">
+                                                    <div className="text-gray-500 dark:text-gray-400 text-xs">Unresolved</div>
+                                                    <div className="font-semibold text-amber-600 dark:text-amber-300">{bulkPreview.summary?.unresolvedCount || 0}</div>
+                                                </div>
+                                                <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-2 border border-gray-200 dark:border-gray-700">
+                                                    <div className="text-gray-500 dark:text-gray-400 text-xs">Internal</div>
+                                                    <div className="font-semibold text-gray-900 dark:text-white">{bulkPreview.summary?.internalCount || 0}</div>
+                                                </div>
+                                                <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-2 border border-gray-200 dark:border-gray-700">
+                                                    <div className="text-gray-500 dark:text-gray-400 text-xs">External</div>
+                                                    <div className="font-semibold text-gray-900 dark:text-white">{bulkPreview.summary?.externalCount || 0}</div>
+                                                </div>
+                                            </div>
+                                            <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-3 border border-gray-200 dark:border-gray-700">
+                                                <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Contoh Kamera Terdampak</div>
+                                                <div className="space-y-2 max-h-48 overflow-y-auto">
+                                                    {(bulkPreview.summary?.examples || []).map((camera) => (
+                                                        <div key={camera.id} className="flex items-center justify-between gap-3 text-xs">
+                                                            <span className="text-gray-900 dark:text-white truncate">{camera.name}</span>
+                                                            <span className="px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 shrink-0">
+                                                                {camera.delivery_classification}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm text-gray-500 dark:text-gray-400">Belum ada preview. Klik Preview untuk melihat dampak target filter dan operasi.</p>
+                                    )}
                                 </div>
                             </div>
                         </div>

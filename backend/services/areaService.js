@@ -1,8 +1,11 @@
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import cache, { CacheTTL, CacheNamespace, cacheKey } from './cacheService.js';
+import cameraHealthService from './cameraHealthService.js';
+import { getCameraDeliveryProfile } from '../utils/cameraDelivery.js';
 
 const CACHE_ALL_AREAS = cacheKey(CacheNamespace.AREAS, 'all');
 const CACHE_AREA_FILTERS = cacheKey(CacheNamespace.AREAS, 'filters');
+const CACHE_AREA_SUMMARY = cacheKey(CacheNamespace.AREAS, 'summary');
 
 class AreaService {
     invalidateAreaCache() {
@@ -45,6 +48,94 @@ class AreaService {
         };
 
         cache.set(CACHE_AREA_FILTERS, data, CacheTTL.VERY_LONG);
+        return { data, isCached: false };
+    }
+
+    getAreaSummary() {
+        const cached = cache.get(CACHE_AREA_SUMMARY);
+        if (cached) {
+            return { data: cached, isCached: true };
+        }
+
+        const areas = query(`
+            SELECT a.id, a.name, a.kecamatan, a.kelurahan
+            FROM areas a
+            ORDER BY a.kecamatan, a.kelurahan, a.rw, a.rt, a.name ASC
+        `);
+        const cameras = query(`
+            SELECT c.id, c.name, c.area_id, c.is_online, c.enable_recording, c.stream_source,
+                   c.delivery_type, c.private_rtsp_url, c.external_hls_url, c.external_stream_url,
+                   c.external_embed_url, c.external_snapshot_url
+            FROM cameras c
+            WHERE c.area_id IS NOT NULL
+            ORDER BY c.area_id ASC, c.id ASC
+        `);
+        const healthItems = cameraHealthService.getHealthDebugSnapshot();
+        const healthByCameraId = new Map(healthItems.map((item) => [item.cameraId, item]));
+
+        const summaryByArea = new Map(
+            areas.map((area) => [area.id, {
+                areaId: area.id,
+                areaName: area.name,
+                kecamatan: area.kecamatan || null,
+                kelurahan: area.kelurahan || null,
+                total: 0,
+                online: 0,
+                offline: 0,
+                internalValid: 0,
+                externalValid: 0,
+                externalUnresolved: 0,
+                recordingEnabled: 0,
+                topReasons: [],
+            }])
+        );
+
+        for (const camera of cameras) {
+            const summary = summaryByArea.get(camera.area_id);
+            if (!summary) {
+                continue;
+            }
+
+            const deliveryProfile = getCameraDeliveryProfile(camera);
+            const healthItem = healthByCameraId.get(camera.id);
+
+            summary.total += 1;
+            if (camera.is_online === 1 || camera.is_online === true) {
+                summary.online += 1;
+            } else {
+                summary.offline += 1;
+            }
+            if (camera.enable_recording === 1 || camera.enable_recording === true) {
+                summary.recordingEnabled += 1;
+            }
+
+            if (deliveryProfile.classification === 'internal_hls') {
+                summary.internalValid += 1;
+            } else if (deliveryProfile.classification === 'external_unresolved') {
+                summary.externalUnresolved += 1;
+            } else {
+                summary.externalValid += 1;
+            }
+
+            if (healthItem?.lastReason) {
+                const existingReason = summary.topReasons.find((item) => item.reason === healthItem.lastReason);
+                if (existingReason) {
+                    existingReason.count += 1;
+                } else {
+                    summary.topReasons.push({ reason: healthItem.lastReason, count: 1 });
+                }
+            }
+        }
+
+        const data = areas.map((area) => {
+            const summary = summaryByArea.get(area.id);
+            summary.topReasons = summary.topReasons
+                .sort((a, b) => b.count - a.count)
+                .slice(0, 3);
+            return summary;
+        });
+
+        cache.set(CACHE_AREA_SUMMARY, data, CacheTTL.SHORT);
         return { data, isCached: false };
     }
 

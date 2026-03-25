@@ -5,6 +5,7 @@ import {
     updateArea,
     deleteArea,
     getAreaFilters,
+    getAreaSummary,
 } from '../controllers/areaController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 import {
@@ -21,6 +22,11 @@ export default async function areaRoutes(fastify, options) {
     
     fastify.get('/filters', {
         handler: getAreaFilters,
+    });
+
+    fastify.get('/summary', {
+        onRequest: [authMiddleware],
+        handler: getAreaSummary,
     });
 
     // Admin endpoints (protected)
