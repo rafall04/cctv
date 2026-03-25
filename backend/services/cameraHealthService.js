@@ -809,8 +809,8 @@ class CameraHealthService {
             const activePaths = await this.getActivePaths();
             const cameras = query(`
                 SELECT ${SHARED_CAMERA_STREAM_PROJECTION}
-                FROM cameras
-                WHERE enabled = 1
+                FROM cameras c
+                WHERE c.enabled = 1
             `);
 
             const timestamp = getTimestamp();
@@ -970,8 +970,8 @@ class CameraHealthService {
             const activePaths = await this.getActivePaths();
             const camera = queryOne(
                 `SELECT ${SHARED_CAMERA_STREAM_PROJECTION}
-                 FROM cameras
-                 WHERE id = ? AND enabled = 1`,
+                 FROM cameras c
+                 WHERE c.id = ? AND c.enabled = 1`,
                 [cameraId]
             );
 
