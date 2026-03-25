@@ -5,6 +5,7 @@ import {
     createCamera,
     updateCamera,
     deleteCamera,
+    exportCameras,
     importCameras,
     bulkUpdateByArea,
     bulkDeleteByArea,
