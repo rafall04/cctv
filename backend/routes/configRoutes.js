@@ -45,7 +45,7 @@ export function buildManifestFromBranding(branding = {}) {
 function loadBrandingSettings() {
     try {
         const settings = query(
-            'SELECT key, value FROM settings WHERE key LIKE "company_%" OR key LIKE "meta_%" OR key = "primary_color"'
+            "SELECT key, value FROM settings WHERE key LIKE 'company_%' OR key LIKE 'meta_%' OR key = 'primary_color'"
         );
 
         return settings.reduce((acc, setting) => {
