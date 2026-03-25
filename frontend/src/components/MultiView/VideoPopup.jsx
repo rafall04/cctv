@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Icons } from '../ui/Icons.jsx';
 import CodecBadge from '../CodecBadge.jsx';
 import ZoomableVideo from './ZoomableVideo';
+import ZoomableMediaFrame from './ZoomableMediaFrame.jsx';
 import { detectDeviceTier } from '../../utils/deviceDetector';
 import { shouldDisableAnimations } from '../../utils/animationControl';
 import { LoadingStage, createStreamError } from '../../utils/streamLoaderTypes';
@@ -223,8 +224,8 @@ function VideoPopup({
 
     // Viewer session tracking - track when user starts/stops watching
     useEffect(() => {
-        // Don't track if camera is offline or in maintenance
-        if (isMaintenance || isOffline || !isHlsCamera) return;
+        // Don't track if camera is offline, in maintenance, or not popup-capable
+        if (isMaintenance || isOffline || !streamCapabilities.popup) return;
 
         let sessionId = null;
 
@@ -247,7 +248,7 @@ function VideoPopup({
                 });
             }
         };
-    }, [camera.id, isMaintenance, isOffline]);
+    }, [camera.id, isMaintenance, isOffline, streamCapabilities.popup]);
 
     useEffect(() => {
         const onKey = (e) => e.key === 'Escape' && onClose();
@@ -326,7 +327,7 @@ function VideoPopup({
 
     useEffect(() => {
         // Skip HLS loading if camera is in maintenance or offline
-        if (isMaintenance || isOffline) return;
+        if (isMaintenance || isOffline || !isHlsCamera) return;
         if (!effectiveUrl || !videoRef.current) return;
         const video = videoRef.current;
         let hls = null;
@@ -865,47 +866,53 @@ function VideoPopup({
                     {isHlsCamera ? (
                         <ZoomableVideo videoRef={videoRef} maxZoom={4} onZoomChange={setZoom} isFullscreen={isFullscreen} />
                     ) : deliveryType === 'external_mjpeg' && effectiveUrl ? (
-                        <img
-                            src={effectiveUrl}
-                            alt={camera.name}
-                            data-testid="external-mjpeg-body"
-                            className="w-full h-full object-contain bg-black"
-                        />
+                        <ZoomableMediaFrame maxZoom={4} onZoomChange={setZoom}>
+                            <img
+                                src={effectiveUrl}
+                                alt={camera.name}
+                                data-testid="external-mjpeg-body"
+                                className="w-full h-full object-contain bg-black pointer-events-none"
+                            />
+                        </ZoomableMediaFrame>
                     ) : popupEmbedUrl ? (
-                        <iframe
-                            src={popupEmbedUrl}
-                            title={camera.name}
-                            data-testid="external-embed-body"
-                            className="w-full h-full border-0 bg-black"
-                            allow="autoplay; fullscreen"
-                            referrerPolicy="strict-origin-when-cross-origin"
-                        />
+                        <ZoomableMediaFrame maxZoom={3} onZoomChange={setZoom}>
+                            <iframe
+                                src={popupEmbedUrl}
+                                title={camera.name}
+                                data-testid="external-embed-body"
+                                className="w-full h-full border-0 bg-black"
+                                allow="autoplay; fullscreen"
+                                referrerPolicy="strict-origin-when-cross-origin"
+                            />
+                        </ZoomableMediaFrame>
                     ) : effectiveUrl ? (
-                        <div data-testid="external-source-fallback" className="absolute inset-0 flex items-center justify-center bg-black p-6">
-                            <div className="max-w-md text-center text-white space-y-4">
-                                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10">
-                                    <Icons.Play />
+                        <ZoomableMediaFrame maxZoom={2} onZoomChange={setZoom}>
+                            <div data-testid="external-source-fallback" className="absolute inset-0 flex items-center justify-center bg-black p-6">
+                                <div className="max-w-md text-center text-white space-y-4">
+                                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10">
+                                        <Icons.Play />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-semibold">Sumber Eksternal</h3>
+                                        <p className="mt-2 text-sm text-gray-300">
+                                            Format stream ini tidak diputar langsung oleh player internal. Buka sumber resmi untuk melihat CCTV dari penyedia asal.
+                                        </p>
+                                    </div>
+                                    {officialSourceUrl ? (
+                                        <a
+                                            href={officialSourceUrl}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="pointer-events-auto inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-600"
+                                        >
+                                            Buka Sumber Resmi
+                                        </a>
+                                    ) : (
+                                        <p className="text-xs text-gray-400 break-all">{effectiveUrl}</p>
+                                    )}
                                 </div>
-                                <div>
-                                    <h3 className="text-lg font-semibold">Sumber Eksternal</h3>
-                                    <p className="mt-2 text-sm text-gray-300">
-                                        Format stream ini tidak diputar langsung oleh player internal. Buka sumber resmi untuk melihat CCTV dari penyedia asal.
-                                    </p>
-                                </div>
-                                {officialSourceUrl ? (
-                                    <a
-                                        href={officialSourceUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-600"
-                                    >
-                                        Buka Sumber Resmi
-                                    </a>
-                                ) : (
-                                    <p className="text-xs text-gray-400 break-all">{effectiveUrl}</p>
-                                )}
                             </div>
-                        </div>
+                        </ZoomableMediaFrame>
                     ) : null}
 
                     {/* Snapshot Notification */}

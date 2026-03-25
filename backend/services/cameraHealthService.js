@@ -11,6 +11,7 @@ import {
 import { getTimezone } from './timezoneService.js';
 import { recordingService } from './recordingService.js';
 import thumbnailService from './thumbnailService.js';
+import { getEffectiveDeliveryType, getPrimaryExternalStreamUrl } from '../utils/cameraDelivery.js';
 
 const mediaMtxApiBaseUrl = `${(config.mediamtx?.apiUrl || 'http://localhost:9997').replace(/\/$/, '')}/v3`;
 
@@ -176,8 +177,8 @@ async function batchProbe(cameras, probeFn) {
     const domainGroups = new Map();
     for (const camera of cameras) {
         let hostname = '_internal_';
-        if (camera.stream_source === 'external' && camera.external_hls_url) {
-            try { hostname = new URL(camera.external_hls_url).hostname; } catch {}
+        if (getEffectiveDeliveryType(camera) === 'external_hls') {
+            try { hostname = new URL(getPrimaryExternalStreamUrl(camera)).hostname; } catch {}
         }
         if (!domainGroups.has(hostname)) domainGroups.set(hostname, []);
         domainGroups.get(hostname).push(camera);
@@ -530,8 +531,9 @@ class CameraHealthService {
     }
 
     async evaluateCameraRaw(camera, activePaths, options = {}) {
-        if ((camera.stream_source || 'internal') === 'external') {
-            let hlsUrl = camera.external_hls_url;
+        const deliveryType = getEffectiveDeliveryType(camera);
+        if (deliveryType === 'external_hls') {
+            let hlsUrl = getPrimaryExternalStreamUrl(camera);
             if (options.bustCache && hlsUrl) {
                 const sep = hlsUrl.includes('?') ? '&' : '?';
                 hlsUrl = `${hlsUrl}${sep}_t=${Date.now()}`;
@@ -542,6 +544,10 @@ class CameraHealthService {
                 this.getExternalRequestOptions(camera),
                 options.timeoutMs
             );
+        }
+
+        if (deliveryType !== 'internal_hls') {
+            return { online: camera.is_online === 1, reason: 'unsupported_external_delivery' };
         }
 
         const pathName = camera.stream_key || `camera${camera.id}`;
@@ -625,7 +631,7 @@ class CameraHealthService {
         try {
             const activePaths = await this.getActivePaths();
             const cameras = query(`
-                SELECT id, name, location, is_online, enabled, enable_recording, stream_key, private_rtsp_url, stream_source, external_hls_url,
+                SELECT id, name, location, is_online, enabled, enable_recording, stream_key, private_rtsp_url, stream_source, delivery_type, external_hls_url, external_stream_url,
                        COALESCE(external_use_proxy, 1) as external_use_proxy,
                        CASE
                            WHEN external_tls_mode IN ('strict', 'insecure') THEN external_tls_mode
@@ -794,7 +800,7 @@ class CameraHealthService {
         try {
             const activePaths = await this.getActivePaths();
             const camera = queryOne(
-                `SELECT id, name, location, is_online, enabled, enable_recording, stream_key, private_rtsp_url, stream_source, external_hls_url,
+                `SELECT id, name, location, is_online, enabled, enable_recording, stream_key, private_rtsp_url, stream_source, delivery_type, external_hls_url, external_stream_url,
                         COALESCE(external_use_proxy, 1) as external_use_proxy,
                         CASE
                             WHEN external_tls_mode IN ('strict', 'insecure') THEN external_tls_mode

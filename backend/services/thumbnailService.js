@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { query, execute } from '../database/database.js';
 import { config } from '../config/config.js';
+import { getEffectiveDeliveryType, getPrimaryExternalStreamUrl } from '../utils/cameraDelivery.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -79,11 +80,17 @@ class ThumbnailService {
     }
 
     resolveCameraHlsUrl(camera) {
-        if ((camera.stream_source || 'internal') === 'external') {
-            const url = (camera.external_hls_url || '').trim();
+        const deliveryType = getEffectiveDeliveryType(camera);
+
+        if (deliveryType === 'external_hls') {
+            const url = (getPrimaryExternalStreamUrl(camera) || '').trim();
             if (url.startsWith('http://') || url.startsWith('https://')) {
                 return url;
             }
+            return null;
+        }
+
+        if (deliveryType !== 'internal_hls') {
             return null;
         }
 
@@ -133,7 +140,7 @@ class ThumbnailService {
 
         try {
             const cameras = query(`
-                SELECT id, name, is_online, stream_key, stream_source, external_hls_url
+                SELECT id, name, is_online, stream_key, stream_source, delivery_type, external_hls_url, external_stream_url
                 FROM cameras
                 WHERE enabled = 1 AND is_online = 1
             `);
@@ -227,13 +234,15 @@ class ThumbnailService {
         }
     }
 
-    async generateSingle(cameraId, streamKey, streamSource = 'internal', externalHlsUrl = null) {
+    async generateSingle(cameraId, streamKey, streamSource = 'internal', externalHlsUrl = null, deliveryType = null, externalStreamUrl = null) {
         try {
             const camera = {
                 id: cameraId,
                 stream_key: streamKey,
                 stream_source: streamSource,
-                external_hls_url: externalHlsUrl
+                delivery_type: deliveryType,
+                external_hls_url: externalHlsUrl,
+                external_stream_url: externalStreamUrl
             };
             const hlsUrl = this.resolveCameraHlsUrl(camera);
 
@@ -255,7 +264,7 @@ class ThumbnailService {
         }
 
         const camera = query(
-            `SELECT id, name, enabled, is_online, stream_key, stream_source, external_hls_url
+            `SELECT id, name, enabled, is_online, stream_key, stream_source, delivery_type, external_hls_url, external_stream_url
              FROM cameras
              WHERE id = ?`,
             [cameraId]

@@ -36,7 +36,10 @@ class ViewerService {
      */
     async startSession(cameraId) {
         try {
-            const response = await apiClient.post('/api/viewer/start', { cameraId });
+            const normalizedCameraId = Number.parseInt(cameraId, 10);
+            const response = await apiClient.post('/api/viewer/start', {
+                cameraId: Number.isInteger(normalizedCameraId) ? normalizedCameraId : cameraId
+            });
             
             if (response.data.success) {
                 const sessionId = response.data.data.sessionId;

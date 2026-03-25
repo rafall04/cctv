@@ -7,12 +7,58 @@ export const DELIVERY_TYPES = [
     'external_custom_ws',
 ];
 
+export const DELIVERY_TYPE_PATTERNS = {
+    websocket: /^wss?:\/\//i,
+    http: /^https?:\/\//i,
+    hlsHint: /\.m3u8($|[?#])/i,
+    zoneminderMjpeg: /\/zm\/cgi-bin\/nph-zms/i,
+    jsmpegHint: /jsmpeg/i,
+};
+
+function normalizeUrl(url) {
+    return typeof url === 'string' ? url.trim() : '';
+}
+
 export function getEffectiveDeliveryType(camera = {}) {
     if (DELIVERY_TYPES.includes(camera.delivery_type)) {
         return camera.delivery_type;
     }
 
-    if (camera.stream_source === 'external' && camera.external_hls_url) {
+    const streamSource = typeof camera.stream_source === 'string'
+        ? camera.stream_source.trim().toLowerCase()
+        : '';
+    const externalHlsUrl = normalizeUrl(camera.external_hls_url);
+    const externalStreamUrl = normalizeUrl(camera.external_stream_url);
+    const externalEmbedUrl = normalizeUrl(camera.external_embed_url);
+    const externalUrl = externalStreamUrl || externalHlsUrl;
+
+    if (streamSource === 'external') {
+        if (externalHlsUrl && DELIVERY_TYPE_PATTERNS.http.test(externalHlsUrl)) {
+            return 'external_hls';
+        }
+
+        if (externalUrl && DELIVERY_TYPE_PATTERNS.websocket.test(externalUrl)) {
+            return DELIVERY_TYPE_PATTERNS.jsmpegHint.test(externalUrl)
+                ? 'external_jsmpeg'
+                : 'external_custom_ws';
+        }
+
+        if (externalUrl && DELIVERY_TYPE_PATTERNS.zoneminderMjpeg.test(externalUrl)) {
+            return 'external_mjpeg';
+        }
+
+        if (externalUrl && DELIVERY_TYPE_PATTERNS.http.test(externalUrl)) {
+            if (DELIVERY_TYPE_PATTERNS.hlsHint.test(externalUrl)) {
+                return 'external_hls';
+            }
+
+            return 'external_mjpeg';
+        }
+
+        if (externalEmbedUrl && DELIVERY_TYPE_PATTERNS.http.test(externalEmbedUrl)) {
+            return 'external_embed';
+        }
+
         return 'external_hls';
     }
 
@@ -49,7 +95,11 @@ export function isMultiViewSupported(camera = {}) {
 }
 
 export function getPrimaryExternalUrl(camera = {}) {
-    return camera.external_stream_url || camera.external_embed_url || camera._rawExternalStreamUrl || null;
+    return normalizeUrl(camera.external_stream_url)
+        || normalizeUrl(camera.external_embed_url)
+        || normalizeUrl(camera._rawExternalStreamUrl)
+        || normalizeUrl(camera.external_hls_url)
+        || null;
 }
 
 export function getPopupEmbedUrl(camera = {}) {

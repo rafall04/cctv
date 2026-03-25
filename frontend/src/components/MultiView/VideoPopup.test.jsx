@@ -467,6 +467,10 @@ describe('VideoPopup non-live states', () => {
         expect(screen.getByTestId('external-mjpeg-body')).toBeTruthy();
         expect(screen.queryByTestId('grid-popup-video')).toBeNull();
         expect(hlsInstances).toHaveLength(0);
+
+        await waitFor(() => {
+            expect(startSessionMock).toHaveBeenCalledWith(23);
+        });
     });
 
     it('merender fallback sumber resmi untuk custom websocket tanpa mencoba HLS', async () => {
@@ -487,6 +491,10 @@ describe('VideoPopup non-live states', () => {
         expect(screen.getByTestId('external-source-fallback')).toBeTruthy();
         expect(screen.getByText('wss://example.com/custom-stream')).toBeTruthy();
         expect(hlsInstances).toHaveLength(0);
+
+        await waitFor(() => {
+            expect(startSessionMock).toHaveBeenCalledWith(24);
+        });
     });
 });
 

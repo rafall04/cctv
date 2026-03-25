@@ -58,7 +58,7 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
             <div onClick={onClick} className={`aspect-video relative cursor-pointer overflow-hidden ${bgStyle}`}>
                 <CameraThumbnail
                     cameraId={camera.id}
-                    thumbnailPath={camera.thumbnail_path}
+                    thumbnailPath={camera.external_snapshot_url || camera.thumbnail_path}
                     cameraName={camera.name}
                     isMaintenance={isMaintenance}
                     isOffline={isOffline}

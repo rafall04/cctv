@@ -10,26 +10,15 @@ import { invalidateCache } from '../middleware/cacheMiddleware.js';
 import { sanitizeCameraThumbnail, sanitizeCameraThumbnailList } from './thumbnailPathService.js';
 import {
     DELIVERY_TYPES,
+    DELIVERY_TYPE_PATTERNS,
     getCompatStreamSource,
     getEffectiveDeliveryType,
-    isHlsDeliveryType,
+    getPrimaryExternalStreamUrl,
     normalizeExternalOriginMode,
 } from '../utils/cameraDelivery.js';
 
-const WS_PROTOCOL_PATTERN = /^wss?:\/\//i;
-const HTTP_PROTOCOL_PATTERN = /^https?:\/\//i;
-const HLS_HINT_PATTERN = /\.m3u8($|[?#])/i;
-
 function getNormalizedDeliveryType(data = {}) {
-    if (DELIVERY_TYPES.includes(data.delivery_type)) {
-        return data.delivery_type;
-    }
-
-    if (data.stream_source === 'external' || data.external_hls_url) {
-        return 'external_hls';
-    }
-
-    return 'internal_hls';
+    return getEffectiveDeliveryType(data);
 }
 
 function getNormalizedExternalStreamUrl(data = {}, deliveryType) {
@@ -37,8 +26,8 @@ function getNormalizedExternalStreamUrl(data = {}, deliveryType) {
         return data.external_stream_url || null;
     }
 
-    if (deliveryType === 'external_hls') {
-        return data.external_hls_url || null;
+    if (deliveryType !== 'internal_hls') {
+        return getPrimaryExternalStreamUrl(data);
     }
 
     return null;
@@ -65,7 +54,7 @@ function validateDeliveryConfiguration({
             err.statusCode = 400;
             throw err;
         }
-        if (!HTTP_PROTOCOL_PATTERN.test(externalStreamUrl)) {
+        if (!DELIVERY_TYPE_PATTERNS.http.test(externalStreamUrl)) {
             const err = new Error('External HLS URL must start with http:// or https://');
             err.statusCode = 400;
             throw err;
@@ -79,7 +68,7 @@ function validateDeliveryConfiguration({
             err.statusCode = 400;
             throw err;
         }
-        if (!HTTP_PROTOCOL_PATTERN.test(externalStreamUrl)) {
+        if (!DELIVERY_TYPE_PATTERNS.http.test(externalStreamUrl)) {
             const err = new Error('MJPEG URL must start with http:// or https://');
             err.statusCode = 400;
             throw err;
@@ -93,7 +82,7 @@ function validateDeliveryConfiguration({
             err.statusCode = 400;
             throw err;
         }
-        if (!HTTP_PROTOCOL_PATTERN.test(externalEmbedUrl)) {
+        if (!DELIVERY_TYPE_PATTERNS.http.test(externalEmbedUrl)) {
             const err = new Error('Embed URL must start with http:// or https://');
             err.statusCode = 400;
             throw err;
@@ -107,7 +96,7 @@ function validateDeliveryConfiguration({
             err.statusCode = 400;
             throw err;
         }
-        if (!WS_PROTOCOL_PATTERN.test(externalStreamUrl)) {
+        if (!DELIVERY_TYPE_PATTERNS.websocket.test(externalStreamUrl)) {
             const err = new Error('WebSocket stream URL must start with ws:// or wss://');
             err.statusCode = 400;
             throw err;
@@ -116,12 +105,13 @@ function validateDeliveryConfiguration({
 }
 
 function normalizeCameraPersistencePayload(data = {}, existingCamera = null) {
-    const deliveryType = getNormalizedDeliveryType({
+    const mergedData = {
         ...existingCamera,
         ...data,
-    });
+    };
+    const deliveryType = getNormalizedDeliveryType(mergedData);
     const compatStreamSource = getCompatStreamSource(deliveryType);
-    const externalStreamUrl = getNormalizedExternalStreamUrl({ ...existingCamera, ...data }, deliveryType);
+    const externalStreamUrl = getNormalizedExternalStreamUrl(mergedData, deliveryType);
     const externalEmbedUrl = data.external_embed_url !== undefined
         ? (data.external_embed_url || null)
         : (existingCamera?.external_embed_url || null);
@@ -805,17 +795,13 @@ class CameraService {
                 const rtspUrl = rawRtspUrl ? String(rawRtspUrl).trim() : null;
                 const embedUrl = rawEmbedUrl ? String(rawEmbedUrl).trim() : null;
                 const snapshotUrl = rawSnapshotUrl ? String(rawSnapshotUrl).trim() : null;
-                const inferredDeliveryType = DELIVERY_TYPES.includes(cam.delivery_type)
-                    ? cam.delivery_type
-                    : (cam.stream_source === 'internal'
-                        ? 'internal_hls'
-                        : (sourceUrl && WS_PROTOCOL_PATTERN.test(sourceUrl)
-                            ? (sourceUrl.toLowerCase().includes('jsmpeg') ? 'external_jsmpeg' : 'external_custom_ws')
-                            : (embedUrl && !sourceUrl
-                                ? 'external_embed'
-                                : (sourceUrl && HLS_HINT_PATTERN.test(sourceUrl)
-                                    ? 'external_hls'
-                                    : (sourceUrl ? 'external_mjpeg' : 'external_embed')))));
+                const inferredDeliveryType = getEffectiveDeliveryType({
+                    stream_source: cam.stream_source || (rtspUrl ? 'internal' : 'external'),
+                    delivery_type: cam.delivery_type,
+                    external_hls_url: cam.external_hls_url || null,
+                    external_stream_url: sourceUrl,
+                    external_embed_url: embedUrl,
+                });
                 
                 // Duplicate Validation
                 if (!name) {

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import { promisify } from 'util';
 import { exec } from 'child_process';
+import { getEffectiveDeliveryType, getPrimaryExternalStreamUrl } from '../utils/cameraDelivery.js';
 const execPromise = promisify(exec);
 
 const __filename = fileURLToPath(import.meta.url);
@@ -149,10 +150,11 @@ export function maskRecordingSourceForLog(sourceUrl) {
 }
 
 export function getRecordingSourceConfig(camera) {
-    const streamSource = (camera?.stream_source || 'internal').trim();
+    const deliveryType = getEffectiveDeliveryType(camera);
+    const streamSource = deliveryType === 'internal_hls' ? 'internal' : 'external';
 
-    if (streamSource === 'external') {
-        const externalUrl = (camera?.external_hls_url || '').trim();
+    if (deliveryType === 'external_hls') {
+        const externalUrl = (getPrimaryExternalStreamUrl(camera) || '').trim();
         if (!externalUrl) {
             return {
                 success: false,
@@ -174,6 +176,14 @@ export function getRecordingSourceConfig(camera) {
             streamSource,
             inputUrl: externalUrl,
             logSource: maskRecordingSourceForLog(externalUrl),
+        };
+    }
+
+    if (deliveryType !== 'internal_hls') {
+        return {
+            success: false,
+            reason: 'unsupported_source',
+            message: 'Playback recording only supports internal HLS or external HLS cameras',
         };
     }
 

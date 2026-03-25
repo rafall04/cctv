@@ -4,6 +4,8 @@
  */
 
 import viewerSessionService from '../services/viewerSessionService.js';
+import cameraService from '../services/cameraService.js';
+import { getStreamCapabilities } from '../utils/cameraDelivery.js';
 
 /**
  * Start a new viewer session
@@ -12,12 +14,30 @@ import viewerSessionService from '../services/viewerSessionService.js';
  */
 export async function startViewerSession(request, reply) {
     try {
-        const { cameraId } = request.body;
+        const rawCameraId = request.body?.cameraId;
+        const cameraId = Number.parseInt(rawCameraId, 10);
 
-        if (!cameraId) {
+        if (!Number.isInteger(cameraId) || cameraId <= 0) {
             return reply.code(400).send({
                 success: false,
                 message: 'Camera ID is required'
+            });
+        }
+
+        const camera = cameraService.getCameraById(cameraId);
+        const capabilities = getStreamCapabilities(camera);
+
+        if (!camera.enabled) {
+            return reply.code(400).send({
+                success: false,
+                message: 'Camera is disabled'
+            });
+        }
+
+        if (!capabilities.popup) {
+            return reply.code(400).send({
+                success: false,
+                message: 'Camera does not support popup viewing'
             });
         }
 
@@ -29,6 +49,12 @@ export async function startViewerSession(request, reply) {
         });
     } catch (error) {
         console.error('Start viewer session error:', error);
+        if (error.statusCode === 404) {
+            return reply.code(404).send({
+                success: false,
+                message: error.message
+            });
+        }
         return reply.code(500).send({
             success: false,
             message: 'Failed to start viewer session'

@@ -23,7 +23,12 @@ export default async function viewerRoutes(fastify, options) {
                 type: 'object',
                 required: ['cameraId'],
                 properties: {
-                    cameraId: { type: 'integer' }
+                    cameraId: {
+                        anyOf: [
+                            { type: 'integer' },
+                            { type: 'string', minLength: 1 }
+                        ]
+                    }
                 }
             }
         },
