@@ -1,4 +1,5 @@
 import { getApiUrl } from '../config/config.js';
+import { getEffectiveDeliveryType } from './cameraDelivery.js';
 
 /**
  * Resolve the playback URL for a camera, honoring the external_use_proxy setting.
@@ -17,9 +18,10 @@ export function resolveStreamUrl(camera, { forceProxy = false } = {}) {
         return { targetUrl: null, proxyFallbackUrl: null, isDirectStream: false };
     }
 
-    const isExternal = camera.stream_source === 'external';
+    const deliveryType = getEffectiveDeliveryType(camera);
+    const isExternalHls = deliveryType === 'external_hls';
     const proxyDisabled = camera.external_use_proxy === 0 || camera.external_use_proxy === false;
-    const rawUrl = camera._rawExternalHlsUrl || camera.external_hls_url;
+    const rawUrl = camera._rawExternalHlsUrl || camera.external_stream_url || camera.external_hls_url;
     const currentStreamUrl = camera.streams?.hls || null;
 
     // Direct stream conditions:
@@ -27,7 +29,7 @@ export function resolveStreamUrl(camera, { forceProxy = false } = {}) {
     // 2. Proxy is explicitly disabled in DB
     // 3. Not forced back to proxy (e.g. after CORS failure)
     // 4. We have the raw external URL available
-    const useDirectStream = isExternal && proxyDisabled && !forceProxy && !!rawUrl;
+    const useDirectStream = isExternalHls && proxyDisabled && !forceProxy && !!rawUrl;
 
     if (!useDirectStream) {
         return {

@@ -9,6 +9,7 @@ import { REQUEST_POLICY } from '../services/requestPolicy';
 import GlobalAdScript from '../components/ads/GlobalAdScript';
 import InlineAdSlot from '../components/ads/InlineAdSlot';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../components/ads/adsConfig.js';
+import { getStreamCapabilities } from '../utils/cameraDelivery.js';
 
 import PlaybackHeader from '../components/playback/PlaybackHeader';
 import PlaybackVideo from '../components/playback/PlaybackVideo';
@@ -36,8 +37,9 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
     const { branding } = useBranding();
 
     const [cameras, setCameras] = useState(propCameras || []);
+    const supportedInitialCameras = (propCameras || []).filter((camera) => getStreamCapabilities(camera).playback);
     const [selectedCameraId, setSelectedCameraId] = useState(() => {
-        if (propSelectedCamera?.id) {
+        if (propSelectedCamera?.id && getStreamCapabilities(propSelectedCamera).playback) {
             return propSelectedCamera.id;
         }
 
@@ -45,7 +47,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
             return parseCameraIdFromSlug(cameraIdFromUrl);
         }
 
-        return propCameras?.[0]?.id ?? null;
+        return supportedInitialCameras[0]?.id ?? null;
     });
     const [segments, setSegments] = useState([]);
     const [segmentsCameraId, setSegmentsCameraId] = useState(null);
@@ -89,14 +91,15 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
     const autoPlayEnabledRef = useRef(autoPlayEnabled);
     const selectedCameraIdRef = useRef(selectedCameraId);
 
+    const playbackCameras = useMemo(() => cameras.filter((camera) => getStreamCapabilities(camera).playback), [cameras]);
     const selectedCamera = useMemo(() => {
         if (!selectedCameraId) {
             return null;
         }
 
-        return cameras.find((camera) => camera.id === selectedCameraId)
-            || (propSelectedCamera?.id === selectedCameraId ? propSelectedCamera : null);
-    }, [cameras, propSelectedCamera, selectedCameraId]);
+        return playbackCameras.find((camera) => camera.id === selectedCameraId)
+            || (propSelectedCamera?.id === selectedCameraId && getStreamCapabilities(propSelectedCamera).playback ? propSelectedCamera : null);
+    }, [playbackCameras, propSelectedCamera, selectedCameraId]);
     const isMobileAdsViewport = isAdsMobileViewport();
     const showPlaybackNative = shouldRenderAdSlot(adsConfig, 'playbackNative', isMobileAdsViewport);
     const showPlaybackPopunder = shouldRenderAdSlot(adsConfig, 'playbackPopunder', isMobileAdsViewport);
@@ -118,6 +121,14 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
     useEffect(() => {
         selectedCameraIdRef.current = selectedCameraId;
     }, [selectedCameraId]);
+
+    useEffect(() => {
+        if (selectedCameraId && playbackCameras.some((camera) => camera.id === selectedCameraId)) {
+            return;
+        }
+
+        setSelectedCameraId(playbackCameras[0]?.id ?? null);
+    }, [playbackCameras, selectedCameraId]);
 
     useEffect(() => {
         if (!showPlaybackPopunder) {
@@ -1106,7 +1117,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
             <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-2 sm:py-6 md:py-8 px-2 sm:px-4">
             <div className="max-w-7xl mx-auto space-y-3 sm:space-y-4 md:space-y-6">
                 <PlaybackHeader
-                    cameras={cameras}
+                    cameras={playbackCameras}
                     selectedCamera={selectedCamera}
                     onCameraChange={handleCameraChange}
                     autoPlayEnabled={autoPlayEnabled}

@@ -16,7 +16,12 @@ export const defaultCameraFormValues = {
     enable_recording: false,
     recording_duration_hours: 5,
     stream_source: 'internal',
+    delivery_type: 'internal_hls',
     external_hls_url: '',
+    external_stream_url: '',
+    external_embed_url: '',
+    external_snapshot_url: '',
+    external_origin_mode: 'direct',
     external_use_proxy: true,
     external_tls_mode: 'strict',
 };
@@ -75,7 +80,13 @@ export const recordingDurationOptions = [
     },
 ];
 
-export function getCameraValidationRules(streamSource = 'internal') {
+export function getCameraValidationRules(deliveryType = 'internal_hls') {
+    const isInternal = deliveryType === 'internal_hls';
+    const isExternalHls = deliveryType === 'external_hls';
+    const requiresStreamUrl = ['external_hls', 'external_mjpeg', 'external_jsmpeg', 'external_custom_ws'].includes(deliveryType);
+    const requiresEmbedUrl = deliveryType === 'external_embed';
+    const requiresWsUrl = deliveryType === 'external_jsmpeg' || deliveryType === 'external_custom_ws';
+
     return {
         name: {
             required: 'Camera name is required',
@@ -83,28 +94,45 @@ export function getCameraValidationRules(streamSource = 'internal') {
             maxLength: { value: 100, message: 'Name must not exceed 100 characters' },
         },
         private_rtsp_url: {
-            required: streamSource === 'internal' ? 'RTSP URL is required' : false,
+            required: isInternal ? 'RTSP URL is required' : false,
             custom: (value) => {
-                if (streamSource === 'external') return undefined;
+                if (!isInternal) return undefined;
                 if (!value || value.trim() === '') return undefined;
                 const result = validateRtspUrl(value);
                 return result.isValid ? undefined : result.error;
             },
         },
-        external_hls_url: {
-            required: streamSource === 'external' ? 'External HLS URL is required' : false,
+        external_stream_url: {
+            required: requiresStreamUrl ? 'External stream URL is required' : false,
             custom: (value) => {
-                if (streamSource === 'internal') return undefined;
+                if (!requiresStreamUrl) return undefined;
                 if (!value || value.trim() === '') return undefined;
-                if (!value.startsWith('http')) {
+                if (requiresWsUrl) {
+                    if (!/^wss?:\/\//i.test(value)) {
+                        return 'URL must start with ws:// or wss://';
+                    }
+                    return undefined;
+                }
+                if (!/^https?:\/\//i.test(value)) {
                     return 'URL must start with http:// or https://';
+                }
+                return undefined;
+            },
+        },
+        external_embed_url: {
+            required: requiresEmbedUrl ? 'External embed URL is required' : false,
+            custom: (value) => {
+                if (!requiresEmbedUrl) return undefined;
+                if (!value || value.trim() === '') return undefined;
+                if (!/^https?:\/\//i.test(value)) {
+                    return 'Embed URL must start with http:// or https://';
                 }
                 return undefined;
             },
         },
         external_tls_mode: {
             custom: (value) => {
-                if (streamSource === 'internal') return undefined;
+                if (!isExternalHls) return undefined;
                 if (!value) return undefined;
                 if (!['strict', 'insecure'].includes(value)) {
                     return 'TLS mode must be strict or insecure';
@@ -116,6 +144,8 @@ export function getCameraValidationRules(streamSource = 'internal') {
 }
 
 export function mapCameraToFormValues(camera) {
+    const deliveryType = camera.delivery_type || ((camera.stream_source === 'external' && camera.external_hls_url) ? 'external_hls' : 'internal_hls');
+
     return {
         ...defaultCameraFormValues,
         name: camera.name || '',
@@ -132,8 +162,13 @@ export function mapCameraToFormValues(camera) {
         status: camera.status || 'active',
         enable_recording: camera.enable_recording === 1 || camera.enable_recording === true,
         recording_duration_hours: camera.recording_duration_hours || 5,
-        stream_source: camera.stream_source || 'internal',
+        stream_source: deliveryType === 'internal_hls' ? 'internal' : 'external',
+        delivery_type: deliveryType,
         external_hls_url: camera.external_hls_url || '',
+        external_stream_url: camera.external_stream_url || camera.external_hls_url || '',
+        external_embed_url: camera.external_embed_url || '',
+        external_snapshot_url: camera.external_snapshot_url || '',
+        external_origin_mode: camera.external_origin_mode || 'direct',
         external_use_proxy: camera.external_use_proxy !== false && camera.external_use_proxy !== 0,
         external_tls_mode: camera.external_tls_mode || 'strict',
     };
@@ -143,20 +178,30 @@ export function buildCameraPayload(formData) {
     const recordingDuration = formData.recording_duration_hours
         ? parseInt(formData.recording_duration_hours, 10)
         : 5;
+    const deliveryType = formData.delivery_type || ((formData.stream_source === 'external') ? 'external_hls' : 'internal_hls');
+    const compatStreamSource = deliveryType === 'internal_hls' ? 'internal' : 'external';
+    const externalStreamUrl = ['external_hls', 'external_mjpeg', 'external_jsmpeg', 'external_custom_ws'].includes(deliveryType)
+        ? (formData.external_stream_url || formData.external_hls_url || null)
+        : null;
 
     return {
         ...formData,
         enabled: formData.enabled ? 1 : 0,
         is_tunnel: formData.is_tunnel ? 1 : 0,
         status: formData.status,
-        enable_recording: formData.enable_recording ? 1 : 0,
+        enable_recording: deliveryType === 'internal_hls' && formData.enable_recording ? 1 : 0,
         recording_duration_hours: recordingDuration,
-        stream_source: formData.stream_source || 'internal',
-        external_hls_url: formData.stream_source === 'external' ? formData.external_hls_url : null,
-        private_rtsp_url: formData.stream_source === 'internal' ? formData.private_rtsp_url : null,
-        external_use_proxy: formData.stream_source === 'external' 
-            ? (formData.external_tls_mode === 'insecure' ? 1 : (formData.external_use_proxy ? 1 : 0)) 
+        stream_source: compatStreamSource,
+        delivery_type: deliveryType,
+        external_hls_url: deliveryType === 'external_hls' ? externalStreamUrl : null,
+        external_stream_url: externalStreamUrl,
+        external_embed_url: formData.external_embed_url || null,
+        external_snapshot_url: formData.external_snapshot_url || null,
+        external_origin_mode: formData.external_origin_mode || 'direct',
+        private_rtsp_url: deliveryType === 'internal_hls' ? formData.private_rtsp_url : null,
+        external_use_proxy: deliveryType === 'external_hls'
+            ? (formData.external_tls_mode === 'insecure' ? 1 : (formData.external_use_proxy ? 1 : 0))
             : 1,
-        external_tls_mode: formData.stream_source === 'external' ? (formData.external_tls_mode || 'strict') : 'strict',
+        external_tls_mode: deliveryType === 'external_hls' ? (formData.external_tls_mode || 'strict') : 'strict',
     };
 }

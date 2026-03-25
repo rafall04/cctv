@@ -2,6 +2,31 @@ import { useState, useRef, useMemo } from 'react';
 import { cameraService } from '../../services/cameraService';
 import { useNotification } from '../../contexts/NotificationContext';
 
+function inferDeliveryType(url, embedUrl = null, streamSource = null) {
+    const normalizedUrl = typeof url === 'string' ? url.trim().toLowerCase() : '';
+    const normalizedEmbedUrl = typeof embedUrl === 'string' ? embedUrl.trim().toLowerCase() : '';
+
+    if (streamSource === 'internal') {
+        return 'internal_hls';
+    }
+    if (normalizedUrl.startsWith('wss://') || normalizedUrl.startsWith('ws://')) {
+        return normalizedUrl.includes('jsmpeg') ? 'external_jsmpeg' : 'external_custom_ws';
+    }
+    if (normalizedUrl.includes('/zm/cgi-bin/nph-zms')) {
+        return 'external_mjpeg';
+    }
+    if (normalizedUrl.includes('.m3u8')) {
+        return 'external_hls';
+    }
+    if ((normalizedEmbedUrl.startsWith('https://') || normalizedEmbedUrl.startsWith('http://')) && !normalizedUrl) {
+        return 'external_embed';
+    }
+    if (normalizedUrl.startsWith('https://') || normalizedUrl.startsWith('http://')) {
+        return 'external_mjpeg';
+    }
+    return 'external_embed';
+}
+
 export default function ImportExport() {
     const { success, error: showError } = useNotification();
     
@@ -88,20 +113,27 @@ export default function ImportExport() {
         return rawPayload.map(item => {
             // Best-effort property mapping (e.g., Jogja JSON uses "title", standard uses "name")
             const resolvedName = item.name || item.title || item.cctv_title || 'Unnamed Camera';
-            const resolvedUrl = item.external_hls_url || item.url || item.cctv_link || item.stream || null;
+            const resolvedUrl = item.external_stream_url || item.external_hls_url || item.url || item.cctv_link || item.stream || null;
+            const resolvedEmbedUrl = item.external_embed_url || item.embed_url || item.page_url || null;
             const resolvedLat = item.latitude || item.lat || item.cctv_latitude || null;
             const resolvedLng = item.longitude || item.lng || item.cctv_longitude || null;
+            const resolvedDeliveryType = inferDeliveryType(resolvedUrl, resolvedEmbedUrl, item.stream_source);
 
             return {
                 name: resolvedName,
                 description: overrideWatermark || item.description || '',
                 location: syncLocationWithName ? resolvedName : (item.location || ''),
-                external_hls_url: resolvedUrl,
+                delivery_type: resolvedDeliveryType,
+                stream_source: resolvedDeliveryType === 'internal_hls' ? 'internal' : 'external',
+                external_hls_url: resolvedDeliveryType === 'external_hls' ? resolvedUrl : null,
+                external_stream_url: resolvedDeliveryType !== 'external_embed' ? resolvedUrl : null,
+                external_embed_url: resolvedEmbedUrl,
+                external_snapshot_url: item.external_snapshot_url || item.thumbnail_url || item.snapshot_url || null,
+                external_origin_mode: resolvedDeliveryType === 'external_embed' ? 'embed' : 'direct',
                 private_rtsp_url: item.private_rtsp_url || null,
                 latitude: resolvedLat,
                 longitude: resolvedLng,
-                stream_source: item.stream_source || 'external',
-                enable_recording: item.enable_recording || 0,
+                enable_recording: resolvedDeliveryType === 'internal_hls' ? (item.enable_recording || 0) : 0,
                 external_use_proxy: overrideProxy ? 1 : 0,
                 external_tls_mode: overrideTls,
                 enabled: overrideEnabled ? 1 : 0

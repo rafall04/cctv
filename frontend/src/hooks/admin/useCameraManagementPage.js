@@ -52,7 +52,7 @@ export function useCameraManagementPage() {
         setSubmitting,
     } = useFormValidation(
         defaultCameraFormValues,
-        getCameraValidationRules('internal')
+        getCameraValidationRules('internal_hls')
     );
 
     const loadAreas = useCallback(async ({ mode = 'initial' } = {}) => {
@@ -136,7 +136,7 @@ export function useCameraManagementPage() {
 
     const openAddModal = useCallback(() => {
         setEditingCamera(null);
-        resetWith(defaultCameraFormValues, getCameraValidationRules('internal'));
+        resetWith(defaultCameraFormValues, getCameraValidationRules('internal_hls'));
         setModalError('');
         setShowModal(true);
     }, [resetWith]);
@@ -144,7 +144,7 @@ export function useCameraManagementPage() {
     const openEditModal = useCallback((camera) => {
         const formValues = mapCameraToFormValues(camera);
         setEditingCamera(camera);
-        resetWith(formValues, getCameraValidationRules(formValues.stream_source));
+        resetWith(formValues, getCameraValidationRules(formValues.delivery_type));
         setModalError('');
         setShowModal(true);
     }, [resetWith]);
@@ -153,7 +153,7 @@ export function useCameraManagementPage() {
         const { name, value, type, checked } = event.target;
         const newValue = type === 'checkbox' ? checked : value;
 
-        if (name === 'stream_source') {
+        if (name === 'delivery_type') {
             updateRules(getCameraValidationRules(newValue));
         }
 

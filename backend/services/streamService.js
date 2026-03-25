@@ -2,8 +2,34 @@ import { query, queryOne } from '../database/connectionPool.js';
 import { config } from '../config/config.js';
 import jwt from 'jsonwebtoken';
 import { sanitizeCameraThumbnailList } from './thumbnailPathService.js';
+import {
+    getEffectiveDeliveryType,
+    getStreamCapabilities,
+} from '../utils/cameraDelivery.js';
 
 class StreamService {
+    buildCameraResponse(camera) {
+        const deliveryType = getEffectiveDeliveryType(camera);
+        const streamPath = camera.stream_key || `camera${camera.id}`;
+        const capabilities = getStreamCapabilities(deliveryType);
+        const isExternalHls = deliveryType === 'external_hls';
+
+        return {
+            ...camera,
+            delivery_type: deliveryType,
+            stream_capabilities: capabilities,
+            streams: isExternalHls
+                ? { hls: camera.external_stream_url || camera.external_hls_url, webrtc: null }
+                : (deliveryType === 'internal_hls' ? this.buildStreamUrls(streamPath, camera._requestHost) : {}),
+            stream_source: camera.stream_source || (deliveryType === 'internal_hls' ? 'internal' : 'external'),
+            external_hls_url: camera.external_hls_url || (deliveryType === 'external_hls' ? camera.external_stream_url || null : null),
+            external_stream_url: camera.external_stream_url || (deliveryType === 'external_hls' ? camera.external_hls_url || null : null),
+            external_embed_url: camera.external_embed_url || null,
+            external_snapshot_url: camera.external_snapshot_url || null,
+            external_origin_mode: camera.external_origin_mode || 'direct',
+        };
+    }
+
     buildStreamUrls(streamKey, requestHost) {
         let hlsBase = (config.mediamtx.hlsUrl || '/hls').replace(/\/$/, '');
         let webrtcBase = (config.mediamtx.webrtcUrl || '/webrtc').replace(/\/$/, '');
@@ -38,6 +64,11 @@ class StreamService {
         const camera = queryOne(
             `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel,
                     c.latitude, c.longitude, c.stream_key, c.video_codec, c.stream_source, c.external_hls_url,
+                    c.delivery_type, c.external_stream_url, c.external_embed_url, c.external_snapshot_url,
+                    CASE
+                        WHEN c.external_origin_mode IN ('direct', 'embed') THEN c.external_origin_mode
+                        ELSE 'direct'
+                    END as external_origin_mode,
                     COALESCE(c.external_use_proxy, 1) as external_use_proxy,
                     CASE
                         WHEN c.external_tls_mode IN ('strict', 'insecure') THEN c.external_tls_mode
@@ -56,34 +87,47 @@ class StreamService {
             throw err;
         }
 
-        const streamPath = camera.stream_key || `camera${camera.id}`;
+        const responseCamera = this.buildCameraResponse({
+            ...camera,
+            _requestHost: requestHost,
+        });
 
         return {
             camera: {
-                id: camera.id,
-                name: camera.name,
-                description: camera.description,
-                location: camera.location,
-                group_name: camera.group_name,
-                area_id: camera.area_id,
-                area_name: camera.area_name,
-                is_tunnel: camera.is_tunnel,
-                latitude: camera.latitude,
-                longitude: camera.longitude,
-                video_codec: camera.video_codec,
-                rt: camera.rt,
-                rw: camera.rw,
-                kelurahan: camera.kelurahan,
-                kecamatan: camera.kecamatan,
-                external_use_proxy: camera.external_use_proxy,
-                external_tls_mode: camera.external_tls_mode,
+                id: responseCamera.id,
+                name: responseCamera.name,
+                description: responseCamera.description,
+                location: responseCamera.location,
+                group_name: responseCamera.group_name,
+                area_id: responseCamera.area_id,
+                area_name: responseCamera.area_name,
+                is_tunnel: responseCamera.is_tunnel,
+                latitude: responseCamera.latitude,
+                longitude: responseCamera.longitude,
+                video_codec: responseCamera.video_codec,
+                rt: responseCamera.rt,
+                rw: responseCamera.rw,
+                kelurahan: responseCamera.kelurahan,
+                kecamatan: responseCamera.kecamatan,
+                external_use_proxy: responseCamera.external_use_proxy,
+                external_tls_mode: responseCamera.external_tls_mode,
+                delivery_type: responseCamera.delivery_type,
+                stream_capabilities: responseCamera.stream_capabilities,
+                external_stream_url: responseCamera.external_stream_url,
+                external_embed_url: responseCamera.external_embed_url,
+                external_snapshot_url: responseCamera.external_snapshot_url,
+                external_origin_mode: responseCamera.external_origin_mode,
             },
-            streams: camera.stream_source === 'external' && camera.external_hls_url
-                ? { hls: camera.external_hls_url, webrtc: null }
-                : this.buildStreamUrls(streamPath, requestHost),
-            stream_source: camera.stream_source || 'internal',
-            external_use_proxy: camera.external_use_proxy,
-            external_tls_mode: camera.external_tls_mode,
+            streams: responseCamera.streams,
+            stream_source: responseCamera.stream_source,
+            delivery_type: responseCamera.delivery_type,
+            stream_capabilities: responseCamera.stream_capabilities,
+            external_use_proxy: responseCamera.external_use_proxy,
+            external_tls_mode: responseCamera.external_tls_mode,
+            external_stream_url: responseCamera.external_stream_url,
+            external_embed_url: responseCamera.external_embed_url,
+            external_snapshot_url: responseCamera.external_snapshot_url,
+            external_origin_mode: responseCamera.external_origin_mode,
         };
     }
 
@@ -92,6 +136,11 @@ class StreamService {
             `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel,
                     c.latitude, c.longitude, c.status, c.is_online, c.last_online_check, c.stream_key, c.video_codec,
                     c.thumbnail_path, c.thumbnail_updated_at, c.stream_source, c.external_hls_url,
+                    c.delivery_type, c.external_stream_url, c.external_embed_url, c.external_snapshot_url,
+                    CASE
+                        WHEN c.external_origin_mode IN ('direct', 'embed') THEN c.external_origin_mode
+                        ELSE 'direct'
+                    END as external_origin_mode,
                     COALESCE(c.external_use_proxy, 1) as external_use_proxy,
                     CASE
                         WHEN c.external_tls_mode IN ('strict', 'insecure') THEN c.external_tls_mode
@@ -104,17 +153,10 @@ class StreamService {
              ORDER BY c.is_tunnel ASC, c.id ASC`
         );
 
-        const camerasWithStreams = cameras.map(camera => {
-            const streamPath = camera.stream_key || `camera${camera.id}`;
-            const isExternal = camera.stream_source === 'external' && camera.external_hls_url;
-            return {
-                ...camera,
-                streams: isExternal
-                    ? { hls: camera.external_hls_url, webrtc: null }
-                    : this.buildStreamUrls(streamPath, requestHost),
-                stream_source: camera.stream_source || 'internal',
-            };
-        });
+        const camerasWithStreams = cameras.map((camera) => this.buildCameraResponse({
+            ...camera,
+            _requestHost: requestHost,
+        }));
 
         return sanitizeCameraThumbnailList(camerasWithStreams);
     }

@@ -32,6 +32,13 @@ import {
     isPublicPopupPlaybackLocked,
     shouldShowPublicPopupRetry,
 } from '../../utils/publicPopupState.js';
+import {
+    getEffectiveDeliveryType,
+    getPopupEmbedUrl,
+    getPrimaryExternalUrl,
+    getStreamCapabilities,
+    isHlsDeliveryType,
+} from '../../utils/cameraDelivery.js';
 
 // ============================================
 // VIDEO POPUP - Optimized with fullscreen detection, timeout handler, progressive stages, and auto-retry
@@ -133,11 +140,17 @@ function VideoPopup({
         footerHeight: 0,
     }));
 
+    const deliveryType = getEffectiveDeliveryType(camera);
+    const streamCapabilities = getStreamCapabilities(camera);
+    const isHlsCamera = isHlsDeliveryType(deliveryType);
+    const popupEmbedUrl = getPopupEmbedUrl(camera);
+    const fallbackExternalUrl = getPrimaryExternalUrl(camera);
+    const officialSourceUrl = popupEmbedUrl || (/^https?:\/\//i.test(fallbackExternalUrl || '') ? fallbackExternalUrl : null);
     const url = camera.streams?.hls;
     const deviceTier = detectDeviceTier();
-    const isExternal = camera.stream_source === 'external';
+    const isExternal = deliveryType === 'external_hls';
     const { targetUrl: resolvedUrl, proxyFallbackUrl, isDirectStream } = resolveStreamUrl(camera, { forceProxy: forceProxyFallback });
-    const effectiveUrl = resolvedUrl || url;
+    const effectiveUrl = isHlsCamera ? (resolvedUrl || url) : (popupEmbedUrl || fallbackExternalUrl);
 
     useEffect(() => {
         loadingStageRef.current = loadingStage;
@@ -146,6 +159,18 @@ function VideoPopup({
     useEffect(() => {
         autoRetryCountRef.current = autoRetryCount;
     }, [autoRetryCount]);
+
+    useEffect(() => {
+        if (isMaintenance || isOffline) {
+            return;
+        }
+
+        if (!isHlsCamera && streamCapabilities.popup) {
+            setStatus(effectiveUrl ? 'playing' : 'error');
+            setLoadingStage(LoadingStage.BUFFERING);
+            setErrorType(effectiveUrl ? null : 'unknown');
+        }
+    }, [effectiveUrl, isHlsCamera, isMaintenance, isOffline, streamCapabilities.popup]);
 
     const syncVideoAspectRatio = useCallback(() => {
         const nextAspectRatio = getVideoAspectRatio(videoRef.current);
@@ -199,7 +224,7 @@ function VideoPopup({
     // Viewer session tracking - track when user starts/stops watching
     useEffect(() => {
         // Don't track if camera is offline or in maintenance
-        if (isMaintenance || isOffline) return;
+        if (isMaintenance || isOffline || !isHlsCamera) return;
 
         let sessionId = null;
 
@@ -837,7 +862,51 @@ function VideoPopup({
                     style={bodyStyle}
                     onDoubleClick={toggleFS}
                 >
-                    <ZoomableVideo videoRef={videoRef} maxZoom={4} onZoomChange={setZoom} isFullscreen={isFullscreen} />
+                    {isHlsCamera ? (
+                        <ZoomableVideo videoRef={videoRef} maxZoom={4} onZoomChange={setZoom} isFullscreen={isFullscreen} />
+                    ) : deliveryType === 'external_mjpeg' && effectiveUrl ? (
+                        <img
+                            src={effectiveUrl}
+                            alt={camera.name}
+                            data-testid="external-mjpeg-body"
+                            className="w-full h-full object-contain bg-black"
+                        />
+                    ) : popupEmbedUrl ? (
+                        <iframe
+                            src={popupEmbedUrl}
+                            title={camera.name}
+                            data-testid="external-embed-body"
+                            className="w-full h-full border-0 bg-black"
+                            allow="autoplay; fullscreen"
+                            referrerPolicy="strict-origin-when-cross-origin"
+                        />
+                    ) : effectiveUrl ? (
+                        <div data-testid="external-source-fallback" className="absolute inset-0 flex items-center justify-center bg-black p-6">
+                            <div className="max-w-md text-center text-white space-y-4">
+                                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10">
+                                    <Icons.Play />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-semibold">Sumber Eksternal</h3>
+                                    <p className="mt-2 text-sm text-gray-300">
+                                        Format stream ini tidak diputar langsung oleh player internal. Buka sumber resmi untuk melihat CCTV dari penyedia asal.
+                                    </p>
+                                </div>
+                                {officialSourceUrl ? (
+                                    <a
+                                        href={officialSourceUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-600"
+                                    >
+                                        Buka Sumber Resmi
+                                    </a>
+                                ) : (
+                                    <p className="text-xs text-gray-400 break-all">{effectiveUrl}</p>
+                                )}
+                            </div>
+                        </div>
+                    ) : null}
 
                     {/* Snapshot Notification */}
                     {snapshotNotification && (

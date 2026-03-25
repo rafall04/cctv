@@ -448,6 +448,46 @@ describe('VideoPopup non-live states', () => {
 
         expect(screen.getByText('popup bottom ad mobile')).toBeTruthy();
     });
+
+    it('merender body MJPEG eksternal tanpa memulai HLS internal', async () => {
+        render(
+            <VideoPopup
+                camera={{
+                    ...baseCamera,
+                    id: 23,
+                    delivery_type: 'external_mjpeg',
+                    stream_source: 'external',
+                    streams: {},
+                    external_stream_url: 'https://example.com/zm/cgi-bin/nph-zms',
+                }}
+                onClose={vi.fn()}
+            />
+        );
+
+        expect(screen.getByTestId('external-mjpeg-body')).toBeTruthy();
+        expect(screen.queryByTestId('grid-popup-video')).toBeNull();
+        expect(hlsInstances).toHaveLength(0);
+    });
+
+    it('merender fallback sumber resmi untuk custom websocket tanpa mencoba HLS', async () => {
+        render(
+            <VideoPopup
+                camera={{
+                    ...baseCamera,
+                    id: 24,
+                    delivery_type: 'external_custom_ws',
+                    stream_source: 'external',
+                    streams: {},
+                    external_stream_url: 'wss://example.com/custom-stream',
+                }}
+                onClose={vi.fn()}
+            />
+        );
+
+        expect(screen.getByTestId('external-source-fallback')).toBeTruthy();
+        expect(screen.getByText('wss://example.com/custom-stream')).toBeTruthy();
+        expect(hlsInstances).toHaveLength(0);
+    });
 });
 
 

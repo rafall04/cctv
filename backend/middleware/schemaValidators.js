@@ -70,8 +70,25 @@ export const createCameraSchema = {
                 type: 'string',
                 enum: ['internal', 'external']
             },
+            delivery_type: {
+                type: 'string',
+                enum: ['internal_hls', 'external_hls', 'external_mjpeg', 'external_embed', 'external_jsmpeg', 'external_custom_ws']
+            },
             external_hls_url: {
                 anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }]
+            },
+            external_stream_url: {
+                anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }]
+            },
+            external_embed_url: {
+                anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }]
+            },
+            external_snapshot_url: {
+                anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }]
+            },
+            external_origin_mode: {
+                type: 'string',
+                enum: ['direct', 'embed']
             },
             external_use_proxy: {
                 anyOf: [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }]
@@ -158,8 +175,25 @@ export const updateCameraSchema = {
                 type: 'string',
                 enum: ['internal', 'external']
             },
+            delivery_type: {
+                type: 'string',
+                enum: ['internal_hls', 'external_hls', 'external_mjpeg', 'external_embed', 'external_jsmpeg', 'external_custom_ws']
+            },
             external_hls_url: {
                 anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }]
+            },
+            external_stream_url: {
+                anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }]
+            },
+            external_embed_url: {
+                anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }]
+            },
+            external_snapshot_url: {
+                anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }]
+            },
+            external_origin_mode: {
+                type: 'string',
+                enum: ['direct', 'embed']
             },
             external_use_proxy: {
                 anyOf: [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }]

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createCameraSlug, parseCameraIdFromSlug } from '../../utils/slugify';
+import { isMultiViewSupported } from '../../utils/cameraDelivery.js';
 
 export function useLandingInteractions({
     cameras,
@@ -36,6 +37,11 @@ export function useLandingInteractions({
     }, [cameras, searchParams, viewMode]);
 
     const handleAddMulti = useCallback((camera) => {
+        if (!isMultiViewSupported(camera)) {
+            addToast(`"${camera.name}" tidak mendukung Multi-View untuk format stream ini`, 'warning');
+            return;
+        }
+
         setMultiCameras((previous) => {
             const exists = previous.some((item) => item.id === camera.id);
             if (exists) {

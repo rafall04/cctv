@@ -8,6 +8,154 @@ import {
 } from './securityAuditLogger.js';
 import { invalidateCache } from '../middleware/cacheMiddleware.js';
 import { sanitizeCameraThumbnail, sanitizeCameraThumbnailList } from './thumbnailPathService.js';
+import {
+    DELIVERY_TYPES,
+    getCompatStreamSource,
+    getEffectiveDeliveryType,
+    isHlsDeliveryType,
+    normalizeExternalOriginMode,
+} from '../utils/cameraDelivery.js';
+
+const WS_PROTOCOL_PATTERN = /^wss?:\/\//i;
+const HTTP_PROTOCOL_PATTERN = /^https?:\/\//i;
+const HLS_HINT_PATTERN = /\.m3u8($|[?#])/i;
+
+function getNormalizedDeliveryType(data = {}) {
+    if (DELIVERY_TYPES.includes(data.delivery_type)) {
+        return data.delivery_type;
+    }
+
+    if (data.stream_source === 'external' || data.external_hls_url) {
+        return 'external_hls';
+    }
+
+    return 'internal_hls';
+}
+
+function getNormalizedExternalStreamUrl(data = {}, deliveryType) {
+    if (data.external_stream_url !== undefined) {
+        return data.external_stream_url || null;
+    }
+
+    if (deliveryType === 'external_hls') {
+        return data.external_hls_url || null;
+    }
+
+    return null;
+}
+
+function validateDeliveryConfiguration({
+    deliveryType,
+    privateRtspUrl,
+    externalStreamUrl,
+    externalEmbedUrl,
+}) {
+    if (deliveryType === 'internal_hls') {
+        if (!privateRtspUrl) {
+            const err = new Error('RTSP URL is required for internal HLS cameras');
+            err.statusCode = 400;
+            throw err;
+        }
+        return;
+    }
+
+    if (deliveryType === 'external_hls') {
+        if (!externalStreamUrl) {
+            const err = new Error('External HLS URL is required for external HLS cameras');
+            err.statusCode = 400;
+            throw err;
+        }
+        if (!HTTP_PROTOCOL_PATTERN.test(externalStreamUrl)) {
+            const err = new Error('External HLS URL must start with http:// or https://');
+            err.statusCode = 400;
+            throw err;
+        }
+        return;
+    }
+
+    if (deliveryType === 'external_mjpeg') {
+        if (!externalStreamUrl) {
+            const err = new Error('External stream URL is required for MJPEG cameras');
+            err.statusCode = 400;
+            throw err;
+        }
+        if (!HTTP_PROTOCOL_PATTERN.test(externalStreamUrl)) {
+            const err = new Error('MJPEG URL must start with http:// or https://');
+            err.statusCode = 400;
+            throw err;
+        }
+        return;
+    }
+
+    if (deliveryType === 'external_embed') {
+        if (!externalEmbedUrl) {
+            const err = new Error('External embed URL is required for embed cameras');
+            err.statusCode = 400;
+            throw err;
+        }
+        if (!HTTP_PROTOCOL_PATTERN.test(externalEmbedUrl)) {
+            const err = new Error('Embed URL must start with http:// or https://');
+            err.statusCode = 400;
+            throw err;
+        }
+        return;
+    }
+
+    if (deliveryType === 'external_jsmpeg' || deliveryType === 'external_custom_ws') {
+        if (!externalStreamUrl) {
+            const err = new Error('External WebSocket stream URL is required for this delivery type');
+            err.statusCode = 400;
+            throw err;
+        }
+        if (!WS_PROTOCOL_PATTERN.test(externalStreamUrl)) {
+            const err = new Error('WebSocket stream URL must start with ws:// or wss://');
+            err.statusCode = 400;
+            throw err;
+        }
+    }
+}
+
+function normalizeCameraPersistencePayload(data = {}, existingCamera = null) {
+    const deliveryType = getNormalizedDeliveryType({
+        ...existingCamera,
+        ...data,
+    });
+    const compatStreamSource = getCompatStreamSource(deliveryType);
+    const externalStreamUrl = getNormalizedExternalStreamUrl({ ...existingCamera, ...data }, deliveryType);
+    const externalEmbedUrl = data.external_embed_url !== undefined
+        ? (data.external_embed_url || null)
+        : (existingCamera?.external_embed_url || null);
+    const externalSnapshotUrl = data.external_snapshot_url !== undefined
+        ? (data.external_snapshot_url || null)
+        : (existingCamera?.external_snapshot_url || null);
+    const externalOriginMode = normalizeExternalOriginMode(
+        data.external_origin_mode !== undefined
+            ? data.external_origin_mode
+            : existingCamera?.external_origin_mode
+    );
+    const externalHlsUrl = deliveryType === 'external_hls'
+        ? (data.external_hls_url !== undefined
+            ? (data.external_hls_url || externalStreamUrl || null)
+            : (existingCamera?.external_hls_url || externalStreamUrl || null))
+        : null;
+
+    validateDeliveryConfiguration({
+        deliveryType,
+        privateRtspUrl: data.private_rtsp_url !== undefined ? data.private_rtsp_url : existingCamera?.private_rtsp_url,
+        externalStreamUrl,
+        externalEmbedUrl,
+    });
+
+    return {
+        deliveryType,
+        compatStreamSource,
+        externalStreamUrl,
+        externalEmbedUrl,
+        externalSnapshotUrl,
+        externalOriginMode,
+        externalHlsUrl,
+    };
+}
 
 class CameraService {
     invalidateCameraCache() {
@@ -30,6 +178,11 @@ class CameraService {
             `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel, 
                     c.latitude, c.longitude, c.status, c.enable_recording, c.video_codec, c.stream_key, 
                     c.thumbnail_path, c.thumbnail_updated_at, c.stream_source, c.external_hls_url,
+                    c.delivery_type, c.external_stream_url, c.external_embed_url, c.external_snapshot_url,
+                    CASE
+                        WHEN c.external_origin_mode IN ('direct', 'embed') THEN c.external_origin_mode
+                        ELSE 'direct'
+                    END as external_origin_mode,
                     COALESCE(c.external_use_proxy, 1) as external_use_proxy,
                     CASE
                         WHEN c.external_tls_mode IN ('strict', 'insecure') THEN c.external_tls_mode
@@ -76,12 +229,15 @@ class CameraService {
             recording_duration_hours,
             video_codec,
             stream_source,
+            delivery_type,
             external_hls_url,
+            external_stream_url,
+            external_embed_url,
+            external_snapshot_url,
+            external_origin_mode,
             external_use_proxy,
             external_tls_mode,
         } = data;
-
-        const sourceType = stream_source === 'external' ? 'external' : 'internal';
         const externalUseProxy = external_use_proxy === false || external_use_proxy === 0 ? 0 : 1;
         const externalTlsMode = external_tls_mode === 'insecure' ? 'insecure' : 'strict';
 
@@ -90,23 +246,17 @@ class CameraService {
             err.statusCode = 400;
             throw err;
         }
+        if (stream_source !== undefined && !['internal', 'external'].includes(stream_source)) {
+            const err = new Error('Invalid stream source. Must be internal or external');
+            err.statusCode = 400;
+            throw err;
+        }
+        if (delivery_type !== undefined && !DELIVERY_TYPES.includes(delivery_type)) {
+            const err = new Error('Invalid delivery type');
+            err.statusCode = 400;
+            throw err;
+        }
 
-        // Conditional validation based on stream source
-        if (sourceType === 'internal' && !private_rtsp_url) {
-            const err = new Error('RTSP URL is required for internal cameras');
-            err.statusCode = 400;
-            throw err;
-        }
-        if (sourceType === 'external' && !external_hls_url) {
-            const err = new Error('External HLS URL is required for external cameras');
-            err.statusCode = 400;
-            throw err;
-        }
-        if (sourceType === 'external' && external_hls_url && !external_hls_url.startsWith('http')) {
-            const err = new Error('External HLS URL must start with http:// or https://');
-            err.statusCode = 400;
-            throw err;
-        }
         if (external_tls_mode !== undefined && !['strict', 'insecure'].includes(external_tls_mode)) {
             const err = new Error('Invalid external TLS mode. Must be strict or insecure');
             err.statusCode = 400;
@@ -114,7 +264,18 @@ class CameraService {
         }
 
         const codecValue = video_codec || 'h264';
-        if (sourceType === 'internal' && !['h264', 'h265'].includes(codecValue)) {
+        const deliveryConfig = normalizeCameraPersistencePayload({
+            stream_source,
+            delivery_type,
+            private_rtsp_url,
+            external_hls_url,
+            external_stream_url,
+            external_embed_url,
+            external_snapshot_url,
+            external_origin_mode,
+        });
+
+        if (deliveryConfig.deliveryType === 'internal_hls' && !['h264', 'h265'].includes(codecValue)) {
             const err = new Error('Invalid video codec. Must be h264 or h265');
             err.statusCode = 400;
             throw err;
@@ -129,7 +290,7 @@ class CameraService {
 
         const isEnabled = enabled === true || enabled === 1 ? 1 : (enabled === false || enabled === 0 ? 0 : 1);
         const isTunnel = is_tunnel === true || is_tunnel === 1 ? 1 : 0;
-        const isRecordingEnabled = enable_recording === true || enable_recording === 1 ? 1 : 0;
+        const isRecordingEnabled = deliveryConfig.deliveryType === 'internal_hls' && (enable_recording === true || enable_recording === 1) ? 1 : 0;
 
         const latValue = latitude !== undefined && latitude !== '' && latitude !== null ? parseFloat(latitude) : null;
         const lngValue = longitude !== undefined && longitude !== '' && longitude !== null ? parseFloat(longitude) : null;
@@ -144,10 +305,10 @@ class CameraService {
         const cameraStatus = status || 'active';
 
         const result = execute(
-            'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, recording_duration_hours, video_codec, stream_source, external_hls_url, external_use_proxy, external_tls_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, recording_duration_hours, video_codec, stream_source, delivery_type, external_hls_url, external_stream_url, external_embed_url, external_snapshot_url, external_origin_mode, external_use_proxy, external_tls_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 name,
-                sourceType === 'internal' ? private_rtsp_url : '',
+                deliveryConfig.deliveryType === 'internal_hls' ? private_rtsp_url : '',
                 description || null,
                 location || null,
                 group_name || null,
@@ -161,8 +322,13 @@ class CameraService {
                 isRecordingEnabled,
                 recordingDuration,
                 codecValue,
-                sourceType,
-                sourceType === 'external' ? external_hls_url : null,
+                deliveryConfig.compatStreamSource,
+                deliveryConfig.deliveryType,
+                deliveryConfig.externalHlsUrl,
+                deliveryConfig.externalStreamUrl,
+                deliveryConfig.externalEmbedUrl,
+                deliveryConfig.externalSnapshotUrl,
+                deliveryConfig.externalOriginMode,
                 externalUseProxy,
                 externalTlsMode,
             ]
@@ -182,7 +348,7 @@ class CameraService {
 
         this.invalidateCameraCache();
 
-        if (isEnabled && sourceType === 'internal') {
+        if (isEnabled && deliveryConfig.deliveryType === 'internal_hls') {
             try {
                 const mtxResult = await mediaMtxService.updateCameraPath(streamKey, private_rtsp_url);
                 if (!mtxResult.success) {
@@ -193,7 +359,7 @@ class CameraService {
             }
         }
 
-        if (isEnabled && isRecordingEnabled) {
+        if (isEnabled && isRecordingEnabled && deliveryConfig.deliveryType === 'internal_hls') {
             try {
                 const { recordingService } = await import('./recordingService.js');
                 console.log(`[Camera ${result.lastInsertRowid}] Auto-starting recording (camera created with recording enabled)`);
@@ -227,14 +393,25 @@ class CameraService {
             recording_duration_hours,
             video_codec,
             stream_source,
+            delivery_type,
             external_hls_url,
+            external_stream_url,
+            external_embed_url,
+            external_snapshot_url,
+            external_origin_mode,
             external_use_proxy,
             external_tls_mode,
         } = data;
 
         const existingCamera = queryOne(
             `SELECT id, name, private_rtsp_url, enabled, stream_key, enable_recording, stream_source,
-                    external_hls_url, COALESCE(external_use_proxy, 1) as external_use_proxy,
+                    delivery_type, external_hls_url, external_stream_url, external_embed_url,
+                    external_snapshot_url,
+                    CASE
+                        WHEN external_origin_mode IN ('direct', 'embed') THEN external_origin_mode
+                        ELSE 'direct'
+                    END as external_origin_mode,
+                    COALESCE(external_use_proxy, 1) as external_use_proxy,
                     CASE
                         WHEN external_tls_mode IN ('strict', 'insecure') THEN external_tls_mode
                         ELSE 'strict'
@@ -248,6 +425,16 @@ class CameraService {
             err.statusCode = 404;
             throw err;
         }
+        if (stream_source !== undefined && !['internal', 'external'].includes(stream_source)) {
+            const err = new Error('Invalid stream source. Must be internal or external');
+            err.statusCode = 400;
+            throw err;
+        }
+        if (delivery_type !== undefined && !DELIVERY_TYPES.includes(delivery_type)) {
+            const err = new Error('Invalid delivery type');
+            err.statusCode = 400;
+            throw err;
+        }
 
         let streamKey = existingCamera.stream_key;
         if (!streamKey) {
@@ -255,6 +442,17 @@ class CameraService {
             execute('UPDATE cameras SET stream_key = ? WHERE id = ?', [streamKey, id]);
             console.log(`[Camera] Generated stream_key for legacy camera ${id}: ${streamKey}`);
         }
+
+        const deliveryConfig = normalizeCameraPersistencePayload({
+            stream_source,
+            delivery_type,
+            private_rtsp_url: private_rtsp_url !== undefined ? private_rtsp_url : existingCamera.private_rtsp_url,
+            external_hls_url,
+            external_stream_url,
+            external_embed_url,
+            external_snapshot_url,
+            external_origin_mode,
+        }, existingCamera);
 
         const updates = [];
         const values = [];
@@ -308,7 +506,7 @@ class CameraService {
         }
         if (enable_recording !== undefined) {
             updates.push('enable_recording = ?');
-            values.push(enable_recording === true || enable_recording === 1 ? 1 : 0);
+            values.push(deliveryConfig.deliveryType === 'internal_hls' && (enable_recording === true || enable_recording === 1) ? 1 : 0);
         }
         if (recording_duration_hours !== undefined) {
             updates.push('recording_duration_hours = ?');
@@ -324,37 +522,21 @@ class CameraService {
             updates.push('video_codec = ?');
             values.push(video_codec);
         }
-        const effectiveStreamSource = stream_source !== undefined
-            ? stream_source
-            : (existingCamera.stream_source || 'internal');
-        const effectiveExternalHlsUrl = external_hls_url !== undefined
-            ? (external_hls_url || null)
-            : (existingCamera.external_hls_url || null);
-
-        if (effectiveStreamSource === 'external') {
-            if (!effectiveExternalHlsUrl) {
-                const err = new Error('External HLS URL is required for external cameras');
-                err.statusCode = 400;
-                throw err;
-            }
-            if (!effectiveExternalHlsUrl.startsWith('http://') && !effectiveExternalHlsUrl.startsWith('https://')) {
-                const err = new Error('External HLS URL must start with http:// or https://');
-                err.statusCode = 400;
-                throw err;
-            }
-        }
-        if (stream_source !== undefined) {
-            if (!['internal', 'external'].includes(stream_source)) {
-                const err = new Error('Invalid stream source. Must be internal or external');
-                err.statusCode = 400;
-                throw err;
-            }
+        if (stream_source !== undefined || delivery_type !== undefined || external_hls_url !== undefined || external_stream_url !== undefined || external_embed_url !== undefined || external_snapshot_url !== undefined || external_origin_mode !== undefined) {
             updates.push('stream_source = ?');
-            values.push(stream_source);
-        }
-        if (external_hls_url !== undefined) {
+            values.push(deliveryConfig.compatStreamSource);
+            updates.push('delivery_type = ?');
+            values.push(deliveryConfig.deliveryType);
             updates.push('external_hls_url = ?');
-            values.push(external_hls_url || null);
+            values.push(deliveryConfig.externalHlsUrl);
+            updates.push('external_stream_url = ?');
+            values.push(deliveryConfig.externalStreamUrl);
+            updates.push('external_embed_url = ?');
+            values.push(deliveryConfig.externalEmbedUrl);
+            updates.push('external_snapshot_url = ?');
+            values.push(deliveryConfig.externalSnapshotUrl);
+            updates.push('external_origin_mode = ?');
+            values.push(deliveryConfig.externalOriginMode);
         }
         if (external_use_proxy !== undefined) {
             updates.push('external_use_proxy = ?');
@@ -399,14 +581,14 @@ class CameraService {
 
         this.invalidateCameraCache();
 
-        const currentStreamSource = stream_source !== undefined ? stream_source : (existingCamera.stream_source || 'internal');
+        const currentDeliveryType = deliveryConfig.deliveryType;
         const newEnabled = enabled !== undefined ? enabled : existingCamera.enabled;
         const newRtspUrl = private_rtsp_url !== undefined ? private_rtsp_url : existingCamera.private_rtsp_url;
         const rtspChanged = private_rtsp_url !== undefined && private_rtsp_url !== existingCamera.private_rtsp_url;
         const enabledChanged = enabled !== undefined && enabled !== existingCamera.enabled;
 
         // If stream source changed to external, remove MediaMTX path
-        if (currentStreamSource === 'external') {
+        if (currentDeliveryType !== 'internal_hls') {
             try {
                 await mediaMtxService.removeCameraPathByKey(streamKey);
             } catch (err) {
@@ -436,7 +618,7 @@ class CameraService {
             const cameraEnabled = (newEnabled === 1 || newEnabled === true);
 
             if (newRecordingEnabled !== oldRecordingEnabled) {
-                if (newRecordingEnabled && cameraEnabled) {
+                if (newRecordingEnabled && cameraEnabled && currentDeliveryType === 'internal_hls') {
                     console.log(`[Camera ${id}] Auto-starting recording (enable_recording changed to true)`);
                     try {
                         await recordingService.startRecording(parseInt(id));
@@ -593,12 +775,14 @@ class CameraService {
         }
 
         // 2. Fetch existing cameras for duplicate checking (O(1) lookups)
-        const allCameras = query('SELECT name, private_rtsp_url, external_hls_url FROM cameras');
+        const allCameras = query('SELECT name, private_rtsp_url, external_hls_url, external_stream_url, external_embed_url FROM cameras');
         const existingNames = new Set(allCameras.map(c => c.name ? c.name.toLowerCase() : ''));
         const existingUrls = new Set();
         allCameras.forEach(c => {
             if (c.private_rtsp_url) existingUrls.add(c.private_rtsp_url.toLowerCase());
             if (c.external_hls_url) existingUrls.add(c.external_hls_url.toLowerCase());
+            if (c.external_stream_url) existingUrls.add(c.external_stream_url.toLowerCase());
+            if (c.external_embed_url) existingUrls.add(c.external_embed_url.toLowerCase());
         });
 
         // 3. Define the bulk insert operation via transaction
@@ -609,14 +793,29 @@ class CameraService {
 
             for (const cam of cameraList) {
                 const rawName = cam.name || cam.title || cam.cctv_title || '';
-                const rawHlsUrl = cam.external_hls_url || cam.url || cam.stream || cam.cctv_link || null;
+                const rawSourceUrl = cam.external_stream_url || cam.external_hls_url || cam.url || cam.stream || cam.cctv_link || null;
                 const rawRtspUrl = cam.private_rtsp_url || null;
+                const rawEmbedUrl = cam.external_embed_url || cam.embed_url || cam.page_url || null;
+                const rawSnapshotUrl = cam.external_snapshot_url || cam.thumbnail_url || cam.snapshot_url || null;
                 const rawLat = cam.latitude !== undefined ? cam.latitude : (cam.lat !== undefined ? cam.lat : null);
                 const rawLng = cam.longitude !== undefined ? cam.longitude : (cam.lng !== undefined ? cam.lng : null);
 
                 const name = rawName ? String(rawName).trim() : '';
-                const hlsUrl = rawHlsUrl ? String(rawHlsUrl).trim() : null;
+                const sourceUrl = rawSourceUrl ? String(rawSourceUrl).trim() : null;
                 const rtspUrl = rawRtspUrl ? String(rawRtspUrl).trim() : null;
+                const embedUrl = rawEmbedUrl ? String(rawEmbedUrl).trim() : null;
+                const snapshotUrl = rawSnapshotUrl ? String(rawSnapshotUrl).trim() : null;
+                const inferredDeliveryType = DELIVERY_TYPES.includes(cam.delivery_type)
+                    ? cam.delivery_type
+                    : (cam.stream_source === 'internal'
+                        ? 'internal_hls'
+                        : (sourceUrl && WS_PROTOCOL_PATTERN.test(sourceUrl)
+                            ? (sourceUrl.toLowerCase().includes('jsmpeg') ? 'external_jsmpeg' : 'external_custom_ws')
+                            : (embedUrl && !sourceUrl
+                                ? 'external_embed'
+                                : (sourceUrl && HLS_HINT_PATTERN.test(sourceUrl)
+                                    ? 'external_hls'
+                                    : (sourceUrl ? 'external_mjpeg' : 'external_embed')))));
                 
                 // Duplicate Validation
                 if (!name) {
@@ -631,16 +830,26 @@ class CameraService {
                     continue;
                 }
 
-                const urlToCheck = hlsUrl || rtspUrl;
+                const urlToCheck = sourceUrl || embedUrl || rtspUrl;
                 if (urlToCheck && existingUrls.has(urlToCheck.toLowerCase())) {
                     errors.push(`Skipped '${name}': Stream URL is already used by another camera`);
                     skippedCount++;
                     continue;
                 }
 
+                const importDeliveryConfig = normalizeCameraPersistencePayload({
+                    delivery_type: inferredDeliveryType,
+                    stream_source: cam.stream_source,
+                    private_rtsp_url: rtspUrl,
+                    external_hls_url: inferredDeliveryType === 'external_hls' ? sourceUrl : null,
+                    external_stream_url: sourceUrl,
+                    external_embed_url: embedUrl,
+                    external_snapshot_url: snapshotUrl,
+                    external_origin_mode: cam.external_origin_mode,
+                });
                 const streamKey = uuidv4();
                 execute(
-                    'INSERT INTO cameras (name, private_rtsp_url, description, location, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, stream_source, external_hls_url, external_use_proxy, external_tls_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    'INSERT INTO cameras (name, private_rtsp_url, description, location, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, stream_source, delivery_type, external_hls_url, external_stream_url, external_embed_url, external_snapshot_url, external_origin_mode, external_use_proxy, external_tls_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                     [
                         name,
                         rtspUrl || '',
@@ -653,12 +862,16 @@ class CameraService {
                         rawLng !== null ? parseFloat(rawLng) : null,
                         'active',
                         streamKey,
-                        cam.enable_recording === true || cam.enable_recording === 1 ? 1 : 0,
-                        cam.stream_source || 'external',
-                        hlsUrl,
+                        importDeliveryConfig.deliveryType === 'internal_hls' && (cam.enable_recording === true || cam.enable_recording === 1) ? 1 : 0,
+                        importDeliveryConfig.compatStreamSource,
+                        importDeliveryConfig.deliveryType,
+                        importDeliveryConfig.externalHlsUrl,
+                        importDeliveryConfig.externalStreamUrl,
+                        importDeliveryConfig.externalEmbedUrl,
+                        importDeliveryConfig.externalSnapshotUrl,
+                        importDeliveryConfig.externalOriginMode,
                         cam.external_use_proxy !== undefined ? cam.external_use_proxy : 1, // dynamically read from frontend overlay
                         cam.external_tls_mode || 'strict' // external_tls_mode
-
                     ]
                 );
                 

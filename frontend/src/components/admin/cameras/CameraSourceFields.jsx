@@ -1,5 +1,14 @@
 import { getRtspFormatHint } from '../../../utils/validators';
 
+const DELIVERY_OPTIONS = [
+    { value: 'internal_hls', label: 'Internal HLS', description: 'RTSP privat -> MediaMTX -> HLS/WebRTC', group: 'internal' },
+    { value: 'external_hls', label: 'External HLS', description: 'URL .m3u8 publik/third-party', group: 'external' },
+    { value: 'external_mjpeg', label: 'External MJPEG', description: 'Popup-only, cocok untuk ZoneMinder/HTTP MJPEG', group: 'external' },
+    { value: 'external_embed', label: 'External Embed', description: 'Popup-only via iframe/embed URL resmi', group: 'external' },
+    { value: 'external_jsmpeg', label: 'External JSMpeg', description: 'Popup-only, gunakan embed fallback bila tersedia', group: 'external' },
+    { value: 'external_custom_ws', label: 'Custom WebSocket', description: 'Tidak dijamin playable, default fallback ke sumber resmi', group: 'external' },
+];
+
 export default function CameraSourceFields({
     formData,
     isSubmitting,
@@ -7,6 +16,17 @@ export default function CameraSourceFields({
     onBlur,
     getFieldError,
 }) {
+    const deliveryType = formData.delivery_type || 'internal_hls';
+    const isInternal = deliveryType === 'internal_hls';
+    const isExternalHls = deliveryType === 'external_hls';
+    const usesStreamUrl = ['external_hls', 'external_mjpeg', 'external_jsmpeg', 'external_custom_ws'].includes(deliveryType);
+    const usesEmbedUrl = deliveryType === 'external_embed' || deliveryType === 'external_jsmpeg' || deliveryType === 'external_custom_ws';
+
+    const setDeliveryType = (value) => {
+        onChange({ target: { name: 'delivery_type', value, type: 'text' } });
+        onChange({ target: { name: 'stream_source', value: value === 'internal_hls' ? 'internal' : 'external', type: 'text' } });
+    };
+
     return (
         <>
             <div className="p-3 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl">
@@ -17,31 +37,33 @@ export default function CameraSourceFields({
                         </svg>
                     </div>
                     <div>
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">Sumber Stream</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Pilih sumber video</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">Delivery Type</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Pilih format distribusi stream yang benar-benar dipakai kamera.</p>
                     </div>
                 </div>
-                <div className="flex rounded-lg overflow-hidden border border-blue-200 dark:border-blue-500/30">
-                    <button
-                        type="button"
-                        onClick={() => onChange({ target: { name: 'stream_source', value: 'internal', type: 'text' } })}
-                        disabled={isSubmitting}
-                        className={`flex-1 px-3 py-2 text-xs font-semibold transition-colors ${formData.stream_source !== 'external' ? 'bg-blue-500 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-500/10'}`}
-                    >
-                        Internal (RTSP)
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => onChange({ target: { name: 'stream_source', value: 'external', type: 'text' } })}
-                        disabled={isSubmitting}
-                        className={`flex-1 px-3 py-2 text-xs font-semibold transition-colors ${formData.stream_source === 'external' ? 'bg-blue-500 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-500/10'}`}
-                    >
-                        External (HLS)
-                    </button>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {DELIVERY_OPTIONS.map((option) => (
+                        <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => setDeliveryType(option.value)}
+                            disabled={isSubmitting}
+                            className={`rounded-xl border px-3 py-3 text-left transition-colors ${deliveryType === option.value
+                                ? 'border-blue-500 bg-blue-500 text-white'
+                                : 'border-blue-200 bg-white text-gray-700 hover:bg-blue-50 dark:border-blue-500/30 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-blue-500/10'
+                                }`}
+                        >
+                            <div className="text-xs font-semibold">{option.label}</div>
+                            <div className={`mt-1 text-[11px] ${deliveryType === option.value ? 'text-blue-50/90' : 'text-gray-500 dark:text-gray-400'}`}>
+                                {option.description}
+                            </div>
+                        </button>
+                    ))}
                 </div>
             </div>
 
-            {formData.stream_source !== 'external' && (
+            {isInternal && (
                 <>
                     <div>
                         <label htmlFor="camera-rtsp-url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -93,87 +115,137 @@ export default function CameraSourceFields({
                                 <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-purple-600 dark:group-hover:text-purple-400">H.265 (Safari only)</span>
                             </label>
                         </div>
-                        <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                            H.265 lebih efisien bandwidth tapi hanya support di Safari. H.264 kompatibel dengan semua browser.
-                        </p>
                     </div>
                 </>
             )}
 
-            {formData.stream_source === 'external' && (
+            {!isInternal && (
                 <div className="space-y-4">
+                    {usesStreamUrl && (
+                        <div>
+                            <label htmlFor="camera-external-stream-url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                External Stream URL <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                id="camera-external-stream-url"
+                                type="text"
+                                name="external_stream_url"
+                                value={formData.external_stream_url}
+                                onChange={onChange}
+                                onBlur={onBlur}
+                                disabled={isSubmitting}
+                                className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white font-mono text-xs placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 ${getFieldError('external_stream_url') ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 dark:border-gray-700/50'}`}
+                                placeholder={deliveryType.includes('ws') || deliveryType.includes('jsmpeg') ? 'wss://example.com/stream' : 'https://example.com/live.m3u8'}
+                            />
+                            {getFieldError('external_stream_url') ? (
+                                <p className="mt-1 text-xs text-red-500">{getFieldError('external_stream_url')}</p>
+                            ) : (
+                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                    {deliveryType === 'external_hls' && 'Gunakan URL HLS (.m3u8). Hanya type ini yang boleh memakai proxy backend dan Multi-View.'}
+                                    {deliveryType === 'external_mjpeg' && 'Cocok untuk MJPEG/ZoneMinder. Popup akan memuat direct browser stream, bukan HLS proxy.'}
+                                    {deliveryType === 'external_jsmpeg' && 'Gunakan WebSocket JSMpeg jika Anda juga punya fallback embed/resmi. Type ini popup-only.'}
+                                    {deliveryType === 'external_custom_ws' && 'Custom WebSocket tidak dijamin playable. Idealnya isi juga embed URL resmi sebagai fallback.'}
+                                </p>
+                            )}
+                        </div>
+                    )}
+
+                    {usesEmbedUrl && (
+                        <div>
+                            <label htmlFor="camera-external-embed-url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                External Embed URL {deliveryType === 'external_embed' ? <span className="text-red-500">*</span> : null}
+                            </label>
+                            <input
+                                id="camera-external-embed-url"
+                                type="text"
+                                name="external_embed_url"
+                                value={formData.external_embed_url}
+                                onChange={onChange}
+                                onBlur={onBlur}
+                                disabled={isSubmitting}
+                                className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white font-mono text-xs placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 ${getFieldError('external_embed_url') ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 dark:border-gray-700/50'}`}
+                                placeholder="https://source.example.com/player?id=cam-1"
+                            />
+                            {getFieldError('external_embed_url') ? (
+                                <p className="mt-1 text-xs text-red-500">{getFieldError('external_embed_url')}</p>
+                            ) : (
+                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                    {deliveryType === 'external_embed' ? 'URL resmi iframe/embed yang akan dipakai langsung di popup.' : 'Opsional tapi sangat disarankan sebagai fallback resmi saat stream WebSocket tidak punya adapter generik.'}
+                                </p>
+                            )}
+                        </div>
+                    )}
+
                     <div>
-                        <label htmlFor="camera-external-hls-url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            URL HLS Eksternal <span className="text-red-500">*</span>
+                        <label htmlFor="camera-external-snapshot-url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Snapshot / Thumbnail URL
                         </label>
                         <input
-                            id="camera-external-hls-url"
+                            id="camera-external-snapshot-url"
                             type="text"
-                            name="external_hls_url"
-                            value={formData.external_hls_url}
+                            name="external_snapshot_url"
+                            value={formData.external_snapshot_url}
                             onChange={onChange}
                             onBlur={onBlur}
                             disabled={isSubmitting}
-                            className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white font-mono text-xs placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 ${getFieldError('external_hls_url') ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 dark:border-gray-700/50'}`}
-                            placeholder="https://data.bojonegorokab.go.id/live/local/xxx.m3u8"
+                            className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white font-mono text-xs placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 border-gray-200 dark:border-gray-700/50"
+                            placeholder="https://example.com/snapshot.jpg"
                         />
-                        {getFieldError('external_hls_url') ? (
-                            <p className="mt-1 text-xs text-red-500">{getFieldError('external_hls_url')}</p>
-                        ) : (
-                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">URL .m3u8 sumber pihak ketiga. V1 tetap mengakses stream melalui proxy backend agar perilaku player tetap konsisten.</p>
-                        )}
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Dipakai untuk card/grid/map agar halaman utama tetap thumbnail-first dan tidak membebani server.</p>
                     </div>
 
-                    <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4 dark:border-amber-500/20 dark:bg-amber-500/10">
-                        <div className="flex items-start justify-between gap-3">
-                            <div>
-                                <p className="text-sm font-medium text-gray-900 dark:text-white">Gunakan Proxy Backend</p>
-                                <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
-                                    {formData.external_tls_mode === 'insecure' 
-                                        ? "Proxy WAJIB aktif karena Mode TLS Insecure. Browser akan memblokir stream secara langsung jika sertifikat SSL target cacat."
-                                        : "Nonaktifkan untuk mempercepat streaming (Direct Stream). Pastikan server CCTV mengizinkan CORS dan memiliki sertifikat TLS yang valid."}
-                                </p>
+                    {isExternalHls && (
+                        <>
+                            <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4 dark:border-amber-500/20 dark:bg-amber-500/10">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                        <p className="text-sm font-medium text-gray-900 dark:text-white">Gunakan Proxy Backend</p>
+                                        <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
+                                            {formData.external_tls_mode === 'insecure'
+                                                ? 'Proxy WAJIB aktif karena Mode TLS Insecure.'
+                                                : 'Nonaktifkan untuk direct browser HLS. Pastikan sumber mengizinkan CORS dan sertifikat TLS valid.'}
+                                        </p>
+                                    </div>
+                                    <label className={`inline-flex items-center gap-2 text-xs font-semibold ${formData.external_tls_mode === 'insecure' ? 'text-amber-700 dark:text-amber-300' : 'text-gray-700 dark:text-gray-300'}`}>
+                                        <input
+                                            type="checkbox"
+                                            name="external_use_proxy"
+                                            aria-label="Gunakan Proxy"
+                                            checked={formData.external_tls_mode === 'insecure' ? true : formData.external_use_proxy}
+                                            onChange={onChange}
+                                            disabled={formData.external_tls_mode === 'insecure' || isSubmitting}
+                                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
+                                        />
+                                        {formData.external_tls_mode === 'insecure' ? 'Wajib Aktif' : (formData.external_use_proxy ? 'Aktif' : 'Nonaktif')}
+                                    </label>
+                                </div>
                             </div>
-                            <label className={`inline-flex items-center gap-2 text-xs font-semibold ${formData.external_tls_mode === 'insecure' ? 'text-amber-700 dark:text-amber-300' : 'text-gray-700 dark:text-gray-300'}`}>
-                                <input
-                                    type="checkbox"
-                                    name="external_use_proxy"
-                                    aria-label="Gunakan Proxy"
-                                    checked={formData.external_tls_mode === 'insecure' ? true : formData.external_use_proxy}
-                                    onChange={onChange}
-                                    disabled={formData.external_tls_mode === 'insecure' || isSubmitting}
-                                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
-                                />
-                                {formData.external_tls_mode === 'insecure' 
-                                    ? "Wajib Aktif" 
-                                    : (formData.external_use_proxy ? "Aktif" : "Nonaktif")}
-                            </label>
-                        </div>
-                    </div>
 
-                    <div>
-                        <label htmlFor="camera-external-tls-mode" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Mode TLS
-                        </label>
-                        <select
-                            id="camera-external-tls-mode"
-                            name="external_tls_mode"
-                            value={formData.external_tls_mode || 'strict'}
-                            onChange={onChange}
-                            onBlur={onBlur}
-                            disabled={isSubmitting}
-                            className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 ${getFieldError('external_tls_mode') ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 dark:border-gray-700/50'}`}
-                        >
-                            <option value="strict">Strict (Default)</option>
-                            <option value="insecure">Insecure (Darurat)</option>
-                        </select>
-                        {getFieldError('external_tls_mode') ? (
-                            <p className="mt-1 text-xs text-red-500">{getFieldError('external_tls_mode')}</p>
-                        ) : (
-                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                Gunakan <strong>Insecure</strong> hanya jika sumber external memiliki sertifikat TLS bermasalah. Mode ini menurunkan keamanan dan tidak direkomendasikan untuk penggunaan normal.
-                            </p>
-                        )}
+                            <div>
+                                <label htmlFor="camera-external-tls-mode" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    Mode TLS
+                                </label>
+                                <select
+                                    id="camera-external-tls-mode"
+                                    name="external_tls_mode"
+                                    value={formData.external_tls_mode || 'strict'}
+                                    onChange={onChange}
+                                    onBlur={onBlur}
+                                    disabled={isSubmitting}
+                                    className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 ${getFieldError('external_tls_mode') ? 'border-red-500 focus:ring-red-500' : 'border-gray-200 dark:border-gray-700/50'}`}
+                                >
+                                    <option value="strict">Strict (Default)</option>
+                                    <option value="insecure">Insecure (Darurat)</option>
+                                </select>
+                            </div>
+                        </>
+                    )}
+
+                    <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-4 text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300">
+                        {deliveryType === 'external_mjpeg' && 'Type ini popup-only dan tidak masuk playback atau Multi-View.'}
+                        {deliveryType === 'external_embed' && 'Type ini popup-only dan tidak masuk playback atau Multi-View.'}
+                        {deliveryType === 'external_jsmpeg' && 'Type ini popup-only. Jika adapter tidak tersedia, sistem akan fallback ke embed atau tombol sumber resmi.'}
+                        {deliveryType === 'external_custom_ws' && 'Type ini metadata-limited. Sistem tidak akan mencoba decode generic WebSocket stream di server.'}
                     </div>
                 </div>
             )}

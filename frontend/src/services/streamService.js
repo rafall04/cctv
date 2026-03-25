@@ -1,6 +1,7 @@
 import apiClient from './apiClient';
 import { getApiUrl } from '../config/config.js';
 import { getRequestPolicyConfig, REQUEST_POLICY } from './requestPolicy';
+import { getEffectiveDeliveryType } from '../utils/cameraDelivery.js';
 
 /**
  * Get base URL for API/backend from central config
@@ -105,9 +106,10 @@ export const streamService = {
             if (response.data?.success && response.data?.data) {
                 response.data.data = response.data.data.map(camera => {
                     let processedStreams = camera.streams;
-                    const rawExternalHlsUrl = camera.external_hls_url || null;
+                    const deliveryType = getEffectiveDeliveryType(camera);
+                    const rawExternalHlsUrl = camera.external_hls_url || camera.external_stream_url || null;
 
-                    if (camera.stream_source === 'external') {
+                    if (deliveryType === 'external_hls') {
                         const useProxy = camera.external_use_proxy !== 0 && camera.external_use_proxy !== false;
                         if (useProxy && processedStreams && processedStreams.hls) {
                             processedStreams = {
@@ -121,8 +123,10 @@ export const streamService = {
 
                     return {
                         ...camera,
+                        delivery_type: deliveryType,
                         streams: processedStreams,
                         _rawExternalHlsUrl: rawExternalHlsUrl,
+                        _rawExternalStreamUrl: camera.external_stream_url || camera.external_embed_url || rawExternalHlsUrl,
                     };
                 });
             }
@@ -142,9 +146,10 @@ export const streamService = {
             if (response.data?.success && response.data?.data?.streams) {
                 const camera = response.data.data;
                 let processedStreams = camera.streams;
-                const rawExternalHlsUrl = camera.external_hls_url || null;
+                const deliveryType = getEffectiveDeliveryType(camera);
+                const rawExternalHlsUrl = camera.external_hls_url || camera.external_stream_url || null;
 
-                if (camera.stream_source === 'external') {
+                if (deliveryType === 'external_hls') {
                     const useProxy = camera.external_use_proxy !== 0 && camera.external_use_proxy !== false;
                     if (useProxy && processedStreams && processedStreams.hls) {
                         processedStreams = {
@@ -157,7 +162,9 @@ export const streamService = {
                 }
 
                 response.data.data.streams = processedStreams;
+                response.data.data.delivery_type = deliveryType;
                 response.data.data._rawExternalHlsUrl = rawExternalHlsUrl;
+                response.data.data._rawExternalStreamUrl = camera.external_stream_url || camera.external_embed_url || rawExternalHlsUrl;
             }
             return response.data;
         } catch (error) {
