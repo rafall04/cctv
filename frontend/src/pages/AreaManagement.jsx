@@ -488,7 +488,7 @@ export default function AreaManagement() {
                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M6 18L18 6M6 6l12 12"/></svg>
                             </button>
                         </div>
-                        <div className="p-6 space-y-5">
+                        <div className="p-6 space-y-5 overflow-y-auto">
                             <p className="text-sm text-gray-500 dark:text-gray-400">Atur setelan di bawah ini untuk diterapkan secara serentak pada semua kamera di area ini.</p>
                             
                             <div className="space-y-4">
