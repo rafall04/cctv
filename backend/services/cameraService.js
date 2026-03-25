@@ -2,6 +2,7 @@ import { query, queryOne, execute, transaction } from '../database/connectionPoo
 import { v4 as uuidv4 } from 'uuid';
 import mediaMtxService from './mediaMtxService.js';
 import {
+    logAdminAction,
     logCameraCreated,
     logCameraUpdated,
     logCameraDeleted
@@ -34,6 +35,24 @@ const BULK_AREA_OPERATIONS = [
     'maintenance',
 ];
 
+const RESTORE_MATCH_MODES = [
+    'id_then_name_area',
+];
+
+const RESTORE_SCOPE_MODES = [
+    'all',
+    'unresolved_only',
+    'area_ids',
+];
+
+const RESTORE_RESULT_STATUSES = [
+    'matched_repairable',
+    'matched_no_changes',
+    'ambiguous_matches',
+    'missing_target',
+    'invalid_backup_row',
+];
+
 function getNormalizedDeliveryType(data = {}) {
     return getEffectiveDeliveryType(data);
 }
@@ -55,7 +74,9 @@ function validateDeliveryConfiguration({
     privateRtspUrl,
     externalStreamUrl,
     externalEmbedUrl,
-}) {
+}, options = {}) {
+    const allowIncompleteExternalMetadata = Boolean(options.allowIncompleteExternalMetadata);
+
     if (deliveryType === 'internal_hls') {
         if (!privateRtspUrl) {
             const err = new Error('RTSP URL is required for internal HLS cameras');
@@ -67,6 +88,9 @@ function validateDeliveryConfiguration({
 
     if (deliveryType === 'external_hls') {
         if (!externalStreamUrl) {
+            if (allowIncompleteExternalMetadata) {
+                return;
+            }
             const err = new Error('External HLS URL is required for external HLS cameras');
             err.statusCode = 400;
             throw err;
@@ -81,6 +105,9 @@ function validateDeliveryConfiguration({
 
     if (deliveryType === 'external_mjpeg') {
         if (!externalStreamUrl) {
+            if (allowIncompleteExternalMetadata) {
+                return;
+            }
             const err = new Error('External stream URL is required for MJPEG cameras');
             err.statusCode = 400;
             throw err;
@@ -95,6 +122,9 @@ function validateDeliveryConfiguration({
 
     if (deliveryType === 'external_embed') {
         if (!externalEmbedUrl) {
+            if (allowIncompleteExternalMetadata) {
+                return;
+            }
             const err = new Error('External embed URL is required for embed cameras');
             err.statusCode = 400;
             throw err;
@@ -109,6 +139,9 @@ function validateDeliveryConfiguration({
 
     if (deliveryType === 'external_jsmpeg' || deliveryType === 'external_custom_ws') {
         if (!externalStreamUrl) {
+            if (allowIncompleteExternalMetadata) {
+                return;
+            }
             const err = new Error('External WebSocket stream URL is required for this delivery type');
             err.statusCode = 400;
             throw err;
@@ -121,7 +154,7 @@ function validateDeliveryConfiguration({
     }
 }
 
-function normalizeCameraPersistencePayload(data = {}, existingCamera = null) {
+function normalizeCameraPersistencePayload(data = {}, existingCamera = null, options = {}) {
     const mergedData = {
         ...existingCamera,
         ...data,
@@ -151,7 +184,7 @@ function normalizeCameraPersistencePayload(data = {}, existingCamera = null) {
         privateRtspUrl: data.private_rtsp_url !== undefined ? data.private_rtsp_url : existingCamera?.private_rtsp_url,
         externalStreamUrl,
         externalEmbedUrl,
-    });
+    }, options);
 
     return {
         deliveryType,
@@ -187,6 +220,155 @@ function normalizeBulkAreaRequest(bulkRequest = {}) {
         operation: bulkRequest.operation || 'policy_update',
         payload: bulkRequest.payload || {},
         preview: Boolean(bulkRequest.preview),
+    };
+}
+
+function normalizeRestoreRequest(restoreRequest = {}) {
+    const backupItems = Array.isArray(restoreRequest)
+        ? restoreRequest
+        : (Array.isArray(restoreRequest.backupItems)
+            ? restoreRequest.backupItems
+            : (Array.isArray(restoreRequest.data)
+                ? restoreRequest.data
+                : (Array.isArray(restoreRequest.cameras) ? restoreRequest.cameras : [])));
+    const scope = restoreRequest.scope || {};
+
+    return {
+        backupFileName: typeof restoreRequest.backupFileName === 'string' ? restoreRequest.backupFileName.trim() : null,
+        backupItems,
+        matchMode: RESTORE_MATCH_MODES.includes(restoreRequest.matchMode)
+            ? restoreRequest.matchMode
+            : 'id_then_name_area',
+        scope: {
+            mode: RESTORE_SCOPE_MODES.includes(scope.mode) ? scope.mode : 'all',
+            areaIds: Array.isArray(scope.areaIds)
+                ? scope.areaIds.map((value) => parseInt(value, 10)).filter((value) => Number.isInteger(value))
+                : [],
+        },
+        applyPolicy: restoreRequest.applyPolicy || 'repair_existing',
+    };
+}
+
+function normalizeComparisonValue(value) {
+    if (value === undefined || value === null) {
+        return null;
+    }
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        return trimmed === '' ? null : trimmed;
+    }
+    return value;
+}
+
+function normalizeLookupKey(value) {
+    return String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ');
+}
+
+function buildNameAreaKey(name, areaName) {
+    return `${normalizeLookupKey(name)}::${normalizeLookupKey(areaName)}`;
+}
+
+function buildRestoreSourceMetadata(backupItem = {}) {
+    const rawName = backupItem.name || backupItem.title || backupItem.cctv_title || '';
+    const rawSourceUrl = backupItem.external_stream_url || backupItem.external_hls_url || backupItem.url || backupItem.stream || backupItem.cctv_link || null;
+    const rawRtspUrl = backupItem.private_rtsp_url || null;
+    const rawEmbedUrl = backupItem.external_embed_url || backupItem.embed_url || backupItem.page_url || null;
+    const rawSnapshotUrl = backupItem.external_snapshot_url || backupItem.thumbnail_url || backupItem.snapshot_url || null;
+    const rawAreaName = backupItem.area_name || backupItem.area || null;
+
+    const name = typeof rawName === 'string' ? rawName.trim() : '';
+    const sourceUrl = typeof rawSourceUrl === 'string' ? rawSourceUrl.trim() : null;
+    const rtspUrl = typeof rawRtspUrl === 'string' ? rawRtspUrl.trim() : null;
+    const embedUrl = typeof rawEmbedUrl === 'string' ? rawEmbedUrl.trim() : null;
+    const snapshotUrl = typeof rawSnapshotUrl === 'string' ? rawSnapshotUrl.trim() : null;
+    const areaName = typeof rawAreaName === 'string' ? rawAreaName.trim() : '';
+
+    const inferredDeliveryType = getEffectiveDeliveryType({
+        stream_source: backupItem.stream_source || (rtspUrl ? 'internal' : 'external'),
+        delivery_type: backupItem.delivery_type,
+        private_rtsp_url: rtspUrl,
+        external_hls_url: backupItem.external_hls_url || null,
+        external_stream_url: sourceUrl,
+        external_embed_url: embedUrl,
+        external_snapshot_url: snapshotUrl,
+    });
+
+    return {
+        id: Number.isInteger(parseInt(backupItem.id, 10)) ? parseInt(backupItem.id, 10) : null,
+        name,
+        areaName,
+        sourceUrl,
+        rtspUrl,
+        embedUrl,
+        snapshotUrl,
+        streamSource: backupItem.stream_source,
+        deliveryType: inferredDeliveryType,
+        externalUseProxy: backupItem.external_use_proxy === false || backupItem.external_use_proxy === 0 ? 0 : 1,
+        externalTlsMode: backupItem.external_tls_mode === 'insecure' ? 'insecure' : 'strict',
+        externalOriginMode: normalizeExternalOriginMode(backupItem.external_origin_mode),
+    };
+}
+
+function buildRestorePatch(existingCamera, sourceMetadata) {
+    const deliveryConfig = normalizeCameraPersistencePayload({
+        stream_source: sourceMetadata.deliveryType === 'internal_hls' ? 'internal' : 'external',
+        delivery_type: sourceMetadata.deliveryType,
+        private_rtsp_url: sourceMetadata.deliveryType === 'internal_hls' ? sourceMetadata.rtspUrl : null,
+        external_hls_url: sourceMetadata.deliveryType === 'external_hls' ? sourceMetadata.sourceUrl : null,
+        external_stream_url: sourceMetadata.deliveryType === 'internal_hls' ? null : sourceMetadata.sourceUrl,
+        external_embed_url: sourceMetadata.deliveryType === 'external_embed' ? sourceMetadata.embedUrl : sourceMetadata.embedUrl,
+        external_snapshot_url: sourceMetadata.snapshotUrl,
+        external_origin_mode: sourceMetadata.externalOriginMode,
+    }, existingCamera);
+
+    return {
+        stream_source: deliveryConfig.compatStreamSource,
+        delivery_type: deliveryConfig.deliveryType,
+        private_rtsp_url: deliveryConfig.deliveryType === 'internal_hls'
+            ? (sourceMetadata.rtspUrl || '')
+            : null,
+        external_hls_url: deliveryConfig.externalHlsUrl,
+        external_stream_url: deliveryConfig.externalStreamUrl,
+        external_embed_url: deliveryConfig.externalEmbedUrl,
+        external_snapshot_url: deliveryConfig.externalSnapshotUrl,
+        external_use_proxy: deliveryConfig.deliveryType === 'external_hls'
+            ? sourceMetadata.externalUseProxy
+            : (existingCamera.external_use_proxy === 0 ? 0 : 1),
+        external_tls_mode: deliveryConfig.deliveryType === 'external_hls'
+            ? sourceMetadata.externalTlsMode
+            : (existingCamera.external_tls_mode === 'insecure' ? 'insecure' : 'strict'),
+        external_origin_mode: deliveryConfig.externalOriginMode,
+    };
+}
+
+function getRestoreChangedFields(existingCamera, patch) {
+    return Object.keys(patch).filter((field) => (
+        normalizeComparisonValue(existingCamera[field]) !== normalizeComparisonValue(patch[field])
+    ));
+}
+
+function buildRestoreResultSummary(rows = []) {
+    const counts = {
+        matched_repairable: 0,
+        matched_no_changes: 0,
+        ambiguous_matches: 0,
+        missing_target: 0,
+        invalid_backup_row: 0,
+        total: rows.length,
+    };
+
+    for (const row of rows) {
+        if (RESTORE_RESULT_STATUSES.includes(row.status)) {
+            counts[row.status] += 1;
+        }
+    }
+
+    return {
+        counts,
+        canApply: counts.matched_repairable > 0,
     };
 }
 
@@ -473,7 +655,7 @@ class CameraService {
         };
     }
 
-    async updateCamera(id, data, request) {
+    async updateCamera(id, data, request, options = {}) {
         const {
             name,
             private_rtsp_url,
@@ -549,7 +731,7 @@ class CameraService {
             external_embed_url,
             external_snapshot_url,
             external_origin_mode,
-        }, existingCamera);
+        }, existingCamera, options);
 
         const updates = [];
         const values = [];
@@ -938,7 +1120,9 @@ class CameraService {
                         private_rtsp_url: payload.clear_internal_rtsp ? null : camera.private_rtsp_url,
                     };
 
-                    normalizeCameraPersistencePayload(validationCandidate, camera);
+                    normalizeCameraPersistencePayload(validationCandidate, camera, {
+                        allowIncompleteExternalMetadata: true,
+                    });
                     patch.delivery_type = payload.delivery_type;
                 }
             }
@@ -961,6 +1145,9 @@ class CameraService {
                 targetFilter,
                 operation,
                 summary,
+                guidance: operation === 'normalization' && summary.unresolvedCount > 0
+                    ? 'Sebagian kamera unresolved tetap membutuhkan Backup Restore untuk mengisi metadata source sebelum dianggap external valid.'
+                    : null,
             };
         }
 
@@ -969,7 +1156,9 @@ class CameraService {
             await this.updateCamera(item.camera.id, {
                 ...item.patch,
                 private_rtsp_url: toNullableRtspValue(item.patch.private_rtsp_url),
-            }, request);
+            }, request, {
+                allowIncompleteExternalMetadata: operation === 'normalization',
+            });
             changes += 1;
         }
 
@@ -992,6 +1181,247 @@ class CameraService {
             operation,
             changes,
             summary,
+            guidance: operation === 'normalization' && summary.unresolvedCount > 0
+                ? 'Sebagian kamera unresolved masih membutuhkan Backup Restore untuk memulihkan URL source dari file backup.'
+                : null,
+        };
+    }
+
+    buildCameraRestorePreview(restoreRequest) {
+        const normalizedRequest = normalizeRestoreRequest(restoreRequest);
+        const { backupItems, matchMode, scope, applyPolicy } = normalizedRequest;
+
+        if (applyPolicy !== 'repair_existing') {
+            const err = new Error('Only repair_existing restore policy is supported');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        if (!backupItems.length) {
+            const err = new Error('Backup items are required');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const areas = query('SELECT id, name FROM areas ORDER BY id ASC');
+        const cameras = query(
+            `SELECT c.*, a.name as area_name
+             FROM cameras c
+             LEFT JOIN areas a ON c.area_id = a.id
+             ORDER BY c.id ASC`
+        );
+        const areasById = new Map(areas.map((area) => [area.id, area]));
+        const areasByName = new Map(areas.map((area) => [normalizeLookupKey(area.name), area]));
+
+        let scopedCameras = cameras;
+        if (scope.mode === 'unresolved_only') {
+            scopedCameras = scopedCameras.filter((camera) => getCameraDeliveryProfile(camera).classification === 'external_unresolved');
+        } else if (scope.mode === 'area_ids') {
+            const areaIdSet = new Set(scope.areaIds);
+            scopedCameras = scopedCameras.filter((camera) => areaIdSet.has(camera.area_id));
+        }
+
+        const camerasById = new Map(scopedCameras.map((camera) => [camera.id, camera]));
+        const camerasByNameArea = new Map();
+        for (const camera of scopedCameras) {
+            const key = buildNameAreaKey(camera.name, camera.area_name);
+            if (!camerasByNameArea.has(key)) {
+                camerasByNameArea.set(key, []);
+            }
+            camerasByNameArea.get(key).push(camera);
+        }
+
+        const rows = backupItems.map((backupItem, index) => {
+            const sourceMetadata = buildRestoreSourceMetadata(backupItem);
+            const backupLabel = sourceMetadata.name || `Backup row ${index + 1}`;
+
+            if (!sourceMetadata.name) {
+                return {
+                    status: 'invalid_backup_row',
+                    reason: 'missing_name',
+                    matchReason: null,
+                    backupId: sourceMetadata.id,
+                    backupName: backupLabel,
+                    backupAreaName: sourceMetadata.areaName || null,
+                    targetCameraId: null,
+                    targetCameraName: null,
+                    targetAreaName: null,
+                    changedFields: [],
+                };
+            }
+
+            const backupArea = sourceMetadata.areaName
+                ? areasByName.get(normalizeLookupKey(sourceMetadata.areaName)) || null
+                : null;
+
+            let targetCamera = null;
+            let matchReason = null;
+            let ambiguousMatches = [];
+
+            if (matchMode === 'id_then_name_area' && sourceMetadata.id !== null && camerasById.has(sourceMetadata.id)) {
+                targetCamera = camerasById.get(sourceMetadata.id);
+                matchReason = 'matched_by_id';
+            } else {
+                const key = buildNameAreaKey(sourceMetadata.name, sourceMetadata.areaName);
+                const candidates = camerasByNameArea.get(key) || [];
+                if (candidates.length === 1) {
+                    targetCamera = candidates[0];
+                    matchReason = 'matched_by_name_area';
+                } else if (candidates.length > 1) {
+                    ambiguousMatches = candidates;
+                }
+            }
+
+            if (ambiguousMatches.length > 0) {
+                return {
+                    status: 'ambiguous_matches',
+                    reason: 'multiple_candidates',
+                    matchReason: null,
+                    backupId: sourceMetadata.id,
+                    backupName: backupLabel,
+                    backupAreaName: sourceMetadata.areaName || null,
+                    targetCameraId: null,
+                    targetCameraName: null,
+                    targetAreaName: null,
+                    changedFields: [],
+                    candidates: ambiguousMatches.slice(0, 5).map((camera) => ({
+                        id: camera.id,
+                        name: camera.name,
+                        area_name: camera.area_name || null,
+                    })),
+                };
+            }
+
+            if (!targetCamera) {
+                return {
+                    status: 'missing_target',
+                    reason: backupArea ? 'camera_not_found_in_scope' : 'target_missing',
+                    matchReason: null,
+                    backupId: sourceMetadata.id,
+                    backupName: backupLabel,
+                    backupAreaName: sourceMetadata.areaName || null,
+                    targetCameraId: null,
+                    targetCameraName: null,
+                    targetAreaName: backupArea?.name || null,
+                    changedFields: [],
+                };
+            }
+
+            let patch;
+            try {
+                patch = buildRestorePatch(targetCamera, sourceMetadata);
+            } catch (error) {
+                return {
+                    status: 'invalid_backup_row',
+                    reason: 'backup_missing_source',
+                    matchReason,
+                    backupId: sourceMetadata.id,
+                    backupName: backupLabel,
+                    backupAreaName: sourceMetadata.areaName || null,
+                    targetCameraId: targetCamera.id,
+                    targetCameraName: targetCamera.name,
+                    targetAreaName: targetCamera.area_name || null,
+                    changedFields: [],
+                    error: error.message,
+                };
+            }
+
+            const changedFields = getRestoreChangedFields(targetCamera, patch);
+            const status = changedFields.length > 0 ? 'matched_repairable' : 'matched_no_changes';
+            const targetProfile = getCameraDeliveryProfile(targetCamera);
+
+            return {
+                status,
+                reason: status === 'matched_no_changes' ? 'already_in_sync' : null,
+                matchReason,
+                backupId: sourceMetadata.id,
+                backupName: backupLabel,
+                backupAreaName: sourceMetadata.areaName || null,
+                backupDeliveryType: sourceMetadata.deliveryType,
+                targetDeliveryClassification: targetProfile.classification,
+                targetEffectiveDeliveryType: targetProfile.effectiveDeliveryType,
+                targetCameraId: targetCamera.id,
+                targetCameraName: targetCamera.name,
+                targetAreaName: targetCamera.area_name || null,
+                changedFields,
+                patch,
+            };
+        });
+
+        const summary = buildRestoreResultSummary(rows);
+        return {
+            backupFileName: normalizedRequest.backupFileName,
+            matchMode,
+            scope,
+            applyPolicy,
+            summary: {
+                ...summary,
+                counts: summary.counts,
+            },
+            rows,
+            canApply: summary.canApply,
+        };
+    }
+
+    previewCameraRestore(restoreRequest) {
+        const preview = this.buildCameraRestorePreview(restoreRequest);
+        return {
+            backupFileName: preview.backupFileName,
+            matchMode: preview.matchMode,
+            scope: preview.scope,
+            applyPolicy: preview.applyPolicy,
+            summary: preview.summary,
+            counts: preview.summary.counts,
+            canApply: preview.canApply,
+            rows: preview.rows.map(({ patch, ...row }) => row),
+        };
+    }
+
+    async applyCameraRestore(restoreRequest, request) {
+        const preview = this.buildCameraRestorePreview(restoreRequest);
+        const repairableRows = preview.rows.filter((row) => row.status === 'matched_repairable');
+
+        if (!repairableRows.length) {
+            const err = new Error('No repairable cameras were found in the backup preview');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        let repaired = 0;
+        for (const row of repairableRows) {
+            await this.updateCamera(row.targetCameraId, {
+                ...row.patch,
+                private_rtsp_url: toNullableRtspValue(row.patch.private_rtsp_url),
+            }, request);
+            repaired += 1;
+        }
+
+        execute(
+            'INSERT INTO audit_logs (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)',
+            [
+                request.user.id,
+                'RESTORE_CAMERAS',
+                `Restored ${repaired} cameras from backup ${preview.backupFileName || 'uploaded JSON'}`,
+                request.ip || 'Unknown',
+            ]
+        );
+
+        logAdminAction({
+            action: 'BACKUP_RESTORE_APPLIED',
+            repaired_count: repaired,
+            backup_file_name: preview.backupFileName,
+            skipped_count: preview.summary.counts.matched_no_changes + preview.summary.counts.missing_target + preview.summary.counts.ambiguous_matches + preview.summary.counts.invalid_backup_row,
+            ambiguous_count: preview.summary.counts.ambiguous_matches,
+            invalid_count: preview.summary.counts.invalid_backup_row,
+        }, request);
+
+        this.invalidateCameraCache();
+
+        return {
+            repaired,
+            skipped: preview.summary.counts.matched_no_changes + preview.summary.counts.missing_target + preview.summary.counts.ambiguous_matches + preview.summary.counts.invalid_backup_row,
+            counts: preview.summary.counts,
+            backupFileName: preview.backupFileName,
         };
     }
 

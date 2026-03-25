@@ -32,6 +32,10 @@ vi.mock('./pages/CameraManagement', () => ({
     default: () => <div>camera-page</div>,
 }));
 
+vi.mock('./pages/admin/BackupRestore', () => ({
+    default: () => <div>backup-restore-page</div>,
+}));
+
 vi.mock('./pages/AreaManagement', () => ({
     default: () => <div>area-page</div>,
 }));

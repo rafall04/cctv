@@ -90,6 +90,26 @@ export const cameraService = {
         }
     },
 
+    async previewCameraRestore(payload) {
+        try {
+            const response = await apiClient.post('/api/cameras/restore/preview', payload);
+            return response.data;
+        } catch (error) {
+            console.error('Preview camera restore error:', error);
+            throw error;
+        }
+    },
+
+    async applyCameraRestore(payload) {
+        try {
+            const response = await apiClient.post('/api/cameras/restore/apply', payload);
+            return response.data;
+        } catch (error) {
+            console.error('Apply camera restore error:', error);
+            throw error;
+        }
+    },
+
     // Bulk update area (admin only)
     async bulkUpdateByArea(areaId, bulkRequest) {
         try {

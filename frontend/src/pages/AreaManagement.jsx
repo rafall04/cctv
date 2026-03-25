@@ -261,7 +261,8 @@ export default function AreaManagement() {
                 setBulkConfigArea(null);
                 setBulkPreview(null);
                 loadAreas(); // refresh counts potentially
-                success('Pembaruan Massal Berhasil', `Berhasil memperbarui ${result.data?.changes || 0} kamera di area ${bulkConfigArea.name}.`);
+                const guidance = result.data?.guidance ? ` ${result.data.guidance}` : '';
+                success('Pembaruan Massal Berhasil', `Berhasil memperbarui ${result.data?.changes || 0} kamera di area ${bulkConfigArea.name}.${guidance}`);
             } else {
                 showError('Gagal', result.message);
             }
@@ -351,6 +352,12 @@ export default function AreaManagement() {
                     <p className="text-gray-500 dark:text-gray-400 mt-1">Kelompokkan kamera berdasarkan RT, RW, Kelurahan, Kecamatan</p>
                 </div>
                 <div className="flex items-center gap-3 flex-wrap">
+                    <Link
+                        to="/admin/backup-restore?scope=unresolved_only"
+                        className="flex items-center gap-2 px-4 py-2.5 bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 font-medium rounded-xl hover:bg-amber-200 dark:hover:bg-amber-500/20 transition-colors"
+                    >
+                        Backup Restore
+                    </Link>
                     {kecamatans.length > 0 && (
                         <select value={filterKecamatan} onChange={(e) => setFilterKecamatan(e.target.value)}
                             className="px-4 py-2.5 bg-white dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary">
@@ -435,6 +442,15 @@ export default function AreaManagement() {
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                         </svg>
                                     </button>
+                                    <Link
+                                        title="Restore metadata kamera area ini"
+                                        to={`/admin/backup-restore?areaId=${area.id}`}
+                                        className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 hover:text-primary hover:bg-sky-50 dark:hover:bg-primary/10 transition-all"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582M20 11A8 8 0 005.582 9M20 20v-5h-.581M4 13a8 8 0 0014.581 2" />
+                                        </svg>
+                                    </Link>
                                     <button title="Hapus Semua Kamera" onClick={() => setBulkDeleteAreaConfirm(area)} className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all">
                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -773,6 +789,11 @@ export default function AreaManagement() {
                                                     ))}
                                                 </div>
                                             </div>
+                                            {bulkPreview.guidance && (
+                                                <div className="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-500/10 dark:border-amber-500/20 px-3 py-3 text-amber-800 dark:text-amber-300">
+                                                    {bulkPreview.guidance}
+                                                </div>
+                                            )}
                                         </div>
                                     ) : (
                                         <p className="text-sm text-gray-500 dark:text-gray-400">Belum ada preview. Klik Preview untuk melihat dampak target filter dan operasi.</p>

@@ -154,3 +154,29 @@ export async function importCameras(request, reply) {
         return reply.code(500).send({ success: false, message: error.message || 'Internal server error' });
     }
 }
+
+export async function previewCameraRestore(request, reply) {
+    try {
+        const result = cameraService.previewCameraRestore(request.body || {});
+        return reply.send({ success: true, data: result });
+    } catch (error) {
+        console.error('Preview camera restore error:', error);
+        if (error.statusCode === 400) {
+            return reply.code(400).send({ success: false, message: error.message });
+        }
+        return reply.code(500).send({ success: false, message: 'Internal server error' });
+    }
+}
+
+export async function applyCameraRestore(request, reply) {
+    try {
+        const result = await cameraService.applyCameraRestore(request.body || {}, request);
+        return reply.send({ success: true, message: 'Backup restore applied successfully', data: result });
+    } catch (error) {
+        console.error('Apply camera restore error:', error);
+        if (error.statusCode === 400) {
+            return reply.code(400).send({ success: false, message: error.message });
+        }
+        return reply.code(500).send({ success: false, message: 'Internal server error' });
+    }
+}

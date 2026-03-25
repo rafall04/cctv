@@ -1,4 +1,5 @@
 import { useState, useRef, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { cameraService } from '../../services/cameraService';
 import { useNotification } from '../../contexts/NotificationContext';
 
@@ -187,6 +188,21 @@ export default function ImportExport() {
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Bulk Data Transfer</h1>
                     <p className="text-gray-500 dark:text-gray-400">Import configuration JSON or export existing database backups.</p>
                 </div>
+            </div>
+
+            <div className="rounded-2xl border border-amber-200 bg-amber-50/80 dark:bg-amber-500/10 dark:border-amber-500/20 p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                    <p className="font-semibold text-amber-900 dark:text-amber-200">Backup Restore untuk metadata kamera existing</p>
+                    <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">
+                        Gunakan halaman restore jika tujuan Anda adalah memulihkan `external_hls_url` atau metadata source lain ke kamera yang sudah ada. Import di halaman ini tetap khusus untuk ingest per-area.
+                    </p>
+                </div>
+                <Link
+                    to="/admin/backup-restore"
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold"
+                >
+                    Buka Backup Restore
+                </Link>
             </div>
 
             {/* Tabs */}

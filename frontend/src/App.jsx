@@ -15,6 +15,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 const AdminLayout = lazy(() => import('./layouts/AdminLayout'));
 const CameraManagement = lazy(() => import('./pages/CameraManagement'));
 const ImportExport = lazy(() => import('./pages/admin/ImportExport'));
+const BackupRestore = lazy(() => import('./pages/admin/BackupRestore'));
 const AreaManagement = lazy(() => import('./pages/AreaManagement'));
 const UserManagement = lazy(() => import('./pages/UserManagement'));
 const FeedbackManagement = lazy(() => import('./pages/FeedbackManagement'));
@@ -77,6 +78,18 @@ function App() {
                             <AdminLayout>
                                 <Suspense fallback={<div className="p-6">Loading...</div>}>
                                     <ImportExport />
+                                </Suspense>
+                            </AdminLayout>
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/admin/backup-restore"
+                    element={
+                        <ProtectedRoute>
+                            <AdminLayout>
+                                <Suspense fallback={<div className="p-6">Loading...</div>}>
+                                    <BackupRestore />
                                 </Suspense>
                             </AdminLayout>
                         </ProtectedRoute>
