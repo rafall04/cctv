@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
     attachAbortCleanup,
     cleanupUpstreamResponse,
+    fetchBufferedBinaryUpstream,
     fetchBinaryUpstream,
     fetchTextUpstream,
     FixedWindowLimiter,
@@ -421,6 +422,50 @@ describe('upstream stream cleanup', () => {
             maxContentLength: 100,
             maxBodyLength: 100,
         });
+    });
+});
+
+describe('buffered external binary fetch', () => {
+    it('returns a full buffer for successful segment fetches', async () => {
+        const httpClient = {
+            get: vi.fn(async () => ({
+                status: 200,
+                data: Uint8Array.from([1, 2, 3, 4]).buffer,
+            })),
+        };
+
+        const result = await fetchBufferedBinaryUpstream({
+            httpClient,
+            targetUrl: 'https://example.com/seg.ts',
+            headers: {},
+        });
+
+        expect(result.status).toBe(200);
+        expect(Buffer.isBuffer(result.data)).toBe(true);
+        expect([...result.data]).toEqual([1, 2, 3, 4]);
+    });
+
+    it('retries once before failing buffered fetches', async () => {
+        const httpClient = {
+            get: vi.fn()
+                .mockRejectedValueOnce(new Error('socket hang up'))
+                .mockResolvedValueOnce({
+                    status: 200,
+                    data: Uint8Array.from([9, 8]).buffer,
+                }),
+        };
+
+        const result = await fetchBufferedBinaryUpstream({
+            httpClient,
+            targetUrl: 'https://example.com/seg.ts',
+            headers: {},
+            maxRetries: 2,
+            retryDelayMs: 0,
+            sleep: async () => {},
+        });
+
+        expect(httpClient.get).toHaveBeenCalledTimes(2);
+        expect([...result.data]).toEqual([9, 8]);
     });
 });
 

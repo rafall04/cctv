@@ -821,6 +821,45 @@ export async function fetchBinaryUpstream({
     throw lastError || new Error('Failed to fetch upstream binary response');
 }
 
+export async function fetchBufferedBinaryUpstream({
+    httpClient,
+    targetUrl,
+    headers,
+    maxRetries = 2,
+    retryDelayMs = 500,
+    sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+}) {
+    let lastError = null;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        const controller = new AbortController();
+
+        try {
+            const response = await httpClient.get(targetUrl, {
+                headers,
+                responseType: 'arraybuffer',
+                signal: controller.signal,
+            });
+
+            return {
+                controller,
+                response,
+                status: response.status,
+                data: Buffer.from(response.data || []),
+            };
+        } catch (error) {
+            safeAbort(controller);
+            lastError = error;
+            if (attempt < maxRetries - 1) {
+                await sleep(retryDelayMs);
+                continue;
+            }
+        }
+    }
+
+    throw lastError || new Error('Failed to fetch upstream binary buffer');
+}
+
 function applyHlsCorsHeaders(request, reply) {
     const origin = request.headers.origin;
     if (!origin) {
@@ -1125,6 +1164,7 @@ async function handleExternalStreamProxy(state, request, reply) {
         
         const headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept-Encoding': 'identity',
         };
 
         if (isTextFile) {
@@ -1149,14 +1189,15 @@ async function handleExternalStreamProxy(state, request, reply) {
             return reply.send(rewriteExternalPlaylist(response.data, url, externalCameraConfig?.cameraId ?? null));
         }
 
-        const { controller, response } = await fetchBinaryUpstream({
+        const { controller, response, data } = await fetchBufferedBinaryUpstream({
             httpClient: requestHttpClient,
             targetUrl: url,
             headers,
+            maxRetries: 3,
         });
 
         if (response.status !== 200) {
-            cleanupUpstreamResponse({ controller, response });
+            safeAbort(controller);
             reply.header('Content-Type', 'text/plain');
             reply.header('Cache-Control', 'no-cache');
             return reply.code(response.status).send('');
@@ -1173,14 +1214,9 @@ async function handleExternalStreamProxy(state, request, reply) {
         reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
         reply.header('Pragma', 'no-cache');
         reply.header('Expires', '0');
-
-        attachAbortCleanup({
-            request,
-            reply,
-            controller,
-            upstreamStream: response.data,
-        }).attach();
-        return reply.send(response.data);
+        reply.header('Content-Length', String(data.length));
+        safeAbort(controller);
+        return reply.send(data);
     } catch (error) {
         console.error(`[HLS Proxy] External fetch error for ${url}:`, error.message);
         return reply.code(502).send('');
