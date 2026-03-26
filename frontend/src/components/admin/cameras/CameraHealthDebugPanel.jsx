@@ -137,10 +137,22 @@ export default function CameraHealthDebugPanel({ items, loading = false, error =
                                                 {item.lastRuntimeSuccessAt}
                                             </div>
                                         ) : null}
+                                        {item.lastRuntimeFreshAt ? (
+                                            <div>
+                                                <span className="font-medium text-gray-500 dark:text-gray-400">Runtime fresh:</span>{' '}
+                                                {item.lastRuntimeFreshAt}
+                                            </div>
+                                        ) : null}
                                         {item.lastRuntimeSignalType ? (
                                             <div>
                                                 <span className="font-medium text-gray-500 dark:text-gray-400">Signal:</span>{' '}
                                                 {item.lastRuntimeSignalType}
+                                            </div>
+                                        ) : null}
+                                        {item.runtimeGraceUntil ? (
+                                            <div>
+                                                <span className="font-medium text-gray-500 dark:text-gray-400">Grace:</span>{' '}
+                                                {item.runtimeGraceUntil}
                                             </div>
                                         ) : null}
                                         {item.domainBackoffUntil ? (

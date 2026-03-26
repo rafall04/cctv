@@ -20,6 +20,8 @@ const EXTERNAL_REQUEST_TIMEOUT_MS = 10000;
 const EXTERNAL_MAX_PDT_AGE_SEC = 120;
 const EXTERNAL_STALE_SEQUENCE_THRESHOLD = 4; // Increased from 2 to 4 to tolerate CDN caching
 const RUNTIME_SUCCESS_WINDOW_MS = 90 * 1000;
+const MJPEG_RUNTIME_FRESH_WINDOW_MS = 60 * 1000;
+const MJPEG_RUNTIME_GRACE_WINDOW_MS = 4 * 60 * 1000;
 const HOT_CADENCE_MS = 20 * 1000;
 const WARM_CADENCE_MS = 90 * 1000;
 const COLD_CADENCE_MS = 5 * 60 * 1000;
@@ -500,8 +502,11 @@ class CameraHealthService {
                 nextCheckAt: 0,
                 tier: 'hot',
                 lastRuntimeSuccessAt: null,
+                lastRuntimeFreshAt: null,
                 lastRuntimeSignalType: null,
                 lastRuntimeTarget: null,
+                lastFreshFrameWindowExpiresAt: null,
+                runtimeGraceUntil: null,
                 providerDomain: null,
                 domainBackoffUntil: null,
                 stableSuccessCount: currentDbOnline === 1 ? 1 : 0,
@@ -589,6 +594,18 @@ class CameraHealthService {
         return Boolean(state?.lastRuntimeSuccessAt && (now - state.lastRuntimeSuccessAt) <= RUNTIME_SUCCESS_WINDOW_MS);
     }
 
+    hasFreshMjpegRuntimeSignal(state, now = Date.now()) {
+        return Boolean(
+            state?.lastRuntimeFreshAt
+            && state.lastFreshFrameWindowExpiresAt
+            && state.lastFreshFrameWindowExpiresAt > now
+        );
+    }
+
+    hasMjpegRuntimeGrace(state, now = Date.now()) {
+        return Boolean(state?.runtimeGraceUntil && state.runtimeGraceUntil > now);
+    }
+
     recordRuntimeSignal(cameraId, { targetUrl = null, signalType = 'runtime_success', timestamp = Date.now(), success = true } = {}) {
         const state = this.ensureCameraState(cameraId, 0);
         const providerDomain = extractProviderDomain(targetUrl);
@@ -599,8 +616,11 @@ class CameraHealthService {
 
         if (success) {
             state.lastRuntimeSuccessAt = timestamp;
+            state.lastRuntimeFreshAt = timestamp;
             state.lastRuntimeSignalType = signalType;
             state.lastRuntimeTarget = targetUrl || state.lastRuntimeTarget || null;
+            state.lastFreshFrameWindowExpiresAt = timestamp + MJPEG_RUNTIME_FRESH_WINDOW_MS;
+            state.runtimeGraceUntil = timestamp + MJPEG_RUNTIME_GRACE_WINDOW_MS;
             state.effectiveOnline = true;
             state.state = state.state === 'offline' ? 'degraded' : (state.state || 'degraded');
             state.confidence = Math.max(state.confidence || 0.5, 0.7);
@@ -609,6 +629,8 @@ class CameraHealthService {
             state.lastDetails = withProbeDetails(state.lastDetails, {
                 runtimeTarget: targetUrl || state.lastRuntimeTarget || null,
                 lastRuntimeSignalType: signalType,
+                lastRuntimeFreshAt: new Date(timestamp).toISOString(),
+                runtimeGraceUntil: new Date(state.runtimeGraceUntil).toISOString(),
             });
 
             const currentTimestamp = getTimestamp();
@@ -626,12 +648,17 @@ class CameraHealthService {
             return false;
         }
 
-        if (!this.hasRecentRuntimeSuccess(state)) {
+        const errorClass = resolveErrorClass(rawResult.reason);
+        if (!(errorClass === 'tls' || errorClass === 'network_transient' || errorClass === 'runtime_probe_mismatch')) {
             return false;
         }
 
-        const errorClass = resolveErrorClass(rawResult.reason);
-        return errorClass === 'tls' || errorClass === 'network_transient' || errorClass === 'runtime_probe_mismatch';
+        const deliveryClassification = rawResult.details?.delivery_classification || null;
+        if (deliveryClassification === 'external_mjpeg') {
+            return this.hasFreshMjpegRuntimeSignal(state) || this.hasMjpegRuntimeGrace(state);
+        }
+
+        return this.hasRecentRuntimeSuccess(state);
     }
 
     applyRuntimeAssist(rawResult, state) {
@@ -640,15 +667,31 @@ class CameraHealthService {
         }
 
         const errorClass = resolveErrorClass(rawResult.reason);
+        const now = Date.now();
+        const deliveryClassification = rawResult.details?.delivery_classification || null;
+        const hasFreshMjpegSignal = deliveryClassification === 'external_mjpeg' && this.hasFreshMjpegRuntimeSignal(state, now);
+        const hasMjpegGrace = deliveryClassification === 'external_mjpeg' && this.hasMjpegRuntimeGrace(state, now);
+        let assistedReason = errorClass === 'tls' ? 'runtime_probe_tls_mismatch' : 'runtime_recent_success';
+
+        if (deliveryClassification === 'external_mjpeg') {
+            if (hasFreshMjpegSignal) {
+                assistedReason = 'mjpeg_runtime_recent';
+            } else if (hasMjpegGrace) {
+                assistedReason = 'mjpeg_runtime_stale';
+            }
+        }
+
         return {
             online: true,
-            reason: errorClass === 'tls' ? 'runtime_probe_tls_mismatch' : 'runtime_recent_success',
+            reason: assistedReason,
             details: withProbeDetails(rawResult.details, {
                 underlyingReason: rawResult.reason,
                 assistedByRuntime: true,
                 lastRuntimeSuccessAt: state.lastRuntimeSuccessAt,
+                lastRuntimeFreshAt: state.lastRuntimeFreshAt,
                 lastRuntimeSignalType: state.lastRuntimeSignalType,
                 runtimeTarget: state.lastRuntimeTarget || rawResult.details?.runtimeTarget || null,
+                runtimeGraceUntil: state.runtimeGraceUntil ? new Date(state.runtimeGraceUntil).toISOString() : null,
             }),
         };
     }
@@ -1496,6 +1539,7 @@ class CameraHealthService {
 
         if (rawResult.online) {
             const runtimeAssisted = rawResult.reason === 'runtime_recent_success' || rawResult.reason === 'runtime_probe_tls_mismatch';
+            const stickyMjpeg = rawResult.reason === 'mjpeg_runtime_recent' || rawResult.reason === 'mjpeg_runtime_stale';
             state.failureScore = runtimeAssisted
                 ? Math.max(0, state.failureScore - SCORE_DECAY_ON_SUCCESS)
                 : 0;
@@ -1503,12 +1547,12 @@ class CameraHealthService {
             state.effectiveOnline = true;
             state.stableSuccessCount += 1;
             state.stableFailureCount = 0;
-            state.state = runtimeAssisted
+            state.state = runtimeAssisted || stickyMjpeg || rawResult.reason === 'probe_target_mismatch'
                 ? 'degraded'
-                : (rawResult.reason === 'probe_target_mismatch' ? 'degraded' : 'healthy');
-            state.confidence = runtimeAssisted
-                ? Math.max(0.65, state.confidence || 0.5)
-                : 0.98;
+                : 'healthy';
+            state.confidence = stickyMjpeg
+                ? (rawResult.reason === 'mjpeg_runtime_stale' ? Math.max(0.55, state.confidence || 0.5) : Math.max(0.72, state.confidence || 0.6))
+                : (runtimeAssisted ? Math.max(0.65, state.confidence || 0.5) : 0.98);
         } else {
             const weight = FAILURE_WEIGHTS[rawResult.reason] ?? 0.3;
             state.failureScore += weight;
@@ -1795,7 +1839,9 @@ class CameraHealthService {
                 contentType: state.lastDetails?.content_type || null,
                 lastProbeAt: state.lastProbeAt,
                 lastRuntimeSuccessAt: state.lastRuntimeSuccessAt ? new Date(state.lastRuntimeSuccessAt).toISOString() : null,
+                lastRuntimeFreshAt: state.lastRuntimeFreshAt ? new Date(state.lastRuntimeFreshAt).toISOString() : null,
                 lastRuntimeSignalType: state.lastRuntimeSignalType,
+                runtimeGraceUntil: state.runtimeGraceUntil ? new Date(state.runtimeGraceUntil).toISOString() : null,
                 providerDomain: state.providerDomain,
                 domainBackoffUntil: state.domainBackoffUntil,
                 tier: state.tier,

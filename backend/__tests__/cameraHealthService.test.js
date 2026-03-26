@@ -443,9 +443,35 @@ describe('cameraHealthService external TLS policy', () => {
 
         const state = service.healthState.get(393);
         expect(result.isOnline).toBe(1);
-        expect(result.rawReason).toBe('runtime_probe_tls_mismatch');
+        expect(result.rawReason).toBe('mjpeg_runtime_recent');
         expect(state.state).toBe('degraded');
         expect(state.lastRuntimeSignalType).toBe('external_mjpeg_image_load');
+    });
+
+    it('keeps MJPEG cameras degraded while runtime grace is still active even when fresh signal is stale', async () => {
+        axios.get.mockRejectedValueOnce({ code: 'ECONNABORTED' });
+
+        const service = new CameraHealthService();
+        service.recordRuntimeSignal(394, {
+            targetUrl: 'https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=113',
+            signalType: 'external_mjpeg_image_load',
+            success: true,
+            timestamp: Date.now() - 120000,
+        });
+
+        const result = await service.evaluateCameraStatus({
+            id: 394,
+            name: 'MJPEG Grace Camera',
+            enabled: 1,
+            is_online: 1,
+            stream_source: 'external',
+            delivery_type: 'external_mjpeg',
+            external_stream_url: 'https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=113',
+        }, new Map());
+
+        expect(result.isOnline).toBe(1);
+        expect(result.rawReason).toBe('mjpeg_runtime_stale');
+        expect(service.healthState.get(394).state).toBe('degraded');
     });
 
     it('keeps websocket external cameras online by default when no probe target exists', async () => {

@@ -61,10 +61,11 @@ describe('thumbnailService external thumbnails', () => {
             18,
             null,
             'external',
-            'https://data.bojonegorokab.go.id/live/local/test/index.m3u8'
+            'https://data.bojonegorokab.go.id/live/local/test/index.m3u8',
+            'external_hls'
         );
 
-        expect(result).toEqual({ success: true });
+        expect(result).toEqual({ success: true, source: 'external_hls' });
         expect(execFileMock).toHaveBeenCalledTimes(1);
 
         const [binary, args] = execFileMock.mock.calls[0];
@@ -78,6 +79,43 @@ describe('thumbnailService external thumbnails', () => {
         );
     });
 
+    it('captures MJPEG thumbnails from snapshot url when available', async () => {
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        const result = await thumbnailService.generateSingle(
+            19,
+            null,
+            'external',
+            null,
+            'external_mjpeg',
+            'https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=112',
+            'https://cctv.jombangkab.go.id/snapshot/112.jpg'
+        );
+
+        expect(result).toEqual({ success: true, source: 'external_snapshot' });
+        const [, args] = execFileMock.mock.calls[0];
+        expect(args).toContain('https://cctv.jombangkab.go.id/snapshot/112.jpg');
+    });
+
+    it('falls back to placeholder thumbnails for external embed without snapshot', async () => {
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        const result = await thumbnailService.generateSingle(
+            20,
+            null,
+            'external',
+            null,
+            'external_embed',
+            null,
+            null
+        );
+
+        expect(result).toEqual({ success: true, source: 'placeholder' });
+        const [, args] = execFileMock.mock.calls[0];
+        expect(args).toContain('lavfi');
+        expect(args.some((arg) => String(arg).includes('color='))).toBe(true);
+    });
+
     it('skips offline cameras during background generation', async () => {
         const { default: thumbnailService } = await import('../services/thumbnailService.js');
 
@@ -88,7 +126,13 @@ describe('thumbnailService external thumbnails', () => {
                 is_online: 1,
                 stream_key: 'camera21',
                 stream_source: 'internal',
+                delivery_type: 'internal_hls',
                 external_hls_url: null,
+                external_stream_url: null,
+                external_snapshot_url: null,
+                external_embed_url: null,
+                external_tls_mode: 'strict',
+                thumbnail_path: null,
             },
         ]);
 
@@ -110,7 +154,13 @@ describe('thumbnailService external thumbnails', () => {
                     is_online: 1,
                     stream_key: 'camera31',
                     stream_source: 'internal',
+                    delivery_type: 'internal_hls',
                     external_hls_url: null,
+                    external_stream_url: null,
+                    external_snapshot_url: null,
+                    external_embed_url: null,
+                    external_tls_mode: 'strict',
+                    thumbnail_path: null,
                 }];
             }
 
@@ -122,7 +172,13 @@ describe('thumbnailService external thumbnails', () => {
                     is_online: 0,
                     stream_key: 'camera32',
                     stream_source: 'internal',
+                    delivery_type: 'internal_hls',
                     external_hls_url: null,
+                    external_stream_url: null,
+                    external_snapshot_url: null,
+                    external_embed_url: null,
+                    external_tls_mode: 'strict',
+                    thumbnail_path: null,
                 }];
             }
 

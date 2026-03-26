@@ -18,6 +18,7 @@ const INTERNAL_HLS_BASE_URL = (config.mediamtx?.hlsUrlInternal || 'http://localh
 const THUMBNAIL_INTERVAL_MS = 5 * 60 * 1000;
 const THUMBNAIL_CONCURRENCY = 3;
 const FFMPEG_TIMEOUT_MS = 15000;
+const DEFAULT_PLACEHOLDER_COLOR = '0x111827';
 
 if (!existsSync(THUMBNAIL_DIR)) {
     mkdirSync(THUMBNAIL_DIR, { recursive: true });
@@ -30,6 +31,7 @@ class ThumbnailService {
         this.generationInterval = null;
         this.ffmpegAvailable = null;
         this.inFlightCameraIds = new Set();
+        this.thumbnailState = new Map();
     }
 
     async checkFFmpeg() {
@@ -44,7 +46,7 @@ class ThumbnailService {
             return true;
         } catch {
             this.ffmpegAvailable = false;
-            console.warn('[Thumbnail] FFmpeg not found - thumbnail generation disabled');
+            console.warn('[Thumbnail] FFmpeg not found - capture thumbnails limited');
             return false;
         }
     }
@@ -52,8 +54,7 @@ class ThumbnailService {
     async start() {
         const hasFFmpeg = await this.checkFFmpeg();
         if (!hasFFmpeg) {
-            console.log('[Thumbnail] Service disabled (FFmpeg not available)');
-            return;
+            console.warn('[Thumbnail] Running without FFmpeg - only retained thumbnails will be available for unsupported sources');
         }
 
         console.log('[Thumbnail] Service started - generating every 5 minutes');
@@ -79,26 +80,83 @@ class ThumbnailService {
         console.log('[Thumbnail] Service stopped');
     }
 
-    resolveCameraHlsUrl(camera) {
+    normalizeExternalTlsMode(value) {
+        return value === 'insecure' ? 'insecure' : 'strict';
+    }
+
+    setThumbnailState(cameraId, patch = {}) {
+        const previous = this.thumbnailState.get(cameraId) || {
+            thumbnail_source_type: null,
+            thumbnail_last_success_at: null,
+            thumbnail_last_error_reason: null,
+        };
+
+        const next = { ...previous, ...patch };
+        this.thumbnailState.set(cameraId, next);
+        return next;
+    }
+
+    buildFfmpegInputArgs(sourceUrl, externalTlsMode = 'strict') {
+        const args = [];
+        const normalizedTlsMode = this.normalizeExternalTlsMode(externalTlsMode);
+        const isHttps = typeof sourceUrl === 'string' && sourceUrl.startsWith('https://');
+
+        if (isHttps && normalizedTlsMode === 'insecure') {
+            args.push('-tls_verify', '0');
+        }
+
+        args.push('-rw_timeout', '10000000');
+        args.push('-i', sourceUrl);
+        return args;
+    }
+
+    resolveCameraThumbnailStrategy(camera) {
         const deliveryType = getEffectiveDeliveryType(camera);
+        const externalStreamUrl = (getPrimaryExternalStreamUrl(camera) || '').trim();
+        const externalSnapshotUrl = (camera.external_snapshot_url || '').trim();
+        const externalTlsMode = this.normalizeExternalTlsMode(camera.external_tls_mode);
+
+        if (deliveryType === 'internal_hls') {
+            if (!camera.stream_key) {
+                return { type: 'unavailable', reason: 'missing_internal_stream_key' };
+            }
+
+            return {
+                type: 'internal_hls',
+                sourceUrl: `${INTERNAL_HLS_BASE_URL}/${camera.stream_key}/index.m3u8`,
+                externalTlsMode,
+            };
+        }
 
         if (deliveryType === 'external_hls') {
-            const url = (getPrimaryExternalStreamUrl(camera) || '').trim();
-            if (url.startsWith('http://') || url.startsWith('https://')) {
-                return url;
+            if (externalStreamUrl.startsWith('http://') || externalStreamUrl.startsWith('https://')) {
+                return { type: 'external_hls', sourceUrl: externalStreamUrl, externalTlsMode };
             }
-            return null;
+
+            return { type: 'unavailable', reason: 'missing_external_hls_url' };
         }
 
-        if (deliveryType !== 'internal_hls') {
-            return null;
+        if (deliveryType === 'external_mjpeg') {
+            if (externalSnapshotUrl) {
+                return { type: 'external_snapshot', sourceUrl: externalSnapshotUrl, externalTlsMode };
+            }
+
+            if (externalStreamUrl.startsWith('http://') || externalStreamUrl.startsWith('https://')) {
+                return { type: 'external_mjpeg', sourceUrl: externalStreamUrl, externalTlsMode };
+            }
+
+            return { type: 'placeholder', reason: 'missing_mjpeg_thumbnail_source' };
         }
 
-        if (!camera.stream_key) {
-            return null;
+        if (deliveryType === 'external_embed' || deliveryType === 'external_jsmpeg' || deliveryType === 'external_custom_ws') {
+            if (externalSnapshotUrl) {
+                return { type: 'external_snapshot', sourceUrl: externalSnapshotUrl, externalTlsMode };
+            }
+
+            return { type: 'placeholder', reason: 'missing_external_snapshot_source' };
         }
 
-        return `${INTERNAL_HLS_BASE_URL}/${camera.stream_key}/index.m3u8`;
+        return { type: 'unavailable', reason: 'unsupported_delivery_type' };
     }
 
     async processCamera(camera) {
@@ -110,26 +168,37 @@ class ThumbnailService {
             return { skipped: true, reason: 'already_in_progress' };
         }
 
-        const hlsUrl = this.resolveCameraHlsUrl(camera);
-
-        if (!hlsUrl) {
-            throw new Error('No valid HLS URL for camera source');
-        }
+        const strategy = this.resolveCameraThumbnailStrategy(camera);
 
         this.inFlightCameraIds.add(camera.id);
         try {
-            await this.generateThumbnail(camera.id, hlsUrl);
+            if (strategy.type === 'unavailable') {
+                throw new Error(strategy.reason || 'No valid source URL for thumbnail generation');
+            }
+
+            if (strategy.type === 'placeholder') {
+                await this.generatePlaceholderThumbnail(camera.id);
+            } else {
+                await this.generateThumbnail(camera.id, strategy);
+            }
+
+            this.setThumbnailState(camera.id, {
+                thumbnail_source_type: strategy.type,
+                thumbnail_last_success_at: new Date().toISOString(),
+                thumbnail_last_error_reason: null,
+            });
             return { skipped: false };
+        } catch (error) {
+            this.setThumbnailState(camera.id, {
+                thumbnail_last_error_reason: error.message,
+            });
+            throw error;
         } finally {
             this.inFlightCameraIds.delete(camera.id);
         }
     }
 
     async generateAllThumbnails() {
-        if (this.ffmpegAvailable === false) {
-            return;
-        }
-
         if (this.isGenerating) {
             console.log('[Thumbnail] Generation already in progress, skipping');
             return;
@@ -140,7 +209,9 @@ class ThumbnailService {
 
         try {
             const cameras = query(`
-                SELECT id, name, is_online, stream_key, stream_source, delivery_type, external_hls_url, external_stream_url
+                SELECT id, name, is_online, stream_key, stream_source, delivery_type,
+                       external_hls_url, external_stream_url, external_snapshot_url,
+                       external_embed_url, external_tls_mode, thumbnail_path
                 FROM cameras
                 WHERE enabled = 1 AND is_online = 1
             `);
@@ -190,17 +261,27 @@ class ThumbnailService {
         }
     }
 
-    async generateThumbnail(cameraId, hlsUrl) {
+    async updateThumbnailPath(cameraId) {
+        execute(
+            'UPDATE cameras SET thumbnail_path = ?, thumbnail_updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            [`/api/thumbnails/${cameraId}.jpg`, cameraId]
+        );
+    }
+
+    async generatePlaceholderThumbnail(cameraId) {
+        if (this.ffmpegAvailable === false) {
+            throw new Error('ffmpeg_unavailable');
+        }
+
         const outputPath = join(THUMBNAIL_DIR, `${cameraId}.jpg`);
         const tempPath = join(THUMBNAIL_DIR, `${cameraId}_temp.jpg`);
 
         try {
             const ffmpegArgs = [
                 '-loglevel', 'error',
-                '-rw_timeout', '10000000',
-                '-i', hlsUrl,
+                '-f', 'lavfi',
+                '-i', `color=c=${DEFAULT_PLACEHOLDER_COLOR}:s=320x180:d=1`,
                 '-vframes', '1',
-                '-vf', 'scale=320:180:force_original_aspect_ratio=decrease,pad=320:180:(ow-iw)/2:(oh-ih)/2',
                 '-q:v', '8',
                 tempPath,
                 '-y'
@@ -208,20 +289,16 @@ class ThumbnailService {
 
             await execFileAsync('ffmpeg', ffmpegArgs, {
                 timeout: FFMPEG_TIMEOUT_MS,
-                maxBuffer: 1024 * 1024
+                maxBuffer: 1024 * 1024,
             });
 
             if (!existsSync(tempPath)) {
-                throw new Error('Temporary thumbnail was not created');
+                throw new Error('Temporary placeholder thumbnail was not created');
             }
 
             copyFileSync(tempPath, outputPath);
             unlinkSync(tempPath);
-
-            execute(
-                'UPDATE cameras SET thumbnail_path = ?, thumbnail_updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                [`/api/thumbnails/${cameraId}.jpg`, cameraId]
-            );
+            await this.updateThumbnailPath(cameraId);
         } catch (error) {
             if (existsSync(tempPath)) {
                 try {
@@ -234,24 +311,84 @@ class ThumbnailService {
         }
     }
 
-    async generateSingle(cameraId, streamKey, streamSource = 'internal', externalHlsUrl = null, deliveryType = null, externalStreamUrl = null) {
+    async generateThumbnail(cameraId, strategy) {
+        if (this.ffmpegAvailable === false) {
+            throw new Error('ffmpeg_unavailable');
+        }
+
+        const outputPath = join(THUMBNAIL_DIR, `${cameraId}.jpg`);
+        const tempPath = join(THUMBNAIL_DIR, `${cameraId}_temp.jpg`);
+
+        try {
+            const ffmpegArgs = [
+                '-loglevel', 'error',
+                ...this.buildFfmpegInputArgs(strategy.sourceUrl, strategy.externalTlsMode),
+                '-vframes', '1',
+                '-vf', 'scale=320:180:force_original_aspect_ratio=decrease,pad=320:180:(ow-iw)/2:(oh-ih)/2',
+                '-q:v', '8',
+                tempPath,
+                '-y'
+            ];
+
+            await execFileAsync('ffmpeg', ffmpegArgs, {
+                timeout: FFMPEG_TIMEOUT_MS,
+                maxBuffer: 1024 * 1024,
+            });
+
+            if (!existsSync(tempPath)) {
+                throw new Error('Temporary thumbnail was not created');
+            }
+
+            copyFileSync(tempPath, outputPath);
+            unlinkSync(tempPath);
+            await this.updateThumbnailPath(cameraId);
+        } catch (error) {
+            if (existsSync(tempPath)) {
+                try {
+                    unlinkSync(tempPath);
+                } catch {
+                    // Ignore cleanup errors
+                }
+            }
+            throw error;
+        }
+    }
+
+    async generateSingle(
+        cameraId,
+        streamKey,
+        streamSource = 'internal',
+        externalHlsUrl = null,
+        deliveryType = null,
+        externalStreamUrl = null,
+        externalSnapshotUrl = null,
+        externalTlsMode = 'strict'
+    ) {
         try {
             const camera = {
                 id: cameraId,
+                name: `Camera ${cameraId}`,
                 stream_key: streamKey,
                 stream_source: streamSource,
                 delivery_type: deliveryType,
                 external_hls_url: externalHlsUrl,
-                external_stream_url: externalStreamUrl
+                external_stream_url: externalStreamUrl,
+                external_snapshot_url: externalSnapshotUrl,
+                external_tls_mode: externalTlsMode,
             };
-            const hlsUrl = this.resolveCameraHlsUrl(camera);
+            const strategy = this.resolveCameraThumbnailStrategy(camera);
 
-            if (!hlsUrl) {
-                return { success: false, error: 'No valid source URL for thumbnail generation' };
+            if (strategy.type === 'unavailable') {
+                return { success: false, error: strategy.reason || 'No valid source URL for thumbnail generation' };
             }
 
-            await this.generateThumbnail(cameraId, hlsUrl);
-            return { success: true };
+            if (strategy.type === 'placeholder') {
+                await this.generatePlaceholderThumbnail(cameraId);
+                return { success: true, source: 'placeholder' };
+            }
+
+            await this.generateThumbnail(cameraId, strategy);
+            return { success: true, source: strategy.type };
         } catch (error) {
             console.error(`[Thumbnail] On-demand generation failed for ${cameraId}:`, error.message);
             return { success: false, error: error.message };
@@ -259,12 +396,10 @@ class ThumbnailService {
     }
 
     async refreshCameraThumbnail(cameraId) {
-        if (this.ffmpegAvailable === false) {
-            return { success: false, skipped: true, reason: 'ffmpeg_unavailable' };
-        }
-
         const camera = query(
-            `SELECT id, name, enabled, is_online, stream_key, stream_source, delivery_type, external_hls_url, external_stream_url
+            `SELECT id, name, enabled, is_online, stream_key, stream_source, delivery_type,
+                    external_hls_url, external_stream_url, external_snapshot_url,
+                    external_embed_url, external_tls_mode, thumbnail_path
              FROM cameras
              WHERE id = ?`,
             [cameraId]
