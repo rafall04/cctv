@@ -40,6 +40,7 @@ import {
     getStreamCapabilities,
     isHlsDeliveryType,
 } from '../../utils/cameraDelivery.js';
+import { getCameraAvailabilityState, isCameraHardOffline } from '../../utils/cameraAvailability.js';
 
 // ============================================
 // VIDEO POPUP - Optimized with fullscreen detection, timeout handler, progressive stages, and auto-retry
@@ -119,7 +120,8 @@ function VideoPopup({
 
     // Check camera status first
     const isMaintenance = camera.status === 'maintenance';
-    const isOffline = camera.is_online === 0;
+    const availabilityState = getCameraAvailabilityState(camera);
+    const isOffline = isCameraHardOffline(camera);
     const isMobileAdsViewport = isAdsMobileViewport();
 
     const [status, setStatus] = useState(() => getPublicPopupInitialStatus(camera));
@@ -206,11 +208,11 @@ function VideoPopup({
         }
 
         if (!isHlsCamera && streamCapabilities.popup) {
-            setStatus(effectiveUrl ? 'playing' : 'error');
+            setStatus(availabilityState === 'degraded' ? 'degraded' : (effectiveUrl ? 'playing' : 'error'));
             setLoadingStage(LoadingStage.BUFFERING);
             setErrorType(effectiveUrl ? null : 'unknown');
         }
-    }, [effectiveUrl, isHlsCamera, isMaintenance, isOffline, streamCapabilities.popup]);
+    }, [availabilityState, effectiveUrl, isHlsCamera, isMaintenance, isOffline, streamCapabilities.popup]);
 
     const syncVideoAspectRatio = useCallback(() => {
         const nextAspectRatio = getVideoAspectRatio(videoRef.current);

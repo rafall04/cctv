@@ -474,6 +474,48 @@ describe('cameraHealthService external TLS policy', () => {
         expect(service.healthState.get(394).state).toBe('degraded');
     });
 
+    it('maps degraded MJPEG runtime state to public degraded availability', () => {
+        const service = new CameraHealthService();
+        service.healthState.set(395, {
+            effectiveOnline: true,
+            state: 'degraded',
+            confidence: 0.71,
+            lastReason: 'mjpeg_runtime_recent',
+            errorClass: 'network_transient',
+        });
+
+        expect(service.getPublicAvailability({
+            id: 395,
+            status: 'active',
+            is_online: 0,
+        })).toEqual({
+            availability_state: 'degraded',
+            availability_reason: 'mjpeg_runtime_recent',
+            availability_confidence: 0.71,
+        });
+    });
+
+    it('keeps hard config failures offline in public availability', () => {
+        const service = new CameraHealthService();
+        service.healthState.set(396, {
+            effectiveOnline: false,
+            state: 'unresolved',
+            confidence: 0.22,
+            lastReason: 'missing_external_source_metadata',
+            errorClass: 'config',
+        });
+
+        expect(service.getPublicAvailability({
+            id: 396,
+            status: 'active',
+            is_online: 1,
+        })).toEqual({
+            availability_state: 'offline',
+            availability_reason: 'missing_external_source_metadata',
+            availability_confidence: 0.22,
+        });
+    });
+
     it('keeps websocket external cameras online by default when no probe target exists', async () => {
         const service = new CameraHealthService();
         const result = await service.evaluateCameraStatus({

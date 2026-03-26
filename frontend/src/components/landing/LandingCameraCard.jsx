@@ -3,10 +3,13 @@ import { Icons } from '../ui/Icons';
 import CodecBadge from '../CodecBadge';
 import CameraThumbnail from '../CameraThumbnail';
 import { shouldDisableAnimations } from '../../utils/animationControl';
+import { getCameraAvailabilityState, isCameraHardOffline, isCameraDegraded } from '../../utils/cameraAvailability.js';
 
 const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMulti, isFavorite, onToggleFavorite }) {
     const isMaintenance = camera.status === 'maintenance';
-    const isOffline = camera.is_online === 0;
+    const availabilityState = getCameraAvailabilityState(camera);
+    const isOffline = isCameraHardOffline(camera);
+    const isDegraded = isCameraDegraded(camera);
     const isTunnel = camera.is_tunnel === 1;
     const disableAnimations = shouldDisableAnimations();
     const isFav = isFavorite?.(camera.id);
@@ -15,12 +18,16 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
         ? 'ring-red-500/50 hover:ring-red-500'
         : isOffline
             ? 'ring-gray-400/50 hover:ring-gray-500'
+            : isDegraded
+                ? 'ring-amber-400/50 hover:ring-amber-500'
             : 'ring-gray-200 dark:ring-gray-800 hover:ring-primary/50';
 
     const bgStyle = isMaintenance
         ? 'bg-red-100 dark:bg-red-900/30'
         : isOffline
             ? 'bg-gray-200 dark:bg-gray-700'
+            : isDegraded
+                ? 'bg-amber-50 dark:bg-amber-900/20'
             : 'bg-gray-100 dark:bg-gray-800';
 
     const transitionClass = disableAnimations ? '' : 'transition-all duration-200';
@@ -86,6 +93,11 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072" />
                             </svg>
                             OFFLINE
+                        </span>
+                    ) : isDegraded ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/90 text-white text-[10px] font-bold shadow-lg">
+                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
+                            TIDAK STABIL
                         </span>
                     ) : (
                         <>

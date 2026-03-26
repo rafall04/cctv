@@ -9,6 +9,7 @@ import {
 } from './securityAuditLogger.js';
 import { invalidateCache } from '../middleware/cacheMiddleware.js';
 import { sanitizeCameraThumbnail, sanitizeCameraThumbnailList } from './thumbnailPathService.js';
+import cameraHealthService from './cameraHealthService.js';
 import {
     DELIVERY_TYPES,
     DELIVERY_TYPE_PATTERNS,
@@ -449,7 +450,7 @@ class CameraService {
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 
              ORDER BY c.id ASC`
-        ));
+        )).map((camera) => cameraHealthService.enrichCameraAvailability(camera));
     }
 
     getActiveCameras() {
@@ -457,6 +458,7 @@ class CameraService {
             `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel, 
                     c.latitude, c.longitude, c.status, c.enable_recording, c.video_codec, c.stream_key, 
                     c.thumbnail_path, c.thumbnail_updated_at, c.stream_source, c.external_hls_url,
+                    c.is_online, c.last_online_check,
                     c.delivery_type, c.external_stream_url, c.external_embed_url, c.external_snapshot_url,
                     CASE
                         WHEN c.external_origin_mode IN ('direct', 'embed') THEN c.external_origin_mode
@@ -472,7 +474,7 @@ class CameraService {
              LEFT JOIN areas a ON c.area_id = a.id 
              WHERE c.enabled = 1 
              ORDER BY c.is_tunnel ASC, c.id ASC`
-        ));
+        )).map((camera) => cameraHealthService.enrichCameraAvailability(camera));
     }
 
     getCameraById(id) {
@@ -488,7 +490,7 @@ class CameraService {
             err.statusCode = 404;
             throw err;
         }
-        return sanitizeCameraThumbnail(camera);
+        return cameraHealthService.enrichCameraAvailability(sanitizeCameraThumbnail(camera));
     }
 
     async createCamera(data, request) {

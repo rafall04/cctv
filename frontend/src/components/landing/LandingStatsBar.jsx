@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useCameras } from '../../contexts/CameraContext';
+import { getCameraAvailabilityState } from '../../utils/cameraAvailability.js';
 import { Icons } from '../ui/Icons';
 import { shouldDisableAnimations } from '../../utils/animationControl';
 
@@ -143,8 +144,8 @@ export default function StatsBar({ onCameraClick }) {
     const disableAnimations = shouldDisableAnimations();
 
     const stats = useMemo(() => {
-        const onlineList = cameras.filter(c => c.status !== 'maintenance' && c.is_online !== 0);
-        const offlineList = cameras.filter(c => c.status !== 'maintenance' && c.is_online === 0);
+        const onlineList = cameras.filter(c => c.status !== 'maintenance' && getCameraAvailabilityState(c) !== 'offline');
+        const offlineList = cameras.filter(c => c.status !== 'maintenance' && getCameraAvailabilityState(c) === 'offline');
         const maintenanceList = cameras.filter(c => c.status === 'maintenance');
         return {
             online: onlineList.length,

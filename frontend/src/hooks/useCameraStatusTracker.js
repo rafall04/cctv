@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { getCameraAvailabilityState } from '../utils/cameraAvailability.js';
 
 // ============================================
 // CAMERA STATUS TRACKER HOOK - Tracks camera status changes
@@ -14,6 +15,7 @@ export function useCameraStatusTracker(cameras, addToast) {
             if (cameras.length > 0) {
                 prevCamerasRef.current = new Map(cameras.map(c => [c.id, {
                     is_online: c.is_online,
+                    availability_state: c.availability_state,
                     status: c.status,
                     name: c.name
                 }]));
@@ -31,13 +33,18 @@ export function useCameraStatusTracker(cameras, addToast) {
             const prev = prevMap.get(camera.id);
             if (!prev) return; // New camera, skip
 
-            const wasOnline = prev.is_online !== 0 && prev.status !== 'maintenance';
-            const isOnline = camera.is_online !== 0 && camera.status !== 'maintenance';
+            const wasState = prev.status === 'maintenance'
+                ? 'maintenance'
+                : (prev.availability_state || (prev.is_online !== 0 ? 'online' : 'offline'));
+            const isState = getCameraAvailabilityState(camera);
+            const wasOnline = wasState !== 'offline' && wasState !== 'maintenance';
+            const isOnline = isState !== 'offline' && isState !== 'maintenance';
             const wasMaintenance = prev.status === 'maintenance';
             const isMaintenance = camera.status === 'maintenance';
+            const becameHardOffline = wasState !== 'offline' && isState === 'offline';
 
             // Check for status changes
-            if (wasOnline && !isOnline && !isMaintenance) {
+            if (becameHardOffline && !isMaintenance) {
                 changes.wentOffline.push(camera.name);
             } else if (!wasOnline && isOnline && !wasMaintenance) {
                 changes.wentOnline.push(camera.name);
@@ -74,6 +81,7 @@ export function useCameraStatusTracker(cameras, addToast) {
         // Update previous state
         prevCamerasRef.current = new Map(cameras.map(c => [c.id, {
             is_online: c.is_online,
+            availability_state: c.availability_state,
             status: c.status,
             name: c.name
         }]));

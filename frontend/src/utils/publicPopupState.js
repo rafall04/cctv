@@ -1,3 +1,5 @@
+import { getCameraAvailabilityState } from './cameraAvailability.js';
+
 const LOADING_MESSAGES = {
     connecting: 'Menghubungkan...',
     loading: 'Memuat stream...',
@@ -65,7 +67,7 @@ export const getPublicPopupErrorType = ({ hlsError, streamSource }) => {
 
 export const getPublicPopupInitialStatus = (camera) => {
     if (camera?.status === 'maintenance') return 'maintenance';
-    if (camera?.is_online === 0) return 'offline';
+    if (getCameraAvailabilityState(camera) === 'offline') return 'offline';
     return 'connecting';
 };
 
@@ -101,6 +103,14 @@ export const getPublicPopupStatusDisplay = ({ status, loadingStage, isTunnel }) 
             label: 'OFFLINE',
             color: 'bg-gray-500/20 text-gray-400',
             dotColor: 'bg-gray-400',
+        };
+    }
+
+    if (status === 'degraded') {
+        return {
+            label: 'TIDAK STABIL',
+            color: 'bg-amber-500/20 text-amber-400',
+            dotColor: 'bg-amber-400',
         };
     }
 
@@ -148,6 +158,8 @@ export const getPublicPopupOverlayState = ({ status, loadingStage, errorType }) 
             canRetry: false,
         };
     }
+
+    if (status === 'degraded') return null;
 
     if (status === 'timeout') {
         return {

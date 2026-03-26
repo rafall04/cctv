@@ -65,6 +65,21 @@ const FAILURE_WEIGHTS = {
     'request_error':            0.3
 };
 
+const HARD_OFFLINE_REASONS = new Set([
+    'missing_external_source_metadata',
+    'missing_external_hls_url',
+    'missing_external_probe_target',
+    'invalid_rtsp_url',
+    'http_401',
+    'http_403',
+    'http_404',
+    'mjpeg_invalid_content_type',
+    'invalid_m3u8',
+    'master_has_no_variant',
+    'nested_master_without_media',
+    'media_playlist_has_no_segments',
+]);
+
 const BATCH_CONCURRENCY_PER_DOMAIN = 2;
 const BATCH_DELAY_MS = 1500;
 const TLS_VERIFICATION_ERROR_CODES = new Set([
@@ -1849,6 +1864,65 @@ class CameraHealthService {
                 needsConfirmation: state.needsConfirmation,
             };
         });
+    }
+
+    getPublicAvailability(camera) {
+        if (camera?.status === 'maintenance') {
+            return {
+                availability_state: 'maintenance',
+                availability_reason: 'maintenance',
+                availability_confidence: 1,
+            };
+        }
+
+        const state = this.healthState.get(camera.id) || this.ensureCameraState(camera.id, camera.is_online);
+        const lastReason = state.lastReason || null;
+        const errorClass = state.errorClass || resolveErrorClass(lastReason);
+
+        if (state.state === 'unresolved' || errorClass === 'config' || HARD_OFFLINE_REASONS.has(lastReason)) {
+            return {
+                availability_state: 'offline',
+                availability_reason: lastReason || 'missing_external_source_metadata',
+                availability_confidence: state.confidence ?? 0.2,
+            };
+        }
+
+        if (state.state === 'healthy') {
+            return {
+                availability_state: 'online',
+                availability_reason: lastReason || 'healthy',
+                availability_confidence: state.confidence ?? 0.98,
+            };
+        }
+
+        if (state.state === 'degraded' || state.state === 'suspect') {
+            return {
+                availability_state: 'degraded',
+                availability_reason: lastReason || state.state,
+                availability_confidence: state.confidence ?? 0.65,
+            };
+        }
+
+        if (state.effectiveOnline) {
+            return {
+                availability_state: 'degraded',
+                availability_reason: lastReason || 'runtime_recent_success',
+                availability_confidence: state.confidence ?? 0.65,
+            };
+        }
+
+        return {
+            availability_state: camera.is_online === 0 ? 'offline' : 'online',
+            availability_reason: lastReason || (camera.is_online === 0 ? 'db_offline' : 'db_online'),
+            availability_confidence: state.confidence ?? (camera.is_online === 0 ? 0.35 : 0.6),
+        };
+    }
+
+    enrichCameraAvailability(camera) {
+        return {
+            ...camera,
+            ...this.getPublicAvailability(camera),
+        };
     }
 
     async checkCamera(cameraId) {

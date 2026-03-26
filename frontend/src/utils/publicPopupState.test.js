@@ -12,6 +12,7 @@ describe('publicPopupState', () => {
     it('menghitung status awal dari kamera non-playable', () => {
         expect(getPublicPopupInitialStatus({ status: 'maintenance', is_online: 1 })).toBe('maintenance');
         expect(getPublicPopupInitialStatus({ status: 'active', is_online: 0 })).toBe('offline');
+        expect(getPublicPopupInitialStatus({ status: 'active', is_online: 0, availability_state: 'degraded' })).toBe('connecting');
         expect(getPublicPopupInitialStatus({ status: 'active', is_online: 1 })).toBe('connecting');
     });
 
@@ -62,5 +63,11 @@ describe('publicPopupState', () => {
             loadingStage: 'error',
             isTunnel: false,
         }).label).toBe('PERBAIKAN');
+
+        expect(getPublicPopupStatusDisplay({
+            status: 'degraded',
+            loadingStage: 'buffering',
+            isTunnel: false,
+        }).label).toBe('TIDAK STABIL');
     });
 });

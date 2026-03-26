@@ -29,6 +29,7 @@ import {
     isPublicPopupPlaybackLocked,
     shouldShowPublicPopupRetry,
 } from '../utils/publicPopupState.js';
+import { getCameraAvailabilityState, isCameraHardOffline } from '../utils/cameraAvailability.js';
 
 // Fix Leaflet icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -56,13 +57,15 @@ const LoadingStage = {
 const iconCache = new Map();
 
 // CCTV Marker - dengan support status (active, maintenance, tunnel, offline)
-const createCameraIcon = (status = 'active', isTunnel = false, isOnline = true) => {
+const createCameraIcon = (status = 'active', isTunnel = false, isOnline = true, availabilityState = 'online') => {
     // Status priority: maintenance > offline > tunnel > stable
     let cacheKey;
     if (status === 'maintenance') {
         cacheKey = 'maintenance';
     } else if (!isOnline) {
         cacheKey = 'offline';
+    } else if (availabilityState === 'degraded') {
+        cacheKey = 'degraded';
     } else if (isTunnel) {
         cacheKey = 'tunnel';
     } else {
@@ -80,6 +83,9 @@ const createCameraIcon = (status = 'active', isTunnel = false, isOnline = true) 
     } else if (!isOnline) {
         color = '#6b7280'; // abu-abu (offline)
         darkColor = '#4b5563';
+    } else if (availabilityState === 'degraded') {
+        color = '#f59e0b';
+        darkColor = '#d97706';
     } else if (isTunnel) {
         color = '#f97316'; // orange
         darkColor = '#ea580c';
@@ -186,7 +192,7 @@ const VideoModal = memo(({ camera, onClose }) => {
     const streamTimeoutRef = useRef(null);
     const { branding } = useBranding();
     const isMaintenance = camera.status === 'maintenance';
-    const isOffline = camera.is_online === 0;
+    const isOffline = isCameraHardOffline(camera);
     const isTunnel = camera.is_tunnel === 1 || camera.is_tunnel === true;
     const isNonPlayable = isMaintenance || isOffline;
 
@@ -1173,13 +1179,14 @@ const CameraMarker = memo(({ camera, onClick }) => {
     const lat = camera._displayLat ?? parseFloat(camera.latitude);
     const lng = camera._displayLng ?? parseFloat(camera.longitude);
     const isTunnel = camera.is_tunnel === 1 || camera.is_tunnel === true;
-    const isOnline = camera.is_online !== 0; // Default to online if undefined
+    const availabilityState = getCameraAvailabilityState(camera);
+    const isOnline = availabilityState !== 'offline';
     const status = camera.status || 'active';
 
     return (
         <Marker
             position={[lat, lng]}
-            icon={createCameraIcon(status, isTunnel, isOnline)}
+            icon={createCameraIcon(status, isTunnel, isOnline, availabilityState)}
             eventHandlers={{ click: () => onClick(camera) }}
         />
     );
@@ -1320,9 +1327,9 @@ const MapView = memo(({
 
     const stats = useMemo(() => {
         const maintenance = filtered.filter(c => c.status === 'maintenance').length;
-        const offline = filtered.filter(c => c.status !== 'maintenance' && c.is_online === 0).length;
-        const online = filtered.filter(c => c.status !== 'maintenance' && c.is_online !== 0 && !c.is_tunnel).length;
-        const tunnel = filtered.filter(c => c.status !== 'maintenance' && c.is_online !== 0 && (c.is_tunnel === 1 || c.is_tunnel === true)).length;
+        const offline = filtered.filter(c => c.status !== 'maintenance' && getCameraAvailabilityState(c) === 'offline').length;
+        const online = filtered.filter(c => c.status !== 'maintenance' && getCameraAvailabilityState(c) !== 'offline' && !c.is_tunnel).length;
+        const tunnel = filtered.filter(c => c.status !== 'maintenance' && getCameraAvailabilityState(c) !== 'offline' && (c.is_tunnel === 1 || c.is_tunnel === true)).length;
         return { online, tunnel, offline: offline + maintenance };
     }, [filtered]);
 

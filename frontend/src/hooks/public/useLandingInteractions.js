@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createCameraSlug, parseCameraIdFromSlug } from '../../utils/slugify';
 import { isMultiViewSupported } from '../../utils/cameraDelivery.js';
+import { isCameraPlayable } from '../../utils/cameraAvailability.js';
 
 export function useLandingInteractions({
     cameras,
@@ -28,7 +29,7 @@ export function useLandingInteractions({
         if (cameraIdFromUrl && cameras.length > 0) {
             const camera = cameras.find((item) => item.id === parseCameraIdFromSlug(cameraIdFromUrl));
             if (camera) {
-                const isAvailable = camera.status !== 'maintenance' && camera.is_online !== 0;
+                const isAvailable = isCameraPlayable(camera);
                 if (isAvailable) {
                     setPopup(camera);
                 }

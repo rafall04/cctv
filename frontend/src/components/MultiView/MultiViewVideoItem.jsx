@@ -14,6 +14,7 @@ import { takeSnapshot as takeSnapshotUtil } from '../../utils/snapshotHelper';
 import { useBranding } from '../../contexts/BrandingContext';
 import { useStreamTimeout } from '../../hooks/useStreamTimeout';
 import { resolveStreamUrl } from '../../utils/directStreamHelper';
+import { getCameraAvailabilityState, isCameraHardOffline } from '../../utils/cameraAvailability.js';
 
 // Now handles offline/maintenance cameras properly
 // **Validates: Requirements 1.1, 1.2, 1.3, 2.3, 4.1, 4.2, 4.3, 4.4, 6.1, 6.2, 6.3, 6.4, 7.1, 7.2, 7.3**
@@ -42,12 +43,14 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
 
     // Check camera status first - same as VideoPopup
     const isMaintenance = camera.status === 'maintenance';
-    const isOffline = camera.is_online === 0;
+    const availabilityState = getCameraAvailabilityState(camera);
+    const isOffline = isCameraHardOffline(camera);
 
     // Set initial status based on camera state
     const getInitialStatus = () => {
         if (isMaintenance) return 'maintenance';
         if (isOffline) return 'offline';
+        if (availabilityState === 'degraded') return 'degraded';
         return 'connecting';
     };
 
@@ -214,7 +217,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         let isLive = false; // Flag to prevent setState after live
 
         abortControllerRef.current = new AbortController();
-        setStatus('connecting');
+        setStatus(availabilityState === 'degraded' ? 'degraded' : 'connecting');
         setLoadingStage(LoadingStage.CONNECTING);
         let playbackCheckInterval = null;
 
@@ -464,7 +467,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 hlsRef.current = null;
             }
         };
-    }, [effectiveUrl, retryKey, initDelay, camera.id, onError, deviceTier, cleanupResources, isMaintenance, isOffline, forceProxyFallback]);
+    }, [availabilityState, effectiveUrl, retryKey, initDelay, camera.id, onError, deviceTier, cleanupResources, isMaintenance, isOffline, forceProxyFallback]);
 
     const handleRetry = useCallback(() => {
         cleanupResources();
@@ -556,6 +559,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         if (status === 'live') return { label: 'LIVE', color: 'bg-emerald-500' };
         if (status === 'maintenance') return { label: 'PERBAIKAN', color: 'bg-red-500' };
         if (status === 'offline') return { label: 'OFFLINE', color: 'bg-gray-500' };
+        if (status === 'degraded') return { label: 'TIDAK STABIL', color: 'bg-amber-500' };
         if (status === 'timeout') return { label: 'TIMEOUT', color: 'bg-amber-500' };
         if (status === 'error') return { label: 'OFF', color: 'bg-red-500' };
         // Connecting - show abbreviated stage

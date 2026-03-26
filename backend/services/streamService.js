@@ -2,6 +2,7 @@ import { query, queryOne } from '../database/connectionPool.js';
 import { config } from '../config/config.js';
 import jwt from 'jsonwebtoken';
 import { sanitizeCameraThumbnailList } from './thumbnailPathService.js';
+import cameraHealthService from './cameraHealthService.js';
 import {
     getEffectiveDeliveryType,
     getStreamCapabilities,
@@ -28,6 +29,7 @@ class StreamService {
             external_embed_url: camera.external_embed_url || null,
             external_snapshot_url: camera.external_snapshot_url || null,
             external_origin_mode: camera.external_origin_mode || 'direct',
+            ...cameraHealthService.getPublicAvailability(camera),
         };
     }
 
@@ -98,6 +100,9 @@ class StreamService {
                 rw: responseCamera.rw,
                 kelurahan: responseCamera.kelurahan,
                 kecamatan: responseCamera.kecamatan,
+                availability_state: responseCamera.availability_state,
+                availability_reason: responseCamera.availability_reason,
+                availability_confidence: responseCamera.availability_confidence,
                 external_use_proxy: responseCamera.external_use_proxy,
                 external_tls_mode: responseCamera.external_tls_mode,
                 delivery_type: responseCamera.delivery_type,
@@ -117,6 +122,9 @@ class StreamService {
             external_embed_url: responseCamera.external_embed_url,
             external_snapshot_url: responseCamera.external_snapshot_url,
             external_origin_mode: responseCamera.external_origin_mode,
+            availability_state: responseCamera.availability_state,
+            availability_reason: responseCamera.availability_reason,
+            availability_confidence: responseCamera.availability_confidence,
         };
     }
 
