@@ -36,6 +36,9 @@ const FAILURE_WEIGHTS = {
     'stream_ended':             1.0,
     'stale_program_date_time':  0.4,
     'stale_media_sequence':     0.5,
+    'snapshot_unreachable':     0.15,
+    'mjpeg_invalid_content_type': 0.4,
+    'probe_target_mismatch':    0.4,
     'ECONNABORTED':             0.2,  // Timeout
     'ETIMEDOUT':                0.2,
     'ENOTFOUND':                0.15,
@@ -181,14 +184,109 @@ function mapExternalFetchError(error) {
     return errorCode || 'request_error';
 }
 
+function withProbeDetails(baseDetails = {}, detailOverrides = {}) {
+    return {
+        ...baseDetails,
+        ...detailOverrides,
+    };
+}
+
+function resolveHealthProbeTarget(camera) {
+    const deliveryProfile = getCameraDeliveryProfile(camera);
+    const deliveryClassification = deliveryProfile.classification;
+    const primaryExternalStreamUrl = getPrimaryExternalStreamUrl(camera);
+
+    const base = {
+        deliveryClassification,
+        runtimeTarget: null,
+        probeTarget: null,
+        fallbackTargets: [],
+        healthStrategy: 'unsupported',
+        probeMethod: null,
+    };
+
+    if (deliveryClassification === 'internal_hls') {
+        return {
+            ...base,
+            healthStrategy: 'internal_hls',
+            probeMethod: 'internal_probe',
+        };
+    }
+
+    if (deliveryClassification === 'external_hls') {
+        return {
+            ...base,
+            runtimeTarget: primaryExternalStreamUrl,
+            probeTarget: primaryExternalStreamUrl,
+            healthStrategy: 'external_hls_playlist',
+            probeMethod: 'hls_playlist',
+        };
+    }
+
+    if (deliveryClassification === 'external_mjpeg') {
+        return {
+            ...base,
+            runtimeTarget: primaryExternalStreamUrl,
+            probeTarget: primaryExternalStreamUrl || camera.external_snapshot_url || null,
+            fallbackTargets: camera.external_snapshot_url ? [camera.external_snapshot_url] : [],
+            healthStrategy: primaryExternalStreamUrl ? 'external_mjpeg_stream_primary' : 'external_snapshot_fallback',
+            probeMethod: primaryExternalStreamUrl ? 'mjpeg_stream_get' : 'snapshot_probe',
+        };
+    }
+
+    if (deliveryClassification === 'external_embed') {
+        return {
+            ...base,
+            runtimeTarget: camera.external_embed_url || camera.external_snapshot_url || null,
+            probeTarget: camera.external_embed_url || camera.external_snapshot_url || null,
+            fallbackTargets: camera.external_embed_url && camera.external_snapshot_url
+                ? [camera.external_snapshot_url]
+                : [],
+            healthStrategy: camera.external_embed_url
+                ? 'external_embed_primary'
+                : (camera.external_snapshot_url ? 'external_snapshot_fallback' : 'passive_external'),
+            probeMethod: camera.external_embed_url
+                ? 'embed_probe'
+                : (camera.external_snapshot_url ? 'snapshot_probe' : 'passive_assumed_online'),
+        };
+    }
+
+    if (deliveryClassification === 'external_jsmpeg' || deliveryClassification === 'external_custom_ws') {
+        const runtimeTarget = camera.external_stream_url || camera.external_embed_url || null;
+        const probeTarget = camera.external_snapshot_url || camera.external_embed_url || null;
+        return {
+            ...base,
+            runtimeTarget,
+            probeTarget,
+            fallbackTargets: [],
+            healthStrategy: probeTarget ? 'external_snapshot_fallback' : 'passive_external',
+            probeMethod: probeTarget
+                ? (camera.external_snapshot_url ? 'snapshot_probe' : 'embed_probe')
+                : 'passive_assumed_online',
+        };
+    }
+
+    if (deliveryClassification === 'external_unresolved') {
+        return {
+            ...base,
+            healthStrategy: 'external_unresolved_metadata',
+            probeMethod: 'none',
+        };
+    }
+
+    return base;
+}
+
 async function batchProbe(cameras, probeFn) {
     const domainGroups = new Map();
     for (const camera of cameras) {
         let hostname = '_internal_';
         const deliveryType = getEffectiveDeliveryType(camera);
-        const primaryTarget = camera.external_snapshot_url
-            || camera.external_embed_url
-            || getPrimaryExternalStreamUrl(camera);
+        const probeResolution = resolveHealthProbeTarget(camera);
+        const primaryTarget = probeResolution.probeTarget
+            || probeResolution.runtimeTarget
+            || probeResolution.fallbackTargets[0]
+            || null;
 
         if (deliveryType !== 'internal_hls' && primaryTarget) {
             try { hostname = new URL(primaryTarget).hostname; } catch {}
@@ -295,35 +393,7 @@ class CameraHealthService {
     }
 
     getHealthStrategy(camera) {
-        const deliveryType = getCameraDeliveryProfile(camera).classification;
-
-        if (deliveryType === 'internal_hls') {
-            return 'internal_hls';
-        }
-
-        if (deliveryType === 'external_hls') {
-            return 'external_hls_playlist';
-        }
-
-        if (deliveryType === 'external_mjpeg') {
-            return camera.external_snapshot_url ? 'external_snapshot' : 'external_mjpeg_stream';
-        }
-
-        if (deliveryType === 'external_embed' || deliveryType === 'external_jsmpeg' || deliveryType === 'external_custom_ws') {
-            if (camera.external_snapshot_url) {
-                return 'external_snapshot';
-            }
-            if (camera.external_embed_url) {
-                return 'external_embed_probe';
-            }
-            return 'passive_external';
-        }
-
-        if (deliveryType === 'external_unresolved') {
-            return 'external_unresolved_metadata';
-        }
-
-        return 'unsupported';
+        return resolveHealthProbeTarget(camera).healthStrategy;
     }
 
     async handleCameraStatusTransition(camera, previousOnline, nextOnline, rawReason) {
@@ -393,7 +463,13 @@ class CameraHealthService {
 
     async probeHttpAvailability(url, requestOptions = {}, options = {}) {
         if (!url) {
-            return { online: false, reason: 'missing_external_probe_target' };
+            return {
+                online: false,
+                reason: 'missing_external_probe_target',
+                details: withProbeDetails(options.baseDetails, {
+                    probe_method: options.probeMethod || 'generic_head_get',
+                }),
+            };
         }
 
         const timeoutMs = options.timeoutMs || EXTERNAL_REQUEST_TIMEOUT_MS;
@@ -414,20 +490,35 @@ class CameraHealthService {
                     return {
                         online: false,
                         reason: `http_${headResponse.status}`,
-                        details: { method: 'HEAD', status: headResponse.status }
+                        details: withProbeDetails(options.baseDetails, {
+                            probe_method: 'HEAD',
+                            http_status: headResponse.status,
+                            content_type: headResponse.headers?.['content-type'] || null,
+                        })
                     };
                 }
             } else {
                 return {
                     online: true,
                     reason: options.successReason || 'http_reachable',
-                    details: { method: 'HEAD', status: headResponse.status }
+                    details: withProbeDetails(options.baseDetails, {
+                        probe_method: 'HEAD',
+                        http_status: headResponse.status,
+                        content_type: headResponse.headers?.['content-type'] || null,
+                    })
                 };
             }
         } catch (error) {
             const mappedReason = mapExternalFetchError(error);
             if (mappedReason !== 'request_error') {
-                return { online: false, reason: mappedReason };
+                return {
+                    online: false,
+                    reason: mappedReason,
+                    details: withProbeDetails(options.baseDetails, {
+                        probe_method: 'HEAD',
+                        http_status: error.response?.status || null,
+                    }),
+                };
             }
         }
 
@@ -444,7 +535,11 @@ class CameraHealthService {
                 return {
                     online: false,
                     reason: `http_${response.status}`,
-                    details: { method: 'GET', status: response.status }
+                    details: withProbeDetails(options.baseDetails, {
+                        probe_method: 'GET',
+                        http_status: response.status,
+                        content_type: response.headers?.['content-type'] || null,
+                    })
                 };
             }
 
@@ -455,13 +550,132 @@ class CameraHealthService {
             return {
                 online: true,
                 reason: options.successReason || 'http_reachable',
-                details: { method: 'GET', status: response.status }
+                details: withProbeDetails(options.baseDetails, {
+                    probe_method: 'GET',
+                    http_status: response.status,
+                    content_type: response.headers?.['content-type'] || null,
+                })
             };
         } catch (error) {
             return {
                 online: false,
                 reason: mapExternalFetchError(error),
-                details: { method: 'GET', status: error.response?.status || null }
+                details: withProbeDetails(options.baseDetails, {
+                    probe_method: 'GET',
+                    http_status: error.response?.status || null,
+                    content_type: error.response?.headers?.['content-type'] || null,
+                })
+            };
+        }
+    }
+
+    async probeSnapshotUrl(url, requestOptions = {}, options = {}) {
+        const result = await this.probeHttpAvailability(url, requestOptions, {
+            ...options,
+            acceptHeader: 'image/*,*/*;q=0.8',
+            successReason: options.successReason || 'snapshot_reachable',
+            probeMethod: 'snapshot_probe',
+        });
+
+        if (!result.online && result.reason?.startsWith('http_')) {
+            return {
+                ...result,
+                reason: 'snapshot_unreachable',
+            };
+        }
+
+        return result;
+    }
+
+    async probeEmbedUrl(url, requestOptions = {}, options = {}) {
+        return this.probeHttpAvailability(url, requestOptions, {
+            ...options,
+            acceptHeader: 'text/html,*/*;q=0.8',
+            successReason: options.successReason || 'embed_reachable',
+            probeMethod: 'embed_probe',
+        });
+    }
+
+    async probeMjpegStream(url, requestOptions = {}, options = {}) {
+        if (!url) {
+            return {
+                online: false,
+                reason: 'missing_external_probe_target',
+                details: withProbeDetails(options.baseDetails, {
+                    probe_method: 'mjpeg_stream_get',
+                }),
+            };
+        }
+
+        const timeoutMs = options.timeoutMs || EXTERNAL_REQUEST_TIMEOUT_MS;
+        const isHttpsRequest = typeof url === 'string' && url.startsWith('https://');
+        const requestConfig = {
+            timeout: timeoutMs,
+            validateStatus: (status) => status < 500,
+            headers: buildExternalRequestHeaders('image/*,*/*;q=0.8'),
+            maxRedirects: options.maxRedirects ?? 5,
+            httpsAgent: isHttpsRequest ? requestOptions.httpsAgent : undefined,
+            responseType: 'stream',
+        };
+
+        try {
+            const response = await axios.get(url, requestConfig);
+            const contentType = response.headers?.['content-type'] || null;
+            const normalizedContentType = String(contentType || '').toLowerCase();
+
+            if (response.status >= 400) {
+                if (response.data?.destroy) {
+                    response.data.destroy();
+                }
+                return {
+                    online: false,
+                    reason: `http_${response.status}`,
+                    details: withProbeDetails(options.baseDetails, {
+                        probe_method: 'GET',
+                        http_status: response.status,
+                        content_type: contentType,
+                    }),
+                };
+            }
+
+            const looksLikeMjpeg = normalizedContentType.includes('multipart/x-mixed-replace')
+                || normalizedContentType.includes('image/jpeg')
+                || normalizedContentType.includes('multipart/');
+
+            if (response.data?.destroy) {
+                response.data.destroy();
+            }
+
+            if (looksLikeMjpeg || response.data?.readable !== false) {
+                return {
+                    online: true,
+                    reason: 'mjpeg_stream_opened',
+                    details: withProbeDetails(options.baseDetails, {
+                        probe_method: 'GET',
+                        http_status: response.status,
+                        content_type: contentType,
+                    }),
+                };
+            }
+
+            return {
+                online: false,
+                reason: 'mjpeg_invalid_content_type',
+                details: withProbeDetails(options.baseDetails, {
+                    probe_method: 'GET',
+                    http_status: response.status,
+                    content_type: contentType,
+                }),
+            };
+        } catch (error) {
+            return {
+                online: false,
+                reason: mapExternalFetchError(error),
+                details: withProbeDetails(options.baseDetails, {
+                    probe_method: 'GET',
+                    http_status: error.response?.status || null,
+                    content_type: error.response?.headers?.['content-type'] || null,
+                }),
             };
         }
     }
@@ -649,49 +863,138 @@ class CameraHealthService {
     }
 
     async evaluateCameraRaw(camera, activePaths, options = {}) {
-        const deliveryType = getCameraDeliveryProfile(camera).classification;
+        const probeResolution = resolveHealthProbeTarget(camera);
+        const deliveryType = probeResolution.deliveryClassification;
+        const baseDetails = {
+            delivery_classification: probeResolution.deliveryClassification,
+            runtimeTarget: probeResolution.runtimeTarget,
+            probeTarget: probeResolution.probeTarget,
+            fallbackTarget: probeResolution.fallbackTargets[0] || null,
+            probe_method: probeResolution.probeMethod,
+            usedFallback: false,
+        };
+
         if (deliveryType === 'external_hls') {
-            let hlsUrl = getPrimaryExternalStreamUrl(camera);
+            let hlsUrl = probeResolution.probeTarget;
             if (options.bustCache && hlsUrl) {
                 const sep = hlsUrl.includes('?') ? '&' : '?';
                 hlsUrl = `${hlsUrl}${sep}_t=${Date.now()}`;
             }
-            return this.probeExternalStream(
+            const result = await this.probeExternalStream(
                 camera.id,
                 hlsUrl,
                 this.getExternalRequestOptions(camera),
                 options.timeoutMs
             );
+            return {
+                ...result,
+                details: withProbeDetails(baseDetails, result.details),
+            };
         }
 
         if (deliveryType === 'external_mjpeg') {
-            return this.probeHttpAvailability(
-                camera.external_snapshot_url || getPrimaryExternalStreamUrl(camera),
-                this.getExternalRequestOptions(camera),
-                {
+            const requestOptions = this.getExternalRequestOptions(camera);
+            const primaryTarget = probeResolution.probeTarget;
+            const fallbackTarget = probeResolution.fallbackTargets[0] || null;
+
+            if (primaryTarget) {
+                const streamResult = await this.probeMjpegStream(primaryTarget, requestOptions, {
                     timeoutMs: options.timeoutMs,
-                    acceptHeader: 'image/*,*/*;q=0.8',
-                    successReason: camera.external_snapshot_url ? 'snapshot_reachable' : 'mjpeg_reachable',
+                    baseDetails,
+                });
+
+                if (streamResult.online || !fallbackTarget) {
+                    return streamResult;
                 }
-            );
+
+                const snapshotResult = await this.probeSnapshotUrl(fallbackTarget, requestOptions, {
+                    timeoutMs: options.timeoutMs,
+                    baseDetails: {
+                        ...baseDetails,
+                        usedFallback: true,
+                    },
+                });
+
+                if (snapshotResult.online) {
+                    return {
+                        online: true,
+                        reason: 'probe_target_mismatch',
+                        details: withProbeDetails(snapshotResult.details, {
+                            streamProbeReason: streamResult.reason,
+                            usedFallback: true,
+                        }),
+                    };
+                }
+
+                return streamResult;
+            }
+
+            return this.probeSnapshotUrl(fallbackTarget, requestOptions, {
+                timeoutMs: options.timeoutMs,
+                baseDetails,
+            });
         }
 
         if (deliveryType === 'external_embed' || deliveryType === 'external_jsmpeg' || deliveryType === 'external_custom_ws') {
-            const probeTarget = camera.external_snapshot_url || camera.external_embed_url;
+            const probeTarget = probeResolution.probeTarget;
             if (!probeTarget) {
                 return {
                     online: camera.enabled === 1,
                     reason: 'assumed_online_no_probe_target',
+                    details: withProbeDetails(baseDetails, {
+                        probe_method: 'passive_assumed_online',
+                    }),
                 };
             }
 
-            return this.probeHttpAvailability(
+            if (deliveryType === 'external_embed' && camera.external_embed_url) {
+                const embedResult = await this.probeEmbedUrl(probeTarget, this.getExternalRequestOptions(camera), {
+                    timeoutMs: options.timeoutMs,
+                    baseDetails,
+                });
+                if (embedResult.online || !camera.external_snapshot_url) {
+                    return embedResult;
+                }
+
+                const snapshotResult = await this.probeSnapshotUrl(camera.external_snapshot_url, this.getExternalRequestOptions(camera), {
+                    timeoutMs: options.timeoutMs,
+                    baseDetails: {
+                        ...baseDetails,
+                        usedFallback: true,
+                    },
+                });
+
+                if (snapshotResult.online) {
+                    return {
+                        online: true,
+                        reason: 'probe_target_mismatch',
+                        details: withProbeDetails(snapshotResult.details, {
+                            embedProbeReason: embedResult.reason,
+                            usedFallback: true,
+                        }),
+                    };
+                }
+
+                return embedResult;
+            }
+
+            if (camera.external_snapshot_url) {
+                return this.probeSnapshotUrl(
+                    probeTarget,
+                    this.getExternalRequestOptions(camera),
+                    {
+                        timeoutMs: options.timeoutMs,
+                        baseDetails,
+                    }
+                );
+            }
+
+            return this.probeEmbedUrl(
                 probeTarget,
                 this.getExternalRequestOptions(camera),
                 {
                     timeoutMs: options.timeoutMs,
-                    acceptHeader: camera.external_snapshot_url ? 'image/*,*/*;q=0.8' : 'text/html,*/*;q=0.8',
-                    successReason: camera.external_snapshot_url ? 'snapshot_reachable' : 'embed_reachable',
+                    baseDetails,
                 }
             );
         }
@@ -700,7 +1003,7 @@ class CameraHealthService {
             return {
                 online: false,
                 reason: 'missing_external_source_metadata',
-                details: {
+                details: withProbeDetails(baseDetails, {
                     stream_source: camera.stream_source || null,
                     delivery_type: camera.delivery_type || null,
                     has_private_rtsp: Boolean(camera.private_rtsp_url),
@@ -708,12 +1011,20 @@ class CameraHealthService {
                     has_external_stream_url: Boolean(camera.external_stream_url),
                     has_external_embed_url: Boolean(camera.external_embed_url),
                     has_external_snapshot_url: Boolean(camera.external_snapshot_url),
-                },
+                }),
             };
         }
 
         if (deliveryType !== 'internal_hls') {
-            return { online: camera.enabled === 1, reason: 'assumed_online_unknown_delivery' };
+            return {
+                online: camera.enabled === 1,
+                reason: 'assumed_online_unknown_delivery',
+                details: withProbeDetails(baseDetails),
+            };
+        }
+
+        if (baseDetails.probe_method === 'internal_probe') {
+            baseDetails.runtimeTarget = camera.private_rtsp_url || null;
         }
 
         const pathName = camera.stream_key || `camera${camera.id}`;
@@ -726,18 +1037,38 @@ class CameraHealthService {
                 const port = parseInt(parsedUrl.port, 10) || 554;
                 const tcpOnline = await checkTcpPort(host, port);
                 if (tcpOnline) {
-                    return { online: true, reason: 'rtsp_tcp_online' };
+                    return {
+                        online: true,
+                        reason: 'rtsp_tcp_online',
+                        details: withProbeDetails(baseDetails, {
+                            probeTarget: camera.private_rtsp_url,
+                        }),
+                    };
                 }
             } catch {
-                return { online: false, reason: 'invalid_rtsp_url' };
+                return {
+                    online: false,
+                    reason: 'invalid_rtsp_url',
+                    details: withProbeDetails(baseDetails, {
+                        probeTarget: camera.private_rtsp_url,
+                    }),
+                };
             }
         }
 
         if (pathInfo && (pathInfo.ready || pathInfo.sourceReady || pathInfo.readers > 0)) {
-            return { online: true, reason: 'mediamtx_path_ready' };
+            return {
+                online: true,
+                reason: 'mediamtx_path_ready',
+                details: withProbeDetails(baseDetails),
+            };
         }
 
-        return { online: false, reason: 'internal_stream_unreachable' };
+        return {
+            online: false,
+            reason: 'internal_stream_unreachable',
+            details: withProbeDetails(baseDetails),
+        };
     }
 
     applyWeightedScoring(camera, rawResult) {
@@ -982,6 +1313,13 @@ class CameraHealthService {
                 effectiveOnline: state.effectiveOnline,
                 lastReason: state.lastReason,
                 lastDetails: state.lastDetails,
+                runtimeTarget: state.lastDetails?.runtimeTarget || null,
+                probeTarget: state.lastDetails?.probeTarget || null,
+                probeMethod: state.lastDetails?.probe_method || null,
+                fallbackTarget: state.lastDetails?.fallbackTarget || null,
+                usedFallback: state.lastDetails?.usedFallback || false,
+                httpStatus: state.lastDetails?.http_status ?? null,
+                contentType: state.lastDetails?.content_type || null,
                 failureScore: state.failureScore,
                 needsConfirmation: state.needsConfirmation,
             };

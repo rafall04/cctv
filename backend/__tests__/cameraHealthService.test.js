@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import axios from 'axios';
+import { PassThrough } from 'stream';
 
 const {
     handleCameraBecameOnlineMock,
@@ -38,6 +39,12 @@ vi.mock('axios', () => ({
         head: vi.fn()
     }
 }));
+
+function createReadableStream() {
+    const stream = new PassThrough();
+    stream.end('frame');
+    return stream;
+}
 
 describe('cameraHealthService.parsePlaylist', () => {
     it('parses master playlist and detects variants', () => {
@@ -322,38 +329,94 @@ describe('cameraHealthService external TLS policy', () => {
         expect(result.reason).toBe('tls_verification_failed');
     });
 
-    it('recovers external MJPEG cameras from offline when snapshot target is reachable', async () => {
-        axios.head.mockResolvedValueOnce({ status: 200 });
+    it('recovers external MJPEG cameras from offline when the live stream opens even if snapshot is broken', async () => {
+        axios.get.mockResolvedValueOnce({
+            status: 200,
+            headers: { 'content-type': 'multipart/x-mixed-replace; boundary=frame' },
+            data: createReadableStream(),
+        });
 
         const service = new CameraHealthService();
         const result = await service.evaluateCameraStatus({
             id: 14,
-            name: 'Snapshot Cam',
+            name: 'Jombang MJPEG',
             enabled: 1,
             is_online: 0,
             delivery_type: 'external_mjpeg',
+            stream_source: 'external',
             external_snapshot_url: 'https://example.com/snapshot.jpg',
             external_stream_url: 'https://example.com/mjpeg',
         }, new Map());
 
         expect(result.isOnline).toBe(1);
-        expect(result.rawReason).toBe('snapshot_reachable');
+        expect(result.rawReason).toBe('mjpeg_stream_opened');
     });
 
-    it('treats embed cameras with embed url as embed health checks instead of missing HLS', async () => {
-        axios.head.mockResolvedValueOnce({ status: 200 });
+    it('treats embed cameras with embed url as embed health checks instead of snapshot-first', async () => {
+        axios.head.mockResolvedValueOnce({ status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } });
 
         const service = new CameraHealthService();
         const result = await service.evaluateCameraRaw({
             id: 15,
             enabled: 1,
             is_online: 1,
-            stream_source: 'internal',
+            stream_source: 'external',
+            delivery_type: 'external_embed',
             external_embed_url: 'https://example.com/embed-page',
+            external_snapshot_url: 'https://example.com/embed-snapshot.jpg',
         }, new Map());
 
         expect(result.online).toBe(true);
         expect(result.reason).toBe('embed_reachable');
+        expect(result.details.probeTarget).toBe('https://example.com/embed-page');
+        expect(result.details.runtimeTarget).toBe('https://example.com/embed-page');
+    });
+
+    it('marks MJPEG cameras online when HEAD fails but GET stream succeeds', async () => {
+        axios.get.mockResolvedValueOnce({
+            status: 200,
+            headers: { 'content-type': 'image/jpeg' },
+            data: createReadableStream(),
+        });
+
+        const service = new CameraHealthService();
+        const result = await service.evaluateCameraRaw({
+            id: 18,
+            enabled: 1,
+            is_online: 0,
+            stream_source: 'external',
+            delivery_type: 'external_mjpeg',
+            external_stream_url: 'https://example.com/live.mjpg',
+        }, new Map());
+
+        expect(result.online).toBe(true);
+        expect(result.reason).toBe('mjpeg_stream_opened');
+        expect(result.details.probeTarget).toBe('https://example.com/live.mjpg');
+    });
+
+    it('surfaces probe target mismatch when snapshot fallback works but MJPEG stream probe fails', async () => {
+        axios.get
+            .mockRejectedValueOnce({ code: 'ECONNABORTED' })
+            .mockResolvedValueOnce({
+                status: 200,
+                headers: { 'content-type': 'image/jpeg' },
+                data: createReadableStream(),
+            });
+
+        const service = new CameraHealthService();
+        const result = await service.evaluateCameraRaw({
+            id: 19,
+            enabled: 1,
+            is_online: 1,
+            stream_source: 'external',
+            delivery_type: 'external_mjpeg',
+            external_stream_url: 'https://example.com/live.mjpg',
+            external_snapshot_url: 'https://example.com/fallback.jpg',
+        }, new Map());
+
+        expect(result.online).toBe(true);
+        expect(result.reason).toBe('probe_target_mismatch');
+        expect(result.details.usedFallback).toBe(true);
     });
 
     it('keeps websocket external cameras online by default when no probe target exists', async () => {

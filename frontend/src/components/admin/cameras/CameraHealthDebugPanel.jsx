@@ -6,6 +6,19 @@ function formatReason(reason) {
     return reason.replace(/_/g, ' ');
 }
 
+function renderTarget(label, value) {
+    if (!value) {
+        return null;
+    }
+
+    return (
+        <div>
+            <span className="font-medium text-gray-500 dark:text-gray-400">{label}:</span>{' '}
+            <span className="break-all">{value}</span>
+        </div>
+    );
+}
+
 export default function CameraHealthDebugPanel({ items, loading = false, error = null }) {
     if (loading) {
         return (
@@ -77,6 +90,35 @@ export default function CameraHealthDebugPanel({ items, loading = false, error =
                                 </td>
                                 <td className="px-3 py-3 text-xs">
                                     <div>{formatReason(item.lastReason)}</div>
+                                    <div className="mt-1 space-y-1 text-[11px] text-gray-400 dark:text-gray-500">
+                                        {renderTarget('Runtime', item.runtimeTarget)}
+                                        {renderTarget('Probe', item.probeTarget)}
+                                        {renderTarget('Fallback', item.fallbackTarget)}
+                                        {item.probeMethod ? (
+                                            <div>
+                                                <span className="font-medium text-gray-500 dark:text-gray-400">Method:</span>{' '}
+                                                {item.probeMethod}
+                                            </div>
+                                        ) : null}
+                                        {item.httpStatus !== null && item.httpStatus !== undefined ? (
+                                            <div>
+                                                <span className="font-medium text-gray-500 dark:text-gray-400">HTTP:</span>{' '}
+                                                {item.httpStatus}
+                                            </div>
+                                        ) : null}
+                                        {item.contentType ? (
+                                            <div>
+                                                <span className="font-medium text-gray-500 dark:text-gray-400">Type:</span>{' '}
+                                                {item.contentType}
+                                            </div>
+                                        ) : null}
+                                        {item.usedFallback ? (
+                                            <div>
+                                                <span className="font-medium text-gray-500 dark:text-gray-400">Fallback:</span>{' '}
+                                                yes
+                                            </div>
+                                        ) : null}
+                                    </div>
                                     {item.lastDetails ? (
                                         <div className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
                                             {JSON.stringify(item.lastDetails)}
