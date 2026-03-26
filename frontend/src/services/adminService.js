@@ -63,10 +63,18 @@ export const adminService = {
         }
     },
 
-    async getCameraHealthDebug(policy = REQUEST_POLICY.BLOCKING, config = {}) {
+    async getCameraHealthDebug(params = {}, policy = REQUEST_POLICY.BLOCKING, config = {}) {
         try {
+            const searchParams = new URLSearchParams();
+            Object.entries(params || {}).forEach(([key, value]) => {
+                if (value !== undefined && value !== null && value !== '') {
+                    searchParams.set(key, String(value));
+                }
+            });
+
+            const queryString = searchParams.toString();
             const response = await apiClient.get(
-                '/api/admin/debug/camera-health',
+                `/api/admin/debug/camera-health${queryString ? `?${queryString}` : ''}`,
                 getRequestPolicyConfig(policy, config)
             );
             return response.data;

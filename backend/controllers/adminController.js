@@ -208,7 +208,7 @@ export async function getCameraHealthDebug(request, reply) {
     try {
         return reply.send({
             success: true,
-            data: cameraHealthService.getHealthDebugSnapshot(),
+            data: cameraHealthService.getHealthDebugPage(request.query || {}),
         });
     } catch (error) {
         console.error('Get camera health debug error:', error);

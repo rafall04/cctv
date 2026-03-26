@@ -599,3 +599,66 @@ describe('cameraHealthService status transitions', () => {
         expect(refreshCameraThumbnailMock).toHaveBeenCalledWith(43);
     });
 });
+
+describe('cameraHealthService health debug pagination', () => {
+    it('filters problem cameras and paginates results for the debug page', () => {
+        const service = new CameraHealthService();
+        service.getHealthDebugSnapshot = vi.fn(() => ([
+            {
+                cameraId: 1,
+                cameraName: 'Healthy Camera',
+                state: 'healthy',
+                confidence: 0.95,
+                errorClass: null,
+                delivery_type: 'internal_hls',
+                availability_state: 'online',
+            },
+            {
+                cameraId: 2,
+                cameraName: 'TLS MJPEG',
+                state: 'degraded',
+                confidence: 0.45,
+                errorClass: 'tls',
+                delivery_type: 'external_mjpeg',
+                availability_state: 'degraded',
+                lastReason: 'runtime_probe_tls_mismatch',
+                providerDomain: 'cctv.jombangkab.go.id',
+            },
+            {
+                cameraId: 3,
+                cameraName: 'Offline HLS',
+                state: 'offline',
+                confidence: 0.2,
+                errorClass: 'network_transient',
+                delivery_type: 'external_hls',
+                availability_state: 'offline',
+                lastReason: 'timeout',
+                providerDomain: 'data.bojonegorokab.go.id',
+            },
+        ]));
+
+        const result = service.getHealthDebugPage({
+            state: 'problem',
+            search: 'kab',
+            page: 1,
+            limit: 1,
+            sort: 'severity',
+        });
+
+        expect(result.summary).toMatchObject({
+            total: 3,
+            healthy: 1,
+            degraded: 1,
+            offline: 1,
+        });
+        expect(result.items).toHaveLength(1);
+        expect(result.items[0].cameraId).toBe(3);
+        expect(result.pagination).toMatchObject({
+            page: 1,
+            limit: 1,
+            totalItems: 2,
+            totalPages: 2,
+            hasNextPage: true,
+        });
+    });
+});

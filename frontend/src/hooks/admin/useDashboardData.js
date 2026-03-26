@@ -14,6 +14,7 @@ export function useDashboardData() {
     const intervalRef = useRef(null);
     const statsRef = useRef(null);
     const requestIdRef = useRef(0);
+    const mountedRef = useRef(true);
 
     useEffect(() => {
         statsRef.current = stats;
@@ -32,7 +33,7 @@ export function useDashboardData() {
                 isBackgroundMode ? REQUEST_POLICY.BACKGROUND : REQUEST_POLICY.BLOCKING
             );
 
-            if (requestId !== requestIdRef.current) {
+            if (!mountedRef.current || requestId !== requestIdRef.current) {
                 return;
             }
 
@@ -47,7 +48,7 @@ export function useDashboardData() {
                 setError(response.message || 'Failed to load dashboard data');
             }
         } catch (err) {
-            if (requestId !== requestIdRef.current) {
+            if (!mountedRef.current || requestId !== requestIdRef.current) {
                 return;
             }
 
@@ -57,7 +58,7 @@ export function useDashboardData() {
                 setError('Failed to connect to server. Please check your connection.');
             }
         } finally {
-            if (requestId === requestIdRef.current) {
+            if (mountedRef.current && requestId === requestIdRef.current) {
                 setLoading(false);
                 setIsRetrying(false);
             }
@@ -65,10 +66,12 @@ export function useDashboardData() {
     }, []);
 
     useEffect(() => {
+        mountedRef.current = true;
         loadStats({ mode: 'initial' });
         intervalRef.current = setInterval(() => loadStats({ mode: 'background' }), 10000);
 
         return () => {
+            mountedRef.current = false;
             if (intervalRef.current) {
                 clearInterval(intervalRef.current);
             }

@@ -16,6 +16,7 @@ const AdminLayout = lazy(() => import('./layouts/AdminLayout'));
 const CameraManagement = lazy(() => import('./pages/CameraManagement'));
 const ImportExport = lazy(() => import('./pages/admin/ImportExport'));
 const BackupRestore = lazy(() => import('./pages/admin/BackupRestore'));
+const HealthDebug = lazy(() => import('./pages/admin/HealthDebug'));
 const AreaManagement = lazy(() => import('./pages/AreaManagement'));
 const UserManagement = lazy(() => import('./pages/UserManagement'));
 const FeedbackManagement = lazy(() => import('./pages/FeedbackManagement'));
@@ -25,6 +26,20 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const SponsorManagement = lazy(() => import('./pages/SponsorManagement'));
 const RecordingDashboard = lazy(() => import('./pages/RecordingDashboard'));
 const Playback = lazy(() => import('./pages/Playback'));
+
+function AdminPageRoute({ children }) {
+    return (
+        <ProtectedRoute>
+            <AdminLayout>
+                <ErrorBoundary>
+                    <Suspense fallback={<div className="p-6">Loading...</div>}>
+                        {children}
+                    </Suspense>
+                </ErrorBoundary>
+            </AdminLayout>
+        </ProtectedRoute>
+    );
+}
 
 function App() {
     return (
@@ -50,133 +65,97 @@ function App() {
                 <Route
                     path="/admin/dashboard"
                     element={
-                        <ProtectedRoute>
-                            <AdminLayout>
-                                <Suspense fallback={<div className="p-6">Loading...</div>}>
-                                    <Dashboard />
-                                </Suspense>
-                            </AdminLayout>
-                        </ProtectedRoute>
+                        <AdminPageRoute>
+                            <Dashboard />
+                        </AdminPageRoute>
                     }
                 />
                 <Route
                     path="/admin/cameras"
                     element={
-                        <ProtectedRoute>
-                            <AdminLayout>
-                                <Suspense fallback={<div className="p-6">Loading...</div>}>
-                                    <CameraManagement />
-                                </Suspense>
-                            </AdminLayout>
-                        </ProtectedRoute>
+                        <AdminPageRoute>
+                            <CameraManagement />
+                        </AdminPageRoute>
+                    }
+                />
+                <Route
+                    path="/admin/health-debug"
+                    element={
+                        <AdminPageRoute>
+                            <HealthDebug />
+                        </AdminPageRoute>
                     }
                 />
                 <Route
                     path="/admin/import-export"
                     element={
-                        <ProtectedRoute>
-                            <AdminLayout>
-                                <Suspense fallback={<div className="p-6">Loading...</div>}>
-                                    <ImportExport />
-                                </Suspense>
-                            </AdminLayout>
-                        </ProtectedRoute>
+                        <AdminPageRoute>
+                            <ImportExport />
+                        </AdminPageRoute>
                     }
                 />
                 <Route
                     path="/admin/backup-restore"
                     element={
-                        <ProtectedRoute>
-                            <AdminLayout>
-                                <Suspense fallback={<div className="p-6">Loading...</div>}>
-                                    <BackupRestore />
-                                </Suspense>
-                            </AdminLayout>
-                        </ProtectedRoute>
+                        <AdminPageRoute>
+                            <BackupRestore />
+                        </AdminPageRoute>
                     }
                 />
                 <Route
                     path="/admin/areas"
                     element={
-                        <ProtectedRoute>
-                            <AdminLayout>
-                                <Suspense fallback={<div className="p-6">Loading...</div>}>
-                                    <AreaManagement />
-                                </Suspense>
-                            </AdminLayout>
-                        </ProtectedRoute>
+                        <AdminPageRoute>
+                            <AreaManagement />
+                        </AdminPageRoute>
                     }
                 />
                 <Route
                     path="/admin/users"
                     element={
-                        <ProtectedRoute>
-                            <AdminLayout>
-                                <Suspense fallback={<div className="p-6">Loading...</div>}>
-                                    <UserManagement />
-                                </Suspense>
-                            </AdminLayout>
-                        </ProtectedRoute>
+                        <AdminPageRoute>
+                            <UserManagement />
+                        </AdminPageRoute>
                     }
                 />
                 <Route
                     path="/admin/feedback"
                     element={
-                        <ProtectedRoute>
-                            <AdminLayout>
-                                <Suspense fallback={<div className="p-6">Loading...</div>}>
-                                    <FeedbackManagement />
-                                </Suspense>
-                            </AdminLayout>
-                        </ProtectedRoute>
+                        <AdminPageRoute>
+                            <FeedbackManagement />
+                        </AdminPageRoute>
                     }
                 />
                 <Route
                     path="/admin/analytics"
                     element={
-                        <ProtectedRoute>
-                            <AdminLayout>
-                                <Suspense fallback={<div className="p-6">Loading...</div>}>
-                                    <ViewerAnalytics />
-                                </Suspense>
-                            </AdminLayout>
-                        </ProtectedRoute>
+                        <AdminPageRoute>
+                            <ViewerAnalytics />
+                        </AdminPageRoute>
                     }
                 />
                 <Route
                     path="/admin/settings"
                     element={
-                        <ProtectedRoute>
-                            <AdminLayout>
-                                <Suspense fallback={<div className="p-6">Loading...</div>}>
-                                    <UnifiedSettings />
-                                </Suspense>
-                            </AdminLayout>
-                        </ProtectedRoute>
+                        <AdminPageRoute>
+                            <UnifiedSettings />
+                        </AdminPageRoute>
                     }
                 />
                 <Route
                     path="/admin/sponsors"
                     element={
-                        <ProtectedRoute>
-                            <AdminLayout>
-                                <Suspense fallback={<div className="p-6">Loading...</div>}>
-                                    <SponsorManagement />
-                                </Suspense>
-                            </AdminLayout>
-                        </ProtectedRoute>
+                        <AdminPageRoute>
+                            <SponsorManagement />
+                        </AdminPageRoute>
                     }
                 />
                 <Route
                     path="/admin/recordings"
                     element={
-                        <ProtectedRoute>
-                            <AdminLayout>
-                                <Suspense fallback={<div className="p-6">Loading...</div>}>
-                                    <RecordingDashboard />
-                                </Suspense>
-                            </AdminLayout>
-                        </ProtectedRoute>
+                        <AdminPageRoute>
+                            <RecordingDashboard />
+                        </AdminPageRoute>
                     }
                 />
 

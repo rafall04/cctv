@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cameraService } from '../../services/cameraService';
 import { areaService } from '../../services/areaService';
-import { adminService } from '../../services/adminService';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useFormValidation } from '../useFormValidation';
 import { useAdminReconnectRefresh } from './useAdminReconnectRefresh';
@@ -27,9 +26,6 @@ export function useCameraManagementPage() {
     const [areas, setAreas] = useState([]);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState(null);
-    const [healthDebugItems, setHealthDebugItems] = useState([]);
-    const [healthDebugLoading, setHealthDebugLoading] = useState(true);
-    const [healthDebugError, setHealthDebugError] = useState(null);
     const [showModal, setShowModal] = useState(false);
     const [editingCamera, setEditingCamera] = useState(null);
     const [modalError, setModalError] = useState('');
@@ -38,6 +34,7 @@ export function useCameraManagementPage() {
     const [togglingMaintenanceId, setTogglingMaintenanceId] = useState(null);
     const camerasRequestIdRef = useRef(0);
     const areasRequestIdRef = useRef(0);
+    const mountedRef = useRef(true);
 
     const { success, error: showError } = useNotification();
 
@@ -67,7 +64,7 @@ export function useCameraManagementPage() {
             const response = await areaService.getAllAreas(
                 isBackgroundMode ? REQUEST_POLICY.BACKGROUND : REQUEST_POLICY.BLOCKING
             );
-            if (requestId !== areasRequestIdRef.current) {
+            if (!mountedRef.current || requestId !== areasRequestIdRef.current) {
                 return;
             }
 
@@ -75,38 +72,8 @@ export function useCameraManagementPage() {
                 setAreas(response.data);
             }
         } catch (error) {
-            if (requestId === areasRequestIdRef.current) {
+            if (mountedRef.current && requestId === areasRequestIdRef.current) {
                 console.error('Load areas error:', error);
-            }
-        }
-    }, []);
-
-    const loadHealthDebug = useCallback(async ({ mode = 'initial' } = {}) => {
-        const isBackgroundMode = mode === 'background' || mode === 'resume';
-
-        try {
-            if (!isBackgroundMode) {
-                setHealthDebugLoading(true);
-                setHealthDebugError(null);
-            }
-
-            const response = await adminService.getCameraHealthDebug(
-                isBackgroundMode ? REQUEST_POLICY.BACKGROUND : REQUEST_POLICY.BLOCKING
-            );
-
-            if (response.success) {
-                setHealthDebugItems(Array.isArray(response.data) ? response.data : []);
-                setHealthDebugError(null);
-            } else if (!isBackgroundMode) {
-                setHealthDebugError(response.message || 'Failed to load health diagnostics');
-            }
-        } catch (error) {
-            if (!isBackgroundMode) {
-                setHealthDebugError(error.response?.data?.message || 'Failed to load health diagnostics');
-            }
-        } finally {
-            if (!isBackgroundMode) {
-                setHealthDebugLoading(false);
             }
         }
     }, []);
@@ -124,7 +91,7 @@ export function useCameraManagementPage() {
             const response = await cameraService.getAllCameras(
                 isBackgroundMode ? REQUEST_POLICY.BACKGROUND : REQUEST_POLICY.BLOCKING
             );
-            if (requestId !== camerasRequestIdRef.current) {
+            if (!mountedRef.current || requestId !== camerasRequestIdRef.current) {
                 return;
             }
 
@@ -137,7 +104,7 @@ export function useCameraManagementPage() {
                 console.warn('Background camera refresh failed:', response.message);
             }
         } catch (error) {
-            if (requestId !== camerasRequestIdRef.current) {
+            if (!mountedRef.current || requestId !== camerasRequestIdRef.current) {
                 return;
             }
 
@@ -146,22 +113,24 @@ export function useCameraManagementPage() {
                 setLoadError(error.response?.data?.message || 'Failed to load cameras. Please try again.');
             }
         } finally {
-            if (requestId === camerasRequestIdRef.current && !isBackgroundMode) {
+            if (mountedRef.current && requestId === camerasRequestIdRef.current && !isBackgroundMode) {
                 setLoading(false);
             }
         }
     }, []);
 
     useEffect(() => {
+        mountedRef.current = true;
         loadCameras({ mode: 'initial' });
         loadAreas({ mode: 'initial' });
-        loadHealthDebug({ mode: 'initial' });
-    }, [loadAreas, loadCameras, loadHealthDebug]);
+        return () => {
+            mountedRef.current = false;
+        };
+    }, [loadAreas, loadCameras]);
 
     useAdminReconnectRefresh(() => Promise.all([
         loadCameras({ mode: 'resume' }),
         loadAreas({ mode: 'resume' }),
-        loadHealthDebug({ mode: 'resume' }),
     ]));
 
     const closeModal = useCallback(() => {
@@ -356,9 +325,6 @@ export function useCameraManagementPage() {
         areas,
         loading,
         loadError,
-        healthDebugItems,
-        healthDebugLoading,
-        healthDebugError,
         showModal,
         editingCamera,
         deletingId,
@@ -368,7 +334,6 @@ export function useCameraManagementPage() {
         formData,
         isSubmitting,
         loadCameras,
-        loadHealthDebug,
         openAddModal,
         openEditModal,
         closeModal,

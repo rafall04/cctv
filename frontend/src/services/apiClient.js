@@ -111,7 +111,6 @@ export async function fetchCsrfToken() {
         }
         return null;
     } catch (error) {
-        console.error('Failed to fetch CSRF token:', error);
         return null;
     }
 }

@@ -12,6 +12,7 @@ export function useViewerAnalyticsData(period, customDate) {
     const [lastUpdate, setLastUpdate] = useState(null);
     const analyticsRef = useRef(null);
     const requestIdRef = useRef(0);
+    const mountedRef = useRef(true);
 
     useEffect(() => {
         analyticsRef.current = analytics;
@@ -33,7 +34,7 @@ export function useViewerAnalyticsData(period, customDate) {
                 ),
             ]);
 
-            if (requestId !== requestIdRef.current) {
+            if (!mountedRef.current || requestId !== requestIdRef.current) {
                 return;
             }
 
@@ -52,7 +53,7 @@ export function useViewerAnalyticsData(period, customDate) {
                 setError(analyticsResponse.message || 'Gagal memuat data analytics');
             }
         } catch (requestError) {
-            if (requestId !== requestIdRef.current) {
+            if (!mountedRef.current || requestId !== requestIdRef.current) {
                 return;
             }
 
@@ -62,13 +63,19 @@ export function useViewerAnalyticsData(period, customDate) {
                 setError('Gagal terhubung ke server');
             }
         } finally {
-            setLoading(false);
+            if (mountedRef.current) {
+                setLoading(false);
+            }
         }
     }, [customDate, period]);
 
     useEffect(() => {
+        mountedRef.current = true;
         setLoading(true);
         loadAnalytics('initial');
+        return () => {
+            mountedRef.current = false;
+        };
     }, [loadAnalytics]);
 
     useEffect(() => {

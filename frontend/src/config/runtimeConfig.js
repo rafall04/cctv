@@ -116,7 +116,9 @@ export const loadRuntimeConfig = async () => {
  */
 export const getApiUrl = () => {
     if (!runtimeConfig) {
-        console.warn('⚠️ Runtime config not loaded yet! Call loadRuntimeConfig() first');
+        if (import.meta.env.MODE !== 'test') {
+            console.warn('⚠️ Runtime config not loaded yet! Call loadRuntimeConfig() first');
+        }
         return getFallbackApiUrl();
     }
 

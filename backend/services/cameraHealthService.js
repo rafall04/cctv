@@ -1827,6 +1827,7 @@ class CameraHealthService {
         return cameras.map((camera) => {
             const deliveryProfile = getCameraDeliveryProfile(camera);
             const state = this.ensureCameraState(camera.id, camera.is_online);
+            const availability = this.getPublicAvailability(camera);
 
             return {
                 cameraId: camera.id,
@@ -1862,7 +1863,174 @@ class CameraHealthService {
                 tier: state.tier,
                 failureScore: state.failureScore,
                 needsConfirmation: state.needsConfirmation,
+                availability_state: availability.availability_state,
+                availability_reason: availability.availability_reason,
+                availability_confidence: availability.availability_confidence,
             };
+        });
+    }
+
+    getHealthDebugPage(queryParams = {}) {
+        const normalized = this.normalizeHealthDebugQuery(queryParams);
+        const snapshot = this.getHealthDebugSnapshot();
+        const summary = this.buildHealthDebugSummary(snapshot);
+        const filteredItems = this.filterHealthDebugItems(snapshot, normalized);
+        const sortedItems = this.sortHealthDebugItems(filteredItems, normalized.sort);
+        const totalItems = sortedItems.length;
+        const totalPages = Math.max(1, Math.ceil(totalItems / normalized.limit));
+        const currentPage = Math.min(normalized.page, totalPages);
+        const startIndex = (currentPage - 1) * normalized.limit;
+        const items = sortedItems.slice(startIndex, startIndex + normalized.limit);
+
+        return {
+            summary,
+            items,
+            pagination: {
+                page: currentPage,
+                limit: normalized.limit,
+                totalItems,
+                totalPages,
+                hasNextPage: currentPage < totalPages,
+                hasPreviousPage: currentPage > 1,
+            },
+            filters: normalized,
+        };
+    }
+
+    normalizeHealthDebugQuery(queryParams = {}) {
+        const normalizeString = (value) => String(value || '').trim();
+        const page = Math.max(1, Number.parseInt(queryParams.page, 10) || 1);
+        const rawLimit = Number.parseInt(queryParams.limit, 10) || 25;
+        const limit = Math.min(Math.max(rawLimit, 1), 100);
+        const sort = normalizeString(queryParams.sort) || 'severity';
+
+        return {
+            state: normalizeString(queryParams.state).toLowerCase() || 'problem',
+            deliveryType: normalizeString(queryParams.deliveryType).toLowerCase(),
+            errorClass: normalizeString(queryParams.errorClass).toLowerCase(),
+            search: normalizeString(queryParams.search).toLowerCase(),
+            page,
+            limit,
+            sort,
+        };
+    }
+
+    buildHealthDebugSummary(items) {
+        return items.reduce((summary, item) => {
+            summary.total += 1;
+
+            switch (item.state) {
+                case 'healthy':
+                    summary.healthy += 1;
+                    break;
+                case 'degraded':
+                case 'suspect':
+                    summary.degraded += 1;
+                    break;
+                case 'offline':
+                    summary.offline += 1;
+                    break;
+                case 'unresolved':
+                    summary.unresolved += 1;
+                    break;
+                default:
+                    break;
+            }
+
+            if (item.availability_state === 'online') {
+                summary.publicOnline += 1;
+            } else if (item.availability_state === 'degraded') {
+                summary.publicDegraded += 1;
+            } else if (item.availability_state === 'offline') {
+                summary.publicOffline += 1;
+            } else if (item.availability_state === 'maintenance') {
+                summary.maintenance += 1;
+            }
+
+            return summary;
+        }, {
+            total: 0,
+            healthy: 0,
+            degraded: 0,
+            offline: 0,
+            unresolved: 0,
+            publicOnline: 0,
+            publicDegraded: 0,
+            publicOffline: 0,
+            maintenance: 0,
+        });
+    }
+
+    filterHealthDebugItems(items, filters) {
+        return items.filter((item) => {
+            if (filters.state && filters.state !== 'all') {
+                if (filters.state === 'problem') {
+                    if (!['degraded', 'suspect', 'offline', 'unresolved'].includes(item.state)) {
+                        return false;
+                    }
+                } else if (item.state !== filters.state) {
+                    return false;
+                }
+            }
+
+            if (filters.deliveryType && item.delivery_type?.toLowerCase() !== filters.deliveryType) {
+                return false;
+            }
+
+            if (filters.errorClass && (item.errorClass || '').toLowerCase() !== filters.errorClass) {
+                return false;
+            }
+
+            if (filters.search) {
+                const haystack = [
+                    item.cameraName,
+                    item.areaName,
+                    item.providerDomain,
+                    item.lastReason,
+                    item.runtimeTarget,
+                    item.probeTarget,
+                ]
+                    .filter(Boolean)
+                    .join(' ')
+                    .toLowerCase();
+
+                if (!haystack.includes(filters.search)) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+    }
+
+    sortHealthDebugItems(items, sortKey) {
+        const severityRank = {
+            offline: 0,
+            unresolved: 1,
+            suspect: 2,
+            degraded: 3,
+            healthy: 4,
+        };
+
+        const confidenceValue = (item) => Number(item.confidence ?? 0);
+        const normalizedSortKey = String(sortKey || 'severity').toLowerCase();
+
+        return [...items].sort((left, right) => {
+            if (normalizedSortKey === 'camera') {
+                return String(left.cameraName || '').localeCompare(String(right.cameraName || ''))
+                    || Number(left.cameraId || 0) - Number(right.cameraId || 0);
+            }
+
+            if (normalizedSortKey === 'confidence') {
+                return confidenceValue(left) - confidenceValue(right)
+                    || (severityRank[left.state] ?? 99) - (severityRank[right.state] ?? 99)
+                    || String(left.cameraName || '').localeCompare(String(right.cameraName || ''));
+            }
+
+            return (severityRank[left.state] ?? 99) - (severityRank[right.state] ?? 99)
+                || confidenceValue(left) - confidenceValue(right)
+                || String(left.cameraName || '').localeCompare(String(right.cameraName || ''))
+                || Number(left.cameraId || 0) - Number(right.cameraId || 0);
         });
     }
 

@@ -13,6 +13,7 @@ export function useRecordingDashboardData() {
     const requestIdRef = useRef(0);
     const recordingsRef = useRef([]);
     const restartLogsRef = useRef([]);
+    const mountedRef = useRef(true);
 
     useEffect(() => {
         recordingsRef.current = recordings;
@@ -37,7 +38,7 @@ export function useRecordingDashboardData() {
                 recordingService.getRestartLogs(null, 50, policy),
             ]);
 
-            if (requestId !== requestIdRef.current) {
+            if (!mountedRef.current || requestId !== requestIdRef.current) {
                 return;
             }
 
@@ -64,7 +65,7 @@ export function useRecordingDashboardData() {
                 setLastSuccessfulUpdate(new Date());
             }
         } catch (error) {
-            if (requestId !== requestIdRef.current) {
+            if (!mountedRef.current || requestId !== requestIdRef.current) {
                 return;
             }
 
@@ -76,16 +77,20 @@ export function useRecordingDashboardData() {
                 setRefreshError(true);
             }
         } finally {
-            if (requestId === requestIdRef.current && !isBackgroundMode) {
+            if (mountedRef.current && requestId === requestIdRef.current && !isBackgroundMode) {
                 setLoading(false);
             }
         }
     }, []);
 
     useEffect(() => {
+        mountedRef.current = true;
         fetchData({ mode: 'initial' });
         const interval = setInterval(() => fetchData({ mode: 'background' }), 10000);
-        return () => clearInterval(interval);
+        return () => {
+            mountedRef.current = false;
+            clearInterval(interval);
+        };
     }, [fetchData]);
 
     useAdminReconnectRefresh(() => fetchData({ mode: 'resume' }));

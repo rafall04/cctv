@@ -36,6 +36,10 @@ vi.mock('./pages/admin/BackupRestore', () => ({
     default: () => <div>backup-restore-page</div>,
 }));
 
+vi.mock('./pages/admin/HealthDebug', () => ({
+    default: () => <div>health-debug-page</div>,
+}));
+
 vi.mock('./pages/AreaManagement', () => ({
     default: () => <div>area-page</div>,
 }));
@@ -91,6 +95,20 @@ describe('App admin routing', () => {
 
         await waitFor(() => {
             expect(screen.getByText('dashboard-page')).toBeTruthy();
+        });
+    });
+
+    it('merender route health debug di dalam layout admin', async () => {
+        window.history.pushState({}, '', '/admin/health-debug');
+
+        render(<App />);
+
+        await waitFor(() => {
+            expect(screen.getByTestId('admin-layout')).toBeTruthy();
+        });
+
+        await waitFor(() => {
+            expect(screen.getByText('health-debug-page')).toBeTruthy();
         });
     });
 });

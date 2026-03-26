@@ -66,6 +66,7 @@ export default function AdminLayout({ children }) {
         { label: 'Dashboard', path: '/admin/dashboard', icon: <Icons.Dashboard /> },
         { label: 'Analytics', path: '/admin/analytics', icon: <Icons.Analytics /> },
         { label: 'Cameras', path: '/admin/cameras', icon: <Icons.Camera /> },
+        { label: 'Health Debug', path: '/admin/health-debug', icon: <Icons.Analytics /> },
         { label: 'Import/Export', path: '/admin/import-export', icon: <Icons.Analytics /> },
         { label: 'Backup Restore', path: '/admin/backup-restore', icon: <Icons.Settings /> },
         { label: 'Recordings', path: '/admin/recordings', icon: <Icons.Camera /> },

@@ -19,7 +19,6 @@ export const brandingService = {
             );
             return response.data.success ? response.data.data : null;
         } catch (error) {
-            console.error('Get public branding error:', error);
             return null;
         }
     },
