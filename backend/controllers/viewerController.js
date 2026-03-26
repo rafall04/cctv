@@ -5,6 +5,7 @@
 
 import viewerSessionService from '../services/viewerSessionService.js';
 import cameraService from '../services/cameraService.js';
+import cameraHealthService from '../services/cameraHealthService.js';
 import { getStreamCapabilities } from '../utils/cameraDelivery.js';
 
 /**
@@ -120,6 +121,46 @@ export async function stopViewerSession(request, reply) {
         return reply.code(500).send({
             success: false,
             message: 'Failed to end viewer session'
+        });
+    }
+}
+
+export async function reportViewerRuntimeSignal(request, reply) {
+    try {
+        const rawCameraId = request.body?.cameraId;
+        const cameraId = Number.parseInt(rawCameraId, 10);
+
+        if (!Number.isInteger(cameraId) || cameraId <= 0) {
+            return reply.code(400).send({
+                success: false,
+                message: 'Camera ID is required'
+            });
+        }
+
+        const success = request.body?.success !== false;
+        const signalType = typeof request.body?.signalType === 'string' && request.body.signalType.trim()
+            ? request.body.signalType.trim()
+            : 'runtime_success';
+        const targetUrl = typeof request.body?.targetUrl === 'string' && request.body.targetUrl.trim()
+            ? request.body.targetUrl.trim()
+            : null;
+
+        cameraHealthService.recordRuntimeSignal(cameraId, {
+            targetUrl,
+            signalType,
+            success,
+            timestamp: Date.now(),
+        });
+
+        return reply.send({
+            success: true,
+            message: 'Runtime signal recorded'
+        });
+    } catch (error) {
+        console.error('Report viewer runtime signal error:', error);
+        return reply.code(500).send({
+            success: false,
+            message: 'Failed to record runtime signal'
         });
     }
 }

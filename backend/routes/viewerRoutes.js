@@ -7,6 +7,7 @@ import {
     startViewerSession,
     viewerHeartbeat,
     stopViewerSession,
+    reportViewerRuntimeSignal,
     getActiveViewers,
     getViewerStats,
     getViewerHistory
@@ -61,6 +62,27 @@ export default async function viewerRoutes(fastify, options) {
             }
         },
         handler: stopViewerSession
+    });
+
+    fastify.post('/runtime-signal', {
+        schema: {
+            body: {
+                type: 'object',
+                required: ['cameraId'],
+                properties: {
+                    cameraId: {
+                        anyOf: [
+                            { type: 'integer' },
+                            { type: 'string', minLength: 1 }
+                        ]
+                    },
+                    targetUrl: { type: 'string' },
+                    signalType: { type: 'string' },
+                    success: { type: 'boolean' }
+                }
+            }
+        },
+        handler: reportViewerRuntimeSignal
     });
 
     // Admin-only endpoints

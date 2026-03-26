@@ -154,6 +154,31 @@ function VideoPopup({
     const isExternal = deliveryType === 'external_hls';
     const { targetUrl: resolvedUrl, proxyFallbackUrl, isDirectStream } = resolveStreamUrl(camera, { forceProxy: forceProxyFallback });
     const effectiveUrl = isHlsCamera ? (resolvedUrl || url) : (popupEmbedUrl || fallbackExternalUrl);
+    const passiveSignalUrl = officialSourceUrl || effectiveUrl || null;
+
+    const reportRuntimeSuccess = useCallback((signalType) => {
+        if (camera.stream_source !== 'external') {
+            return;
+        }
+
+        viewerService.reportRuntimeSignal(camera.id, {
+            targetUrl: passiveSignalUrl,
+            signalType,
+            success: true,
+        });
+    }, [camera.id, camera.stream_source, passiveSignalUrl]);
+
+    const reportRuntimeFailure = useCallback((signalType) => {
+        if (camera.stream_source !== 'external') {
+            return;
+        }
+
+        viewerService.reportRuntimeSignal(camera.id, {
+            targetUrl: passiveSignalUrl,
+            signalType,
+            success: false,
+        });
+    }, [camera.id, camera.stream_source, passiveSignalUrl]);
 
     useEffect(() => {
         loadingStageRef.current = loadingStage;
@@ -385,6 +410,7 @@ function VideoPopup({
             }
             setAutoRetryCount(0);
             setConsecutiveFailures(0);
+            reportRuntimeSuccess('external_hls_runtime_playing');
         };
 
         // Fallback: Check video state periodically
@@ -415,6 +441,7 @@ function VideoPopup({
             playbackCheckInterval = null;
             setStatus('error');
             setLoadingStage(LoadingStage.ERROR);
+            reportRuntimeFailure('external_hls_runtime_error');
         };
 
         const handleLoadedMetadata = () => {
@@ -667,7 +694,7 @@ function VideoPopup({
             cleanupResources();
             if (hls) { hls.destroy(); hlsRef.current = null; }
         };
-    }, [camera.id, camera.stream_source, cleanupResources, clearInternalWarmupRetry, clearStreamTimeout, deviceTier, isExternal, isHlsCamera, isMaintenance, isOffline, requestVideoPlay, resetFailures, retryKey, startTimeout, syncVideoAspectRatio, updateStreamStage, effectiveUrl, forceProxyFallback, isDirectStream, proxyFallbackUrl]);
+    }, [camera.id, camera.stream_source, cleanupResources, clearInternalWarmupRetry, clearStreamTimeout, deviceTier, isExternal, isHlsCamera, isMaintenance, isOffline, requestVideoPlay, resetFailures, retryKey, startTimeout, syncVideoAspectRatio, updateStreamStage, effectiveUrl, forceProxyFallback, isDirectStream, proxyFallbackUrl, reportRuntimeFailure, reportRuntimeSuccess]);
 
     const handleRetry = useCallback(() => {
         cleanupResources();
@@ -922,6 +949,16 @@ function VideoPopup({
                                 alt={camera.name}
                                 data-testid="external-mjpeg-body"
                                 className="w-full h-full object-contain bg-black pointer-events-none"
+                                onLoad={() => {
+                                    setStatus('live');
+                                    setLoadingStage(LoadingStage.PLAYING);
+                                    reportRuntimeSuccess('external_mjpeg_image_load');
+                                }}
+                                onError={() => {
+                                    setStatus('error');
+                                    setLoadingStage(LoadingStage.ERROR);
+                                    reportRuntimeFailure('external_mjpeg_image_error');
+                                }}
                             />
                         </ZoomableMediaFrame>
                     ) : popupEmbedUrl ? (
@@ -933,6 +970,11 @@ function VideoPopup({
                                 className="w-full h-full border-0 bg-black"
                                 allow="autoplay; fullscreen"
                                 referrerPolicy="strict-origin-when-cross-origin"
+                                onLoad={() => {
+                                    setStatus('live');
+                                    setLoadingStage(LoadingStage.PLAYING);
+                                    reportRuntimeSuccess('external_embed_frame_load');
+                                }}
                             />
                         </ZoomableMediaFrame>
                     ) : effectiveUrl ? (

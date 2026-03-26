@@ -66,6 +66,7 @@ export default function CameraHealthDebugPanel({ items, loading = false, error =
                             <th className="px-3 py-2">Delivery</th>
                             <th className="px-3 py-2">Strategy</th>
                             <th className="px-3 py-2">Status</th>
+                            <th className="px-3 py-2">State</th>
                             <th className="px-3 py-2">Reason</th>
                             <th className="px-3 py-2">Score</th>
                         </tr>
@@ -89,11 +90,23 @@ export default function CameraHealthDebugPanel({ items, loading = false, error =
                                     </span>
                                 </td>
                                 <td className="px-3 py-3 text-xs">
+                                    <div>{item.state || '-'}</div>
+                                    <div className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+                                        confidence {Number(item.confidence || 0).toFixed(2)}
+                                    </div>
+                                    {item.errorClass ? (
+                                        <div className="text-[11px] text-gray-400 dark:text-gray-500">
+                                            {item.errorClass}
+                                        </div>
+                                    ) : null}
+                                </td>
+                                <td className="px-3 py-3 text-xs">
                                     <div>{formatReason(item.lastReason)}</div>
                                     <div className="mt-1 space-y-1 text-[11px] text-gray-400 dark:text-gray-500">
                                         {renderTarget('Runtime', item.runtimeTarget)}
                                         {renderTarget('Probe', item.probeTarget)}
                                         {renderTarget('Fallback', item.fallbackTarget)}
+                                        {renderTarget('Provider', item.providerDomain)}
                                         {item.probeMethod ? (
                                             <div>
                                                 <span className="font-medium text-gray-500 dark:text-gray-400">Method:</span>{' '}
@@ -116,6 +129,24 @@ export default function CameraHealthDebugPanel({ items, loading = false, error =
                                             <div>
                                                 <span className="font-medium text-gray-500 dark:text-gray-400">Fallback:</span>{' '}
                                                 yes
+                                            </div>
+                                        ) : null}
+                                        {item.lastRuntimeSuccessAt ? (
+                                            <div>
+                                                <span className="font-medium text-gray-500 dark:text-gray-400">Runtime ok:</span>{' '}
+                                                {item.lastRuntimeSuccessAt}
+                                            </div>
+                                        ) : null}
+                                        {item.lastRuntimeSignalType ? (
+                                            <div>
+                                                <span className="font-medium text-gray-500 dark:text-gray-400">Signal:</span>{' '}
+                                                {item.lastRuntimeSignalType}
+                                            </div>
+                                        ) : null}
+                                        {item.domainBackoffUntil ? (
+                                            <div>
+                                                <span className="font-medium text-gray-500 dark:text-gray-400">Backoff:</span>{' '}
+                                                {item.domainBackoffUntil}
                                             </div>
                                         ) : null}
                                     </div>

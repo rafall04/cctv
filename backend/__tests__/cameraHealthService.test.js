@@ -419,6 +419,35 @@ describe('cameraHealthService external TLS policy', () => {
         expect(result.details.usedFallback).toBe(true);
     });
 
+    it('keeps MJPEG cameras online in degraded mode when recent runtime success exists but probe fails TLS', async () => {
+        axios.get.mockRejectedValueOnce({ code: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' });
+
+        const service = new CameraHealthService();
+        service.recordRuntimeSignal(393, {
+            targetUrl: 'https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=112',
+            signalType: 'external_mjpeg_image_load',
+            success: true,
+            timestamp: Date.now(),
+        });
+
+        const result = await service.evaluateCameraStatus({
+            id: 393,
+            name: 'PERBATASAN KABUH (SELATAN)',
+            enabled: 1,
+            is_online: 0,
+            stream_source: 'external',
+            delivery_type: 'external_mjpeg',
+            external_tls_mode: 'strict',
+            external_stream_url: 'https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=112',
+        }, new Map());
+
+        const state = service.healthState.get(393);
+        expect(result.isOnline).toBe(1);
+        expect(result.rawReason).toBe('runtime_probe_tls_mismatch');
+        expect(state.state).toBe('degraded');
+        expect(state.lastRuntimeSignalType).toBe('external_mjpeg_image_load');
+    });
+
     it('keeps websocket external cameras online by default when no probe target exists', async () => {
         const service = new CameraHealthService();
         const result = await service.evaluateCameraStatus({

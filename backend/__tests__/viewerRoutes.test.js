@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const startSessionMock = vi.fn();
 const getCameraByIdMock = vi.fn();
+const recordRuntimeSignalMock = vi.fn();
 
 vi.mock('../services/viewerSessionService.js', () => ({
     default: {
@@ -21,10 +22,17 @@ vi.mock('../services/cameraService.js', () => ({
     },
 }));
 
+vi.mock('../services/cameraHealthService.js', () => ({
+    default: {
+        recordRuntimeSignal: recordRuntimeSignalMock,
+    },
+}));
+
 describe('viewerRoutes', () => {
     beforeEach(() => {
         startSessionMock.mockReset();
         getCameraByIdMock.mockReset();
+        recordRuntimeSignalMock.mockReset();
         startSessionMock.mockReturnValue('session-123');
     });
 
@@ -108,6 +116,31 @@ describe('viewerRoutes', () => {
         expect(response.statusCode).toBe(400);
         expect(response.json().message).toContain('cameraId');
         expect(getCameraByIdMock).not.toHaveBeenCalled();
+        await fastify.close();
+    });
+
+    it('records runtime success signals for passive health evidence', async () => {
+        const { default: viewerRoutes } = await import('../routes/viewerRoutes.js');
+        const fastify = Fastify();
+        await fastify.register(viewerRoutes, { prefix: '/api/viewer' });
+
+        const response = await fastify.inject({
+            method: 'POST',
+            url: '/api/viewer/runtime-signal',
+            payload: {
+                cameraId: 393,
+                targetUrl: 'https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=112',
+                signalType: 'external_mjpeg_image_load',
+                success: true,
+            },
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(recordRuntimeSignalMock).toHaveBeenCalledWith(393, expect.objectContaining({
+            targetUrl: expect.stringContaining('jombangkab.go.id'),
+            signalType: 'external_mjpeg_image_load',
+            success: true,
+        }));
         await fastify.close();
     });
 });

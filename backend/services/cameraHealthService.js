@@ -19,6 +19,24 @@ const mediaMtxApiBaseUrl = `${(config.mediamtx?.apiUrl || 'http://localhost:9997
 const EXTERNAL_REQUEST_TIMEOUT_MS = 10000;
 const EXTERNAL_MAX_PDT_AGE_SEC = 120;
 const EXTERNAL_STALE_SEQUENCE_THRESHOLD = 4; // Increased from 2 to 4 to tolerate CDN caching
+const RUNTIME_SUCCESS_WINDOW_MS = 90 * 1000;
+const HOT_CADENCE_MS = 20 * 1000;
+const WARM_CADENCE_MS = 90 * 1000;
+const COLD_CADENCE_MS = 5 * 60 * 1000;
+const PASSIVE_ONLY_CADENCE_MS = 10 * 60 * 1000;
+const CHECKPOINT_DB_WRITE_MS = 5 * 60 * 1000;
+const DOMAIN_BACKOFF_BASE_MS = 60 * 1000;
+const DOMAIN_BACKOFF_MAX_MS = 10 * 60 * 1000;
+const HEALTH_LOOP_FLOOR_MS = 5 * 1000;
+const HEALTH_LOOP_CEIL_MS = 30 * 1000;
+
+const PROBE_CACHE_TTLS_MS = {
+    external_hls_playlist: 15 * 1000,
+    external_mjpeg_stream_primary: 30 * 1000,
+    external_snapshot_fallback: 45 * 1000,
+    external_embed_primary: 45 * 1000,
+    passive_external: 30 * 1000,
+};
 
 const SCORE_DECAY_ON_SUCCESS = 0.5;
 const OFFLINE_SCORE_THRESHOLD = 3.0;
@@ -191,6 +209,82 @@ function withProbeDetails(baseDetails = {}, detailOverrides = {}) {
     };
 }
 
+function extractProviderDomain(url) {
+    try {
+        return new URL(url).hostname.toLowerCase();
+    } catch {
+        return null;
+    }
+}
+
+function resolveErrorClass(reason) {
+    if (!reason) {
+        return 'unknown';
+    }
+
+    if ([
+        'missing_external_source_metadata',
+        'missing_external_hls_url',
+        'missing_external_probe_target',
+        'invalid_rtsp_url',
+    ].includes(reason)) {
+        return 'config';
+    }
+
+    if (reason === 'tls_verification_failed') {
+        return 'tls';
+    }
+
+    if ([
+        'http_401',
+        'http_403',
+    ].includes(reason)) {
+        return 'auth_policy';
+    }
+
+    if ([
+        'invalid_m3u8',
+        'master_has_no_variant',
+        'nested_master_without_media',
+        'media_playlist_has_no_segments',
+        'mjpeg_invalid_content_type',
+    ].includes(reason)) {
+        return 'format_protocol';
+    }
+
+    if ([
+        'stream_ended',
+        'stale_program_date_time',
+        'stale_media_sequence',
+    ].includes(reason)) {
+        return 'stale';
+    }
+
+    if ([
+        'probe_target_mismatch',
+        'runtime_probe_tls_mismatch',
+    ].includes(reason)) {
+        return 'runtime_probe_mismatch';
+    }
+
+    if (
+        reason.startsWith('http_')
+        || [
+            'ECONNREFUSED',
+            'ECONNABORTED',
+            'ETIMEDOUT',
+            'ENOTFOUND',
+            'request_error',
+            'internal_stream_unreachable',
+            'provider_backoff_active',
+        ].includes(reason)
+    ) {
+        return 'network_transient';
+    }
+
+    return 'unknown';
+}
+
 function resolveHealthProbeTarget(camera) {
     const deliveryProfile = getCameraDeliveryProfile(camera);
     const deliveryClassification = deliveryProfile.classification;
@@ -318,8 +412,11 @@ class CameraHealthService {
         this.isRunning = false;
         this.isChecking = false;
         this.lastCheck = null;
+        this.lastCheckpointWriteAt = 0;
         this.offlineSince = new Map();
         this.healthState = new Map();
+        this.domainHealth = new Map();
+        this.probeCache = new Map();
     }
 
     start(intervalMs = 30000) {
@@ -329,7 +426,7 @@ class CameraHealthService {
         }
 
         this.isRunning = true;
-        this.baseIntervalMs = intervalMs;
+        this.baseIntervalMs = Math.min(intervalMs, HEALTH_LOOP_CEIL_MS);
         console.log(`[CameraHealth] Starting health check service (interval: ${intervalMs / 1000}s)`);
 
         setTimeout(() => {
@@ -344,9 +441,22 @@ class CameraHealthService {
     }
 
     scheduleNextCheck() {
-        const effectiveInterval = this.lastCheckDuration
-            ? Math.max(this.baseIntervalMs, Math.ceil(this.lastCheckDuration * 1.5))
-            : this.baseIntervalMs;
+        const now = Date.now();
+        let nextDueAt = now + this.baseIntervalMs;
+        for (const state of this.healthState.values()) {
+            if (state?.nextCheckAt && state.nextCheckAt < nextDueAt) {
+                nextDueAt = state.nextCheckAt;
+            }
+        }
+
+        const durationFloor = this.lastCheckDuration
+            ? Math.max(HEALTH_LOOP_FLOOR_MS, Math.ceil(this.lastCheckDuration * 1.2))
+            : HEALTH_LOOP_FLOOR_MS;
+        const dueDelay = Math.max(HEALTH_LOOP_FLOOR_MS, nextDueAt - now);
+        const effectiveInterval = Math.min(
+            HEALTH_LOOP_CEIL_MS,
+            Math.max(durationFloor, dueDelay)
+        );
             
         this.checkTimeout = setTimeout(() => {
             const startTime = Date.now();
@@ -382,10 +492,253 @@ class CameraHealthService {
                 lastMediaSequence: null,
                 lastReason: null,
                 lastDetails: null,
-                needsConfirmation: false
+                needsConfirmation: false,
+                state: currentDbOnline === 1 ? 'healthy' : 'offline',
+                confidence: currentDbOnline === 1 ? 0.75 : 0.35,
+                errorClass: null,
+                lastProbeAt: null,
+                nextCheckAt: 0,
+                tier: 'hot',
+                lastRuntimeSuccessAt: null,
+                lastRuntimeSignalType: null,
+                lastRuntimeTarget: null,
+                providerDomain: null,
+                domainBackoffUntil: null,
+                stableSuccessCount: currentDbOnline === 1 ? 1 : 0,
+                stableFailureCount: currentDbOnline === 1 ? 0 : 1,
+                lastStateChangeAt: null,
             });
         }
         return this.healthState.get(cameraId);
+    }
+
+    getDomainState(domain) {
+        if (!domain) {
+            return null;
+        }
+
+        if (!this.domainHealth.has(domain)) {
+            this.domainHealth.set(domain, {
+                consecutiveFailures: 0,
+                backoffUntil: 0,
+                lastReason: null,
+                lastSuccessAt: 0,
+            });
+        }
+
+        return this.domainHealth.get(domain);
+    }
+
+    buildProbeCacheKey(probeResolution) {
+        if (!probeResolution?.probeTarget) {
+            return null;
+        }
+
+        return `${probeResolution.healthStrategy}:${probeResolution.probeTarget}`;
+    }
+
+    getProbeCacheTtlMs(probeResolution) {
+        return PROBE_CACHE_TTLS_MS[probeResolution?.healthStrategy] || 0;
+    }
+
+    getCachedProbeResult(cacheKey) {
+        if (!cacheKey) {
+            return null;
+        }
+
+        const cached = this.probeCache.get(cacheKey);
+        if (!cached) {
+            return null;
+        }
+
+        if (cached.expiresAt <= Date.now()) {
+            this.probeCache.delete(cacheKey);
+            return null;
+        }
+
+        return {
+            ...cached.result,
+            details: withProbeDetails(cached.result.details, {
+                cacheHit: true,
+            }),
+        };
+    }
+
+    setCachedProbeResult(cacheKey, probeResolution, result) {
+        const ttlMs = this.getProbeCacheTtlMs(probeResolution);
+        if (!cacheKey || ttlMs <= 0 || !result) {
+            return;
+        }
+
+        this.probeCache.set(cacheKey, {
+            expiresAt: Date.now() + ttlMs,
+            result,
+        });
+    }
+
+    cleanupProbeCache() {
+        const now = Date.now();
+        for (const [key, value] of this.probeCache.entries()) {
+            if (value.expiresAt <= now) {
+                this.probeCache.delete(key);
+            }
+        }
+    }
+
+    hasRecentRuntimeSuccess(state, now = Date.now()) {
+        return Boolean(state?.lastRuntimeSuccessAt && (now - state.lastRuntimeSuccessAt) <= RUNTIME_SUCCESS_WINDOW_MS);
+    }
+
+    recordRuntimeSignal(cameraId, { targetUrl = null, signalType = 'runtime_success', timestamp = Date.now(), success = true } = {}) {
+        const state = this.ensureCameraState(cameraId, 0);
+        const providerDomain = extractProviderDomain(targetUrl);
+
+        state.providerDomain = providerDomain || state.providerDomain || null;
+        state.nextCheckAt = Math.min(state.nextCheckAt || timestamp, timestamp + HOT_CADENCE_MS);
+        state.tier = 'hot';
+
+        if (success) {
+            state.lastRuntimeSuccessAt = timestamp;
+            state.lastRuntimeSignalType = signalType;
+            state.lastRuntimeTarget = targetUrl || state.lastRuntimeTarget || null;
+            state.effectiveOnline = true;
+            state.state = state.state === 'offline' ? 'degraded' : (state.state || 'degraded');
+            state.confidence = Math.max(state.confidence || 0.5, 0.7);
+            state.lastStateChangeAt = timestamp;
+            state.lastReason = 'runtime_recent_success';
+            state.lastDetails = withProbeDetails(state.lastDetails, {
+                runtimeTarget: targetUrl || state.lastRuntimeTarget || null,
+                lastRuntimeSignalType: signalType,
+            });
+
+            const currentTimestamp = getTimestamp();
+            execute(
+                'UPDATE cameras SET is_online = 1, last_online_check = ? WHERE id = ? AND (is_online IS NULL OR is_online = 0)',
+                [currentTimestamp, cameraId]
+            );
+        }
+
+        return state;
+    }
+
+    shouldUseRuntimeAssist(rawResult, state) {
+        if (!rawResult || rawResult.online || !state) {
+            return false;
+        }
+
+        if (!this.hasRecentRuntimeSuccess(state)) {
+            return false;
+        }
+
+        const errorClass = resolveErrorClass(rawResult.reason);
+        return errorClass === 'tls' || errorClass === 'network_transient' || errorClass === 'runtime_probe_mismatch';
+    }
+
+    applyRuntimeAssist(rawResult, state) {
+        if (!this.shouldUseRuntimeAssist(rawResult, state)) {
+            return rawResult;
+        }
+
+        const errorClass = resolveErrorClass(rawResult.reason);
+        return {
+            online: true,
+            reason: errorClass === 'tls' ? 'runtime_probe_tls_mismatch' : 'runtime_recent_success',
+            details: withProbeDetails(rawResult.details, {
+                underlyingReason: rawResult.reason,
+                assistedByRuntime: true,
+                lastRuntimeSuccessAt: state.lastRuntimeSuccessAt,
+                lastRuntimeSignalType: state.lastRuntimeSignalType,
+                runtimeTarget: state.lastRuntimeTarget || rawResult.details?.runtimeTarget || null,
+            }),
+        };
+    }
+
+    updateDomainHealth(domain, rawResult) {
+        const domainState = this.getDomainState(domain);
+        if (!domainState || !rawResult) {
+            return null;
+        }
+
+        const errorClass = resolveErrorClass(rawResult.reason);
+        const now = Date.now();
+
+        if (rawResult.online) {
+            domainState.consecutiveFailures = 0;
+            domainState.backoffUntil = 0;
+            domainState.lastReason = rawResult.reason;
+            domainState.lastSuccessAt = now;
+            return domainState;
+        }
+
+        if (errorClass === 'tls' || errorClass === 'network_transient' || errorClass === 'auth_policy') {
+            domainState.consecutiveFailures += 1;
+            const backoffMs = Math.min(
+                DOMAIN_BACKOFF_MAX_MS,
+                DOMAIN_BACKOFF_BASE_MS * Math.max(1, Math.min(domainState.consecutiveFailures, 5))
+            );
+            domainState.backoffUntil = now + backoffMs;
+        }
+
+        domainState.lastReason = rawResult.reason;
+        return domainState;
+    }
+
+    resolveTier(camera, state, rawResult = null) {
+        const deliveryProfile = getCameraDeliveryProfile(camera);
+
+        if (deliveryProfile.classification === 'external_unresolved') {
+            return 'cold';
+        }
+
+        if (deliveryProfile.classification === 'external_custom_ws' && !camera.external_snapshot_url && !camera.external_embed_url) {
+            return 'cold';
+        }
+
+        if (this.hasRecentRuntimeSuccess(state) || state.needsConfirmation) {
+            return 'hot';
+        }
+
+        if (rawResult && !rawResult.online) {
+            return state.stableFailureCount >= 5 ? 'cold' : 'hot';
+        }
+
+        if (state.stableSuccessCount >= 3) {
+            return 'warm';
+        }
+
+        return 'hot';
+    }
+
+    getNextCadenceMs(camera, state, rawResult = null) {
+        const deliveryProfile = getCameraDeliveryProfile(camera);
+
+        if (deliveryProfile.classification === 'external_unresolved') {
+            return COLD_CADENCE_MS;
+        }
+
+        if ((deliveryProfile.classification === 'external_jsmpeg' || deliveryProfile.classification === 'external_custom_ws')
+            && !camera.external_snapshot_url
+            && !camera.external_embed_url) {
+            return PASSIVE_ONLY_CADENCE_MS;
+        }
+
+        const tier = this.resolveTier(camera, state, rawResult);
+        state.tier = tier;
+
+        if (tier === 'cold') {
+            return COLD_CADENCE_MS;
+        }
+
+        if (tier === 'warm') {
+            return WARM_CADENCE_MS;
+        }
+
+        return HOT_CADENCE_MS;
+    }
+
+    scheduleNextCameraCheck(camera, state, rawResult = null) {
+        state.nextCheckAt = Date.now() + this.getNextCadenceMs(camera, state, rawResult);
+        return state.nextCheckAt;
     }
 
     getExternalRequestOptions(camera) {
@@ -865,6 +1218,12 @@ class CameraHealthService {
     async evaluateCameraRaw(camera, activePaths, options = {}) {
         const probeResolution = resolveHealthProbeTarget(camera);
         const deliveryType = probeResolution.deliveryClassification;
+        const providerDomain = extractProviderDomain(
+            probeResolution.probeTarget
+            || probeResolution.runtimeTarget
+            || probeResolution.fallbackTargets[0]
+            || null
+        );
         const baseDetails = {
             delivery_classification: probeResolution.deliveryClassification,
             runtimeTarget: probeResolution.runtimeTarget,
@@ -872,7 +1231,32 @@ class CameraHealthService {
             fallbackTarget: probeResolution.fallbackTargets[0] || null,
             probe_method: probeResolution.probeMethod,
             usedFallback: false,
+            providerDomain,
         };
+        const domainState = this.getDomainState(providerDomain);
+        const cacheKey = options.bustCache ? null : this.buildProbeCacheKey(probeResolution);
+
+        if (cacheKey) {
+            const cachedResult = this.getCachedProbeResult(cacheKey);
+            if (cachedResult) {
+                return cachedResult;
+            }
+        }
+
+        if (
+            providerDomain
+            && domainState?.backoffUntil
+            && domainState.backoffUntil > Date.now()
+            && !options.bustCache
+        ) {
+            return {
+                online: false,
+                reason: 'provider_backoff_active',
+                details: withProbeDetails(baseDetails, {
+                    domainBackoffUntil: new Date(domainState.backoffUntil).toISOString(),
+                }),
+            };
+        }
 
         if (deliveryType === 'external_hls') {
             let hlsUrl = probeResolution.probeTarget;
@@ -886,10 +1270,13 @@ class CameraHealthService {
                 this.getExternalRequestOptions(camera),
                 options.timeoutMs
             );
-            return {
+            const finalResult = {
                 ...result,
                 details: withProbeDetails(baseDetails, result.details),
             };
+            this.setCachedProbeResult(cacheKey, probeResolution, finalResult);
+            this.updateDomainHealth(providerDomain, finalResult);
+            return finalResult;
         }
 
         if (deliveryType === 'external_mjpeg') {
@@ -904,6 +1291,8 @@ class CameraHealthService {
                 });
 
                 if (streamResult.online || !fallbackTarget) {
+                    this.setCachedProbeResult(cacheKey, probeResolution, streamResult);
+                    this.updateDomainHealth(providerDomain, streamResult);
                     return streamResult;
                 }
 
@@ -916,7 +1305,7 @@ class CameraHealthService {
                 });
 
                 if (snapshotResult.online) {
-                    return {
+                    const assistedResult = {
                         online: true,
                         reason: 'probe_target_mismatch',
                         details: withProbeDetails(snapshotResult.details, {
@@ -924,15 +1313,23 @@ class CameraHealthService {
                             usedFallback: true,
                         }),
                     };
+                    this.setCachedProbeResult(cacheKey, probeResolution, assistedResult);
+                    this.updateDomainHealth(providerDomain, assistedResult);
+                    return assistedResult;
                 }
 
+                this.setCachedProbeResult(cacheKey, probeResolution, streamResult);
+                this.updateDomainHealth(providerDomain, streamResult);
                 return streamResult;
             }
 
-            return this.probeSnapshotUrl(fallbackTarget, requestOptions, {
+            const fallbackResult = await this.probeSnapshotUrl(fallbackTarget, requestOptions, {
                 timeoutMs: options.timeoutMs,
                 baseDetails,
             });
+            this.setCachedProbeResult(cacheKey, probeResolution, fallbackResult);
+            this.updateDomainHealth(providerDomain, fallbackResult);
+            return fallbackResult;
         }
 
         if (deliveryType === 'external_embed' || deliveryType === 'external_jsmpeg' || deliveryType === 'external_custom_ws') {
@@ -953,6 +1350,8 @@ class CameraHealthService {
                     baseDetails,
                 });
                 if (embedResult.online || !camera.external_snapshot_url) {
+                    this.setCachedProbeResult(cacheKey, probeResolution, embedResult);
+                    this.updateDomainHealth(providerDomain, embedResult);
                     return embedResult;
                 }
 
@@ -965,7 +1364,7 @@ class CameraHealthService {
                 });
 
                 if (snapshotResult.online) {
-                    return {
+                    const assistedResult = {
                         online: true,
                         reason: 'probe_target_mismatch',
                         details: withProbeDetails(snapshotResult.details, {
@@ -973,13 +1372,18 @@ class CameraHealthService {
                             usedFallback: true,
                         }),
                     };
+                    this.setCachedProbeResult(cacheKey, probeResolution, assistedResult);
+                    this.updateDomainHealth(providerDomain, assistedResult);
+                    return assistedResult;
                 }
 
+                this.setCachedProbeResult(cacheKey, probeResolution, embedResult);
+                this.updateDomainHealth(providerDomain, embedResult);
                 return embedResult;
             }
 
             if (camera.external_snapshot_url) {
-                return this.probeSnapshotUrl(
+                const snapshotResult = await this.probeSnapshotUrl(
                     probeTarget,
                     this.getExternalRequestOptions(camera),
                     {
@@ -987,9 +1391,12 @@ class CameraHealthService {
                         baseDetails,
                     }
                 );
+                this.setCachedProbeResult(cacheKey, probeResolution, snapshotResult);
+                this.updateDomainHealth(providerDomain, snapshotResult);
+                return snapshotResult;
             }
 
-            return this.probeEmbedUrl(
+            const embedResult = await this.probeEmbedUrl(
                 probeTarget,
                 this.getExternalRequestOptions(camera),
                 {
@@ -997,6 +1404,9 @@ class CameraHealthService {
                     baseDetails,
                 }
             );
+            this.setCachedProbeResult(cacheKey, probeResolution, embedResult);
+            this.updateDomainHealth(providerDomain, embedResult);
+            return embedResult;
         }
 
         if (deliveryType === 'external_unresolved') {
@@ -1073,20 +1483,44 @@ class CameraHealthService {
 
     applyWeightedScoring(camera, rawResult) {
         const state = this.ensureCameraState(camera.id, camera.is_online);
+        const now = Date.now();
+        const errorClass = resolveErrorClass(rawResult.reason);
+
+        state.lastProbeAt = new Date(now).toISOString();
+        state.errorClass = errorClass;
+        state.providerDomain = rawResult.details?.providerDomain || state.providerDomain || extractProviderDomain(rawResult.details?.probeTarget || rawResult.details?.runtimeTarget);
+        const domainState = this.getDomainState(state.providerDomain);
+        state.domainBackoffUntil = domainState?.backoffUntil
+            ? new Date(domainState.backoffUntil).toISOString()
+            : null;
 
         if (rawResult.online) {
-            // Instant Recovery! A single success wipes out the failure memory completely.
-            state.failureScore = 0;
+            const runtimeAssisted = rawResult.reason === 'runtime_recent_success' || rawResult.reason === 'runtime_probe_tls_mismatch';
+            state.failureScore = runtimeAssisted
+                ? Math.max(0, state.failureScore - SCORE_DECAY_ON_SUCCESS)
+                : 0;
             state.needsConfirmation = false;
             state.effectiveOnline = true;
+            state.stableSuccessCount += 1;
+            state.stableFailureCount = 0;
+            state.state = runtimeAssisted
+                ? 'degraded'
+                : (rawResult.reason === 'probe_target_mismatch' ? 'degraded' : 'healthy');
+            state.confidence = runtimeAssisted
+                ? Math.max(0.65, state.confidence || 0.5)
+                : 0.98;
         } else {
             const weight = FAILURE_WEIGHTS[rawResult.reason] ?? 0.3;
             state.failureScore += weight;
+            state.stableFailureCount += 1;
+            state.stableSuccessCount = 0;
         }
 
         // Only flag for confirmation if we are transitioning online->offline
         if (state.effectiveOnline && state.failureScore >= OFFLINE_SCORE_THRESHOLD) {
             state.needsConfirmation = true;
+            state.state = 'suspect';
+            state.confidence = Math.min(state.confidence || 0.6, 0.55);
         }
 
         // Transition offline->online happens instantly
@@ -1094,8 +1528,17 @@ class CameraHealthService {
             state.effectiveOnline = true;
         }
 
+        if (!rawResult.online && !state.effectiveOnline) {
+            state.state = getCameraDeliveryProfile(camera).classification === 'external_unresolved'
+                ? 'unresolved'
+                : 'offline';
+            state.confidence = Math.max(0.15, Math.min(0.45, 1 - Math.min(state.failureScore / OFFLINE_SCORE_THRESHOLD, 1)));
+        }
+
         state.lastReason = rawResult.reason;
         state.lastDetails = rawResult.details || null;
+        state.lastStateChangeAt = state.lastStateChangeAt || new Date(now).toISOString();
+        this.scheduleNextCameraCheck(camera, state, rawResult);
         return state.effectiveOnline ? 1 : 0;
     }
 
@@ -1119,8 +1562,9 @@ class CameraHealthService {
 
     async evaluateCameraStatus(camera, activePaths, options = {}) {
         this.ensureCameraState(camera.id, camera.is_online);
-        const rawResult = await this.evaluateCameraRaw(camera, activePaths, options);
+        const baseRawResult = await this.evaluateCameraRaw(camera, activePaths, options);
         const state = this.healthState.get(camera.id);
+        const rawResult = this.applyRuntimeAssist(baseRawResult, state);
         let isOnline = this.applyWeightedScoring(camera, rawResult);
         let effectiveRawResult = rawResult;
 
@@ -1129,13 +1573,14 @@ class CameraHealthService {
             if (confirmed) {
                 state.effectiveOnline = false;
                 state.needsConfirmation = false;
+                state.state = getCameraDeliveryProfile(camera).classification === 'external_unresolved' ? 'unresolved' : 'offline';
                 isOnline = 0;
             } else {
                 state.failureScore = Math.max(0, state.failureScore - SCORE_DECAY_ON_SUCCESS);
                 state.needsConfirmation = false;
                 if (confirmationRawResult) {
-                    effectiveRawResult = confirmationRawResult;
-                    isOnline = this.applyWeightedScoring(camera, confirmationRawResult);
+                    effectiveRawResult = this.applyRuntimeAssist(confirmationRawResult, state);
+                    isOnline = this.applyWeightedScoring(camera, effectiveRawResult);
                 }
             }
         }
@@ -1157,6 +1602,7 @@ class CameraHealthService {
         this.isChecking = true;
 
         try {
+            this.cleanupProbeCache();
             const activePaths = await this.getActivePaths();
             const cameras = query(`
                 SELECT ${SHARED_CAMERA_STREAM_PROJECTION}
@@ -1166,8 +1612,13 @@ class CameraHealthService {
 
             const timestamp = getTimestamp();
             const activeCameraIds = new Set(cameras.map((camera) => camera.id));
+            const now = Date.now();
+            const dueCameras = cameras.filter((camera) => {
+                const state = this.ensureCameraState(camera.id, camera.is_online);
+                return !state.nextCheckAt || state.nextCheckAt <= now;
+            });
 
-            const probeResults = await batchProbe(cameras, async (camera) => {
+            const probeResults = await batchProbe(dueCameras, async (camera) => {
                 return this.evaluateCameraStatus(camera, activePaths);
             });
 
@@ -1179,14 +1630,18 @@ class CameraHealthService {
                     timestamp
                 }));
 
+            const shouldCheckpoint = now - this.lastCheckpointWriteAt >= CHECKPOINT_DB_WRITE_MS;
             const batchUpdate = transaction((results) => {
                 for (const res of results) {
-                    execute('UPDATE cameras SET is_online = ?, last_online_check = ? WHERE id = ?',
-                        [res.isOnline, res.timestamp, res.cameraId]
+                    execute('UPDATE cameras SET is_online = ?, last_online_check = ? WHERE id = ? AND (is_online != ? OR last_online_check IS NULL OR ? = 1)',
+                        [res.isOnline, res.timestamp, res.cameraId, res.isOnline, shouldCheckpoint ? 1 : 0]
                     );
                 }
             });
             batchUpdate(finalResults);
+            if (shouldCheckpoint) {
+                this.lastCheckpointWriteAt = now;
+            }
 
             let onlineCount = 0;
             let offlineCount = 0;
@@ -1195,12 +1650,14 @@ class CameraHealthService {
             const wentOffline = [];
             const wentOnline = [];
 
+            const processedIds = new Set();
             for (const { result, camera } of probeResults) {
                 if (result.status !== 'fulfilled') {
                     console.error(`[CameraHealth] Camera ${camera.id} (${camera.name}) probe failed:`, result.reason?.message || result.reason);
                     continue;
                 }
 
+                processedIds.add(camera.id);
                 const { camera, isOnline, rawReason } = result.value;
                 const statusChanged = camera.is_online !== isOnline;
 
@@ -1216,6 +1673,19 @@ class CameraHealthService {
                 else {
                     offlineCount += 1;
                     console.warn(`[CameraHealth] Camera ${camera.id} (${camera.name}) offline reason: ${rawReason}`);
+                }
+            }
+
+            for (const camera of cameras) {
+                if (processedIds.has(camera.id)) {
+                    continue;
+                }
+
+                const state = this.ensureCameraState(camera.id, camera.is_online);
+                if (state.effectiveOnline) {
+                    onlineCount += 1;
+                } else {
+                    offlineCount += 1;
                 }
             }
 
@@ -1250,7 +1720,7 @@ class CameraHealthService {
             }
 
             this.lastCheck = new Date();
-            console.log(`[CameraHealth] Check complete: ${onlineCount} online, ${offlineCount} offline (${changedCount} changed)`);
+            console.log(`[CameraHealth] Check complete: ${onlineCount} online, ${offlineCount} offline (${changedCount} changed, ${dueCameras.length}/${cameras.length} probed)`);
         } catch (error) {
             console.error('[CameraHealth] Check failed:', error.message);
         } finally {
@@ -1311,6 +1781,9 @@ class CameraHealthService {
                 delivery_classification: deliveryProfile.classification,
                 healthStrategy: this.getHealthStrategy(camera),
                 effectiveOnline: state.effectiveOnline,
+                state: state.state,
+                confidence: state.confidence,
+                errorClass: state.errorClass,
                 lastReason: state.lastReason,
                 lastDetails: state.lastDetails,
                 runtimeTarget: state.lastDetails?.runtimeTarget || null,
@@ -1320,6 +1793,12 @@ class CameraHealthService {
                 usedFallback: state.lastDetails?.usedFallback || false,
                 httpStatus: state.lastDetails?.http_status ?? null,
                 contentType: state.lastDetails?.content_type || null,
+                lastProbeAt: state.lastProbeAt,
+                lastRuntimeSuccessAt: state.lastRuntimeSuccessAt ? new Date(state.lastRuntimeSuccessAt).toISOString() : null,
+                lastRuntimeSignalType: state.lastRuntimeSignalType,
+                providerDomain: state.providerDomain,
+                domainBackoffUntil: state.domainBackoffUntil,
+                tier: state.tier,
                 failureScore: state.failureScore,
                 needsConfirmation: state.needsConfirmation,
             };
@@ -1344,8 +1823,8 @@ class CameraHealthService {
             const timestamp = getTimestamp();
 
             execute(
-                'UPDATE cameras SET is_online = ?, last_online_check = ? WHERE id = ?',
-                [result.isOnline, timestamp, camera.id]
+                'UPDATE cameras SET is_online = ?, last_online_check = ? WHERE id = ? AND (is_online != ? OR last_online_check IS NULL OR ? = 1)',
+                [result.isOnline, timestamp, camera.id, result.isOnline, 1]
             );
 
             if (camera.is_online !== result.isOnline) {

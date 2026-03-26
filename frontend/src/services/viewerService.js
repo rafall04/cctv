@@ -27,6 +27,7 @@ class ViewerService {
         // Map of sessionId -> session data
         this.sessions = new Map();
         this.heartbeatInterval = null;
+        this.runtimeSignals = new Map();
     }
 
     /**
@@ -180,6 +181,39 @@ class ViewerService {
      */
     getSessionCount() {
         return this.sessions.size;
+    }
+
+    async reportRuntimeSignal(cameraId, { targetUrl = null, signalType = 'runtime_success', success = true } = {}) {
+        const normalizedCameraId = Number.parseInt(cameraId, 10);
+        if (!Number.isInteger(normalizedCameraId) || normalizedCameraId <= 0) {
+            return;
+        }
+
+        const dedupeKey = [
+            normalizedCameraId,
+            signalType,
+            success ? '1' : '0',
+            targetUrl || '',
+        ].join(':');
+        const now = Date.now();
+        const lastSentAt = this.runtimeSignals.get(dedupeKey) || 0;
+
+        if (now - lastSentAt < 30000) {
+            return;
+        }
+
+        this.runtimeSignals.set(dedupeKey, now);
+
+        try {
+            await apiClient.post('/api/viewer/runtime-signal', {
+                cameraId: normalizedCameraId,
+                targetUrl,
+                signalType,
+                success,
+            });
+        } catch (error) {
+            console.warn('[ViewerService] Runtime signal failed:', signalType, normalizedCameraId, error?.message || error);
+        }
     }
 }
 

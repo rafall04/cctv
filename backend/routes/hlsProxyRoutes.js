@@ -10,6 +10,7 @@ import jwt from 'jsonwebtoken';
 import { isIP } from 'net';
 import { config } from '../config/config.js';
 import viewerSessionService from '../services/viewerSessionService.js';
+import cameraHealthService from '../services/cameraHealthService.js';
 import { queryOne } from '../database/connectionPool.js';
 
 const IPV4_MAPPED_PREFIX = '::ffff:';
@@ -1186,6 +1187,13 @@ async function handleExternalStreamProxy(state, request, reply) {
             reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
             reply.header('Pragma', 'no-cache');
             reply.header('Expires', '0');
+            if (externalCameraConfig?.cameraId) {
+                cameraHealthService.recordRuntimeSignal(externalCameraConfig.cameraId, {
+                    targetUrl: url,
+                    signalType: 'external_hls_playlist_proxy',
+                    success: true,
+                });
+            }
             return reply.send(rewriteExternalPlaylist(response.data, url, externalCameraConfig?.cameraId ?? null));
         }
 
@@ -1216,6 +1224,13 @@ async function handleExternalStreamProxy(state, request, reply) {
         reply.header('Expires', '0');
         reply.header('Content-Length', String(data.length));
         safeAbort(controller);
+        if (externalCameraConfig?.cameraId) {
+            cameraHealthService.recordRuntimeSignal(externalCameraConfig.cameraId, {
+                targetUrl: url,
+                signalType: 'external_hls_segment_proxy',
+                success: true,
+            });
+        }
         return reply.send(data);
     } catch (error) {
         console.error(`[HLS Proxy] External fetch error for ${url}:`, error.message);
@@ -1298,6 +1313,13 @@ export default async function hlsProxyRoutes(fastify, _options) {
                 reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
                 reply.header('Pragma', 'no-cache');
                 reply.header('Expires', '0');
+                if (cameraId) {
+                    cameraHealthService.recordRuntimeSignal(cameraId, {
+                        targetUrl,
+                        signalType: 'internal_hls_playlist_proxy',
+                        success: true,
+                    });
+                }
                 return reply.send(response.data);
             }
 
@@ -1326,6 +1348,13 @@ export default async function hlsProxyRoutes(fastify, _options) {
                 controller,
                 upstreamStream: response.data,
             }).attach();
+            if (cameraId) {
+                cameraHealthService.recordRuntimeSignal(cameraId, {
+                    targetUrl,
+                    signalType: 'internal_hls_segment_proxy',
+                    success: true,
+                });
+            }
             return reply.send(response.data);
         } catch (error) {
             console.error(`[HLSProxy] Error proxying ${fullPath}:`, error.message);
