@@ -15,9 +15,10 @@ class StreamService {
         const streamPath = camera.stream_key || `camera${camera.id}`;
         const capabilities = getStreamCapabilities(deliveryType);
         const isExternalHls = deliveryType === 'external_hls';
+        const availability = cameraHealthService.enrichCameraAvailability(camera);
 
         return {
-            ...camera,
+            ...availability,
             delivery_type: deliveryType,
             stream_capabilities: capabilities,
             streams: isExternalHls
@@ -29,7 +30,6 @@ class StreamService {
             external_embed_url: camera.external_embed_url || null,
             external_snapshot_url: camera.external_snapshot_url || null,
             external_origin_mode: camera.external_origin_mode || 'direct',
-            ...cameraHealthService.getPublicAvailability(camera),
         };
     }
 

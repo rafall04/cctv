@@ -9,6 +9,34 @@ const DELIVERY_OPTIONS = [
     { value: 'external_custom_ws', label: 'Custom WebSocket', description: 'Tidak dijamin playable, default fallback ke sumber resmi', group: 'external' },
 ];
 
+const EXTERNAL_HEALTH_MODE_OPTIONS = [
+    {
+        value: 'default',
+        label: 'Default',
+        description: 'Ikuti policy global berdasarkan delivery type.',
+    },
+    {
+        value: 'passive_first',
+        label: 'Passive First',
+        description: 'Gunakan bukti runtime pengguna. Cocok untuk MJPEG yang sering false offline.',
+    },
+    {
+        value: 'hybrid_probe',
+        label: 'Hybrid Probe',
+        description: 'Gabungkan runtime dan probe backend dengan runtime tetap menang untuk mismatch transient.',
+    },
+    {
+        value: 'probe_first',
+        label: 'Probe First',
+        description: 'Backend probe diutamakan. Gunakan hanya jika sumbernya stabil untuk diverifikasi.',
+    },
+    {
+        value: 'disabled',
+        label: 'Disabled',
+        description: 'Tanpa active probe. Hanya maintenance, metadata, dan runtime evidence.',
+    },
+];
+
 export default function CameraSourceFields({
     formData,
     isSubmitting,
@@ -19,12 +47,22 @@ export default function CameraSourceFields({
     const deliveryType = formData.delivery_type || 'internal_hls';
     const isInternal = deliveryType === 'internal_hls';
     const isExternalHls = deliveryType === 'external_hls';
+    const isExternal = !isInternal;
     const usesStreamUrl = ['external_hls', 'external_mjpeg', 'external_jsmpeg', 'external_custom_ws'].includes(deliveryType);
     const usesEmbedUrl = deliveryType === 'external_embed' || deliveryType === 'external_jsmpeg' || deliveryType === 'external_custom_ws';
 
     const setDeliveryType = (value) => {
         onChange({ target: { name: 'delivery_type', value, type: 'text' } });
         onChange({ target: { name: 'stream_source', value: value === 'internal_hls' ? 'internal' : 'external', type: 'text' } });
+        if (value === 'internal_hls') {
+            onChange({ target: { name: 'external_health_mode', value: 'default', type: 'text' } });
+        } else if (value === 'external_mjpeg') {
+            onChange({ target: { name: 'external_health_mode', value: 'passive_first', type: 'text' } });
+        } else if (value === 'external_hls') {
+            onChange({ target: { name: 'external_health_mode', value: 'hybrid_probe', type: 'text' } });
+        } else {
+            onChange({ target: { name: 'external_health_mode', value: 'default', type: 'text' } });
+        }
     };
 
     return (
@@ -240,6 +278,32 @@ export default function CameraSourceFields({
                             </div>
                         </>
                     )}
+
+                    {isExternal ? (
+                        <div>
+                            <label htmlFor="camera-external-health-mode" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Health Mode
+                            </label>
+                            <select
+                                id="camera-external-health-mode"
+                                name="external_health_mode"
+                                value={formData.external_health_mode || 'default'}
+                                onChange={onChange}
+                                onBlur={onBlur}
+                                disabled={isSubmitting}
+                                className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 border-gray-200 dark:border-gray-700/50"
+                            >
+                                {EXTERNAL_HEALTH_MODE_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                {EXTERNAL_HEALTH_MODE_OPTIONS.find((option) => option.value === (formData.external_health_mode || 'default'))?.description}
+                            </p>
+                        </div>
+                    ) : null}
 
                     <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-4 text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300">
                         {deliveryType === 'external_mjpeg' && 'Type ini popup-only dan tidak masuk playback atau Multi-View.'}

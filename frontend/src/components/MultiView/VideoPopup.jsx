@@ -183,6 +183,28 @@ function VideoPopup({
     }, [camera.id, camera.stream_source, passiveSignalUrl]);
 
     useEffect(() => {
+        if (
+            deliveryType !== 'external_mjpeg'
+            || isMaintenance
+            || isOffline
+            || status === 'error'
+            || !effectiveUrl
+        ) {
+            return undefined;
+        }
+
+        const intervalId = setInterval(() => {
+            if (status !== 'error') {
+                reportRuntimeSuccess('external_mjpeg_live_tick');
+            }
+        }, 25000);
+
+        return () => {
+            clearInterval(intervalId);
+        };
+    }, [deliveryType, effectiveUrl, isMaintenance, isOffline, reportRuntimeSuccess, status]);
+
+    useEffect(() => {
         loadingStageRef.current = loadingStage;
     }, [loadingStage]);
 
@@ -961,7 +983,7 @@ function VideoPopup({
                                 onLoad={() => {
                                     setStatus('live');
                                     setLoadingStage(LoadingStage.PLAYING);
-                                    reportRuntimeSuccess('external_mjpeg_image_load');
+                                    reportRuntimeSuccess('external_mjpeg_open');
                                 }}
                                 onError={() => {
                                     setStatus('error');

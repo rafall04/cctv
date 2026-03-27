@@ -32,7 +32,11 @@ export const SHARED_CAMERA_STREAM_PROJECTION = `
     CASE
         WHEN c.external_tls_mode IN ('strict', 'insecure') THEN c.external_tls_mode
         ELSE 'strict'
-    END as external_tls_mode
+    END as external_tls_mode,
+    CASE
+        WHEN c.external_health_mode IN ('default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled') THEN c.external_health_mode
+        ELSE 'default'
+    END as external_health_mode
 `;
 
 export const SHARED_CAMERA_STREAM_WITH_AREA_PROJECTION = `

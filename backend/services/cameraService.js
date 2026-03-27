@@ -13,10 +13,12 @@ import cameraHealthService from './cameraHealthService.js';
 import {
     DELIVERY_TYPES,
     DELIVERY_TYPE_PATTERNS,
+    EXTERNAL_HEALTH_MODES,
     getCameraDeliveryProfile,
     getCompatStreamSource,
     getEffectiveDeliveryType,
     getPrimaryExternalStreamUrl,
+    normalizeExternalHealthMode,
     normalizeExternalOriginMode,
 } from '../utils/cameraDelivery.js';
 
@@ -537,6 +539,10 @@ class CameraService {
                         WHEN c.external_tls_mode IN ('strict', 'insecure') THEN c.external_tls_mode
                         ELSE 'strict'
                     END as external_tls_mode,
+                    CASE
+                        WHEN c.external_health_mode IN ('default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled') THEN c.external_health_mode
+                        ELSE 'default'
+                    END as external_health_mode,
                     a.name as area_name 
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 
@@ -586,9 +592,11 @@ class CameraService {
             external_origin_mode,
             external_use_proxy,
             external_tls_mode,
+            external_health_mode,
         } = data;
         const externalUseProxy = external_use_proxy === false || external_use_proxy === 0 ? 0 : 1;
         const externalTlsMode = external_tls_mode === 'insecure' ? 'insecure' : 'strict';
+        const externalHealthMode = normalizeExternalHealthMode(external_health_mode);
 
         if (!name) {
             const err = new Error('Camera name is required');
@@ -608,6 +616,12 @@ class CameraService {
 
         if (external_tls_mode !== undefined && !['strict', 'insecure'].includes(external_tls_mode)) {
             const err = new Error('Invalid external TLS mode. Must be strict or insecure');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        if (external_health_mode !== undefined && !EXTERNAL_HEALTH_MODES.includes(external_health_mode)) {
+            const err = new Error('Invalid external health mode');
             err.statusCode = 400;
             throw err;
         }
@@ -654,7 +668,7 @@ class CameraService {
         const cameraStatus = status || 'active';
 
         const result = execute(
-            'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, recording_duration_hours, video_codec, stream_source, delivery_type, external_hls_url, external_stream_url, external_embed_url, external_snapshot_url, external_origin_mode, external_use_proxy, external_tls_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, recording_duration_hours, video_codec, stream_source, delivery_type, external_hls_url, external_stream_url, external_embed_url, external_snapshot_url, external_origin_mode, external_use_proxy, external_tls_mode, external_health_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 name,
                 deliveryConfig.deliveryType === 'internal_hls' ? private_rtsp_url : '',
@@ -680,6 +694,7 @@ class CameraService {
                 deliveryConfig.externalOriginMode,
                 externalUseProxy,
                 externalTlsMode,
+                externalHealthMode,
             ]
         );
 
@@ -750,6 +765,7 @@ class CameraService {
             external_origin_mode,
             external_use_proxy,
             external_tls_mode,
+            external_health_mode,
         } = data;
 
         const existingCamera = queryOne(
@@ -764,7 +780,11 @@ class CameraService {
                     CASE
                         WHEN external_tls_mode IN ('strict', 'insecure') THEN external_tls_mode
                         ELSE 'strict'
-                    END as external_tls_mode
+                    END as external_tls_mode,
+                    CASE
+                        WHEN external_health_mode IN ('default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled') THEN external_health_mode
+                        ELSE 'default'
+                    END as external_health_mode
              FROM cameras WHERE id = ?`,
             [id]
         );
@@ -781,6 +801,12 @@ class CameraService {
         }
         if (delivery_type !== undefined && !DELIVERY_TYPES.includes(delivery_type)) {
             const err = new Error('Invalid delivery type');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        if (external_health_mode !== undefined && !EXTERNAL_HEALTH_MODES.includes(external_health_mode)) {
+            const err = new Error('Invalid external health mode');
             err.statusCode = 400;
             throw err;
         }
@@ -899,6 +925,10 @@ class CameraService {
             }
             updates.push('external_tls_mode = ?');
             values.push(external_tls_mode);
+        }
+        if (external_health_mode !== undefined) {
+            updates.push('external_health_mode = ?');
+            values.push(normalizeExternalHealthMode(external_health_mode));
         }
 
         if (updates.length === 0) {
@@ -1617,7 +1647,7 @@ class CameraService {
                 });
                 const streamKey = uuidv4();
                 execute(
-                    'INSERT INTO cameras (name, private_rtsp_url, description, location, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, stream_source, delivery_type, external_hls_url, external_stream_url, external_embed_url, external_snapshot_url, external_origin_mode, external_use_proxy, external_tls_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    'INSERT INTO cameras (name, private_rtsp_url, description, location, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, stream_source, delivery_type, external_hls_url, external_stream_url, external_embed_url, external_snapshot_url, external_origin_mode, external_use_proxy, external_tls_mode, external_health_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                     [
                         name,
                         rtspUrl || '',
@@ -1639,7 +1669,8 @@ class CameraService {
                         importDeliveryConfig.externalSnapshotUrl,
                         importDeliveryConfig.externalOriginMode,
                         cam.external_use_proxy !== undefined ? cam.external_use_proxy : 1, // dynamically read from frontend overlay
-                        cam.external_tls_mode || 'strict' // external_tls_mode
+                        cam.external_tls_mode || 'strict', // external_tls_mode
+                        normalizeExternalHealthMode(cam.external_health_mode)
                     ]
                 );
                 

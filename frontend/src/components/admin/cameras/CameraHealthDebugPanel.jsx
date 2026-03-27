@@ -185,6 +185,7 @@ export default function CameraHealthDebugPanel({
                                         <th className="px-3 py-2">Camera</th>
                                         <th className="px-3 py-2">Internal State</th>
                                         <th className="px-3 py-2">Public State</th>
+                                        <th className="px-3 py-2">Monitoring</th>
                                         <th className="px-3 py-2">Delivery</th>
                                         <th className="px-3 py-2">Reason</th>
                                         <th className="px-3 py-2">Diagnostics</th>
@@ -233,6 +234,13 @@ export default function CameraHealthDebugPanel({
                                                     <div className="text-xs text-gray-500 dark:text-gray-400">
                                                         confidence {Number(item.availability_confidence || 0).toFixed(2)}
                                                     </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-3 py-3 text-xs">
+                                                <div className="space-y-2">
+                                                    <div className="font-medium text-gray-700 dark:text-gray-200">{item.healthMode || '-'}</div>
+                                                    <div className="text-gray-500 dark:text-gray-400">{formatReason(item.monitoring_state)}</div>
+                                                    <div className="text-gray-400 dark:text-gray-500">{formatReason(item.monitoring_reason)}</div>
                                                 </div>
                                             </td>
                                             <td className="px-3 py-3 text-xs">

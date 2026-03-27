@@ -12,6 +12,14 @@ export const CAMERA_DELIVERY_CLASSIFICATIONS = [
     'external_unresolved',
 ];
 
+export const EXTERNAL_HEALTH_MODES = [
+    'default',
+    'passive_first',
+    'hybrid_probe',
+    'probe_first',
+    'disabled',
+];
+
 export const DELIVERY_TYPE_PATTERNS = {
     websocket: /^wss?:\/\//i,
     http: /^https?:\/\//i,
@@ -224,4 +232,8 @@ export function normalizeExternalOriginMode(originMode) {
     }
 
     return 'direct';
+}
+
+export function normalizeExternalHealthMode(healthMode) {
+    return EXTERNAL_HEALTH_MODES.includes(healthMode) ? healthMode : 'default';
 }

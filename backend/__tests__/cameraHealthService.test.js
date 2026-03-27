@@ -346,6 +346,7 @@ describe('cameraHealthService external TLS policy', () => {
             stream_source: 'external',
             external_snapshot_url: 'https://example.com/snapshot.jpg',
             external_stream_url: 'https://example.com/mjpeg',
+            external_health_mode: 'probe_first',
         }, new Map());
 
         expect(result.isOnline).toBe(1);
@@ -387,6 +388,7 @@ describe('cameraHealthService external TLS policy', () => {
             stream_source: 'external',
             delivery_type: 'external_mjpeg',
             external_stream_url: 'https://example.com/live.mjpg',
+            external_health_mode: 'probe_first',
         }, new Map());
 
         expect(result.online).toBe(true);
@@ -412,6 +414,7 @@ describe('cameraHealthService external TLS policy', () => {
             delivery_type: 'external_mjpeg',
             external_stream_url: 'https://example.com/live.mjpg',
             external_snapshot_url: 'https://example.com/fallback.jpg',
+            external_health_mode: 'probe_first',
         }, new Map());
 
         expect(result.online).toBe(true);
@@ -419,13 +422,11 @@ describe('cameraHealthService external TLS policy', () => {
         expect(result.details.usedFallback).toBe(true);
     });
 
-    it('keeps MJPEG cameras online in degraded mode when recent runtime success exists but probe fails TLS', async () => {
-        axios.get.mockRejectedValueOnce({ code: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' });
-
+    it('uses passive-first MJPEG runtime evidence without probing backend by default', async () => {
         const service = new CameraHealthService();
         service.recordRuntimeSignal(393, {
             targetUrl: 'https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=112',
-            signalType: 'external_mjpeg_image_load',
+            signalType: 'external_mjpeg_open',
             success: true,
             timestamp: Date.now(),
         });
@@ -444,17 +445,16 @@ describe('cameraHealthService external TLS policy', () => {
         const state = service.healthState.get(393);
         expect(result.isOnline).toBe(1);
         expect(result.rawReason).toBe('mjpeg_runtime_recent');
-        expect(state.state).toBe('degraded');
-        expect(state.lastRuntimeSignalType).toBe('external_mjpeg_image_load');
+        expect(state.state).toBe('degraded_runtime_recent');
+        expect(state.lastRuntimeSignalType).toBe('external_mjpeg_open');
+        expect(axios.get).not.toHaveBeenCalled();
     });
 
-    it('keeps MJPEG cameras degraded while runtime grace is still active even when fresh signal is stale', async () => {
-        axios.get.mockRejectedValueOnce({ code: 'ECONNABORTED' });
-
+    it('keeps MJPEG cameras degraded while passive runtime grace is still active', async () => {
         const service = new CameraHealthService();
         service.recordRuntimeSignal(394, {
             targetUrl: 'https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=113',
-            signalType: 'external_mjpeg_image_load',
+            signalType: 'external_mjpeg_open',
             success: true,
             timestamp: Date.now() - 120000,
         });
@@ -470,15 +470,40 @@ describe('cameraHealthService external TLS policy', () => {
         }, new Map());
 
         expect(result.isOnline).toBe(1);
-        expect(result.rawReason).toBe('mjpeg_runtime_stale');
-        expect(service.healthState.get(394).state).toBe('degraded');
+        expect(result.rawReason).toBe('mjpeg_runtime_grace');
+        expect(service.healthState.get(394).state).toBe('degraded_runtime_grace');
+        expect(axios.get).not.toHaveBeenCalled();
+    });
+
+    it('downgrades MJPEG passive-first cameras after grace but before final stale timeout', async () => {
+        const service = new CameraHealthService();
+        service.recordRuntimeSignal(397, {
+            targetUrl: 'https://example.com/mjpeg',
+            signalType: 'external_mjpeg_live_tick',
+            success: true,
+            timestamp: Date.now() - (5 * 60 * 1000),
+        });
+
+        const result = await service.evaluateCameraStatus({
+            id: 397,
+            enabled: 1,
+            is_online: 1,
+            stream_source: 'external',
+            delivery_type: 'external_mjpeg',
+            external_stream_url: 'https://example.com/mjpeg',
+        }, new Map());
+
+        expect(result.isOnline).toBe(1);
+        expect(result.rawReason).toBe('stale_passive');
+        expect(service.healthState.get(397).state).toBe('degraded_runtime_grace');
+        expect(axios.get).not.toHaveBeenCalled();
     });
 
     it('maps degraded MJPEG runtime state to public degraded availability', () => {
         const service = new CameraHealthService();
         service.healthState.set(395, {
             effectiveOnline: true,
-            state: 'degraded',
+            state: 'degraded_runtime_recent',
             confidence: 0.71,
             lastReason: 'mjpeg_runtime_recent',
             errorClass: 'network_transient',

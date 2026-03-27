@@ -11,7 +11,13 @@ import {
 import { getTimezone } from './timezoneService.js';
 import { recordingService } from './recordingService.js';
 import thumbnailService from './thumbnailService.js';
-import { getCameraDeliveryProfile, getEffectiveDeliveryType, getPrimaryExternalStreamUrl } from '../utils/cameraDelivery.js';
+import settingsService from './settingsService.js';
+import {
+    getCameraDeliveryProfile,
+    getEffectiveDeliveryType,
+    getPrimaryExternalStreamUrl,
+    normalizeExternalHealthMode,
+} from '../utils/cameraDelivery.js';
 import { SHARED_CAMERA_STREAM_PROJECTION } from '../utils/cameraProjection.js';
 
 const mediaMtxApiBaseUrl = `${(config.mediamtx?.apiUrl || 'http://localhost:9997').replace(/\/$/, '')}/v3`;
@@ -22,6 +28,7 @@ const EXTERNAL_STALE_SEQUENCE_THRESHOLD = 4; // Increased from 2 to 4 to tolerat
 const RUNTIME_SUCCESS_WINDOW_MS = 90 * 1000;
 const MJPEG_RUNTIME_FRESH_WINDOW_MS = 60 * 1000;
 const MJPEG_RUNTIME_GRACE_WINDOW_MS = 4 * 60 * 1000;
+const MJPEG_PASSIVE_STALE_TIMEOUT_MS = 12 * 60 * 1000;
 const HOT_CADENCE_MS = 20 * 1000;
 const WARM_CADENCE_MS = 90 * 1000;
 const COLD_CADENCE_MS = 5 * 60 * 1000;
@@ -217,6 +224,20 @@ function mapExternalFetchError(error) {
         return 'tls_verification_failed';
     }
     return errorCode || 'request_error';
+}
+
+function isExternalHttpDelivery(deliveryType) {
+    return [
+        'external_hls',
+        'external_mjpeg',
+        'external_embed',
+        'external_jsmpeg',
+        'external_custom_ws',
+    ].includes(deliveryType);
+}
+
+function rawReasonIsHardConfig(reason) {
+    return HARD_OFFLINE_REASONS.has(reason) || resolveErrorClass(reason) === 'config';
 }
 
 function withProbeDetails(baseDetails = {}, detailOverrides = {}) {
@@ -621,6 +642,57 @@ class CameraHealthService {
         return Boolean(state?.runtimeGraceUntil && state.runtimeGraceUntil > now);
     }
 
+    hasMjpegPassiveRuntime(state, now = Date.now()) {
+        return Boolean(
+            state?.lastRuntimeSuccessAt
+            && (now - state.lastRuntimeSuccessAt) <= MJPEG_PASSIVE_STALE_TIMEOUT_MS
+        );
+    }
+
+    buildPassiveMjpegResult(camera, baseDetails, state, reason = 'mjpeg_runtime_recent', extraDetails = {}) {
+        return {
+            online: true,
+            reason,
+            details: withProbeDetails(baseDetails, {
+                probe_method: 'passive_runtime_only',
+                assistedByRuntime: true,
+                runtimeTarget: state?.lastRuntimeTarget || baseDetails.runtimeTarget || null,
+                lastRuntimeSuccessAt: state?.lastRuntimeSuccessAt ? new Date(state.lastRuntimeSuccessAt).toISOString() : null,
+                lastRuntimeFreshAt: state?.lastRuntimeFreshAt ? new Date(state.lastRuntimeFreshAt).toISOString() : null,
+                lastRuntimeSignalType: state?.lastRuntimeSignalType || null,
+                runtimeGraceUntil: state?.runtimeGraceUntil ? new Date(state.runtimeGraceUntil).toISOString() : null,
+                healthMode: this.resolveExternalHealthMode(camera),
+                ...extraDetails,
+            }),
+        };
+    }
+
+    evaluatePassiveMjpegRaw(camera, baseDetails) {
+        const state = this.ensureCameraState(camera.id, camera.is_online);
+        const now = Date.now();
+
+        if (this.hasFreshMjpegRuntimeSignal(state, now)) {
+            return this.buildPassiveMjpegResult(camera, baseDetails, state, 'mjpeg_runtime_recent');
+        }
+
+        if (this.hasMjpegRuntimeGrace(state, now)) {
+            return this.buildPassiveMjpegResult(camera, baseDetails, state, 'mjpeg_runtime_grace');
+        }
+
+        if (this.hasMjpegPassiveRuntime(state, now)) {
+            return this.buildPassiveMjpegResult(camera, baseDetails, state, 'stale_passive');
+        }
+
+        return {
+            online: false,
+            reason: 'no_runtime_signal',
+            details: withProbeDetails(baseDetails, {
+                probe_method: 'passive_runtime_only',
+                healthMode: this.resolveExternalHealthMode(camera),
+            }),
+        };
+    }
+
     recordRuntimeSignal(cameraId, { targetUrl = null, signalType = 'runtime_success', timestamp = Date.now(), success = true } = {}) {
         const state = this.ensureCameraState(cameraId, 0);
         const providerDomain = extractProviderDomain(targetUrl);
@@ -637,10 +709,14 @@ class CameraHealthService {
             state.lastFreshFrameWindowExpiresAt = timestamp + MJPEG_RUNTIME_FRESH_WINDOW_MS;
             state.runtimeGraceUntil = timestamp + MJPEG_RUNTIME_GRACE_WINDOW_MS;
             state.effectiveOnline = true;
-            state.state = state.state === 'offline' ? 'degraded' : (state.state || 'degraded');
+            state.state = signalType === 'external_mjpeg_live_tick' || signalType === 'external_mjpeg_open'
+                ? 'degraded_runtime_recent'
+                : (state.state === 'offline' ? 'degraded_runtime_recent' : (state.state || 'degraded_runtime_recent'));
             state.confidence = Math.max(state.confidence || 0.5, 0.7);
             state.lastStateChangeAt = timestamp;
-            state.lastReason = 'runtime_recent_success';
+            state.lastReason = signalType === 'external_mjpeg_live_tick' || signalType === 'external_mjpeg_open'
+                ? 'mjpeg_runtime_recent'
+                : 'runtime_recent_success';
             state.lastDetails = withProbeDetails(state.lastDetails, {
                 runtimeTarget: targetUrl || state.lastRuntimeTarget || null,
                 lastRuntimeSignalType: signalType,
@@ -670,6 +746,10 @@ class CameraHealthService {
 
         const deliveryClassification = rawResult.details?.delivery_classification || null;
         if (deliveryClassification === 'external_mjpeg') {
+            const healthMode = this.resolveExternalHealthMode({ id: rawResult.details?.cameraId, delivery_type: 'external_mjpeg', external_health_mode: rawResult.details?.healthMode });
+            if (healthMode === 'disabled' || healthMode === 'passive_first') {
+                return false;
+            }
             return this.hasFreshMjpegRuntimeSignal(state) || this.hasMjpegRuntimeGrace(state);
         }
 
@@ -692,7 +772,7 @@ class CameraHealthService {
             if (hasFreshMjpegSignal) {
                 assistedReason = 'mjpeg_runtime_recent';
             } else if (hasMjpegGrace) {
-                assistedReason = 'mjpeg_runtime_stale';
+                assistedReason = 'mjpeg_runtime_grace';
             }
         }
 
@@ -805,6 +885,101 @@ class CameraHealthService {
 
     getHealthStrategy(camera) {
         return resolveHealthProbeTarget(camera).healthStrategy;
+    }
+
+    resolveExternalHealthMode(camera) {
+        const explicitMode = normalizeExternalHealthMode(camera?.external_health_mode);
+        if (explicitMode !== 'default') {
+            return explicitMode;
+        }
+
+        const deliveryType = getEffectiveDeliveryType(camera);
+        const defaults = settingsService.getExternalHealthDefaults();
+
+        if (deliveryType === 'external_mjpeg') {
+            return defaults.external_mjpeg || 'passive_first';
+        }
+
+        if (deliveryType === 'external_hls') {
+            return defaults.external_hls || 'hybrid_probe';
+        }
+
+        if (deliveryType === 'external_embed') {
+            return 'passive_first';
+        }
+
+        if (deliveryType === 'external_jsmpeg' || deliveryType === 'external_custom_ws') {
+            return 'disabled';
+        }
+
+        return 'hybrid_probe';
+    }
+
+    getMonitoringState(camera, state) {
+        const healthMode = this.resolveExternalHealthMode(camera);
+        const deliveryType = getEffectiveDeliveryType(camera);
+
+        if (camera?.status === 'maintenance') {
+            return {
+                health_mode: healthMode,
+                monitoring_state: 'maintenance',
+                monitoring_reason: 'maintenance',
+            };
+        }
+
+        if (state?.state === 'unresolved') {
+            return {
+                health_mode: healthMode,
+                monitoring_state: 'unresolved',
+                monitoring_reason: state.lastReason || 'missing_external_source_metadata',
+            };
+        }
+
+        if (deliveryType === 'external_mjpeg' && healthMode === 'passive_first') {
+            if (this.hasFreshMjpegRuntimeSignal(state)) {
+                return {
+                    health_mode: healthMode,
+                    monitoring_state: 'passive',
+                    monitoring_reason: 'mjpeg_runtime_recent',
+                };
+            }
+
+            if (this.hasMjpegRuntimeGrace(state)) {
+                return {
+                    health_mode: healthMode,
+                    monitoring_state: 'stale',
+                    monitoring_reason: 'mjpeg_runtime_grace',
+                };
+            }
+
+            if (state?.lastRuntimeSuccessAt) {
+                return {
+                    health_mode: healthMode,
+                    monitoring_state: 'stale',
+                    monitoring_reason: 'mjpeg_runtime_stale',
+                };
+            }
+
+            return {
+                health_mode: healthMode,
+                monitoring_state: state?.effectiveOnline ? 'passive' : 'offline',
+                monitoring_reason: state?.lastReason || 'no_runtime_signal',
+            };
+        }
+
+        if (!state?.effectiveOnline && !rawReasonIsHardConfig(state?.lastReason) && state?.errorClass && state.errorClass !== 'config') {
+            return {
+                health_mode: healthMode,
+                monitoring_state: 'probe_failed',
+                monitoring_reason: state.lastReason,
+            };
+        }
+
+        return {
+            health_mode: healthMode,
+            monitoring_state: state?.effectiveOnline ? 'passive' : 'offline',
+            monitoring_reason: state?.lastReason || 'unknown',
+        };
     }
 
     async handleCameraStatusTransition(camera, previousOnline, nextOnline, rawReason) {
@@ -1276,6 +1451,9 @@ class CameraHealthService {
     async evaluateCameraRaw(camera, activePaths, options = {}) {
         const probeResolution = resolveHealthProbeTarget(camera);
         const deliveryType = probeResolution.deliveryClassification;
+        const healthMode = isExternalHttpDelivery(deliveryType)
+            ? this.resolveExternalHealthMode(camera)
+            : 'default';
         const providerDomain = extractProviderDomain(
             probeResolution.probeTarget
             || probeResolution.runtimeTarget
@@ -1290,6 +1468,8 @@ class CameraHealthService {
             probe_method: probeResolution.probeMethod,
             usedFallback: false,
             providerDomain,
+            cameraId: camera.id,
+            healthMode,
         };
         const domainState = this.getDomainState(providerDomain);
         const cacheKey = options.bustCache ? null : this.buildProbeCacheKey(probeResolution);
@@ -1338,6 +1518,10 @@ class CameraHealthService {
         }
 
         if (deliveryType === 'external_mjpeg') {
+            if (healthMode === 'disabled' || healthMode === 'passive_first') {
+                return this.evaluatePassiveMjpegRaw(camera, baseDetails);
+            }
+
             const requestOptions = this.getExternalRequestOptions(camera);
             const primaryTarget = probeResolution.probeTarget;
             const fallbackTarget = probeResolution.fallbackTargets[0] || null;
@@ -1347,6 +1531,15 @@ class CameraHealthService {
                     timeoutMs: options.timeoutMs,
                     baseDetails,
                 });
+
+                if (healthMode === 'hybrid_probe' && !streamResult.online) {
+                    const assistedPassiveResult = this.evaluatePassiveMjpegRaw(camera, baseDetails);
+                    if (assistedPassiveResult.online) {
+                        this.setCachedProbeResult(cacheKey, probeResolution, assistedPassiveResult);
+                        this.updateDomainHealth(providerDomain, streamResult);
+                        return assistedPassiveResult;
+                    }
+                }
 
                 if (streamResult.online || !fallbackTarget) {
                     this.setCachedProbeResult(cacheKey, probeResolution, streamResult);
@@ -1554,7 +1747,10 @@ class CameraHealthService {
 
         if (rawResult.online) {
             const runtimeAssisted = rawResult.reason === 'runtime_recent_success' || rawResult.reason === 'runtime_probe_tls_mismatch';
-            const stickyMjpeg = rawResult.reason === 'mjpeg_runtime_recent' || rawResult.reason === 'mjpeg_runtime_stale';
+            const stickyMjpeg = rawResult.reason === 'mjpeg_runtime_recent'
+                || rawResult.reason === 'mjpeg_runtime_grace'
+                || rawResult.reason === 'mjpeg_runtime_stale'
+                || rawResult.reason === 'stale_passive';
             state.failureScore = runtimeAssisted
                 ? Math.max(0, state.failureScore - SCORE_DECAY_ON_SUCCESS)
                 : 0;
@@ -1562,11 +1758,21 @@ class CameraHealthService {
             state.effectiveOnline = true;
             state.stableSuccessCount += 1;
             state.stableFailureCount = 0;
-            state.state = runtimeAssisted || stickyMjpeg || rawResult.reason === 'probe_target_mismatch'
-                ? 'degraded'
-                : 'healthy';
+            if (rawResult.reason === 'mjpeg_runtime_recent') {
+                state.state = 'degraded_runtime_recent';
+            } else if (rawResult.reason === 'mjpeg_runtime_grace' || rawResult.reason === 'mjpeg_runtime_stale' || rawResult.reason === 'stale_passive') {
+                state.state = 'degraded_runtime_grace';
+            } else {
+                state.state = runtimeAssisted || stickyMjpeg || rawResult.reason === 'probe_target_mismatch'
+                    ? 'degraded'
+                    : 'healthy';
+            }
             state.confidence = stickyMjpeg
-                ? (rawResult.reason === 'mjpeg_runtime_stale' ? Math.max(0.55, state.confidence || 0.5) : Math.max(0.72, state.confidence || 0.6))
+                ? (
+                    rawResult.reason === 'mjpeg_runtime_grace' || rawResult.reason === 'mjpeg_runtime_stale'
+                        ? Math.max(0.55, state.confidence || 0.5)
+                        : Math.max(0.72, state.confidence || 0.6)
+                )
                 : (runtimeAssisted ? Math.max(0.65, state.confidence || 0.5) : 0.98);
         } else {
             const weight = FAILURE_WEIGHTS[rawResult.reason] ?? 0.3;
@@ -1588,9 +1794,20 @@ class CameraHealthService {
         }
 
         if (!rawResult.online && !state.effectiveOnline) {
-            state.state = getCameraDeliveryProfile(camera).classification === 'external_unresolved'
-                ? 'unresolved'
-                : 'offline';
+            const deliveryClassification = getCameraDeliveryProfile(camera).classification;
+            const healthMode = this.resolveExternalHealthMode(camera);
+            if (deliveryClassification === 'external_unresolved') {
+                state.state = 'unresolved';
+            } else if (
+                deliveryClassification === 'external_mjpeg'
+                && (healthMode === 'passive_first' || healthMode === 'disabled')
+                && rawResult.reason === 'no_runtime_signal'
+                && state.lastRuntimeSuccessAt
+            ) {
+                state.state = 'stale_passive';
+            } else {
+                state.state = 'offline';
+            }
             state.confidence = Math.max(0.15, Math.min(0.45, 1 - Math.min(state.failureScore / OFFLINE_SCORE_THRESHOLD, 1)));
         }
 
@@ -1828,6 +2045,7 @@ class CameraHealthService {
             const deliveryProfile = getCameraDeliveryProfile(camera);
             const state = this.ensureCameraState(camera.id, camera.is_online);
             const availability = this.getPublicAvailability(camera);
+            const monitoring = this.getMonitoringState(camera, state);
 
             return {
                 cameraId: camera.id,
@@ -1840,6 +2058,9 @@ class CameraHealthService {
                 delivery_type: deliveryProfile.effectiveDeliveryType,
                 delivery_classification: deliveryProfile.classification,
                 healthStrategy: this.getHealthStrategy(camera),
+                healthMode: monitoring.health_mode,
+                monitoring_state: monitoring.monitoring_state,
+                monitoring_reason: monitoring.monitoring_reason,
                 effectiveOnline: state.effectiveOnline,
                 state: state.state,
                 confidence: state.confidence,
@@ -1925,6 +2146,9 @@ class CameraHealthService {
                     break;
                 case 'degraded':
                 case 'suspect':
+                case 'degraded_runtime_recent':
+                case 'degraded_runtime_grace':
+                case 'stale_passive':
                     summary.degraded += 1;
                     break;
                 case 'offline':
@@ -1965,7 +2189,11 @@ class CameraHealthService {
         return items.filter((item) => {
             if (filters.state && filters.state !== 'all') {
                 if (filters.state === 'problem') {
-                    if (!['degraded', 'suspect', 'offline', 'unresolved'].includes(item.state)) {
+                    if (!['degraded', 'degraded_runtime_recent', 'degraded_runtime_grace', 'stale_passive', 'suspect', 'offline', 'unresolved'].includes(item.state)) {
+                        return false;
+                    }
+                } else if (filters.state === 'degraded') {
+                    if (!['degraded', 'degraded_runtime_recent', 'degraded_runtime_grace', 'stale_passive'].includes(item.state)) {
                         return false;
                     }
                 } else if (item.state !== filters.state) {
@@ -2009,7 +2237,10 @@ class CameraHealthService {
             unresolved: 1,
             suspect: 2,
             degraded: 3,
-            healthy: 4,
+            degraded_runtime_grace: 3,
+            stale_passive: 3,
+            degraded_runtime_recent: 4,
+            healthy: 5,
         };
 
         const confidenceValue = (item) => Number(item.confidence ?? 0);
@@ -2063,7 +2294,13 @@ class CameraHealthService {
             };
         }
 
-        if (state.state === 'degraded' || state.state === 'suspect') {
+        if (
+            state.state === 'degraded'
+            || state.state === 'suspect'
+            || state.state === 'degraded_runtime_recent'
+            || state.state === 'degraded_runtime_grace'
+            || state.state === 'stale_passive'
+        ) {
             return {
                 availability_state: 'degraded',
                 availability_reason: lastReason || state.state,
@@ -2087,9 +2324,11 @@ class CameraHealthService {
     }
 
     enrichCameraAvailability(camera) {
+        const state = this.healthState.get(camera.id) || this.ensureCameraState(camera.id, camera.is_online);
         return {
             ...camera,
             ...this.getPublicAvailability(camera),
+            ...this.getMonitoringState(camera, state),
         };
     }
 

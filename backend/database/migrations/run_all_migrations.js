@@ -47,6 +47,7 @@ const MIGRATIONS = [
     'add_analytics_indexes.js',
     'add_external_stream.js',
     'add_external_proxy_controls.js',
+    'add_external_health_mode.js',
     'create_camera_discovery_table.js',
     'add_camera_delivery_types.js',
     'backfill_camera_delivery_types.js'

@@ -97,6 +97,10 @@ export const createCameraSchema = {
                 type: 'string',
                 enum: ['strict', 'insecure']
             },
+            external_health_mode: {
+                type: 'string',
+                enum: ['default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled']
+            },
             video_codec: {
                 type: 'string',
                 enum: ['h264', 'h265'],
@@ -201,6 +205,10 @@ export const updateCameraSchema = {
             external_tls_mode: {
                 type: 'string',
                 enum: ['strict', 'insecure']
+            },
+            external_health_mode: {
+                type: 'string',
+                enum: ['default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled']
             },
             video_codec: {
                 type: 'string',

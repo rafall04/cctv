@@ -24,6 +24,7 @@ export const defaultCameraFormValues = {
     external_origin_mode: 'direct',
     external_use_proxy: true,
     external_tls_mode: 'strict',
+    external_health_mode: 'default',
 };
 
 export const recordingDurationOptions = [
@@ -171,6 +172,7 @@ export function mapCameraToFormValues(camera) {
         external_origin_mode: camera.external_origin_mode || 'direct',
         external_use_proxy: camera.external_use_proxy !== false && camera.external_use_proxy !== 0,
         external_tls_mode: camera.external_tls_mode || 'strict',
+        external_health_mode: camera.external_health_mode || 'default',
     };
 }
 
@@ -203,5 +205,8 @@ export function buildCameraPayload(formData) {
             ? (formData.external_tls_mode === 'insecure' ? 1 : (formData.external_use_proxy ? 1 : 0))
             : 1,
         external_tls_mode: deliveryType === 'external_hls' ? (formData.external_tls_mode || 'strict') : 'strict',
+        external_health_mode: compatStreamSource === 'external'
+            ? (formData.external_health_mode || 'default')
+            : 'default',
     };
 }

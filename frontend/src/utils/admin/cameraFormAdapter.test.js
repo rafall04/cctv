@@ -21,6 +21,16 @@ describe('cameraFormAdapter delivery type support', () => {
         expect(values.external_tls_mode).toBe('insecure');
     });
 
+    it('maps external health mode into form values', () => {
+        const values = mapCameraToFormValues({
+            delivery_type: 'external_mjpeg',
+            external_stream_url: 'https://example.com/live.mjpg',
+            external_health_mode: 'passive_first',
+        });
+
+        expect(values.external_health_mode).toBe('passive_first');
+    });
+
     it('builds external HLS payload with compat fields and strict proxy defaults', () => {
         const payload = buildCameraPayload({
             ...defaultCameraFormValues,
@@ -59,7 +69,20 @@ describe('cameraFormAdapter delivery type support', () => {
             external_stream_url: 'https://example.com/zm/cgi-bin/nph-zms',
             external_snapshot_url: 'https://example.com/snapshot.jpg',
             external_hls_url: null,
+            external_health_mode: 'default',
         });
+    });
+
+    it('builds external MJPEG payload with passive-first health mode override', () => {
+        const payload = buildCameraPayload({
+            ...defaultCameraFormValues,
+            delivery_type: 'external_mjpeg',
+            stream_source: 'external',
+            external_stream_url: 'https://example.com/mjpeg',
+            external_health_mode: 'passive_first',
+        });
+
+        expect(payload.external_health_mode).toBe('passive_first');
     });
 
     it('validates WebSocket delivery types with ws/wss URLs only', () => {

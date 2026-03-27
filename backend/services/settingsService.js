@@ -1,5 +1,6 @@
 import { query, queryOne, execute } from '../database/database.js';
 import { getTimezone } from './timezoneService.js';
+import { normalizeExternalHealthMode } from '../utils/cameraDelivery.js';
 
 const LANDING_PAGE_KEYS = [
     'landing_area_coverage',
@@ -286,6 +287,23 @@ class SettingsService {
         }
 
         return { key, value };
+    }
+
+    getExternalHealthDefaults() {
+        const rows = query(
+            'SELECT key, value FROM settings WHERE key IN (?, ?)',
+            ['external_mjpeg_health_default', 'external_hls_health_default']
+        );
+
+        const map = new Map(rows.map((row) => [row.key, row.value]));
+        return {
+            external_mjpeg: normalizeExternalHealthMode(
+                map.get('external_mjpeg_health_default') || 'passive_first'
+            ),
+            external_hls: normalizeExternalHealthMode(
+                map.get('external_hls_health_default') || 'hybrid_probe'
+            ),
+        };
     }
 
     getMapDefaultCenter() {
