@@ -42,6 +42,20 @@ export async function getAreaSummary(request, reply) {
     }
 }
 
+export async function getAreaAdminOverview(request, reply) {
+    try {
+        const result = areaService.getAdminOverview();
+        return reply.send({
+            success: true,
+            data: result.data,
+            cached: result.isCached,
+        });
+    } catch (error) {
+        console.error('Get area admin overview error:', error);
+        return reply.code(500).send({ success: false, message: 'Internal server error' });
+    }
+}
+
 export async function getAreaById(request, reply) {
     try {
         const { id } = request.params;

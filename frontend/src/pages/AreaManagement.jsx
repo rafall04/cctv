@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, lazy, Suspense } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { areaService } from '../services/areaService';
 import { cameraService } from '../services/cameraService';
@@ -22,9 +22,46 @@ const defaultBulkConfig = {
     clear_internal_rtsp: false,
 };
 
+function requiresExternalHlsTarget(config) {
+    if (config.operation !== 'policy_update' && config.operation !== 'maintenance') {
+        return false;
+    }
+
+    return config.external_use_proxy !== 'ignore'
+        || config.external_tls_mode !== 'ignore'
+        || config.external_origin_mode !== 'ignore';
+}
+
+function getEffectiveTargetFilter(config) {
+    if (requiresExternalHlsTarget(config)) {
+        return 'external_hls_only';
+    }
+    return config.targetFilter || 'all';
+}
+
+function getBulkFilterLabel(targetFilter) {
+    switch (targetFilter) {
+        case 'internal_only':
+            return 'Hanya Internal';
+        case 'external_only':
+            return 'Hanya External';
+        case 'external_hls_only':
+            return 'Hanya External HLS';
+        case 'external_unresolved_only':
+            return 'Hanya External Unresolved';
+        case 'online_only':
+            return 'Hanya Online';
+        case 'offline_only':
+            return 'Hanya Offline';
+        case 'recording_enabled_only':
+            return 'Hanya Recording Enabled';
+        default:
+            return 'Semua Kamera Area';
+    }
+}
+
 export default function AreaManagement() {
     const [areas, setAreas] = useState([]);
-    const [areaSummaries, setAreaSummaries] = useState([]);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState(null);
     const [showModal, setShowModal] = useState(false);
@@ -55,24 +92,38 @@ export default function AreaManagement() {
     const [applyingBulkDelete, setApplyingBulkDelete] = useState(false);
 
     const { success, error: showError } = useNotification();
+    const loadRequestRef = useRef(0);
+    const hasLoadedAreasRef = useRef(false);
 
     const loadAreas = useCallback(async () => {
+        const requestId = ++loadRequestRef.current;
         try {
-            setLoading(true);
-            setLoadError(null);
-            const [areasResponse, summaryResponse] = await Promise.all([
-                areaService.getAllAreas(),
-                areaService.getAreaSummary(),
-            ]);
-            if (areasResponse.success) setAreas(areasResponse.data);
-            if (summaryResponse.success) setAreaSummaries(summaryResponse.data);
+            if (!hasLoadedAreasRef.current) {
+                setLoading(true);
+                setLoadError(null);
+            }
+            const overviewResponse = await areaService.getAdminOverview();
+            if (requestId !== loadRequestRef.current) {
+                return;
+            }
+            if (overviewResponse.success) {
+                setAreas(overviewResponse.data);
+                hasLoadedAreasRef.current = true;
+                setLoadError(null);
+            }
         } catch (err) {
             console.error('Load areas error:', err);
-            setLoadError('Gagal memuat data area.');
+            if (!hasLoadedAreasRef.current) {
+                setLoadError('Gagal memuat data area.');
+            } else if (requestId === loadRequestRef.current) {
+                showError('Sinkronisasi Area Gagal', 'Menampilkan data area terakhir yang berhasil dimuat.');
+            }
         } finally {
-            setLoading(false);
+            if (requestId === loadRequestRef.current) {
+                setLoading(false);
+            }
         }
-    }, []);
+    }, [showError]);
 
     const loadMapCenter = useCallback(async () => {
         try {
@@ -183,12 +234,11 @@ export default function AreaManagement() {
     };
 
     const openBulkConfigModal = (area) => {
-        const summary = areaSummaries.find((item) => item.areaId === area.id);
         setBulkConfigArea(area);
         setBulkConfig({
             ...defaultBulkConfig,
-            targetFilter: summary?.externalUnresolved ? 'external_unresolved_only' : 'all',
-            operation: summary?.externalUnresolved ? 'normalization' : 'policy_update',
+            targetFilter: area.externalUnresolvedCount > 0 ? 'external_unresolved_only' : 'all',
+            operation: area.externalUnresolvedCount > 0 ? 'normalization' : 'policy_update',
         });
         setBulkPreview(null);
     };
@@ -221,7 +271,7 @@ export default function AreaManagement() {
         try {
             const payload = buildBulkPayload();
             const result = await cameraService.bulkUpdateByArea(bulkConfigArea.id, {
-                targetFilter: bulkConfig.targetFilter,
+                targetFilter: getEffectiveTargetFilter(bulkConfig),
                 operation: bulkConfig.operation,
                 payload,
                 preview: true,
@@ -239,7 +289,7 @@ export default function AreaManagement() {
         } finally {
             setBulkPreviewLoading(false);
         }
-    }, [buildBulkPayload, bulkConfig.operation, bulkConfig.targetFilter, bulkConfigArea, showError]);
+    }, [buildBulkPayload, bulkConfig, bulkConfigArea, showError]);
 
     const handleBulkUpdate = async () => {
         if (!bulkConfigArea) return;
@@ -253,7 +303,7 @@ export default function AreaManagement() {
                 return;
             }
             const result = await cameraService.bulkUpdateByArea(bulkConfigArea.id, {
-                targetFilter: bulkConfig.targetFilter,
+                targetFilter: getEffectiveTargetFilter(bulkConfig),
                 operation: bulkConfig.operation,
                 payload,
             });
@@ -307,7 +357,7 @@ export default function AreaManagement() {
 
     const kecamatans = [...new Set(areas.map(a => a.kecamatan).filter(Boolean))].sort();
     const filteredAreas = filterKecamatan ? areas.filter(a => a.kecamatan === filterKecamatan) : areas;
-    const areaSummaryMap = new Map(areaSummaries.map((item) => [item.areaId, item]));
+    const effectiveBulkTargetFilter = useMemo(() => getEffectiveTargetFilter(bulkConfig), [bulkConfig]);
 
     const getLocationString = (area) => {
         const parts = [];
@@ -400,7 +450,7 @@ export default function AreaManagement() {
                 </div>
                 <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4">
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {areas.reduce((sum, a) => sum + (a.camera_count || 0), 0)}
+                        {areas.reduce((sum, a) => sum + (a.cameraCount || 0), 0)}
                     </p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">Total Kamera</p>
                 </div>
@@ -424,10 +474,6 @@ export default function AreaManagement() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredAreas.map((area) => (
                         <div key={area.id} className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6 hover:shadow-xl hover:border-primary/30 transition-all group">
-                            {(() => {
-                                const areaSummary = areaSummaryMap.get(area.id);
-                                return (
-                                    <>
                             <div className="flex justify-between items-start mb-4">
                                 <div className="w-12 h-12 bg-gradient-to-br from-primary-400 to-primary-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/30 group-hover:scale-110 transition-transform">
                                     <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -482,30 +528,25 @@ export default function AreaManagement() {
                             <div className="flex flex-wrap gap-2 mb-4">
                                 {area.kecamatan && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-blue-100 dark:bg-primary/20 text-primary-600 dark:text-blue-400">{area.kecamatan}</span>}
                                 {area.kelurahan && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400">{area.kelurahan}</span>}
-                                {areaSummary?.externalUnresolved > 0 && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300">{areaSummary.externalUnresolved} unresolved</span>}
-                                {areaSummary?.offline > 0 && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300">{areaSummary.offline} offline</span>}
+                                {area.externalUnresolvedCount > 0 && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300">{area.externalUnresolvedCount} unresolved</span>}
+                                {area.offlineCount > 0 && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300">{area.offlineCount} offline</span>}
                             </div>
-                            {areaSummary && (
-                                <div className="grid grid-cols-2 gap-2 mb-4 text-xs">
-                                    <div className="rounded-xl border border-gray-200 dark:border-gray-700/50 bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
-                                        <div className="text-gray-500 dark:text-gray-400">Internal</div>
-                                        <div className="font-semibold text-gray-900 dark:text-white">{areaSummary.internalValid}</div>
-                                    </div>
-                                    <div className="rounded-xl border border-gray-200 dark:border-gray-700/50 bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
-                                        <div className="text-gray-500 dark:text-gray-400">External</div>
-                                        <div className="font-semibold text-gray-900 dark:text-white">{areaSummary.externalValid}</div>
-                                    </div>
+                            <div className="grid grid-cols-2 gap-2 mb-4 text-xs">
+                                <div className="rounded-xl border border-gray-200 dark:border-gray-700/50 bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
+                                    <div className="text-gray-500 dark:text-gray-400">Internal</div>
+                                    <div className="font-semibold text-gray-900 dark:text-white">{area.internalValidCount}</div>
                                 </div>
-                            )}
+                                <div className="rounded-xl border border-gray-200 dark:border-gray-700/50 bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
+                                    <div className="text-gray-500 dark:text-gray-400">External</div>
+                                    <div className="font-semibold text-gray-900 dark:text-white">{area.externalValidCount}</div>
+                                </div>
+                            </div>
                             <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700/50">
-                                <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{area.camera_count || 0} Kamera</span>
+                                <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{area.cameraCount || 0} Kamera</span>
                                 <Link to="/admin/cameras" className="text-sm font-semibold text-primary hover:text-primary-600 flex items-center gap-1">
                                     Lihat <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
                                 </Link>
                             </div>
-                                    </>
-                                );
-                            })()}
                         </div>
                     ))}
                 </div>
@@ -610,7 +651,7 @@ export default function AreaManagement() {
                                         <label className="text-sm font-semibold text-gray-900 dark:text-white">Mode Operasi</label>
                                         <select
                                             value={bulkConfig.operation}
-                                            onChange={(e) => setBulkConfig({ ...bulkConfig, operation: e.target.value })}
+                                            onChange={(e) => setBulkConfig((current) => ({ ...current, operation: e.target.value }))}
                                             className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
                                         >
                                             <option value="policy_update">Bulk Policy Update</option>
@@ -621,18 +662,24 @@ export default function AreaManagement() {
                                     <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
                                         <label className="text-sm font-semibold text-gray-900 dark:text-white">Target Kamera</label>
                                         <select
-                                            value={bulkConfig.targetFilter}
-                                            onChange={(e) => setBulkConfig({ ...bulkConfig, targetFilter: e.target.value })}
+                                            value={effectiveBulkTargetFilter}
+                                            onChange={(e) => setBulkConfig((current) => ({ ...current, targetFilter: e.target.value }))}
                                             className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
                                         >
                                             <option value="all">Semua Kamera Area</option>
                                             <option value="internal_only">Hanya Internal</option>
                                             <option value="external_only">Hanya External</option>
+                                            <option value="external_hls_only">Hanya External HLS</option>
                                             <option value="external_unresolved_only">Hanya External Unresolved</option>
                                             <option value="online_only">Hanya Online</option>
                                             <option value="offline_only">Hanya Offline</option>
                                             <option value="recording_enabled_only">Hanya Recording Enabled</option>
                                         </select>
+                                        {requiresExternalHlsTarget(bulkConfig) && (
+                                            <p className="text-xs text-amber-700 dark:text-amber-300">
+                                                Proxy, TLS, dan origin policy otomatis dikunci ke target External HLS.
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
 
@@ -656,7 +703,7 @@ export default function AreaManagement() {
                                         <label className="text-sm font-semibold text-gray-900 dark:text-white">Origin Mode</label>
                                         <select
                                             value={bulkConfig.external_origin_mode}
-                                            onChange={(e) => setBulkConfig({ ...bulkConfig, external_origin_mode: e.target.value })}
+                                            onChange={(e) => setBulkConfig((current) => ({ ...current, external_origin_mode: e.target.value }))}
                                             className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
                                         >
                                             <option value="ignore">Biarkan Seperti Semula</option>
@@ -668,7 +715,7 @@ export default function AreaManagement() {
                                         <label className="text-sm font-semibold text-gray-900 dark:text-white">Gunakan Proxy Server</label>
                                         <select
                                             value={bulkConfig.external_use_proxy}
-                                            onChange={(e) => setBulkConfig({ ...bulkConfig, external_use_proxy: e.target.value })}
+                                            onChange={(e) => setBulkConfig((current) => ({ ...current, external_use_proxy: e.target.value }))}
                                             className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
                                         >
                                             <option value="ignore">Biarkan Seperti Semula</option>
@@ -680,7 +727,7 @@ export default function AreaManagement() {
                                         <label className="text-sm font-semibold text-gray-900 dark:text-white">Mode TLS</label>
                                         <select
                                             value={bulkConfig.external_tls_mode}
-                                            onChange={(e) => setBulkConfig({ ...bulkConfig, external_tls_mode: e.target.value })}
+                                            onChange={(e) => setBulkConfig((current) => ({ ...current, external_tls_mode: e.target.value }))}
                                             className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
                                         >
                                             <option value="ignore">Biarkan Seperti Semula</option>
@@ -758,24 +805,51 @@ export default function AreaManagement() {
 
                                     {bulkPreview ? (
                                         <div className="space-y-3 text-sm">
+                                            <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-3 border border-gray-200 dark:border-gray-700">
+                                                <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Target Aktif</div>
+                                                <div className="font-semibold text-gray-900 dark:text-white">{getBulkFilterLabel(bulkPreview.targetFilter || effectiveBulkTargetFilter)}</div>
+                                            </div>
                                             <div className="grid grid-cols-2 gap-3">
                                                 <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-2 border border-gray-200 dark:border-gray-700">
-                                                    <div className="text-gray-500 dark:text-gray-400 text-xs">Target</div>
-                                                    <div className="font-semibold text-gray-900 dark:text-white">{bulkPreview.summary?.total || 0}</div>
+                                                    <div className="text-gray-500 dark:text-gray-400 text-xs">Total Area</div>
+                                                    <div className="font-semibold text-gray-900 dark:text-white">{bulkPreview.summary?.totalInArea || 0}</div>
                                                 </div>
+                                                <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-2 border border-gray-200 dark:border-gray-700">
+                                                    <div className="text-gray-500 dark:text-gray-400 text-xs">Matched Filter</div>
+                                                    <div className="font-semibold text-gray-900 dark:text-white">{bulkPreview.summary?.matchedCount || 0}</div>
+                                                </div>
+                                                <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-2 border border-gray-200 dark:border-gray-700">
+                                                    <div className="text-gray-500 dark:text-gray-400 text-xs">Eligible</div>
+                                                    <div className="font-semibold text-emerald-600 dark:text-emerald-300">{bulkPreview.summary?.eligibleCount || 0}</div>
+                                                </div>
+                                                <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-2 border border-gray-200 dark:border-gray-700">
+                                                    <div className="text-gray-500 dark:text-gray-400 text-xs">Blocked</div>
+                                                    <div className="font-semibold text-red-600 dark:text-red-300">{bulkPreview.summary?.blockedCount || 0}</div>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
                                                 <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-2 border border-gray-200 dark:border-gray-700">
                                                     <div className="text-gray-500 dark:text-gray-400 text-xs">Unresolved</div>
                                                     <div className="font-semibold text-amber-600 dark:text-amber-300">{bulkPreview.summary?.unresolvedCount || 0}</div>
                                                 </div>
                                                 <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-2 border border-gray-200 dark:border-gray-700">
-                                                    <div className="text-gray-500 dark:text-gray-400 text-xs">Internal</div>
-                                                    <div className="font-semibold text-gray-900 dark:text-white">{bulkPreview.summary?.internalCount || 0}</div>
-                                                </div>
-                                                <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-2 border border-gray-200 dark:border-gray-700">
-                                                    <div className="text-gray-500 dark:text-gray-400 text-xs">External</div>
-                                                    <div className="font-semibold text-gray-900 dark:text-white">{bulkPreview.summary?.externalCount || 0}</div>
+                                                    <div className="text-gray-500 dark:text-gray-400 text-xs">Recording Enabled</div>
+                                                    <div className="font-semibold text-gray-900 dark:text-white">{bulkPreview.summary?.recordingEnabledCount || 0}</div>
                                                 </div>
                                             </div>
+                                            {(bulkPreview.summary?.blockedReasons || []).length > 0 && (
+                                                <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-3 border border-gray-200 dark:border-gray-700">
+                                                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Blocked Reasons</div>
+                                                    <div className="space-y-2">
+                                                        {bulkPreview.summary.blockedReasons.map((item) => (
+                                                            <div key={item.reason} className="flex items-center justify-between gap-3 text-xs">
+                                                                <span className="text-gray-700 dark:text-gray-300">{item.reason}</span>
+                                                                <span className="px-2 py-1 rounded-full bg-red-100 dark:bg-red-500/10 text-red-700 dark:text-red-300 shrink-0">{item.count}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                             <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-3 border border-gray-200 dark:border-gray-700">
                                                 <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Contoh Kamera Terdampak</div>
                                                 <div className="space-y-2 max-h-48 overflow-y-auto">
@@ -789,6 +863,24 @@ export default function AreaManagement() {
                                                     ))}
                                                 </div>
                                             </div>
+                                            {(bulkPreview.summary?.blockedExamples || []).length > 0 && (
+                                                <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-3 border border-gray-200 dark:border-gray-700">
+                                                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Contoh Kamera Tidak Eligible</div>
+                                                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                                                        {(bulkPreview.summary?.blockedExamples || []).map((camera) => (
+                                                            <div key={camera.id} className="flex items-center justify-between gap-3 text-xs">
+                                                                <div className="min-w-0">
+                                                                    <div className="text-gray-900 dark:text-white truncate">{camera.name}</div>
+                                                                    <div className="text-gray-500 dark:text-gray-400 truncate">{camera.reason}</div>
+                                                                </div>
+                                                                <span className="px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 shrink-0">
+                                                                    {camera.delivery_classification}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                             {bulkPreview.guidance && (
                                                 <div className="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-500/10 dark:border-amber-500/20 px-3 py-3 text-amber-800 dark:text-amber-300">
                                                     {bulkPreview.guidance}
@@ -882,7 +974,7 @@ export default function AreaManagement() {
                             </div>
                             <h3 className="text-xl font-bold text-gray-900 dark:text-white text-center mb-2">Hapus Semua Kamera?</h3>
                             <p className="text-gray-500 dark:text-gray-400 text-center mb-4">
-                                Anda akan menghapus <span className="font-bold text-red-500 border-b border-red-500">{bulkDeleteAreaConfirm.camera_count || 0} kamera</span> dari area <span className="font-bold text-gray-900 dark:text-white">&quot;{bulkDeleteAreaConfirm.name}&quot;</span>.
+                                Anda akan menghapus <span className="font-bold text-red-500 border-b border-red-500">{bulkDeleteAreaConfirm.cameraCount || 0} kamera</span> dari area <span className="font-bold text-gray-900 dark:text-white">&quot;{bulkDeleteAreaConfirm.name}&quot;</span>.
                             </p>
                             <div className="p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-xl mb-2">
                                 <p className="text-red-800 dark:text-red-400 text-xs font-semibold uppercase tracking-wider mb-1">PERINGATAN BAHAYA</p>
@@ -914,12 +1006,12 @@ export default function AreaManagement() {
                             <p className="text-gray-500 dark:text-gray-400 text-center mb-4">
                                 Yakin ingin menghapus <span className="font-semibold text-gray-900 dark:text-white">&quot;{deleteConfirm.name}&quot;</span>?
                             </p>
-                            {deleteConfirm.camera_count > 0 && (
+                            {deleteConfirm.cameraCount > 0 && (
                                 <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl mb-4">
                                     <svg className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                     </svg>
-                                    <p className="text-amber-800 dark:text-amber-400 text-sm">Area ini memiliki {deleteConfirm.camera_count} kamera. Menghapus area akan melepas kamera dari area ini.</p>
+                                    <p className="text-amber-800 dark:text-amber-400 text-sm">Area ini memiliki {deleteConfirm.cameraCount} kamera. Menghapus area akan melepas kamera dari area ini.</p>
                                 </div>
                             )}
                         </div>

@@ -6,6 +6,70 @@ import { getCameraDeliveryProfile } from '../utils/cameraDelivery.js';
 const CACHE_ALL_AREAS = cacheKey(CacheNamespace.AREAS, 'all');
 const CACHE_AREA_FILTERS = cacheKey(CacheNamespace.AREAS, 'filters');
 const CACHE_AREA_SUMMARY = cacheKey(CacheNamespace.AREAS, 'summary');
+const CACHE_AREA_OVERVIEW = cacheKey(CacheNamespace.AREAS, 'overview');
+
+function buildAreaOverviewRows(areas, cameras, healthItems) {
+    const healthByCameraId = new Map(healthItems.map((item) => [item.cameraId, item]));
+    const overviewByArea = new Map(
+        areas.map((area) => [area.id, {
+            ...area,
+            cameraCount: 0,
+            onlineCount: 0,
+            offlineCount: 0,
+            internalValidCount: 0,
+            externalValidCount: 0,
+            externalUnresolvedCount: 0,
+            recordingEnabledCount: 0,
+            topReasons: [],
+        }])
+    );
+
+    for (const camera of cameras) {
+        const overview = overviewByArea.get(camera.area_id);
+        if (!overview) {
+            continue;
+        }
+
+        const deliveryProfile = getCameraDeliveryProfile(camera);
+        const healthItem = healthByCameraId.get(camera.id);
+
+        overview.cameraCount += 1;
+        if (camera.is_online === 1 || camera.is_online === true) {
+            overview.onlineCount += 1;
+        } else {
+            overview.offlineCount += 1;
+        }
+
+        if (camera.enable_recording === 1 || camera.enable_recording === true) {
+            overview.recordingEnabledCount += 1;
+        }
+
+        if (deliveryProfile.classification === 'internal_hls') {
+            overview.internalValidCount += 1;
+        } else if (deliveryProfile.classification === 'external_unresolved') {
+            overview.externalUnresolvedCount += 1;
+        } else {
+            overview.externalValidCount += 1;
+        }
+
+        if (healthItem?.lastReason) {
+            const existingReason = overview.topReasons.find((item) => item.reason === healthItem.lastReason);
+            if (existingReason) {
+                existingReason.count += 1;
+            } else {
+                overview.topReasons.push({ reason: healthItem.lastReason, count: 1 });
+            }
+        }
+    }
+
+    return areas.map((area) => {
+        const overview = overviewByArea.get(area.id);
+        overview.topReasons = overview.topReasons
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 3);
+        return overview;
+    });
+}
 
 class AreaService {
     invalidateAreaCache() {
@@ -57,8 +121,22 @@ class AreaService {
             return { data: cached, isCached: true };
         }
 
+        const overviewResult = this.getAdminOverview();
+        cache.set(CACHE_AREA_SUMMARY, overviewResult.data, CacheTTL.SHORT);
+        return {
+            data: overviewResult.data,
+            isCached: overviewResult.isCached,
+        };
+    }
+
+    getAdminOverview() {
+        const cached = cache.get(CACHE_AREA_OVERVIEW);
+        if (cached) {
+            return { data: cached, isCached: true };
+        }
+
         const areas = query(`
-            SELECT a.id, a.name, a.kecamatan, a.kelurahan
+            SELECT a.id, a.name, a.description, a.rt, a.rw, a.kelurahan, a.kecamatan, a.latitude, a.longitude
             FROM areas a
             ORDER BY a.kecamatan, a.kelurahan, a.rw, a.rt, a.name ASC
         `);
@@ -70,71 +148,9 @@ class AreaService {
             WHERE c.area_id IS NOT NULL
             ORDER BY c.area_id ASC, c.id ASC
         `);
-        const healthItems = cameraHealthService.getHealthDebugSnapshot();
-        const healthByCameraId = new Map(healthItems.map((item) => [item.cameraId, item]));
+        const data = buildAreaOverviewRows(areas, cameras, cameraHealthService.getHealthDebugSnapshot());
 
-        const summaryByArea = new Map(
-            areas.map((area) => [area.id, {
-                areaId: area.id,
-                areaName: area.name,
-                kecamatan: area.kecamatan || null,
-                kelurahan: area.kelurahan || null,
-                total: 0,
-                online: 0,
-                offline: 0,
-                internalValid: 0,
-                externalValid: 0,
-                externalUnresolved: 0,
-                recordingEnabled: 0,
-                topReasons: [],
-            }])
-        );
-
-        for (const camera of cameras) {
-            const summary = summaryByArea.get(camera.area_id);
-            if (!summary) {
-                continue;
-            }
-
-            const deliveryProfile = getCameraDeliveryProfile(camera);
-            const healthItem = healthByCameraId.get(camera.id);
-
-            summary.total += 1;
-            if (camera.is_online === 1 || camera.is_online === true) {
-                summary.online += 1;
-            } else {
-                summary.offline += 1;
-            }
-            if (camera.enable_recording === 1 || camera.enable_recording === true) {
-                summary.recordingEnabled += 1;
-            }
-
-            if (deliveryProfile.classification === 'internal_hls') {
-                summary.internalValid += 1;
-            } else if (deliveryProfile.classification === 'external_unresolved') {
-                summary.externalUnresolved += 1;
-            } else {
-                summary.externalValid += 1;
-            }
-
-            if (healthItem?.lastReason) {
-                const existingReason = summary.topReasons.find((item) => item.reason === healthItem.lastReason);
-                if (existingReason) {
-                    existingReason.count += 1;
-                } else {
-                    summary.topReasons.push({ reason: healthItem.lastReason, count: 1 });
-                }
-            }
-        }
-
-        const data = areas.map((area) => {
-            const summary = summaryByArea.get(area.id);
-            summary.topReasons = summary.topReasons
-                .sort((a, b) => b.count - a.count)
-                .slice(0, 3);
-            return summary;
-        });
-
+        cache.set(CACHE_AREA_OVERVIEW, data, CacheTTL.SHORT);
         cache.set(CACHE_AREA_SUMMARY, data, CacheTTL.SHORT);
         return { data, isCached: false };
     }

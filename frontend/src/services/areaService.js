@@ -12,6 +12,10 @@ export const areaService = {
         const response = await apiClient.get('/api/areas', getRequestPolicyConfig(policy, config));
         return response.data;
     },
+    getAdminOverview: async (policy = REQUEST_POLICY.BLOCKING, config = {}) => {
+        const response = await apiClient.get('/api/areas/overview', getRequestPolicyConfig(policy, config));
+        return response.data;
+    },
     getAreaSummary: async () => {
         const response = await apiClient.get('/api/areas/summary');
         return response.data;

@@ -24,6 +24,7 @@ const BULK_AREA_TARGET_FILTERS = [
     'all',
     'internal_only',
     'external_only',
+    'external_hls_only',
     'external_unresolved_only',
     'online_only',
     'offline_only',
@@ -383,6 +384,9 @@ function matchesBulkTargetFilter(camera, targetFilter) {
             return deliveryProfile.classification === 'internal_hls';
         case 'external_only':
             return deliveryProfile.classification !== 'internal_hls';
+        case 'external_hls_only':
+            return deliveryProfile.classification !== 'external_unresolved'
+                && deliveryProfile.effectiveDeliveryType === 'external_hls';
         case 'external_unresolved_only':
             return deliveryProfile.classification === 'external_unresolved';
         case 'online_only':
@@ -396,15 +400,58 @@ function matchesBulkTargetFilter(camera, targetFilter) {
     }
 }
 
-function buildBulkTargetSummary(targetCameras = []) {
+function requiresExternalHlsAreaPolicy(operation, payload = {}) {
+    if (operation !== 'policy_update' && operation !== 'maintenance') {
+        return false;
+    }
+
+    return payload.external_use_proxy !== undefined
+        || payload.external_tls_mode !== undefined
+        || payload.external_origin_mode !== undefined;
+}
+
+function getBulkEligibility(camera, operation, payload = {}) {
+    const deliveryProfile = getCameraDeliveryProfile(camera);
+    const effectiveDeliveryType = payload.delivery_type || deliveryProfile.effectiveDeliveryType;
+
+    if ((operation === 'policy_update' || operation === 'maintenance') && payload.enable_recording !== undefined) {
+        if (deliveryProfile.classification !== 'internal_hls') {
+            return { eligible: false, reason: 'internal_only_policy' };
+        }
+    }
+
+    if ((operation === 'policy_update' || operation === 'maintenance') && payload.video_codec !== undefined) {
+        if (deliveryProfile.classification !== 'internal_hls') {
+            return { eligible: false, reason: 'internal_only_policy' };
+        }
+    }
+
+    if (requiresExternalHlsAreaPolicy(operation, payload) && effectiveDeliveryType !== 'external_hls') {
+        return { eligible: false, reason: 'external_hls_only_policy' };
+    }
+
+    return { eligible: true, reason: null };
+}
+
+function buildBulkTargetSummary(targetCameras = [], options = {}) {
+    const {
+        totalInArea = targetCameras.length,
+        operation = null,
+        payload = {},
+    } = options;
     const summary = {
-        total: targetCameras.length,
+        totalInArea,
+        matchedCount: targetCameras.length,
+        eligibleCount: 0,
+        blockedCount: 0,
+        blockedReasons: [],
         internalCount: 0,
         externalCount: 0,
         unresolvedCount: 0,
         onlineCount: 0,
         offlineCount: 0,
         recordingEnabledCount: 0,
+        total: targetCameras.length,
         examples: targetCameras.slice(0, 10).map((camera) => ({
             id: camera.id,
             name: camera.name,
@@ -412,10 +459,13 @@ function buildBulkTargetSummary(targetCameras = []) {
             delivery_classification: getCameraDeliveryProfile(camera).classification,
             is_online: camera.is_online === 1 || camera.is_online === true,
         })),
+        blockedExamples: [],
     };
+    const blockedReasonMap = new Map();
 
     for (const camera of targetCameras) {
         const deliveryProfile = getCameraDeliveryProfile(camera);
+        const eligibility = getBulkEligibility(camera, operation, payload);
         if (deliveryProfile.classification === 'internal_hls') {
             summary.internalCount += 1;
         } else {
@@ -432,7 +482,25 @@ function buildBulkTargetSummary(targetCameras = []) {
         if (camera.enable_recording === 1 || camera.enable_recording === true) {
             summary.recordingEnabledCount += 1;
         }
+
+        if (eligibility.eligible) {
+            summary.eligibleCount += 1;
+        } else {
+            summary.blockedCount += 1;
+            blockedReasonMap.set(eligibility.reason, (blockedReasonMap.get(eligibility.reason) || 0) + 1);
+            if (summary.blockedExamples.length < 10) {
+                summary.blockedExamples.push({
+                    id: camera.id,
+                    name: camera.name,
+                    delivery_type: deliveryProfile.effectiveDeliveryType,
+                    delivery_classification: deliveryProfile.classification,
+                    reason: eligibility.reason,
+                });
+            }
+        }
     }
+
+    summary.blockedReasons = Array.from(blockedReasonMap.entries()).map(([reason, count]) => ({ reason, count }));
 
     return summary;
 }
@@ -1038,10 +1106,58 @@ class CameraService {
         );
 
         const targetCameras = cameras.filter((camera) => matchesBulkTargetFilter(camera, targetFilter));
-        const summary = buildBulkTargetSummary(targetCameras);
+        const summary = buildBulkTargetSummary(targetCameras, {
+            totalInArea: cameras.length,
+            operation,
+            payload,
+        });
+
+        if (preview && targetCameras.length === 0) {
+            return {
+                preview: true,
+                area: { id: area.id, name: area.name },
+                targetFilter,
+                operation,
+                summary,
+                guidance: cameras.length === 0
+                    ? 'Area ini belum memiliki kamera.'
+                    : (targetFilter === 'external_hls_only'
+                        ? 'Area ini memiliki kamera, tetapi tidak ada kamera external_hls yang eligible untuk policy proxy/TLS/origin.'
+                        : 'Tidak ada kamera yang cocok dengan target filter yang dipilih.'),
+            };
+        }
 
         if (targetCameras.length === 0) {
-            const err = new Error('No cameras matched the selected bulk target filter');
+            const err = new Error(
+                cameras.length === 0
+                    ? 'Area ini belum memiliki kamera'
+                    : (targetFilter === 'external_hls_only'
+                        ? 'Area ini memiliki kamera, tetapi tidak ada kamera external_hls yang eligible untuk policy proxy/TLS/origin.'
+                        : 'No cameras matched the selected bulk target filter')
+            );
+            err.statusCode = 400;
+            throw err;
+        }
+
+        if (requiresExternalHlsAreaPolicy(operation, payload) && targetFilter !== 'external_hls_only') {
+            const err = new Error('Proxy/TLS/origin policy hanya boleh diterapkan dengan target filter external_hls_only.');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        if (preview && summary.eligibleCount === 0) {
+            return {
+                preview: true,
+                area: { id: area.id, name: area.name },
+                targetFilter,
+                operation,
+                summary,
+                guidance: 'Tidak ada kamera yang eligible untuk operasi ini. Tinjau blocked reasons sebelum apply.',
+            };
+        }
+
+        if (summary.eligibleCount === 0) {
+            const err = new Error('Tidak ada kamera yang eligible untuk operasi ini.');
             err.statusCode = 400;
             throw err;
         }
@@ -1050,6 +1166,10 @@ class CameraService {
 
         for (const camera of targetCameras) {
             const deliveryProfile = getCameraDeliveryProfile(camera);
+            const eligibility = getBulkEligibility(camera, operation, payload);
+            if (!eligibility.eligible) {
+                continue;
+            }
             const patch = {};
 
             if (operation === 'policy_update' || operation === 'maintenance') {
@@ -1057,19 +1177,9 @@ class CameraService {
                     patch.enabled = payload.enabled;
                 }
                 if (payload.enable_recording !== undefined) {
-                    if (deliveryProfile.classification !== 'internal_hls') {
-                        const err = new Error(`Recording policy can only be updated for internal cameras. Camera ${camera.id} is ${deliveryProfile.classification}.`);
-                        err.statusCode = 400;
-                        throw err;
-                    }
                     patch.enable_recording = payload.enable_recording;
                 }
                 if (payload.video_codec !== undefined) {
-                    if (deliveryProfile.classification !== 'internal_hls') {
-                        const err = new Error(`Video codec can only be updated for internal cameras. Camera ${camera.id} is ${deliveryProfile.classification}.`);
-                        err.statusCode = 400;
-                        throw err;
-                    }
                     patch.video_codec = payload.video_codec;
                 }
                 if (payload.delivery_type !== undefined) {
@@ -1085,19 +1195,9 @@ class CameraService {
                     patch.external_origin_mode = payload.external_origin_mode;
                 }
                 if (payload.external_use_proxy !== undefined) {
-                    if ((patch.delivery_type || deliveryProfile.effectiveDeliveryType) !== 'external_hls') {
-                        const err = new Error(`Proxy policy can only be updated for external HLS cameras. Camera ${camera.id} is ${(patch.delivery_type || deliveryProfile.classification)}.`);
-                        err.statusCode = 400;
-                        throw err;
-                    }
                     patch.external_use_proxy = payload.external_use_proxy;
                 }
                 if (payload.external_tls_mode !== undefined) {
-                    if ((patch.delivery_type || deliveryProfile.effectiveDeliveryType) !== 'external_hls') {
-                        const err = new Error(`TLS mode can only be updated for external HLS cameras. Camera ${camera.id} is ${(patch.delivery_type || deliveryProfile.classification)}.`);
-                        err.statusCode = 400;
-                        throw err;
-                    }
                     patch.external_tls_mode = payload.external_tls_mode;
                 }
             }
