@@ -197,58 +197,96 @@ const getGroupMarkerColor = (cameras = []) => {
     return { color: '#0ea5e9', darkColor: '#0284c7' };
 };
 
+const getGroupMarkerProfile = (kind = 'group', count = 0) => {
+    const normalizedCount = Math.min(count, 999);
+    const digits = String(normalizedCount).length;
+
+    if (kind === 'area') {
+        return {
+            size: 58,
+            borderRadius: 22,
+            fontSize: digits >= 3 ? 18 : 22,
+            ringOpacity: 0.2,
+            shadow: '0 14px 32px rgba(15,23,42,0.24)',
+            countLabel: count > 999 ? '999+' : String(count),
+            glowSize: 72,
+        };
+    }
+
+    return {
+        size: 50,
+        borderRadius: 18,
+        fontSize: digits >= 3 ? 16 : 19,
+        ringOpacity: 0.26,
+        shadow: '0 10px 24px rgba(15,23,42,0.22)',
+        countLabel: count > 999 ? '999+' : String(count),
+        glowSize: 62,
+    };
+};
+
 const createGroupIcon = (count, cameras = [], kind = 'group') => {
-    const colorKey = `${kind}-${count}-${cameras.length}-${cameras.some((camera) => getCameraAvailabilityState(camera) === 'degraded')}-${cameras.every((camera) => getCameraAvailabilityState(camera) === 'offline')}`;
+    const hasDegraded = cameras.some((camera) => getCameraAvailabilityState(camera) === 'degraded');
+    const allOffline = cameras.every((camera) => getCameraAvailabilityState(camera) === 'offline');
+    const countBucket = count > 999 ? '999+' : count > 99 ? '100+' : count > 9 ? '10+' : String(count);
+    const colorKey = `${kind}-${countBucket}-${hasDegraded}-${allOffline}`;
     if (iconCache.has(colorKey)) {
         return iconCache.get(colorKey);
     }
 
     const { color, darkColor } = getGroupMarkerColor(cameras);
-    const label = kind === 'area' ? 'AREA' : 'GROUP';
+    const profile = getGroupMarkerProfile(kind, count);
     const icon = L.divIcon({
         className: 'cctv-group-marker',
         html: `
             <div style="
                 display:flex;
-                flex-direction:column;
                 align-items:center;
                 justify-content:center;
-                width:56px;
-                height:56px;
+                width:${profile.size}px;
+                height:${profile.size}px;
                 background:linear-gradient(135deg, ${color} 0%, ${darkColor} 100%);
                 border:2px solid rgba(255,255,255,0.88);
-                border-radius:20px;
-                box-shadow:0 12px 28px rgba(15,23,42,0.28);
+                border-radius:${profile.borderRadius}px;
+                box-shadow:${profile.shadow};
                 backdrop-filter:blur(10px);
                 color:white;
                 font-weight:700;
                 position:relative;
                 overflow:hidden;
+                cursor:pointer;
+                transition:transform 160ms ease, box-shadow 160ms ease;
             ">
                 <div style="
                     position:absolute;
                     inset:0;
-                    background:linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.02) 100%);
+                    border-radius:${Math.max(profile.borderRadius - 3, 12)}px;
+                    inset:3px;
+                    border:1px solid rgba(255,255,255,${profile.ringOpacity});
+                    box-sizing:border-box;
+                    pointer-events:none;
+                "></div>
+                <div style="
+                    position:absolute;
+                    top:-10px;
+                    left:50%;
+                    width:${profile.glowSize}px;
+                    height:${Math.round(profile.glowSize * 0.62)}px;
+                    transform:translateX(-50%);
+                    background:radial-gradient(circle, rgba(255,255,255,0.32) 0%, rgba(255,255,255,0.06) 55%, rgba(255,255,255,0) 100%);
                     pointer-events:none;
                 "></div>
                 <span style="
                     position:relative;
-                    font-size:9px;
-                    line-height:1;
-                    letter-spacing:0.18em;
-                    opacity:0.78;
-                    margin-bottom:4px;
-                ">${label}</span>
-                <span style="
-                    position:relative;
-                    font-size:18px;
+                    font-size:${profile.fontSize}px;
                     line-height:1;
                     font-weight:800;
-                ">${count}</span>
+                    letter-spacing:-0.04em;
+                    text-shadow:0 1px 2px rgba(15,23,42,0.18);
+                ">${profile.countLabel}</span>
             </div>
         `,
-        iconSize: [56, 56],
-        iconAnchor: [28, 28],
+        iconSize: [profile.size, profile.size],
+        iconAnchor: [profile.size / 2, profile.size / 2],
     });
 
     iconCache.set(colorKey, icon);

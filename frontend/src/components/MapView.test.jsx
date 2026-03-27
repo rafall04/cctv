@@ -2,6 +2,7 @@
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import L from 'leaflet';
 import MapView from './MapView';
 
 const {
@@ -770,6 +771,10 @@ describe('MapView area filter visibility', () => {
         expect(screen.queryByTestId('marker--7.1507-111.8815')).toBeNull();
         expect(screen.getByTestId('marker--7.14-111.89')).toBeTruthy();
         expect(screen.getByTestId('map-zoom-hint')).toBeTruthy();
+        const aggregateIconCall = L.divIcon.mock.calls.at(-1)?.[0];
+        expect(aggregateIconCall?.html).not.toContain('AREA');
+        expect(aggregateIconCall?.html).not.toContain('GROUP');
+        expect(aggregateIconCall?.iconSize).toEqual([58, 58]);
     });
 
     it('merender marker individual saat zoom tinggi pada area padat', async () => {
@@ -796,6 +801,34 @@ describe('MapView area filter visibility', () => {
 
         expect(screen.getByTestId('marker--7.1507-111.8815')).toBeTruthy();
         expect(screen.queryByTestId('map-zoom-hint')).toBeNull();
+    });
+
+    it('membedakan profile bucket marker tanpa label teks', async () => {
+        const denseCameras = Array.from({ length: 30 }, (_, index) => ({
+            id: index + 1,
+            name: `Dense ${index + 1}`,
+            latitude: '-7.1507',
+            longitude: '111.8815',
+            area_name: 'Dense Area',
+            is_online: index % 4 === 0 ? 0 : 1,
+            status: 'active',
+            is_tunnel: 0,
+        }));
+
+        setMockZoom(14);
+
+        await act(async () => {
+            render(<MapView cameras={denseCameras} areas={[]} showAreaFilter selectedArea="Dense Area" />);
+        });
+
+        await waitFor(() => {
+            expect(screen.getAllByText('marker')).toHaveLength(1);
+        });
+
+        const bucketIconCall = L.divIcon.mock.calls.at(-1)?.[0];
+        expect(bucketIconCall?.html).not.toContain('AREA');
+        expect(bucketIconCall?.html).not.toContain('GROUP');
+        expect(bucketIconCall?.iconSize).toEqual([50, 50]);
     });
 
     it('tidak mereset viewport saat user sudah drag lalu rerender dengan area yang sama', async () => {
