@@ -769,6 +769,7 @@ describe('MapView area filter visibility', () => {
 
         expect(screen.queryByTestId('marker--7.1507-111.8815')).toBeNull();
         expect(screen.getByTestId('marker--7.14-111.89')).toBeTruthy();
+        expect(screen.getByTestId('map-zoom-hint')).toBeTruthy();
     });
 
     it('merender marker individual saat zoom tinggi pada area padat', async () => {
@@ -794,6 +795,7 @@ describe('MapView area filter visibility', () => {
         });
 
         expect(screen.getByTestId('marker--7.1507-111.8815')).toBeTruthy();
+        expect(screen.queryByTestId('map-zoom-hint')).toBeNull();
     });
 
     it('tidak mereset viewport saat user sudah drag lalu rerender dengan area yang sama', async () => {

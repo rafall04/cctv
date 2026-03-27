@@ -164,4 +164,66 @@ describe('Dashboard', () => {
         expect(systemHealthCard?.className).toContain('dark:border-gray-700/50');
         expect(screen.getByText('Optimal').className).toContain('dark:bg-emerald-500/10');
     });
+
+    it('meringkas stream aktif menjadi top 8 dan membuka drawer untuk daftar penuh', async () => {
+        getStats.mockResolvedValueOnce({
+            success: true,
+            data: {
+                summary: {
+                    totalCameras: 12,
+                    activeCameras: 12,
+                    disabledCameras: 0,
+                    totalAreas: 3,
+                    activeViewers: 9,
+                },
+                system: {
+                    platform: 'win32',
+                    arch: 'x64',
+                    cpus: 8,
+                    cpuModel: 'Test CPU',
+                    cpuLoad: 10,
+                    totalMem: 16000,
+                    freeMem: 8000,
+                    usedMem: 8000,
+                    memUsagePercent: 50,
+                    uptime: 1000,
+                    loadAvg: [0, 0, 0],
+                },
+                streams: Array.from({ length: 10 }, (_, index) => ({
+                    id: index + 1,
+                    name: `Stream ${index + 1}`,
+                    viewers: 10 - index,
+                    sessions: [],
+                    bytesSent: 1024 * (index + 1),
+                    bytesReceived: 512 * (index + 1),
+                    operationalState: index === 8 ? 'offline' : 'online',
+                    state: index === 8 ? 'offline' : 'ready',
+                })),
+                recentLogs: [],
+                mtxConnected: true,
+                cameraStatusBreakdown: { online: 10, offline: 2, maintenance: 0 },
+                topCameras: [],
+                allSessions: [],
+            },
+        });
+
+        renderWithRouter(<Dashboard />);
+
+        await waitFor(() => {
+            expect(screen.getByTestId('dashboard-streams-panel')).toBeTruthy();
+        });
+
+        expect(screen.getByText('Stream 1')).toBeTruthy();
+        expect(screen.getByText('Stream 8')).toBeTruthy();
+        expect(screen.queryByText('Stream 9')).toBeNull();
+        expect(screen.getByTestId('open-streams-drawer')).toBeTruthy();
+
+        fireEvent.click(screen.getByTestId('open-streams-drawer'));
+
+        await waitFor(() => {
+            expect(screen.getByText('Semua stream aktif')).toBeTruthy();
+        });
+
+        expect(screen.getByText('Stream 10')).toBeTruthy();
+    });
 });

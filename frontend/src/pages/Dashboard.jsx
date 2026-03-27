@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Skeleton } from '../components/ui/Skeleton';
 import { NoStreamsEmptyState, NoActivityEmptyState } from '../components/ui/EmptyState';
 import { Alert } from '../components/ui/Alert';
@@ -144,6 +144,156 @@ function ViewerSessionsModal({ title, sessions, onClose }) {
     );
 }
 
+function getStreamPriorityScore(stream) {
+    const viewerScore = (stream.viewers || 0) * 100;
+    const operationalPenalty = stream.operationalState === 'online' ? 0 : 40;
+    const stateBonus = stream.state === 'buffering'
+        ? 45
+        : stream.state === 'offline'
+            ? 35
+            : stream.state === 'maintenance'
+                ? 30
+                : 0;
+    return viewerScore + operationalPenalty + stateBonus;
+}
+
+function rankDashboardStreams(streams = []) {
+    return [...streams].sort((left, right) => {
+        const scoreDiff = getStreamPriorityScore(right) - getStreamPriorityScore(left);
+        if (scoreDiff !== 0) {
+            return scoreDiff;
+        }
+
+        const viewerDiff = (right.viewers || 0) - (left.viewers || 0);
+        if (viewerDiff !== 0) {
+            return viewerDiff;
+        }
+
+        return String(left.name || '').localeCompare(String(right.name || ''));
+    });
+}
+
+function StreamStatePill({ children, tone }) {
+    return (
+        <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-wide ${tone}`}>
+            {children}
+        </span>
+    );
+}
+
+function StreamViewerButton({ stream, onOpen }) {
+    const hasViewers = stream.viewers > 0;
+
+    return (
+        <button
+            onClick={() => onOpen({
+                title: `Viewer ${stream.name}`,
+                sessions: stream.sessions || []
+            })}
+            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors ${
+                hasViewers
+                    ? 'bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-500/20 dark:text-purple-300 dark:hover:bg-purple-500/30'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700/60 dark:text-gray-300 dark:hover:bg-gray-700'
+            }`}
+            title="Klik untuk lihat detail viewer"
+        >
+            <span className={`h-1.5 w-1.5 rounded-full ${hasViewers ? 'bg-purple-500 animate-pulse' : 'bg-gray-400'}`}></span>
+            {stream.viewers}
+        </button>
+    );
+}
+
+function ActiveStreamRow({ stream, formatBytes, getOperationalTone, getStreamTransportTone, onOpenViewer }) {
+    const isHot = (stream.viewers || 0) > 0;
+
+    return (
+        <div className="flex items-center gap-3 rounded-2xl border border-gray-200/80 bg-white/80 p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md dark:border-gray-700/60 dark:bg-gray-900/30">
+            <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
+                isHot
+                    ? 'bg-gradient-to-br from-primary to-sky-600 text-white shadow-lg shadow-primary/20'
+                    : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-300'
+            }`}>
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+            </div>
+
+            <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                    <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">{stream.name}</p>
+                    {isHot && (
+                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary dark:bg-primary/20 dark:text-sky-300">
+                            Hot
+                        </span>
+                    )}
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <StreamStatePill tone={getOperationalTone(stream.operationalState)}>
+                        {stream.operationalState || 'offline'}
+                    </StreamStatePill>
+                    <StreamStatePill tone={getStreamTransportTone(stream.state)}>
+                        {stream.state}
+                    </StreamStatePill>
+                </div>
+            </div>
+
+            <div className="shrink-0 text-right">
+                <div className="flex items-center justify-end gap-2">
+                    <StreamViewerButton stream={stream} onOpen={onOpenViewer} />
+                    <div>
+                        <p className="text-sm font-semibold text-primary dark:text-sky-300">{formatBytes(stream.bytesSent)}</p>
+                        <p className="text-[11px] text-gray-400 dark:text-gray-500">{formatBytes(stream.bytesReceived)}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function StreamsDrawer({ open, streams, onClose, formatBytes, getOperationalTone, getStreamTransportTone, onOpenViewer }) {
+    if (!open) {
+        return null;
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/45 backdrop-blur-sm" onClick={onClose}>
+            <div
+                className="flex h-full w-full max-w-2xl flex-col border-l border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900"
+                onClick={(event) => event.stopPropagation()}
+            >
+                <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-5 py-4 dark:border-gray-800">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary dark:text-sky-300">Stream Detail</p>
+                        <h3 className="mt-1 text-lg font-bold text-gray-900 dark:text-white">Semua stream aktif</h3>
+                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{streams.length} stream diprioritaskan berdasarkan viewer dan kondisi operasional.</p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="rounded-xl p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
+                    >
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div className="flex-1 space-y-3 overflow-y-auto p-5">
+                    {streams.map((stream) => (
+                        <ActiveStreamRow
+                            key={stream.id}
+                            stream={stream}
+                            formatBytes={formatBytes}
+                            getOperationalTone={getOperationalTone}
+                            getStreamTransportTone={getStreamTransportTone}
+                            onOpenViewer={onOpenViewer}
+                        />
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 /**
  * Dashboard Skeleton Components
  * Requirements: 3.4, 8.1, 8.2, 8.3, 8.4, 8.5
@@ -249,6 +399,7 @@ function DashboardHeaderSkeleton() {
 
 export default function Dashboard() {
     const [viewerModal, setViewerModal] = useState(null); // { title, sessions }
+    const [isStreamsDrawerOpen, setIsStreamsDrawerOpen] = useState(false);
     const navigate = useNavigate();
     const {
         stats,
@@ -271,6 +422,10 @@ export default function Dashboard() {
     const handleAddCamera = () => {
         navigate('/admin/cameras');
     };
+
+    const rankedStreams = useMemo(() => rankDashboardStreams(stats?.streams || []), [stats?.streams]);
+    const visibleStreams = useMemo(() => rankedStreams.slice(0, 8), [rankedStreams]);
+    const overflowStreamCount = Math.max(rankedStreams.length - visibleStreams.length, 0);
 
     // Show skeleton loading state on initial load
     if (loading && !stats) {
@@ -614,23 +769,29 @@ export default function Dashboard() {
 
             {/* Content Grid */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                {/* Enhanced Live Streams Table */}
                 <div className="xl:col-span-2 space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Stream Aktif</h2>
-                        <div className="flex items-center gap-3">
-                            <span className="text-xs text-gray-500 dark:text-gray-400">
-                                Diurutkan berdasarkan viewer
-                            </span>
-                            <Link to="/admin/cameras" className="text-sm font-semibold text-primary hover:text-primary-600 transition-colors flex items-center gap-1">
-                                Kelola semua
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                                </svg>
-                            </Link>
+                    <div className="flex items-center justify-between gap-4">
+                        <div>
+                            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Stream Aktif</h2>
+                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Top 8 stream paling penting untuk dipantau cepat.</p>
                         </div>
+                        {rankedStreams.length > 0 && (
+                            <button
+                                type="button"
+                                data-testid="open-streams-drawer"
+                                onClick={() => setIsStreamsDrawerOpen(true)}
+                                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:text-primary dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-primary/40 dark:hover:text-sky-300"
+                            >
+                                Lihat semua stream
+                                {overflowStreamCount > 0 && (
+                                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary dark:bg-primary/20 dark:text-sky-300">
+                                        +{overflowStreamCount}
+                                    </span>
+                                )}
+                            </button>
+                        )}
                     </div>
-                    <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl overflow-hidden">
+                    <div data-testid="dashboard-streams-panel" className="rounded-[28px] border border-white/55 bg-white/75 p-4 shadow-[0_24px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl dark:border-white/10 dark:bg-gray-900/70">
                         <div className="overflow-x-auto">
                             <table className="w-full">
                                 <thead>
@@ -674,8 +835,7 @@ export default function Dashboard() {
                                         </tr>
                                     ) : (
                                         // Sort streams by viewers (descending)
-                                        [...stats.streams]
-                                            .sort((a, b) => b.viewers - a.viewers)
+                                        visibleStreams
                                             .map((stream, idx) => {
                                                 // Determine rank badge for top 3
                                                 const isTop3 = idx < 3 && stream.viewers > 0;
@@ -836,6 +996,16 @@ export default function Dashboard() {
                     onClose={() => setViewerModal(null)}
                 />
             )}
+
+            <StreamsDrawer
+                open={isStreamsDrawerOpen}
+                streams={rankedStreams}
+                onClose={() => setIsStreamsDrawerOpen(false)}
+                formatBytes={formatBytes}
+                getOperationalTone={getOperationalTone}
+                getStreamTransportTone={getStreamTransportTone}
+                onOpenViewer={setViewerModal}
+            />
         </div>
     );
 }

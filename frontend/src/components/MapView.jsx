@@ -204,29 +204,51 @@ const createGroupIcon = (count, cameras = [], kind = 'group') => {
     }
 
     const { color, darkColor } = getGroupMarkerColor(cameras);
+    const label = kind === 'area' ? 'AREA' : 'GROUP';
     const icon = L.divIcon({
         className: 'cctv-group-marker',
         html: `
             <div style="
                 display:flex;
+                flex-direction:column;
                 align-items:center;
                 justify-content:center;
-                min-width:42px;
-                height:42px;
-                padding:0 10px;
+                width:56px;
+                height:56px;
                 background:linear-gradient(135deg, ${color} 0%, ${darkColor} 100%);
-                border:3px solid white;
-                border-radius:999px;
-                box-shadow:0 4px 12px rgba(0,0,0,0.35);
+                border:2px solid rgba(255,255,255,0.88);
+                border-radius:20px;
+                box-shadow:0 12px 28px rgba(15,23,42,0.28);
+                backdrop-filter:blur(10px);
                 color:white;
                 font-weight:700;
-                font-size:13px;
+                position:relative;
+                overflow:hidden;
             ">
-                ${count}
+                <div style="
+                    position:absolute;
+                    inset:0;
+                    background:linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.02) 100%);
+                    pointer-events:none;
+                "></div>
+                <span style="
+                    position:relative;
+                    font-size:9px;
+                    line-height:1;
+                    letter-spacing:0.18em;
+                    opacity:0.78;
+                    margin-bottom:4px;
+                ">${label}</span>
+                <span style="
+                    position:relative;
+                    font-size:18px;
+                    line-height:1;
+                    font-weight:800;
+                ">${count}</span>
             </div>
         `,
-        iconSize: [42, 42],
-        iconAnchor: [21, 21],
+        iconSize: [56, 56],
+        iconAnchor: [28, 28],
     });
 
     iconCache.set(colorKey, icon);
@@ -1500,6 +1522,7 @@ const MapView = memo(({
 
     const shouldUseAggregateMarkers = filteredBase.length > DENSE_AREA_THRESHOLD && effectiveZoom < AREA_AGGREGATE_ZOOM;
     const shouldUseGroupedMarkers = filteredBase.length > DENSE_AREA_THRESHOLD && effectiveZoom >= AREA_AGGREGATE_ZOOM && effectiveZoom < INDIVIDUAL_MARKER_ZOOM;
+    const shouldShowZoomHint = filteredBase.length > DENSE_AREA_THRESHOLD && effectiveZoom < INDIVIDUAL_MARKER_ZOOM;
 
     const areaAggregateMarkers = useMemo(() => {
         if (!shouldUseAggregateMarkers) {
@@ -1726,48 +1749,66 @@ const MapView = memo(({
                 ))}
             </MapContainer>
 
-            {showAreaFilter && (
-                <div className="absolute top-3 left-3 z-[1000]">
-                    <select
-                        value={selectedAreaValue}
-                        onChange={handleAreaChange}
-                        className="px-2.5 py-1.5 sm:px-3 sm:py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg shadow-lg text-xs sm:text-sm font-medium border-0 focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer max-w-[180px] sm:max-w-none truncate"
-                    >
-                        <option value="all">{mapSettings.name || 'Semua Lokasi'} ({camerasWithCoords.length})</option>
-                        {areaNames.map(area => (
-                            <option key={area} value={area}>
-                                {area} ({areaCounts.get(area) || 0})
-                            </option>
-                        ))}
-                    </select>
-                </div>
-            )}
+            <div className="absolute left-3 right-3 top-3 z-[1000] flex items-start justify-between gap-3">
+                <div className="flex max-w-[min(100%,24rem)] flex-col gap-2">
+                    {showAreaFilter && (
+                        <div className="rounded-2xl border border-white/55 bg-white/78 p-1.5 shadow-[0_14px_30px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-gray-900/72">
+                            <div className="flex items-center gap-2 px-2 pb-1.5 pt-1">
+                                <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gray-500 dark:text-gray-400">
+                                    Area View
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <select
+                                    value={selectedAreaValue}
+                                    onChange={handleAreaChange}
+                                    className="min-w-0 flex-1 rounded-xl border-0 bg-transparent px-2.5 py-2 text-xs font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:text-white sm:text-sm"
+                                >
+                                    <option value="all">{mapSettings.name || 'Semua Lokasi'} ({camerasWithCoords.length})</option>
+                                    {areaNames.map(area => (
+                                        <option key={area} value={area}>
+                                            {area} ({areaCounts.get(area) || 0})
+                                        </option>
+                                    ))}
+                                </select>
+                                <button
+                                    type="button"
+                                    onClick={handleResetView}
+                                    data-testid="map-reset-view"
+                                    className="rounded-xl border border-white/40 bg-white/70 px-3 py-2 text-[11px] font-semibold text-gray-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-white dark:border-white/10 dark:bg-gray-800/85 dark:text-gray-200 dark:hover:bg-gray-800"
+                                >
+                                    Reset
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
-            <div className="absolute top-3 right-14 z-[1000]">
-                <button
-                    type="button"
-                    onClick={handleResetView}
-                    data-testid="map-reset-view"
-                    className="px-3 py-2 bg-white/95 dark:bg-gray-800/95 text-gray-900 dark:text-white rounded-lg shadow-lg text-xs sm:text-sm font-medium border border-gray-200/80 dark:border-gray-700/80 hover:bg-white dark:hover:bg-gray-800"
-                >
-                    Reset View
-                </button>
+                    {shouldShowZoomHint && (
+                        <div
+                            data-testid="map-zoom-hint"
+                            className="inline-flex max-w-fit items-center gap-2 rounded-full border border-white/55 bg-white/78 px-3 py-1.5 text-[11px] font-medium text-gray-600 shadow-[0_12px_28px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-gray-900/72 dark:text-gray-300"
+                        >
+                            <span className="inline-flex h-2 w-2 rounded-full bg-sky-500" />
+                            Zoom in untuk lihat kamera individual
+                        </div>
+                    )}
+                </div>
             </div>
 
             <div className="pointer-events-none absolute bottom-3 left-1/2 z-[1000] w-full -translate-x-1/2 px-3">
                 <div
-                    className="mx-auto inline-flex max-w-[calc(100%-6rem)] items-center gap-1.5 overflow-hidden rounded-full bg-white/90 px-2 py-1 shadow-md backdrop-blur dark:bg-gray-800/85 sm:gap-2 sm:px-2.5"
+                    className="mx-auto inline-flex max-w-[calc(100%-3rem)] items-center gap-1.5 overflow-hidden rounded-full border border-white/50 bg-white/72 px-2 py-1.5 shadow-[0_16px_36px_rgba(15,23,42,0.16)] backdrop-blur-xl dark:border-white/10 dark:bg-gray-900/72 sm:gap-2 sm:px-3"
                     data-testid="map-status-bar"
                 >
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-medium leading-none text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50/90 px-2 py-1 text-[10px] font-semibold leading-none text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                         Online {stats.online}
                     </span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-1 text-[10px] font-medium leading-none text-orange-700 dark:bg-orange-500/10 dark:text-orange-400">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-orange-50/90 px-2 py-1 text-[10px] font-semibold leading-none text-orange-700 dark:bg-orange-500/10 dark:text-orange-400">
                         <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
                         Tunnel {stats.tunnel}
                     </span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-[10px] font-medium leading-none text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-gray-100/90 px-2 py-1 text-[10px] font-semibold leading-none text-gray-700 dark:bg-gray-700 dark:text-gray-300">
                         <span className="h-1.5 w-1.5 rounded-full bg-gray-500" />
                         Offline {stats.offline}
                     </span>
