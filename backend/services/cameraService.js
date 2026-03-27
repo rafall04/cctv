@@ -1083,7 +1083,10 @@ class CameraService {
             throw err;
         }
 
-        const { targetFilter, operation, payload, preview } = normalizeBulkAreaRequest(bulkRequest);
+        const { targetFilter: requestedTargetFilter, operation, payload, preview } = normalizeBulkAreaRequest(bulkRequest);
+        const targetFilter = requiresExternalHlsAreaPolicy(operation, payload)
+            ? 'external_hls_only'
+            : requestedTargetFilter;
 
         if (!BULK_AREA_TARGET_FILTERS.includes(targetFilter)) {
             const err = new Error('Invalid bulk target filter');
@@ -1139,20 +1142,17 @@ class CameraService {
             throw err;
         }
 
-        if (requiresExternalHlsAreaPolicy(operation, payload) && targetFilter !== 'external_hls_only') {
-            const err = new Error('Proxy/TLS/origin policy hanya boleh diterapkan dengan target filter external_hls_only.');
-            err.statusCode = 400;
-            throw err;
-        }
-
         if (preview && summary.eligibleCount === 0) {
             return {
                 preview: true,
                 area: { id: area.id, name: area.name },
+                requestedTargetFilter,
                 targetFilter,
                 operation,
                 summary,
-                guidance: 'Tidak ada kamera yang eligible untuk operasi ini. Tinjau blocked reasons sebelum apply.',
+                guidance: targetFilter !== requestedTargetFilter
+                    ? 'Target filter otomatis dikunci ke external_hls_only karena operasi ini hanya berlaku untuk kamera external HLS.'
+                    : 'Tidak ada kamera yang eligible untuk operasi ini. Tinjau blocked reasons sebelum apply.',
             };
         }
 
@@ -1244,12 +1244,15 @@ class CameraService {
             return {
                 preview: true,
                 area: { id: area.id, name: area.name },
+                requestedTargetFilter,
                 targetFilter,
                 operation,
                 summary,
-                guidance: operation === 'normalization' && summary.unresolvedCount > 0
-                    ? 'Sebagian kamera unresolved tetap membutuhkan Backup Restore untuk mengisi metadata source sebelum dianggap external valid.'
-                    : null,
+                guidance: targetFilter !== requestedTargetFilter
+                    ? 'Target filter otomatis dikunci ke external_hls_only karena operasi ini hanya berlaku untuk kamera external HLS.'
+                    : (operation === 'normalization' && summary.unresolvedCount > 0
+                        ? 'Sebagian kamera unresolved tetap membutuhkan Backup Restore untuk mengisi metadata source sebelum dianggap external valid.'
+                        : null),
             };
         }
 
@@ -1279,13 +1282,16 @@ class CameraService {
         return {
             success: true,
             area: { id: area.id, name: area.name },
+            requestedTargetFilter,
             targetFilter,
             operation,
             changes,
             summary,
-            guidance: operation === 'normalization' && summary.unresolvedCount > 0
-                ? 'Sebagian kamera unresolved masih membutuhkan Backup Restore untuk memulihkan URL source dari file backup.'
-                : null,
+            guidance: targetFilter !== requestedTargetFilter
+                ? 'Target filter otomatis dikunci ke external_hls_only karena operasi ini hanya berlaku untuk kamera external HLS.'
+                : (operation === 'normalization' && summary.unresolvedCount > 0
+                    ? 'Sebagian kamera unresolved masih membutuhkan Backup Restore untuk memulihkan URL source dari file backup.'
+                    : null),
         };
     }
 
