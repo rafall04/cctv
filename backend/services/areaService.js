@@ -1,7 +1,7 @@
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import cache, { CacheTTL, CacheNamespace, cacheKey } from './cacheService.js';
 import cameraHealthService from './cameraHealthService.js';
-import { getCameraDeliveryProfile } from '../utils/cameraDelivery.js';
+import { getCameraDeliveryProfile, normalizeExternalHealthMode } from '../utils/cameraDelivery.js';
 
 const CACHE_ALL_AREAS = cacheKey(CacheNamespace.AREAS, 'all');
 const CACHE_AREA_FILTERS = cacheKey(CacheNamespace.AREAS, 'filters');
@@ -20,9 +20,30 @@ function buildAreaOverviewRows(areas, cameras, healthItems) {
             externalValidCount: 0,
             externalUnresolvedCount: 0,
             recordingEnabledCount: 0,
+            degradedCount: 0,
+            maintenanceCount: 0,
+            passiveMonitoredCount: 0,
+            probeFailedCount: 0,
+            externalHealthModeBreakdown: [],
+            deliveryTypeBreakdown: [],
             topReasons: [],
+            monitoringReasons: [],
         }])
     );
+
+    const incrementBreakdown = (items, key) => {
+        if (!key) {
+            return;
+        }
+
+        const existingItem = items.find((item) => item.key === key);
+        if (existingItem) {
+            existingItem.count += 1;
+            return;
+        }
+
+        items.push({ key, count: 1 });
+    };
 
     for (const camera of cameras) {
         const overview = overviewByArea.get(camera.area_id);
@@ -52,12 +73,46 @@ function buildAreaOverviewRows(areas, cameras, healthItems) {
             overview.externalValidCount += 1;
         }
 
+        incrementBreakdown(overview.deliveryTypeBreakdown, deliveryProfile.effectiveDeliveryType || deliveryProfile.classification || 'unknown');
+        if (camera.stream_source === 'external' || deliveryProfile.classification.startsWith('external_')) {
+            incrementBreakdown(overview.externalHealthModeBreakdown, healthItem?.healthMode || camera.external_health_mode || 'default');
+        }
+
+        if (camera.status === 'maintenance') {
+            overview.maintenanceCount += 1;
+        }
+
+        if (healthItem?.state === 'degraded'
+            || healthItem?.state === 'suspect'
+            || healthItem?.state === 'degraded_runtime_recent'
+            || healthItem?.state === 'degraded_runtime_grace'
+            || healthItem?.state === 'stale_passive') {
+            overview.degradedCount += 1;
+        }
+
+        if (healthItem?.monitoring_state === 'passive') {
+            overview.passiveMonitoredCount += 1;
+        }
+
+        if (healthItem?.monitoring_state === 'probe_failed') {
+            overview.probeFailedCount += 1;
+        }
+
         if (healthItem?.lastReason) {
             const existingReason = overview.topReasons.find((item) => item.reason === healthItem.lastReason);
             if (existingReason) {
                 existingReason.count += 1;
             } else {
                 overview.topReasons.push({ reason: healthItem.lastReason, count: 1 });
+            }
+        }
+
+        if (healthItem?.monitoring_reason) {
+            const existingReason = overview.monitoringReasons.find((item) => item.reason === healthItem.monitoring_reason);
+            if (existingReason) {
+                existingReason.count += 1;
+            } else {
+                overview.monitoringReasons.push({ reason: healthItem.monitoring_reason, count: 1 });
             }
         }
     }
@@ -67,6 +122,12 @@ function buildAreaOverviewRows(areas, cameras, healthItems) {
         overview.topReasons = overview.topReasons
             .sort((a, b) => b.count - a.count)
             .slice(0, 3);
+        overview.monitoringReasons = overview.monitoringReasons
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 3);
+        overview.deliveryTypeBreakdown = overview.deliveryTypeBreakdown.sort((a, b) => b.count - a.count);
+        overview.externalHealthModeBreakdown = overview.externalHealthModeBreakdown.sort((a, b) => b.count - a.count);
+        overview.dominantExternalHealthMode = overview.externalHealthModeBreakdown[0]?.key || 'default';
         return overview;
     });
 }
@@ -137,6 +198,11 @@ class AreaService {
 
         const areas = query(`
             SELECT a.id, a.name, a.description, a.rt, a.rw, a.kelurahan, a.kecamatan, a.latitude, a.longitude
+                   , CASE
+                        WHEN a.external_health_mode_override IN ('default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled')
+                            THEN a.external_health_mode_override
+                        ELSE 'default'
+                     END as external_health_mode_override
             FROM areas a
             ORDER BY a.kecamatan, a.kelurahan, a.rw, a.rt, a.name ASC
         `);
@@ -144,6 +210,12 @@ class AreaService {
             SELECT c.id, c.name, c.area_id, c.is_online, c.enable_recording, c.stream_source,
                    c.delivery_type, c.private_rtsp_url, c.external_hls_url, c.external_stream_url,
                    c.external_embed_url, c.external_snapshot_url
+                   , CASE
+                        WHEN c.external_health_mode IN ('default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled')
+                            THEN c.external_health_mode
+                        ELSE 'default'
+                     END as external_health_mode
+                   , c.status
             FROM cameras c
             WHERE c.area_id IS NOT NULL
             ORDER BY c.area_id ASC, c.id ASC
@@ -166,7 +238,17 @@ class AreaService {
     }
 
     createArea(data) {
-        const { name, description, rt, rw, kelurahan, kecamatan, latitude, longitude } = data;
+        const {
+            name,
+            description,
+            rt,
+            rw,
+            kelurahan,
+            kecamatan,
+            latitude,
+            longitude,
+            external_health_mode_override,
+        } = data;
 
         if (!name) {
             const err = new Error('Area name is required');
@@ -176,8 +258,20 @@ class AreaService {
 
         try {
             const result = execute(
-                'INSERT INTO areas (name, description, rt, rw, kelurahan, kecamatan, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                [name, description || null, rt || null, rw || null, kelurahan || null, kecamatan || null, latitude || null, longitude || null]
+                `INSERT INTO areas (
+                    name, description, rt, rw, kelurahan, kecamatan, latitude, longitude, external_health_mode_override
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    name,
+                    description || null,
+                    rt || null,
+                    rw || null,
+                    kelurahan || null,
+                    kecamatan || null,
+                    latitude || null,
+                    longitude || null,
+                    normalizeExternalHealthMode(external_health_mode_override),
+                ]
             );
 
             const newArea = queryOne('SELECT * FROM areas WHERE id = ?', [result.lastInsertRowid]);
@@ -194,7 +288,17 @@ class AreaService {
     }
 
     updateArea(id, data) {
-        const { name, description, rt, rw, kelurahan, kecamatan, latitude, longitude } = data;
+        const {
+            name,
+            description,
+            rt,
+            rw,
+            kelurahan,
+            kecamatan,
+            latitude,
+            longitude,
+            external_health_mode_override,
+        } = data;
 
         const area = queryOne('SELECT * FROM areas WHERE id = ?', [id]);
         if (!area) {
@@ -205,7 +309,10 @@ class AreaService {
 
         try {
             execute(
-                'UPDATE areas SET name = ?, description = ?, rt = ?, rw = ?, kelurahan = ?, kecamatan = ?, latitude = ?, longitude = ? WHERE id = ?',
+                `UPDATE areas
+                 SET name = ?, description = ?, rt = ?, rw = ?, kelurahan = ?, kecamatan = ?, latitude = ?, longitude = ?,
+                     external_health_mode_override = ?
+                 WHERE id = ?`,
                 [
                     name || area.name,
                     description !== undefined ? description : area.description,
@@ -215,6 +322,9 @@ class AreaService {
                     kecamatan !== undefined ? (kecamatan || null) : area.kecamatan,
                     latitude !== undefined ? (latitude || null) : area.latitude,
                     longitude !== undefined ? (longitude || null) : area.longitude,
+                    external_health_mode_override !== undefined
+                        ? normalizeExternalHealthMode(external_health_mode_override)
+                        : normalizeExternalHealthMode(area.external_health_mode_override),
                     id
                 ]
             );

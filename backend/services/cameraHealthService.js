@@ -18,7 +18,10 @@ import {
     getPrimaryExternalStreamUrl,
     normalizeExternalHealthMode,
 } from '../utils/cameraDelivery.js';
-import { SHARED_CAMERA_STREAM_PROJECTION } from '../utils/cameraProjection.js';
+import {
+    SHARED_CAMERA_STREAM_PROJECTION,
+    SHARED_CAMERA_STREAM_WITH_AREA_PROJECTION,
+} from '../utils/cameraProjection.js';
 
 const mediaMtxApiBaseUrl = `${(config.mediamtx?.apiUrl || 'http://localhost:9997').replace(/\/$/, '')}/v3`;
 
@@ -893,6 +896,11 @@ class CameraHealthService {
             return explicitMode;
         }
 
+        const areaOverrideMode = normalizeExternalHealthMode(camera?.area_external_health_mode_override);
+        if (areaOverrideMode !== 'default') {
+            return areaOverrideMode;
+        }
+
         const deliveryType = getEffectiveDeliveryType(camera);
         const defaults = settingsService.getExternalHealthDefaults();
 
@@ -905,11 +913,11 @@ class CameraHealthService {
         }
 
         if (deliveryType === 'external_embed') {
-            return 'passive_first';
+            return defaults.external_embed || 'passive_first';
         }
 
         if (deliveryType === 'external_jsmpeg' || deliveryType === 'external_custom_ws') {
-            return 'disabled';
+            return defaults[deliveryType] || 'disabled';
         }
 
         return 'hybrid_probe';
@@ -1881,8 +1889,9 @@ class CameraHealthService {
             this.cleanupProbeCache();
             const activePaths = await this.getActivePaths();
             const cameras = query(`
-                SELECT ${SHARED_CAMERA_STREAM_PROJECTION}
+                SELECT ${SHARED_CAMERA_STREAM_WITH_AREA_PROJECTION}
                 FROM cameras c
+                LEFT JOIN areas a ON c.area_id = a.id
                 WHERE c.enabled = 1
             `);
 
@@ -2036,8 +2045,9 @@ class CameraHealthService {
 
     getHealthDebugSnapshot() {
         const cameras = query(`
-            SELECT ${SHARED_CAMERA_STREAM_PROJECTION}
+            SELECT ${SHARED_CAMERA_STREAM_WITH_AREA_PROJECTION}
             FROM cameras c
+            LEFT JOIN areas a ON c.area_id = a.id
             ORDER BY c.enabled DESC, c.id ASC
         `);
 
@@ -2336,8 +2346,9 @@ class CameraHealthService {
         try {
             const activePaths = await this.getActivePaths();
             const camera = queryOne(
-                `SELECT ${SHARED_CAMERA_STREAM_PROJECTION}
+                `SELECT ${SHARED_CAMERA_STREAM_WITH_AREA_PROJECTION}
                  FROM cameras c
+                 LEFT JOIN areas a ON c.area_id = a.id
                  WHERE c.id = ? AND c.enabled = 1`,
                 [cameraId]
             );

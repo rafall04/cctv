@@ -22,6 +22,14 @@ export default function CameraCard({
     onToggleEnabled,
     onToggleMaintenance,
 }) {
+    const availabilityTone = camera.availability_state === 'online'
+        ? 'bg-emerald-500/90 text-white'
+        : (camera.availability_state === 'degraded'
+            ? 'bg-amber-500/90 text-white'
+            : (camera.availability_state === 'maintenance'
+                ? 'bg-slate-600/90 text-white'
+                : 'bg-red-500/90 text-white'));
+
     return (
         <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl overflow-hidden hover:shadow-xl hover:border-primary/30 transition-all group">
             <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 relative">
@@ -48,14 +56,28 @@ export default function CameraCard({
                     >
                         {camera.external_tls_mode === 'insecure' ? 'TLS Insecure' : 'TLS Strict'}
                     </CameraBadge>
+                    <CameraBadge
+                        condition={Boolean(camera.delivery_type)}
+                        className="bg-white/90 text-slate-700"
+                        title="Delivery type kamera"
+                    >
+                        {camera.delivery_type || 'unknown'}
+                    </CameraBadge>
+                    <CameraBadge
+                        condition={camera.stream_source === 'external'}
+                        className="bg-sky-600/90 text-white"
+                        title="Health mode kamera external"
+                    >
+                        {camera.external_health_mode || 'default'}
+                    </CameraBadge>
                     <CameraBadge condition={camera.status === 'maintenance'} className="bg-red-500/90 text-white" title="Dalam Perbaikan">
                         Perbaikan
                     </CameraBadge>
                     <CameraBadge condition={camera.is_tunnel === 1 && camera.status !== 'maintenance'} className="bg-amber-500/90 text-white" title="Koneksi Tunnel - Kurang Stabil">
                         Tunnel
                     </CameraBadge>
-                    <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm ${camera.enabled ? 'bg-emerald-500/90 text-white' : 'bg-gray-500/90 text-white'}`}>
-                        {camera.enabled ? 'Live' : 'Offline'}
+                    <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm ${availabilityTone}`}>
+                        {camera.availability_state || (camera.enabled ? 'online' : 'offline')}
                     </span>
                 </div>
                 <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
@@ -69,6 +91,14 @@ export default function CameraCard({
                     <div>
                         <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Location</p>
                         <p className="text-sm font-medium text-gray-900 dark:text-white">{camera.location || 'Not specified'}</p>
+                        <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+                            <span className="rounded-full bg-sky-50 px-2.5 py-1 font-medium text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
+                                Public: {camera.availability_state || 'offline'}
+                            </span>
+                            <span className="rounded-full bg-gray-100 px-2.5 py-1 font-medium text-gray-700 dark:bg-gray-700/60 dark:text-gray-200">
+                                Monitor: {camera.monitoring_state || 'unknown'}
+                            </span>
+                        </div>
                     </div>
                     <div className="flex gap-1">
                         <button

@@ -143,4 +143,29 @@ describe('AreaManagement', () => {
             }));
         });
     });
+
+    it('memaksa preview health policy ke target external_streams_only', async () => {
+        render(
+            <MemoryRouter>
+                <AreaManagement />
+            </MemoryRouter>
+        );
+
+        await screen.findByText('Area A');
+        fireEvent.click(screen.getByTitle('Pengaturan Massal Kamera'));
+
+        fireEvent.change(screen.getByLabelText('Health Monitoring'), { target: { value: 'passive_first' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
+
+        await waitFor(() => {
+            expect(bulkUpdateByArea).toHaveBeenCalledWith(1, expect.objectContaining({
+                preview: true,
+                targetFilter: 'external_streams_only',
+                operation: 'policy_update',
+                payload: expect.objectContaining({
+                    external_health_mode: 'passive_first',
+                }),
+            }));
+        });
+    });
 });

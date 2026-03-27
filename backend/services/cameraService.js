@@ -26,7 +26,11 @@ const BULK_AREA_TARGET_FILTERS = [
     'all',
     'internal_only',
     'external_only',
+    'external_streams_only',
     'external_hls_only',
+    'external_mjpeg_only',
+    'external_probeable_only',
+    'external_passive_only',
     'external_unresolved_only',
     'online_only',
     'offline_only',
@@ -386,9 +390,19 @@ function matchesBulkTargetFilter(camera, targetFilter) {
             return deliveryProfile.classification === 'internal_hls';
         case 'external_only':
             return deliveryProfile.classification !== 'internal_hls';
+        case 'external_streams_only':
+            return deliveryProfile.classification !== 'internal_hls'
+                && deliveryProfile.classification !== 'external_unresolved';
         case 'external_hls_only':
             return deliveryProfile.classification !== 'external_unresolved'
                 && deliveryProfile.effectiveDeliveryType === 'external_hls';
+        case 'external_mjpeg_only':
+            return deliveryProfile.classification !== 'external_unresolved'
+                && deliveryProfile.effectiveDeliveryType === 'external_mjpeg';
+        case 'external_probeable_only':
+            return ['external_hls', 'external_mjpeg', 'external_embed'].includes(deliveryProfile.effectiveDeliveryType);
+        case 'external_passive_only':
+            return ['external_embed', 'external_jsmpeg', 'external_custom_ws'].includes(deliveryProfile.effectiveDeliveryType);
         case 'external_unresolved_only':
             return deliveryProfile.classification === 'external_unresolved';
         case 'online_only':
@@ -412,6 +426,14 @@ function requiresExternalHlsAreaPolicy(operation, payload = {}) {
         || payload.external_origin_mode !== undefined;
 }
 
+function requiresExternalStreamAreaPolicy(operation, payload = {}) {
+    if (operation !== 'policy_update' && operation !== 'maintenance') {
+        return false;
+    }
+
+    return payload.external_health_mode !== undefined;
+}
+
 function getBulkEligibility(camera, operation, payload = {}) {
     const deliveryProfile = getCameraDeliveryProfile(camera);
     const effectiveDeliveryType = payload.delivery_type || deliveryProfile.effectiveDeliveryType;
@@ -430,6 +452,15 @@ function getBulkEligibility(camera, operation, payload = {}) {
 
     if (requiresExternalHlsAreaPolicy(operation, payload) && effectiveDeliveryType !== 'external_hls') {
         return { eligible: false, reason: 'external_hls_only_policy' };
+    }
+
+    if (requiresExternalStreamAreaPolicy(operation, payload)) {
+        if (deliveryProfile.classification === 'internal_hls') {
+            return { eligible: false, reason: 'external_only_policy' };
+        }
+        if (deliveryProfile.classification === 'external_unresolved') {
+            return { eligible: false, reason: 'external_metadata_required' };
+        }
     }
 
     return { eligible: true, reason: null };
@@ -453,6 +484,8 @@ function buildBulkTargetSummary(targetCameras = [], options = {}) {
         onlineCount: 0,
         offlineCount: 0,
         recordingEnabledCount: 0,
+        deliveryTypeBreakdown: [],
+        externalHealthModeBreakdown: [],
         total: targetCameras.length,
         examples: targetCameras.slice(0, 10).map((camera) => ({
             id: camera.id,
@@ -460,10 +493,13 @@ function buildBulkTargetSummary(targetCameras = [], options = {}) {
             delivery_type: getCameraDeliveryProfile(camera).effectiveDeliveryType,
             delivery_classification: getCameraDeliveryProfile(camera).classification,
             is_online: camera.is_online === 1 || camera.is_online === true,
+            external_health_mode: camera.external_health_mode || 'default',
         })),
         blockedExamples: [],
     };
     const blockedReasonMap = new Map();
+    const deliveryTypeMap = new Map();
+    const healthModeMap = new Map();
 
     for (const camera of targetCameras) {
         const deliveryProfile = getCameraDeliveryProfile(camera);
@@ -484,6 +520,14 @@ function buildBulkTargetSummary(targetCameras = [], options = {}) {
         if (camera.enable_recording === 1 || camera.enable_recording === true) {
             summary.recordingEnabledCount += 1;
         }
+        deliveryTypeMap.set(
+            deliveryProfile.effectiveDeliveryType,
+            (deliveryTypeMap.get(deliveryProfile.effectiveDeliveryType) || 0) + 1
+        );
+        if (deliveryProfile.classification !== 'internal_hls') {
+            const healthMode = camera.external_health_mode || 'default';
+            healthModeMap.set(healthMode, (healthModeMap.get(healthMode) || 0) + 1);
+        }
 
         if (eligibility.eligible) {
             summary.eligibleCount += 1;
@@ -502,7 +546,15 @@ function buildBulkTargetSummary(targetCameras = [], options = {}) {
         }
     }
 
-    summary.blockedReasons = Array.from(blockedReasonMap.entries()).map(([reason, count]) => ({ reason, count }));
+    summary.blockedReasons = Array.from(blockedReasonMap.entries())
+        .map(([reason, count]) => ({ reason, count }))
+        .sort((a, b) => b.count - a.count);
+    summary.deliveryTypeBreakdown = Array.from(deliveryTypeMap.entries())
+        .map(([key, count]) => ({ key, count }))
+        .sort((a, b) => b.count - a.count);
+    summary.externalHealthModeBreakdown = Array.from(healthModeMap.entries())
+        .map(([key, count]) => ({ key, count }))
+        .sort((a, b) => b.count - a.count);
 
     return summary;
 }
@@ -516,7 +568,12 @@ class CameraService {
 
     getAllCameras() {
         return sanitizeCameraThumbnailList(query(
-            `SELECT c.*, a.name as area_name 
+            `SELECT c.*, a.name as area_name,
+                    CASE
+                        WHEN a.external_health_mode_override IN ('default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled')
+                            THEN a.external_health_mode_override
+                        ELSE 'default'
+                    END as area_external_health_mode_override
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 
              ORDER BY c.id ASC`
@@ -543,10 +600,15 @@ class CameraService {
                         WHEN c.external_health_mode IN ('default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled') THEN c.external_health_mode
                         ELSE 'default'
                     END as external_health_mode,
-                    a.name as area_name 
+                    a.name as area_name,
+                    CASE
+                        WHEN a.external_health_mode_override IN ('default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled')
+                            THEN a.external_health_mode_override
+                        ELSE 'default'
+                    END as area_external_health_mode_override
              FROM cameras c 
              LEFT JOIN areas a ON c.area_id = a.id 
-             WHERE c.enabled = 1 
+             WHERE c.enabled = 1
              ORDER BY c.is_tunnel ASC, c.id ASC`
         )).map((camera) => cameraHealthService.enrichCameraAvailability(camera));
     }
@@ -1116,7 +1178,9 @@ class CameraService {
         const { targetFilter: requestedTargetFilter, operation, payload, preview } = normalizeBulkAreaRequest(bulkRequest);
         const targetFilter = requiresExternalHlsAreaPolicy(operation, payload)
             ? 'external_hls_only'
-            : requestedTargetFilter;
+            : (requiresExternalStreamAreaPolicy(operation, payload)
+                ? 'external_streams_only'
+                : requestedTargetFilter);
 
         if (!BULK_AREA_TARGET_FILTERS.includes(targetFilter)) {
             const err = new Error('Invalid bulk target filter');
@@ -1156,7 +1220,9 @@ class CameraService {
                     ? 'Area ini belum memiliki kamera.'
                     : (targetFilter === 'external_hls_only'
                         ? 'Area ini memiliki kamera, tetapi tidak ada kamera external_hls yang eligible untuk policy proxy/TLS/origin.'
-                        : 'Tidak ada kamera yang cocok dengan target filter yang dipilih.'),
+                        : (targetFilter === 'external_streams_only'
+                            ? 'Area ini memiliki kamera, tetapi tidak ada kamera external valid yang eligible untuk health monitoring policy.'
+                            : 'Tidak ada kamera yang cocok dengan target filter yang dipilih.')),
             };
         }
 
@@ -1166,7 +1232,9 @@ class CameraService {
                     ? 'Area ini belum memiliki kamera'
                     : (targetFilter === 'external_hls_only'
                         ? 'Area ini memiliki kamera, tetapi tidak ada kamera external_hls yang eligible untuk policy proxy/TLS/origin.'
-                        : 'No cameras matched the selected bulk target filter')
+                        : (targetFilter === 'external_streams_only'
+                            ? 'Area ini memiliki kamera, tetapi tidak ada kamera external valid yang eligible untuk health monitoring policy.'
+                            : 'No cameras matched the selected bulk target filter'))
             );
             err.statusCode = 400;
             throw err;
@@ -1181,7 +1249,9 @@ class CameraService {
                 operation,
                 summary,
                 guidance: targetFilter !== requestedTargetFilter
-                    ? 'Target filter otomatis dikunci ke external_hls_only karena operasi ini hanya berlaku untuk kamera external HLS.'
+                    ? (targetFilter === 'external_hls_only'
+                        ? 'Target filter otomatis dikunci ke external_hls_only karena operasi ini hanya berlaku untuk kamera external HLS.'
+                        : 'Target filter otomatis dikunci ke external_streams_only karena health monitoring policy hanya berlaku untuk kamera external yang valid.')
                     : 'Tidak ada kamera yang eligible untuk operasi ini. Tinjau blocked reasons sebelum apply.',
             };
         }
@@ -1229,6 +1299,9 @@ class CameraService {
                 }
                 if (payload.external_tls_mode !== undefined) {
                     patch.external_tls_mode = payload.external_tls_mode;
+                }
+                if (payload.external_health_mode !== undefined) {
+                    patch.external_health_mode = normalizeExternalHealthMode(payload.external_health_mode);
                 }
             }
 
@@ -1279,7 +1352,9 @@ class CameraService {
                 operation,
                 summary,
                 guidance: targetFilter !== requestedTargetFilter
-                    ? 'Target filter otomatis dikunci ke external_hls_only karena operasi ini hanya berlaku untuk kamera external HLS.'
+                    ? (targetFilter === 'external_hls_only'
+                        ? 'Target filter otomatis dikunci ke external_hls_only karena operasi ini hanya berlaku untuk kamera external HLS.'
+                        : 'Target filter otomatis dikunci ke external_streams_only karena health monitoring policy hanya berlaku untuk kamera external yang valid.')
                     : (operation === 'normalization' && summary.unresolvedCount > 0
                         ? 'Sebagian kamera unresolved tetap membutuhkan Backup Restore untuk mengisi metadata source sebelum dianggap external valid.'
                         : null),
@@ -1318,7 +1393,9 @@ class CameraService {
             changes,
             summary,
             guidance: targetFilter !== requestedTargetFilter
-                ? 'Target filter otomatis dikunci ke external_hls_only karena operasi ini hanya berlaku untuk kamera external HLS.'
+                ? (targetFilter === 'external_hls_only'
+                    ? 'Target filter otomatis dikunci ke external_hls_only karena operasi ini hanya berlaku untuk kamera external HLS.'
+                    : 'Target filter otomatis dikunci ke external_streams_only karena health monitoring policy hanya berlaku untuk kamera external yang valid.')
                 : (operation === 'normalization' && summary.unresolvedCount > 0
                     ? 'Sebagian kamera unresolved masih membutuhkan Backup Restore untuk memulihkan URL source dari file backup.'
                     : null),

@@ -291,8 +291,14 @@ class SettingsService {
 
     getExternalHealthDefaults() {
         const rows = query(
-            'SELECT key, value FROM settings WHERE key IN (?, ?)',
-            ['external_mjpeg_health_default', 'external_hls_health_default']
+            'SELECT key, value FROM settings WHERE key IN (?, ?, ?, ?, ?)',
+            [
+                'external_mjpeg_health_default',
+                'external_hls_health_default',
+                'external_embed_health_default',
+                'external_jsmpeg_health_default',
+                'external_custom_ws_health_default',
+            ]
         );
 
         const map = new Map(rows.map((row) => [row.key, row.value]));
@@ -302,6 +308,15 @@ class SettingsService {
             ),
             external_hls: normalizeExternalHealthMode(
                 map.get('external_hls_health_default') || 'hybrid_probe'
+            ),
+            external_embed: normalizeExternalHealthMode(
+                map.get('external_embed_health_default') || 'passive_first'
+            ),
+            external_jsmpeg: normalizeExternalHealthMode(
+                map.get('external_jsmpeg_health_default') || 'disabled'
+            ),
+            external_custom_ws: normalizeExternalHealthMode(
+                map.get('external_custom_ws_health_default') || 'disabled'
             ),
         };
     }

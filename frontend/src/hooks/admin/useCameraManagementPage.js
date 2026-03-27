@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cameraService } from '../../services/cameraService';
 import { areaService } from '../../services/areaService';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -24,6 +24,14 @@ function getDuplicateNameError(errorMessage) {
 export function useCameraManagementPage() {
     const [cameras, setCameras] = useState([]);
     const [areas, setAreas] = useState([]);
+    const [filters, setFilters] = useState({
+        search: '',
+        areaId: 'all',
+        deliveryType: 'all',
+        healthMode: 'all',
+        availabilityState: 'all',
+        monitoringState: 'all',
+    });
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState(null);
     const [showModal, setShowModal] = useState(false);
@@ -320,9 +328,54 @@ export function useCameraManagementPage() {
         return touched[fieldName] ? formErrors[fieldName] : '';
     }, [formErrors, touched]);
 
+    const filteredCameras = useMemo(() => {
+        return cameras.filter((camera) => {
+            const normalizedSearch = filters.search.trim().toLowerCase();
+            if (normalizedSearch) {
+                const haystack = [
+                    camera.name,
+                    camera.area_name,
+                    camera.location,
+                    camera.delivery_type,
+                    camera.external_health_mode,
+                    camera.availability_state,
+                    camera.monitoring_state,
+                ].filter(Boolean).join(' ').toLowerCase();
+
+                if (!haystack.includes(normalizedSearch)) {
+                    return false;
+                }
+            }
+
+            if (filters.areaId !== 'all' && String(camera.area_id || '') !== filters.areaId) {
+                return false;
+            }
+
+            if (filters.deliveryType !== 'all' && camera.delivery_type !== filters.deliveryType) {
+                return false;
+            }
+
+            if (filters.healthMode !== 'all' && (camera.external_health_mode || 'default') !== filters.healthMode) {
+                return false;
+            }
+
+            if (filters.availabilityState !== 'all' && (camera.availability_state || 'offline') !== filters.availabilityState) {
+                return false;
+            }
+
+            if (filters.monitoringState !== 'all' && (camera.monitoring_state || 'unknown') !== filters.monitoringState) {
+                return false;
+            }
+
+            return true;
+        });
+    }, [cameras, filters]);
+
     return {
         cameras,
+        filteredCameras,
         areas,
+        filters,
         loading,
         loadError,
         showModal,
@@ -346,6 +399,7 @@ export function useCameraManagementPage() {
         setFieldValue,
         getFieldError,
         setModalError,
+        setFilters,
     };
 }
 

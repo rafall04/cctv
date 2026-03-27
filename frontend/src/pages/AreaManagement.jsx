@@ -13,6 +13,7 @@ const defaultBulkConfig = {
     targetFilter: 'all',
     operation: 'policy_update',
     delivery_type: 'ignore',
+    external_health_mode: 'ignore',
     external_use_proxy: 'ignore',
     enable_recording: 'ignore',
     enabled: 'ignore',
@@ -21,6 +22,14 @@ const defaultBulkConfig = {
     video_codec: 'ignore',
     clear_internal_rtsp: false,
 };
+
+const AREA_HEALTH_MODE_OPTIONS = [
+    { value: 'default', label: 'Ikuti Global Default' },
+    { value: 'passive_first', label: 'Passive First' },
+    { value: 'hybrid_probe', label: 'Hybrid Probe' },
+    { value: 'probe_first', label: 'Probe First' },
+    { value: 'disabled', label: 'Disabled' },
+];
 
 function requiresExternalHlsTarget(config) {
     if (config.operation !== 'policy_update' && config.operation !== 'maintenance') {
@@ -32,9 +41,20 @@ function requiresExternalHlsTarget(config) {
         || config.external_origin_mode !== 'ignore';
 }
 
+function requiresExternalStreamsTarget(config) {
+    if (config.operation !== 'policy_update' && config.operation !== 'maintenance') {
+        return false;
+    }
+
+    return config.external_health_mode !== 'ignore';
+}
+
 function getEffectiveTargetFilter(config) {
     if (requiresExternalHlsTarget(config)) {
         return 'external_hls_only';
+    }
+    if (requiresExternalStreamsTarget(config)) {
+        return 'external_streams_only';
     }
     return config.targetFilter || 'all';
 }
@@ -45,8 +65,16 @@ function getBulkFilterLabel(targetFilter) {
             return 'Hanya Internal';
         case 'external_only':
             return 'Hanya External';
+        case 'external_streams_only':
+            return 'Hanya External Valid';
         case 'external_hls_only':
             return 'Hanya External HLS';
+        case 'external_mjpeg_only':
+            return 'Hanya External MJPEG';
+        case 'external_probeable_only':
+            return 'Hanya External Probeable';
+        case 'external_passive_only':
+            return 'Hanya External Passive';
         case 'external_unresolved_only':
             return 'Hanya External Unresolved';
         case 'online_only':
@@ -67,7 +95,7 @@ export default function AreaManagement() {
     const [showModal, setShowModal] = useState(false);
     const [editingArea, setEditingArea] = useState(null);
     const [formData, setFormData] = useState({ 
-        name: '', description: '', rt: '', rw: '', kelurahan: '', kecamatan: '', latitude: '', longitude: ''
+        name: '', description: '', rt: '', rw: '', kelurahan: '', kecamatan: '', latitude: '', longitude: '', external_health_mode_override: 'default'
     });
     const [formErrors, setFormErrors] = useState({});
     const [error, setError] = useState('');
@@ -159,7 +187,7 @@ export default function AreaManagement() {
 
     const openAddModal = () => {
         setEditingArea(null);
-        setFormData({ name: '', description: '', rt: '', rw: '', kelurahan: '', kecamatan: '', latitude: '', longitude: '' });
+        setFormData({ name: '', description: '', rt: '', rw: '', kelurahan: '', kecamatan: '', latitude: '', longitude: '', external_health_mode_override: 'default' });
         setFormErrors({});
         setError('');
         setShowModal(true);
@@ -171,6 +199,7 @@ export default function AreaManagement() {
             name: area.name, description: area.description || '', rt: area.rt || '', rw: area.rw || '',
             kelurahan: area.kelurahan || '', kecamatan: area.kecamatan || '',
             latitude: area.latitude || '', longitude: area.longitude || '',
+            external_health_mode_override: area.external_health_mode_override || 'default',
         });
         setFormErrors({});
         setError('');
@@ -248,6 +277,7 @@ export default function AreaManagement() {
 
         if (bulkConfig.operation === 'policy_update' || bulkConfig.operation === 'maintenance') {
             if (bulkConfig.delivery_type !== 'ignore') payload.delivery_type = bulkConfig.delivery_type;
+            if (bulkConfig.external_health_mode !== 'ignore') payload.external_health_mode = bulkConfig.external_health_mode;
             if (bulkConfig.external_use_proxy !== 'ignore') payload.external_use_proxy = parseInt(bulkConfig.external_use_proxy, 10);
             if (bulkConfig.enable_recording !== 'ignore') payload.enable_recording = parseInt(bulkConfig.enable_recording, 10);
             if (bulkConfig.enabled !== 'ignore') payload.enabled = parseInt(bulkConfig.enabled, 10);
@@ -523,15 +553,17 @@ export default function AreaManagement() {
                                 {getLocationString(area)}
                             </p>
                             {area.latitude && area.longitude && (
-                                <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-3">✓ Koordinat tersedia</p>
+                                <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-3">Koordinat tersedia</p>
                             )}
                             <div className="flex flex-wrap gap-2 mb-4">
                                 {area.kecamatan && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-blue-100 dark:bg-primary/20 text-primary-600 dark:text-blue-400">{area.kecamatan}</span>}
                                 {area.kelurahan && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400">{area.kelurahan}</span>}
                                 {area.externalUnresolvedCount > 0 && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300">{area.externalUnresolvedCount} unresolved</span>}
+                                {area.degradedCount > 0 && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300">{area.degradedCount} degraded</span>}
                                 {area.offlineCount > 0 && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300">{area.offlineCount} offline</span>}
+                                {area.maintenanceCount > 0 && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-slate-200 dark:bg-slate-700/70 text-slate-700 dark:text-slate-200">{area.maintenanceCount} maintenance</span>}
                             </div>
-                            <div className="grid grid-cols-2 gap-2 mb-4 text-xs">
+                            <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
                                 <div className="rounded-xl border border-gray-200 dark:border-gray-700/50 bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
                                     <div className="text-gray-500 dark:text-gray-400">Internal</div>
                                     <div className="font-semibold text-gray-900 dark:text-white">{area.internalValidCount}</div>
@@ -539,6 +571,20 @@ export default function AreaManagement() {
                                 <div className="rounded-xl border border-gray-200 dark:border-gray-700/50 bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
                                     <div className="text-gray-500 dark:text-gray-400">External</div>
                                     <div className="font-semibold text-gray-900 dark:text-white">{area.externalValidCount}</div>
+                                </div>
+                            </div>
+                            <div className="rounded-xl border border-gray-200 dark:border-gray-700/50 bg-gray-50 dark:bg-gray-900/40 px-3 py-3 mb-4">
+                                <div className="flex items-center justify-between gap-3 text-xs">
+                                    <span className="text-gray-500 dark:text-gray-400">Health Default Area</span>
+                                    <span className="font-semibold text-gray-900 dark:text-white">{area.external_health_mode_override || 'default'}</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-3 text-xs mt-2">
+                                    <span className="text-gray-500 dark:text-gray-400">Dominant External Mode</span>
+                                    <span className="font-semibold text-sky-700 dark:text-sky-300">{area.dominantExternalHealthMode || 'default'}</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-3 text-xs mt-2">
+                                    <span className="text-gray-500 dark:text-gray-400">Passive Monitored</span>
+                                    <span className="font-semibold text-emerald-700 dark:text-emerald-300">{area.passiveMonitoredCount || 0}</span>
                                 </div>
                             </div>
                             <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700/50">
@@ -608,6 +654,23 @@ export default function AreaManagement() {
                                     className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary resize-none" placeholder="Catatan opsional..." />
                             </div>
 
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Default Health Monitoring External</label>
+                                <select
+                                    name="external_health_mode_override"
+                                    value={formData.external_health_mode_override}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                                >
+                                    {AREA_HEALTH_MODE_OPTIONS.map((option) => (
+                                        <option key={option.value} value={option.value}>{option.label}</option>
+                                    ))}
+                                </select>
+                                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                    Override ini menjadi default steady-state untuk kamera external di area ini. Kamera dengan override sendiri tetap menang.
+                                </p>
+                            </div>
+
                             {/* Koordinat dengan LocationPicker */}
                             <div className="pt-4 border-t border-gray-200 dark:border-gray-700/50">
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Koordinat Area (untuk Map View)</label>
@@ -669,7 +732,11 @@ export default function AreaManagement() {
                                             <option value="all">Semua Kamera Area</option>
                                             <option value="internal_only">Hanya Internal</option>
                                             <option value="external_only">Hanya External</option>
+                                            <option value="external_streams_only">Hanya External Valid</option>
                                             <option value="external_hls_only">Hanya External HLS</option>
+                                            <option value="external_mjpeg_only">Hanya External MJPEG</option>
+                                            <option value="external_probeable_only">Hanya External Probeable</option>
+                                            <option value="external_passive_only">Hanya External Passive</option>
                                             <option value="external_unresolved_only">Hanya External Unresolved</option>
                                             <option value="online_only">Hanya Online</option>
                                             <option value="offline_only">Hanya Offline</option>
@@ -680,10 +747,31 @@ export default function AreaManagement() {
                                                 Proxy, TLS, dan origin policy otomatis dikunci ke target External HLS.
                                             </p>
                                         )}
+                                        {requiresExternalStreamsTarget(bulkConfig) && !requiresExternalHlsTarget(bulkConfig) && (
+                                            <p className="text-xs text-sky-700 dark:text-sky-300">
+                                                Health monitoring policy otomatis dikunci ke target External Valid.
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
+                                        <label className="text-sm font-semibold text-gray-900 dark:text-white">Health Monitoring</label>
+                                        <select
+                                            aria-label="Health Monitoring"
+                                            value={bulkConfig.external_health_mode}
+                                            onChange={(e) => setBulkConfig((current) => ({ ...current, external_health_mode: e.target.value }))}
+                                            className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                                        >
+                                            <option value="ignore">Biarkan Seperti Semula</option>
+                                            <option value="default">Ikuti Default Area/Global</option>
+                                            <option value="passive_first">Passive First</option>
+                                            <option value="hybrid_probe">Hybrid Probe</option>
+                                            <option value="probe_first">Probe First</option>
+                                            <option value="disabled">Disabled</option>
+                                        </select>
+                                    </div>
                                     <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
                                         <label className="text-sm font-semibold text-gray-900 dark:text-white">Delivery Type</label>
                                         <select
@@ -827,7 +915,7 @@ export default function AreaManagement() {
                                                     <div className="font-semibold text-red-600 dark:text-red-300">{bulkPreview.summary?.blockedCount || 0}</div>
                                                 </div>
                                             </div>
-                                            <div className="grid grid-cols-2 gap-3">
+                                    <div className="grid grid-cols-2 gap-3">
                                                 <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-2 border border-gray-200 dark:border-gray-700">
                                                     <div className="text-gray-500 dark:text-gray-400 text-xs">Unresolved</div>
                                                     <div className="font-semibold text-amber-600 dark:text-amber-300">{bulkPreview.summary?.unresolvedCount || 0}</div>
@@ -835,6 +923,30 @@ export default function AreaManagement() {
                                                 <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-2 border border-gray-200 dark:border-gray-700">
                                                     <div className="text-gray-500 dark:text-gray-400 text-xs">Recording Enabled</div>
                                                     <div className="font-semibold text-gray-900 dark:text-white">{bulkPreview.summary?.recordingEnabledCount || 0}</div>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-3 border border-gray-200 dark:border-gray-700">
+                                                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Delivery Mix</div>
+                                                    <div className="space-y-2">
+                                                        {(bulkPreview.summary?.deliveryTypeBreakdown || []).slice(0, 5).map((item) => (
+                                                            <div key={item.key} className="flex items-center justify-between gap-3 text-xs">
+                                                                <span className="text-gray-700 dark:text-gray-300">{item.key}</span>
+                                                                <span className="px-2 py-1 rounded-full bg-sky-100 dark:bg-sky-500/10 text-sky-700 dark:text-sky-300">{item.count}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-3 border border-gray-200 dark:border-gray-700">
+                                                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Current Health Modes</div>
+                                                    <div className="space-y-2">
+                                                        {(bulkPreview.summary?.externalHealthModeBreakdown || []).slice(0, 5).map((item) => (
+                                                            <div key={item.key} className="flex items-center justify-between gap-3 text-xs">
+                                                                <span className="text-gray-700 dark:text-gray-300">{item.key}</span>
+                                                                <span className="px-2 py-1 rounded-full bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">{item.count}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             </div>
                                             {(bulkPreview.summary?.blockedReasons || []).length > 0 && (

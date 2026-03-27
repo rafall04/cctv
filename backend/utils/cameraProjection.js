@@ -45,5 +45,10 @@ export const SHARED_CAMERA_STREAM_WITH_AREA_PROJECTION = `
     a.rt,
     a.rw,
     a.kelurahan,
-    a.kecamatan
+    a.kecamatan,
+    CASE
+        WHEN a.external_health_mode_override IN ('default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled')
+            THEN a.external_health_mode_override
+        ELSE 'default'
+    END as area_external_health_mode_override
 `;

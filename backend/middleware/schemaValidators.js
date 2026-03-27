@@ -443,6 +443,28 @@ export const createAreaSchema = {
             },
             description: {
                 anyOf: [{ type: 'string', maxLength: 500 }, { type: 'null' }]
+            },
+            rt: {
+                anyOf: [{ type: 'string', maxLength: 20 }, { type: 'null' }]
+            },
+            rw: {
+                anyOf: [{ type: 'string', maxLength: 20 }, { type: 'null' }]
+            },
+            kelurahan: {
+                anyOf: [{ type: 'string', maxLength: 100 }, { type: 'null' }]
+            },
+            kecamatan: {
+                anyOf: [{ type: 'string', maxLength: 100 }, { type: 'null' }]
+            },
+            latitude: {
+                anyOf: [{ type: 'number' }, { type: 'string' }, { type: 'null' }]
+            },
+            longitude: {
+                anyOf: [{ type: 'number' }, { type: 'string' }, { type: 'null' }]
+            },
+            external_health_mode_override: {
+                type: 'string',
+                enum: ['default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled']
             }
         },
         additionalProperties: false
@@ -460,6 +482,28 @@ export const updateAreaSchema = {
             },
             description: {
                 anyOf: [{ type: 'string', maxLength: 500 }, { type: 'null' }]
+            },
+            rt: {
+                anyOf: [{ type: 'string', maxLength: 20 }, { type: 'null' }]
+            },
+            rw: {
+                anyOf: [{ type: 'string', maxLength: 20 }, { type: 'null' }]
+            },
+            kelurahan: {
+                anyOf: [{ type: 'string', maxLength: 100 }, { type: 'null' }]
+            },
+            kecamatan: {
+                anyOf: [{ type: 'string', maxLength: 100 }, { type: 'null' }]
+            },
+            latitude: {
+                anyOf: [{ type: 'number' }, { type: 'string' }, { type: 'null' }]
+            },
+            longitude: {
+                anyOf: [{ type: 'number' }, { type: 'string' }, { type: 'null' }]
+            },
+            external_health_mode_override: {
+                type: 'string',
+                enum: ['default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled']
             }
         },
         additionalProperties: false

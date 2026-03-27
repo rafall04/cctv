@@ -4,6 +4,7 @@ import SaweriaSettingsPanel from '../components/admin/settings/SaweriaSettingsPa
 import BrandingSettingsPanel from '../components/admin/settings/BrandingSettingsPanel';
 import GeneralSettingsPanel from '../components/admin/settings/GeneralSettingsPanel';
 import AdsSettingsPanel from '../components/admin/settings/AdsSettingsPanel';
+import StreamHealthSettingsPanel from '../components/admin/settings/StreamHealthSettingsPanel';
 import ApiKeySettings from '../components/settings/ApiKeySettings';
 import TimezoneSettingsTab from '../components/settings/TimezoneSettingsTab';
 import BackupSettingsTab from '../components/settings/BackupSettingsTab';
@@ -35,6 +36,11 @@ const Icons = {
             <path strokeLinecap="round" strokeLinejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
         </svg>
     ),
+    Health: () => (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.382A9 9 0 1112 3a9 9 0 019 9c0 1.61-.423 3.122-1.162 4.43M15 19l-3 2-3-2" />
+        </svg>
+    ),
     ApiKey: () => (
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
@@ -59,6 +65,7 @@ export default function UnifiedSettings() {
         { id: 'general', label: 'General', icon: <Icons.General /> },
         { id: 'timezone', label: 'Timezone', icon: <Icons.Timezone /> },
         { id: 'backup', label: 'Backup', icon: <Icons.Backup /> },
+        { id: 'health', label: 'Health', icon: <Icons.Health /> },
         { id: 'telegram', label: 'Telegram Bot', icon: <Icons.Telegram /> },
         { id: 'saweria', label: 'Saweria', icon: <Icons.Saweria /> },
         { id: 'ads', label: 'Ads', icon: <Icons.Ads /> },
@@ -105,6 +112,7 @@ export default function UnifiedSettings() {
                 {activeTab === 'general' && <GeneralSettingsPanel />}
                 {activeTab === 'timezone' && <TimezoneSettingsTab />}
                 {activeTab === 'backup' && <BackupSettingsTab />}
+                {activeTab === 'health' && <StreamHealthSettingsPanel />}
                 {activeTab === 'telegram' && <TelegramSettingsPanel />}
                 {activeTab === 'saweria' && <SaweriaSettingsPanel />}
                 {activeTab === 'ads' && <AdsSettingsPanel />}
