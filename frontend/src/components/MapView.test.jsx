@@ -7,6 +7,12 @@ import MapView from './MapView';
 const {
     fitBoundsMock,
     setViewMock,
+    mapEventHandlers,
+    getZoomMock,
+    getBoundsMock,
+    setMockZoom,
+    setMockBounds,
+    resetMockMapState,
     startSessionMock,
     stopSessionMock,
     startTimeoutMock,
@@ -17,6 +23,12 @@ const {
 } = vi.hoisted(() => ({
     fitBoundsMock: vi.fn(),
     setViewMock: vi.fn(),
+    mapEventHandlers: {},
+    getZoomMock: vi.fn(),
+    getBoundsMock: vi.fn(),
+    setMockZoom: vi.fn(),
+    setMockBounds: vi.fn(),
+    resetMockMapState: vi.fn(),
     startSessionMock: vi.fn().mockResolvedValue('session-1'),
     stopSessionMock: vi.fn().mockResolvedValue(undefined),
     startTimeoutMock: vi.fn(),
@@ -25,6 +37,40 @@ const {
     resetFailuresMock: vi.fn(),
     hlsInstances: [],
 }));
+
+const createMockBounds = (south, west, north, east) => ({
+    isValid: () => true,
+    getSouth: () => south,
+    getWest: () => west,
+    getNorth: () => north,
+    getEast: () => east,
+});
+
+let mockZoom = 11;
+let mockBounds = createMockBounds(-8, 111, -6, 113);
+
+getZoomMock.mockImplementation(() => mockZoom);
+getBoundsMock.mockImplementation(() => mockBounds);
+setMockZoom.mockImplementation((value) => {
+    mockZoom = value;
+});
+setMockBounds.mockImplementation((value) => {
+    mockBounds = value;
+});
+resetMockMapState.mockImplementation(() => {
+    mockZoom = 11;
+    mockBounds = createMockBounds(-8, 111, -6, 113);
+    Object.keys(mapEventHandlers).forEach((key) => delete mapEventHandlers[key]);
+});
+
+const mapMock = {
+    flyTo: vi.fn(),
+    fitBounds: fitBoundsMock,
+    setView: setViewMock,
+    invalidateSize: vi.fn(),
+    getZoom: getZoomMock,
+    getBounds: getBoundsMock,
+};
 
 vi.mock('react-router-dom', () => ({
     useSearchParams: () => [new URLSearchParams('mode=simple&view=map')],
@@ -46,12 +92,11 @@ vi.mock('react-leaflet', () => ({
     LayersControl: Object.assign(({ children }) => <div>{children}</div>, {
         BaseLayer: ({ children }) => <div>{children}</div>,
     }),
-    useMap: () => ({
-        flyTo: vi.fn(),
-        fitBounds: fitBoundsMock,
-        setView: setViewMock,
-        invalidateSize: vi.fn(),
-    }),
+    useMap: () => mapMock,
+    useMapEvents: (handlers) => {
+        Object.assign(mapEventHandlers, handlers);
+        return mapMock;
+    },
 }));
 
 vi.mock('leaflet', () => ({
@@ -63,9 +108,20 @@ vi.mock('leaflet', () => ({
             },
         },
         divIcon: vi.fn(() => ({})),
-        latLngBounds: vi.fn(() => ({
-            isValid: () => true,
-        })),
+        latLngBounds: vi.fn((coords = []) => {
+            if (!Array.isArray(coords) || coords.length === 0) {
+                return createMockBounds(-8, 111, -6, 113);
+            }
+
+            const latitudes = coords.map(([lat]) => lat);
+            const longitudes = coords.map(([, lng]) => lng);
+            return createMockBounds(
+                Math.min(...latitudes),
+                Math.min(...longitudes),
+                Math.max(...latitudes),
+                Math.max(...longitudes),
+            );
+        }),
     },
 }));
 
@@ -260,6 +316,7 @@ describe('MapView area filter visibility', () => {
 
     beforeEach(() => {
         vi.useRealTimers();
+        resetMockMapState();
         playMock = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
         requestFullscreenMock = vi.fn().mockResolvedValue(undefined);
         window.URL.createObjectURL = vi.fn(() => 'blob:test');
@@ -275,6 +332,8 @@ describe('MapView area filter visibility', () => {
         });
         fitBoundsMock.mockReset();
         setViewMock.mockReset();
+        mapMock.flyTo.mockReset();
+        mapMock.invalidateSize.mockReset();
         startSessionMock.mockClear();
         stopSessionMock.mockClear();
         hlsInstances.length = 0;
@@ -680,6 +739,104 @@ describe('MapView area filter visibility', () => {
         });
 
         expect(screen.queryByText('popup top ad map')).toBeNull();
+    });
+
+    it('merender aggregate marker saat zoom rendah untuk area padat', async () => {
+        const denseCameras = Array.from({ length: 30 }, (_, index) => ({
+            id: index + 1,
+            name: `Dense ${index + 1}`,
+            latitude: (-7.1507 + (index * 0.0001)).toFixed(4),
+            longitude: (111.8815 + (index * 0.0001)).toFixed(4),
+            area_name: 'Dense Area',
+            is_online: 1,
+            status: 'active',
+            is_tunnel: 0,
+        }));
+
+        const denseAreas = [
+            { name: 'Dense Area', latitude: '-7.1400', longitude: '111.8900' },
+        ];
+
+        setMockZoom(11);
+
+        await act(async () => {
+            render(<MapView cameras={denseCameras} areas={denseAreas} showAreaFilter />);
+        });
+
+        await waitFor(() => {
+            expect(screen.getAllByText('marker')).toHaveLength(1);
+        });
+
+        expect(screen.queryByTestId('marker--7.1507-111.8815')).toBeNull();
+        expect(screen.getByTestId('marker--7.14-111.89')).toBeTruthy();
+    });
+
+    it('merender marker individual saat zoom tinggi pada area padat', async () => {
+        const denseCameras = Array.from({ length: 30 }, (_, index) => ({
+            id: index + 1,
+            name: `Dense ${index + 1}`,
+            latitude: (-7.1507 + (index * 0.0001)).toFixed(4),
+            longitude: (111.8815 + (index * 0.0001)).toFixed(4),
+            area_name: 'Dense Area',
+            is_online: 1,
+            status: 'active',
+            is_tunnel: 0,
+        }));
+
+        setMockZoom(16);
+
+        await act(async () => {
+            render(<MapView cameras={denseCameras} areas={[]} showAreaFilter />);
+        });
+
+        await waitFor(() => {
+            expect(screen.getAllByText('marker')).toHaveLength(30);
+        });
+
+        expect(screen.getByTestId('marker--7.1507-111.8815')).toBeTruthy();
+    });
+
+    it('tidak mereset viewport saat user sudah drag lalu rerender dengan area yang sama', async () => {
+        const { rerender } = render(
+            <MapView cameras={areaCameras} areas={areas} showAreaFilter selectedArea="Dander" />
+        );
+
+        await waitFor(() => {
+            expect(setViewMock).toHaveBeenCalledWith([-7.15, 111.88], 15, { animate: true, duration: 0.5 });
+        });
+
+        setViewMock.mockClear();
+
+        act(() => {
+            mapEventHandlers.dragstart?.();
+            mapEventHandlers.zoomend?.();
+        });
+
+        rerender(
+            <MapView cameras={areaCameras} areas={areas} showAreaFilter selectedArea="Dander" />
+        );
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+
+        expect(setViewMock).not.toHaveBeenCalled();
+    });
+
+    it('menjalankan reset view eksplisit ke area aktif', async () => {
+        render(<MapView cameras={areaCameras} areas={areas} showAreaFilter selectedArea="Baureno" />);
+
+        await waitFor(() => {
+            expect(setViewMock).toHaveBeenCalledWith([-7.25, 112.08], 15, { animate: true, duration: 0.5 });
+        });
+
+        setViewMock.mockClear();
+
+        fireEvent.click(screen.getByTestId('map-reset-view'));
+
+        await waitFor(() => {
+            expect(setViewMock).toHaveBeenCalledWith([-7.25, 112.08], 15, { animate: true, duration: 0.5 });
+        });
     });
 });
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, memo, useCallback, useMemo, useLayoutEffect } from 'react';
-import { MapContainer, TileLayer, Marker, useMap, ZoomControl, LayersControl } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMap, useMapEvents, ZoomControl, LayersControl } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import '../styles/leaflet-overrides.css';
@@ -55,6 +55,9 @@ const LoadingStage = {
 
 // Cache icon untuk menghindari pembuatan ulang
 const iconCache = new Map();
+const AREA_AGGREGATE_ZOOM = 13;
+const INDIVIDUAL_MARKER_ZOOM = 16;
+const DENSE_AREA_THRESHOLD = 24;
 
 // CCTV Marker - dengan support status (active, maintenance, tunnel, offline)
 const createCameraIcon = (status = 'active', isTunnel = false, isOnline = true, availabilityState = 'online') => {
@@ -147,6 +150,89 @@ const hasValidCoords = (c) => {
     return !isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0);
 };
 
+const normalizeBounds = (bounds) => {
+    if (!bounds) return null;
+    if (typeof bounds.getSouth === 'function') {
+        return {
+            south: bounds.getSouth(),
+            west: bounds.getWest(),
+            north: bounds.getNorth(),
+            east: bounds.getEast(),
+        };
+    }
+    if (bounds.south !== undefined) {
+        return bounds;
+    }
+    return null;
+};
+
+const isCameraInBounds = (camera, bounds, padding = 0.02) => {
+    const normalizedBounds = normalizeBounds(bounds);
+    if (!normalizedBounds || !hasValidCoords(camera)) {
+        return true;
+    }
+
+    const lat = parseFloat(camera.latitude);
+    const lng = parseFloat(camera.longitude);
+
+    return lat >= normalizedBounds.south - padding
+        && lat <= normalizedBounds.north + padding
+        && lng >= normalizedBounds.west - padding
+        && lng <= normalizedBounds.east + padding;
+};
+
+const getGroupMarkerColor = (cameras = []) => {
+    const counts = cameras.reduce((acc, camera) => {
+        const state = getCameraAvailabilityState(camera);
+        acc[state] = (acc[state] || 0) + 1;
+        return acc;
+    }, {});
+
+    if ((counts.offline || 0) === cameras.length) {
+        return { color: '#6b7280', darkColor: '#4b5563' };
+    }
+    if ((counts.degraded || 0) > 0) {
+        return { color: '#f59e0b', darkColor: '#d97706' };
+    }
+    return { color: '#0ea5e9', darkColor: '#0284c7' };
+};
+
+const createGroupIcon = (count, cameras = [], kind = 'group') => {
+    const colorKey = `${kind}-${count}-${cameras.length}-${cameras.some((camera) => getCameraAvailabilityState(camera) === 'degraded')}-${cameras.every((camera) => getCameraAvailabilityState(camera) === 'offline')}`;
+    if (iconCache.has(colorKey)) {
+        return iconCache.get(colorKey);
+    }
+
+    const { color, darkColor } = getGroupMarkerColor(cameras);
+    const icon = L.divIcon({
+        className: 'cctv-group-marker',
+        html: `
+            <div style="
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                min-width:42px;
+                height:42px;
+                padding:0 10px;
+                background:linear-gradient(135deg, ${color} 0%, ${darkColor} 100%);
+                border:3px solid white;
+                border-radius:999px;
+                box-shadow:0 4px 12px rgba(0,0,0,0.35);
+                color:white;
+                font-weight:700;
+                font-size:13px;
+            ">
+                ${count}
+            </div>
+        `,
+        iconSize: [42, 42],
+        iconAnchor: [21, 21],
+    });
+
+    iconCache.set(colorKey, icon);
+    return icon;
+};
+
 // Fungsi untuk mendeteksi dan memberikan offset pada marker yang bertumpuk
 const applyMarkerOffset = (cameras) => {
     const coordMap = new Map();
@@ -174,6 +260,32 @@ const applyMarkerOffset = (cameras) => {
         }
 
         return { ...camera, _displayLat: lat, _displayLng: lng, _isGrouped: false, _groupIndex: 0 };
+    });
+};
+
+const bucketCamerasByCoordinate = (cameras, zoom) => {
+    const precision = zoom >= 15 ? 4 : (zoom >= 13 ? 3 : 2);
+    const grouped = new Map();
+
+    cameras.forEach((camera) => {
+        const lat = parseFloat(camera.latitude);
+        const lng = parseFloat(camera.longitude);
+        const key = `${lat.toFixed(precision)},${lng.toFixed(precision)}`;
+        if (!grouped.has(key)) {
+            grouped.set(key, []);
+        }
+        grouped.get(key).push(camera);
+    });
+
+    return Array.from(grouped.values()).map((group) => {
+        const first = group[0];
+        return {
+            key: `${group.length}-${first.id}-${precision}`,
+            latitude: parseFloat(first.latitude),
+            longitude: parseFloat(first.longitude),
+            count: group.length,
+            cameras: group,
+        };
     });
 };
 
@@ -1155,19 +1267,50 @@ const VideoModal = memo(({ camera, onClose }) => {
 VideoModal.displayName = 'VideoModal';
 
 // Map controller
-function MapController({ center, zoom, bounds }) {
+function MapController({ viewportCommand, onViewportChange, onCommandApplied }) {
     const map = useMap();
+    const lastAppliedCommandRef = useRef(null);
+
+    useMapEvents({
+        dragstart() {
+            onViewportChange?.({
+                hasUserInteracted: true,
+                viewportMode: 'user_controlled',
+            });
+        },
+        zoomend() {
+            onViewportChange?.({
+                currentZoom: typeof map.getZoom === 'function' ? map.getZoom() : null,
+                currentBounds: typeof map.getBounds === 'function' ? normalizeBounds(map.getBounds()) : null,
+            });
+        },
+        moveend() {
+            onViewportChange?.({
+                currentZoom: typeof map.getZoom === 'function' ? map.getZoom() : null,
+                currentBounds: typeof map.getBounds === 'function' ? normalizeBounds(map.getBounds()) : null,
+            });
+        },
+    });
 
     useEffect(() => {
-        // Jika semua null, jangan ubah view (preserve current position)
-        if (!center && !bounds) return;
+        if (viewportCommand?.id && viewportCommand.id !== lastAppliedCommandRef.current) {
+            if (viewportCommand.bounds?.isValid?.()) {
+                map.fitBounds(viewportCommand.bounds, { padding: [50, 50], maxZoom: viewportCommand.maxZoom || 16 });
+            } else if (viewportCommand.center) {
+                map.setView(viewportCommand.center, viewportCommand.zoom || 15, { animate: true, duration: 0.5 });
+            }
 
-        if (bounds?.isValid()) {
-            map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
-        } else if (center) {
-            map.setView(center, zoom || 15, { animate: true, duration: 0.5 });
+            lastAppliedCommandRef.current = viewportCommand.id;
+            onCommandApplied?.(viewportCommand);
         }
-    }, [map, center, zoom, bounds]);
+    }, [map, onCommandApplied, viewportCommand]);
+
+    useEffect(() => {
+        onViewportChange?.({
+            currentZoom: typeof map.getZoom === 'function' ? map.getZoom() : null,
+            currentBounds: typeof map.getBounds === 'function' ? normalizeBounds(map.getBounds()) : null,
+        });
+    }, [map, onViewportChange]);
 
     return null;
 }
@@ -1193,6 +1336,15 @@ const CameraMarker = memo(({ camera, onClick }) => {
 });
 CameraMarker.displayName = 'CameraMarker';
 
+const AggregateMarker = memo(({ marker, onClick }) => (
+    <Marker
+        position={[marker.latitude, marker.longitude]}
+        icon={createGroupIcon(marker.count, marker.cameras, marker.kind)}
+        eventHandlers={{ click: () => onClick(marker) }}
+    />
+));
+AggregateMarker.displayName = 'AggregateMarker';
+
 // Main MapView
 const MapView = memo(({
     cameras = [],
@@ -1211,18 +1363,26 @@ const MapView = memo(({
     const [internalSelectedArea, setInternalSelectedArea] = useState('all');
     const selectedAreaValue = controlledSelectedArea ?? internalSelectedArea;
     const [modalCamera, setModalCamera] = useState(null);
-    const [mapKey, setMapKey] = useState(0);
     const [mapSettings, setMapSettings] = useState({
         latitude: defaultCenter[0],
         longitude: defaultCenter[1],
         zoom: defaultZoom,
         name: 'Semua Lokasi'
     });
-    // State untuk menyimpan posisi kamera yang akan difokuskan (untuk animasi)
     const [pendingFocusCamera, setPendingFocusCamera] = useState(null);
-    // Flag untuk mencegah map reset saat close modal
-    const [preserveMapPosition, setPreserveMapPosition] = useState(false);
+    const [viewportCommand, setViewportCommand] = useState(null);
+    const [viewportState, setViewportState] = useState({
+        currentZoom: defaultZoom,
+        currentBounds: null,
+        hasUserInteracted: false,
+        viewportMode: 'initial',
+        lastAppliedArea: selectedAreaValue,
+        lastAppliedFocusCameraId: null,
+    });
+    const initialViewportAppliedRef = useRef(false);
+    const commandCounterRef = useRef(0);
     const previousSelectedAreaRef = useRef(selectedAreaValue);
+    const lastFocusedCameraIdRef = useRef(null);
 
     const setSelectedAreaValue = useCallback((value) => {
         if (typeof onAreaChange === 'function') {
@@ -1241,30 +1401,40 @@ const MapView = memo(({
         }).catch(() => { });
     }, []);
 
-    // Handle focused camera from search - Step 1: Navigate map first
-    useEffect(() => {
-        if (focusedCameraId) {
-            const camera = cameras.find(c => c.id === focusedCameraId);
-            if (camera && hasValidCoords(camera)) {
-                // Set area filter to show the camera if needed
-                if (camera.area_name && selectedAreaValue !== camera.area_name && selectedAreaValue !== 'all') {
-                    setSelectedAreaValue('all');
-                }
-                // Set pending focus camera - map will navigate first
-                setPendingFocusCamera(camera);
-                setPreserveMapPosition(true);
-                // Trigger map rerender to focus on camera
-                setMapKey(prev => prev + 1);
-                // Notify parent that focus has been handled
-                onFocusHandled?.();
-            }
-        }
-    }, [focusedCameraId, cameras, onFocusHandled, selectedAreaValue, setSelectedAreaValue]);
+    const enqueueViewportCommand = useCallback((command) => {
+        commandCounterRef.current += 1;
+        setViewportCommand({
+            id: commandCounterRef.current,
+            ...command,
+        });
+    }, []);
 
-    // Handle focused camera - Step 2: Open modal after map animation
+    useEffect(() => {
+        if (!focusedCameraId || focusedCameraId === lastFocusedCameraIdRef.current) {
+            return;
+        }
+
+        const camera = cameras.find(c => c.id === focusedCameraId);
+        if (!camera || !hasValidCoords(camera)) {
+            return;
+        }
+
+        lastFocusedCameraIdRef.current = focusedCameraId;
+        if (camera.area_name && selectedAreaValue !== camera.area_name && selectedAreaValue !== 'all') {
+            setSelectedAreaValue('all');
+        }
+
+        setPendingFocusCamera(camera);
+        enqueueViewportCommand({
+            type: 'focus_camera',
+            center: [parseFloat(camera.latitude), parseFloat(camera.longitude)],
+            zoom: 17,
+        });
+        onFocusHandled?.();
+    }, [cameras, enqueueViewportCommand, focusedCameraId, onFocusHandled, selectedAreaValue, setSelectedAreaValue]);
+
     useEffect(() => {
         if (pendingFocusCamera) {
-            // Delay opening modal to let map animate to position first
             const timer = setTimeout(() => {
                 if (typeof onCameraOpen === 'function') {
                     onCameraOpen(pendingFocusCamera);
@@ -1272,123 +1442,176 @@ const MapView = memo(({
                     setModalCamera(pendingFocusCamera);
                 }
                 setPendingFocusCamera(null);
-            }, 600); // 600ms delay for map animation
+            }, 600);
             return () => clearTimeout(timer);
         }
     }, [onCameraOpen, pendingFocusCamera]);
 
     useEffect(() => {
         const previousSelectedArea = previousSelectedAreaRef.current;
-        if (previousSelectedArea === selectedAreaValue) {
-            return;
+        if (previousSelectedArea !== selectedAreaValue) {
+            setPendingFocusCamera(null);
+            setViewportState((current) => ({
+                ...current,
+                hasUserInteracted: false,
+                viewportMode: 'programmatic',
+            }));
         }
-
-        const isFocusDrivenAreaChange = Boolean(
-            pendingFocusCamera
-            && (selectedAreaValue === 'all' || pendingFocusCamera.area_name === selectedAreaValue)
-        );
-
-        if (!isFocusDrivenAreaChange) {
-            setPreserveMapPosition(false);
-            setPendingFocusCamera((current) => {
-                if (!current) {
-                    return null;
-                }
-
-                if (selectedAreaValue === 'all' || current.area_name === selectedAreaValue) {
-                    return current;
-                }
-
-                return null;
-            });
-        }
-
-        previousSelectedAreaRef.current = selectedAreaValue;
-    }, [pendingFocusCamera, selectedAreaValue]);
+    }, [selectedAreaValue]);
 
     const camerasWithCoords = useMemo(() => cameras.filter(hasValidCoords), [cameras]);
 
-    const areaNames = useMemo(() => {
-        const set = new Set();
-        cameras.forEach(c => c.area_name && set.add(c.area_name));
-        return Array.from(set).sort();
-    }, [cameras]);
+    const camerasByAreaName = useMemo(() => {
+        const nextMap = new Map();
+        camerasWithCoords.forEach((camera) => {
+            if (!camera.area_name) return;
+            if (!nextMap.has(camera.area_name)) {
+                nextMap.set(camera.area_name, []);
+            }
+            nextMap.get(camera.area_name).push(camera);
+        });
+        return nextMap;
+    }, [camerasWithCoords]);
 
-    const filtered = useMemo(() => {
-        let result;
+    const areaNames = useMemo(() => {
+        return Array.from(camerasByAreaName.keys()).sort();
+    }, [camerasByAreaName]);
+
+    const areaCounts = useMemo(() => {
+        const nextMap = new Map();
+        camerasByAreaName.forEach((value, key) => {
+            nextMap.set(key, value.length);
+        });
+        return nextMap;
+    }, [camerasByAreaName]);
+
+    const filteredBase = useMemo(() => {
         if (selectedAreaValue === 'all') {
-            result = camerasWithCoords;
-        } else {
-            result = camerasWithCoords.filter(c => c.area_name === selectedAreaValue);
+            return camerasWithCoords;
         }
-        // Terapkan offset untuk marker yang bertumpuk
-        return applyMarkerOffset(result);
-    }, [camerasWithCoords, selectedAreaValue]);
+        return camerasByAreaName.get(selectedAreaValue) || [];
+    }, [camerasByAreaName, camerasWithCoords, selectedAreaValue]);
+
+    const visibleBase = useMemo(() => (
+        filteredBase.filter((camera) => isCameraInBounds(camera, viewportState.currentBounds))
+    ), [filteredBase, viewportState.currentBounds]);
+
+    const effectiveZoom = viewportState.currentZoom || mapSettings.zoom || defaultZoom;
+
+    const shouldUseAggregateMarkers = filteredBase.length > DENSE_AREA_THRESHOLD && effectiveZoom < AREA_AGGREGATE_ZOOM;
+    const shouldUseGroupedMarkers = filteredBase.length > DENSE_AREA_THRESHOLD && effectiveZoom >= AREA_AGGREGATE_ZOOM && effectiveZoom < INDIVIDUAL_MARKER_ZOOM;
+
+    const areaAggregateMarkers = useMemo(() => {
+        if (!shouldUseAggregateMarkers) {
+            return [];
+        }
+
+        if (selectedAreaValue !== 'all') {
+            const grouped = bucketCamerasByCoordinate(visibleBase, effectiveZoom);
+            return grouped.map((group) => ({
+                ...group,
+                kind: 'bucket',
+            }));
+        }
+
+        return Array.from(camerasByAreaName.entries())
+            .map(([areaName, areaCameras]) => {
+                const areaData = areas.find((area) => area.name === areaName);
+                const representative = areaCameras[0];
+                const latitude = parseFloat(areaData?.latitude ?? representative?.latitude);
+                const longitude = parseFloat(areaData?.longitude ?? representative?.longitude);
+                if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
+                    return null;
+                }
+                return {
+                    key: `area-${areaName}`,
+                    latitude,
+                    longitude,
+                    count: areaCameras.length,
+                    cameras: areaCameras,
+                    areaName,
+                    kind: 'area',
+                };
+            })
+            .filter(Boolean);
+    }, [areas, camerasByAreaName, effectiveZoom, selectedAreaValue, shouldUseAggregateMarkers, visibleBase]);
+
+    const groupedVisibleMarkers = useMemo(() => {
+        if (!shouldUseGroupedMarkers) {
+            return [];
+        }
+        return bucketCamerasByCoordinate(visibleBase, effectiveZoom).map((group) => ({
+            ...group,
+            kind: 'bucket',
+        }));
+    }, [effectiveZoom, shouldUseGroupedMarkers, visibleBase]);
+
+    const visibleIndividualMarkers = useMemo(() => {
+        if (shouldUseAggregateMarkers || shouldUseGroupedMarkers) {
+            return [];
+        }
+        return applyMarkerOffset(visibleBase);
+    }, [shouldUseAggregateMarkers, shouldUseGroupedMarkers, visibleBase]);
 
     const stats = useMemo(() => {
-        const maintenance = filtered.filter(c => c.status === 'maintenance').length;
-        const offline = filtered.filter(c => c.status !== 'maintenance' && getCameraAvailabilityState(c) === 'offline').length;
-        const online = filtered.filter(c => c.status !== 'maintenance' && getCameraAvailabilityState(c) !== 'offline' && !c.is_tunnel).length;
-        const tunnel = filtered.filter(c => c.status !== 'maintenance' && getCameraAvailabilityState(c) !== 'offline' && (c.is_tunnel === 1 || c.is_tunnel === true)).length;
+        const maintenance = filteredBase.filter(c => c.status === 'maintenance').length;
+        const offline = filteredBase.filter(c => c.status !== 'maintenance' && getCameraAvailabilityState(c) === 'offline').length;
+        const online = filteredBase.filter(c => c.status !== 'maintenance' && getCameraAvailabilityState(c) !== 'offline' && !c.is_tunnel).length;
+        const tunnel = filteredBase.filter(c => c.status !== 'maintenance' && getCameraAvailabilityState(c) !== 'offline' && (c.is_tunnel === 1 || c.is_tunnel === true)).length;
         return { online, tunnel, offline: offline + maintenance };
-    }, [filtered]);
+    }, [filteredBase]);
 
-    const { center, zoom, bounds } = useMemo(() => {
-        // Jika ada pending focus camera (dari search), navigasi ke kamera tersebut
-        if (pendingFocusCamera) {
-            return {
-                center: [parseFloat(pendingFocusCamera.latitude), parseFloat(pendingFocusCamera.longitude)],
-                zoom: 17, // Zoom dekat untuk fokus ke kamera
-                bounds: null
-            };
-        }
-
-        // Jika preserveMapPosition aktif (setelah close modal), jangan ubah posisi
-        // Return null untuk semua agar MapController tidak mengubah view
-        if (preserveMapPosition) {
-            return { center: null, zoom: null, bounds: null };
-        }
-
-        // Jika area spesifik dipilih, gunakan koordinat area tersebut
-        if (selectedAreaValue !== 'all') {
-            const areaData = areas.find(a => a.name === selectedAreaValue);
+    const buildAreaViewportCommand = useCallback((areaName) => {
+        if (areaName !== 'all') {
+            const areaData = areas.find((area) => area.name === areaName);
             if (areaData?.latitude && areaData?.longitude) {
                 return {
+                    type: 'focus_area',
                     center: [parseFloat(areaData.latitude), parseFloat(areaData.longitude)],
-                    zoom: 15, // Zoom level untuk desa
-                    bounds: null
+                    zoom: 15,
+                    areaName,
                 };
             }
-            // Area tidak punya koordinat, tapi tetap filter kamera
-            // Jika ada kamera di area ini, gunakan bounds kamera
-            const areaCameras = camerasWithCoords.filter(c => c.area_name === selectedAreaValue);
+
+            const areaCameras = camerasByAreaName.get(areaName) || [];
             if (areaCameras.length > 0) {
-                const cameraBounds = L.latLngBounds(areaCameras.map(c => [parseFloat(c.latitude), parseFloat(c.longitude)]));
-                return { center: null, zoom: null, bounds: cameraBounds };
+                return {
+                    type: 'focus_area',
+                    bounds: L.latLngBounds(areaCameras.map((camera) => [parseFloat(camera.latitude), parseFloat(camera.longitude)])),
+                    maxZoom: 16,
+                    areaName,
+                };
             }
-            // Area tidak punya koordinat dan tidak ada kamera, fallback ke default
         }
 
-        // "Semua Lokasi" - gunakan settings dengan zoom dari settings
-        if (selectedAreaValue === 'all' && mapSettings.latitude && mapSettings.longitude) {
-            return {
-                center: [mapSettings.latitude, mapSettings.longitude],
-                zoom: mapSettings.zoom || 13, // Gunakan zoom dari settings
-                bounds: null
-            };
-        }
-
-        // Fallback
         return {
+            type: 'focus_default',
             center: [mapSettings.latitude || defaultCenter[0], mapSettings.longitude || defaultCenter[1]],
             zoom: mapSettings.zoom || defaultZoom,
-            bounds: null
+            areaName: 'all',
         };
-    }, [camerasWithCoords, selectedAreaValue, areas, defaultCenter, defaultZoom, mapSettings, pendingFocusCamera, preserveMapPosition]);
+    }, [areas, camerasByAreaName, defaultCenter, defaultZoom, mapSettings]);
+
+    useEffect(() => {
+        if (!initialViewportAppliedRef.current && selectedAreaValue) {
+            enqueueViewportCommand(buildAreaViewportCommand(selectedAreaValue));
+            initialViewportAppliedRef.current = true;
+        }
+    }, [buildAreaViewportCommand, enqueueViewportCommand, selectedAreaValue]);
+
+    useEffect(() => {
+        if (!initialViewportAppliedRef.current) {
+            return;
+        }
+
+        const previousSelectedArea = previousSelectedAreaRef.current;
+        if (previousSelectedArea !== selectedAreaValue) {
+            enqueueViewportCommand(buildAreaViewportCommand(selectedAreaValue));
+            previousSelectedAreaRef.current = selectedAreaValue;
+        }
+    }, [buildAreaViewportCommand, enqueueViewportCommand, selectedAreaValue]);
 
     const openModal = useCallback((camera) => {
-        // Set preserve position saat buka modal dari klik marker
-        setPreserveMapPosition(true);
         if (typeof onCameraOpen === 'function') {
             onCameraOpen(camera);
             return;
@@ -1396,13 +1619,50 @@ const MapView = memo(({
         setModalCamera(camera);
     }, [onCameraOpen]);
 
+    const handleAggregateMarkerClick = useCallback((marker) => {
+        if (marker.kind === 'area' && marker.areaName) {
+            enqueueViewportCommand(buildAreaViewportCommand(marker.areaName));
+            return;
+        }
+
+        const groupBounds = L.latLngBounds(marker.cameras.map((camera) => [parseFloat(camera.latitude), parseFloat(camera.longitude)]));
+        enqueueViewportCommand({
+            type: 'focus_group',
+            bounds: groupBounds,
+            maxZoom: INDIVIDUAL_MARKER_ZOOM,
+        });
+    }, [buildAreaViewportCommand, enqueueViewportCommand]);
+
     const handleAreaChange = (e) => {
         const nextArea = e?.target?.value || 'all';
         setSelectedAreaValue(nextArea);
-        // Reset preserve position saat ganti area filter
-        setPreserveMapPosition(false);
-        setMapKey(prev => prev + 1);
     };
+
+    const handleResetView = useCallback(() => {
+        setViewportState((current) => ({
+            ...current,
+            hasUserInteracted: false,
+            viewportMode: 'programmatic',
+        }));
+        enqueueViewportCommand(buildAreaViewportCommand(selectedAreaValue));
+    }, [buildAreaViewportCommand, enqueueViewportCommand, selectedAreaValue]);
+
+    const handleViewportChange = useCallback((nextState) => {
+        setViewportState((current) => ({
+            ...current,
+            ...nextState,
+        }));
+    }, []);
+
+    const handleCommandApplied = useCallback((command) => {
+        setViewportState((current) => ({
+            ...current,
+            viewportMode: command.type === 'focus_camera' ? 'user_controlled' : 'programmatic',
+            lastAppliedArea: command.areaName || current.lastAppliedArea,
+            lastAppliedFocusCameraId: command.type === 'focus_camera' ? focusedCameraId : current.lastAppliedFocusCameraId,
+            hasUserInteracted: command.type === 'focus_camera' ? true : current.hasUserInteracted,
+        }));
+    }, [focusedCameraId]);
 
     if (cameras.length === 0 || camerasWithCoords.length === 0) {
         return (
@@ -1423,8 +1683,7 @@ const MapView = memo(({
         <div className={`relative w-full h-full min-h-[450px] rounded-xl overflow-hidden ${className}`}>
             {/* Map */}
             <MapContainer
-                key={mapKey}
-                center={center || defaultCenter}
+                center={defaultCenter}
                 zoom={defaultZoom}
                 className="w-full h-full"
                 style={{ minHeight: '450px', zIndex: 1 }}
@@ -1451,8 +1710,18 @@ const MapView = memo(({
                 </LayersControl>
 
                 <ZoomControl position="bottomright" />
-                <MapController center={center} zoom={zoom} bounds={bounds} />
-                {filtered.map(camera => (
+                <MapController
+                    viewportCommand={viewportCommand}
+                    onViewportChange={handleViewportChange}
+                    onCommandApplied={handleCommandApplied}
+                />
+                {areaAggregateMarkers.map((marker) => (
+                    <AggregateMarker key={marker.key} marker={marker} onClick={handleAggregateMarkerClick} />
+                ))}
+                {groupedVisibleMarkers.map((marker) => (
+                    <AggregateMarker key={marker.key} marker={marker} onClick={handleAggregateMarkerClick} />
+                ))}
+                {visibleIndividualMarkers.map(camera => (
                     <CameraMarker key={camera.id} camera={camera} onClick={openModal} />
                 ))}
             </MapContainer>
@@ -1467,12 +1736,23 @@ const MapView = memo(({
                         <option value="all">{mapSettings.name || 'Semua Lokasi'} ({camerasWithCoords.length})</option>
                         {areaNames.map(area => (
                             <option key={area} value={area}>
-                                {area} ({camerasWithCoords.filter(c => c.area_name === area).length})
+                                {area} ({areaCounts.get(area) || 0})
                             </option>
                         ))}
                     </select>
                 </div>
             )}
+
+            <div className="absolute top-3 right-14 z-[1000]">
+                <button
+                    type="button"
+                    onClick={handleResetView}
+                    data-testid="map-reset-view"
+                    className="px-3 py-2 bg-white/95 dark:bg-gray-800/95 text-gray-900 dark:text-white rounded-lg shadow-lg text-xs sm:text-sm font-medium border border-gray-200/80 dark:border-gray-700/80 hover:bg-white dark:hover:bg-gray-800"
+                >
+                    Reset View
+                </button>
+            </div>
 
             <div className="pointer-events-none absolute bottom-3 left-1/2 z-[1000] w-full -translate-x-1/2 px-3">
                 <div
