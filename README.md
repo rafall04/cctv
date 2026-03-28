@@ -6,6 +6,7 @@ A secure, high-performance video streaming system that isolates private IP camer
 
 ### Public Features
 - **Live Camera Viewing** - Real-time HLS streaming without authentication
+- **Public Playback Preview** - Playback publik dibatasi ke preview awal untuk privasi
 - **Interactive Map** - Leaflet map with camera markers
 - **Feedback System** - Public feedback submission
 - **Responsive Design** - Works on all devices (mobile, tablet, desktop)
@@ -16,7 +17,8 @@ A secure, high-performance video streaming system that isolates private IP camer
 - **Area Management** - Organize cameras by location (RT/RW/Kelurahan/Kecamatan)
 - **User Management** - Multi-user admin access with roles
 - **Viewer Analytics** - Real-time viewer tracking
-- **Recording Management** - FFmpeg-based recording with playback
+- **Playback Analytics** - Viewer playback tracking terpisah untuk `public_preview` dan `admin_full`
+- **Recording Management** - FFmpeg-based recording with admin full playback
 - **Feedback Management** - Review and respond to feedback
 - **Audit Logging** - Track all admin actions
 - **Security** - JWT auth, brute force protection, CSRF protection
@@ -34,7 +36,7 @@ A secure, high-performance video streaming system that isolates private IP camer
 ```
 Public User → Frontend (React) → Backend (Fastify) → MediaMTX → Private RTSP Cameras
 Admin User → Admin Panel → JWT Auth → API → SQLite Database
-Recording → FFmpeg → MP4 Segments → Playback API → Video Player
+Recording → FFmpeg → MP4 Segments → Playback API (`public_preview` / `admin_full`) → Video Player
 ```
 
 ### Tech Stack
@@ -100,7 +102,7 @@ See [deployment/AAPANEL_QUICK_SETUP.md](deployment/AAPANEL_QUICK_SETUP.md) for d
 
 ```bash
 git clone https://github.com/YOUR_USERNAME/cctv.git
-cd rafnet-cctv
+cd cctv
 ```
 
 #### 2. Backend Setup
@@ -111,6 +113,7 @@ npm install
 cp .env.example .env
 nano .env  # Edit configuration
 npm run setup-db
+npm run migrate
 ```
 
 #### 3. Frontend Setup
@@ -375,6 +378,9 @@ rafnet-cctv/
 - **Speed control** - 0.5x to 2x
 - **Timeline navigation** - Precise seeking
 - **Download support** - Full segment download
+- **Public preview policy** - Route publik `/playback` hanya menampilkan preview terbatas
+- **Admin full playback** - Route `/admin/playback` tetap untuk akses penuh admin
+- **Separate playback viewer tracking** - Analytics playback tidak tercampur dengan viewer live
 
 ## 🔄 Management
 
@@ -425,9 +431,12 @@ cp /var/www/cctv/backend/data/cctv.db /backup/cctv_$(date +%Y%m%d).db
 - `POST /api/cameras` - Create camera
 - `PUT /api/cameras/:id` - Update camera
 - `DELETE /api/cameras/:id` - Delete camera
-- `GET /api/admin/dashboard` - Dashboard stats
+- `GET /api/admin/stats` - Dashboard stats
+- `GET /api/admin/analytics/viewers` - Live viewer analytics
 - `GET /api/users` - List users
-- `GET /api/playback/recordings/:cameraId` - List recordings
+- `GET /api/recordings/:cameraId/segments` - List playback segments
+- `GET /api/recordings/:cameraId/playlist.m3u8` - Generate playback playlist
+- `GET /api/playback-viewer/analytics` - Playback viewer analytics
 
 ## 🐛 Troubleshooting
 

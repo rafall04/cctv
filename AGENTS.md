@@ -44,11 +44,12 @@ npm test
 npm test:watch
 
 # Run a single test file
-npm test -- cameraService.test.js
+npm test -- cameraHealthService.test.js
+npm test -- recordingPlaybackService.test.js
 npm test -- playbackViewerRoutes.test.js
 
 # Run a single test
-npm test -- cameraService.test.js -t "test name"
+npm test -- cameraHealthService.test.js -t "test name"
 ```
 
 ### Frontend Commands
@@ -82,6 +83,14 @@ npm test -- src/pages/PlaybackAnalytics.test.jsx
 # Run a single test
 npm test -- CameraManagement.test.jsx -t "test name"
 ```
+
+### Current Playback/Admin Workflow
+
+- Public playback route: `/playback` with `accessScope='public_preview'`
+- Admin full playback route: `/admin/playback` (protected)
+- Admin playback analytics route: `/admin/playback-analytics` (protected)
+- Public playback API uses `/api/recordings/:cameraId/segments`, `/stream/:filename`, and `/playlist.m3u8`
+- Playback viewer tracking is separate from live viewer tracking and uses `/api/playback-viewer/*`
 
 ---
 
@@ -411,6 +420,15 @@ export function useCRUD(endpoint) {
 }
 ```
 
+### Playback Tracking Pattern
+
+- Start playback viewer sessions only after real playback begins (`playing` or equivalent progress), not when the page opens
+- Keep playback tracking separate from live tracking:
+  - live: `viewer_sessions`, `/api/viewer/*`
+  - playback: `playback_viewer_sessions`, `/api/playback-viewer/*`
+- When changing camera or segment in playback, stop the old playback session before starting a new one
+- For public/admin playback differences, pass the correct `accessScope` (`public_preview` or `admin_full`) through frontend and backend calls
+
 ---
 
 ## Git & Version Control
@@ -576,6 +594,11 @@ When switching between view modes (map/grid/playback), follow these patterns:
        setSelectedSegment(segment);
    };
    ```
+
+4. **Keep playback route scope and share params separate**
+   - Public playback stays on `/playback`
+   - Admin full playback stays on `/admin/playback`
+   - Playback sharing still uses `cam` and `t`; admin scope must not leak into public share links
 
 ### Share Link Best Practices
 

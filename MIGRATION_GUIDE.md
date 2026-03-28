@@ -9,7 +9,8 @@ Script ini akan menjalankan semua migration secara berurutan tanpa menghapus dat
 ```bash
 cd /var/www/rafnet-cctv
 git pull origin main
-node backend/database/migrations/run_all_migrations.js
+cd backend
+npm run migrate
 pm2 restart rafnet-cctv-backend
 ```
 
@@ -18,7 +19,8 @@ pm2 restart rafnet-cctv-backend
 ```bash
 cd C:\project\cctv
 git pull origin main
-node backend/database/migrations/run_all_migrations.js
+cd backend
+npm run migrate
 ```
 
 ## Cara Kerja
@@ -35,6 +37,7 @@ node backend/database/migrations/run_all_migrations.js
    - Default settings
 
 3. **Urutan migration** dijaga otomatis oleh script
+   - termasuk migration recent seperti public playback controls, area health override, external health mode, dan playback viewer sessions
 
 ## Output Example
 
@@ -54,8 +57,8 @@ node backend/database/migrations/run_all_migrations.js
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📊 Migration Summary:
-   ✅ Success: 18
-   ⏭️  Skipped: 6
+   ✅ Success: <will vary>
+   ⏭️  Skipped: <will vary>
    ❌ Errors:  0
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -71,7 +74,8 @@ node backend/database/migrations/run_all_migrations.js
 pm2 stop rafnet-cctv-backend
 
 # Run migration
-node backend/database/migrations/run_all_migrations.js
+cd backend
+npm run migrate
 
 # Start backend
 pm2 start rafnet-cctv-backend
