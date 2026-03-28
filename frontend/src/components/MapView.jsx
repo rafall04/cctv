@@ -150,6 +150,74 @@ const hasValidCoords = (c) => {
     return !isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0);
 };
 
+const normalizeAreaKey = (value) => String(value || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+
+const getValidCoordinatePair = (value) => {
+    if (!value) {
+        return null;
+    }
+
+    const lat = parseFloat(value.latitude);
+    const lng = parseFloat(value.longitude);
+    if (Number.isNaN(lat) || Number.isNaN(lng) || (lat === 0 && lng === 0)) {
+        return null;
+    }
+
+    return { latitude: lat, longitude: lng };
+};
+
+const getBoundsCenterFromCameras = (cameras = []) => {
+    const validCameras = Array.isArray(cameras) ? cameras.filter(hasValidCoords) : [];
+    if (validCameras.length === 0) {
+        return null;
+    }
+
+    const latitudes = validCameras.map((camera) => parseFloat(camera.latitude));
+    const longitudes = validCameras.map((camera) => parseFloat(camera.longitude));
+
+    if (latitudes.some(Number.isNaN) || longitudes.some(Number.isNaN)) {
+        return null;
+    }
+
+    return {
+        latitude: (Math.min(...latitudes) + Math.max(...latitudes)) / 2,
+        longitude: (Math.min(...longitudes) + Math.max(...longitudes)) / 2,
+    };
+};
+
+const getCentroidFromCameras = (cameras = []) => {
+    const validCameras = Array.isArray(cameras) ? cameras.filter(hasValidCoords) : [];
+    if (validCameras.length === 0) {
+        return null;
+    }
+
+    const totals = validCameras.reduce((acc, camera) => {
+        const lat = parseFloat(camera.latitude);
+        const lng = parseFloat(camera.longitude);
+
+        if (Number.isNaN(lat) || Number.isNaN(lng)) {
+            return acc;
+        }
+
+        acc.latitude += lat;
+        acc.longitude += lng;
+        acc.count += 1;
+        return acc;
+    }, { latitude: 0, longitude: 0, count: 0 });
+
+    if (totals.count === 0) {
+        return null;
+    }
+
+    return {
+        latitude: totals.latitude / totals.count,
+        longitude: totals.longitude / totals.count,
+    };
+};
+
 const normalizeBounds = (bounds) => {
     if (!bounds) return null;
     if (typeof bounds.getSouth === 'function') {
@@ -187,11 +255,16 @@ const getGroupMarkerColor = (cameras = []) => {
         acc[state] = (acc[state] || 0) + 1;
         return acc;
     }, {});
+    const total = cameras.length || 1;
+    const offlineCount = counts.offline || 0;
+    const degradedCount = counts.degraded || 0;
+    const suspectCount = counts.suspect || 0;
+    const unhealthyRatio = (offlineCount + degradedCount + suspectCount) / total;
 
-    if ((counts.offline || 0) === cameras.length) {
+    if (offlineCount === cameras.length) {
         return { color: '#6b7280', darkColor: '#4b5563' };
     }
-    if ((counts.degraded || 0) > 0) {
+    if (unhealthyRatio >= 0.45 || degradedCount > 0 || suspectCount > 0) {
         return { color: '#f59e0b', darkColor: '#d97706' };
     }
     return { color: '#0ea5e9', darkColor: '#0284c7' };
@@ -346,6 +419,122 @@ const bucketCamerasByCoordinate = (cameras, zoom) => {
             count: group.length,
             cameras: group,
         };
+    });
+};
+
+const buildAreaSummaryList = (areas = [], cameras = []) => {
+    const normalizedAreas = new Map();
+    areas.forEach((area) => {
+        const key = normalizeAreaKey(area?.name);
+        if (!key || normalizedAreas.has(key)) {
+            return;
+        }
+        normalizedAreas.set(key, area);
+    });
+
+    const groups = new Map();
+    cameras.forEach((camera) => {
+        const normalizedKey = normalizeAreaKey(camera?.area_name);
+        if (!normalizedKey) {
+            return;
+        }
+
+        if (!groups.has(normalizedKey)) {
+            groups.set(normalizedKey, {
+                areaKey: normalizedKey,
+                areaName: String(camera.area_name || '').trim(),
+                cameras: [],
+                onlineCount: 0,
+                offlineCount: 0,
+                degradedCount: 0,
+            });
+        }
+
+        const group = groups.get(normalizedKey);
+        if (!group.areaName && camera.area_name) {
+            group.areaName = String(camera.area_name).trim();
+        }
+
+        group.cameras.push(camera);
+        const availabilityState = getCameraAvailabilityState(camera);
+        if (availabilityState === 'offline' || camera.status === 'maintenance') {
+            group.offlineCount += 1;
+        } else {
+            group.onlineCount += 1;
+        }
+        if (availabilityState === 'degraded' || availabilityState === 'suspect') {
+            group.degradedCount += 1;
+        }
+    });
+
+    return Array.from(groups.values())
+        .map((group) => {
+            const areaData = normalizedAreas.get(group.areaKey);
+            const centroid = getCentroidFromCameras(group.cameras);
+            const areaMaster = getValidCoordinatePair(areaData);
+            const boundsCenter = getBoundsCenterFromCameras(group.cameras);
+            const anchor = centroid || areaMaster || boundsCenter;
+
+            if (!anchor) {
+                console.warn('[MapView] Area aggregate missing valid anchor', {
+                    areaName: group.areaName,
+                    cameraCount: group.cameras.length,
+                    source: 'missing_coordinates',
+                });
+                return {
+                    ...group,
+                    cameraCount: group.cameras.length,
+                    hasValidAnchor: false,
+                    source: 'missing_coordinates',
+                    anchor: null,
+                };
+            }
+
+            return {
+                ...group,
+                cameraCount: group.cameras.length,
+                hasValidAnchor: true,
+                source: centroid ? 'centroid' : (areaMaster ? 'area_master' : 'bounds_center'),
+                anchor,
+            };
+        })
+        .sort((left, right) => left.areaName.localeCompare(right.areaName));
+};
+
+const applyAreaAggregateSeparation = (markers = [], zoom) => {
+    if (!Array.isArray(markers) || markers.length <= 1) {
+        return markers;
+    }
+
+    const precision = zoom <= 10 ? 1 : 2;
+    const radius = zoom <= 10 ? 0.12 : 0.025;
+    const grouped = new Map();
+
+    markers.forEach((marker) => {
+        const key = `${marker.latitude.toFixed(precision)},${marker.longitude.toFixed(precision)}`;
+        if (!grouped.has(key)) {
+            grouped.set(key, []);
+        }
+        grouped.get(key).push(marker);
+    });
+
+    return Array.from(grouped.values()).flatMap((group) => {
+        if (group.length === 1) {
+            return group;
+        }
+
+        return group
+            .slice()
+            .sort((left, right) => left.areaName.localeCompare(right.areaName))
+            .map((marker, index) => {
+                const angle = (Math.PI * 2 * index) / group.length;
+                return {
+                    ...marker,
+                    latitude: marker.latitude + (radius * Math.cos(angle)),
+                    longitude: marker.longitude + (radius * Math.sin(angle)),
+                    displayOffset: true,
+                };
+            });
     });
 };
 
@@ -1521,36 +1710,49 @@ const MapView = memo(({
 
     const camerasWithCoords = useMemo(() => cameras.filter(hasValidCoords), [cameras]);
 
-    const camerasByAreaName = useMemo(() => {
+    const camerasWithCoordsByAreaKey = useMemo(() => {
         const nextMap = new Map();
         camerasWithCoords.forEach((camera) => {
-            if (!camera.area_name) return;
-            if (!nextMap.has(camera.area_name)) {
-                nextMap.set(camera.area_name, []);
+            const areaKey = normalizeAreaKey(camera?.area_name);
+            if (!areaKey) return;
+            if (!nextMap.has(areaKey)) {
+                nextMap.set(areaKey, []);
             }
-            nextMap.get(camera.area_name).push(camera);
+            nextMap.get(areaKey).push(camera);
         });
         return nextMap;
     }, [camerasWithCoords]);
 
+    const areaSummaryList = useMemo(() => (
+        buildAreaSummaryList(areas, cameras)
+    ), [areas, cameras]);
+
+    const areaSummaryByKey = useMemo(() => {
+        const nextMap = new Map();
+        areaSummaryList.forEach((summary) => {
+            nextMap.set(summary.areaKey, summary);
+        });
+        return nextMap;
+    }, [areaSummaryList]);
+
     const areaNames = useMemo(() => {
-        return Array.from(camerasByAreaName.keys()).sort();
-    }, [camerasByAreaName]);
+        return areaSummaryList.map((summary) => summary.areaName);
+    }, [areaSummaryList]);
 
     const areaCounts = useMemo(() => {
         const nextMap = new Map();
-        camerasByAreaName.forEach((value, key) => {
-            nextMap.set(key, value.length);
+        areaSummaryList.forEach((summary) => {
+            nextMap.set(summary.areaName, summary.cameraCount);
         });
         return nextMap;
-    }, [camerasByAreaName]);
+    }, [areaSummaryList]);
 
     const filteredBase = useMemo(() => {
         if (selectedAreaValue === 'all') {
             return camerasWithCoords;
         }
-        return camerasByAreaName.get(selectedAreaValue) || [];
-    }, [camerasByAreaName, camerasWithCoords, selectedAreaValue]);
+        return camerasWithCoordsByAreaKey.get(normalizeAreaKey(selectedAreaValue)) || [];
+    }, [camerasWithCoords, camerasWithCoordsByAreaKey, selectedAreaValue]);
 
     const visibleBase = useMemo(() => (
         filteredBase.filter((camera) => isCameraInBounds(camera, viewportState.currentBounds))
@@ -1575,27 +1777,26 @@ const MapView = memo(({
             }));
         }
 
-        return Array.from(camerasByAreaName.entries())
-            .map(([areaName, areaCameras]) => {
-                const areaData = areas.find((area) => area.name === areaName);
-                const representative = areaCameras[0];
-                const latitude = parseFloat(areaData?.latitude ?? representative?.latitude);
-                const longitude = parseFloat(areaData?.longitude ?? representative?.longitude);
-                if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
-                    return null;
-                }
-                return {
-                    key: `area-${areaName}`,
-                    latitude,
-                    longitude,
-                    count: areaCameras.length,
-                    cameras: areaCameras,
-                    areaName,
+        return applyAreaAggregateSeparation(
+            areaSummaryList
+                .filter((summary) => summary.hasValidAnchor && summary.cameraCount > 0)
+                .map((summary) => ({
+                    key: `area-${summary.areaKey}`,
+                    latitude: summary.anchor.latitude,
+                    longitude: summary.anchor.longitude,
+                    count: summary.cameraCount,
+                    cameras: summary.cameras,
+                    areaName: summary.areaName,
+                    areaKey: summary.areaKey,
+                    onlineCount: summary.onlineCount,
+                    offlineCount: summary.offlineCount,
+                    degradedCount: summary.degradedCount,
+                    source: summary.source,
                     kind: 'area',
-                };
-            })
-            .filter(Boolean);
-    }, [areas, camerasByAreaName, effectiveZoom, selectedAreaValue, shouldUseAggregateMarkers, visibleBase]);
+                })),
+            effectiveZoom
+        );
+    }, [areaSummaryList, effectiveZoom, selectedAreaValue, shouldUseAggregateMarkers, visibleBase]);
 
     const groupedVisibleMarkers = useMemo(() => {
         if (!shouldUseGroupedMarkers) {
@@ -1624,23 +1825,23 @@ const MapView = memo(({
 
     const buildAreaViewportCommand = useCallback((areaName) => {
         if (areaName !== 'all') {
-            const areaData = areas.find((area) => area.name === areaName);
-            if (areaData?.latitude && areaData?.longitude) {
+            const summary = areaSummaryByKey.get(normalizeAreaKey(areaName));
+            if (summary?.anchor) {
                 return {
                     type: 'focus_area',
-                    center: [parseFloat(areaData.latitude), parseFloat(areaData.longitude)],
+                    center: [summary.anchor.latitude, summary.anchor.longitude],
                     zoom: 15,
-                    areaName,
+                    areaName: summary.areaName,
                 };
             }
 
-            const areaCameras = camerasByAreaName.get(areaName) || [];
+            const areaCameras = camerasWithCoordsByAreaKey.get(normalizeAreaKey(areaName)) || [];
             if (areaCameras.length > 0) {
                 return {
                     type: 'focus_area',
                     bounds: L.latLngBounds(areaCameras.map((camera) => [parseFloat(camera.latitude), parseFloat(camera.longitude)])),
                     maxZoom: 16,
-                    areaName,
+                    areaName: summary?.areaName || areaName,
                 };
             }
         }
@@ -1651,7 +1852,7 @@ const MapView = memo(({
             zoom: mapSettings.zoom || defaultZoom,
             areaName: 'all',
         };
-    }, [areas, camerasByAreaName, defaultCenter, defaultZoom, mapSettings]);
+    }, [areaSummaryByKey, camerasWithCoordsByAreaKey, defaultCenter, defaultZoom, mapSettings]);
 
     useEffect(() => {
         if (!initialViewportAppliedRef.current && selectedAreaValue) {
