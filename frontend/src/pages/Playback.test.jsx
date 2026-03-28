@@ -11,11 +11,28 @@ const { getSegments, getSegmentStreamUrl, globalAdScriptSpy } = vi.hoisted(() =>
     getSegmentStreamUrl: vi.fn(),
     globalAdScriptSpy: vi.fn(),
 }));
+const {
+    startPlaybackViewerSessionMock,
+    stopPlaybackViewerSessionMock,
+    stopAllPlaybackViewerSessionsMock,
+} = vi.hoisted(() => ({
+    startPlaybackViewerSessionMock: vi.fn(),
+    stopPlaybackViewerSessionMock: vi.fn(),
+    stopAllPlaybackViewerSessionsMock: vi.fn(),
+}));
 
 vi.mock('../services/recordingService', () => ({
     default: {
         getSegments,
         getSegmentStreamUrl,
+    },
+}));
+
+vi.mock('../services/playbackViewerService', () => ({
+    default: {
+        startSession: startPlaybackViewerSessionMock,
+        stopSession: stopPlaybackViewerSessionMock,
+        stopAllSessions: stopAllPlaybackViewerSessionsMock,
     },
 }));
 
@@ -131,6 +148,9 @@ describe('Playback', () => {
         getSegments.mockReset();
         getSegmentStreamUrl.mockReset();
         globalAdScriptSpy.mockReset();
+        startPlaybackViewerSessionMock.mockReset();
+        stopPlaybackViewerSessionMock.mockReset();
+        stopAllPlaybackViewerSessionsMock.mockReset();
         localStorage.clear();
         getSegments.mockResolvedValue({
             success: true,
@@ -139,6 +159,9 @@ describe('Playback', () => {
             },
         });
         getSegmentStreamUrl.mockImplementation((cameraId, filename) => `/stream/${cameraId}/${filename}`);
+        startPlaybackViewerSessionMock.mockResolvedValue('playback-session-1');
+        stopPlaybackViewerSessionMock.mockResolvedValue(undefined);
+        stopAllPlaybackViewerSessionsMock.mockResolvedValue(undefined);
 
         Object.defineProperty(HTMLMediaElement.prototype, 'paused', {
             configurable: true,
@@ -996,6 +1019,117 @@ describe('Playback', () => {
         });
 
         expect(screen.getByTestId('buffering-state').textContent).toBe('false');
+    });
+
+    it('baru memulai tracking playback saat video benar-benar playing', async () => {
+        render(
+            <TestRouter initialEntries={['/playback?mode=full&view=playback&cam=1']}>
+                <Playback
+                    cameras={[
+                        { id: 1, name: 'Lobby', enable_recording: 1 },
+                    ]}
+                />
+            </TestRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('video-segment').textContent).toBe('seg-2');
+        });
+
+        expect(startPlaybackViewerSessionMock).not.toHaveBeenCalled();
+
+        act(() => {
+            dispatchMediaEvent(screen.getByTestId('playback-video'), 'playing');
+        });
+
+        await waitFor(() => {
+            expect(startPlaybackViewerSessionMock).toHaveBeenCalledWith({
+                cameraId: 1,
+                segmentFilename: 'seg-2.mp4',
+                segmentStartedAt: '2026-03-05T10:20:00.000Z',
+                accessMode: 'public_preview',
+            });
+        });
+    });
+
+    it('mengganti segment menutup sesi tracking lama lalu membuka sesi baru saat segment baru play', async () => {
+        startPlaybackViewerSessionMock
+            .mockResolvedValueOnce('playback-session-1')
+            .mockResolvedValueOnce('playback-session-2');
+
+        render(
+            <TestRouter initialEntries={['/playback?mode=full&view=playback&cam=1']}>
+                <Playback
+                    cameras={[
+                        { id: 1, name: 'Lobby', enable_recording: 1 },
+                    ]}
+                />
+            </TestRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('video-segment').textContent).toBe('seg-2');
+        });
+
+        const video = screen.getByTestId('playback-video');
+        act(() => {
+            dispatchMediaEvent(video, 'playing');
+        });
+
+        await waitFor(() => {
+            expect(startPlaybackViewerSessionMock).toHaveBeenCalledTimes(1);
+        });
+
+        fireEvent.click(screen.getByText('pilih-segmen-pertama'));
+
+        await waitFor(() => {
+            expect(screen.getByTestId('video-segment').textContent).toBe('seg-1');
+        });
+
+        await waitFor(() => {
+            expect(stopPlaybackViewerSessionMock).toHaveBeenCalledWith('playback-session-1');
+        });
+
+        act(() => {
+            dispatchMediaEvent(video, 'playing');
+        });
+
+        await waitFor(() => {
+            expect(startPlaybackViewerSessionMock).toHaveBeenCalledTimes(2);
+        });
+
+        expect(startPlaybackViewerSessionMock).toHaveBeenLastCalledWith({
+            cameraId: 1,
+            segmentFilename: 'seg-1.mp4',
+            segmentStartedAt: '2026-03-05T10:00:00.000Z',
+            accessMode: 'public_preview',
+        });
+    });
+
+    it('event playing ulang pada segment yang sama tidak membuat sesi tracking ganda', async () => {
+        render(
+            <TestRouter initialEntries={['/playback?mode=full&view=playback&cam=1']}>
+                <Playback
+                    cameras={[
+                        { id: 1, name: 'Lobby', enable_recording: 1 },
+                    ]}
+                />
+            </TestRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('video-segment').textContent).toBe('seg-2');
+        });
+
+        const video = screen.getByTestId('playback-video');
+        act(() => {
+            dispatchMediaEvent(video, 'playing');
+            dispatchMediaEvent(video, 'playing');
+        });
+
+        await waitFor(() => {
+            expect(startPlaybackViewerSessionMock).toHaveBeenCalledTimes(1);
+        });
     });
 
 });

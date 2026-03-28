@@ -36,6 +36,7 @@ import feedbackRoutes from './routes/feedbackRoutes.js';
 import configRoutes from './routes/configRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
 import viewerRoutes from './routes/viewerRoutes.js';
+import playbackViewerRoutes from './routes/playbackViewerRoutes.js';
 import hlsProxyRoutes from './routes/hlsProxyRoutes.js';
 import sponsorRoutes from './routes/sponsorRoutes.js';
 import saweriaRoutes from './routes/saweriaRoutes.js';
@@ -46,6 +47,7 @@ import mediaMtxService from './services/mediaMtxService.js';
 import streamWarmer from './services/streamWarmer.js';
 import cameraHealthService from './services/cameraHealthService.js';
 import viewerSessionService from './services/viewerSessionService.js';
+import playbackViewerSessionService from './services/playbackViewerSessionService.js';
 import { recordingService } from './services/recordingService.js';
 import thumbnailService from './services/thumbnailService.js';
 
@@ -252,6 +254,7 @@ await fastify.register(feedbackRoutes, { prefix: '/api/feedback' });
 await fastify.register(configRoutes);
 await fastify.register(settingsRoutes);
 await fastify.register(viewerRoutes, { prefix: '/api/viewer' });
+await fastify.register(playbackViewerRoutes, { prefix: '/api/playback-viewer' });
 await fastify.register(hlsProxyRoutes, { prefix: '/hls' });
 await fastify.register(sponsorRoutes, { prefix: '/api/sponsors' });
 await fastify.register(saweriaRoutes, { prefix: '/api/saweria' });
@@ -384,6 +387,9 @@ const start = async () => {
         // Start viewer session cleanup service
         viewerSessionService.startCleanup();
         console.log('[ViewerSession] Session cleanup service started (15s interval)');
+
+        playbackViewerSessionService.startCleanup();
+        console.log('[PlaybackViewerSession] Session cleanup service started (15s interval)');
         
         // Wait for MediaMTX paths to be fully ready before starting recordings
         console.log('[Recording] Waiting for MediaMTX paths to be ready...');
@@ -416,6 +422,7 @@ const shutdown = async () => {
         streamWarmer.stopAll();
         cameraHealthService.stop();
         viewerSessionService.stopCleanup();
+        playbackViewerSessionService.stopCleanup();
         thumbnailService.stop();
         stopDailyCleanup();
         
@@ -443,6 +450,17 @@ const shutdown = async () => {
             console.log(`[Shutdown] Closed ${activeSessions.length} viewer sessions`);
         } catch (error) {
             console.error('[Shutdown] Session cleanup error:', error.message);
+        }
+
+        console.log('[Shutdown] Closing active playback viewer sessions...');
+        try {
+            const activePlaybackSessions = playbackViewerSessionService.getActiveSessions();
+            for (const session of activePlaybackSessions) {
+                playbackViewerSessionService.endSession(session.session_id);
+            }
+            console.log(`[Shutdown] Closed ${activePlaybackSessions.length} playback viewer sessions`);
+        } catch (error) {
+            console.error('[Shutdown] Playback session cleanup error:', error.message);
         }
         
         // Close database connections

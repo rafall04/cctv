@@ -56,6 +56,10 @@ vi.mock('./pages/ViewerAnalytics', () => ({
     default: () => <div>analytics-page</div>,
 }));
 
+vi.mock('./pages/PlaybackAnalytics', () => ({
+    default: () => <div>playback-analytics-page</div>,
+}));
+
 vi.mock('./pages/UnifiedSettings', () => ({
     default: () => <div>settings-page</div>,
 }));
@@ -123,6 +127,20 @@ describe('App admin routing', () => {
 
         await waitFor(() => {
             expect(screen.getByText('playback-page')).toBeTruthy();
+        });
+    });
+
+    it('merender route playback analytics admin di dalam layout admin', async () => {
+        window.history.pushState({}, '', '/admin/playback-analytics');
+
+        render(<App />);
+
+        await waitFor(() => {
+            expect(screen.getByTestId('admin-layout')).toBeTruthy();
+        });
+
+        await waitFor(() => {
+            expect(screen.getByText('playback-analytics-page')).toBeTruthy();
         });
     });
 });

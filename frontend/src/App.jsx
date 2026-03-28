@@ -21,6 +21,7 @@ const AreaManagement = lazy(() => import('./pages/AreaManagement'));
 const UserManagement = lazy(() => import('./pages/UserManagement'));
 const FeedbackManagement = lazy(() => import('./pages/FeedbackManagement'));
 const ViewerAnalytics = lazy(() => import('./pages/ViewerAnalytics'));
+const PlaybackAnalytics = lazy(() => import('./pages/PlaybackAnalytics'));
 const UnifiedSettings = lazy(() => import('./pages/UnifiedSettings'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const SponsorManagement = lazy(() => import('./pages/SponsorManagement'));
@@ -139,6 +140,14 @@ function App() {
                     element={
                         <AdminPageRoute>
                             <ViewerAnalytics />
+                        </AdminPageRoute>
+                    }
+                />
+                <Route
+                    path="/admin/playback-analytics"
+                    element={
+                        <AdminPageRoute>
+                            <PlaybackAnalytics />
                         </AdminPageRoute>
                     }
                 />

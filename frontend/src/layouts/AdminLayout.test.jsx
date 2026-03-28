@@ -61,7 +61,20 @@ describe('AdminLayout dark mode readability', () => {
             </MemoryRouter>
         );
 
-        const playbackLink = screen.getByRole('link', { name: /Playback/i });
+        const playbackLink = screen.getByRole('link', { name: /^Playback$/i });
         expect(playbackLink.getAttribute('href')).toBe('/admin/playback');
+    });
+
+    it('menampilkan tautan playback analytics di navigasi utama', () => {
+        render(
+            <MemoryRouter initialEntries={['/admin/dashboard']}>
+                <AdminLayout>
+                    <div>Content</div>
+                </AdminLayout>
+            </MemoryRouter>
+        );
+
+        const playbackAnalyticsLink = screen.getByRole('link', { name: /^Playback Analytics$/i });
+        expect(playbackAnalyticsLink.getAttribute('href')).toBe('/admin/playback-analytics');
     });
 });

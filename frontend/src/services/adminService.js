@@ -63,6 +63,57 @@ export const adminService = {
         }
     },
 
+    async getPlaybackViewerAnalytics(period = '7days', params = {}, policy = REQUEST_POLICY.BLOCKING, config = {}) {
+        try {
+            const searchParams = new URLSearchParams();
+            searchParams.set('period', period);
+
+            if (params.cameraId) {
+                searchParams.set('cameraId', String(params.cameraId));
+            }
+
+            if (params.accessMode) {
+                searchParams.set('accessMode', params.accessMode);
+            }
+
+            const response = await apiClient.get(
+                `/api/playback-viewer/analytics?${searchParams.toString()}`,
+                getRequestPolicyConfig(policy, config)
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Get playback viewer analytics error:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to fetch playback analytics',
+            };
+        }
+    },
+
+    async getPlaybackViewerActive(params = {}, policy = REQUEST_POLICY.BLOCKING, config = {}) {
+        try {
+            const searchParams = new URLSearchParams();
+            if (params.cameraId) {
+                searchParams.set('cameraId', String(params.cameraId));
+            }
+            if (params.accessMode) {
+                searchParams.set('accessMode', params.accessMode);
+            }
+
+            const response = await apiClient.get(
+                `/api/playback-viewer/active${searchParams.toString() ? `?${searchParams.toString()}` : ''}`,
+                getRequestPolicyConfig(policy, config)
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Get active playback viewers error:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to fetch active playback viewers',
+            };
+        }
+    },
+
     async getCameraHealthDebug(params = {}, policy = REQUEST_POLICY.BLOCKING, config = {}) {
         try {
             const searchParams = new URLSearchParams();
