@@ -499,6 +499,84 @@ describe('cameraHealthService external TLS policy', () => {
         expect(axios.get).not.toHaveBeenCalled();
     });
 
+    it('keeps disabled MJPEG cameras online without runtime signal and skips probing', async () => {
+        const service = new CameraHealthService();
+
+        const result = await service.evaluateCameraStatus({
+            id: 398,
+            enabled: 1,
+            is_online: 1,
+            stream_source: 'external',
+            delivery_type: 'external_mjpeg',
+            external_health_mode: 'disabled',
+            external_stream_url: 'https://example.com/mjpeg',
+        }, new Map());
+
+        const state = service.healthState.get(398);
+        const monitoring = service.getMonitoringState({
+            id: 398,
+            delivery_type: 'external_mjpeg',
+            external_health_mode: 'disabled',
+        }, state);
+
+        expect(result.isOnline).toBe(1);
+        expect(result.rawReason).toBe('health_check_disabled');
+        expect(state.state).toBe('disabled');
+        expect(state.effectiveOnline).toBe(true);
+        expect(monitoring).toEqual({
+            health_mode: 'disabled',
+            monitoring_state: 'disabled',
+            monitoring_reason: 'health_check_disabled',
+        });
+        expect(axios.get).not.toHaveBeenCalled();
+    });
+
+    it('keeps disabled MJPEG cameras online with runtime metadata and skips probing', async () => {
+        const service = new CameraHealthService();
+        service.recordRuntimeSignal(399, {
+            targetUrl: 'https://example.com/mjpeg',
+            signalType: 'external_mjpeg_open',
+            success: true,
+            timestamp: Date.now() - 30_000,
+        });
+
+        const result = await service.evaluateCameraStatus({
+            id: 399,
+            enabled: 1,
+            is_online: 0,
+            stream_source: 'external',
+            delivery_type: 'external_mjpeg',
+            external_health_mode: 'disabled',
+            external_stream_url: 'https://example.com/mjpeg',
+        }, new Map());
+
+        const state = service.healthState.get(399);
+
+        expect(result.isOnline).toBe(1);
+        expect(result.rawReason).toBe('mjpeg_runtime_recent');
+        expect(state.state).toBe('disabled');
+        expect(state.effectiveOnline).toBe(true);
+        expect(state.lastRuntimeSignalType).toBe('external_mjpeg_open');
+        expect(axios.get).not.toHaveBeenCalled();
+    });
+
+    it('keeps hard config failures offline even when health mode is disabled', async () => {
+        const service = new CameraHealthService();
+
+        const result = await service.evaluateCameraStatus({
+            id: 400,
+            enabled: 1,
+            is_online: 1,
+            stream_source: 'external',
+            delivery_type: 'external_unresolved',
+            external_health_mode: 'disabled',
+        }, new Map());
+
+        expect(result.isOnline).toBe(0);
+        expect(result.rawReason).toBe('missing_external_source_metadata');
+        expect(service.healthState.get(400).state).toBe('unresolved');
+    });
+
     it('maps degraded MJPEG runtime state to public degraded availability', () => {
         const service = new CameraHealthService();
         service.healthState.set(395, {
