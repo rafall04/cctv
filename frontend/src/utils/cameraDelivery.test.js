@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getEffectiveDeliveryType, getPrimaryExternalUrl } from './cameraDelivery.js';
+import { getEffectiveDeliveryType, getPrimaryExternalUrl, getStreamCapabilities } from './cameraDelivery.js';
 
 describe('cameraDelivery compat inference', () => {
     it('maps legacy external_hls_url cameras to external_hls', () => {
@@ -48,6 +48,13 @@ describe('cameraDelivery compat inference', () => {
         expect(getEffectiveDeliveryType({
             stream_source: 'external',
         })).toBe('external_hls');
+    });
+
+    it('marks external hls cameras as playback-capable for recorded playback', () => {
+        expect(getStreamCapabilities({
+            stream_source: 'external',
+            external_stream_url: 'https://example.com/live/index.m3u8?token=abc',
+        }).playback).toBe(true);
     });
 
     it('prefers the explicit external stream URL before legacy compat fields', () => {

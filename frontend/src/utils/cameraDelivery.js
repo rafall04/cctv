@@ -68,7 +68,7 @@ export function getStreamCapabilities(camera = {}) {
     const deliveryType = getEffectiveDeliveryType(camera);
     const fallbackCapabilities = {
         internal_hls: { live: true, popup: true, multiview: true, playback: true, supported_player: 'hls' },
-        external_hls: { live: true, popup: true, multiview: true, playback: false, supported_player: 'hls' },
+        external_hls: { live: true, popup: true, multiview: true, playback: true, supported_player: 'hls' },
         external_mjpeg: { live: true, popup: true, multiview: false, playback: false, supported_player: 'mjpeg' },
         external_embed: { live: true, popup: true, multiview: false, playback: false, supported_player: 'embed' },
         external_jsmpeg: { live: true, popup: true, multiview: false, playback: false, supported_player: 'embed_fallback' },

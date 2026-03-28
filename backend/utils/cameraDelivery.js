@@ -174,7 +174,7 @@ export function getStreamCapabilities(cameraOrDeliveryType = {}) {
                 live: true,
                 popup: true,
                 multiview: true,
-                playback: false,
+                playback: true,
                 direct_embed: false,
                 supported_player: 'hls',
             };
