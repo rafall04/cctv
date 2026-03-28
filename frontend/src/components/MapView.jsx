@@ -300,8 +300,8 @@ const getGroupMarkerProfile = (kind = 'group', count = 0) => {
 const createGroupIcon = (count, cameras = [], kind = 'group') => {
     const hasDegraded = cameras.some((camera) => getCameraAvailabilityState(camera) === 'degraded');
     const allOffline = cameras.every((camera) => getCameraAvailabilityState(camera) === 'offline');
-    const countBucket = count > 999 ? '999+' : count > 99 ? '100+' : count > 9 ? '10+' : String(count);
-    const colorKey = `${kind}-${countBucket}-${hasDegraded}-${allOffline}`;
+    const countLabel = count > 999 ? '999+' : String(count);
+    const colorKey = `${kind}-${countLabel}-${hasDegraded}-${allOffline}`;
     if (iconCache.has(colorKey)) {
         return iconCache.get(colorKey);
     }
@@ -499,43 +499,6 @@ const buildAreaSummaryList = (areas = [], cameras = []) => {
             };
         })
         .sort((left, right) => left.areaName.localeCompare(right.areaName));
-};
-
-const applyAreaAggregateSeparation = (markers = [], zoom) => {
-    if (!Array.isArray(markers) || markers.length <= 1) {
-        return markers;
-    }
-
-    const precision = zoom <= 10 ? 1 : 2;
-    const radius = zoom <= 10 ? 0.12 : 0.025;
-    const grouped = new Map();
-
-    markers.forEach((marker) => {
-        const key = `${marker.latitude.toFixed(precision)},${marker.longitude.toFixed(precision)}`;
-        if (!grouped.has(key)) {
-            grouped.set(key, []);
-        }
-        grouped.get(key).push(marker);
-    });
-
-    return Array.from(grouped.values()).flatMap((group) => {
-        if (group.length === 1) {
-            return group;
-        }
-
-        return group
-            .slice()
-            .sort((left, right) => left.areaName.localeCompare(right.areaName))
-            .map((marker, index) => {
-                const angle = (Math.PI * 2 * index) / group.length;
-                return {
-                    ...marker,
-                    latitude: marker.latitude + (radius * Math.cos(angle)),
-                    longitude: marker.longitude + (radius * Math.sin(angle)),
-                    displayOffset: true,
-                };
-            });
-    });
 };
 
 // Video Modal - OPTIMIZED untuk low-end device
@@ -1769,34 +1732,23 @@ const MapView = memo(({
             return [];
         }
 
-        if (selectedAreaValue !== 'all') {
-            const grouped = bucketCamerasByCoordinate(visibleBase, effectiveZoom);
-            return grouped.map((group) => ({
-                ...group,
-                kind: 'bucket',
-            }));
-        }
+        const grouped = bucketCamerasByCoordinate(visibleBase, effectiveZoom);
+        return grouped.map((group) => {
+            const dominantAreaName = group.cameras.reduce((acc, camera) => {
+                const areaName = String(camera.area_name || '').trim() || 'Tanpa Area';
+                acc[areaName] = (acc[areaName] || 0) + 1;
+                return acc;
+            }, {});
+            const dominantEntry = Object.entries(dominantAreaName)
+                .sort((left, right) => right[1] - left[1])[0];
 
-        return applyAreaAggregateSeparation(
-            areaSummaryList
-                .filter((summary) => summary.hasValidAnchor && summary.cameraCount > 0)
-                .map((summary) => ({
-                    key: `area-${summary.areaKey}`,
-                    latitude: summary.anchor.latitude,
-                    longitude: summary.anchor.longitude,
-                    count: summary.cameraCount,
-                    cameras: summary.cameras,
-                    areaName: summary.areaName,
-                    areaKey: summary.areaKey,
-                    onlineCount: summary.onlineCount,
-                    offlineCount: summary.offlineCount,
-                    degradedCount: summary.degradedCount,
-                    source: summary.source,
-                    kind: 'area',
-                })),
-            effectiveZoom
-        );
-    }, [areaSummaryList, effectiveZoom, selectedAreaValue, shouldUseAggregateMarkers, visibleBase]);
+            return {
+                ...group,
+                dominantAreaName: dominantEntry?.[0] || null,
+                kind: selectedAreaValue === 'all' ? 'hotspot' : 'bucket',
+            };
+        });
+    }, [effectiveZoom, selectedAreaValue, shouldUseAggregateMarkers, visibleBase]);
 
     const groupedVisibleMarkers = useMemo(() => {
         if (!shouldUseGroupedMarkers) {

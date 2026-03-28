@@ -335,6 +335,7 @@ describe('MapView area filter visibility', () => {
         setViewMock.mockReset();
         mapMock.flyTo.mockReset();
         mapMock.invalidateSize.mockReset();
+        L.divIcon.mockClear();
         startSessionMock.mockClear();
         stopSessionMock.mockClear();
         hlsInstances.length = 0;
@@ -768,16 +769,60 @@ describe('MapView area filter visibility', () => {
             expect(screen.getAllByText('marker')).toHaveLength(1);
         });
 
-        expect(screen.queryByTestId('marker--7.1507-111.8815')).toBeNull();
-        expect(screen.getByTestId('marker--7.149249999999999-111.88295000000001')).toBeTruthy();
+        expect(screen.getByTestId('marker--7.1507-111.8815')).toBeTruthy();
         expect(screen.getByTestId('map-zoom-hint')).toBeTruthy();
         const aggregateIconCall = L.divIcon.mock.calls.at(-1)?.[0];
         expect(aggregateIconCall?.html).not.toContain('AREA');
         expect(aggregateIconCall?.html).not.toContain('GROUP');
-        expect(aggregateIconCall?.iconSize).toEqual([58, 58]);
+        expect(aggregateIconCall?.iconSize).toEqual([50, 50]);
     });
 
-    it('memprioritaskan centroid kamera dan menormalkan nama area saat aggregate all-area', async () => {
+    it('menggunakan hotspot spasial di mode all-area untuk area besar yang tersebar', async () => {
+        const makeCluster = (startId, count, baseLat, baseLng) => Array.from({ length: count }, (_, index) => ({
+            id: startId + index,
+            name: `Bojonegoro ${startId + index}`,
+            latitude: (baseLat + (index * 0.00005)).toFixed(5),
+            longitude: (baseLng + (index * 0.00005)).toFixed(5),
+            area_name: 'BOJONEGORO',
+            is_online: 1,
+            status: 'active',
+            is_tunnel: 0,
+        }));
+
+        const spreadCameras = [
+            ...makeCluster(1, 13, -7.1500, 111.8800),
+            ...makeCluster(101, 42, -7.3100, 111.6500),
+            ...makeCluster(201, 40, -7.0200, 112.0300),
+        ];
+
+        setMockZoom(11);
+
+        await act(async () => {
+            render(
+                <MapView
+                    cameras={spreadCameras}
+                    areas={[{ name: 'BOJONEGORO', latitude: '-7.1500', longitude: '111.8800' }]}
+                    showAreaFilter
+                />
+            );
+        });
+
+        await waitFor(() => {
+            expect(screen.getAllByText('marker')).toHaveLength(3);
+        });
+
+        const aggregateIconCalls = L.divIcon.mock.calls
+            .map((call) => call[0])
+            .filter((call) => Array.isArray(call?.iconSize) && call.iconSize[0] === 50);
+
+        expect(aggregateIconCalls).toHaveLength(3);
+        expect(aggregateIconCalls.some((call) => call.html.includes('13'))).toBe(true);
+        expect(aggregateIconCalls.some((call) => call.html.includes('42'))).toBe(true);
+        expect(aggregateIconCalls.some((call) => call.html.includes('40'))).toBe(true);
+        expect(aggregateIconCalls.some((call) => call.html.includes('95'))).toBe(false);
+    });
+
+    it('tetap menormalkan nama area untuk dropdown dan focus area walau all-area memakai hotspot', async () => {
         const denseCameras = Array.from({ length: 30 }, (_, index) => ({
             id: index + 1,
             name: `Gresik ${index + 1}`,
@@ -803,64 +848,8 @@ describe('MapView area filter visibility', () => {
             expect(screen.getAllByText('marker')).toHaveLength(1);
         });
 
-        const markerIds = Array.from(document.querySelectorAll('[data-testid^="marker-"]'))
-            .map((node) => node.getAttribute('data-testid'));
-        expect(markerIds).toHaveLength(1);
-        expect(markerIds[0]).toContain('marker--7.1234');
-        expect(markerIds[0]).toContain('112.5432');
-        expect(markerIds[0]).not.toContain('6.9');
         expect(screen.getByRole('combobox').value).toBe('all');
         expect(screen.getByRole('option', { name: /kab gresik/i })).toBeTruthy();
-    });
-
-    it('memberi separation deterministik saat dua area aggregate berbagi anchor yang sama', async () => {
-        const gresikCameras = Array.from({ length: 30 }, (_, index) => ({
-            id: index + 1,
-            name: `Gresik ${index + 1}`,
-            latitude: '-7.1111',
-            longitude: '112.2222',
-            area_name: 'KAB GRESIK',
-            is_online: 1,
-            status: 'active',
-            is_tunnel: 0,
-        }));
-        const surabayaCameras = Array.from({ length: 30 }, (_, index) => ({
-            id: index + 101,
-            name: `Surabaya ${index + 1}`,
-            latitude: '-7.1111',
-            longitude: '112.2222',
-            area_name: 'SURABAYA',
-            is_online: 0,
-            status: 'active',
-            is_tunnel: 0,
-        }));
-
-        setMockZoom(11);
-
-        await act(async () => {
-            render(
-                <MapView
-                    cameras={[...gresikCameras, ...surabayaCameras]}
-                    areas={[
-                        { name: 'KAB GRESIK', latitude: '-7.1111', longitude: '112.2222' },
-                        { name: 'SURABAYA', latitude: '-7.1111', longitude: '112.2222' },
-                    ]}
-                    showAreaFilter
-                />
-            );
-        });
-
-        await waitFor(() => {
-            expect(screen.getAllByText('marker')).toHaveLength(2);
-        });
-
-        const markerIds = Array.from(document.querySelectorAll('[data-testid^="marker-"]'))
-            .map((node) => node.getAttribute('data-testid'))
-            .sort();
-
-        expect(markerIds).toHaveLength(2);
-        expect(new Set(markerIds).size).toBe(2);
-        expect(markerIds).not.toContain('marker--7.1111-112.2222');
     });
 
     it('memberi warning observability saat area punya kamera tanpa anchor valid', async () => {
