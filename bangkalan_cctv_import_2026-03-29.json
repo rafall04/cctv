@@ -1,0 +1,17 @@
+[
+    {
+        "name": "Bangkalan Dishub CCTV Live",
+        "location": "Bangkalan Dishub CCTV Live",
+        "description": "SOURCE: BANGKALAN DISHUB | provider: YouTube embed | source_status: verified_200 | note: single public live embed only",
+        "stream_source": "external",
+        "delivery_type": "external_embed",
+        "external_stream_url": null,
+        "external_embed_url": "https://www.youtube.com/embed/eDUdY1-Nkuc",
+        "external_snapshot_url": null,
+        "external_origin_mode": "embed",
+        "external_use_proxy": 0,
+        "external_tls_mode": "strict",
+        "external_health_mode": "passive_first",
+        "enabled": 1
+    }
+]

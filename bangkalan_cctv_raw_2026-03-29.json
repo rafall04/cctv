@@ -1,0 +1,12 @@
+[
+    {
+        "source_type": "youtube_embed",
+        "source_site": "https://dishub.bangkalankab.go.id/cctv.html",
+        "provider": "Dinas Perhubungan Kabupaten Bangkalan",
+        "title": "Layanan CCTV",
+        "embed_url": "https://www.youtube.com/embed/eDUdY1-Nkuc",
+        "youtube_video_id": "eDUdY1-Nkuc",
+        "verified_status": 200,
+        "notes": "No individual CCTV list, coordinates, or direct HLS/RTSP URLs found in page source. Only one public YouTube live embed is present."
+    }
+]
