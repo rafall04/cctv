@@ -32,6 +32,7 @@ npm run setup-db
 
 # Run migrations
 npm run migrate
+# Note: after adding new schema like playback viewer tables, run migrations before restarting backend
 
 # Run security migrations
 npm run migrate-security
@@ -44,6 +45,7 @@ npm test:watch
 
 # Run a single test file
 npm test -- cameraService.test.js
+npm test -- playbackViewerRoutes.test.js
 
 # Run a single test
 npm test -- cameraService.test.js -t "test name"
@@ -75,6 +77,7 @@ npm test:watch
 
 # Run a single test file
 npm test -- CameraManagement.test.jsx
+npm test -- src/pages/PlaybackAnalytics.test.jsx
 
 # Run a single test
 npm test -- CameraManagement.test.jsx -t "test name"
@@ -97,7 +100,8 @@ frontend/src/
 │   │   ├── CameraManagement.jsx
 │   │   ├── AreaManagement.jsx
 │   │   ├── UserManagement.jsx
-│   │   └── Playback.jsx
+│   │   ├── Playback.jsx
+│   │   └── PlaybackAnalytics.jsx
 │   └── settings/
 │       └── UnifiedSettings.jsx
 ├── components/
@@ -498,6 +502,10 @@ git push origin main
        };
    }
    ```
+
+3. **For async media/session starts, guard duplicate event bursts with a pending ref/token**
+   - Repeated media events like `playing` can fire before the first async start finishes
+   - Use a `pendingKeyRef` / `pendingTokenRef` pattern so the same playback segment does not create duplicate sessions
 
 ### Mode Switching (LandingPage View Modes)
 
