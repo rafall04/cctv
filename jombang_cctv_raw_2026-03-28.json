@@ -1,0 +1,612 @@
+﻿[
+    {
+        "id":  "3",
+        "nama":  "Alun-alun Jombang - Lapangan Sintetis",
+        "lat":  "-7.557116",
+        "lng":  "112.233742",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=120\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ3MDQ4LCJleHAiOjE3NzM1NTQyNDgsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.j13Hm3O2hk0HqIr7TwMrAU6hoM_am4IyUwYTGnnDt0I",
+        "kategori":  "Area Publik",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "7",
+        "nama":  "Alun-alun Jombang - Area Tempat Duduk",
+        "lat":  "-7.557355",
+        "lng":  "112.233968",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=121\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ3MDQ4LCJleHAiOjE3NzM1NTQyNDgsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.j13Hm3O2hk0HqIr7TwMrAU6hoM_am4IyUwYTGnnDt0I",
+        "kategori":  "Area Publik",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "8",
+        "nama":  "Alun-alun Jombang - Area Playgorund",
+        "lat":  "-7.557361",
+        "lng":  "112.233619",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=122\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ3MDQ4LCJleHAiOjE3NzM1NTQyNDgsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.j13Hm3O2hk0HqIr7TwMrAU6hoM_am4IyUwYTGnnDt0I",
+        "kategori":  "Area Publik",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "9",
+        "nama":  "Alun-alun Jombang - Area Tempat Duduk Timur",
+        "lat":  "-7.556483",
+        "lng":  "112.233882",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=124\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ3MTAyLCJleHAiOjE3NzM1NTQzMDIsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.5Qzt5Q-HWm-tY2H-3h9d1gFQd6Y48D5rA2R_dGJKqLU",
+        "kategori":  "Area Publik",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "10",
+        "nama":  "Alun-alun Jombang - Parkiran Selatan",
+        "lat":  "-7.557653",
+        "lng":  "112.233399",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=123\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ3MTAyLCJleHAiOjE3NzM1NTQzMDIsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.5Qzt5Q-HWm-tY2H-3h9d1gFQd6Y48D5rA2R_dGJKqLU",
+        "kategori":  "Area Publik",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "11",
+        "nama":  "Sentra Wisata Kuliner 1",
+        "lat":  "-7.554665",
+        "lng":  "112.230223",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=98\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ3Mzc2LCJleHAiOjE3NzM1NTQ1NzYsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.pKjbM5nexAm79uWC350IwjM5mPdLDgdDb_T2FrqGRnc",
+        "kategori":  "Area Publik",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "12",
+        "nama":  "Sentra Wisata Kuliner 2",
+        "lat":  "-7.554739",
+        "lng":  "112.230685",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=100\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ3Mzc2LCJleHAiOjE3NzM1NTQ1NzYsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.pKjbM5nexAm79uWC350IwjM5mPdLDgdDb_T2FrqGRnc",
+        "kategori":  "Area Publik",
+        "status":  "offline",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "13",
+        "nama":  "Sentra Wisata Kuliner 3",
+        "lat":  "-7.554782",
+        "lng":  "112.23105",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=100\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ3Mzc2LCJleHAiOjE3NzM1NTQ1NzYsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.pKjbM5nexAm79uWC350IwjM5mPdLDgdDb_T2FrqGRnc",
+        "kategori":  "Area Publik",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "14",
+        "nama":  "Sentra Wisata Kuliner 4",
+        "lat":  "-7.55493",
+        "lng":  "112.231501",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=101\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ3Mzc2LCJleHAiOjE3NzM1NTQ1NzYsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.pKjbM5nexAm79uWC350IwjM5mPdLDgdDb_T2FrqGRnc",
+        "kategori":  "Area Publik",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "15",
+        "nama":  "Sentra Wisata Kuliner 6",
+        "lat":  "-7.555164",
+        "lng":  "112.230749",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=98\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQzNzU1LCJleHAiOjE3NzM1NTA5NTUsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.tddtE8DTYpl94WOv945S9qtpyUH4IBKDDlO9y9ncFmo",
+        "kategori":  "Area Publik",
+        "status":  "offline",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "16",
+        "nama":  "Sentra Wisata Kuliner 7",
+        "lat":  "-7.555388",
+        "lng":  "112.230019",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=104\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ3Mzc2LCJleHAiOjE3NzM1NTQ1NzYsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.pKjbM5nexAm79uWC350IwjM5mPdLDgdDb_T2FrqGRnc",
+        "kategori":  "Area Publik",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "17",
+        "nama":  "Sentra Wisata Kuliner 5",
+        "lat":  "-7.55509",
+        "lng":  "112.230062",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=102\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ3Mzc2LCJleHAiOjE3NzM1NTQ1NzYsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.pKjbM5nexAm79uWC350IwjM5mPdLDgdDb_T2FrqGRnc",
+        "kategori":  "Area Publik",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "18",
+        "nama":  "Sentra Wisata Kuliner 8",
+        "lat":  "-7.555611",
+        "lng":  "112.23062",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=105\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ3Mzc2LCJleHAiOjE3NzM1NTQ1NzYsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.pKjbM5nexAm79uWC350IwjM5mPdLDgdDb_T2FrqGRnc",
+        "kategori":  "Area Publik",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "19",
+        "nama":  "Perbatasan Mojoagung (Barat)",
+        "lat":  "-7.56178",
+        "lng":  "112.367262",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=96\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ3NTA4LCJleHAiOjE3NzM1NTQ3MDgsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.wN9NB03P6MUjDMTItRQsYTXZ7tGyrsVzXrNiXMZQIS8",
+        "kategori":  "Perbatasan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "20",
+        "nama":  "Perbatasan Mojoagung (Timur)",
+        "lat":  "-7.560418",
+        "lng":  "112.36868",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=106\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ3NTA4LCJleHAiOjE3NzM1NTQ3MDgsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.wN9NB03P6MUjDMTItRQsYTXZ7tGyrsVzXrNiXMZQIS8",
+        "kategori":  "Perbatasan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "21",
+        "nama":  "Perbatasan Rejoagung Ngoro (Selatan)",
+        "lat":  "-7.725663",
+        "lng":  "112.278342",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=107\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ3NzM3LCJleHAiOjE3NzM1NTQ5MzcsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.k72MUAMakv5xNptcO_2jG_-368ouIMM2wqNDqVrsc-A",
+        "kategori":  "Perbatasan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "22",
+        "nama":  "Perbatasan Rejoagung Ngoro (Utara)",
+        "lat":  "-7.724962",
+        "lng":  "112.27846",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=108\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ3NzM3LCJleHAiOjE3NzM1NTQ5MzcsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.k72MUAMakv5xNptcO_2jG_-368ouIMM2wqNDqVrsc-A",
+        "kategori":  "Perbatasan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "23",
+        "nama":  "Perbatasan Bandarkedungmulyo (Timur)",
+        "lat":  "-7.597072",
+        "lng":  "112.118278",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=109\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ3NzM3LCJleHAiOjE3NzM1NTQ5MzcsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.k72MUAMakv5xNptcO_2jG_-368ouIMM2wqNDqVrsc-A",
+        "kategori":  "Perbatasan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "24",
+        "nama":  "Perbatasan Bandarkedungmulyo (Barat)",
+        "lat":  "-7.597072",
+        "lng":  "112.118278",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=110\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ3NzM3LCJleHAiOjE3NzM1NTQ5MzcsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.k72MUAMakv5xNptcO_2jG_-368ouIMM2wqNDqVrsc-A",
+        "kategori":  "Perbatasan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "25",
+        "nama":  "Perbatasan Kabuh (Utara)",
+        "lat":  "-7.397451",
+        "lng":  "112.215729",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=111\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ3NzM3LCJleHAiOjE3NzM1NTQ5MzcsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.k72MUAMakv5xNptcO_2jG_-368ouIMM2wqNDqVrsc-A",
+        "kategori":  "Perbatasan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "26",
+        "nama":  "Perbatasan Kabuh (Selatan)",
+        "lat":  "-7.398983",
+        "lng":  "112.215729",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=112\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ3NzM3LCJleHAiOjE3NzM1NTQ5MzcsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.k72MUAMakv5xNptcO_2jG_-368ouIMM2wqNDqVrsc-A",
+        "kategori":  "Perbatasan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "27",
+        "nama":  "Perbatasan Jombok Ngoro (Selatan)",
+        "lat":  "-7.688622",
+        "lng":  "112.218647",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=113\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ3ODg5LCJleHAiOjE3NzM1NTUwODksInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.F-aLz8a5Tw9-EdY8_fJSo5ewvRdyUle1mrNkM2Md4xw",
+        "kategori":  "Perbatasan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "28",
+        "nama":  "Perbatasan Jombok Ngoro (Utara)",
+        "lat":  "-7.687947",
+        "lng":  "112.218892",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=114\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ3ODg5LCJleHAiOjE3NzM1NTUwODksInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.F-aLz8a5Tw9-EdY8_fJSo5ewvRdyUle1mrNkM2Md4xw",
+        "kategori":  "Perbatasan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "29",
+        "nama":  "Simpang Mojongapit (Barat)",
+        "lat":  "-7.538296",
+        "lng":  "112.248344",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=139\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4MjA4LCJleHAiOjE3NzM1NTU0MDgsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.SBvoVnIpkSFfkbp7AhSvCK31XcFoGrj-wUDPej5TeXE",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "30",
+        "nama":  "Simpang Mojongapit (Timur)",
+        "lat":  "-7.538211",
+        "lng":  "112.249718",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=140\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4MjA4LCJleHAiOjE3NzM1NTU0MDgsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.SBvoVnIpkSFfkbp7AhSvCK31XcFoGrj-wUDPej5TeXE",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "31",
+        "nama":  "Simpang Mojongapit (Utara)",
+        "lat":  "-7.537615",
+        "lng":  "112.249676",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=141\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4MjA4LCJleHAiOjE3NzM1NTU0MDgsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.SBvoVnIpkSFfkbp7AhSvCK31XcFoGrj-wUDPej5TeXE",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "32",
+        "nama":  "Simpang Keplaksari (Timur)",
+        "lat":  "-7.537998",
+        "lng":  "112.264224",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=133\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4MDkyLCJleHAiOjE3NzM1NTUyOTIsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.9ufaMvWzMDkjuwcieEyk-mQINcZVVvtHFHVj0u8emFo",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "33",
+        "nama":  "Simpang Keplaksari (Barat)",
+        "lat":  "-7.537849",
+        "lng":  "112.263",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=134\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4MDkyLCJleHAiOjE3NzM1NTUyOTIsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.9ufaMvWzMDkjuwcieEyk-mQINcZVVvtHFHVj0u8emFo",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "34",
+        "nama":  "Simpang Keplaksari (Utara)",
+        "lat":  "-7.537147",
+        "lng":  "112.263623",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=138\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4MDkyLCJleHAiOjE3NzM1NTUyOTIsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.9ufaMvWzMDkjuwcieEyk-mQINcZVVvtHFHVj0u8emFo",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "35",
+        "nama":  "Simpang Terminal (Utara)",
+        "lat":  "-7.533744",
+        "lng":  "112.26286",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=136\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4ODQ5LCJleHAiOjE3NzM1NTYwNDksInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.j-oOTUkEF6MIWA8quIG10tJ-LMEANZsWLzebqOIWG5A",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "36",
+        "nama":  "Simpang Terminal (Selatan)",
+        "lat":  "-7.534977",
+        "lng":  "112.262388",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=137\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4ODQ5LCJleHAiOjE3NzM1NTYwNDksInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.j-oOTUkEF6MIWA8quIG10tJ-LMEANZsWLzebqOIWG5A",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "37",
+        "nama":  "Simpang Terminal (Barat)",
+        "lat":  "-7.533999",
+        "lng":  "112.262259",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=135\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4OTIyLCJleHAiOjE3NzM1NTYxMjIsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.MRmADGRtBaZLnjcXdu3ZA0OoHaoEsIH0_otJF1Ui5JY",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "38",
+        "nama":  "Simpang Stadion (Selatan)",
+        "lat":  "-7.538955",
+        "lng":  "112.245297",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=142\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4OTIyLCJleHAiOjE3NzM1NTYxMjIsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.MRmADGRtBaZLnjcXdu3ZA0OoHaoEsIH0_otJF1Ui5JY",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "39",
+        "nama":  "Simpang Weru (Selatan)",
+        "lat":  "-7.533105",
+        "lng":  "112.251027",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=143\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4NjkyLCJleHAiOjE3NzM1NTU4OTIsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.8yQ5tOlObDTXMNa4cBOlxFyB3_5BgXdxdvhkaMzrtRs",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "40",
+        "nama":  "Simpang Weru (Utara)",
+        "lat":  "-7.532403",
+        "lng":  "112.251241",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=144\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4NjkyLCJleHAiOjE3NzM1NTU4OTIsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.8yQ5tOlObDTXMNa4cBOlxFyB3_5BgXdxdvhkaMzrtRs",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "41",
+        "nama":  "Simpang Tugu (Utara)",
+        "lat":  "-7.544167",
+        "lng":  "112.237144",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=145\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4ODQ5LCJleHAiOjE3NzM1NTYwNDksInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.j-oOTUkEF6MIWA8quIG10tJ-LMEANZsWLzebqOIWG5A",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "42",
+        "nama":  "Simpang Tugu (Selatan)",
+        "lat":  "-7.544688",
+        "lng":  "112.237058",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=147\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4ODQ5LCJleHAiOjE3NzM1NTYwNDksInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.j-oOTUkEF6MIWA8quIG10tJ-LMEANZsWLzebqOIWG5A",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "44",
+        "nama":  "Simpang Tugu (Timur)",
+        "lat":  "-7.544518",
+        "lng":  "112.237326",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=148\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4ODQ5LCJleHAiOjE3NzM1NTYwNDksInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.j-oOTUkEF6MIWA8quIG10tJ-LMEANZsWLzebqOIWG5A",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "47",
+        "nama":  "Simpang Tugu (Barat)",
+        "lat":  "-7.544433",
+        "lng":  "112.236811",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=146\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4ODQ5LCJleHAiOjE3NzM1NTYwNDksInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.j-oOTUkEF6MIWA8quIG10tJ-LMEANZsWLzebqOIWG5A",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "48",
+        "nama":  "Simpang RSUD (Utara)",
+        "lat":  "-7.54874",
+        "lng":  "112.236371",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=149\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4MzIxLCJleHAiOjE3NzM1NTU1MjEsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.kpEk7cgK1eB5_S2zo5lSDDgUZq_YrgBI21ObmFiTlZM",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "49",
+        "nama":  "Simpang RSUD (Selatan)",
+        "lat":  "-7.549145",
+        "lng":  "112.236285",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=152\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4MzIxLCJleHAiOjE3NzM1NTU1MjEsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.kpEk7cgK1eB5_S2zo5lSDDgUZq_YrgBI21ObmFiTlZM",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "50",
+        "nama":  "Simpang RSUD (Timur)",
+        "lat":  "-7.548974",
+        "lng":  "112.236628",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=151\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4MzIxLCJleHAiOjE3NzM1NTU1MjEsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.kpEk7cgK1eB5_S2zo5lSDDgUZq_YrgBI21ObmFiTlZM",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "51",
+        "nama":  "Simpang RSUD (Barat)",
+        "lat":  "-7.548847",
+        "lng":  "112.23577",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=150\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4MzIxLCJleHAiOjE3NzM1NTU1MjEsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.kpEk7cgK1eB5_S2zo5lSDDgUZq_YrgBI21ObmFiTlZM",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "52",
+        "nama":  "Simpang Kebonrojo (Barat)",
+        "lat":  "-7.553654",
+        "lng":  "112.235042",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=153\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ3ODg5LCJleHAiOjE3NzM1NTUwODksInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.F-aLz8a5Tw9-EdY8_fJSo5ewvRdyUle1mrNkM2Md4xw",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "53",
+        "nama":  "Simpang Kebonrojo (Timur)",
+        "lat":  "-7.553867",
+        "lng":  "112.236029",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=154\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4MDkyLCJleHAiOjE3NzM1NTUyOTIsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.9ufaMvWzMDkjuwcieEyk-mQINcZVVvtHFHVj0u8emFo",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "54",
+        "nama":  "Simpang SMAN 2 Jombang (Utara)",
+        "lat":  "-7.551357",
+        "lng":  "112.227788",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=155\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4NjkyLCJleHAiOjE3NzM1NTU4OTIsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.8yQ5tOlObDTXMNa4cBOlxFyB3_5BgXdxdvhkaMzrtRs",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "55",
+        "nama":  "Simpang SMAN 2 Jombang (Selatan)",
+        "lat":  "-7.55242",
+        "lng":  "112.227444",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=157\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4NjkyLCJleHAiOjE3NzM1NTU4OTIsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.8yQ5tOlObDTXMNa4cBOlxFyB3_5BgXdxdvhkaMzrtRs",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "56",
+        "nama":  "Simpang SMAN 2 Jombang (Timur)",
+        "lat":  "-7.551952",
+        "lng":  "112.228001",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=158\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4NDU3LCJleHAiOjE3NzM1NTU2NTcsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.BykXY_HwiyMfFyKCEgwi-E6Evd-Ec8PXgL5gNialnXc",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "57",
+        "nama":  "Simpang SMAN 2 Jombang (Barat)",
+        "lat":  "-7.55174",
+        "lng":  "112.227209",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=156\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4NDU3LCJleHAiOjE3NzM1NTU2NTcsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.BykXY_HwiyMfFyKCEgwi-E6Evd-Ec8PXgL5gNialnXc",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "58",
+        "nama":  "Simpang Sengon (Timur)",
+        "lat":  "-7.550549",
+        "lng":  "112.221817",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=159\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ1NTg0LCJleHAiOjE3NzM1NTI3ODQsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.1XU6bFT9vDVQlDu-pfCneG8U0PDFXinRsw1JC_S7h1Y",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "59",
+        "nama":  "Simpang Sengon (Selatan)",
+        "lat":  "-7.550719",
+        "lng":  "112.221088",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=159\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ1NTg0LCJleHAiOjE3NzM1NTI3ODQsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.1XU6bFT9vDVQlDu-pfCneG8U0PDFXinRsw1JC_S7h1Y",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "60",
+        "nama":  "Simpang Sengon (Barat)",
+        "lat":  "-7.550187",
+        "lng":  "112.221131",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=159\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ1NTg0LCJleHAiOjE3NzM1NTI3ODQsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.1XU6bFT9vDVQlDu-pfCneG8U0PDFXinRsw1JC_S7h1Y",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "61",
+        "nama":  "Simpang Sengon (Utara)",
+        "lat":  "-7.549783",
+        "lng":  "112.221646",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=159\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ1NTg0LCJleHAiOjE3NzM1NTI3ODQsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.1XU6bFT9vDVQlDu-pfCneG8U0PDFXinRsw1JC_S7h1Y",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "62",
+        "nama":  "Simpang PG Jombang (Timur)",
+        "lat":  "-7.537275",
+        "lng":  "112.227016",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=163\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4MjA4LCJleHAiOjE3NzM1NTU0MDgsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.SBvoVnIpkSFfkbp7AhSvCK31XcFoGrj-wUDPej5TeXE",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "63",
+        "nama":  "Simpang PG Jombang (Barat)",
+        "lat":  "-7.53702",
+        "lng":  "112.2262",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=165\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4MjA4LCJleHAiOjE3NzM1NTU0MDgsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.SBvoVnIpkSFfkbp7AhSvCK31XcFoGrj-wUDPej5TeXE",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "64",
+        "nama":  "Simpang PG Jombang (Selatan)",
+        "lat":  "-7.537743",
+        "lng":  "112.226457",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=164\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ4MjA4LCJleHAiOjE3NzM1NTU0MDgsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.SBvoVnIpkSFfkbp7AhSvCK31XcFoGrj-wUDPej5TeXE",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "65",
+        "nama":  "Simpang KA Pandanwangi (Utara)",
+        "lat":  "-7.560461",
+        "lng":  "112.225384",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=166\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ3ODg5LCJleHAiOjE3NzM1NTUwODksInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.F-aLz8a5Tw9-EdY8_fJSo5ewvRdyUle1mrNkM2Md4xw",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "66",
+        "nama":  "Simpang KA Pandanwangi (Timur)",
+        "lat":  "-7.560844",
+        "lng":  "112.225771",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=167\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ3ODg5LCJleHAiOjE3NzM1NTUwODksInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.F-aLz8a5Tw9-EdY8_fJSo5ewvRdyUle1mrNkM2Md4xw",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "67",
+        "nama":  "Simpang KA Pandanwangi (Selatan)",
+        "lat":  "-7.561471",
+        "lng":  "112.225159",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=168\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ3ODg5LCJleHAiOjE3NzM1NTUwODksInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.F-aLz8a5Tw9-EdY8_fJSo5ewvRdyUle1mrNkM2Md4xw",
+        "kategori":  "Persimpangan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "68",
+        "nama":  "DPRD Jombang (Selatan)",
+        "lat":  "-7.545645",
+        "lng":  "112.236908",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=116\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ1OTA0LCJleHAiOjE3NzM1NTMxMDQsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.rPxevNlL1nhcMb_Xq79nZBYb3K4wEFVQ2GcdnrL1Ork",
+        "kategori":  "Jalan Perkotaan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    },
+    {
+        "id":  "69",
+        "nama":  "SDN Wijana (Utara)",
+        "lat":  "-7.55208",
+        "lng":  "112.23577",
+        "url":  "https://cctv.jombangkab.go.id/zm/cgi-bin/nph-zms?monitor=119\u0026token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJab25lTWluZGVyIiwiaWF0IjoxNzczNTQ1OTA0LCJleHAiOjE3NzM1NTMxMDQsInVzZXIiOiJmcm9udGVuZCIsInR5cGUiOiJhY2Nlc3MifQ.rPxevNlL1nhcMb_Xq79nZBYb3K4wEFVQ2GcdnrL1Ork",
+        "kategori":  "Jalan Perkotaan",
+        "status":  "online",
+        "source_site":  "https://cctv.jombangkab.go.id/v2/"
+    }
+]
