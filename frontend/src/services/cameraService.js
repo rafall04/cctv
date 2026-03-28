@@ -90,6 +90,16 @@ export const cameraService = {
         }
     },
 
+    async previewImportCameras(payload) {
+        try {
+            const response = await apiClient.post('/api/cameras/import/preview', payload);
+            return response.data;
+        } catch (error) {
+            console.error('Preview import cameras error:', error);
+            throw error;
+        }
+    },
+
     async previewCameraRestore(payload) {
         try {
             const response = await apiClient.post('/api/cameras/restore/preview', payload);

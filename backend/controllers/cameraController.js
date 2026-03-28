@@ -139,19 +139,27 @@ export async function bulkUpdateByArea(request, reply) {
 // Import cameras (admin only)
 export async function importCameras(request, reply) {
     try {
-        const { targetArea, cameras } = request.body;
-        if (!Array.isArray(cameras) || cameras.length === 0) {
-             return reply.code(400).send({ success: false, message: 'Cameras array is required and cannot be empty' });
-        }
-        if (!targetArea) {
-             return reply.code(400).send({ success: false, message: 'Target area is required' });
-        }
-
-        const result = cameraService.importCamerasTransaction(cameras, targetArea, request);
+        const result = await cameraService.importCamerasTransaction(request.body || {}, null, request);
         return reply.send({ success: true, message: 'Import successful', result });
     } catch (error) {
         console.error('Import cameras error:', error);
+        if (error.statusCode === 400 || error.statusCode === 502) {
+            return reply.code(error.statusCode).send({ success: false, message: error.message });
+        }
         return reply.code(500).send({ success: false, message: error.message || 'Internal server error' });
+    }
+}
+
+export async function previewImportCameras(request, reply) {
+    try {
+        const result = await cameraService.previewImportCameras(request.body || {});
+        return reply.send({ success: true, data: result });
+    } catch (error) {
+        console.error('Preview import cameras error:', error);
+        if (error.statusCode === 400 || error.statusCode === 502) {
+            return reply.code(error.statusCode).send({ success: false, message: error.message });
+        }
+        return reply.code(500).send({ success: false, message: 'Internal server error' });
     }
 }
 

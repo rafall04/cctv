@@ -7,6 +7,7 @@ import {
     deleteCamera,
     exportCameras,
     importCameras,
+    previewImportCameras,
     previewCameraRestore,
     applyCameraRestore,
     bulkUpdateByArea,
@@ -67,6 +68,11 @@ export default async function cameraRoutes(fastify, options) {
     fastify.post('/import', {
         onRequest: [authMiddleware],
         handler: importCameras,
+    });
+
+    fastify.post('/import/preview', {
+        onRequest: [authMiddleware],
+        handler: previewImportCameras,
     });
 
     fastify.post('/restore/preview', {

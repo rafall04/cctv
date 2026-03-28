@@ -589,9 +589,14 @@ export default function AreaManagement() {
                             </div>
                             <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700/50">
                                 <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{area.cameraCount || 0} Kamera</span>
-                                <Link to="/admin/cameras" className="text-sm font-semibold text-primary hover:text-primary-600 flex items-center gap-1">
-                                    Lihat <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
-                                </Link>
+                                <div className="flex items-center gap-3">
+                                    <Link to={`/admin/import-export?area=${encodeURIComponent(area.name)}`} className="text-sm font-semibold text-emerald-600 hover:text-emerald-700">
+                                        Import
+                                    </Link>
+                                    <Link to="/admin/cameras" className="text-sm font-semibold text-primary hover:text-primary-600 flex items-center gap-1">
+                                        Lihat <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                                    </Link>
+                                </div>
                             </div>
                         </div>
                     ))}

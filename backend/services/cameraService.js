@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { query, queryOne, execute, transaction } from '../database/connectionPool.js';
 import { v4 as uuidv4 } from 'uuid';
 import mediaMtxService from './mediaMtxService.js';
@@ -59,6 +60,39 @@ const RESTORE_RESULT_STATUSES = [
     'ambiguous_matches',
     'missing_target',
     'invalid_backup_row',
+];
+
+const IMPORT_DUPLICATE_MODES = [
+    'skip_existing_name_or_url',
+];
+
+const IMPORT_AREA_MODES = [
+    'single_target_area',
+];
+
+const IMPORT_SOURCE_FILTER_MODES = [
+    'all',
+    'online_only',
+    'offline_only',
+];
+
+const IMPORT_SNAPSHOT_HANDLING_MODES = [
+    'preserve',
+    'clear',
+    'derive_if_supported',
+];
+
+const IMPORT_LOCATION_MAPPING_MODES = [
+    'name',
+    'source_field',
+    'area_plus_name',
+];
+
+const IMPORT_PRESET_PROFILES = [
+    'generic_hls',
+    'generic_mjpeg',
+    'embed_only',
+    'jombang_mjpeg',
 ];
 
 function getNormalizedDeliveryType(data = {}) {
@@ -378,6 +412,265 @@ function buildRestoreResultSummary(rows = []) {
         counts,
         canApply: counts.matched_repairable > 0,
     };
+}
+
+function extractImportItems(importRequest = {}) {
+    if (Array.isArray(importRequest)) {
+        return importRequest;
+    }
+
+    if (Array.isArray(importRequest?.cameras)) {
+        return importRequest.cameras;
+    }
+
+    if (Array.isArray(importRequest?.data)) {
+        return importRequest.data;
+    }
+
+    return [];
+}
+
+function normalizeImportRequest(importRequest = {}, legacyTargetArea = null) {
+    if (Array.isArray(importRequest)) {
+        return {
+            targetArea: typeof legacyTargetArea === 'string' ? legacyTargetArea.trim() : '',
+            cameras: importRequest,
+            globalOverrides: {},
+            importPolicy: {
+                duplicateMode: 'skip_existing_name_or_url',
+                areaMode: 'single_target_area',
+                normalizeNames: true,
+                dropOfflineSourceRows: false,
+                filterSourceRows: 'all',
+                snapshotHandling: 'preserve',
+                locationMapping: 'name',
+            },
+            sourceProfile: null,
+        };
+    }
+
+    const importPolicy = importRequest.importPolicy || {};
+
+    return {
+        targetArea: typeof importRequest.targetArea === 'string'
+            ? importRequest.targetArea.trim()
+            : (typeof legacyTargetArea === 'string' ? legacyTargetArea.trim() : ''),
+        cameras: extractImportItems(importRequest),
+        globalOverrides: importRequest.globalOverrides || {},
+        importPolicy: {
+            duplicateMode: IMPORT_DUPLICATE_MODES.includes(importPolicy.duplicateMode)
+                ? importPolicy.duplicateMode
+                : 'skip_existing_name_or_url',
+            areaMode: IMPORT_AREA_MODES.includes(importPolicy.areaMode)
+                ? importPolicy.areaMode
+                : 'single_target_area',
+            normalizeNames: importPolicy.normalizeNames !== false,
+            dropOfflineSourceRows: Boolean(importPolicy.dropOfflineSourceRows),
+            filterSourceRows: IMPORT_SOURCE_FILTER_MODES.includes(importPolicy.filterSourceRows)
+                ? importPolicy.filterSourceRows
+                : 'all',
+            snapshotHandling: IMPORT_SNAPSHOT_HANDLING_MODES.includes(importPolicy.snapshotHandling)
+                ? importPolicy.snapshotHandling
+                : 'preserve',
+            locationMapping: IMPORT_LOCATION_MAPPING_MODES.includes(importPolicy.locationMapping)
+                ? importPolicy.locationMapping
+                : 'name',
+        },
+        sourceProfile: IMPORT_PRESET_PROFILES.includes(importRequest.sourceProfile)
+            ? importRequest.sourceProfile
+            : null,
+    };
+}
+
+function normalizeImportName(name, shouldNormalize = true) {
+    const normalized = typeof name === 'string' ? name.trim() : '';
+    if (!shouldNormalize) {
+        return normalized;
+    }
+
+    return normalized.replace(/\s+/g, ' ');
+}
+
+function inferImportDeliveryType(url, embedUrl = null, streamSource = null) {
+    const normalizedUrl = typeof url === 'string' ? url.trim() : '';
+    const normalizedEmbedUrl = typeof embedUrl === 'string' ? embedUrl.trim() : '';
+
+    if ((streamSource || '').toLowerCase() === 'internal') {
+        return 'internal_hls';
+    }
+    if (DELIVERY_TYPE_PATTERNS.websocket.test(normalizedUrl)) {
+        return DELIVERY_TYPE_PATTERNS.jsmpegHint.test(normalizedUrl)
+            ? 'external_jsmpeg'
+            : 'external_custom_ws';
+    }
+    if (DELIVERY_TYPE_PATTERNS.zoneminderMjpeg.test(normalizedUrl)) {
+        return 'external_mjpeg';
+    }
+    if (DELIVERY_TYPE_PATTERNS.hlsHint.test(normalizedUrl)) {
+        return 'external_hls';
+    }
+    if (DELIVERY_TYPE_PATTERNS.http.test(normalizedEmbedUrl) && !normalizedUrl) {
+        return 'external_embed';
+    }
+    if (DELIVERY_TYPE_PATTERNS.http.test(normalizedUrl)) {
+        return 'external_mjpeg';
+    }
+
+    return 'external_embed';
+}
+
+function normalizeImportStatus(value) {
+    const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    if (normalized === 'online') {
+        return 'online';
+    }
+    if (normalized === 'offline') {
+        return 'offline';
+    }
+    return 'unknown';
+}
+
+function applyDescriptionTemplate(template, tokens) {
+    if (typeof template !== 'string' || template.trim() === '') {
+        return null;
+    }
+
+    return template.replace(/\{(\w+)\}/g, (_, key) => {
+        const value = tokens[key];
+        return value === undefined || value === null ? '' : String(value);
+    }).replace(/\s+\|\s+\|\s+/g, ' | ').trim();
+}
+
+function deriveSnapshotUrl(sourceRow = {}, snapshotHandling = 'preserve') {
+    if (snapshotHandling === 'clear') {
+        return null;
+    }
+
+    const existingSnapshot = sourceRow.external_snapshot_url
+        || sourceRow.thumbnail_url
+        || sourceRow.snapshot_url
+        || null;
+
+    if (existingSnapshot) {
+        return existingSnapshot;
+    }
+
+    if (snapshotHandling === 'derive_if_supported') {
+        return null;
+    }
+
+    return null;
+}
+
+function buildImportFieldMapping(sourceProfile = null) {
+    if (sourceProfile === 'jombang_mjpeg') {
+        return {
+            name: 'nama',
+            streamUrl: 'url',
+            coordinates: 'lat + lng',
+            sourceStatus: 'status',
+            sourceCategory: 'kategori',
+            location: 'nama',
+        };
+    }
+
+    return {
+        name: 'name | title | cctv_title',
+        streamUrl: 'external_stream_url | external_hls_url | url | stream | cctv_link',
+        embedUrl: 'external_embed_url | embed_url | page_url',
+        coordinates: 'latitude/longitude | lat/lng',
+        sourceStatus: 'status',
+        sourceCategory: 'kategori | category',
+        location: 'location',
+    };
+}
+
+function getImportProfileDefaults(sourceProfile = null) {
+    switch (sourceProfile) {
+        case 'jombang_mjpeg':
+            return {
+                delivery_type: 'external_mjpeg',
+                external_use_proxy: 1,
+                external_tls_mode: 'strict',
+                external_health_mode: 'passive_first',
+                external_origin_mode: 'direct',
+                enabled: 1,
+                descriptionTemplate: 'SOURCE: JOMBANG V2 | kategori: {sourceCategory} | source_status: {sourceStatus}',
+                locationMapping: 'name',
+            };
+        case 'generic_hls':
+            return {
+                delivery_type: 'external_hls',
+                external_use_proxy: 1,
+                external_tls_mode: 'strict',
+                external_health_mode: 'hybrid_probe',
+                external_origin_mode: 'direct',
+                enabled: 1,
+            };
+        case 'generic_mjpeg':
+            return {
+                delivery_type: 'external_mjpeg',
+                external_use_proxy: 1,
+                external_tls_mode: 'strict',
+                external_health_mode: 'passive_first',
+                external_origin_mode: 'direct',
+                enabled: 1,
+            };
+        case 'embed_only':
+            return {
+                delivery_type: 'external_embed',
+                external_use_proxy: 0,
+                external_tls_mode: 'strict',
+                external_health_mode: 'passive_first',
+                external_origin_mode: 'embed',
+                enabled: 1,
+            };
+        default:
+            return {};
+    }
+}
+
+function sourceFilterMatches(filterMode, sourceStatus) {
+    if (filterMode === 'online_only') {
+        return sourceStatus === 'online';
+    }
+
+    if (filterMode === 'offline_only') {
+        return sourceStatus === 'offline';
+    }
+
+    return true;
+}
+
+function buildImportWarnings(rows = [], sourceProfile = null) {
+    const warningMap = new Map();
+
+    const addWarning = (code, message) => {
+        const current = warningMap.get(code) || { code, message, count: 0 };
+        current.count += 1;
+        warningMap.set(code, current);
+    };
+
+    for (const row of rows) {
+        if (row.resolvedDeliveryType === 'external_mjpeg' && typeof row.resolvedUrl === 'string' && row.resolvedUrl.includes('token=')) {
+            addWarning('tokenized_mjpeg_url', 'Beberapa URL MJPEG menggunakan token yang bisa berubah atau kedaluwarsa.');
+        }
+        if (
+            ['external_mjpeg', 'external_embed', 'external_jsmpeg', 'external_custom_ws'].includes(row.resolvedDeliveryType)
+            && !row.resolvedSnapshotUrl
+        ) {
+            addWarning('missing_snapshot', 'Sebagian kamera external non-HLS tidak memiliki snapshot URL.');
+        }
+        if (row.reason === 'duplicate_payload_url') {
+            addWarning('duplicate_payload_url', 'Ada URL stream yang berulang di dalam payload import.');
+        }
+    }
+
+    if (sourceProfile === 'jombang_mjpeg') {
+        addWarning('jombang_tokenized_source', 'Preset Jombang v2 menggunakan MJPEG tokenized. Passive-first direkomendasikan.');
+    }
+
+    return Array.from(warningMap.values()).sort((left, right) => right.count - left.count);
 }
 
 function matchesBulkTargetFilter(camera, targetFilter) {
@@ -1640,139 +1933,440 @@ class CameraService {
         };
     }
 
-    importCamerasTransaction(cameras, targetAreaName, request) {
-        if (!cameras || !Array.isArray(cameras) || cameras.length === 0) return { imported: 0, skipped: 0, errors: [] };
+    async fetchImportSourceRows(sourceProfile) {
+        if (sourceProfile !== 'jombang_mjpeg') {
+            const err = new Error('Unsupported import source profile');
+            err.statusCode = 400;
+            throw err;
+        }
 
-        // 1. Ensure target area exists
+        const response = await axios.get('https://cctv.jombangkab.go.id/v2/', {
+            timeout: 15000,
+            responseType: 'text',
+            headers: {
+                Accept: 'text/html,application/xhtml+xml',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            },
+        });
+
+        const html = typeof response.data === 'string' ? response.data : '';
+        const match = html.match(/const\s+cctvData\s*=\s*(\[[\s\S]*?\]);/);
+        if (!match) {
+            const err = new Error('Failed to extract Jombang CCTV dataset from source page');
+            err.statusCode = 502;
+            throw err;
+        }
+
+        const sourceRows = JSON.parse(match[1]);
+        return sourceRows.map((row) => ({
+            ...row,
+            name: row.nama,
+            location: row.nama,
+            latitude: row.lat,
+            longitude: row.lng,
+            external_stream_url: row.url,
+            delivery_type: 'external_mjpeg',
+            stream_source: 'external',
+            external_use_proxy: 1,
+            external_tls_mode: 'strict',
+            external_health_mode: 'passive_first',
+            external_origin_mode: 'direct',
+            enabled: 1,
+            source_id: row.id,
+            source_category: row.kategori || null,
+            source_status: normalizeImportStatus(row.status),
+            source_site: 'https://cctv.jombangkab.go.id/v2/',
+            description: `SOURCE: JOMBANG V2 | kategori: ${row.kategori || '-'} | source_status: ${normalizeImportStatus(row.status)}`,
+        }));
+    }
+
+    async buildImportPlan(importRequest, legacyTargetArea = null) {
+        const normalizedRequest = normalizeImportRequest(importRequest, legacyTargetArea);
+        const profileDefaults = getImportProfileDefaults(normalizedRequest.sourceProfile);
+        const globalOverrides = {
+            ...profileDefaults,
+            ...(normalizedRequest.globalOverrides || {}),
+        };
+        const effectiveSourceFilter = normalizedRequest.importPolicy.dropOfflineSourceRows
+            && normalizedRequest.importPolicy.filterSourceRows === 'all'
+            ? 'online_only'
+            : normalizedRequest.importPolicy.filterSourceRows;
+
+        const sourceRows = normalizedRequest.cameras.length > 0
+            ? normalizedRequest.cameras
+            : (normalizedRequest.sourceProfile
+                ? await this.fetchImportSourceRows(normalizedRequest.sourceProfile)
+                : []);
+
+        if (!normalizedRequest.targetArea) {
+            const err = new Error('Target area is required');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        if (!sourceRows.length) {
+            const err = new Error('No camera rows are available to import');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const allCameras = query('SELECT name, private_rtsp_url, external_hls_url, external_stream_url, external_embed_url FROM cameras');
+        const seenNames = new Set(allCameras.map((camera) => normalizeLookupKey(camera.name)));
+        const seenUrls = new Set();
+        allCameras.forEach((camera) => {
+            [camera.private_rtsp_url, camera.external_hls_url, camera.external_stream_url, camera.external_embed_url]
+                .filter(Boolean)
+                .forEach((url) => seenUrls.add(normalizeLookupKey(url)));
+        });
+
+        const rows = [];
+        const importableRows = [];
+        const deliveryTypeMap = new Map();
+        const categoryMap = new Map();
+        const sourceUrlMap = new Map();
+        let onlineSourceCount = 0;
+        let offlineSourceCount = 0;
+        let missingCoordsCount = 0;
+
+        for (let index = 0; index < sourceRows.length; index += 1) {
+            const item = sourceRows[index] || {};
+            const rawName = item.name || item.title || item.cctv_title || item.nama || '';
+            const rawSourceUrl = item.external_stream_url || item.external_hls_url || item.url || item.stream || item.cctv_link || null;
+            const rawRtspUrl = item.private_rtsp_url || null;
+            const rawEmbedUrl = item.external_embed_url || item.embed_url || item.page_url || null;
+            const rawLat = item.latitude !== undefined ? item.latitude : (item.lat !== undefined ? item.lat : null);
+            const rawLng = item.longitude !== undefined ? item.longitude : (item.lng !== undefined ? item.lng : null);
+            const sourceStatus = normalizeImportStatus(item.source_status || item.status);
+            const sourceCategory = item.source_category || item.kategori || item.category || null;
+
+            if (sourceStatus === 'online') {
+                onlineSourceCount += 1;
+            } else if (sourceStatus === 'offline') {
+                offlineSourceCount += 1;
+            }
+
+            if (sourceCategory) {
+                categoryMap.set(sourceCategory, (categoryMap.get(sourceCategory) || 0) + 1);
+            }
+
+            if (rawSourceUrl) {
+                const urlKey = normalizeLookupKey(rawSourceUrl);
+                sourceUrlMap.set(urlKey, (sourceUrlMap.get(urlKey) || 0) + 1);
+            }
+
+            if (!rawLat || !rawLng) {
+                missingCoordsCount += 1;
+            }
+
+            const resolvedName = normalizeImportName(rawName, normalizedRequest.importPolicy.normalizeNames);
+            const resolvedDeliveryType = DELIVERY_TYPES.includes(globalOverrides.delivery_type)
+                ? globalOverrides.delivery_type
+                : getEffectiveDeliveryType({
+                    stream_source: item.stream_source || (rawRtspUrl ? 'internal' : 'external'),
+                    delivery_type: item.delivery_type || inferImportDeliveryType(rawSourceUrl, rawEmbedUrl, item.stream_source),
+                    private_rtsp_url: rawRtspUrl,
+                    external_hls_url: item.external_hls_url || null,
+                    external_stream_url: rawSourceUrl,
+                    external_embed_url: rawEmbedUrl,
+                });
+            const resolvedStreamSource = resolvedDeliveryType === 'internal_hls' ? 'internal' : 'external';
+            const resolvedSourceUrl = typeof rawSourceUrl === 'string' ? rawSourceUrl.trim() : null;
+            const resolvedEmbedUrl = typeof rawEmbedUrl === 'string' ? rawEmbedUrl.trim() : null;
+            const snapshotHandling = IMPORT_SNAPSHOT_HANDLING_MODES.includes(globalOverrides.external_snapshot_url_handling)
+                ? globalOverrides.external_snapshot_url_handling
+                : normalizedRequest.importPolicy.snapshotHandling;
+            const resolvedSnapshotUrl = deriveSnapshotUrl(item, snapshotHandling);
+            const locationMapping = globalOverrides.syncLocationWithName
+                ? 'name'
+                : (IMPORT_LOCATION_MAPPING_MODES.includes(globalOverrides.locationMapping)
+                    ? globalOverrides.locationMapping
+                    : normalizedRequest.importPolicy.locationMapping);
+            const resolvedLocation = locationMapping === 'area_plus_name'
+                ? `${normalizedRequest.targetArea} - ${resolvedName}`
+                : (locationMapping === 'source_field'
+                    ? (item.location || item.alamat || item.address || resolvedName)
+                    : resolvedName);
+            const resolvedDescription = applyDescriptionTemplate(
+                globalOverrides.descriptionTemplate || globalOverrides.description_template || profileDefaults.descriptionTemplate,
+                {
+                    name: resolvedName,
+                    area: normalizedRequest.targetArea,
+                    sourceCategory,
+                    sourceStatus,
+                    sourceProfile: normalizedRequest.sourceProfile || 'manual_upload',
+                    description: item.description || '',
+                }
+            ) || item.description || null;
+            const resolvedTlsMode = globalOverrides.external_tls_mode || item.external_tls_mode || profileDefaults.external_tls_mode || 'strict';
+            const resolvedHealthMode = normalizeExternalHealthMode(
+                globalOverrides.external_health_mode
+                || item.external_health_mode
+                || profileDefaults.external_health_mode
+            );
+            const resolvedOriginMode = normalizeExternalOriginMode(
+                globalOverrides.external_origin_mode
+                || item.external_origin_mode
+                || profileDefaults.external_origin_mode
+            );
+            const resolvedEnabled = globalOverrides.enabled !== undefined && globalOverrides.enabled !== null
+                ? (globalOverrides.enabled === true || globalOverrides.enabled === 1 || globalOverrides.enabled === '1' ? 1 : 0)
+                : (item.enabled === false || item.enabled === 0 ? 0 : 1);
+            const resolvedProxy = globalOverrides.external_use_proxy !== undefined && globalOverrides.external_use_proxy !== null
+                ? (globalOverrides.external_use_proxy === true || globalOverrides.external_use_proxy === 1 || globalOverrides.external_use_proxy === '1' ? 1 : 0)
+                : (item.external_use_proxy !== undefined ? (item.external_use_proxy ? 1 : 0) : (profileDefaults.external_use_proxy !== undefined ? profileDefaults.external_use_proxy : 1));
+            const resolvedRow = {
+                index,
+                sourceId: item.source_id || item.id || null,
+                sourceCategory,
+                sourceStatus,
+                sourceSite: item.source_site || null,
+                resolvedName,
+                resolvedDeliveryType,
+                resolvedUrl: resolvedDeliveryType === 'external_embed'
+                    ? resolvedEmbedUrl
+                    : (resolvedSourceUrl || rawRtspUrl || null),
+                resolvedArea: normalizedRequest.targetArea,
+                resolvedHealthMode,
+                resolvedTlsMode,
+                resolvedOriginMode,
+                resolvedSnapshotUrl,
+                resolvedLocation,
+                latitude: rawLat !== null && rawLat !== '' ? parseFloat(rawLat) : null,
+                longitude: rawLng !== null && rawLng !== '' ? parseFloat(rawLng) : null,
+                status: 'importable',
+                reason: null,
+                warnings: [],
+                importData: null,
+            };
+
+            deliveryTypeMap.set(resolvedDeliveryType, (deliveryTypeMap.get(resolvedDeliveryType) || 0) + 1);
+
+            if (!sourceFilterMatches(effectiveSourceFilter, sourceStatus)) {
+                resolvedRow.status = 'filtered_out';
+                resolvedRow.reason = 'source_filter_mismatch';
+                rows.push(resolvedRow);
+                continue;
+            }
+
+            if (!resolvedName) {
+                resolvedRow.status = 'missing_required_field';
+                resolvedRow.reason = 'missing_name';
+                rows.push(resolvedRow);
+                continue;
+            }
+
+            const duplicateNameKey = normalizeLookupKey(resolvedName);
+            if (seenNames.has(duplicateNameKey)) {
+                resolvedRow.status = 'duplicate_name';
+                resolvedRow.reason = 'duplicate_existing_or_payload_name';
+                rows.push(resolvedRow);
+                continue;
+            }
+
+            const duplicateUrlKey = normalizeLookupKey(resolvedRow.resolvedUrl);
+            if (duplicateUrlKey && seenUrls.has(duplicateUrlKey)) {
+                resolvedRow.status = 'duplicate_url';
+                resolvedRow.reason = 'duplicate_existing_or_payload_url';
+                rows.push(resolvedRow);
+                continue;
+            }
+
+            try {
+                const deliveryConfig = normalizeCameraPersistencePayload({
+                    stream_source: resolvedStreamSource,
+                    delivery_type: resolvedDeliveryType,
+                    private_rtsp_url: resolvedDeliveryType === 'internal_hls' ? rawRtspUrl : null,
+                    external_hls_url: resolvedDeliveryType === 'external_hls' ? resolvedSourceUrl : null,
+                    external_stream_url: resolvedDeliveryType === 'internal_hls' ? null : resolvedSourceUrl,
+                    external_embed_url: resolvedEmbedUrl,
+                    external_snapshot_url: resolvedSnapshotUrl,
+                    external_origin_mode: resolvedOriginMode,
+                });
+
+                resolvedRow.importData = {
+                    name: resolvedName,
+                    private_rtsp_url: resolvedDeliveryType === 'internal_hls' ? (rawRtspUrl || '') : '',
+                    description: resolvedDescription,
+                    location: resolvedLocation,
+                    enabled: resolvedEnabled,
+                    latitude: resolvedRow.latitude,
+                    longitude: resolvedRow.longitude,
+                    enable_recording: deliveryConfig.deliveryType === 'internal_hls' && (item.enable_recording === true || item.enable_recording === 1) ? 1 : 0,
+                    stream_source: deliveryConfig.compatStreamSource,
+                    delivery_type: deliveryConfig.deliveryType,
+                    external_hls_url: deliveryConfig.externalHlsUrl,
+                    external_stream_url: deliveryConfig.externalStreamUrl,
+                    external_embed_url: deliveryConfig.externalEmbedUrl,
+                    external_snapshot_url: deliveryConfig.externalSnapshotUrl,
+                    external_origin_mode: deliveryConfig.externalOriginMode,
+                    external_use_proxy: resolvedProxy,
+                    external_tls_mode: resolvedTlsMode === 'insecure' ? 'insecure' : 'strict',
+                    external_health_mode: deliveryConfig.deliveryType === 'internal_hls' ? 'default' : resolvedHealthMode,
+                };
+                importableRows.push(resolvedRow);
+                seenNames.add(duplicateNameKey);
+                if (duplicateUrlKey) {
+                    seenUrls.add(duplicateUrlKey);
+                }
+            } catch (error) {
+                resolvedRow.status = resolvedName ? 'invalid_source' : 'missing_required_field';
+                resolvedRow.reason = error.message;
+                resolvedRow.importData = null;
+            }
+
+            rows.push(resolvedRow);
+        }
+
+        const summary = {
+            totalRows: rows.length,
+            importableCount: rows.filter((row) => row.status === 'importable').length,
+            duplicateCount: rows.filter((row) => row.status === 'duplicate_name' || row.status === 'duplicate_url').length,
+            invalidCount: rows.filter((row) => row.status === 'invalid_source' || row.status === 'missing_required_field').length,
+            filteredOutCount: rows.filter((row) => row.status === 'filtered_out').length,
+            onlineSourceCount,
+            offlineSourceCount,
+            deliveryTypeBreakdown: Array.from(deliveryTypeMap.entries()).map(([deliveryType, count]) => ({
+                deliveryType,
+                count,
+            })).sort((left, right) => right.count - left.count),
+        };
+
+        return {
+            targetArea: normalizedRequest.targetArea,
+            sourceProfile: normalizedRequest.sourceProfile,
+            sourceFieldMapping: buildImportFieldMapping(normalizedRequest.sourceProfile),
+            sourceStats: {
+                totalRows: sourceRows.length,
+                onlineCount: onlineSourceCount,
+                offlineCount: offlineSourceCount,
+                unknownCount: sourceRows.length - onlineSourceCount - offlineSourceCount,
+                missingCoordsCount,
+                duplicateUrlCount: Array.from(sourceUrlMap.values()).filter((count) => count > 1).length,
+                categoryBreakdown: Array.from(categoryMap.entries()).map(([category, count]) => ({ category, count })),
+            },
+            summary,
+            rows: rows.map((row) => ({
+                index: row.index,
+                sourceId: row.sourceId,
+                sourceCategory: row.sourceCategory,
+                sourceStatus: row.sourceStatus,
+                resolvedName: row.resolvedName,
+                resolvedDeliveryType: row.resolvedDeliveryType,
+                resolvedUrl: row.resolvedUrl,
+                resolvedArea: row.resolvedArea,
+                resolvedHealthMode: row.resolvedHealthMode,
+                resolvedTlsMode: row.resolvedTlsMode,
+                resolvedOriginMode: row.resolvedOriginMode,
+                resolvedSnapshotUrl: row.resolvedSnapshotUrl,
+                resolvedLocation: row.resolvedLocation,
+                latitude: row.latitude,
+                longitude: row.longitude,
+                status: row.status,
+                reason: row.reason,
+            })),
+            warnings: buildImportWarnings(rows, normalizedRequest.sourceProfile),
+            canImport: importableRows.length > 0,
+            importableRows,
+        };
+    }
+
+    async previewImportCameras(importRequest, legacyTargetArea = null) {
+        const plan = await this.buildImportPlan(importRequest, legacyTargetArea);
+        return {
+            targetArea: plan.targetArea,
+            sourceProfile: plan.sourceProfile,
+            fieldMapping: plan.sourceFieldMapping,
+            sourceStats: plan.sourceStats,
+            summary: plan.summary,
+            rows: plan.rows,
+            warnings: plan.warnings,
+            canImport: plan.canImport,
+        };
+    }
+
+    async importCamerasTransaction(importRequest, targetAreaName, request) {
+        const plan = await this.buildImportPlan(importRequest, targetAreaName);
+        if (!plan.importableRows.length) {
+            const err = new Error('No importable cameras were found in the preview');
+            err.statusCode = 400;
+            throw err;
+        }
+
         let areaId = null;
-        const existingArea = queryOne('SELECT id FROM areas WHERE name = ? COLLATE NOCASE', [targetAreaName]);
+        const existingArea = queryOne('SELECT id FROM areas WHERE name = ? COLLATE NOCASE', [plan.targetArea]);
         if (existingArea) {
             areaId = existingArea.id;
         } else {
-            const insertArea = execute('INSERT INTO areas (name, description) VALUES (?, ?)', [targetAreaName, 'Auto-created during bulk import']);
+            const insertArea = execute('INSERT INTO areas (name, description) VALUES (?, ?)', [plan.targetArea, 'Auto-created during bulk import']);
             areaId = insertArea.lastInsertRowid;
         }
 
-        // 2. Fetch existing cameras for duplicate checking (O(1) lookups)
-        const allCameras = query('SELECT name, private_rtsp_url, external_hls_url, external_stream_url, external_embed_url FROM cameras');
-        const existingNames = new Set(allCameras.map(c => c.name ? c.name.toLowerCase() : ''));
-        const existingUrls = new Set();
-        allCameras.forEach(c => {
-            if (c.private_rtsp_url) existingUrls.add(c.private_rtsp_url.toLowerCase());
-            if (c.external_hls_url) existingUrls.add(c.external_hls_url.toLowerCase());
-            if (c.external_stream_url) existingUrls.add(c.external_stream_url.toLowerCase());
-            if (c.external_embed_url) existingUrls.add(c.external_embed_url.toLowerCase());
-        });
-
-        // 3. Define the bulk insert operation via transaction
-        const performImport = transaction((cameraList) => {
+        const performImport = transaction((rowsToImport) => {
             let importedCount = 0;
-            let skippedCount = 0;
-            const errors = [];
 
-            for (const cam of cameraList) {
-                const rawName = cam.name || cam.title || cam.cctv_title || '';
-                const rawSourceUrl = cam.external_stream_url || cam.external_hls_url || cam.url || cam.stream || cam.cctv_link || null;
-                const rawRtspUrl = cam.private_rtsp_url || null;
-                const rawEmbedUrl = cam.external_embed_url || cam.embed_url || cam.page_url || null;
-                const rawSnapshotUrl = cam.external_snapshot_url || cam.thumbnail_url || cam.snapshot_url || null;
-                const rawLat = cam.latitude !== undefined ? cam.latitude : (cam.lat !== undefined ? cam.lat : null);
-                const rawLng = cam.longitude !== undefined ? cam.longitude : (cam.lng !== undefined ? cam.lng : null);
-
-                const name = rawName ? String(rawName).trim() : '';
-                const sourceUrl = rawSourceUrl ? String(rawSourceUrl).trim() : null;
-                const rtspUrl = rawRtspUrl ? String(rawRtspUrl).trim() : null;
-                const embedUrl = rawEmbedUrl ? String(rawEmbedUrl).trim() : null;
-                const snapshotUrl = rawSnapshotUrl ? String(rawSnapshotUrl).trim() : null;
-                const inferredDeliveryType = getEffectiveDeliveryType({
-                    stream_source: cam.stream_source || (rtspUrl ? 'internal' : 'external'),
-                    delivery_type: cam.delivery_type,
-                    external_hls_url: cam.external_hls_url || null,
-                    external_stream_url: sourceUrl,
-                    external_embed_url: embedUrl,
-                });
-                
-                // Duplicate Validation
-                if (!name) {
-                    errors.push(`Skipped: Missing name`);
-                    skippedCount++;
-                    continue;
-                }
-                
-                if (existingNames.has(name.toLowerCase())) {
-                    errors.push(`Skipped '${name}': Name already exists in database`);
-                    skippedCount++;
-                    continue;
-                }
-
-                const urlToCheck = sourceUrl || embedUrl || rtspUrl;
-                if (urlToCheck && existingUrls.has(urlToCheck.toLowerCase())) {
-                    errors.push(`Skipped '${name}': Stream URL is already used by another camera`);
-                    skippedCount++;
-                    continue;
-                }
-
-                const importDeliveryConfig = normalizeCameraPersistencePayload({
-                    delivery_type: inferredDeliveryType,
-                    stream_source: cam.stream_source,
-                    private_rtsp_url: rtspUrl,
-                    external_hls_url: inferredDeliveryType === 'external_hls' ? sourceUrl : null,
-                    external_stream_url: sourceUrl,
-                    external_embed_url: embedUrl,
-                    external_snapshot_url: snapshotUrl,
-                    external_origin_mode: cam.external_origin_mode,
-                });
+            for (const row of rowsToImport) {
+                const importData = row.importData;
                 const streamKey = uuidv4();
                 execute(
                     'INSERT INTO cameras (name, private_rtsp_url, description, location, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, stream_source, delivery_type, external_hls_url, external_stream_url, external_embed_url, external_snapshot_url, external_origin_mode, external_use_proxy, external_tls_mode, external_health_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                     [
-                        name,
-                        rtspUrl || '',
-                        cam.description || null,
-                        cam.location || null,
+                        importData.name,
+                        importData.private_rtsp_url || '',
+                        importData.description || null,
+                        importData.location || null,
                         areaId,
-                        cam.enabled === false || cam.enabled === 0 ? 0 : 1,
-                        0, // is_tunnel
-                        rawLat !== null ? parseFloat(rawLat) : null,
-                        rawLng !== null ? parseFloat(rawLng) : null,
+                        importData.enabled === 0 ? 0 : 1,
+                        0,
+                        importData.latitude,
+                        importData.longitude,
                         'active',
                         streamKey,
-                        importDeliveryConfig.deliveryType === 'internal_hls' && (cam.enable_recording === true || cam.enable_recording === 1) ? 1 : 0,
-                        importDeliveryConfig.compatStreamSource,
-                        importDeliveryConfig.deliveryType,
-                        importDeliveryConfig.externalHlsUrl,
-                        importDeliveryConfig.externalStreamUrl,
-                        importDeliveryConfig.externalEmbedUrl,
-                        importDeliveryConfig.externalSnapshotUrl,
-                        importDeliveryConfig.externalOriginMode,
-                        cam.external_use_proxy !== undefined ? cam.external_use_proxy : 1, // dynamically read from frontend overlay
-                        cam.external_tls_mode || 'strict', // external_tls_mode
-                        normalizeExternalHealthMode(cam.external_health_mode)
+                        importData.enable_recording === 1 ? 1 : 0,
+                        importData.stream_source,
+                        importData.delivery_type,
+                        importData.external_hls_url,
+                        importData.external_stream_url,
+                        importData.external_embed_url,
+                        importData.external_snapshot_url,
+                        importData.external_origin_mode,
+                        importData.external_use_proxy === 0 ? 0 : 1,
+                        importData.external_tls_mode === 'insecure' ? 'insecure' : 'strict',
+                        normalizeExternalHealthMode(importData.external_health_mode),
                     ]
                 );
-                
-                // Prevent duplicates within the import payload itself
-                existingNames.add(name.toLowerCase());
-                if (urlToCheck) existingUrls.add(urlToCheck.toLowerCase());
-                importedCount++;
+                importedCount += 1;
             }
 
-            return { imported: importedCount, skipped: skippedCount, errors };
+            return importedCount;
         });
 
-        // Execute transaction
-        const result = performImport(cameras);
+        const imported = performImport(plan.importableRows);
+        const skipped = plan.summary.totalRows - imported;
+        const errors = plan.rows
+            .filter((row) => row.status !== 'importable')
+            .map((row) => `Skipped '${row.resolvedName || `row ${row.index + 1}`}': ${row.reason || row.status}`);
 
-        // Audit Log and Cache Invalidations (outside transaction)
-        if (result.imported > 0) {
+        if (imported > 0) {
             execute(
                 'INSERT INTO audit_logs (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)',
-                [request.user.id, 'IMPORT_CAMERAS', `Bulk imported ${result.imported} cameras to area: ${targetAreaName}`, request.ip || 'Unknown']
+                [
+                    request.user.id,
+                    'IMPORT_CAMERAS',
+                    `Imported ${imported} cameras to area ${plan.targetArea}${plan.sourceProfile ? ` via source profile ${plan.sourceProfile}` : ''}`,
+                    request.ip || 'Unknown',
+                ]
             );
             this.invalidateCameraCache();
         }
 
-        return result;
+        return {
+            imported,
+            skipped,
+            errors,
+            summary: plan.summary,
+            warnings: plan.warnings,
+            sourceStats: plan.sourceStats,
+        };
     }
 }
 
