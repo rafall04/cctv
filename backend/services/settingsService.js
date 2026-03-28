@@ -140,6 +140,26 @@ const ADS_DEFAULTS = {
     },
 };
 
+const PLAYBACK_SETTINGS_KEYS = [
+    'public_playback_enabled',
+    'public_playback_preview_minutes',
+    'public_playback_notice_enabled',
+    'public_playback_notice_title',
+    'public_playback_notice_text',
+    'public_playback_contact_mode',
+];
+
+const PLAYBACK_SETTINGS_DEFAULTS = {
+    publicPlaybackEnabled: true,
+    previewMinutes: 10,
+    notice: {
+        enabled: true,
+        title: 'Akses Playback Publik Terbatas',
+        text: 'Playback publik dibatasi untuk menjaga privasi. Untuk akses lebih lanjut silakan hubungi admin.',
+    },
+    contactMode: 'branding_whatsapp',
+};
+
 function parseBoolean(value, fallback = false) {
     if (typeof value === 'boolean') {
         return value;
@@ -187,6 +207,15 @@ function hasScriptValue(value) {
 function parsePositiveInt(value, fallback) {
     const parsed = Number.parseInt(value, 10);
     if (Number.isFinite(parsed) && parsed > 0) {
+        return parsed;
+    }
+
+    return fallback;
+}
+
+function parsePlaybackPreviewMinutes(value, fallback = PLAYBACK_SETTINGS_DEFAULTS.previewMinutes) {
+    const parsed = Number.parseInt(value, 10);
+    if ([0, 10, 20, 30, 60].includes(parsed)) {
         return parsed;
     }
 
@@ -528,6 +557,46 @@ class SettingsService {
                 delete slot.script;
             });
         }
+
+        return result;
+    }
+
+    getPublicPlaybackSettings() {
+        const placeholders = PLAYBACK_SETTINGS_KEYS.map(() => '?').join(', ');
+        const settings = query(
+            `SELECT key, value FROM settings WHERE key IN (${placeholders})`,
+            PLAYBACK_SETTINGS_KEYS
+        );
+
+        const result = {
+            ...PLAYBACK_SETTINGS_DEFAULTS,
+            notice: { ...PLAYBACK_SETTINGS_DEFAULTS.notice },
+        };
+
+        settings.forEach((setting) => {
+            switch (setting.key) {
+                case 'public_playback_enabled':
+                    result.publicPlaybackEnabled = parseBoolean(setting.value, true);
+                    break;
+                case 'public_playback_preview_minutes':
+                    result.previewMinutes = parsePlaybackPreviewMinutes(setting.value);
+                    break;
+                case 'public_playback_notice_enabled':
+                    result.notice.enabled = parseBoolean(setting.value, true);
+                    break;
+                case 'public_playback_notice_title':
+                    result.notice.title = setting.value || PLAYBACK_SETTINGS_DEFAULTS.notice.title;
+                    break;
+                case 'public_playback_notice_text':
+                    result.notice.text = setting.value || PLAYBACK_SETTINGS_DEFAULTS.notice.text;
+                    break;
+                case 'public_playback_contact_mode':
+                    result.contactMode = setting.value || PLAYBACK_SETTINGS_DEFAULTS.contactMode;
+                    break;
+                default:
+                    break;
+            }
+        });
 
         return result;
     }

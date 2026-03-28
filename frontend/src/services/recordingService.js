@@ -14,6 +14,10 @@ const getApiBaseUrl = () => {
     return getApiUrl();
 };
 
+const buildPlaybackQuery = (accessScope = 'public') => {
+    return accessScope === 'admin_full' ? '?scope=admin' : '';
+};
+
 // ============================================
 // ADMIN - Recording Control
 // ============================================
@@ -78,9 +82,9 @@ export const getRestartLogs = async (cameraId = null, limit = 50, policy = REQUE
 /**
  * Get segments untuk camera (untuk playback)
  */
-export const getSegments = async (cameraId, policy = REQUEST_POLICY.BLOCKING, config = {}) => {
+export const getSegments = async (cameraId, policy = REQUEST_POLICY.BLOCKING, config = {}, accessScope = 'public') => {
     const response = await apiClient.get(
-        `/api/recordings/${cameraId}/segments`,
+        `/api/recordings/${cameraId}/segments${buildPlaybackQuery(accessScope)}`,
         getRequestPolicyConfig(policy, config)
     );
     return response.data;
@@ -89,17 +93,17 @@ export const getSegments = async (cameraId, policy = REQUEST_POLICY.BLOCKING, co
 /**
  * Get stream URL untuk segment
  */
-export const getSegmentStreamUrl = (cameraId, filename) => {
+export const getSegmentStreamUrl = (cameraId, filename, accessScope = 'public') => {
     const baseUrl = getApiBaseUrl();
-    return `${baseUrl}/api/recordings/${cameraId}/stream/${filename}`;
+    return `${baseUrl}/api/recordings/${cameraId}/stream/${filename}${buildPlaybackQuery(accessScope)}`;
 };
 
 /**
  * Get HLS playlist URL untuk seamless playback
  */
-export const getPlaylistUrl = (cameraId) => {
+export const getPlaylistUrl = (cameraId, accessScope = 'public') => {
     const baseUrl = getApiBaseUrl();
-    return `${baseUrl}/api/recordings/${cameraId}/playlist.m3u8`;
+    return `${baseUrl}/api/recordings/${cameraId}/playlist.m3u8${buildPlaybackQuery(accessScope)}`;
 };
 
 export default {

@@ -65,11 +65,17 @@ export async function getRecordingsOverview(request, reply) {
 export async function getSegments(request, reply) {
     try {
         const { cameraId } = request.params;
-        const segmentsData = recordingPlaybackService.getSegments(cameraId);
+        const segmentsData = recordingPlaybackService.getSegments(cameraId, request);
 
         return reply.send({ success: true, data: segmentsData });
     } catch (error) {
         console.error('Get segments error:', error);
+        if (error.statusCode === 401) {
+            return reply.code(401).send({ success: false, message: error.message });
+        }
+        if (error.statusCode === 403) {
+            return reply.code(403).send({ success: false, message: error.message });
+        }
         if (error.statusCode === 404) {
             return reply.code(404).send({ success: false, message: error.message });
         }
@@ -83,13 +89,7 @@ export async function streamSegment(request, reply) {
         const { cameraId, filename } = request.params;
         console.log(`[Stream Request] Camera: ${cameraId}, File: ${filename}`);
 
-        const { segment, stats } = recordingPlaybackService.getStreamSegment(cameraId, filename);
-
-        // Set CORS headers explicitly
-        reply.header('Access-Control-Allow-Origin', '*');
-        reply.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-        reply.header('Access-Control-Allow-Headers', 'Range');
-        reply.header('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
+        const { segment, stats } = recordingPlaybackService.getStreamSegment(cameraId, filename, request);
 
         // Set headers for video streaming
         reply.header('Content-Type', 'video/mp4');
@@ -122,6 +122,12 @@ export async function streamSegment(request, reply) {
 
     } catch (error) {
         console.error('[Stream Error] Exception:', error);
+        if (error.statusCode === 401) {
+            return reply.code(401).send({ success: false, message: error.message });
+        }
+        if (error.statusCode === 403) {
+            return reply.code(403).send({ success: false, message: error.message });
+        }
         if (error.statusCode === 404) {
             return reply.code(404).send({ success: false, message: error.message });
         }
@@ -137,12 +143,18 @@ export async function streamSegment(request, reply) {
 export async function generatePlaylist(request, reply) {
     try {
         const { cameraId } = request.params;
-        const playlist = recordingPlaybackService.generatePlaylist(cameraId);
+        const playlist = recordingPlaybackService.generatePlaylist(cameraId, request);
 
         reply.header('Content-Type', 'application/vnd.apple.mpegurl');
         return reply.send(playlist);
     } catch (error) {
         console.error('Generate playlist error:', error);
+        if (error.statusCode === 401) {
+            return reply.code(401).send({ success: false, message: error.message });
+        }
+        if (error.statusCode === 403) {
+            return reply.code(403).send({ success: false, message: error.message });
+        }
         if (error.statusCode === 404) {
             return reply.code(404).send({ success: false, message: error.message });
         }

@@ -56,12 +56,20 @@ function App() {
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/playback" element={
                     <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
-                        <Playback />
+                        <Playback accessScope="public_preview" />
                     </Suspense>
                 } />
                 <Route path="/admin/login" element={<LoginPage />} />
 
                 {/* Protected admin routes */}
+                <Route
+                    path="/admin/playback"
+                    element={
+                        <AdminPageRoute>
+                            <Playback accessScope="admin_full" />
+                        </AdminPageRoute>
+                    }
+                />
                 <Route
                     path="/admin/dashboard"
                     element={

@@ -8,6 +8,7 @@ const stopRecordingMock = vi.fn();
 const getRecordingStatusMock = vi.fn();
 const getStorageUsageMock = vi.fn();
 const logAdminActionMock = vi.fn();
+const getPublicPlaybackSettingsMock = vi.fn();
 
 vi.mock('../database/database.js', () => ({
     query: queryMock,
@@ -28,11 +29,27 @@ vi.mock('../services/securityAuditLogger.js', () => ({
     logAdminAction: logAdminActionMock,
 }));
 
+vi.mock('../services/settingsService.js', () => ({
+    default: {
+        getPublicPlaybackSettings: getPublicPlaybackSettingsMock,
+    },
+}));
+
 const { default: recordingPlaybackService } = await import('../services/recordingPlaybackService.js');
 
 describe('recordingPlaybackService', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        getPublicPlaybackSettingsMock.mockReturnValue({
+            publicPlaybackEnabled: true,
+            previewMinutes: 10,
+            notice: {
+                enabled: true,
+                title: 'Notice',
+                text: 'Playback publik dibatasi',
+            },
+            contactMode: 'branding_whatsapp',
+        });
     });
 
     it('returns enriched overview camera fields for recording dashboard', () => {
@@ -90,5 +107,61 @@ describe('recordingPlaybackService', () => {
         expect(startRecordingMock).toHaveBeenCalledWith(7);
         expect(stopRecordingMock).not.toHaveBeenCalled();
         expect(logAdminActionMock).toHaveBeenCalled();
+    });
+
+    it('returns only preview segments for public playback', () => {
+        queryOneMock
+            .mockReturnValueOnce({
+                id: 9,
+                name: 'CCTV TAMAN',
+                public_playback_mode: 'inherit',
+                public_playback_preview_minutes: null,
+            })
+            .mockReturnValueOnce({ value: '628111111111' });
+        queryMock.mockReturnValueOnce([
+            { id: 1, filename: 'first.mp4', start_time: '2026-03-20T10:00:00.000Z', end_time: '2026-03-20T10:10:00.000Z', duration: 600, file_path: 'a', file_size: 100, created_at: '2026-03-20T10:00:00.000Z' },
+            { id: 2, filename: 'second.mp4', start_time: '2026-03-20T10:10:00.000Z', end_time: '2026-03-20T10:20:00.000Z', duration: 600, file_path: 'b', file_size: 100, created_at: '2026-03-20T10:10:00.000Z' },
+        ]);
+
+        const result = recordingPlaybackService.getSegments(9, { query: {} });
+
+        expect(result.playback_policy).toEqual(expect.objectContaining({
+            accessMode: 'public_preview',
+            previewMinutes: 10,
+        }));
+        expect(result.segments).toHaveLength(1);
+        expect(result.segments[0].filename).toBe('first.mp4');
+    });
+
+    it('allows admin full playback when admin scope is requested by authenticated user', () => {
+        queryOneMock.mockReturnValueOnce({
+            id: 10,
+            name: 'CCTV ALUN',
+            public_playback_mode: 'admin_only',
+            public_playback_preview_minutes: null,
+        });
+        queryMock.mockReturnValueOnce([
+            { id: 1, filename: 'first.mp4', start_time: '2026-03-20T10:00:00.000Z', end_time: '2026-03-20T10:10:00.000Z', duration: 600, file_path: 'a', file_size: 100, created_at: '2026-03-20T10:00:00.000Z' },
+            { id: 2, filename: 'second.mp4', start_time: '2026-03-20T10:10:00.000Z', end_time: '2026-03-20T10:20:00.000Z', duration: 600, file_path: 'b', file_size: 100, created_at: '2026-03-20T10:10:00.000Z' },
+        ]);
+
+        const result = recordingPlaybackService.getSegments(10, {
+            query: { scope: 'admin' },
+            user: { id: 1 },
+        });
+
+        expect(result.playback_policy.accessMode).toBe('admin_full');
+        expect(result.segments).toHaveLength(2);
+    });
+
+    it('blocks public playback for admin-only cameras', () => {
+        queryOneMock.mockReturnValueOnce({
+            id: 11,
+            name: 'CCTV PRIVAT',
+            public_playback_mode: 'admin_only',
+            public_playback_preview_minutes: null,
+        });
+
+        expect(() => recordingPlaybackService.getSegments(11, { query: {} })).toThrow('Playback publik tidak tersedia untuk kamera ini');
     });
 });

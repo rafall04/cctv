@@ -25,6 +25,8 @@ export const defaultCameraFormValues = {
     external_use_proxy: true,
     external_tls_mode: 'strict',
     external_health_mode: 'default',
+    public_playback_mode: 'inherit',
+    public_playback_preview_minutes: '',
 };
 
 export const recordingDurationOptions = [
@@ -173,6 +175,8 @@ export function mapCameraToFormValues(camera) {
         external_use_proxy: camera.external_use_proxy !== false && camera.external_use_proxy !== 0,
         external_tls_mode: camera.external_tls_mode || 'strict',
         external_health_mode: camera.external_health_mode || 'default',
+        public_playback_mode: camera.public_playback_mode || 'inherit',
+        public_playback_preview_minutes: camera.public_playback_preview_minutes ?? '',
     };
 }
 
@@ -208,5 +212,9 @@ export function buildCameraPayload(formData) {
         external_health_mode: compatStreamSource === 'external'
             ? (formData.external_health_mode || 'default')
             : 'default',
+        public_playback_mode: formData.public_playback_mode || 'inherit',
+        public_playback_preview_minutes: formData.public_playback_preview_minutes === '' || formData.public_playback_preview_minutes === null || formData.public_playback_preview_minutes === undefined
+            ? null
+            : parseInt(formData.public_playback_preview_minutes, 10),
     };
 }

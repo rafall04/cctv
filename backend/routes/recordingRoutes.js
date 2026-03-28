@@ -9,7 +9,7 @@ import {
     getRestartLogs,
     updateRecordingSettings
 } from '../controllers/recordingController.js';
-import { authMiddleware } from '../middleware/authMiddleware.js';
+import { authMiddleware, optionalAuthMiddleware } from '../middleware/authMiddleware.js';
 
 /**
  * Recording Routes
@@ -63,11 +63,17 @@ export default async function recordingRoutes(fastify) {
     // ============================================
 
     // Get segments untuk camera (untuk playback UI)
-    fastify.get('/recordings/:cameraId/segments', getSegments);
+    fastify.get('/recordings/:cameraId/segments', {
+        onRequest: [optionalAuthMiddleware]
+    }, getSegments);
 
     // Stream segment file
-    fastify.get('/recordings/:cameraId/stream/:filename', streamSegment);
+    fastify.get('/recordings/:cameraId/stream/:filename', {
+        onRequest: [optionalAuthMiddleware]
+    }, streamSegment);
 
     // Generate HLS playlist
-    fastify.get('/recordings/:cameraId/playlist.m3u8', generatePlaylist);
+    fastify.get('/recordings/:cameraId/playlist.m3u8', {
+        onRequest: [optionalAuthMiddleware]
+    }, generatePlaylist);
 }

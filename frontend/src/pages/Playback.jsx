@@ -31,10 +31,28 @@ function getSegmentKey(segment) {
     return `${segment.filename || 'no-file'}:${segment.start_time || 'no-start'}`;
 }
 
-function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, adsConfig = null }) {
+const DEFAULT_PUBLIC_PLAYBACK_POLICY = {
+    accessMode: 'public_preview',
+    isPublicPreview: true,
+    previewMinutes: 10,
+    notice: {
+        enabled: true,
+        title: 'Akses Playback Publik Terbatas',
+        text: 'Playback publik dibatasi untuk menjaga privasi. Untuk akses lebih lanjut silakan hubungi admin.',
+    },
+    contact: null,
+};
+
+function Playback({
+    cameras: propCameras,
+    selectedCamera: propSelectedCamera,
+    adsConfig = null,
+    accessScope = 'public_preview',
+}) {
     const [searchParams, setSearchParams] = useSearchParams();
     const cameraIdFromUrl = searchParams.get('cam');
     const { branding } = useBranding();
+    const isAdminPlayback = accessScope === 'admin_full';
 
     const [cameras, setCameras] = useState(propCameras || []);
     const supportedInitialCameras = (propCameras || []).filter((camera) => getStreamCapabilities(camera).playback);
@@ -68,6 +86,12 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
         const saved = localStorage.getItem('playback-autoplay-enabled');
         return saved !== null ? saved === 'true' : true;
     });
+    const [playbackPolicy, setPlaybackPolicy] = useState(() => (
+        isAdminPlayback
+            ? { accessMode: 'admin_full', isPublicPreview: false, previewMinutes: null, notice: null, contact: null }
+            : DEFAULT_PUBLIC_PLAYBACK_POLICY
+    ));
+    const [playbackDeniedMessage, setPlaybackDeniedMessage] = useState('');
 
     const videoRef = useRef(null);
     const containerRef = useRef(null);
@@ -292,7 +316,9 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
 
         const fetchCameras = async () => {
             try {
-                const response = await cameraService.getActiveCameras(REQUEST_POLICY.BLOCKING);
+                const response = isAdminPlayback
+                    ? await cameraService.getAllCameras(REQUEST_POLICY.BLOCKING)
+                    : await cameraService.getActiveCameras(REQUEST_POLICY.BLOCKING);
                 if (response.success) {
                     const recordingCameras = response.data.filter(cam => cam.enable_recording);
                     const uniqueCameras = recordingCameras.filter((cam, index, self) =>
@@ -327,7 +353,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
         return () => {
             isMounted = false;
         };
-    }, [cameraIdFromUrl, propCameras, propSelectedCamera]);
+    }, [cameraIdFromUrl, isAdminPlayback, propCameras, propSelectedCamera]);
 
     // URL camera change effect
     useEffect(() => {
@@ -433,7 +459,9 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
         try {
             const response = await recordingService.getSegments(
                 cameraId,
-                isBackgroundMode ? REQUEST_POLICY.BACKGROUND : REQUEST_POLICY.BLOCKING
+                isBackgroundMode ? REQUEST_POLICY.BACKGROUND : REQUEST_POLICY.BLOCKING,
+                {},
+                accessScope
             );
 
             if (requestId !== segmentsRequestIdRef.current) {
@@ -442,6 +470,13 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
 
             if (response.success && response.data) {
                 const segmentsArray = response.data.segments || [];
+                setPlaybackPolicy(
+                    response.data.playback_policy
+                    || (isAdminPlayback
+                        ? { accessMode: 'admin_full', isPublicPreview: false, previewMinutes: null, notice: null, contact: null }
+                        : DEFAULT_PUBLIC_PLAYBACK_POLICY)
+                );
+                setPlaybackDeniedMessage('');
                 setSegments(segmentsArray);
                 setSegmentsCameraId(cameraId);
 
@@ -462,12 +497,13 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
 
             console.error('Failed to fetch segments:', error);
             if (!isBackgroundMode) {
+                setPlaybackDeniedMessage(error?.response?.data?.message || '');
                 setSegments([]);
                 setSegmentsCameraId(null);
                 setSelectedSegment(null);
             }
         }
-    }, [resetPlaybackSession]);
+    }, [accessScope, isAdminPlayback, resetPlaybackSession]);
 
     // Fetch segments effect
     useEffect(() => {
@@ -499,7 +535,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
             return;
         }
 
-        const nextStreamUrl = recordingService.getSegmentStreamUrl(selectedCameraId, selectedSegment.filename);
+        const nextStreamUrl = recordingService.getSegmentStreamUrl(selectedCameraId, selectedSegment.filename, accessScope);
         if (
             playbackSourceRef.current.segmentKey === selectedSegmentKey
             && playbackSourceRef.current.streamUrl === nextStreamUrl
@@ -616,7 +652,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
                 resetVideoElement();
             }
         };
-    }, [clearBufferingState, loading, resetSourcePlaybackState, resetVideoElement, selectedCameraId, selectedSegment, selectedSegmentKey]);
+    }, [accessScope, clearBufferingState, loading, resetSourcePlaybackState, resetVideoElement, selectedCameraId, selectedSegment, selectedSegmentKey]);
 
     useEffect(() => {
         const video = videoRef.current;
@@ -1026,6 +1062,10 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
 
     // Handle share playback link - use timestamp instead of segment ID
     const handleShare = useCallback(async () => {
+        if (isAdminPlayback) {
+            return;
+        }
+
         let preciseTimestamp = null;
         if (selectedSegment?.start_time) {
             const baseTimeMs = new Date(selectedSegment.start_time).getTime();
@@ -1069,7 +1109,7 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
                 setTimeout(() => setSnapshotNotification(null), 3000);
             }
         }
-    }, [searchParams, selectedCamera, selectedSegment]);
+    }, [isAdminPlayback, searchParams, selectedCamera, selectedSegment]);
 
 
 
@@ -1105,6 +1145,34 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
         );
     }
 
+    if (!isAdminPlayback && playbackDeniedMessage) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-950">
+                <div className="text-center max-w-xl mx-auto px-4">
+                    <svg className="w-20 h-20 mx-auto mb-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M5.071 19h13.858c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                        Playback Publik Tidak Tersedia
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-400 mb-4">
+                        {playbackDeniedMessage}
+                    </p>
+                    {branding?.whatsapp_number && (
+                        <a
+                            href={`https://wa.me/${branding.whatsapp_number}?text=${encodeURIComponent('Halo Admin, saya ingin informasi lebih lanjut tentang akses playback CCTV.')}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-600"
+                        >
+                            Hubungi Admin
+                        </a>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
     return (
         <>
             {showPlaybackPopunder && playbackPopunderTriggerId > 0 && (
@@ -1122,7 +1190,9 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
                     onCameraChange={handleCameraChange}
                     autoPlayEnabled={autoPlayEnabled}
                     onAutoPlayToggle={handleAutoPlayToggle}
-                    onShare={handleShare}
+                    onShare={isAdminPlayback ? null : handleShare}
+                    playbackPolicy={playbackPolicy}
+                    showPublicNotice={!isAdminPlayback}
                 />
 
                 <PlaybackVideo
@@ -1158,18 +1228,20 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
                     />
                 )}
 
-                <div className="flex justify-center">
-                    <button
-                        onClick={handleShare}
-                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                        title="Bagikan tautan playback ini"
-                    >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                        </svg>
-                        Bagikan Link Playback
-                    </button>
-                </div>
+                {!isAdminPlayback && (
+                    <div className="flex justify-center">
+                        <button
+                            onClick={handleShare}
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                            title="Bagikan tautan playback ini"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                            </svg>
+                            Bagikan Link Playback
+                        </button>
+                    </div>
+                )}
 
                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg sm:rounded-xl p-4 sm:p-5 border border-blue-200 dark:border-blue-800">
                     <div className="flex items-start gap-3">
@@ -1183,6 +1255,9 @@ function Playback({ cameras: propCameras, selectedCamera: propSelectedCamera, ad
                                 <li className="flex items-start gap-2"><span className="flex-shrink-0 mt-0.5">•</span><span><strong>Timeline:</strong> Klik pada timeline untuk melompat ke waktu tertentu</span></li>
                                 <li className="flex items-start gap-2"><span className="flex-shrink-0 mt-0.5">•</span><span><strong>Kecepatan:</strong> Klik tombol di pojok kanan atas video (0.5x - 2x)</span></li>
                                 <li className="flex items-start gap-2"><span className="flex-shrink-0 mt-0.5">•</span><span><strong>Segment:</strong> Pilih segment di bawah untuk melihat recording waktu berbeda</span></li>
+                                {!isAdminPlayback && typeof playbackPolicy?.previewMinutes === 'number' && (
+                                    <li className="flex items-start gap-2"><span className="flex-shrink-0 mt-0.5">-</span><span><strong>Preview Publik:</strong> Hanya {playbackPolicy.previewMinutes} menit awal yang tersedia demi privasi</span></li>
+                                )}
                             </ul>
                         </div>
                     </div>

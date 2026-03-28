@@ -95,6 +95,38 @@ const IMPORT_PRESET_PROFILES = [
     'jombang_mjpeg',
 ];
 
+const PUBLIC_PLAYBACK_MODES = [
+    'inherit',
+    'disabled',
+    'preview_only',
+    'admin_only',
+];
+
+const PUBLIC_PLAYBACK_PREVIEW_MINUTES = new Set([0, 10, 20, 30, 60]);
+
+function normalizePublicPlaybackMode(value) {
+    return PUBLIC_PLAYBACK_MODES.includes(value) ? value : 'inherit';
+}
+
+function normalizePublicPlaybackPreviewMinutes(value) {
+    if (value === undefined) {
+        return undefined;
+    }
+
+    if (value === null || value === '') {
+        return null;
+    }
+
+    const parsed = parseInt(value, 10);
+    if (!PUBLIC_PLAYBACK_PREVIEW_MINUTES.has(parsed)) {
+        const err = new Error('Invalid public playback preview minutes');
+        err.statusCode = 400;
+        throw err;
+    }
+
+    return parsed;
+}
+
 function getNormalizedDeliveryType(data = {}) {
     return getEffectiveDeliveryType(data);
 }
@@ -948,10 +980,14 @@ class CameraService {
             external_use_proxy,
             external_tls_mode,
             external_health_mode,
+            public_playback_mode,
+            public_playback_preview_minutes,
         } = data;
         const externalUseProxy = external_use_proxy === false || external_use_proxy === 0 ? 0 : 1;
         const externalTlsMode = external_tls_mode === 'insecure' ? 'insecure' : 'strict';
         const externalHealthMode = normalizeExternalHealthMode(external_health_mode);
+        const publicPlaybackMode = normalizePublicPlaybackMode(public_playback_mode);
+        const publicPlaybackPreviewMinutes = normalizePublicPlaybackPreviewMinutes(public_playback_preview_minutes);
 
         if (!name) {
             const err = new Error('Camera name is required');
@@ -977,6 +1013,12 @@ class CameraService {
 
         if (external_health_mode !== undefined && !EXTERNAL_HEALTH_MODES.includes(external_health_mode)) {
             const err = new Error('Invalid external health mode');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        if (public_playback_mode !== undefined && !PUBLIC_PLAYBACK_MODES.includes(public_playback_mode)) {
+            const err = new Error('Invalid public playback mode');
             err.statusCode = 400;
             throw err;
         }
@@ -1023,7 +1065,7 @@ class CameraService {
         const cameraStatus = status || 'active';
 
         const result = execute(
-            'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, recording_duration_hours, video_codec, stream_source, delivery_type, external_hls_url, external_stream_url, external_embed_url, external_snapshot_url, external_origin_mode, external_use_proxy, external_tls_mode, external_health_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, recording_duration_hours, video_codec, stream_source, delivery_type, external_hls_url, external_stream_url, external_embed_url, external_snapshot_url, external_origin_mode, external_use_proxy, external_tls_mode, external_health_mode, public_playback_mode, public_playback_preview_minutes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 name,
                 deliveryConfig.deliveryType === 'internal_hls' ? private_rtsp_url : '',
@@ -1050,6 +1092,8 @@ class CameraService {
                 externalUseProxy,
                 externalTlsMode,
                 externalHealthMode,
+                publicPlaybackMode,
+                publicPlaybackPreviewMinutes,
             ]
         );
 
@@ -1121,6 +1165,8 @@ class CameraService {
             external_use_proxy,
             external_tls_mode,
             external_health_mode,
+            public_playback_mode,
+            public_playback_preview_minutes,
         } = data;
 
         const existingCamera = queryOne(
@@ -1139,7 +1185,12 @@ class CameraService {
                     CASE
                         WHEN external_health_mode IN ('default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled') THEN external_health_mode
                         ELSE 'default'
-                    END as external_health_mode
+                    END as external_health_mode,
+                    CASE
+                        WHEN public_playback_mode IN ('inherit', 'disabled', 'preview_only', 'admin_only') THEN public_playback_mode
+                        ELSE 'inherit'
+                    END as public_playback_mode,
+                    public_playback_preview_minutes
              FROM cameras WHERE id = ?`,
             [id]
         );
@@ -1162,6 +1213,12 @@ class CameraService {
 
         if (external_health_mode !== undefined && !EXTERNAL_HEALTH_MODES.includes(external_health_mode)) {
             const err = new Error('Invalid external health mode');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        if (public_playback_mode !== undefined && !PUBLIC_PLAYBACK_MODES.includes(public_playback_mode)) {
+            const err = new Error('Invalid public playback mode');
             err.statusCode = 400;
             throw err;
         }
@@ -1284,6 +1341,14 @@ class CameraService {
         if (external_health_mode !== undefined) {
             updates.push('external_health_mode = ?');
             values.push(normalizeExternalHealthMode(external_health_mode));
+        }
+        if (public_playback_mode !== undefined) {
+            updates.push('public_playback_mode = ?');
+            values.push(normalizePublicPlaybackMode(public_playback_mode));
+        }
+        if (public_playback_preview_minutes !== undefined) {
+            updates.push('public_playback_preview_minutes = ?');
+            values.push(normalizePublicPlaybackPreviewMinutes(public_playback_preview_minutes));
         }
 
         if (updates.length === 0) {

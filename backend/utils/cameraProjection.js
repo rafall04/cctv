@@ -36,7 +36,12 @@ export const SHARED_CAMERA_STREAM_PROJECTION = `
     CASE
         WHEN c.external_health_mode IN ('default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled') THEN c.external_health_mode
         ELSE 'default'
-    END as external_health_mode
+    END as external_health_mode,
+    CASE
+        WHEN c.public_playback_mode IN ('inherit', 'disabled', 'preview_only', 'admin_only') THEN c.public_playback_mode
+        ELSE 'inherit'
+    END as public_playback_mode,
+    c.public_playback_preview_minutes
 `;
 
 export const SHARED_CAMERA_STREAM_WITH_AREA_PROJECTION = `

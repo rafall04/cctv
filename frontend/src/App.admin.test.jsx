@@ -111,4 +111,18 @@ describe('App admin routing', () => {
             expect(screen.getByText('health-debug-page')).toBeTruthy();
         });
     });
+
+    it('merender route playback admin di dalam layout admin', async () => {
+        window.history.pushState({}, '', '/admin/playback');
+
+        render(<App />);
+
+        await waitFor(() => {
+            expect(screen.getByTestId('admin-layout')).toBeTruthy();
+        });
+
+        await waitFor(() => {
+            expect(screen.getByText('playback-page')).toBeTruthy();
+        });
+    });
 });

@@ -242,6 +242,7 @@ export default function CamerasSection({
                         cameras={cameras.filter((camera) => camera.enable_recording)}
                         selectedCamera={selectedCamera}
                         adsConfig={adsConfig}
+                        accessScope="public_preview"
                     />
                 ) : viewMode === 'map' ? (
                     <LandingMapPanel

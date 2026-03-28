@@ -28,6 +28,10 @@ vi.mock('../components/admin/settings/StreamHealthSettingsPanel', () => ({
     default: () => <div>health-panel</div>,
 }));
 
+vi.mock('../components/admin/settings/PlaybackSettingsPanel', () => ({
+    default: () => <div>playback-panel</div>,
+}));
+
 vi.mock('../components/settings/TimezoneSettingsTab', () => ({
     default: () => <div>timezone-panel</div>,
 }));
@@ -54,6 +58,9 @@ describe('UnifiedSettings', () => {
 
         fireEvent.click(screen.getByText('Health'));
         expect(screen.getByText('health-panel')).toBeTruthy();
+
+        fireEvent.click(screen.getByText('Playback'));
+        expect(screen.getByText('playback-panel')).toBeTruthy();
 
         fireEvent.click(screen.getByText('Branding'));
         expect(screen.getByText('branding-panel')).toBeTruthy();

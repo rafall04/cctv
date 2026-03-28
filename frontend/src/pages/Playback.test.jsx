@@ -241,6 +241,30 @@ describe('Playback', () => {
         expect(screen.getByTestId('list-segment').textContent).toBe('seg-2');
     });
 
+    it('menampilkan info preview publik sesuai policy backend', async () => {
+        getSegments.mockResolvedValueOnce({
+            success: true,
+            data: {
+                segments: buildSegments('seg'),
+                playback_policy: {
+                    previewMinutes: 20,
+                },
+            },
+        });
+
+        render(
+            <TestRouter initialEntries={['/playback?mode=full&view=playback&cam=1']}>
+                <Playback
+                    cameras={[
+                        { id: 1, name: 'Lobby', enable_recording: 1 },
+                    ]}
+                />
+            </TestRouter>
+        );
+
+        expect(await screen.findByText(/20 menit awal/i)).toBeTruthy();
+    });
+
     it('stall awal tidak langsung me-reload video dan timeout dibersihkan saat playback pulih', async () => {
         render(
             <TestRouter initialEntries={['/playback?mode=full&view=playback&cam=1']}>
@@ -635,8 +659,8 @@ describe('Playback', () => {
             expect(screen.getByTestId('video-segment').textContent).toBe('gate-2');
         });
 
-        expect(getSegmentStreamUrl).toHaveBeenCalledWith(2, 'gate-2.mp4');
-        expect(getSegmentStreamUrl.mock.calls).not.toContainEqual([2, 'seg-2.mp4']);
+        expect(getSegmentStreamUrl).toHaveBeenCalledWith(2, 'gate-2.mp4', 'public_preview');
+        expect(getSegmentStreamUrl.mock.calls).not.toContainEqual([2, 'seg-2.mp4', 'public_preview']);
     });
 
     it('mengabaikan respons segmen lama yang datang terlambat setelah user pindah kamera', async () => {

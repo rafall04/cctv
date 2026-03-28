@@ -7,7 +7,11 @@ export default function PlaybackHeader({
     autoPlayEnabled,
     onAutoPlayToggle,
     onShare,
+    playbackPolicy = null,
+    showPublicNotice = false,
 }) {
+    const contact = playbackPolicy?.contact || null;
+
     return (
         <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-6 shadow-lg space-y-3 sm:space-y-4">
             <div className="flex items-center justify-between">
@@ -64,6 +68,41 @@ export default function PlaybackHeader({
                             <span>{selectedCamera.location}</span>
                         </div>
                     )}
+                </div>
+            )}
+
+            {showPublicNotice && playbackPolicy?.notice?.enabled && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                    <div className="flex items-start gap-3">
+                        <svg className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600 dark:text-amber-300" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.981-1.742 2.981H4.42c-1.53 0-2.492-1.647-1.743-2.98l5.58-9.921zM11 13a1 1 0 10-2 0 1 1 0 002 0zm-1-7a1 1 0 00-.993.883L9 7v3a1 1 0 001.993.117L11 10V7a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                        <div className="min-w-0 flex-1 space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-semibold">
+                                    {playbackPolicy.notice.title || 'Akses Playback Publik Terbatas'}
+                                </span>
+                                {typeof playbackPolicy.previewMinutes === 'number' && (
+                                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-500/20 dark:text-amber-200">
+                                        Preview {playbackPolicy.previewMinutes} Menit
+                                    </span>
+                                )}
+                            </div>
+                            <p className="text-xs sm:text-sm leading-5">
+                                {playbackPolicy.notice.text}
+                            </p>
+                            {contact?.href && (
+                                <a
+                                    href={contact.href}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-400"
+                                >
+                                    {contact.label || 'Hubungi Admin'}
+                                </a>
+                            )}
+                        </div>
+                    </div>
                 </div>
             )}
             
