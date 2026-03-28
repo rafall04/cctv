@@ -51,4 +51,17 @@ describe('AdminLayout dark mode readability', () => {
         expect(screen.getByText('Quick Links').className).toContain('dark:text-gray-400');
         expect(screen.getByText('Light Mode').closest('button').className).toContain('dark:text-gray-300');
     });
+
+    it('menampilkan tautan playback admin di navigasi utama', () => {
+        render(
+            <MemoryRouter initialEntries={['/admin/dashboard']}>
+                <AdminLayout>
+                    <div>Content</div>
+                </AdminLayout>
+            </MemoryRouter>
+        );
+
+        const playbackLink = screen.getByRole('link', { name: /Playback/i });
+        expect(playbackLink.getAttribute('href')).toBe('/admin/playback');
+    });
 });
