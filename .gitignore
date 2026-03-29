@@ -57,6 +57,7 @@ mediamtx/logs/
 tmp/
 temp/
 *.tmp
+private_exports/
 
 # Backup files (SECURITY)
 *.bak
