@@ -63,6 +63,29 @@ export const adminService = {
         }
     },
 
+    async getViewerHistory(params = {}, policy = REQUEST_POLICY.BLOCKING, config = {}) {
+        try {
+            const searchParams = new URLSearchParams();
+            Object.entries(params || {}).forEach(([key, value]) => {
+                if (value !== undefined && value !== null && value !== '') {
+                    searchParams.set(key, String(value));
+                }
+            });
+
+            const response = await apiClient.get(
+                `/api/admin/analytics/viewers/history${searchParams.toString() ? `?${searchParams.toString()}` : ''}`,
+                getRequestPolicyConfig(policy, config)
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Get viewer history error:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to fetch viewer history',
+            };
+        }
+    },
+
     async getPlaybackViewerAnalytics(period = '7days', params = {}, policy = REQUEST_POLICY.BLOCKING, config = {}) {
         try {
             const searchParams = new URLSearchParams();
@@ -110,6 +133,29 @@ export const adminService = {
             return {
                 success: false,
                 message: error.response?.data?.message || 'Failed to fetch active playback viewers',
+            };
+        }
+    },
+
+    async getPlaybackViewerHistory(params = {}, policy = REQUEST_POLICY.BLOCKING, config = {}) {
+        try {
+            const searchParams = new URLSearchParams();
+            Object.entries(params || {}).forEach(([key, value]) => {
+                if (value !== undefined && value !== null && value !== '') {
+                    searchParams.set(key, String(value));
+                }
+            });
+
+            const response = await apiClient.get(
+                `/api/playback-viewer/history${searchParams.toString() ? `?${searchParams.toString()}` : ''}`,
+                getRequestPolicyConfig(policy, config)
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Get playback viewer history error:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to fetch playback viewer history',
             };
         }
     },

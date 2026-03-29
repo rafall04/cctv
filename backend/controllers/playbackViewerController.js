@@ -124,14 +124,19 @@ export async function getPlaybackViewerStats(request, reply) {
 
 export async function getPlaybackViewerHistory(request, reply) {
     try {
-        const limit = Number.parseInt(request.query?.limit, 10) || 50;
-        const offset = Number.parseInt(request.query?.offset, 10) || 0;
-        const cameraId = request.query?.cameraId || null;
-        const accessMode = request.query?.accessMode || '';
-
         return reply.send({
             success: true,
-            data: playbackViewerSessionService.getSessionHistory(limit, offset, { cameraId, accessMode }),
+            data: playbackViewerSessionService.getHistoryPage({
+                period: request.query?.period || '7days',
+                page: request.query?.page,
+                pageSize: request.query?.pageSize,
+                cameraId: request.query?.cameraId || null,
+                accessMode: request.query?.accessMode || '',
+                deviceType: request.query?.deviceType || '',
+                search: request.query?.search || '',
+                sortBy: request.query?.sortBy || 'started_at',
+                sortDirection: request.query?.sortDirection || 'desc',
+            }),
         });
     } catch (error) {
         console.error('Get playback viewer history error:', error);

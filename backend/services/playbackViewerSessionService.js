@@ -85,6 +85,50 @@ function buildSessionFilters({ cameraId = null, accessMode = '' } = {}, tableAli
     };
 }
 
+function buildHistoryFilters({
+    cameraId = null,
+    accessMode = '',
+    deviceType = '',
+    search = '',
+} = {}) {
+    const base = buildSessionFilters({ cameraId, accessMode });
+    const clauses = [base.clause];
+    const params = [...base.params];
+
+    if (typeof deviceType === 'string' && ['desktop', 'mobile', 'tablet', 'unknown'].includes(deviceType)) {
+        clauses.push('AND device_type = ?');
+        params.push(deviceType);
+    }
+
+    if (typeof search === 'string' && search.trim()) {
+        const likeValue = `%${search.trim()}%`;
+        clauses.push('AND (camera_name LIKE ? OR segment_filename LIKE ? OR ip_address LIKE ? OR COALESCE(admin_username, \'\') LIKE ?)');
+        params.push(likeValue, likeValue, likeValue, likeValue);
+    }
+
+    return {
+        clause: clauses.filter(Boolean).join(' '),
+        params,
+    };
+}
+
+function resolveHistorySort(sortBy = 'started_at', sortDirection = 'desc') {
+    const sortMap = {
+        camera_name: 'camera_name',
+        segment_filename: 'segment_filename',
+        playback_access_mode: 'playback_access_mode',
+        ip_address: 'ip_address',
+        admin_username: 'admin_username',
+        device_type: 'device_type',
+        started_at: 'started_at',
+        ended_at: 'ended_at',
+        duration_seconds: 'duration_seconds',
+    };
+    const column = sortMap[sortBy] || 'started_at';
+    const direction = String(sortDirection).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+    return `${column} ${direction}`;
+}
+
 class PlaybackViewerSessionService {
     constructor() {
         this.cleanupInterval = null;
@@ -312,6 +356,84 @@ class PlaybackViewerSessionService {
         `, [...params, limit, offset]);
     }
 
+    getHistoryPage({
+        period = '7days',
+        page = 1,
+        pageSize = 25,
+        cameraId = null,
+        accessMode = '',
+        deviceType = '',
+        search = '',
+        sortBy = 'started_at',
+        sortDirection = 'desc',
+    } = {}) {
+        const safePageSize = Math.min(100, Math.max(10, Number.parseInt(pageSize, 10) || 25));
+        const safePage = Math.max(1, Number.parseInt(page, 10) || 1);
+        const offset = (safePage - 1) * safePageSize;
+        const dateFilter = buildHistoryDateFilter(period);
+        const filters = buildHistoryFilters({ cameraId, accessMode, deviceType, search });
+        const whereClause = `${dateFilter.clause} ${filters.clause}`.trim();
+        const params = [...dateFilter.params, ...filters.params];
+        const orderBy = resolveHistorySort(sortBy, sortDirection);
+
+        const totalResult = queryOne(`
+            SELECT COUNT(*) as total_items
+            FROM playback_viewer_session_history
+            WHERE 1 = 1
+            ${whereClause}
+        `, params);
+
+        const summary = queryOne(`
+            SELECT
+                COUNT(*) as total_items,
+                COUNT(DISTINCT ip_address) as unique_viewers,
+                COALESCE(SUM(duration_seconds), 0) as total_watch_time
+            FROM playback_viewer_session_history
+            WHERE 1 = 1
+            ${whereClause}
+        `, params);
+
+        const items = query(`
+            SELECT
+                id,
+                camera_id,
+                camera_name,
+                segment_filename,
+                segment_started_at,
+                playback_access_mode,
+                ip_address,
+                user_agent,
+                device_type,
+                admin_user_id,
+                admin_username,
+                started_at,
+                ended_at,
+                duration_seconds
+            FROM playback_viewer_session_history
+            WHERE 1 = 1
+            ${whereClause}
+            ORDER BY ${orderBy}
+            LIMIT ? OFFSET ?
+        `, [...params, safePageSize, offset]);
+
+        const totalItems = totalResult?.total_items || 0;
+
+        return {
+            items,
+            pagination: {
+                page: safePage,
+                pageSize: safePageSize,
+                totalItems,
+                totalPages: Math.max(1, Math.ceil(totalItems / safePageSize)),
+            },
+            summary: {
+                totalItems: summary?.total_items || 0,
+                uniqueViewers: summary?.unique_viewers || 0,
+                totalWatchTime: summary?.total_watch_time || 0,
+            },
+        };
+    }
+
     getStats(filters = {}) {
         const { clause, params } = buildSessionFilters(filters);
         const activeResult = queryOne(`
@@ -426,6 +548,35 @@ class PlaybackViewerSessionService {
             ORDER BY count DESC
         `, sharedParams);
 
+        const deviceBreakdown = query(`
+            SELECT
+                device_type,
+                COUNT(*) as count,
+                ROUND(COUNT(*) * 100.0 / NULLIF((SELECT COUNT(*) FROM playback_viewer_session_history WHERE 1 = 1 ${dateFilter.clause} ${historyFilters.clause}), 0), 1) as percentage
+            FROM playback_viewer_session_history
+            WHERE 1 = 1
+            ${dateFilter.clause}
+            ${historyFilters.clause}
+            GROUP BY device_type
+            ORDER BY count DESC
+        `, [...sharedParams, ...sharedParams]);
+
+        const topViewers = query(`
+            SELECT
+                ip_address,
+                COUNT(*) as total_sessions,
+                COUNT(DISTINCT camera_id) as cameras_watched,
+                COALESCE(SUM(duration_seconds), 0) as total_watch_time,
+                MAX(started_at) as last_visit
+            FROM playback_viewer_session_history
+            WHERE 1 = 1
+            ${dateFilter.clause}
+            ${historyFilters.clause}
+            GROUP BY ip_address
+            ORDER BY total_sessions DESC
+            LIMIT 20
+        `, sharedParams);
+
         return {
             period,
             overview: {
@@ -436,6 +587,8 @@ class PlaybackViewerSessionService {
                 avgSessionDuration: stats.avgSessionDuration,
             },
             accessBreakdown,
+            deviceBreakdown,
+            topViewers,
             topCameras,
             topSegments,
             recentSessions,

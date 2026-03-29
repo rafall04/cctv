@@ -184,6 +184,32 @@ export async function getViewerAnalytics(request, reply) {
     }
 }
 
+export async function getViewerHistoryPage(request, reply) {
+    try {
+        const data = viewerSessionService.getHistoryPage({
+            period: request.query?.period || '7days',
+            page: request.query?.page,
+            pageSize: request.query?.pageSize,
+            cameraId: request.query?.cameraId || null,
+            deviceType: request.query?.deviceType || '',
+            search: request.query?.search || '',
+            sortBy: request.query?.sortBy || 'started_at',
+            sortDirection: request.query?.sortDirection || 'desc',
+        });
+
+        return reply.send({
+            success: true,
+            data,
+        });
+    } catch (error) {
+        console.error('Get viewer history page error:', error);
+        return reply.code(500).send({
+            success: false,
+            message: 'Internal server error',
+        });
+    }
+}
+
 /**
  * Get real-time viewer data (for live dashboard updates)
  */

@@ -1,18 +1,32 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ViewerAnalytics, { DailyDetailModal } from './ViewerAnalytics';
 
-const { getViewerAnalytics, getRealTimeViewers } = vi.hoisted(() => ({
+const {
+    getViewerAnalytics,
+    getRealTimeViewers,
+    getViewerHistory,
+    getAllCameras,
+} = vi.hoisted(() => ({
     getViewerAnalytics: vi.fn(),
     getRealTimeViewers: vi.fn(),
+    getViewerHistory: vi.fn(),
+    getAllCameras: vi.fn(),
 }));
 
 vi.mock('../services/adminService', () => ({
     adminService: {
         getViewerAnalytics,
         getRealTimeViewers,
+        getViewerHistory,
+    },
+}));
+
+vi.mock('../services/cameraService', () => ({
+    cameraService: {
+        getAllCameras,
     },
 }));
 
@@ -88,6 +102,8 @@ describe('ViewerAnalytics', () => {
     beforeEach(() => {
         getViewerAnalytics.mockReset();
         getRealTimeViewers.mockReset();
+        getViewerHistory.mockReset();
+        getAllCameras.mockReset();
         getViewerAnalytics.mockResolvedValue({ success: true, data: buildAnalyticsData() });
         getRealTimeViewers.mockResolvedValue({
             success: true,
@@ -103,6 +119,33 @@ describe('ViewerAnalytics', () => {
                 ],
             },
         });
+        getViewerHistory.mockResolvedValue({
+            success: true,
+            data: {
+                items: [
+                    {
+                        id: 11,
+                        camera_id: 2,
+                        camera_name: 'Gate',
+                        ip_address: '10.0.0.11',
+                        device_type: 'desktop',
+                        started_at: '2026-03-06T10:01:00.000Z',
+                        ended_at: '2026-03-06T10:06:00.000Z',
+                        duration_seconds: 300,
+                        user_agent: 'test-agent',
+                    },
+                ],
+                pagination: { page: 1, pageSize: 25, totalItems: 1, totalPages: 1 },
+                summary: { totalItems: 1, uniqueViewers: 1, totalWatchTime: 300 },
+            },
+        });
+        getAllCameras.mockResolvedValue({
+            success: true,
+            data: [
+                { id: 1, name: 'Lobby' },
+                { id: 2, name: 'Gate' },
+            ],
+        });
     });
 
     it('memanggil ulang analytics saat periode berubah', async () => {
@@ -116,33 +159,38 @@ describe('ViewerAnalytics', () => {
         });
     });
 
-    it('memfilter sesi berdasarkan kamera tanpa mengubah summary global', async () => {
+    it('memuat tab history dari endpoint server-side dan filter kamera ikut dikirim', async () => {
         render(<ViewerAnalytics />);
 
-        await screen.findByText('Pengunjung Unik');
-        fireEvent.change(screen.getByDisplayValue('Semua Kamera'), { target: { value: '2' } });
-
-        const sessionsSection = screen.getByText('Sesi Terbaru').closest('.bg-white');
+        await screen.findByText('Statistik Penonton');
+        fireEvent.click(screen.getByRole('button', { name: 'History' }));
 
         await waitFor(() => {
-            expect(screen.getByText(/Menampilkan 10 dari 10 sesi/)).toBeTruthy();
+            expect(screen.getByText('Riwayat Sesi Live')).toBeTruthy();
         });
 
-        expect(screen.getByText('12')).toBeTruthy();
-        expect(within(sessionsSection).queryByText('10.0.0.1')).toBeNull();
-        expect(within(sessionsSection).getByText('10.0.0.11')).toBeTruthy();
+        fireEvent.change(screen.getAllByDisplayValue('Semua Kamera')[0], { target: { value: '2' } });
+
+        await waitFor(() => {
+            expect(getViewerHistory).toHaveBeenLastCalledWith(expect.objectContaining({
+                cameraId: '2',
+            }), 'blocking');
+        });
+
+        expect(screen.getByText('Riwayat Sesi Live')).toBeTruthy();
     });
 
-    it('membuka modal detail saat bar chart harian diklik', async () => {
+    it('menampilkan sesi aktif pada tab active', async () => {
         render(<ViewerAnalytics />);
 
-        await screen.findByText('Sesi per Hari');
-        const chartSection = screen.getByText('Sesi per Hari').closest('.bg-white');
-        fireEvent.click(within(chartSection).getByText(/6$/));
+        await screen.findByText('Statistik Penonton');
+        fireEvent.click(screen.getByRole('button', { name: 'Active' }));
 
         await waitFor(() => {
-            expect(screen.getByText(/Detail Tanggal/i)).toBeTruthy();
+            expect(screen.getByText('Viewer Aktif')).toBeTruthy();
         });
+
+        expect(screen.getByText('127.0.0.1')).toBeTruthy();
     });
 });
 

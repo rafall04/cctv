@@ -64,6 +64,74 @@ function getDateWithOffset(days) {
     });
 }
 
+function buildHistoryDateFilter(period) {
+    const todayDate = getDate();
+
+    if (typeof period === 'string' && period.startsWith('date:')) {
+        const customDate = period.substring(5);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(customDate)) {
+            return {
+                clause: 'AND date(started_at) = ?',
+                params: [customDate],
+            };
+        }
+    }
+
+    switch (period) {
+        case 'today':
+            return { clause: 'AND date(started_at) = ?', params: [todayDate] };
+        case 'yesterday':
+            return { clause: 'AND date(started_at) = ?', params: [getDateWithOffset(-1)] };
+        case '7days':
+            return { clause: 'AND date(started_at) >= ?', params: [getDateWithOffset(-7)] };
+        case '30days':
+            return { clause: 'AND date(started_at) >= ?', params: [getDateWithOffset(-30)] };
+        default:
+            return { clause: '', params: [] };
+    }
+}
+
+function buildHistoryFilters({ cameraId = null, deviceType = '', search = '' } = {}) {
+    const clauses = [];
+    const params = [];
+    const normalizedCameraId = Number.parseInt(cameraId, 10);
+
+    if (Number.isInteger(normalizedCameraId) && normalizedCameraId > 0) {
+        clauses.push('AND camera_id = ?');
+        params.push(normalizedCameraId);
+    }
+
+    if (typeof deviceType === 'string' && ['desktop', 'mobile', 'tablet', 'unknown'].includes(deviceType)) {
+        clauses.push('AND device_type = ?');
+        params.push(deviceType);
+    }
+
+    if (typeof search === 'string' && search.trim()) {
+        const likeValue = `%${search.trim()}%`;
+        clauses.push('AND (camera_name LIKE ? OR ip_address LIKE ? OR device_type LIKE ?)');
+        params.push(likeValue, likeValue, likeValue);
+    }
+
+    return {
+        clause: clauses.join(' '),
+        params,
+    };
+}
+
+function resolveHistorySort(sortBy = 'started_at', sortDirection = 'desc') {
+    const sortMap = {
+        camera_name: 'camera_name',
+        ip_address: 'ip_address',
+        device_type: 'device_type',
+        started_at: 'started_at',
+        ended_at: 'ended_at',
+        duration_seconds: 'duration_seconds',
+    };
+    const column = sortMap[sortBy] || 'started_at';
+    const direction = String(sortDirection).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+    return `${column} ${direction}`;
+}
+
 // Session timeout in seconds (if no heartbeat received)
 const SESSION_TIMEOUT = 15;
 
@@ -299,6 +367,87 @@ class ViewerSessionService {
         } catch (error) {
             console.error('[ViewerSession] Error getting history:', error);
             return [];
+        }
+    }
+
+    getHistoryPage({
+        period = '7days',
+        page = 1,
+        pageSize = 25,
+        cameraId = null,
+        deviceType = '',
+        search = '',
+        sortBy = 'started_at',
+        sortDirection = 'desc',
+    } = {}) {
+        try {
+            const safePageSize = Math.min(100, Math.max(10, Number.parseInt(pageSize, 10) || 25));
+            const safePage = Math.max(1, Number.parseInt(page, 10) || 1);
+            const offset = (safePage - 1) * safePageSize;
+            const dateFilter = buildHistoryDateFilter(period);
+            const filters = buildHistoryFilters({ cameraId, deviceType, search });
+            const whereClause = `${dateFilter.clause} ${filters.clause}`.trim();
+            const params = [...dateFilter.params, ...filters.params];
+            const orderBy = resolveHistorySort(sortBy, sortDirection);
+
+            const totalResult = queryOne(`
+                SELECT COUNT(*) as total_items
+                FROM viewer_session_history
+                WHERE 1 = 1
+                ${whereClause}
+            `, params);
+
+            const summary = queryOne(`
+                SELECT
+                    COUNT(*) as total_items,
+                    COUNT(DISTINCT ip_address) as unique_viewers,
+                    COALESCE(SUM(duration_seconds), 0) as total_watch_time
+                FROM viewer_session_history
+                WHERE 1 = 1
+                ${whereClause}
+            `, params);
+
+            const items = query(`
+                SELECT
+                    id,
+                    camera_id,
+                    camera_name,
+                    ip_address,
+                    user_agent,
+                    device_type,
+                    started_at,
+                    ended_at,
+                    duration_seconds
+                FROM viewer_session_history
+                WHERE 1 = 1
+                ${whereClause}
+                ORDER BY ${orderBy}
+                LIMIT ? OFFSET ?
+            `, [...params, safePageSize, offset]);
+
+            const totalItems = totalResult?.total_items || 0;
+
+            return {
+                items,
+                pagination: {
+                    page: safePage,
+                    pageSize: safePageSize,
+                    totalItems,
+                    totalPages: Math.max(1, Math.ceil(totalItems / safePageSize)),
+                },
+                summary: {
+                    totalItems: summary?.total_items || 0,
+                    uniqueViewers: summary?.unique_viewers || 0,
+                    totalWatchTime: summary?.total_watch_time || 0,
+                },
+            };
+        } catch (error) {
+            console.error('[ViewerSession] Error getting paginated history:', error);
+            return {
+                items: [],
+                pagination: { page: 1, pageSize: 25, totalItems: 0, totalPages: 1 },
+                summary: { totalItems: 0, uniqueViewers: 0, totalWatchTime: 0 },
+            };
         }
     }
 

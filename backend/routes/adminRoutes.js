@@ -1,4 +1,4 @@
-import { getDashboardStats, getTodayStats, testTelegramNotification, getTelegramConfig, updateTelegramConfig, getViewerAnalytics, getRealTimeViewers, getCameraHealthDebug, getCacheStats, clearCache, getTimezoneConfig, updateTimezoneConfig, exportDatabaseBackup, importDatabaseBackup, getBackupPreview } from '../controllers/adminController.js';
+import { getDashboardStats, getTodayStats, testTelegramNotification, getTelegramConfig, updateTelegramConfig, getViewerAnalytics, getViewerHistoryPage, getRealTimeViewers, getCameraHealthDebug, getCacheStats, clearCache, getTimezoneConfig, updateTimezoneConfig, exportDatabaseBackup, importDatabaseBackup, getBackupPreview } from '../controllers/adminController.js';
 import { generateApiKey, listApiKeys, deleteApiKey } from '../controllers/apiKeyController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 import { createApiKeySchema, apiKeyIdParamSchema } from '../middleware/schemaValidators.js';
@@ -21,6 +21,11 @@ export default async function adminRoutes(fastify, options) {
     fastify.get('/analytics/viewers', {
         onRequest: [authMiddleware],
         handler: getViewerAnalytics,
+    });
+
+    fastify.get('/analytics/viewers/history', {
+        onRequest: [authMiddleware],
+        handler: getViewerHistoryPage,
     });
 
     fastify.get('/analytics/realtime', {
