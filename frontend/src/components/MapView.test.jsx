@@ -822,6 +822,72 @@ describe('MapView area filter visibility', () => {
         expect(aggregateIconCalls.some((call) => call.html.includes('95'))).toBe(false);
     });
 
+    it('menggabungkan all-area menjadi satu marker per area saat zoom sangat rendah', async () => {
+        const makeCluster = (startId, count, baseLat, baseLng, areaName) => Array.from({ length: count }, (_, index) => ({
+            id: startId + index,
+            name: `${areaName} ${startId + index}`,
+            latitude: (baseLat + (index * 0.00005)).toFixed(5),
+            longitude: (baseLng + (index * 0.00005)).toFixed(5),
+            area_name: areaName,
+            is_online: 1,
+            status: 'active',
+            is_tunnel: 0,
+        }));
+
+        const areaCameras = [
+            ...makeCluster(1, 13, -7.1500, 111.8800, 'BOJONEGORO'),
+            ...makeCluster(101, 42, -7.3100, 111.6500, 'BOJONEGORO'),
+            ...makeCluster(201, 40, -7.0200, 112.0300, 'BOJONEGORO'),
+            ...makeCluster(301, 19, -7.2600, 112.7300, 'GRESIK'),
+        ];
+        const bojonegoroCameras = areaCameras.filter((camera) => camera.area_name === 'BOJONEGORO');
+        const bojonegoroCenter = [
+            bojonegoroCameras.reduce((sum, camera) => sum + parseFloat(camera.latitude), 0) / bojonegoroCameras.length,
+            bojonegoroCameras.reduce((sum, camera) => sum + parseFloat(camera.longitude), 0) / bojonegoroCameras.length,
+        ];
+
+        setMockZoom(10);
+
+        await act(async () => {
+            render(
+                <MapView
+                    cameras={areaCameras}
+                    areas={[
+                        { name: 'BOJONEGORO', latitude: '-7.1500', longitude: '111.8800' },
+                        { name: 'GRESIK', latitude: '-7.2600', longitude: '112.7300' },
+                    ]}
+                    showAreaFilter
+                />
+            );
+        });
+
+        await waitFor(() => {
+            expect(screen.getAllByText('marker')).toHaveLength(2);
+        });
+
+        const aggregateIconCalls = L.divIcon.mock.calls
+            .map((call) => call[0])
+            .filter((call) => Array.isArray(call?.iconSize) && call.iconSize[0] === 58);
+
+        expect(aggregateIconCalls).toHaveLength(2);
+        expect(aggregateIconCalls.some((call) => call.html.includes('95'))).toBe(true);
+        expect(aggregateIconCalls.some((call) => call.html.includes('19'))).toBe(true);
+
+        const [areaMarker] = screen.getAllByText('marker');
+        expect(areaMarker).toBeTruthy();
+
+        setViewMock.mockClear();
+        fitBoundsMock.mockClear();
+
+        fireEvent.click(areaMarker);
+
+        await waitFor(() => {
+            expect(setViewMock).toHaveBeenCalledWith(bojonegoroCenter, 15, { animate: true, duration: 0.5 });
+        });
+
+        expect(fitBoundsMock).not.toHaveBeenCalled();
+    });
+
     it('memusatkan cluster all-area ke centroid dan klik cluster melakukan fitBounds ke child cameras', async () => {
         const clusterCameras = [
             {

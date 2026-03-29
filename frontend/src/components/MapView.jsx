@@ -58,6 +58,7 @@ const iconCache = new Map();
 const AREA_AGGREGATE_ZOOM = 13;
 const INDIVIDUAL_MARKER_ZOOM = 16;
 const DENSE_AREA_THRESHOLD = 24;
+const ALL_AREA_SUPER_AGGREGATE_ZOOM = 11;
 
 // CCTV Marker - dengan support status (active, maintenance, tunnel, offline)
 const createCameraIcon = (status = 'active', isTunnel = false, isOnline = true, availabilityState = 'online') => {
@@ -1784,10 +1785,42 @@ const MapView = memo(({
 
     const effectiveZoom = viewportState.currentZoom || mapSettings.zoom || defaultZoom;
 
-    const shouldUseAggregateMarkers = filteredBase.length > DENSE_AREA_THRESHOLD && effectiveZoom < AREA_AGGREGATE_ZOOM;
+    const shouldUseAllAreaSuperAggregateMarkers = selectedAreaValue === 'all'
+        && filteredBase.length > DENSE_AREA_THRESHOLD
+        && effectiveZoom < ALL_AREA_SUPER_AGGREGATE_ZOOM;
+    const shouldUseAggregateMarkers = filteredBase.length > DENSE_AREA_THRESHOLD
+        && effectiveZoom >= ALL_AREA_SUPER_AGGREGATE_ZOOM
+        && effectiveZoom < AREA_AGGREGATE_ZOOM;
     const shouldUseGroupedMarkers = filteredBase.length > DENSE_AREA_THRESHOLD && effectiveZoom >= AREA_AGGREGATE_ZOOM && effectiveZoom < INDIVIDUAL_MARKER_ZOOM;
     const shouldShowZoomHint = filteredBase.length > DENSE_AREA_THRESHOLD && effectiveZoom < INDIVIDUAL_MARKER_ZOOM;
     const spatialClusterSource = selectedAreaValue === 'all' ? filteredBase : visibleBase;
+
+    const allAreaSuperAggregateMarkers = useMemo(() => {
+        if (!shouldUseAllAreaSuperAggregateMarkers) {
+            return [];
+        }
+
+        return areaSummaryList
+            .filter((summary) => summary.hasValidAnchor && summary.cameraCount > 0)
+            .map((summary) => ({
+                key: `area-${summary.areaKey}-${summary.cameraCount}`,
+                kind: 'area',
+                areaName: summary.areaName,
+                latitude: summary.anchor.latitude,
+                longitude: summary.anchor.longitude,
+                count: summary.cameraCount,
+                cameras: summary.cameras,
+                bounds: L.latLngBounds(summary.cameras.map((camera) => [
+                    parseFloat(camera.latitude),
+                    parseFloat(camera.longitude),
+                ])),
+                statusSummary: {
+                    onlineCount: summary.onlineCount,
+                    degradedCount: summary.degradedCount,
+                    offlineCount: summary.offlineCount,
+                },
+            }));
+    }, [areaSummaryList, shouldUseAllAreaSuperAggregateMarkers]);
 
     const areaAggregateMarkers = useMemo(() => {
         if (!shouldUseAggregateMarkers) {
@@ -1811,11 +1844,11 @@ const MapView = memo(({
     }, [effectiveZoom, shouldUseGroupedMarkers, spatialClusterSource]);
 
     const visibleIndividualMarkers = useMemo(() => {
-        if (shouldUseAggregateMarkers || shouldUseGroupedMarkers) {
+        if (shouldUseAllAreaSuperAggregateMarkers || shouldUseAggregateMarkers || shouldUseGroupedMarkers) {
             return [];
         }
         return applyMarkerOffset(visibleBase);
-    }, [shouldUseAggregateMarkers, shouldUseGroupedMarkers, visibleBase]);
+    }, [shouldUseAggregateMarkers, shouldUseAllAreaSuperAggregateMarkers, shouldUseGroupedMarkers, visibleBase]);
 
     const stats = useMemo(() => {
         const maintenance = filteredBase.filter(c => c.status === 'maintenance').length;
@@ -1978,6 +2011,9 @@ const MapView = memo(({
                     onViewportChange={handleViewportChange}
                     onCommandApplied={handleCommandApplied}
                 />
+                {allAreaSuperAggregateMarkers.map((marker) => (
+                    <AggregateMarker key={marker.key} marker={marker} onClick={handleAggregateMarkerClick} />
+                ))}
                 {areaAggregateMarkers.map((marker) => (
                     <AggregateMarker key={marker.key} marker={marker} onClick={handleAggregateMarkerClick} />
                 ))}
