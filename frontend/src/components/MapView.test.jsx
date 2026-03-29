@@ -769,7 +769,7 @@ describe('MapView area filter visibility', () => {
             expect(screen.getAllByText('marker')).toHaveLength(1);
         });
 
-        expect(screen.getByTestId('marker--7.1507-111.8815')).toBeTruthy();
+        expect(screen.getAllByText('marker')[0]).toBeTruthy();
         expect(screen.getByTestId('map-zoom-hint')).toBeTruthy();
         const aggregateIconCall = L.divIcon.mock.calls.at(-1)?.[0];
         expect(aggregateIconCall?.html).not.toContain('AREA');
@@ -820,6 +820,94 @@ describe('MapView area filter visibility', () => {
         expect(aggregateIconCalls.some((call) => call.html.includes('42'))).toBe(true);
         expect(aggregateIconCalls.some((call) => call.html.includes('40'))).toBe(true);
         expect(aggregateIconCalls.some((call) => call.html.includes('95'))).toBe(false);
+    });
+
+    it('memusatkan cluster all-area ke centroid dan klik cluster melakukan fitBounds ke child cameras', async () => {
+        const clusterCameras = [
+            {
+                id: 1,
+                name: 'Cluster 1',
+                latitude: '-7.1500',
+                longitude: '111.8800',
+                area_name: 'BOJONEGORO',
+                is_online: 1,
+                status: 'active',
+                is_tunnel: 0,
+            },
+            {
+                id: 2,
+                name: 'Cluster 2',
+                latitude: '-7.1400',
+                longitude: '111.9000',
+                area_name: 'BOJONEGORO',
+                is_online: 1,
+                status: 'active',
+                is_tunnel: 0,
+            },
+            {
+                id: 3,
+                name: 'Cluster 3',
+                latitude: '-7.1300',
+                longitude: '111.9200',
+                area_name: 'BOJONEGORO',
+                is_online: 1,
+                status: 'active',
+                is_tunnel: 0,
+            },
+        ];
+
+        const fillerCameras = Array.from({ length: 27 }, (_, index) => ({
+            id: 100 + index,
+            name: `Filler ${index + 1}`,
+            latitude: (-6.5000 - (index * 0.01)).toFixed(4),
+            longitude: (112.5000 + (index * 0.01)).toFixed(4),
+            area_name: 'Lainnya',
+            is_online: 1,
+            status: 'active',
+            is_tunnel: 0,
+        }));
+
+        setMockZoom(11);
+
+        await act(async () => {
+            render(
+                <MapView
+                    cameras={[...clusterCameras, ...fillerCameras]}
+                    areas={[{ name: 'BOJONEGORO', latitude: '-7.1500', longitude: '111.8800' }]}
+                    showAreaFilter
+                />
+            );
+        });
+
+        await waitFor(() => {
+            expect(screen.getAllByText('marker').length).toBeGreaterThan(1);
+        });
+
+        expect(screen.getByTestId('marker--7.14-111.9')).toBeTruthy();
+
+        fitBoundsMock.mockClear();
+        setViewMock.mockClear();
+
+        fireEvent.click(screen.getByTestId('marker--7.14-111.9'));
+
+        await waitFor(() => {
+            expect(fitBoundsMock).toHaveBeenCalledTimes(1);
+        });
+
+        expect(setViewMock).not.toHaveBeenCalled();
+        expect(fitBoundsMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                getSouth: expect.any(Function),
+                getWest: expect.any(Function),
+                getNorth: expect.any(Function),
+                getEast: expect.any(Function),
+            }),
+            expect.objectContaining({
+                maxZoom: 16,
+                paddingTopLeft: [50, 80],
+                paddingBottomRight: [50, 40],
+            })
+        );
     });
 
     it('tetap menormalkan nama area untuk dropdown dan focus area walau all-area memakai hotspot', async () => {

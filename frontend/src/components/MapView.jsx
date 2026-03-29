@@ -286,6 +286,18 @@ const getGroupMarkerProfile = (kind = 'group', count = 0) => {
         };
     }
 
+    if (kind === 'cluster') {
+        return {
+            size: 50,
+            borderRadius: 20,
+            fontSize: digits >= 3 ? 17 : 20,
+            ringOpacity: 0.22,
+            shadow: '0 12px 28px rgba(15,23,42,0.24)',
+            countLabel: count > 999 ? '999+' : String(count),
+            glowSize: 66,
+        };
+    }
+
     return {
         size: 50,
         borderRadius: 18,
@@ -410,16 +422,61 @@ const bucketCamerasByCoordinate = (cameras, zoom) => {
         grouped.get(key).push(camera);
     });
 
-    return Array.from(grouped.values()).map((group) => {
-        const first = group[0];
-        return {
-            key: `${group.length}-${first.id}-${precision}`,
-            latitude: parseFloat(first.latitude),
-            longitude: parseFloat(first.longitude),
-            count: group.length,
-            cameras: group,
-        };
-    });
+    return Array.from(grouped.values())
+        .map((group) => {
+            const first = group[0];
+            const centroid = getCentroidFromCameras(group);
+            const boundsCenter = getBoundsCenterFromCameras(group);
+            const center = centroid || boundsCenter || {
+                latitude: parseFloat(first.latitude),
+                longitude: parseFloat(first.longitude),
+            };
+            const areaBreakdown = group.reduce((acc, camera) => {
+                const areaName = String(camera.area_name || '').trim() || 'Tanpa Area';
+                acc[areaName] = (acc[areaName] || 0) + 1;
+                return acc;
+            }, {});
+            const dominantAreaEntry = Object.entries(areaBreakdown)
+                .sort((left, right) => right[1] - left[1])[0];
+            const bounds = L.latLngBounds(group.map((camera) => [
+                parseFloat(camera.latitude),
+                parseFloat(camera.longitude),
+            ]));
+
+            return {
+                key: `${precision}-${center.latitude.toFixed(5)}-${center.longitude.toFixed(5)}-${group.length}-${first.id}`,
+                latitude: center.latitude,
+                longitude: center.longitude,
+                count: group.length,
+                cameras: group,
+                center,
+                bounds,
+                dominantAreaName: dominantAreaEntry?.[0] || null,
+                statusSummary: {
+                    onlineCount: group.filter((camera) => {
+                        const state = getCameraAvailabilityState(camera);
+                        return state !== 'offline' && state !== 'degraded' && state !== 'suspect' && camera.status !== 'maintenance';
+                    }).length,
+                    degradedCount: group.filter((camera) => {
+                        const state = getCameraAvailabilityState(camera);
+                        return state === 'degraded' || state === 'suspect';
+                    }).length,
+                    offlineCount: group.filter((camera) => {
+                        const state = getCameraAvailabilityState(camera);
+                        return state === 'offline' || camera.status === 'maintenance';
+                    }).length,
+                },
+            };
+        })
+        .sort((left, right) => {
+            if (right.count !== left.count) {
+                return right.count - left.count;
+            }
+            if (left.latitude !== right.latitude) {
+                return left.latitude - right.latitude;
+            }
+            return left.longitude - right.longitude;
+        });
 };
 
 const buildAreaSummaryList = (areas = [], cameras = []) => {
@@ -1507,7 +1564,11 @@ function MapController({ viewportCommand, onViewportChange, onCommandApplied }) 
     useEffect(() => {
         if (viewportCommand?.id && viewportCommand.id !== lastAppliedCommandRef.current) {
             if (viewportCommand.bounds?.isValid?.()) {
-                map.fitBounds(viewportCommand.bounds, { padding: [50, 50], maxZoom: viewportCommand.maxZoom || 16 });
+                map.fitBounds(viewportCommand.bounds, {
+                    paddingTopLeft: [50, 80],
+                    paddingBottomRight: [50, 40],
+                    maxZoom: viewportCommand.maxZoom || 16,
+                });
             } else if (viewportCommand.center) {
                 map.setView(viewportCommand.center, viewportCommand.zoom || 15, { animate: true, duration: 0.5 });
             }
@@ -1726,39 +1787,28 @@ const MapView = memo(({
     const shouldUseAggregateMarkers = filteredBase.length > DENSE_AREA_THRESHOLD && effectiveZoom < AREA_AGGREGATE_ZOOM;
     const shouldUseGroupedMarkers = filteredBase.length > DENSE_AREA_THRESHOLD && effectiveZoom >= AREA_AGGREGATE_ZOOM && effectiveZoom < INDIVIDUAL_MARKER_ZOOM;
     const shouldShowZoomHint = filteredBase.length > DENSE_AREA_THRESHOLD && effectiveZoom < INDIVIDUAL_MARKER_ZOOM;
+    const spatialClusterSource = selectedAreaValue === 'all' ? filteredBase : visibleBase;
 
     const areaAggregateMarkers = useMemo(() => {
         if (!shouldUseAggregateMarkers) {
             return [];
         }
 
-        const grouped = bucketCamerasByCoordinate(visibleBase, effectiveZoom);
-        return grouped.map((group) => {
-            const dominantAreaName = group.cameras.reduce((acc, camera) => {
-                const areaName = String(camera.area_name || '').trim() || 'Tanpa Area';
-                acc[areaName] = (acc[areaName] || 0) + 1;
-                return acc;
-            }, {});
-            const dominantEntry = Object.entries(dominantAreaName)
-                .sort((left, right) => right[1] - left[1])[0];
-
-            return {
-                ...group,
-                dominantAreaName: dominantEntry?.[0] || null,
-                kind: selectedAreaValue === 'all' ? 'hotspot' : 'bucket',
-            };
-        });
-    }, [effectiveZoom, selectedAreaValue, shouldUseAggregateMarkers, visibleBase]);
+        return bucketCamerasByCoordinate(spatialClusterSource, effectiveZoom).map((group) => ({
+            ...group,
+            kind: selectedAreaValue === 'all' ? 'cluster' : 'bucket',
+        }));
+    }, [effectiveZoom, selectedAreaValue, shouldUseAggregateMarkers, spatialClusterSource]);
 
     const groupedVisibleMarkers = useMemo(() => {
         if (!shouldUseGroupedMarkers) {
             return [];
         }
-        return bucketCamerasByCoordinate(visibleBase, effectiveZoom).map((group) => ({
+        return bucketCamerasByCoordinate(spatialClusterSource, effectiveZoom).map((group) => ({
             ...group,
             kind: 'bucket',
         }));
-    }, [effectiveZoom, shouldUseGroupedMarkers, visibleBase]);
+    }, [effectiveZoom, shouldUseGroupedMarkers, spatialClusterSource]);
 
     const visibleIndividualMarkers = useMemo(() => {
         if (shouldUseAggregateMarkers || shouldUseGroupedMarkers) {
@@ -1839,10 +1889,9 @@ const MapView = memo(({
             return;
         }
 
-        const groupBounds = L.latLngBounds(marker.cameras.map((camera) => [parseFloat(camera.latitude), parseFloat(camera.longitude)]));
         enqueueViewportCommand({
             type: 'focus_group',
-            bounds: groupBounds,
+            bounds: marker.bounds || L.latLngBounds(marker.cameras.map((camera) => [parseFloat(camera.latitude), parseFloat(camera.longitude)])),
             maxZoom: INDIVIDUAL_MARKER_ZOOM,
         });
     }, [buildAreaViewportCommand, enqueueViewportCommand]);
