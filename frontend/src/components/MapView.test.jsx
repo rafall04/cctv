@@ -1034,6 +1034,42 @@ describe('MapView area filter visibility', () => {
         warnSpy.mockRestore();
     });
 
+    it('menahan ledakan marker individual dengan micro-bucket saat zoom tinggi sangat padat', async () => {
+        const makeDenseGroup = (startId, count, latitude, longitude) => Array.from({ length: count }, (_, index) => ({
+            id: startId + index,
+            name: `Dense High ${startId + index}`,
+            latitude,
+            longitude,
+            area_name: 'Dense Area',
+            is_online: 1,
+            status: 'active',
+            is_tunnel: 0,
+        }));
+
+        const denseCameras = [
+            ...makeDenseGroup(1, 35, '-7.1500', '111.8800'),
+            ...makeDenseGroup(101, 35, '-7.1600', '111.8900'),
+            ...makeDenseGroup(201, 35, '-7.1700', '111.9000'),
+            ...makeDenseGroup(301, 35, '-7.1800', '111.9100'),
+        ];
+
+        setMockZoom(16);
+
+        await act(async () => {
+            render(<MapView cameras={denseCameras} areas={[]} showAreaFilter selectedArea="Dense Area" />);
+        });
+
+        await waitFor(() => {
+            expect(screen.getAllByText('marker')).toHaveLength(4);
+        });
+
+        const aggregateIconCalls = L.divIcon.mock.calls
+            .map((call) => call[0])
+            .filter((call) => Array.isArray(call?.iconSize) && call.iconSize[0] === 50);
+
+        expect(aggregateIconCalls.some((call) => call.html.includes('35'))).toBe(true);
+    });
+
     it('merender marker individual saat zoom tinggi pada area padat', async () => {
         const denseCameras = Array.from({ length: 30 }, (_, index) => ({
             id: index + 1,

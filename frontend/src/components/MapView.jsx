@@ -59,6 +59,8 @@ const AREA_AGGREGATE_ZOOM = 13;
 const INDIVIDUAL_MARKER_ZOOM = 16;
 const DENSE_AREA_THRESHOLD = 24;
 const ALL_AREA_SUPER_AGGREGATE_ZOOM = 11;
+const VIEWPORT_RECALC_DEBOUNCE_MS = 100;
+const MAX_VISIBLE_INDIVIDUAL_MARKERS = 120;
 
 // CCTV Marker - dengan support status (active, maintenance, tunnel, offline)
 const createCameraIcon = (status = 'active', isTunnel = false, isOnline = true, availabilityState = 'online') => {
@@ -1619,6 +1621,110 @@ const AggregateMarker = memo(({ marker, onClick }) => (
 ));
 AggregateMarker.displayName = 'AggregateMarker';
 
+const ImperativeMarkerLayer = memo(({ cameras = [], onClick }) => {
+    const map = useMap();
+    const layerGroupRef = useRef(null);
+    const markersRef = useRef(new Map());
+    const cameraLookupRef = useRef(new Map());
+    const onClickRef = useRef(onClick);
+    const supportsImperativeMarkers = typeof L.layerGroup === 'function' && typeof L.marker === 'function';
+
+    useEffect(() => {
+        onClickRef.current = onClick;
+    }, [onClick]);
+
+    useEffect(() => {
+        cameraLookupRef.current = new Map(cameras.map((camera) => [camera.id, camera]));
+    }, [cameras]);
+
+    useEffect(() => {
+        if (!supportsImperativeMarkers) {
+            return undefined;
+        }
+
+        if (!layerGroupRef.current) {
+            const layerGroup = L.layerGroup();
+            layerGroup.addTo?.(map);
+            layerGroupRef.current = layerGroup;
+        }
+
+        const layerGroup = layerGroupRef.current;
+        const nextIds = new Set();
+
+        cameras.forEach((camera) => {
+            if (!hasValidCoords(camera)) {
+                return;
+            }
+
+            const lat = camera._displayLat ?? parseFloat(camera.latitude);
+            const lng = camera._displayLng ?? parseFloat(camera.longitude);
+            const isTunnel = camera.is_tunnel === 1 || camera.is_tunnel === true;
+            const availabilityState = getCameraAvailabilityState(camera);
+            const isOnline = availabilityState !== 'offline';
+            const status = camera.status || 'active';
+            const icon = createCameraIcon(status, isTunnel, isOnline, availabilityState);
+
+            nextIds.add(camera.id);
+            let marker = markersRef.current.get(camera.id);
+            if (!marker) {
+                marker = L.marker([lat, lng], { icon });
+                marker.on?.('click', () => {
+                    const currentCamera = cameraLookupRef.current.get(camera.id);
+                    if (currentCamera) {
+                        onClickRef.current?.(currentCamera);
+                    }
+                });
+                marker.addTo?.(layerGroup);
+                layerGroup.addLayer?.(marker);
+                markersRef.current.set(camera.id, marker);
+                return;
+            }
+
+            marker.setLatLng?.([lat, lng]);
+            marker.setIcon?.(icon);
+        });
+
+        markersRef.current.forEach((marker, cameraId) => {
+            if (nextIds.has(cameraId)) {
+                return;
+            }
+
+            layerGroup.removeLayer?.(marker);
+            marker.remove?.();
+            markersRef.current.delete(cameraId);
+        });
+
+        return undefined;
+    }, [cameras, map, supportsImperativeMarkers]);
+
+    useEffect(() => () => {
+        if (!supportsImperativeMarkers) {
+            return;
+        }
+
+        markersRef.current.forEach((marker) => {
+            layerGroupRef.current?.removeLayer?.(marker);
+            marker.remove?.();
+        });
+        markersRef.current.clear();
+        layerGroupRef.current?.remove?.();
+        layerGroupRef.current = null;
+    }, [supportsImperativeMarkers]);
+
+    if (!supportsImperativeMarkers) {
+        return (
+            <>
+                {cameras.map((camera) => (
+                    <CameraMarker key={camera.id} camera={camera} onClick={onClick} />
+                ))}
+            </>
+        );
+    }
+
+    return null;
+});
+ImperativeMarkerLayer.displayName = 'ImperativeMarkerLayer';
+
 // Main MapView
 const MapView = memo(({
     cameras = [],
@@ -1652,6 +1758,10 @@ const MapView = memo(({
         viewportMode: 'initial',
         lastAppliedArea: selectedAreaValue,
         lastAppliedFocusCameraId: null,
+    });
+    const [debouncedViewportState, setDebouncedViewportState] = useState({
+        currentZoom: defaultZoom,
+        currentBounds: null,
     });
     const initialViewportAppliedRef = useRef(false);
     const commandCounterRef = useRef(0);
@@ -1733,6 +1843,17 @@ const MapView = memo(({
         }
     }, [selectedAreaValue]);
 
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedViewportState({
+                currentZoom: viewportState.currentZoom,
+                currentBounds: viewportState.currentBounds,
+            });
+        }, VIEWPORT_RECALC_DEBOUNCE_MS);
+
+        return () => clearTimeout(timer);
+    }, [viewportState.currentBounds, viewportState.currentZoom]);
+
     const camerasWithCoords = useMemo(() => cameras.filter(hasValidCoords), [cameras]);
 
     const camerasWithCoordsByAreaKey = useMemo(() => {
@@ -1780,10 +1901,10 @@ const MapView = memo(({
     }, [camerasWithCoords, camerasWithCoordsByAreaKey, selectedAreaValue]);
 
     const visibleBase = useMemo(() => (
-        filteredBase.filter((camera) => isCameraInBounds(camera, viewportState.currentBounds))
-    ), [filteredBase, viewportState.currentBounds]);
+        filteredBase.filter((camera) => isCameraInBounds(camera, debouncedViewportState.currentBounds))
+    ), [debouncedViewportState.currentBounds, filteredBase]);
 
-    const effectiveZoom = viewportState.currentZoom || mapSettings.zoom || defaultZoom;
+    const effectiveZoom = debouncedViewportState.currentZoom || mapSettings.zoom || defaultZoom;
 
     const shouldUseAllAreaSuperAggregateMarkers = selectedAreaValue === 'all'
         && filteredBase.length > DENSE_AREA_THRESHOLD
@@ -1792,6 +1913,7 @@ const MapView = memo(({
         && effectiveZoom >= ALL_AREA_SUPER_AGGREGATE_ZOOM
         && effectiveZoom < AREA_AGGREGATE_ZOOM;
     const shouldUseGroupedMarkers = filteredBase.length > DENSE_AREA_THRESHOLD && effectiveZoom >= AREA_AGGREGATE_ZOOM && effectiveZoom < INDIVIDUAL_MARKER_ZOOM;
+    const shouldUseMicroBucketMarkers = effectiveZoom >= INDIVIDUAL_MARKER_ZOOM && visibleBase.length > MAX_VISIBLE_INDIVIDUAL_MARKERS;
     const shouldShowZoomHint = filteredBase.length > DENSE_AREA_THRESHOLD && effectiveZoom < INDIVIDUAL_MARKER_ZOOM;
     const spatialClusterSource = selectedAreaValue === 'all' ? filteredBase : visibleBase;
 
@@ -1843,12 +1965,23 @@ const MapView = memo(({
         }));
     }, [effectiveZoom, shouldUseGroupedMarkers, spatialClusterSource]);
 
+    const microBucketMarkers = useMemo(() => {
+        if (!shouldUseMicroBucketMarkers) {
+            return [];
+        }
+
+        return bucketCamerasByCoordinate(visibleBase, INDIVIDUAL_MARKER_ZOOM - 1).map((group) => ({
+            ...group,
+            kind: 'bucket',
+        }));
+    }, [shouldUseMicroBucketMarkers, visibleBase]);
+
     const visibleIndividualMarkers = useMemo(() => {
-        if (shouldUseAllAreaSuperAggregateMarkers || shouldUseAggregateMarkers || shouldUseGroupedMarkers) {
+        if (shouldUseAllAreaSuperAggregateMarkers || shouldUseAggregateMarkers || shouldUseGroupedMarkers || shouldUseMicroBucketMarkers) {
             return [];
         }
         return applyMarkerOffset(visibleBase);
-    }, [shouldUseAggregateMarkers, shouldUseAllAreaSuperAggregateMarkers, shouldUseGroupedMarkers, visibleBase]);
+    }, [shouldUseAggregateMarkers, shouldUseAllAreaSuperAggregateMarkers, shouldUseGroupedMarkers, shouldUseMicroBucketMarkers, visibleBase]);
 
     const stats = useMemo(() => {
         const maintenance = filteredBase.filter(c => c.status === 'maintenance').length;
@@ -2020,9 +2153,10 @@ const MapView = memo(({
                 {groupedVisibleMarkers.map((marker) => (
                     <AggregateMarker key={marker.key} marker={marker} onClick={handleAggregateMarkerClick} />
                 ))}
-                {visibleIndividualMarkers.map(camera => (
-                    <CameraMarker key={camera.id} camera={camera} onClick={openModal} />
+                {microBucketMarkers.map((marker) => (
+                    <AggregateMarker key={marker.key} marker={marker} onClick={handleAggregateMarkerClick} />
                 ))}
+                <ImperativeMarkerLayer cameras={visibleIndividualMarkers} onClick={openModal} />
             </MapContainer>
 
             <div className="absolute left-3 right-3 top-3 z-[1000] flex items-start justify-between gap-3">
