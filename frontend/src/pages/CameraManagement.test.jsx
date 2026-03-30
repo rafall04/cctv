@@ -6,12 +6,14 @@ import CameraManagement from './CameraManagement';
 
 const {
     getAllCameras,
+    getCameraById,
     createCamera,
     updateCamera,
     deleteCamera,
     getAllAreas,
 } = vi.hoisted(() => ({
     getAllCameras: vi.fn(),
+    getCameraById: vi.fn(),
     createCamera: vi.fn(),
     updateCamera: vi.fn(),
     deleteCamera: vi.fn(),
@@ -21,6 +23,7 @@ const {
 vi.mock('../services/cameraService', () => ({
     cameraService: {
         getAllCameras,
+        getCameraById,
         createCamera,
         updateCamera,
         deleteCamera,
@@ -51,12 +54,14 @@ vi.mock('../components/LocationPicker', () => ({
 describe('CameraManagement', () => {
     beforeEach(() => {
         getAllCameras.mockReset();
+        getCameraById.mockReset();
         createCamera.mockReset();
         updateCamera.mockReset();
         deleteCamera.mockReset();
         getAllAreas.mockReset();
 
         getAllCameras.mockResolvedValue({ success: true, data: [] });
+        getCameraById.mockResolvedValue({ success: true, data: null });
         getAllAreas.mockResolvedValue({ success: true, data: [{ id: 1, name: 'Lobby' }] });
         createCamera.mockResolvedValue({ success: true });
         updateCamera.mockResolvedValue({ success: true });
@@ -140,5 +145,51 @@ describe('CameraManagement', () => {
 
         await screen.findByText('Add Camera');
         expect(screen.queryByText('Camera health diagnostics')).toBeNull();
+    });
+
+    it('mengambil detail penuh saat edit agar RTSP internal tetap muncul di form', async () => {
+        getAllCameras.mockResolvedValue({
+            success: true,
+            data: [{
+                id: 7,
+                name: 'Surabaya Cam',
+                enabled: 1,
+                status: 'active',
+                area_name: 'SURABAYA',
+                area_id: 1,
+                location: 'A. YANI',
+                stream_source: 'internal',
+                delivery_type: 'internal_hls',
+                is_tunnel: 0,
+            }],
+        });
+        getCameraById.mockResolvedValue({
+            success: true,
+            data: {
+                id: 7,
+                name: 'Surabaya Cam',
+                enabled: 1,
+                status: 'active',
+                area_name: 'SURABAYA',
+                area_id: 1,
+                location: 'A. YANI',
+                stream_source: 'internal',
+                delivery_type: 'internal_hls',
+                private_rtsp_url: 'rtsp://user:pass@36.66.208.112:554/Streaming/Channels/402',
+                video_codec: 'h264',
+                is_tunnel: 0,
+            },
+        });
+
+        render(<CameraManagement />);
+
+        await screen.findByText('Surabaya Cam');
+        fireEvent.click(screen.getByTitle('Edit camera'));
+
+        await waitFor(() => {
+            expect(getCameraById).toHaveBeenCalledWith(7);
+        });
+
+        expect(await screen.findByDisplayValue('rtsp://user:pass@36.66.208.112:554/Streaming/Channels/402')).toBeTruthy();
     });
 });

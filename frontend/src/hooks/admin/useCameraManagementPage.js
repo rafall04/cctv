@@ -37,6 +37,7 @@ export function useCameraManagementPage() {
     const [showModal, setShowModal] = useState(false);
     const [editingCamera, setEditingCamera] = useState(null);
     const [modalError, setModalError] = useState('');
+    const [, setLoadingEditCameraId] = useState(null);
     const [deletingId, setDeletingId] = useState(null);
     const [togglingId, setTogglingId] = useState(null);
     const [togglingMaintenanceId, setTogglingMaintenanceId] = useState(null);
@@ -154,13 +155,24 @@ export function useCameraManagementPage() {
         setShowModal(true);
     }, [resetWith]);
 
-    const openEditModal = useCallback((camera) => {
-        const formValues = mapCameraToFormValues(camera);
-        setEditingCamera(camera);
-        resetWith(formValues, getCameraValidationRules(formValues.delivery_type));
+    const openEditModal = useCallback(async (camera) => {
         setModalError('');
-        setShowModal(true);
-    }, [resetWith]);
+        setLoadingEditCameraId(camera.id);
+
+        try {
+            const response = await cameraService.getCameraById(camera.id);
+            const fullCamera = response?.success ? response.data : camera;
+            const formValues = mapCameraToFormValues(fullCamera);
+            setEditingCamera(fullCamera);
+            resetWith(formValues, getCameraValidationRules(formValues.delivery_type));
+            setShowModal(true);
+        } catch (error) {
+            console.error('Load camera detail error:', error);
+            showError('Load Camera Failed', error.response?.data?.message || 'Failed to load full camera detail.');
+        } finally {
+            setLoadingEditCameraId(null);
+        }
+    }, [resetWith, showError]);
 
     const handleFormChange = useCallback((event) => {
         const { name, value, type, checked } = event.target;
