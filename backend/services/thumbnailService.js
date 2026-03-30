@@ -100,9 +100,14 @@ class ThumbnailService {
         const args = [];
         const normalizedTlsMode = this.normalizeExternalTlsMode(externalTlsMode);
         const isHttps = typeof sourceUrl === 'string' && sourceUrl.startsWith('https://');
+        const isRtsp = typeof sourceUrl === 'string' && sourceUrl.startsWith('rtsp://');
 
         if (isHttps && normalizedTlsMode === 'insecure') {
             args.push('-tls_verify', '0');
+        }
+
+        if (isRtsp) {
+            args.push('-rtsp_transport', 'tcp');
         }
 
         args.push('-rw_timeout', '10000000');
@@ -115,8 +120,17 @@ class ThumbnailService {
         const externalStreamUrl = (getPrimaryExternalStreamUrl(camera) || '').trim();
         const externalSnapshotUrl = (camera.external_snapshot_url || '').trim();
         const externalTlsMode = this.normalizeExternalTlsMode(camera.external_tls_mode);
+        const privateRtspUrl = typeof camera.private_rtsp_url === 'string' ? camera.private_rtsp_url.trim() : '';
 
         if (deliveryType === 'internal_hls') {
+            if (privateRtspUrl.startsWith('rtsp://')) {
+                return {
+                    type: 'internal_rtsp',
+                    sourceUrl: privateRtspUrl,
+                    externalTlsMode,
+                };
+            }
+
             if (!camera.stream_key) {
                 return { type: 'unavailable', reason: 'missing_internal_stream_key' };
             }
@@ -159,9 +173,30 @@ class ThumbnailService {
         return { type: 'unavailable', reason: 'unsupported_delivery_type' };
     }
 
-    async processCamera(camera) {
-        if (camera.is_online === 0) {
+    shouldSkipCamera(camera) {
+        if (!camera || camera.enabled === 0) {
+            return { skipped: true, reason: 'camera_unavailable' };
+        }
+
+        if (camera.status === 'maintenance') {
+            return { skipped: true, reason: 'camera_maintenance' };
+        }
+
+        const deliveryType = getEffectiveDeliveryType(camera);
+        const isInternal = deliveryType === 'internal_hls';
+        const runtimeOnline = camera.runtime_is_online;
+
+        if (!isInternal && (camera.is_online === 0 || runtimeOnline === 0)) {
             return { skipped: true, reason: 'camera_offline' };
+        }
+
+        return { skipped: false };
+    }
+
+    async processCamera(camera) {
+        const skip = this.shouldSkipCamera(camera);
+        if (skip.skipped) {
+            return skip;
         }
 
         if (this.inFlightCameraIds.has(camera.id)) {
@@ -209,11 +244,14 @@ class ThumbnailService {
 
         try {
             const cameras = query(`
-                SELECT id, name, is_online, stream_key, stream_source, delivery_type,
+                SELECT c.id, c.name, c.enabled, c.status, c.is_online, c.stream_key, c.stream_source, c.delivery_type,
+                       c.private_rtsp_url,
                        external_hls_url, external_stream_url, external_snapshot_url,
-                       external_embed_url, external_tls_mode, thumbnail_path
-                FROM cameras
-                WHERE enabled = 1 AND is_online = 1
+                       external_embed_url, external_tls_mode, thumbnail_path,
+                       crs.is_online as runtime_is_online
+                FROM cameras c
+                LEFT JOIN camera_runtime_state crs ON crs.camera_id = c.id
+                WHERE c.enabled = 1
             `);
 
             if (cameras.length === 0) {
@@ -371,6 +409,7 @@ class ThumbnailService {
                 stream_key: streamKey,
                 stream_source: streamSource,
                 delivery_type: deliveryType,
+                private_rtsp_url: null,
                 external_hls_url: externalHlsUrl,
                 external_stream_url: externalStreamUrl,
                 external_snapshot_url: externalSnapshotUrl,
@@ -397,20 +436,19 @@ class ThumbnailService {
 
     async refreshCameraThumbnail(cameraId) {
         const camera = query(
-            `SELECT id, name, enabled, is_online, stream_key, stream_source, delivery_type,
-                    external_hls_url, external_stream_url, external_snapshot_url,
-                    external_embed_url, external_tls_mode, thumbnail_path
-             FROM cameras
-             WHERE id = ?`,
+            `SELECT c.id, c.name, c.enabled, c.status, c.is_online, c.stream_key, c.stream_source, c.delivery_type,
+                    c.private_rtsp_url, c.external_hls_url, c.external_stream_url, c.external_snapshot_url,
+                    c.external_embed_url, c.external_tls_mode, c.thumbnail_path,
+                    crs.is_online as runtime_is_online
+             FROM cameras c
+             LEFT JOIN camera_runtime_state crs ON crs.camera_id = c.id
+             WHERE c.id = ?`,
             [cameraId]
         )?.[0];
 
-        if (!camera || !camera.enabled) {
-            return { success: false, skipped: true, reason: 'camera_unavailable' };
-        }
-
-        if (camera.is_online !== 1) {
-            return { success: false, skipped: true, reason: 'camera_offline' };
+        const skip = this.shouldSkipCamera(camera);
+        if (skip.skipped) {
+            return { success: false, skipped: true, reason: skip.reason };
         }
 
         const result = await this.processCamera(camera);

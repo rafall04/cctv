@@ -139,7 +139,7 @@ describe('thumbnailService external thumbnails', () => {
         await thumbnailService.generateAllThumbnails();
 
         expect(execFileMock).toHaveBeenCalledTimes(1);
-        expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('WHERE enabled = 1 AND is_online = 1'));
+        expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('WHERE c.enabled = 1'));
     });
 
     it('refreshes a single camera only when it is eligible and online', async () => {
@@ -170,11 +170,13 @@ describe('thumbnailService external thumbnails', () => {
                     name: 'Offline Camera',
                     enabled: 1,
                     is_online: 0,
+                    status: 'active',
                     stream_key: 'camera32',
-                    stream_source: 'internal',
-                    delivery_type: 'internal_hls',
-                    external_hls_url: null,
-                    external_stream_url: null,
+                    stream_source: 'external',
+                    delivery_type: 'external_hls',
+                    private_rtsp_url: null,
+                    external_hls_url: 'https://example.com/offline/index.m3u8',
+                    external_stream_url: 'https://example.com/offline/index.m3u8',
                     external_snapshot_url: null,
                     external_embed_url: null,
                     external_tls_mode: 'strict',
@@ -191,5 +193,68 @@ describe('thumbnailService external thumbnails', () => {
         expect(onlineResult).toEqual({ success: true });
         expect(offlineResult).toEqual({ success: false, skipped: true, reason: 'camera_offline' });
         expect(execFileMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('uses private RTSP directly for internal thumbnails when available', async () => {
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        const result = await thumbnailService.generateSingle(
+            33,
+            'stream-key-33',
+            'internal',
+            null,
+            'internal_hls'
+        );
+
+        expect(result).toEqual({ success: true, source: 'internal_hls' });
+
+        const strategy = thumbnailService.resolveCameraThumbnailStrategy({
+            id: 33,
+            stream_key: 'stream-key-33',
+            stream_source: 'internal',
+            delivery_type: 'internal_hls',
+            private_rtsp_url: 'rtsp://user:pass@36.66.208.112:554/Streaming/Channels/402',
+        });
+
+        expect(strategy).toEqual(expect.objectContaining({
+            type: 'internal_rtsp',
+            sourceUrl: 'rtsp://user:pass@36.66.208.112:554/Streaming/Channels/402',
+        }));
+    });
+
+    it('still refreshes internal thumbnails even when legacy is_online is 0', async () => {
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        queryMock.mockImplementation((sql, params) => {
+            if (params?.[0] === 34) {
+                return [{
+                    id: 34,
+                    name: 'Surabaya Internal',
+                    enabled: 1,
+                    status: 'active',
+                    is_online: 0,
+                    runtime_is_online: 0,
+                    stream_key: 'camera34',
+                    stream_source: 'internal',
+                    delivery_type: 'internal_hls',
+                    private_rtsp_url: 'rtsp://user:pass@36.66.208.112:554/Streaming/Channels/402',
+                    external_hls_url: null,
+                    external_stream_url: null,
+                    external_snapshot_url: null,
+                    external_embed_url: null,
+                    external_tls_mode: 'strict',
+                    thumbnail_path: null,
+                }];
+            }
+
+            return [];
+        });
+
+        const result = await thumbnailService.refreshCameraThumbnail(34);
+
+        expect(result).toEqual({ success: true });
+        const [, args] = execFileMock.mock.calls[0];
+        expect(args).toContain('rtsp://user:pass@36.66.208.112:554/Streaming/Channels/402');
+        expect(args).toContain('-rtsp_transport');
     });
 });
