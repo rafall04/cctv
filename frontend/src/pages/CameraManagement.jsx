@@ -71,8 +71,9 @@ export default function CameraManagement() {
                         >
                             <option value="all">Semua Delivery</option>
                             <option value="internal_hls">Internal HLS</option>
-                            <option value="external_hls">External HLS</option>
-                            <option value="external_mjpeg">External MJPEG</option>
+                                    <option value="external_hls">External HLS</option>
+                                    <option value="external_flv">External FLV</option>
+                                    <option value="external_mjpeg">External MJPEG</option>
                             <option value="external_embed">External Embed</option>
                             <option value="external_jsmpeg">External JSMPEG</option>
                             <option value="external_custom_ws">External Custom WS</option>

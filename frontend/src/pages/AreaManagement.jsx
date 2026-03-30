@@ -785,8 +785,9 @@ export default function AreaManagement() {
                                             className="w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
                                         >
                                             <option value="ignore">Biarkan Seperti Semula</option>
-                                            <option value="external_hls">External HLS</option>
-                                            <option value="external_mjpeg">External MJPEG</option>
+                            <option value="external_hls">External HLS</option>
+                            <option value="external_flv">External FLV</option>
+                            <option value="external_mjpeg">External MJPEG</option>
                                             <option value="external_embed">External Embed</option>
                                             <option value="external_jsmpeg">External JSMpeg</option>
                                             <option value="external_custom_ws">Custom WebSocket</option>

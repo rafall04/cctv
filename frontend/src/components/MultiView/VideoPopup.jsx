@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect, useCallback, useLayoutEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import flvjs from 'flv.js';
 import { Icons } from '../ui/Icons.jsx';
 import CodecBadge from '../CodecBadge.jsx';
 import ZoomableVideo from './ZoomableVideo';
@@ -61,6 +62,7 @@ function VideoPopup({
     const headerRef = useRef(null);
     const footerRef = useRef(null);
     const hlsRef = useRef(null);
+    const flvRef = useRef(null);
     const fallbackHandlerRef = useRef(null);
     const abortControllerRef = useRef(null);
     const loadingStageRef = useRef(LoadingStage.CONNECTING);
@@ -136,6 +138,9 @@ function VideoPopup({
     const [showTroubleshooting, setShowTroubleshooting] = useState(false);
     const [forceProxyFallback, setForceProxyFallback] = useState(false);
     const [videoAspectRatio, setVideoAspectRatio] = useState(null);
+    const [flvPlaybackSupported, setFlvPlaybackSupported] = useState(() => (
+        typeof window !== 'undefined' ? flvjs.isSupported() : false
+    ));
     const [popupTopAdHeight, setPopupTopAdHeight] = useState(0);
     const [popupBottomAdHeight, setPopupBottomAdHeight] = useState(0);
     const [layoutMetrics, setLayoutMetrics] = useState(() => ({
@@ -150,13 +155,18 @@ function VideoPopup({
     const isHlsCamera = isHlsDeliveryType(deliveryType);
     const popupEmbedUrl = getPopupEmbedUrl(camera);
     const fallbackExternalUrl = getPrimaryExternalUrl(camera);
-    const officialSourceUrl = popupEmbedUrl || (/^https?:\/\//i.test(fallbackExternalUrl || '') ? fallbackExternalUrl : null);
+    const flvUrl = deliveryType === 'external_flv'
+        ? (camera.external_stream_url || camera.external_hls_url || null)
+        : null;
+    const officialSourceUrl = popupEmbedUrl || (/^https?:\/\//i.test((deliveryType === 'external_flv' ? flvUrl : fallbackExternalUrl) || '') ? (deliveryType === 'external_flv' ? flvUrl : fallbackExternalUrl) : null);
     const url = camera.streams?.hls;
     const deviceTier = detectDeviceTier();
     const isExternal = deliveryType === 'external_hls';
     const { targetUrl: resolvedUrl, proxyFallbackUrl, isDirectStream } = resolveStreamUrl(camera, { forceProxy: forceProxyFallback });
-    const effectiveUrl = isHlsCamera ? (resolvedUrl || url) : (popupEmbedUrl || fallbackExternalUrl);
-    const passiveSignalUrl = officialSourceUrl || effectiveUrl || null;
+    const effectiveUrl = isHlsCamera
+        ? (resolvedUrl || url)
+        : (deliveryType === 'external_flv' ? flvUrl : (popupEmbedUrl || fallbackExternalUrl));
+    const passiveSignalUrl = (deliveryType === 'external_flv' ? flvUrl : null) || officialSourceUrl || effectiveUrl || null;
 
     const reportRuntimeSuccess = useCallback((signalType) => {
         if (camera.stream_source !== 'external') {
@@ -184,7 +194,7 @@ function VideoPopup({
 
     useEffect(() => {
         if (
-            deliveryType !== 'external_mjpeg'
+            (deliveryType !== 'external_mjpeg' && deliveryType !== 'external_flv')
             || isMaintenance
             || isOffline
             || status === 'error'
@@ -195,7 +205,7 @@ function VideoPopup({
 
         const intervalId = setInterval(() => {
             if (status !== 'error') {
-                reportRuntimeSuccess('external_mjpeg_live_tick');
+                reportRuntimeSuccess(deliveryType === 'external_flv' ? 'external_flv_live_tick' : 'external_mjpeg_live_tick');
             }
         }, 25000);
 
@@ -229,12 +239,16 @@ function VideoPopup({
             return;
         }
 
-        if (!isHlsCamera && streamCapabilities.popup) {
+        if (!isHlsCamera && deliveryType !== 'external_flv' && streamCapabilities.popup) {
             setStatus(availabilityState === 'degraded' ? 'degraded' : (effectiveUrl ? 'playing' : 'error'));
             setLoadingStage(LoadingStage.BUFFERING);
             setErrorType(effectiveUrl ? null : 'unknown');
         }
-    }, [availabilityState, effectiveUrl, isHlsCamera, isMaintenance, isOffline, streamCapabilities.popup]);
+    }, [availabilityState, deliveryType, effectiveUrl, isHlsCamera, isMaintenance, isOffline, streamCapabilities.popup]);
+
+    useEffect(() => {
+        setFlvPlaybackSupported(typeof window !== 'undefined' ? flvjs.isSupported() : false);
+    }, [camera.id]);
 
     const syncVideoAspectRatio = useCallback(() => {
         const nextAspectRatio = getVideoAspectRatio(videoRef.current);
@@ -384,6 +398,10 @@ function VideoPopup({
         if (hlsRef.current) {
             hlsRef.current.destroy();
             hlsRef.current = null;
+        }
+        if (flvRef.current) {
+            flvRef.current.destroy();
+            flvRef.current = null;
         }
         if (videoRef.current) {
             videoRef.current.pause();
@@ -720,6 +738,92 @@ function VideoPopup({
         };
     }, [camera.id, camera.stream_source, cleanupResources, clearInternalWarmupRetry, clearStreamTimeout, deviceTier, isExternal, isHlsCamera, isMaintenance, isOffline, requestVideoPlay, resetFailures, retryKey, startTimeout, syncVideoAspectRatio, updateStreamStage, effectiveUrl, forceProxyFallback, isDirectStream, proxyFallbackUrl, reportRuntimeFailure, reportRuntimeSuccess]);
 
+    useEffect(() => {
+        if (isMaintenance || isOffline || deliveryType !== 'external_flv') return;
+        if (!videoRef.current) return;
+
+        if (!flvjs.isSupported()) {
+            setFlvPlaybackSupported(false);
+            setStatus(popupEmbedUrl ? 'playing' : 'error');
+            setLoadingStage(popupEmbedUrl ? LoadingStage.BUFFERING : LoadingStage.ERROR);
+            setErrorType(popupEmbedUrl ? null : 'media');
+            return;
+        }
+
+        if (!effectiveUrl) {
+            setStatus('error');
+            setLoadingStage(LoadingStage.ERROR);
+            setErrorType('unknown');
+            return;
+        }
+
+        setFlvPlaybackSupported(true);
+        const video = videoRef.current;
+        let cancelled = false;
+        const player = flvjs.createPlayer({
+            type: 'flv',
+            isLive: true,
+            url: effectiveUrl,
+        }, {
+            enableStashBuffer: false,
+            stashInitialSize: 128,
+            autoCleanupSourceBuffer: true,
+        });
+        flvRef.current = player;
+
+        setStatus('connecting');
+        setLoadingStage(LoadingStage.CONNECTING);
+        setErrorType(null);
+        setVideoAspectRatio(null);
+
+        const handlePlaying = () => {
+            if (cancelled) return;
+            setStatus('live');
+            setLoadingStage(LoadingStage.PLAYING);
+            syncVideoAspectRatio();
+            reportRuntimeSuccess('external_flv_runtime_playing');
+        };
+
+        const handleLoadedMetadata = () => {
+            if (cancelled) return;
+            syncVideoAspectRatio();
+            setLoadingStage(LoadingStage.BUFFERING);
+            requestVideoPlay(video);
+        };
+
+        const handleFatalError = () => {
+            if (cancelled) return;
+            setStatus(popupEmbedUrl ? 'playing' : 'error');
+            setLoadingStage(popupEmbedUrl ? LoadingStage.BUFFERING : LoadingStage.ERROR);
+            setErrorType(popupEmbedUrl ? null : 'media');
+            reportRuntimeFailure('external_flv_runtime_error');
+        };
+
+        video.addEventListener('playing', handlePlaying);
+        video.addEventListener('loadedmetadata', handleLoadedMetadata);
+        video.addEventListener('error', handleFatalError);
+        player.on(flvjs.Events.ERROR, handleFatalError);
+
+        try {
+            player.attachMediaElement(video);
+            player.load();
+            requestVideoPlay(video);
+        } catch {
+            handleFatalError();
+        }
+
+        return () => {
+            cancelled = true;
+            video.removeEventListener('playing', handlePlaying);
+            video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            video.removeEventListener('error', handleFatalError);
+            if (flvRef.current) {
+                flvRef.current.destroy();
+                flvRef.current = null;
+            }
+        };
+    }, [deliveryType, effectiveUrl, isMaintenance, isOffline, popupEmbedUrl, reportRuntimeFailure, reportRuntimeSuccess, requestVideoPlay, syncVideoAspectRatio]);
+
     const handleRetry = useCallback(() => {
         cleanupResources();
         setStatus('connecting');
@@ -971,7 +1075,7 @@ function VideoPopup({
                     style={bodyStyle}
                     onDoubleClick={toggleFS}
                 >
-                    {isHlsCamera ? (
+                    {isHlsCamera || (deliveryType === 'external_flv' && flvPlaybackSupported) ? (
                         <ZoomableVideo videoRef={videoRef} maxZoom={4} onZoomChange={setZoom} isFullscreen={isFullscreen} />
                     ) : deliveryType === 'external_mjpeg' && effectiveUrl ? (
                         <ZoomableMediaFrame maxZoom={4} onZoomChange={setZoom}>

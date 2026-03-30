@@ -72,7 +72,7 @@ export const createCameraSchema = {
             },
             delivery_type: {
                 type: 'string',
-                enum: ['internal_hls', 'external_hls', 'external_mjpeg', 'external_embed', 'external_jsmpeg', 'external_custom_ws']
+                enum: ['internal_hls', 'external_hls', 'external_flv', 'external_mjpeg', 'external_embed', 'external_jsmpeg', 'external_custom_ws']
             },
             external_hls_url: {
                 anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }]
@@ -181,7 +181,7 @@ export const updateCameraSchema = {
             },
             delivery_type: {
                 type: 'string',
-                enum: ['internal_hls', 'external_hls', 'external_mjpeg', 'external_embed', 'external_jsmpeg', 'external_custom_ws']
+                enum: ['internal_hls', 'external_hls', 'external_flv', 'external_mjpeg', 'external_embed', 'external_jsmpeg', 'external_custom_ws']
             },
             external_hls_url: {
                 anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }]

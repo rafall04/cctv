@@ -1,6 +1,7 @@
 export const DELIVERY_TYPES = [
     'internal_hls',
     'external_hls',
+    'external_flv',
     'external_mjpeg',
     'external_embed',
     'external_jsmpeg',
@@ -11,6 +12,7 @@ export const DELIVERY_TYPE_PATTERNS = {
     websocket: /^wss?:\/\//i,
     http: /^https?:\/\//i,
     hlsHint: /\.m3u8($|[?#])/i,
+    flvHint: /\.flv($|[?#])/i,
     zoneminderMjpeg: /\/zm\/cgi-bin\/nph-zms/i,
     jsmpegHint: /jsmpeg/i,
 };
@@ -44,6 +46,9 @@ export function getEffectiveDeliveryType(camera = {}) {
     }
 
     if (externalUrl && DELIVERY_TYPE_PATTERNS.http.test(externalUrl)) {
+        if (DELIVERY_TYPE_PATTERNS.flvHint.test(externalUrl)) {
+            return 'external_flv';
+        }
         return DELIVERY_TYPE_PATTERNS.hlsHint.test(externalUrl)
             ? 'external_hls'
             : 'external_mjpeg';
@@ -69,6 +74,7 @@ export function getStreamCapabilities(camera = {}) {
     const fallbackCapabilities = {
         internal_hls: { live: true, popup: true, multiview: true, playback: true, supported_player: 'hls' },
         external_hls: { live: true, popup: true, multiview: true, playback: true, supported_player: 'hls' },
+        external_flv: { live: true, popup: true, multiview: false, playback: false, supported_player: 'flv' },
         external_mjpeg: { live: true, popup: true, multiview: false, playback: false, supported_player: 'mjpeg' },
         external_embed: { live: true, popup: true, multiview: false, playback: false, supported_player: 'embed' },
         external_jsmpeg: { live: true, popup: true, multiview: false, playback: false, supported_player: 'embed_fallback' },
@@ -110,6 +116,10 @@ export function getPopupEmbedUrl(camera = {}) {
 
     if (deliveryType === 'external_mjpeg') {
         return camera.external_stream_url || camera.external_embed_url || null;
+    }
+
+    if (deliveryType === 'external_flv') {
+        return camera.external_embed_url || null;
     }
 
     if (deliveryType === 'external_jsmpeg' || deliveryType === 'external_custom_ws') {

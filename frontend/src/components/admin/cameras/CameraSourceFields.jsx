@@ -3,6 +3,7 @@ import { getRtspFormatHint } from '../../../utils/validators';
 const DELIVERY_OPTIONS = [
     { value: 'internal_hls', label: 'Internal HLS', description: 'RTSP privat -> MediaMTX -> HLS/WebRTC', group: 'internal' },
     { value: 'external_hls', label: 'External HLS', description: 'URL .m3u8 publik/third-party', group: 'external' },
+    { value: 'external_flv', label: 'External FLV', description: 'HTTP-FLV live stream seperti Surakarta', group: 'external' },
     { value: 'external_mjpeg', label: 'External MJPEG', description: 'Popup-only, cocok untuk ZoneMinder/HTTP MJPEG', group: 'external' },
     { value: 'external_embed', label: 'External Embed', description: 'Popup-only via iframe/embed URL resmi', group: 'external' },
     { value: 'external_jsmpeg', label: 'External JSMpeg', description: 'Popup-only, gunakan embed fallback bila tersedia', group: 'external' },
@@ -47,9 +48,10 @@ export default function CameraSourceFields({
     const deliveryType = formData.delivery_type || 'internal_hls';
     const isInternal = deliveryType === 'internal_hls';
     const isExternalHls = deliveryType === 'external_hls';
+    const isExternalFlv = deliveryType === 'external_flv';
     const isExternal = !isInternal;
-    const usesStreamUrl = ['external_hls', 'external_mjpeg', 'external_jsmpeg', 'external_custom_ws'].includes(deliveryType);
-    const usesEmbedUrl = deliveryType === 'external_embed' || deliveryType === 'external_jsmpeg' || deliveryType === 'external_custom_ws';
+    const usesStreamUrl = ['external_hls', 'external_flv', 'external_mjpeg', 'external_jsmpeg', 'external_custom_ws'].includes(deliveryType);
+    const usesEmbedUrl = deliveryType === 'external_embed' || deliveryType === 'external_flv' || deliveryType === 'external_jsmpeg' || deliveryType === 'external_custom_ws';
 
     const setDeliveryType = (value) => {
         onChange({ target: { name: 'delivery_type', value, type: 'text' } });
@@ -57,6 +59,8 @@ export default function CameraSourceFields({
         if (value === 'internal_hls') {
             onChange({ target: { name: 'external_health_mode', value: 'default', type: 'text' } });
         } else if (value === 'external_mjpeg') {
+            onChange({ target: { name: 'external_health_mode', value: 'passive_first', type: 'text' } });
+        } else if (value === 'external_flv') {
             onChange({ target: { name: 'external_health_mode', value: 'passive_first', type: 'text' } });
         } else if (value === 'external_hls') {
             onChange({ target: { name: 'external_health_mode', value: 'hybrid_probe', type: 'text' } });
@@ -180,6 +184,7 @@ export default function CameraSourceFields({
                             ) : (
                                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                                     {deliveryType === 'external_hls' && 'Gunakan URL HLS (.m3u8). Hanya type ini yang boleh memakai proxy backend dan Multi-View.'}
+                                    {deliveryType === 'external_flv' && 'Gunakan URL HTTP-FLV resmi (.flv). Live popup memakai player FLV browser-side dan tidak masuk playback/recording.'}
                                     {deliveryType === 'external_mjpeg' && 'Cocok untuk MJPEG/ZoneMinder. Popup akan memuat direct browser stream, bukan HLS proxy.'}
                                     {deliveryType === 'external_jsmpeg' && 'Gunakan WebSocket JSMpeg jika Anda juga punya fallback embed/resmi. Type ini popup-only.'}
                                     {deliveryType === 'external_custom_ws' && 'Custom WebSocket tidak dijamin playable. Idealnya isi juga embed URL resmi sebagai fallback.'}
@@ -208,7 +213,7 @@ export default function CameraSourceFields({
                                 <p className="mt-1 text-xs text-red-500">{getFieldError('external_embed_url')}</p>
                             ) : (
                                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                    {deliveryType === 'external_embed' ? 'URL resmi iframe/embed yang akan dipakai langsung di popup.' : 'Opsional tapi sangat disarankan sebagai fallback resmi saat stream WebSocket tidak punya adapter generik.'}
+                                    {deliveryType === 'external_embed' ? 'URL resmi iframe/embed yang akan dipakai langsung di popup.' : (isExternalFlv ? 'Opsional. Dipakai sebagai fallback jika browser gagal memutar HTTP-FLV secara native.' : 'Opsional tapi sangat disarankan sebagai fallback resmi saat stream WebSocket tidak punya adapter generik.')}
                                 </p>
                             )}
                         </div>
@@ -279,6 +284,19 @@ export default function CameraSourceFields({
                         </>
                     )}
 
+                    {isExternalFlv && (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4 dark:border-amber-500/20 dark:bg-amber-500/10">
+                            <div className="flex items-start gap-3">
+                                <div>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white">HTTP-FLV Live Only</p>
+                                    <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
+                                        Type ini khusus live popup. Recording, playback, dan Multi-View belum didukung. Isi embed URL resmi bila ingin fallback aman di browser yang gagal memutar FLV.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {isExternal ? (
                         <div>
                             <label htmlFor="camera-external-health-mode" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -306,8 +324,9 @@ export default function CameraSourceFields({
                     ) : null}
 
                     <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-4 text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300">
-                        {deliveryType === 'external_mjpeg' && 'Type ini popup-only dan tidak masuk playback atau Multi-View.'}
-                        {deliveryType === 'external_embed' && 'Type ini popup-only dan tidak masuk playback atau Multi-View.'}
+                    {deliveryType === 'external_flv' && 'Type ini live-only. Tidak masuk playback, recording, atau Multi-View pada v1.'}
+                    {deliveryType === 'external_mjpeg' && 'Type ini popup-only dan tidak masuk playback atau Multi-View.'}
+                    {deliveryType === 'external_embed' && 'Type ini popup-only dan tidak masuk playback atau Multi-View.'}
                         {deliveryType === 'external_jsmpeg' && 'Type ini popup-only. Jika adapter tidak tersedia, sistem akan fallback ke embed atau tombol sumber resmi.'}
                         {deliveryType === 'external_custom_ws' && 'Type ini metadata-limited. Sistem tidak akan mencoba decode generic WebSocket stream di server.'}
                     </div>

@@ -85,6 +85,34 @@ describe('cameraFormAdapter delivery type support', () => {
         expect(payload.external_health_mode).toBe('passive_first');
     });
 
+    it('builds external FLV payload as live-only external source without proxy', () => {
+        const payload = buildCameraPayload({
+            ...defaultCameraFormValues,
+            delivery_type: 'external_flv',
+            stream_source: 'external',
+            external_stream_url: 'https://surakarta.atcsindonesia.info:8086/camera/BalaiKota.flv',
+            external_embed_url: 'https://example.com/fallback-player',
+            external_use_proxy: true,
+        });
+
+        expect(payload).toMatchObject({
+            delivery_type: 'external_flv',
+            stream_source: 'external',
+            external_stream_url: 'https://surakarta.atcsindonesia.info:8086/camera/BalaiKota.flv',
+            external_hls_url: null,
+            external_embed_url: 'https://example.com/fallback-player',
+            external_use_proxy: 0,
+            external_tls_mode: 'strict',
+        });
+    });
+
+    it('validates FLV delivery types with .flv URLs only', () => {
+        const rules = getCameraValidationRules('external_flv');
+
+        expect(rules.external_stream_url.custom('https://example.com/live')).toBe('URL FLV harus berakhiran .flv');
+        expect(rules.external_stream_url.custom('https://example.com/live.flv')).toBeUndefined();
+    });
+
     it('validates WebSocket delivery types with ws/wss URLs only', () => {
         const rules = getCameraValidationRules('external_custom_ws');
 

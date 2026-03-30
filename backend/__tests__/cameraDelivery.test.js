@@ -35,6 +35,13 @@ describe('cameraDelivery compat inference', () => {
         })).toBe('external_mjpeg');
     });
 
+    it('maps direct flv cameras to external_flv', () => {
+        expect(getEffectiveDeliveryType({
+            stream_source: 'external',
+            external_stream_url: 'https://surakarta.atcsindonesia.info:8086/camera/BalaiKota.flv',
+        })).toBe('external_flv');
+    });
+
     it('maps jsmpeg websocket cameras to external_jsmpeg', () => {
         expect(getEffectiveDeliveryType({
             stream_source: 'external',
@@ -60,6 +67,19 @@ describe('cameraDelivery compat inference', () => {
             stream_source: 'external',
             external_stream_url: 'https://example.com/live/index.m3u8?token=abc',
         }).playback).toBe(true);
+    });
+
+    it('marks flv cameras as live-only popup sources', () => {
+        expect(getStreamCapabilities({
+            stream_source: 'external',
+            external_stream_url: 'https://surakarta.atcsindonesia.info:8086/camera/BalaiKota.flv',
+        })).toEqual(expect.objectContaining({
+            live: true,
+            popup: true,
+            multiview: false,
+            playback: false,
+            supported_player: 'flv',
+        }));
     });
 
     it('classifies legacy external cameras without metadata as external_unresolved', () => {

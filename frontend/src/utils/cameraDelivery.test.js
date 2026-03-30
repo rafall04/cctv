@@ -30,6 +30,13 @@ describe('cameraDelivery compat inference', () => {
         })).toBe('external_mjpeg');
     });
 
+    it('maps direct flv cameras to external_flv', () => {
+        expect(getEffectiveDeliveryType({
+            stream_source: 'external',
+            external_stream_url: 'https://surakarta.atcsindonesia.info:8086/camera/BalaiKota.flv',
+        })).toBe('external_flv');
+    });
+
     it('maps jsmpeg websocket cameras to external_jsmpeg', () => {
         expect(getEffectiveDeliveryType({
             stream_source: 'external',
@@ -63,5 +70,18 @@ describe('cameraDelivery compat inference', () => {
             external_embed_url: 'https://example.com/embed',
             external_hls_url: 'https://example.com/old/index.m3u8',
         })).toBe('https://example.com/new/index.m3u8');
+    });
+
+    it('treats flv cameras as popup live-only sources', () => {
+        expect(getStreamCapabilities({
+            external_stream_url: 'https://surakarta.atcsindonesia.info:8086/camera/BalaiKota.flv',
+            external_embed_url: 'https://example.com/flv-player#https://surakarta.atcsindonesia.info:8086/camera/BalaiKota.flv',
+        })).toEqual(expect.objectContaining({
+            live: true,
+            popup: true,
+            multiview: false,
+            playback: false,
+            supported_player: 'flv',
+        }));
     });
 });

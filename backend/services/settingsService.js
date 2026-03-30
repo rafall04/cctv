@@ -320,10 +320,11 @@ class SettingsService {
 
     getExternalHealthDefaults() {
         const rows = query(
-            'SELECT key, value FROM settings WHERE key IN (?, ?, ?, ?, ?)',
+            'SELECT key, value FROM settings WHERE key IN (?, ?, ?, ?, ?, ?)',
             [
                 'external_mjpeg_health_default',
                 'external_hls_health_default',
+                'external_flv_health_default',
                 'external_embed_health_default',
                 'external_jsmpeg_health_default',
                 'external_custom_ws_health_default',
@@ -337,6 +338,9 @@ class SettingsService {
             ),
             external_hls: normalizeExternalHealthMode(
                 map.get('external_hls_health_default') || 'hybrid_probe'
+            ),
+            external_flv: normalizeExternalHealthMode(
+                map.get('external_flv_health_default') || 'passive_first'
             ),
             external_embed: normalizeExternalHealthMode(
                 map.get('external_embed_health_default') || 'passive_first'

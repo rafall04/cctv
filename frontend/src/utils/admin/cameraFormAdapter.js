@@ -86,7 +86,8 @@ export const recordingDurationOptions = [
 export function getCameraValidationRules(deliveryType = 'internal_hls') {
     const isInternal = deliveryType === 'internal_hls';
     const isExternalHls = deliveryType === 'external_hls';
-    const requiresStreamUrl = ['external_hls', 'external_mjpeg', 'external_jsmpeg', 'external_custom_ws'].includes(deliveryType);
+    const isExternalFlv = deliveryType === 'external_flv';
+    const requiresStreamUrl = ['external_hls', 'external_flv', 'external_mjpeg', 'external_jsmpeg', 'external_custom_ws'].includes(deliveryType);
     const requiresEmbedUrl = deliveryType === 'external_embed';
     const requiresWsUrl = deliveryType === 'external_jsmpeg' || deliveryType === 'external_custom_ws';
 
@@ -119,6 +120,9 @@ export function getCameraValidationRules(deliveryType = 'internal_hls') {
                 if (!/^https?:\/\//i.test(value)) {
                     return 'URL must start with http:// or https://';
                 }
+                if (isExternalFlv && !/\.flv($|[?#])/i.test(value)) {
+                    return 'URL FLV harus berakhiran .flv';
+                }
                 return undefined;
             },
         },
@@ -147,7 +151,10 @@ export function getCameraValidationRules(deliveryType = 'internal_hls') {
 }
 
 export function mapCameraToFormValues(camera) {
-    const deliveryType = camera.delivery_type || ((camera.stream_source === 'external' && camera.external_hls_url) ? 'external_hls' : 'internal_hls');
+    const inferredExternalType = typeof camera.external_stream_url === 'string' && /\.flv($|[?#])/i.test(camera.external_stream_url)
+        ? 'external_flv'
+        : ((camera.stream_source === 'external' && camera.external_hls_url) ? 'external_hls' : 'internal_hls');
+    const deliveryType = camera.delivery_type || inferredExternalType;
 
     return {
         ...defaultCameraFormValues,
@@ -186,7 +193,7 @@ export function buildCameraPayload(formData) {
         : 5;
     const deliveryType = formData.delivery_type || ((formData.stream_source === 'external') ? 'external_hls' : 'internal_hls');
     const compatStreamSource = deliveryType === 'internal_hls' ? 'internal' : 'external';
-    const externalStreamUrl = ['external_hls', 'external_mjpeg', 'external_jsmpeg', 'external_custom_ws'].includes(deliveryType)
+    const externalStreamUrl = ['external_hls', 'external_flv', 'external_mjpeg', 'external_jsmpeg', 'external_custom_ws'].includes(deliveryType)
         ? (formData.external_stream_url || formData.external_hls_url || null)
         : null;
 
@@ -207,7 +214,7 @@ export function buildCameraPayload(formData) {
         private_rtsp_url: deliveryType === 'internal_hls' ? formData.private_rtsp_url : null,
         external_use_proxy: deliveryType === 'external_hls'
             ? (formData.external_tls_mode === 'insecure' ? 1 : (formData.external_use_proxy ? 1 : 0))
-            : 1,
+            : (deliveryType === 'external_flv' ? 0 : 1),
         external_tls_mode: deliveryType === 'external_hls' ? (formData.external_tls_mode || 'strict') : 'strict',
         external_health_mode: compatStreamSource === 'external'
             ? (formData.external_health_mode || 'default')

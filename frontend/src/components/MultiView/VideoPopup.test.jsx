@@ -65,6 +65,35 @@ vi.mock('hls.js', () => {
     return { default: HlsMock };
 });
 
+const flvPlayers = [];
+
+vi.mock('flv.js', () => {
+    const Events = {
+        ERROR: 'error',
+    };
+
+    return {
+        default: {
+            Events,
+            isSupported: () => true,
+            createPlayer: vi.fn(() => {
+                const handlers = {};
+                const player = {
+                    attachMediaElement: vi.fn(),
+                    load: vi.fn(),
+                    destroy: vi.fn(),
+                    on: vi.fn((event, handler) => {
+                        handlers[event] = handler;
+                    }),
+                    emit: (event, ...args) => handlers[event]?.(...args),
+                };
+                flvPlayers.push(player);
+                return player;
+            }),
+        },
+    };
+});
+
 vi.mock('../../utils/deviceDetector', () => ({
     detectDeviceTier: () => 'mid',
 }));
@@ -144,6 +173,7 @@ const baseCamera = {
 describe('VideoPopup non-live states', () => {
     beforeEach(() => {
         hlsInstances.length = 0;
+        flvPlayers.length = 0;
         startSessionMock.mockClear();
         stopSessionMock.mockClear();
         startTimeoutMock.mockClear();
@@ -151,6 +181,7 @@ describe('VideoPopup non-live states', () => {
         updateStageMock.mockClear();
         resetFailuresMock.mockClear();
         vi.useRealTimers();
+        vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(() => Promise.resolve());
         vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
         vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
     });
@@ -530,6 +561,33 @@ describe('VideoPopup non-live states', () => {
         await waitFor(() => {
             expect(startSessionMock).toHaveBeenCalledWith(24);
         });
+    });
+
+    it('memutar external FLV secara native tanpa menginisialisasi HLS', async () => {
+        render(
+            <VideoPopup
+                camera={{
+                    ...baseCamera,
+                    id: 25,
+                    delivery_type: 'external_flv',
+                    stream_source: 'external',
+                    streams: {},
+                    external_stream_url: 'https://surakarta.atcsindonesia.info:8086/camera/BalaiKota.flv',
+                    external_embed_url: 'https://example.com/fallback-player',
+                }}
+                onClose={vi.fn()}
+            />
+        );
+
+        expect(screen.getByTestId('grid-popup-video')).toBeTruthy();
+        expect(hlsInstances).toHaveLength(0);
+
+        await waitFor(() => {
+            expect(flvPlayers).toHaveLength(1);
+        });
+
+        expect(flvPlayers[0].attachMediaElement).toHaveBeenCalled();
+        expect(flvPlayers[0].load).toHaveBeenCalled();
     });
 });
 

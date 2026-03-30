@@ -93,6 +93,7 @@ const IMPORT_PRESET_PROFILES = [
     'generic_mjpeg',
     'embed_only',
     'jombang_mjpeg',
+    'surakarta_flv',
 ];
 
 const PUBLIC_PLAYBACK_MODES = [
@@ -171,6 +172,28 @@ function validateDeliveryConfiguration({
         }
         if (!DELIVERY_TYPE_PATTERNS.http.test(externalStreamUrl)) {
             const err = new Error('External HLS URL must start with http:// or https://');
+            err.statusCode = 400;
+            throw err;
+        }
+        return;
+    }
+
+    if (deliveryType === 'external_flv') {
+        if (!externalStreamUrl) {
+            if (allowIncompleteExternalMetadata) {
+                return;
+            }
+            const err = new Error('External FLV URL is required for FLV cameras');
+            err.statusCode = 400;
+            throw err;
+        }
+        if (!DELIVERY_TYPE_PATTERNS.http.test(externalStreamUrl)) {
+            const err = new Error('External FLV URL must start with http:// or https://');
+            err.statusCode = 400;
+            throw err;
+        }
+        if (!DELIVERY_TYPE_PATTERNS.flvHint.test(externalStreamUrl)) {
+            const err = new Error('External FLV URL must end with .flv');
             err.statusCode = 400;
             throw err;
         }
@@ -538,6 +561,9 @@ function inferImportDeliveryType(url, embedUrl = null, streamSource = null) {
     if (DELIVERY_TYPE_PATTERNS.zoneminderMjpeg.test(normalizedUrl)) {
         return 'external_mjpeg';
     }
+    if (DELIVERY_TYPE_PATTERNS.flvHint.test(normalizedUrl)) {
+        return 'external_flv';
+    }
     if (DELIVERY_TYPE_PATTERNS.hlsHint.test(normalizedUrl)) {
         return 'external_hls';
     }
@@ -549,6 +575,25 @@ function inferImportDeliveryType(url, embedUrl = null, streamSource = null) {
     }
 
     return 'external_embed';
+}
+
+function extractWrappedExternalTarget(url) {
+    const normalizedUrl = typeof url === 'string' ? url.trim() : '';
+    if (!normalizedUrl) {
+        return null;
+    }
+
+    const hashIndex = normalizedUrl.indexOf('#');
+    if (hashIndex === -1) {
+        return null;
+    }
+
+    const fragment = normalizedUrl.slice(hashIndex + 1).trim();
+    if (/^https?:\/\//i.test(fragment) || /^wss?:\/\//i.test(fragment)) {
+        return fragment;
+    }
+
+    return null;
 }
 
 function normalizeImportStatus(value) {
@@ -606,6 +651,18 @@ function buildImportFieldMapping(sourceProfile = null) {
         };
     }
 
+    if (sourceProfile === 'surakarta_flv') {
+        return {
+            name: 'title',
+            streamUrl: 'arguments[0] fragment -> direct .flv URL',
+            embedUrl: 'arguments[0] wrapper URL',
+            coordinates: 'none',
+            sourceStatus: 'implicit_online',
+            sourceCategory: 'source_profile',
+            location: 'title',
+        };
+    }
+
     return {
         name: 'name | title | cctv_title',
         streamUrl: 'external_stream_url | external_hls_url | url | stream | cctv_link',
@@ -647,6 +704,17 @@ function getImportProfileDefaults(sourceProfile = null) {
                 external_health_mode: 'passive_first',
                 external_origin_mode: 'direct',
                 enabled: 1,
+            };
+        case 'surakarta_flv':
+            return {
+                delivery_type: 'external_flv',
+                external_use_proxy: 0,
+                external_tls_mode: 'strict',
+                external_health_mode: 'passive_first',
+                external_origin_mode: 'direct',
+                enabled: 1,
+                descriptionTemplate: 'SOURCE: SURAKARTA FLV | source_profile: {sourceProfile}',
+                locationMapping: 'name',
             };
         case 'embed_only':
             return {
@@ -727,7 +795,7 @@ function matchesBulkTargetFilter(camera, targetFilter) {
         case 'external_probeable_only':
             return ['external_hls', 'external_mjpeg', 'external_embed'].includes(deliveryProfile.effectiveDeliveryType);
         case 'external_passive_only':
-            return ['external_embed', 'external_jsmpeg', 'external_custom_ws'].includes(deliveryProfile.effectiveDeliveryType);
+            return ['external_flv', 'external_embed', 'external_jsmpeg', 'external_custom_ws'].includes(deliveryProfile.effectiveDeliveryType);
         case 'external_unresolved_only':
             return deliveryProfile.classification === 'external_unresolved';
         case 'online_only':
@@ -1999,6 +2067,44 @@ class CameraService {
     }
 
     async fetchImportSourceRows(sourceProfile) {
+        if (sourceProfile === 'surakarta_flv') {
+            const response = await axios.get('http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/soloCCTV.json', {
+                timeout: 15000,
+                responseType: 'json',
+                headers: {
+                    Accept: 'application/json,text/plain,*/*',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                },
+            });
+
+            const sourceRows = Array.isArray(response.data) ? response.data : [];
+            return sourceRows.map((row, index) => {
+                const wrapperUrl = Array.isArray(row.arguments) ? row.arguments[0] : null;
+                const directUrl = extractWrappedExternalTarget(wrapperUrl);
+                return {
+                    title: row.title || '',
+                    name: row.title || '',
+                    location: row.title || '',
+                    latitude: null,
+                    longitude: null,
+                    external_stream_url: directUrl,
+                    external_embed_url: wrapperUrl,
+                    delivery_type: 'external_flv',
+                    stream_source: 'external',
+                    external_use_proxy: 0,
+                    external_tls_mode: 'strict',
+                    external_health_mode: 'passive_first',
+                    external_origin_mode: 'direct',
+                    enabled: 1,
+                    source_id: row.id || index + 1,
+                    source_category: 'surakarta_flv',
+                    source_status: 'online',
+                    source_site: 'http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/soloCCTV.json',
+                    description: 'SOURCE: SURAKARTA FLV | source_profile: surakarta_flv',
+                };
+            });
+        }
+
         if (sourceProfile !== 'jombang_mjpeg') {
             const err = new Error('Unsupported import source profile');
             err.statusCode = 400;
@@ -2099,10 +2205,13 @@ class CameraService {
             const rawSourceUrl = item.external_stream_url || item.external_hls_url || item.url || item.stream || item.cctv_link || null;
             const rawRtspUrl = item.private_rtsp_url || null;
             const rawEmbedUrl = item.external_embed_url || item.embed_url || item.page_url || null;
+            const wrappedSourceUrl = extractWrappedExternalTarget(rawSourceUrl) || extractWrappedExternalTarget(rawEmbedUrl);
+            const effectiveSourceUrl = wrappedSourceUrl || rawSourceUrl;
+            const effectiveEmbedUrl = rawEmbedUrl || rawSourceUrl || null;
             const rawLat = item.latitude !== undefined ? item.latitude : (item.lat !== undefined ? item.lat : null);
             const rawLng = item.longitude !== undefined ? item.longitude : (item.lng !== undefined ? item.lng : null);
-            const sourceStatus = normalizeImportStatus(item.source_status || item.status);
-            const sourceCategory = item.source_category || item.kategori || item.category || null;
+            const sourceStatus = normalizeImportStatus(item.source_status || item.status || (normalizedRequest.sourceProfile === 'surakarta_flv' ? 'online' : null));
+            const sourceCategory = item.source_category || item.kategori || item.category || (normalizedRequest.sourceProfile === 'surakarta_flv' ? 'surakarta_flv' : null);
 
             if (sourceStatus === 'online') {
                 onlineSourceCount += 1;
@@ -2114,8 +2223,8 @@ class CameraService {
                 categoryMap.set(sourceCategory, (categoryMap.get(sourceCategory) || 0) + 1);
             }
 
-            if (rawSourceUrl) {
-                const urlKey = normalizeLookupKey(rawSourceUrl);
+            if (effectiveSourceUrl) {
+                const urlKey = normalizeLookupKey(effectiveSourceUrl);
                 sourceUrlMap.set(urlKey, (sourceUrlMap.get(urlKey) || 0) + 1);
             }
 
@@ -2128,15 +2237,15 @@ class CameraService {
                 ? globalOverrides.delivery_type
                 : getEffectiveDeliveryType({
                     stream_source: item.stream_source || (rawRtspUrl ? 'internal' : 'external'),
-                    delivery_type: item.delivery_type || inferImportDeliveryType(rawSourceUrl, rawEmbedUrl, item.stream_source),
+                    delivery_type: item.delivery_type || inferImportDeliveryType(effectiveSourceUrl, effectiveEmbedUrl, item.stream_source),
                     private_rtsp_url: rawRtspUrl,
                     external_hls_url: item.external_hls_url || null,
-                    external_stream_url: rawSourceUrl,
-                    external_embed_url: rawEmbedUrl,
+                    external_stream_url: effectiveSourceUrl,
+                    external_embed_url: effectiveEmbedUrl,
                 });
             const resolvedStreamSource = resolvedDeliveryType === 'internal_hls' ? 'internal' : 'external';
-            const resolvedSourceUrl = typeof rawSourceUrl === 'string' ? rawSourceUrl.trim() : null;
-            const resolvedEmbedUrl = typeof rawEmbedUrl === 'string' ? rawEmbedUrl.trim() : null;
+            const resolvedSourceUrl = typeof effectiveSourceUrl === 'string' ? effectiveSourceUrl.trim() : null;
+            const resolvedEmbedUrl = typeof effectiveEmbedUrl === 'string' ? effectiveEmbedUrl.trim() : null;
             const snapshotHandling = IMPORT_SNAPSHOT_HANDLING_MODES.includes(globalOverrides.external_snapshot_url_handling)
                 ? globalOverrides.external_snapshot_url_handling
                 : normalizedRequest.importPolicy.snapshotHandling;

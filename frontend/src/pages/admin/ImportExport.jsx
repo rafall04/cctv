@@ -11,18 +11,21 @@ const IMPORT_MODE_OPTIONS = [
 const PROFILE_OPTIONS = [
     { value: 'jombang_mjpeg', label: 'Jombang MJPEG' },
     { value: 'generic_hls', label: 'Generic HLS' },
+    { value: 'surakarta_flv', label: 'Surakarta FLV' },
     { value: 'generic_mjpeg', label: 'Generic MJPEG' },
     { value: 'embed_only', label: 'Embed Only' },
 ];
 
 const REMOTE_PROFILE_OPTIONS = [
     { value: 'jombang_mjpeg', label: 'Jombang v2' },
+    { value: 'surakarta_flv', label: 'Surakarta FLV' },
 ];
 
 const DELIVERY_TYPE_OPTIONS = [
     { value: '', label: 'Auto / Ikuti Source' },
     { value: 'internal_hls', label: 'Internal HLS' },
     { value: 'external_hls', label: 'External HLS' },
+    { value: 'external_flv', label: 'External FLV' },
     { value: 'external_mjpeg', label: 'External MJPEG' },
     { value: 'external_embed', label: 'External Embed' },
     { value: 'external_jsmpeg', label: 'External JSMPEG' },
@@ -107,6 +110,18 @@ function getProfileDefaults(profile) {
                 external_origin_mode: 'direct',
                 descriptionTemplate: '',
                 locationMapping: 'source_field',
+                sourceFilter: 'all',
+            };
+        case 'surakarta_flv':
+            return {
+                delivery_type: 'external_flv',
+                external_use_proxy: false,
+                enabled: true,
+                external_tls_mode: 'strict',
+                external_health_mode: 'passive_first',
+                external_origin_mode: 'direct',
+                descriptionTemplate: 'SOURCE: SURAKARTA FLV | source_profile: {sourceProfile}',
+                locationMapping: 'name',
                 sourceFilter: 'all',
             };
         case 'embed_only':
@@ -433,7 +448,7 @@ export default function ImportExport() {
                                 </div>
                             ) : (
                                 <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-200">
-                                    Backend akan fetch source preset saat preview. Saat ini preset remote yang aktif adalah Jombang v2.
+                                    Backend akan fetch source preset saat preview. Saat ini preset remote yang aktif adalah Jombang v2 dan Surakarta FLV.
                                 </div>
                             )}
 

@@ -450,6 +450,33 @@ describe('cameraHealthService external TLS policy', () => {
         expect(axios.get).not.toHaveBeenCalled();
     });
 
+    it('uses passive-first FLV runtime evidence without probing backend by default', async () => {
+        const service = new CameraHealthService();
+        service.recordRuntimeSignal(401, {
+            targetUrl: 'https://surakarta.atcsindonesia.info:8086/camera/BalaiKota.flv',
+            signalType: 'external_flv_runtime_playing',
+            success: true,
+            timestamp: Date.now(),
+        });
+
+        const result = await service.evaluateCameraStatus({
+            id: 401,
+            name: 'BALAIKOTA',
+            enabled: 1,
+            is_online: 0,
+            stream_source: 'external',
+            delivery_type: 'external_flv',
+            external_stream_url: 'https://surakarta.atcsindonesia.info:8086/camera/BalaiKota.flv',
+        }, new Map());
+
+        const state = service.healthState.get(401);
+        expect(result.isOnline).toBe(1);
+        expect(result.rawReason).toBe('flv_runtime_recent');
+        expect(state.state).toBe('healthy');
+        expect(state.lastRuntimeSignalType).toBe('external_flv_runtime_playing');
+        expect(axios.get).not.toHaveBeenCalled();
+    });
+
     it('keeps MJPEG cameras degraded while passive runtime grace is still active', async () => {
         const service = new CameraHealthService();
         service.recordRuntimeSignal(394, {

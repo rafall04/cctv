@@ -92,4 +92,49 @@ describe('cameraService import preview', () => {
         expect(result.fieldMapping.name).toBe('nama');
         expect(result.warnings.some((warning) => warning.code === 'jombang_tokenized_source')).toBe(true);
     });
+
+    it('mengambil source preset Surakarta dan mengonversi wrapper menjadi direct FLV', async () => {
+        vi.spyOn(connectionPool, 'query').mockReturnValue([]);
+        axios.get.mockResolvedValue({
+            data: [
+                {
+                    title: 'BALAIKOTA',
+                    provider: 'webview',
+                    arguments: [
+                        'https://kanghen10.github.io/flv-player/#https://surakarta.atcsindonesia.info:8086/camera/BalaiKota.flv',
+                    ],
+                },
+            ],
+        });
+
+        const result = await cameraService.buildImportPlan({
+            targetArea: 'SURAKARTA',
+            sourceProfile: 'surakarta_flv',
+            globalOverrides: {},
+            importPolicy: {
+                filterSourceRows: 'all',
+            },
+        });
+
+        expect(axios.get).toHaveBeenCalledWith(
+            'http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/soloCCTV.json',
+            expect.objectContaining({
+                responseType: 'json',
+            })
+        );
+        expect(result.summary.totalRows).toBe(1);
+        expect(result.rows[0]).toEqual(expect.objectContaining({
+            resolvedDeliveryType: 'external_flv',
+            resolvedUrl: 'https://surakarta.atcsindonesia.info:8086/camera/BalaiKota.flv',
+            resolvedHealthMode: 'passive_first',
+            resolvedTlsMode: 'strict',
+        }));
+        expect(result.importableRows[0].importData).toEqual(expect.objectContaining({
+            delivery_type: 'external_flv',
+            external_stream_url: 'https://surakarta.atcsindonesia.info:8086/camera/BalaiKota.flv',
+            external_embed_url: 'https://kanghen10.github.io/flv-player/#https://surakarta.atcsindonesia.info:8086/camera/BalaiKota.flv',
+            external_use_proxy: 0,
+        }));
+        expect(result.sourceFieldMapping.name).toBe('title');
+    });
 });

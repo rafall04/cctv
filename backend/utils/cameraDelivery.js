@@ -1,6 +1,7 @@
 export const DELIVERY_TYPES = [
     'internal_hls',
     'external_hls',
+    'external_flv',
     'external_mjpeg',
     'external_embed',
     'external_jsmpeg',
@@ -24,6 +25,7 @@ export const DELIVERY_TYPE_PATTERNS = {
     websocket: /^wss?:\/\//i,
     http: /^https?:\/\//i,
     hlsHint: /\.m3u8($|[?#])/i,
+    flvHint: /\.flv($|[?#])/i,
     zoneminderMjpeg: /\/zm\/cgi-bin\/nph-zms/i,
     jsmpegHint: /jsmpeg/i,
 };
@@ -74,6 +76,9 @@ function inferLegacyExternalDeliveryType(camera = {}) {
     }
 
     if (externalUrl && DELIVERY_TYPE_PATTERNS.http.test(externalUrl)) {
+        if (DELIVERY_TYPE_PATTERNS.flvHint.test(externalUrl)) {
+            return 'external_flv';
+        }
         return DELIVERY_TYPE_PATTERNS.hlsHint.test(externalUrl)
             ? 'external_hls'
             : 'external_mjpeg';
@@ -177,6 +182,15 @@ export function getStreamCapabilities(cameraOrDeliveryType = {}) {
                 playback: true,
                 direct_embed: false,
                 supported_player: 'hls',
+            };
+        case 'external_flv':
+            return {
+                live: true,
+                popup: true,
+                multiview: false,
+                playback: false,
+                direct_embed: false,
+                supported_player: 'flv',
             };
         case 'external_mjpeg':
             return {

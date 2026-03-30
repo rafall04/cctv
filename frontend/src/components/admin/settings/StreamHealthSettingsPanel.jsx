@@ -14,6 +14,11 @@ const HEALTH_SETTING_FIELDS = [
         description: 'Dipakai untuk external HLS yang masih butuh hybrid probe.',
     },
     {
+        key: 'external_flv_health_default',
+        label: 'Default FLV',
+        description: 'Cocok untuk HTTP-FLV live seperti Surakarta yang lebih aman dipantau via runtime.',
+    },
+    {
         key: 'external_embed_health_default',
         label: 'Default Embed',
         description: 'Biasanya cukup passive-first karena backend tidak punya playability penuh.',
@@ -53,6 +58,7 @@ export default function StreamHealthSettingsPanel() {
                 setForm({
                     external_mjpeg_health_default: result.data.external_mjpeg_health_default || 'passive_first',
                     external_hls_health_default: result.data.external_hls_health_default || 'hybrid_probe',
+                    external_flv_health_default: result.data.external_flv_health_default || 'passive_first',
                     external_embed_health_default: result.data.external_embed_health_default || 'passive_first',
                     external_jsmpeg_health_default: result.data.external_jsmpeg_health_default || 'disabled',
                     external_custom_ws_health_default: result.data.external_custom_ws_health_default || 'disabled',

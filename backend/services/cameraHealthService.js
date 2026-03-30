@@ -232,6 +232,7 @@ function mapExternalFetchError(error) {
 function isExternalHttpDelivery(deliveryType) {
     return [
         'external_hls',
+        'external_flv',
         'external_mjpeg',
         'external_embed',
         'external_jsmpeg',
@@ -367,6 +368,23 @@ function resolveHealthProbeTarget(camera) {
             probeTarget: primaryExternalStreamUrl,
             healthStrategy: 'external_hls_playlist',
             probeMethod: 'hls_playlist',
+        };
+    }
+
+    if (deliveryClassification === 'external_flv') {
+        return {
+            ...base,
+            runtimeTarget: primaryExternalStreamUrl || camera.external_embed_url || null,
+            probeTarget: camera.external_snapshot_url || camera.external_embed_url || null,
+            fallbackTargets: camera.external_snapshot_url && camera.external_embed_url
+                ? [camera.external_embed_url]
+                : [],
+            healthStrategy: camera.external_snapshot_url || camera.external_embed_url
+                ? 'external_snapshot_fallback'
+                : 'passive_external',
+            probeMethod: camera.external_snapshot_url
+                ? 'snapshot_probe'
+                : (camera.external_embed_url ? 'embed_probe' : 'passive_assumed_online'),
         };
     }
 
@@ -682,16 +700,16 @@ class CameraHealthService {
         };
     }
 
-    evaluatePassiveMjpegRaw(camera, baseDetails) {
+    evaluatePassiveRuntimeRaw(camera, baseDetails, reasonPrefix = 'mjpeg') {
         const state = this.ensureCameraState(camera.id, camera.is_online);
         const now = Date.now();
 
         if (this.hasFreshMjpegRuntimeSignal(state, now)) {
-            return this.buildPassiveMjpegResult(camera, baseDetails, state, 'mjpeg_runtime_recent');
+            return this.buildPassiveMjpegResult(camera, baseDetails, state, `${reasonPrefix}_runtime_recent`);
         }
 
         if (this.hasMjpegRuntimeGrace(state, now)) {
-            return this.buildPassiveMjpegResult(camera, baseDetails, state, 'mjpeg_runtime_grace');
+            return this.buildPassiveMjpegResult(camera, baseDetails, state, `${reasonPrefix}_runtime_grace`);
         }
 
         if (this.hasMjpegPassiveRuntime(state, now)) {
@@ -708,21 +726,26 @@ class CameraHealthService {
         };
     }
 
+    evaluatePassiveMjpegRaw(camera, baseDetails) {
+        return this.evaluatePassiveRuntimeRaw(camera, baseDetails, 'mjpeg');
+    }
+
     evaluateDisabledExternalRaw(camera, baseDetails) {
         const state = this.ensureCameraState(camera.id, camera.is_online);
         const now = Date.now();
         const deliveryType = getEffectiveDeliveryType(camera);
 
-        if (deliveryType === 'external_mjpeg') {
+        if (deliveryType === 'external_mjpeg' || deliveryType === 'external_flv') {
+            const runtimeReasonPrefix = deliveryType === 'external_flv' ? 'flv' : 'mjpeg';
             if (this.hasFreshMjpegRuntimeSignal(state, now)) {
-                return this.buildPassiveMjpegResult(camera, baseDetails, state, 'mjpeg_runtime_recent', {
+                return this.buildPassiveMjpegResult(camera, baseDetails, state, `${runtimeReasonPrefix}_runtime_recent`, {
                     probe_method: 'none',
                     monitoringDisabled: true,
                 });
             }
 
             if (this.hasMjpegRuntimeGrace(state, now)) {
-                return this.buildPassiveMjpegResult(camera, baseDetails, state, 'mjpeg_runtime_grace', {
+                return this.buildPassiveMjpegResult(camera, baseDetails, state, `${runtimeReasonPrefix}_runtime_grace`, {
                     probe_method: 'none',
                     monitoringDisabled: true,
                 });
@@ -792,13 +815,19 @@ class CameraHealthService {
             state.lastFreshFrameWindowExpiresAt = timestamp + MJPEG_RUNTIME_FRESH_WINDOW_MS;
             state.runtimeGraceUntil = timestamp + MJPEG_RUNTIME_GRACE_WINDOW_MS;
             state.effectiveOnline = true;
-            state.state = signalType === 'external_mjpeg_live_tick' || signalType === 'external_mjpeg_open'
+            const isPassiveExternalTick = [
+                'external_mjpeg_live_tick',
+                'external_mjpeg_open',
+                'external_flv_live_tick',
+                'external_flv_runtime_playing',
+            ].includes(signalType);
+            state.state = isPassiveExternalTick
                 ? 'degraded_runtime_recent'
                 : (state.state === 'offline' ? 'degraded_runtime_recent' : (state.state || 'degraded_runtime_recent'));
             state.confidence = Math.max(state.confidence || 0.5, 0.7);
             state.lastStateChangeAt = timestamp;
-            state.lastReason = signalType === 'external_mjpeg_live_tick' || signalType === 'external_mjpeg_open'
-                ? 'mjpeg_runtime_recent'
+            state.lastReason = isPassiveExternalTick
+                ? (signalType.startsWith('external_flv') ? 'flv_runtime_recent' : 'mjpeg_runtime_recent')
                 : 'runtime_recent_success';
             state.lastDetails = withProbeDetails(state.lastDetails, {
                 runtimeTarget: targetUrl || state.lastRuntimeTarget || null,
@@ -992,6 +1021,10 @@ class CameraHealthService {
             return defaults.external_hls || 'hybrid_probe';
         }
 
+        if (deliveryType === 'external_flv') {
+            return defaults.external_flv || 'passive_first';
+        }
+
         if (deliveryType === 'external_embed') {
             return defaults.external_embed || 'passive_first';
         }
@@ -1031,12 +1064,12 @@ class CameraHealthService {
             };
         }
 
-        if (deliveryType === 'external_mjpeg' && healthMode === 'passive_first') {
+        if ((deliveryType === 'external_mjpeg' || deliveryType === 'external_flv') && healthMode === 'passive_first') {
             if (this.hasFreshMjpegRuntimeSignal(state)) {
                 return {
                     health_mode: healthMode,
                     monitoring_state: 'passive',
-                    monitoring_reason: 'mjpeg_runtime_recent',
+                    monitoring_reason: deliveryType === 'external_flv' ? 'flv_runtime_recent' : 'mjpeg_runtime_recent',
                 };
             }
 
@@ -1044,7 +1077,7 @@ class CameraHealthService {
                 return {
                     health_mode: healthMode,
                     monitoring_state: 'stale',
-                    monitoring_reason: 'mjpeg_runtime_grace',
+                    monitoring_reason: deliveryType === 'external_flv' ? 'flv_runtime_grace' : 'mjpeg_runtime_grace',
                 };
             }
 
@@ -1052,7 +1085,7 @@ class CameraHealthService {
                 return {
                     health_mode: healthMode,
                     monitoring_state: 'stale',
-                    monitoring_reason: 'mjpeg_runtime_stale',
+                    monitoring_reason: deliveryType === 'external_flv' ? 'flv_runtime_stale' : 'mjpeg_runtime_stale',
                 };
             }
 
@@ -1683,7 +1716,17 @@ class CameraHealthService {
             return fallbackResult;
         }
 
-        if (deliveryType === 'external_embed' || deliveryType === 'external_jsmpeg' || deliveryType === 'external_custom_ws') {
+        if (deliveryType === 'external_flv') {
+            if (healthMode === 'disabled') {
+                return this.evaluateDisabledExternalRaw(camera, baseDetails);
+            }
+
+            if (healthMode === 'passive_first') {
+                return this.evaluatePassiveRuntimeRaw(camera, baseDetails, 'flv');
+            }
+        }
+
+        if (deliveryType === 'external_embed' || deliveryType === 'external_flv' || deliveryType === 'external_jsmpeg' || deliveryType === 'external_custom_ws') {
             if (healthMode === 'disabled') {
                 return this.evaluateDisabledExternalRaw(camera, baseDetails);
             }
