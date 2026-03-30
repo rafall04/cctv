@@ -888,6 +888,51 @@ describe('MapView area filter visibility', () => {
         expect(fitBoundsMock).not.toHaveBeenCalled();
     });
 
+    it('mengabaikan child camera tanpa koordinat valid saat all-area zoom rendah', async () => {
+        const validAreaCameras = Array.from({ length: 30 }, (_, index) => ({
+            id: index + 1,
+            name: `BOJONEGORO ${index + 1}`,
+            latitude: (-7.15 + (index * 0.0001)).toFixed(5),
+            longitude: (111.88 + (index * 0.0001)).toFixed(5),
+            area_name: 'BOJONEGORO',
+            is_online: 1,
+            status: 'active',
+            is_tunnel: 0,
+        }));
+
+        const cameras = [
+            ...validAreaCameras,
+            {
+                id: 999,
+                name: 'Broken Coord',
+                latitude: 'NaN',
+                longitude: 'NaN',
+                area_name: 'BOJONEGORO',
+                is_online: 1,
+                status: 'active',
+                is_tunnel: 0,
+            },
+        ];
+
+        setMockZoom(10);
+
+        await act(async () => {
+            render(
+                <MapView
+                    cameras={cameras}
+                    areas={[{ name: 'BOJONEGORO', latitude: '-7.1500', longitude: '111.8800' }]}
+                    showAreaFilter
+                />
+            );
+        });
+
+        await waitFor(() => {
+            expect(screen.getAllByText('marker')).toHaveLength(1);
+        });
+
+        expect(screen.getByTestId(/marker-/)).toBeTruthy();
+    });
+
     it('memusatkan cluster all-area ke centroid dan klik cluster melakukan fitBounds ke child cameras', async () => {
         const clusterCameras = [
             {
@@ -1006,8 +1051,7 @@ describe('MapView area filter visibility', () => {
         expect(screen.getByRole('option', { name: /kab gresik/i })).toBeTruthy();
     });
 
-    it('memberi warning observability saat area punya kamera tanpa anchor valid', async () => {
-        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    it('tetap aman saat semua kamera area tidak punya koordinat valid', async () => {
         const missingCoordCameras = Array.from({ length: 30 }, (_, index) => ({
             id: index + 1,
             name: `Area Hilang ${index + 1}`,
@@ -1023,15 +1067,7 @@ describe('MapView area filter visibility', () => {
             render(<MapView cameras={missingCoordCameras} areas={[]} showAreaFilter />);
         });
 
-        expect(warnSpy).toHaveBeenCalledWith(
-            '[MapView] Area aggregate missing valid anchor',
-            expect.objectContaining({
-                areaName: 'Area Tanpa Anchor',
-                cameraCount: 30,
-            })
-        );
-
-        warnSpy.mockRestore();
+        expect(screen.getByText(/koordinat kamera belum diatur/i)).toBeTruthy();
     });
 
     it('menahan ledakan marker individual dengan micro-bucket saat zoom tinggi sangat padat', async () => {
