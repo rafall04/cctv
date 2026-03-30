@@ -1202,5 +1202,71 @@ describe('MapView area filter visibility', () => {
             expect(setViewMock).toHaveBeenCalledWith([-7.2507, 112.0815], 15, { animate: true, duration: 0.5 });
         });
     });
+
+    it('menggunakan fitBounds dengan zoom kabupaten saat coverage area luas', async () => {
+        const broadAreaCameras = [
+            {
+                id: 11,
+                name: 'Barat',
+                latitude: '-7.1200',
+                longitude: '111.8200',
+                area_name: 'Bojonegoro',
+                is_online: 1,
+                status: 'active',
+                is_tunnel: 0,
+            },
+            {
+                id: 12,
+                name: 'Timur',
+                latitude: '-7.3000',
+                longitude: '112.0500',
+                area_name: 'Bojonegoro',
+                is_online: 1,
+                status: 'active',
+                is_tunnel: 0,
+            },
+            {
+                id: 13,
+                name: 'Utara',
+                latitude: '-7.0000',
+                longitude: '111.9500',
+                area_name: 'Bojonegoro',
+                is_online: 1,
+                status: 'active',
+                is_tunnel: 0,
+            },
+            {
+                id: 14,
+                name: 'Selatan',
+                latitude: '-7.3600',
+                longitude: '111.9000',
+                area_name: 'Bojonegoro',
+                is_online: 1,
+                status: 'active',
+                is_tunnel: 0,
+            },
+        ];
+        const broadAreas = [
+            {
+                name: 'Bojonegoro',
+                latitude: '-7.1500',
+                longitude: '111.9000',
+                coverage_scope: 'kabupaten_kota',
+            },
+        ];
+
+        render(<MapView cameras={broadAreaCameras} areas={broadAreas} showAreaFilter selectedArea="Bojonegoro" />);
+
+        await waitFor(() => {
+            expect(fitBoundsMock).toHaveBeenCalledWith(
+                expect.anything(),
+                expect.objectContaining({
+                    maxZoom: 10,
+                })
+            );
+        });
+
+        expect(setViewMock).not.toHaveBeenCalledWith([-7.15, 111.9], 15, { animate: true, duration: 0.5 });
+    });
 });
 

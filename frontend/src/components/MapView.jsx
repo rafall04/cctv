@@ -30,6 +30,7 @@ import {
     shouldShowPublicPopupRetry,
 } from '../utils/publicPopupState.js';
 import { getCameraAvailabilityState, isCameraHardOffline } from '../utils/cameraAvailability.js';
+import { isBroadAreaCoverage, resolveAreaFocusZoom } from '../utils/areaCoverage';
 
 // Fix Leaflet icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -570,6 +571,8 @@ const buildAreaSummaryList = (areas = [], cameras = []) => {
 
             return {
                 ...group,
+                coverage_scope: areaData?.coverage_scope || 'default',
+                viewport_zoom_override: areaData?.viewport_zoom_override ?? null,
                 cameraCount: group.cameras.length,
                 hasValidAnchor: true,
                 source: centroid ? 'centroid' : (areaMaster ? 'area_master' : 'bounds_center'),
@@ -2016,31 +2019,32 @@ const MapView = memo(({
     const buildAreaViewportCommand = useCallback((areaName) => {
         if (areaName !== 'all') {
             const summary = areaSummaryByKey.get(normalizeAreaKey(areaName));
+            const areaCameras = camerasWithCoordsByAreaKey.get(normalizeAreaKey(areaName)) || [];
+            const focusZoom = resolveAreaFocusZoom(
+                summary?.coverage_scope,
+                summary?.viewport_zoom_override,
+                15
+            );
+            const shouldPreferBounds = isBroadAreaCoverage(summary?.coverage_scope);
+
+            if (areaCameras.length > 0) {
+                const areaBounds = buildBoundsFromCameras(areaCameras);
+                if (areaBounds && shouldPreferBounds) {
+                    return {
+                        type: 'focus_area',
+                        bounds: areaBounds,
+                        maxZoom: focusZoom,
+                        areaName: summary?.areaName || areaName,
+                    };
+                }
+            }
+
             if (summary?.anchor) {
                 return {
                     type: 'focus_area',
                     center: [summary.anchor.latitude, summary.anchor.longitude],
-                    zoom: 15,
+                    zoom: focusZoom,
                     areaName: summary.areaName,
-                };
-            }
-
-            const areaCameras = camerasWithCoordsByAreaKey.get(normalizeAreaKey(areaName)) || [];
-            if (areaCameras.length > 0) {
-                const areaBounds = buildBoundsFromCameras(areaCameras);
-                if (!areaBounds) {
-                    return {
-                        type: 'focus_default',
-                        center: [mapSettings.latitude || defaultCenter[0], mapSettings.longitude || defaultCenter[1]],
-                        zoom: mapSettings.zoom || defaultZoom,
-                        areaName: 'all',
-                    };
-                }
-                return {
-                    type: 'focus_area',
-                    bounds: areaBounds,
-                    maxZoom: 16,
-                    areaName: summary?.areaName || areaName,
                 };
             }
         }

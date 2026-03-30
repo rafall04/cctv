@@ -27,6 +27,8 @@ describe('areaService.getAdminOverview', () => {
                     kecamatan: 'Bojonegoro',
                     latitude: null,
                     longitude: null,
+                    coverage_scope: 'kecamatan',
+                    viewport_zoom_override: 12,
                 },
             ])
             .mockReturnValueOnce([
@@ -85,6 +87,8 @@ describe('areaService.getAdminOverview', () => {
             expect.objectContaining({
                 id: 10,
                 name: 'Area Dishub',
+                coverage_scope: 'kecamatan',
+                viewport_zoom_override: 12,
                 cameraCount: 3,
                 onlineCount: 1,
                 offlineCount: 2,

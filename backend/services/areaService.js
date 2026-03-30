@@ -8,6 +8,34 @@ const CACHE_AREA_FILTERS = cacheKey(CacheNamespace.AREAS, 'filters');
 const CACHE_AREA_SUMMARY = cacheKey(CacheNamespace.AREAS, 'summary');
 const CACHE_AREA_OVERVIEW = cacheKey(CacheNamespace.AREAS, 'overview');
 
+const AREA_COVERAGE_SCOPES = new Set([
+    'default',
+    'site_point',
+    'rt_rw',
+    'kelurahan_desa',
+    'kecamatan',
+    'kabupaten_kota',
+    'regional',
+    'custom',
+]);
+
+function normalizeAreaCoverageScope(value) {
+    return AREA_COVERAGE_SCOPES.has(value) ? value : 'default';
+}
+
+function normalizeViewportZoomOverride(value) {
+    if (value === undefined || value === null || value === '') {
+        return null;
+    }
+
+    const parsed = parseInt(value, 10);
+    if (Number.isNaN(parsed)) {
+        return null;
+    }
+
+    return Math.max(1, Math.min(parsed, 20));
+}
+
 function buildAreaOverviewRows(areas, cameras, healthItems) {
     const healthByCameraId = new Map(healthItems.map((item) => [item.cameraId, item]));
     const overviewByArea = new Map(
@@ -197,7 +225,8 @@ class AreaService {
         }
 
         const areas = query(`
-            SELECT a.id, a.name, a.description, a.rt, a.rw, a.kelurahan, a.kecamatan, a.latitude, a.longitude
+            SELECT a.id, a.name, a.description, a.rt, a.rw, a.kelurahan, a.kecamatan, a.latitude, a.longitude,
+                   a.coverage_scope, a.viewport_zoom_override
                    , CASE
                         WHEN a.external_health_mode_override IN ('default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled')
                             THEN a.external_health_mode_override
@@ -248,6 +277,8 @@ class AreaService {
             latitude,
             longitude,
             external_health_mode_override,
+            coverage_scope,
+            viewport_zoom_override,
         } = data;
 
         if (!name) {
@@ -259,8 +290,8 @@ class AreaService {
         try {
             const result = execute(
                 `INSERT INTO areas (
-                    name, description, rt, rw, kelurahan, kecamatan, latitude, longitude, external_health_mode_override
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    name, description, rt, rw, kelurahan, kecamatan, latitude, longitude, external_health_mode_override, coverage_scope, viewport_zoom_override
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     name,
                     description || null,
@@ -271,6 +302,8 @@ class AreaService {
                     latitude || null,
                     longitude || null,
                     normalizeExternalHealthMode(external_health_mode_override),
+                    normalizeAreaCoverageScope(coverage_scope),
+                    normalizeViewportZoomOverride(viewport_zoom_override),
                 ]
             );
 
@@ -298,6 +331,8 @@ class AreaService {
             latitude,
             longitude,
             external_health_mode_override,
+            coverage_scope,
+            viewport_zoom_override,
         } = data;
 
         const area = queryOne('SELECT * FROM areas WHERE id = ?', [id]);
@@ -311,7 +346,7 @@ class AreaService {
             execute(
                 `UPDATE areas
                  SET name = ?, description = ?, rt = ?, rw = ?, kelurahan = ?, kecamatan = ?, latitude = ?, longitude = ?,
-                     external_health_mode_override = ?
+                     external_health_mode_override = ?, coverage_scope = ?, viewport_zoom_override = ?
                  WHERE id = ?`,
                 [
                     name || area.name,
@@ -325,6 +360,12 @@ class AreaService {
                     external_health_mode_override !== undefined
                         ? normalizeExternalHealthMode(external_health_mode_override)
                         : normalizeExternalHealthMode(area.external_health_mode_override),
+                    coverage_scope !== undefined
+                        ? normalizeAreaCoverageScope(coverage_scope)
+                        : normalizeAreaCoverageScope(area.coverage_scope),
+                    viewport_zoom_override !== undefined
+                        ? normalizeViewportZoomOverride(viewport_zoom_override)
+                        : normalizeViewportZoomOverride(area.viewport_zoom_override),
                     id
                 ]
             );

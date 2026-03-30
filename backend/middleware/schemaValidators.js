@@ -465,6 +465,13 @@ export const createAreaSchema = {
             external_health_mode_override: {
                 type: 'string',
                 enum: ['default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled']
+            },
+            coverage_scope: {
+                type: 'string',
+                enum: ['default', 'site_point', 'rt_rw', 'kelurahan_desa', 'kecamatan', 'kabupaten_kota', 'regional', 'custom']
+            },
+            viewport_zoom_override: {
+                anyOf: [{ type: 'integer', minimum: 1, maximum: 20 }, { type: 'string' }, { type: 'null' }]
             }
         },
         additionalProperties: false
@@ -504,6 +511,13 @@ export const updateAreaSchema = {
             external_health_mode_override: {
                 type: 'string',
                 enum: ['default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled']
+            },
+            coverage_scope: {
+                type: 'string',
+                enum: ['default', 'site_point', 'rt_rw', 'kelurahan_desa', 'kecamatan', 'kabupaten_kota', 'regional', 'custom']
+            },
+            viewport_zoom_override: {
+                anyOf: [{ type: 'integer', minimum: 1, maximum: 20 }, { type: 'string' }, { type: 'null' }]
             }
         },
         additionalProperties: false

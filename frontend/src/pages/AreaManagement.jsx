@@ -6,6 +6,7 @@ import { settingsService } from '../services/settingsService';
 import { useNotification } from '../contexts/NotificationContext';
 import { StatCardSkeleton, CameraCardSkeleton, NoAreasEmptyState, Alert } from '../components/ui';
 import lazyWithRetry from '../utils/lazyWithRetry';
+import { AREA_COVERAGE_OPTIONS, getAreaCoverageLabel, resolveAreaFocusZoom } from '../utils/areaCoverage';
 
 // Lazy load LocationPicker to avoid conflicts with CameraManagement
 const LocationPicker = lazyWithRetry(() => import('../components/LocationPicker'), 'location-picker');
@@ -96,7 +97,7 @@ export default function AreaManagement() {
     const [showModal, setShowModal] = useState(false);
     const [editingArea, setEditingArea] = useState(null);
     const [formData, setFormData] = useState({ 
-        name: '', description: '', rt: '', rw: '', kelurahan: '', kecamatan: '', latitude: '', longitude: '', external_health_mode_override: 'default'
+        name: '', description: '', rt: '', rw: '', kelurahan: '', kecamatan: '', latitude: '', longitude: '', external_health_mode_override: 'default', coverage_scope: 'default', viewport_zoom_override: ''
     });
     const [formErrors, setFormErrors] = useState({});
     const [error, setError] = useState('');
@@ -188,7 +189,7 @@ export default function AreaManagement() {
 
     const openAddModal = () => {
         setEditingArea(null);
-        setFormData({ name: '', description: '', rt: '', rw: '', kelurahan: '', kecamatan: '', latitude: '', longitude: '', external_health_mode_override: 'default' });
+        setFormData({ name: '', description: '', rt: '', rw: '', kelurahan: '', kecamatan: '', latitude: '', longitude: '', external_health_mode_override: 'default', coverage_scope: 'default', viewport_zoom_override: '' });
         setFormErrors({});
         setError('');
         setShowModal(true);
@@ -201,6 +202,8 @@ export default function AreaManagement() {
             kelurahan: area.kelurahan || '', kecamatan: area.kecamatan || '',
             latitude: area.latitude || '', longitude: area.longitude || '',
             external_health_mode_override: area.external_health_mode_override || 'default',
+            coverage_scope: area.coverage_scope || 'default',
+            viewport_zoom_override: area.viewport_zoom_override || '',
         });
         setFormErrors({});
         setError('');
@@ -559,6 +562,9 @@ export default function AreaManagement() {
                             <div className="flex flex-wrap gap-2 mb-4">
                                 {area.kecamatan && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-blue-100 dark:bg-primary/20 text-primary-600 dark:text-blue-400">{area.kecamatan}</span>}
                                 {area.kelurahan && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400">{area.kelurahan}</span>}
+                                <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-700/50 text-slate-700 dark:text-slate-200">
+                                    {getAreaCoverageLabel(area.coverage_scope)}
+                                </span>
                                 {area.externalUnresolvedCount > 0 && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300">{area.externalUnresolvedCount} unresolved</span>}
                                 {area.degradedCount > 0 && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300">{area.degradedCount} degraded</span>}
                                 {area.offlineCount > 0 && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300">{area.offlineCount} offline</span>}
@@ -586,6 +592,14 @@ export default function AreaManagement() {
                                 <div className="flex items-center justify-between gap-3 text-xs mt-2">
                                     <span className="text-gray-500 dark:text-gray-400">Passive Monitored</span>
                                     <span className="font-semibold text-emerald-700 dark:text-emerald-300">{area.passiveMonitoredCount || 0}</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-3 text-xs mt-2">
+                                    <span className="text-gray-500 dark:text-gray-400">Coverage Area</span>
+                                    <span className="font-semibold text-gray-900 dark:text-white">{getAreaCoverageLabel(area.coverage_scope)}</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-3 text-xs mt-2">
+                                    <span className="text-gray-500 dark:text-gray-400">Focus Zoom</span>
+                                    <span className="font-semibold text-indigo-700 dark:text-indigo-300">{resolveAreaFocusZoom(area.coverage_scope, area.viewport_zoom_override, 15)}</span>
                                 </div>
                             </div>
                             <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700/50">
@@ -675,6 +689,41 @@ export default function AreaManagement() {
                                 <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                                     Override ini menjadi default steady-state untuk kamera external di area ini. Kamera dengan override sendiri tetap menang.
                                 </p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Coverage Area</label>
+                                    <select
+                                        name="coverage_scope"
+                                        value={formData.coverage_scope}
+                                        onChange={handleChange}
+                                        className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                                    >
+                                        {AREA_COVERAGE_OPTIONS.map((option) => (
+                                            <option key={option.value} value={option.value}>{option.label}</option>
+                                        ))}
+                                    </select>
+                                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                        Menjelaskan skala area ini, misalnya titik kecil, kelurahan, kecamatan, atau kabupaten/kota.
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Override Focus Zoom</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="20"
+                                        name="viewport_zoom_override"
+                                        value={formData.viewport_zoom_override}
+                                        onChange={handleChange}
+                                        className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                                        placeholder="Kosongkan untuk auto"
+                                    />
+                                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                        Jika diisi, zoom ini akan dipakai saat area difokuskan di map view.
+                                    </p>
+                                </div>
                             </div>
 
                             {/* Koordinat dengan LocationPicker */}
