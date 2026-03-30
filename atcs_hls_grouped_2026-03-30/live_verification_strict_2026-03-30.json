@@ -1,0 +1,374 @@
+[
+    {
+        "area_key": "kab-bandung-barat",
+        "total_cameras": 75,
+        "online_count": 73,
+        "online_ratio": 0.9733,
+        "import_ready": true,
+        "failures_preview": [
+            {
+                "name": "ALUN ALUN CILILIN ARAH SINDANGKERTA",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "PADALARANG - JL. SUNDIAL KBP (ARAH TOL)",
+                "ok": false,
+                "status": 404,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kab-banyuwangi",
+        "total_cameras": 224,
+        "online_count": 223,
+        "online_ratio": 0.9955,
+        "import_ready": true,
+        "failures_preview": [
+            {
+                "name": "ANPR LATENG",
+                "ok": false,
+                "status": 404,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kab-cirebon",
+        "total_cameras": 40,
+        "online_count": 40,
+        "online_ratio": 1,
+        "import_ready": true,
+        "failures_preview": []
+    },
+    {
+        "area_key": "kab-indramayu",
+        "total_cameras": 25,
+        "online_count": 23,
+        "online_ratio": 0.92,
+        "import_ready": false,
+        "failures_preview": [
+            {
+                "name": "Taman Tjimanuk",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "POS LOHBENER",
+                "ok": false,
+                "status": 404,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kab-klaten",
+        "total_cameras": 42,
+        "online_count": 37,
+        "online_ratio": 0.881,
+        "import_ready": false,
+        "failures_preview": [
+            {
+                "name": "Simpang Lima Matahari : Arah Pasar",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Posko Merapi : Desa Balerante 2",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Posko Merapi : Desa Tegal Mulyo 1",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Posko Merapi : Desa Balerante 2",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "BPBD : POS INDUK",
+                "ok": false,
+                "status": 404,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kab-kudus",
+        "total_cameras": 28,
+        "online_count": 23,
+        "online_ratio": 0.8214,
+        "import_ready": false,
+        "failures_preview": [
+            {
+                "name": "Simpang Krawang2",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Dawe 1",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Dawe 2",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Terminal Bakalan",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Terminal Jati",
+                "ok": false,
+                "status": 404,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kab-sanggau",
+        "total_cameras": 28,
+        "online_count": 28,
+        "online_ratio": 1,
+        "import_ready": true,
+        "failures_preview": []
+    },
+    {
+        "area_key": "kab-sleman",
+        "total_cameras": 44,
+        "online_count": 36,
+        "online_ratio": 0.8182,
+        "import_ready": false,
+        "failures_preview": [
+            {
+                "name": "Perempatan_Condongcatur",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Perempatan_Kronggahan",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Pertigaan_Bantulan1",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Pertigaan_Bantulan2",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Pertigaan_Maguwo3",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Pertigaan_PasarPrambanan",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Condong Catur",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Condong Catur",
+                "ok": false,
+                "status": 404,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kab-tangerang",
+        "total_cameras": 28,
+        "online_count": 25,
+        "online_ratio": 0.8929,
+        "import_ready": false,
+        "failures_preview": [
+            {
+                "name": "Simpang Legok 1",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Kecamatan Mauk",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Tugu Mauk",
+                "ok": false,
+                "status": 404,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kab-tasikmalaya",
+        "total_cameras": 11,
+        "online_count": 11,
+        "online_ratio": 1,
+        "import_ready": true,
+        "failures_preview": []
+    },
+    {
+        "area_key": "kota-bekasi",
+        "total_cameras": 40,
+        "online_count": 40,
+        "online_ratio": 1,
+        "import_ready": true,
+        "failures_preview": []
+    },
+    {
+        "area_key": "kota-metro",
+        "total_cameras": 40,
+        "online_count": 37,
+        "online_ratio": 0.925,
+        "import_ready": false,
+        "failures_preview": [
+            {
+                "name": "Perbatasan Metro Punggur",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Perbatasan Tejo Agung-Batanghari",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Traffic Light Kel. Metro",
+                "ok": false,
+                "status": 404,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kota-padang",
+        "total_cameras": 24,
+        "online_count": 16,
+        "online_ratio": 0.6667,
+        "import_ready": false,
+        "failures_preview": [
+            {
+                "name": "Puskesmas Ulak Karang 1",
+                "ok": false,
+                "status": 500,
+                "error": null
+            },
+            {
+                "name": "Puskesmas Ulak Karang 2",
+                "ok": false,
+                "status": 500,
+                "error": null
+            },
+            {
+                "name": "Puskesmas Ulak Karang 3",
+                "ok": false,
+                "status": 500,
+                "error": null
+            },
+            {
+                "name": "MPP Plaza Andalas 1",
+                "ok": false,
+                "status": 502,
+                "error": null
+            },
+            {
+                "name": "MPP Plaza Andalas 2",
+                "ok": false,
+                "status": 502,
+                "error": null
+            },
+            {
+                "name": "Pantai Padang IORA",
+                "ok": false,
+                "status": 502,
+                "error": null
+            },
+            {
+                "name": "Pantai Padang Jalan",
+                "ok": false,
+                "status": 502,
+                "error": null
+            },
+            {
+                "name": "UPTD Pasar Belimbing 2",
+                "ok": false,
+                "status": 0,
+                "error": "socket hang up"
+            }
+        ]
+    },
+    {
+        "area_key": "kota-pematang-siantar",
+        "total_cameras": 48,
+        "online_count": 48,
+        "online_ratio": 1,
+        "import_ready": true,
+        "failures_preview": []
+    },
+    {
+        "area_key": "kota-sumedang",
+        "total_cameras": 44,
+        "online_count": 42,
+        "online_ratio": 0.9545,
+        "import_ready": true,
+        "failures_preview": [
+            {
+                "name": "Angkrek arah Ojolali",
+                "ok": false,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Binokasih Arah Cirebon",
+                "ok": false,
+                "status": 200,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kota-tasikmalaya",
+        "total_cameras": 41,
+        "online_count": 41,
+        "online_ratio": 1,
+        "import_ready": true,
+        "failures_preview": []
+    }
+]

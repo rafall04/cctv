@@ -1,0 +1,1640 @@
+[
+    {
+        "area_key": "kab-bandung-barat",
+        "total_cameras": 75,
+        "sample_size": 5,
+        "sample_online": 5,
+        "sample_ratio": 1,
+        "sample_details": [
+            {
+                "name": "TAGOG PADALARANG 1 ARAH BANDUNG",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "TAGOG PADALARANG 1 ARAH PURWAKARTA",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "CIKAMUNING ARAH PURWAKARTA",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "CIKAMUNING ARAH CIHALIWUNG",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "CIKAMUNING ARAH EXIT TOL",
+                "ok": true,
+                "status": 200,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kab-banyumas",
+        "total_cameras": 30,
+        "sample_size": 5,
+        "sample_online": 4,
+        "sample_ratio": 0.8,
+        "sample_details": [
+            {
+                "name": "RUAS PATRIOT",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "RUAS TUGU ADIPURA",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "SIMPANG AJIBARANG",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "SIMPANG ALUN ALUN",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "SIMPANG GOR SATRIA",
+                "ok": true,
+                "status": 200,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kab-banyuwangi",
+        "total_cameras": 224,
+        "sample_size": 5,
+        "sample_online": 5,
+        "sample_ratio": 1,
+        "sample_details": [
+            {
+                "name": "PB. SUDIRMAN LATENG",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "SUNEAST MALL BARAT",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "SUNEAST MALL TIMUR",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "RTH JAMBU 2",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "RTH JAMBU 1",
+                "ok": true,
+                "status": 200,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kab-belitung",
+        "total_cameras": 27,
+        "sample_size": 5,
+        "sample_online": 0,
+        "sample_ratio": 0,
+        "sample_details": [
+            {
+                "name": "Pantai Tanjung Tinggi",
+                "ok": false,
+                "status": 0,
+                "error": "unable to verify the first certificate"
+            },
+            {
+                "name": "Traffic Light Pangkallalang",
+                "ok": false,
+                "status": 0,
+                "error": "unable to verify the first certificate"
+            },
+            {
+                "name": "Pasar Tanjungpandan/Jl. Kimting",
+                "ok": false,
+                "status": 0,
+                "error": "unable to verify the first certificate"
+            },
+            {
+                "name": "Traffic Light Jl. Pemuda",
+                "ok": false,
+                "status": 0,
+                "error": "unable to verify the first certificate"
+            },
+            {
+                "name": "Traffic Light Simp. Membalong",
+                "ok": false,
+                "status": 0,
+                "error": "unable to verify the first certificate"
+            }
+        ]
+    },
+    {
+        "area_key": "kab-boyolali",
+        "total_cameras": 58,
+        "sample_size": 5,
+        "sample_online": 4,
+        "sample_ratio": 0.8,
+        "sample_details": [
+            {
+                "name": "SIMPANG SELO",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Gambiran Barat",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Gambiran Timur",
+                "ok": false,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Museum Hamong Wardoyo",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Pandan Alas Arah Perempatan",
+                "ok": true,
+                "status": 200,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kab-cianjur",
+        "total_cameras": 52,
+        "sample_size": 5,
+        "sample_online": 4,
+        "sample_ratio": 0.8,
+        "sample_details": [
+            {
+                "name": "Simpang 4 Bojong PTZ 2",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Simpang 4 Bojong PTZ 1",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Pasar Ciranjang",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Jembatan Citarum",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Ruas JL Raya Bandung Masjid Al.Zabbar",
+                "ok": true,
+                "status": 200,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kab-cirebon",
+        "total_cameras": 40,
+        "sample_size": 5,
+        "sample_online": 5,
+        "sample_ratio": 1,
+        "sample_details": [
+            {
+                "name": "KEC.BEBER-JALAN GRONGGONG",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "KEC.SUMBER-SIMP BABAKAN SUMBER",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "KEC.SUMBER-ALUN-ALUN PATARAKSA",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "KEC.SUMBER-SIMPANG DPRD",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "KEC.SUMBER-JALAN KANTOR BUPATI",
+                "ok": true,
+                "status": 200,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kab-gunungkidul",
+        "total_cameras": 111,
+        "sample_size": 5,
+        "sample_online": 4,
+        "sample_ratio": 0.8,
+        "sample_details": [
+            {
+                "name": "Pantai Baron",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Pantai Kukup",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Kalurahan Getas",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Pertigaan Bunder",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Kalurahan Planjan - Fix",
+                "ok": false,
+                "status": 404,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kab-indramayu",
+        "total_cameras": 25,
+        "sample_size": 5,
+        "sample_online": 5,
+        "sample_ratio": 1,
+        "sample_details": [
+            {
+                "name": "Sudirman Arah Terminal",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "PerTigaan Prahu",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Bundaran Kijang",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Waiki - A. Yani",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Yos Sudarso - Karangturi",
+                "ok": true,
+                "status": 200,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kab-klaten",
+        "total_cameras": 42,
+        "sample_size": 5,
+        "sample_online": 5,
+        "sample_ratio": 1,
+        "sample_details": [
+            {
+                "name": "Simpang Tiga Ngingas : Arah Ronggowarsito",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Simpang Tiga Ngingas : Arah Solo",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Simpang Tiga Ngingas : Arah Yogyakarta",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Simpang Tiga Ngingas : PTZ",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Simpang Empat Bareng : Arah Rajawali",
+                "ok": true,
+                "status": 200,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kab-kudus",
+        "total_cameras": 28,
+        "sample_size": 5,
+        "sample_online": 5,
+        "sample_ratio": 1,
+        "sample_details": [
+            {
+                "name": "Penthol Gor",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Penthol Pati",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Penthol PTZ",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Penthol Rendeng",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Penthol Kota",
+                "ok": true,
+                "status": 200,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kab-nganjuk",
+        "total_cameras": 261,
+        "sample_size": 5,
+        "sample_online": 1,
+        "sample_ratio": 0.2,
+        "sample_details": [
+            {
+                "name": "Desa MUNUNG - Simpang 3 Selatan",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "ploso selatan",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "ploso barat",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Ploso Timur",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "POS TAMAN NYAWIJI",
+                "ok": false,
+                "status": 404,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kab-pasuruan",
+        "total_cameras": 32,
+        "sample_size": 5,
+        "sample_online": 0,
+        "sample_ratio": 0,
+        "sample_details": [
+            {
+                "name": "Pasar Nguling",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            },
+            {
+                "name": "Simpang 3 Sumurwaru",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            },
+            {
+                "name": "Exit Tol grati",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            },
+            {
+                "name": "Simpang 3 Semambung",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            },
+            {
+                "name": "Simpang 3 Ngopak",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            }
+        ]
+    },
+    {
+        "area_key": "kab-sampang",
+        "total_cameras": 44,
+        "sample_size": 5,
+        "sample_online": 0,
+        "sample_ratio": 0,
+        "sample_details": [
+            {
+                "name": "Monumen Barat",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Monumen Utara",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Monumen Timur",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Monumen Dome",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Duek Porte 1",
+                "ok": false,
+                "status": 404,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kab-sanggau",
+        "total_cameras": 28,
+        "sample_size": 5,
+        "sample_online": 5,
+        "sample_ratio": 1,
+        "sample_details": [
+            {
+                "name": "Simpang SDN 01 Sanggau Arah Sekadau",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Simpang SDN 01 Sanggau Arah Ilir Kota/Pasar Senggol",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Simpang SDN 01 Sanggau Arah Bunut/Pontianak",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Simpang SDN 01 Sanggau Arah SMP Negeri 2 Sanggau",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Simpang Tugu Rambai Ilir Kota Arah Sanggau Permai",
+                "ok": true,
+                "status": 200,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kab-sleman",
+        "total_cameras": 44,
+        "sample_size": 5,
+        "sample_online": 5,
+        "sample_ratio": 1,
+        "sample_details": [
+            {
+                "name": "Bundaran_UGM1",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Bundaran_UGM2",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Bundaran_UGM3",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "FlyOver_JomborBarat",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "FlyOver_JomborTimur",
+                "ok": true,
+                "status": 200,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kab-tabalong",
+        "total_cameras": 45,
+        "sample_size": 5,
+        "sample_online": 3,
+        "sample_ratio": 0.6,
+        "sample_details": [
+            {
+                "name": "Taman Giat Tanjung 2",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Kantor Kecamatan Pugaan",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "RTH Sport Center",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "RTH Kec. Haruai",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "RTH Kec. Tanta",
+                "ok": true,
+                "status": 200,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kab-tangerang",
+        "total_cameras": 28,
+        "sample_size": 5,
+        "sample_online": 5,
+        "sample_ratio": 1,
+        "sample_details": [
+            {
+                "name": "Jayanti 1",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Jayanti 2",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Cikupa Kedaton 1",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Cikupa Mas 2",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Cisauk 1",
+                "ok": true,
+                "status": 200,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kab-tasikmalaya",
+        "total_cameras": 11,
+        "sample_size": 5,
+        "sample_online": 5,
+        "sample_ratio": 1,
+        "sample_details": [
+            {
+                "name": "POS TAPAL KUDA (KEC.SALAWU)",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "JALAN KADIPATEN ARAH TASIK (KEC.KADIPATEN)",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "SIMPANG CIPASUNG (CIPASUNG)",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "SIMPANG PASAR SINGAPARNA (SINGAPARNA)",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "RAJAPOLAH (DEPAN KAUM) KEC.RAJAPOLAH",
+                "ok": true,
+                "status": 200,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kab-wonosobo",
+        "total_cameras": 23,
+        "sample_size": 5,
+        "sample_online": 4,
+        "sample_ratio": 0.8,
+        "sample_details": [
+            {
+                "name": "PEREMPATAN SETDA - S4 SETDA (ARAH BARAT)",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "PEREMPATAN SETDA - S4 SETDA (ARAH UTARA)",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "PEREMPATAN SETDA - S4 SETDA (ARAH SELATAN)",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "PEREMPATAN KODIM - S4 KODIM",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "PERTIGAAN PAHLAWAN - PAHLAWAN 1",
+                "ok": false,
+                "status": 404,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kota-bandung",
+        "total_cameras": 307,
+        "sample_size": 5,
+        "sample_online": 4,
+        "sample_ratio": 0.8,
+        "sample_details": [
+            {
+                "name": "ACEH-WASTUKENCANA",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "ALUN-ALUN_03",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "ANTAPANI-DEPAN BORMA 01",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "ANTAPANI-DEPAN BORMA 02",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "BATAS KOTA 01",
+                "ok": true,
+                "status": 200,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kota-banjar",
+        "total_cameras": 38,
+        "sample_size": 5,
+        "sample_online": 1,
+        "sample_ratio": 0.2,
+        "sample_details": [
+            {
+                "name": "Jembar Arah Ciamis",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Jembar Dari Timur",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Alun Alun Arah Cimaragas",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Alun Alun Dari Parungsari",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Jembar Arah Terminal",
+                "ok": false,
+                "status": 404,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kota-banjarbaru",
+        "total_cameras": 54,
+        "sample_size": 5,
+        "sample_online": 0,
+        "sample_ratio": 0,
+        "sample_details": [
+            {
+                "name": "ARAH POLRESTA",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            },
+            {
+                "name": "ARAH MUSEUM",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            },
+            {
+                "name": "ARAH GERBANG ULM",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            },
+            {
+                "name": "ARAH PURNAMA ULM",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            },
+            {
+                "name": "A1 SPBU SIMPANG 4",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            }
+        ]
+    },
+    {
+        "area_key": "kota-banjarmasin",
+        "total_cameras": 30,
+        "sample_size": 5,
+        "sample_online": 0,
+        "sample_ratio": 0,
+        "sample_details": [
+            {
+                "name": "Jalan Lambung Mangkurat Bank BI",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            },
+            {
+                "name": "Jalan A Yani KM 3",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            },
+            {
+                "name": "Simpang Mentari",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            },
+            {
+                "name": "Simpang Sultan Adam Sungai Andai",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            },
+            {
+                "name": "Simpang Antasari",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            }
+        ]
+    },
+    {
+        "area_key": "kota-batam",
+        "total_cameras": 46,
+        "sample_size": 5,
+        "sample_online": 1,
+        "sample_ratio": 0.2,
+        "sample_details": [
+            {
+                "name": "Atap Kantor Walikota",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "SP. Indomobil",
+                "ok": false,
+                "status": 0,
+                "error": "connect ECONNREFUSED 103.248.199.102:80"
+            },
+            {
+                "name": "Sp Baloi",
+                "ok": false,
+                "status": 0,
+                "error": "connect ECONNREFUSED 103.248.199.102:80"
+            },
+            {
+                "name": "Sp APT Harmoni",
+                "ok": false,
+                "status": 0,
+                "error": "connect ECONNREFUSED 103.248.199.102:80"
+            },
+            {
+                "name": "Sp Lippo",
+                "ok": false,
+                "status": 0,
+                "error": "connect ECONNREFUSED 103.248.199.102:80"
+            }
+        ]
+    },
+    {
+        "area_key": "kota-batu",
+        "total_cameras": 38,
+        "sample_size": 5,
+        "sample_online": 0,
+        "sample_ratio": 0,
+        "sample_details": [
+            {
+                "name": "Depan Rumah Dinas Walikota Batu",
+                "ok": false,
+                "status": 0,
+                "error": "unable to verify the first certificate"
+            },
+            {
+                "name": "Depan Pertigaan sumbergondo",
+                "ok": false,
+                "status": 0,
+                "error": "unable to verify the first certificate"
+            },
+            {
+                "name": "Kecamatan Bumiaji Kota Batu",
+                "ok": false,
+                "status": 0,
+                "error": "unable to verify the first certificate"
+            },
+            {
+                "name": "Depan BPBD Kota Batu",
+                "ok": false,
+                "status": 0,
+                "error": "unable to verify the first certificate"
+            },
+            {
+                "name": "Taman Kenanga Kota Batu",
+                "ok": false,
+                "status": 0,
+                "error": "unable to verify the first certificate"
+            }
+        ]
+    },
+    {
+        "area_key": "kota-bekasi",
+        "total_cameras": 40,
+        "sample_size": 5,
+        "sample_online": 5,
+        "sample_ratio": 1,
+        "sample_details": [
+            {
+                "name": "Depan Anugrah Motor",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Depan FTL Fitness",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Depan NGOPIBAH",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Depan SMP Strada Budi luhur",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Dishub Bambu Kuning 1 ",
+                "ok": true,
+                "status": 200,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kota-bogor",
+        "total_cameras": 27,
+        "sample_size": 5,
+        "sample_online": 0,
+        "sample_ratio": 0,
+        "sample_details": [
+            {
+                "name": "JALAN SUKASARI",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            },
+            {
+                "name": "GANG AUT",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            },
+            {
+                "name": "KAPTEN MUSLIHAT",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            },
+            {
+                "name": "LAWANG GINTUNG",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            },
+            {
+                "name": "MAYOR OKING",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            }
+        ]
+    },
+    {
+        "area_key": "kota-bukittinggi",
+        "total_cameras": 56,
+        "sample_size": 5,
+        "sample_online": 3,
+        "sample_ratio": 0.6,
+        "sample_details": [
+            {
+                "name": "Simpang Pasar Banto",
+                "ok": false,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Simpang BNI",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Taman Bypass",
+                "ok": false,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Batas Kota Birugo",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Batas Kota Birugo",
+                "ok": true,
+                "status": 200,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kota-cirebon",
+        "total_cameras": 22,
+        "sample_size": 5,
+        "sample_online": 0,
+        "sample_ratio": 0,
+        "sample_details": [
+            {
+                "name": "Depan Balaikota arah DPRD",
+                "ok": false,
+                "status": 0,
+                "error": "unable to verify the first certificate"
+            },
+            {
+                "name": "Depan Ataqwa",
+                "ok": false,
+                "status": 0,
+                "error": "unable to verify the first certificate"
+            },
+            {
+                "name": "Kelurahan Kesambi",
+                "ok": false,
+                "status": 0,
+                "error": "unable to verify the first certificate"
+            },
+            {
+                "name": "Satpol PP",
+                "ok": false,
+                "status": 0,
+                "error": "unable to verify the first certificate"
+            },
+            {
+                "name": "Simpang Sunyaragi",
+                "ok": false,
+                "status": 0,
+                "error": "unable to verify the first certificate"
+            }
+        ]
+    },
+    {
+        "area_key": "kota-depok",
+        "total_cameras": 48,
+        "sample_size": 5,
+        "sample_online": 2,
+        "sample_ratio": 0.4,
+        "sample_details": [
+            {
+                "name": "Sektor Pasar Pucung",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "SP Sektor Melati",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Taman Elok Duren Seribu",
+                "ok": false,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "SP PEKAPURAN",
+                "ok": false,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "SP PASAR PUCUNG",
+                "ok": false,
+                "status": 200,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kota-magelang",
+        "total_cameras": 41,
+        "sample_size": 5,
+        "sample_online": 4,
+        "sample_ratio": 0.8,
+        "sample_details": [
+            {
+                "name": "Batas Kota",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "RSJ - Utara",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "RSJ - Selatan",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Simpang Kupatan - Utara",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Simpang Kupatan - PTZ",
+                "ok": true,
+                "status": 200,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kota-medan",
+        "total_cameras": 182,
+        "sample_size": 5,
+        "sample_online": 2,
+        "sample_ratio": 0.4,
+        "sample_details": [
+            {
+                "name": "SIMPANG LAPANGAN MERDEKA (RADEN SALEH - BALAI KOTA)",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "SIMPANG LONSUM (AHMAD YANI - PULAU PINANG)",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "SIMPANG KESAWAN (KESAWAN - PALANG MERAH)",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "SIMPANG WASPADA (KATAMSO - ANI IDRUS)",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "SIMPANG TIRTANADI (PANDU - CIREBON)",
+                "ok": false,
+                "status": 404,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kota-metro",
+        "total_cameras": 40,
+        "sample_size": 5,
+        "sample_online": 5,
+        "sample_ratio": 1,
+        "sample_details": [
+            {
+                "name": "Bunderan 24, Tejo Agung",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Bunderan 29 Banjarsari",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Dam Raman , Purwo Asri",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Depan Kantor Kesbang",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Gapura Kota Metro",
+                "ok": true,
+                "status": 200,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kota-padang",
+        "total_cameras": 24,
+        "sample_size": 5,
+        "sample_online": 5,
+        "sample_ratio": 1,
+        "sample_details": [
+            {
+                "name": "UPTD Pasar Bandar Buat 1",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "UPTD Pasar Bandar Buat 2",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "UPTD Pasar Bandar Buat 3",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "UPTD Pasar Bandar Buat 4",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Bapenda",
+                "ok": true,
+                "status": 200,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kota-palembang",
+        "total_cameras": 31,
+        "sample_size": 5,
+        "sample_online": 2,
+        "sample_ratio": 0.4,
+        "sample_details": [
+            {
+                "name": "Benteng Kuto Besak",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Jembatan Ampera - Tengah",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Simpang Polda",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Simpang Macan Lindungan",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Simpang Angkatan 45",
+                "ok": false,
+                "status": 404,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kota-pekanbaru",
+        "total_cameras": 50,
+        "sample_size": 5,
+        "sample_online": 0,
+        "sample_ratio": 0,
+        "sample_details": [
+            {
+                "name": "Sudirman - Gajah Mada 1",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            },
+            {
+                "name": "Sudirman - Gajah Mada 2",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            },
+            {
+                "name": "DIPO - Gajah Mada 1",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            },
+            {
+                "name": "DIPO - Gajah Mada 2",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            },
+            {
+                "name": "Depan MPP 1",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            }
+        ]
+    },
+    {
+        "area_key": "kota-pematang-siantar",
+        "total_cameras": 48,
+        "sample_size": 5,
+        "sample_online": 5,
+        "sample_ratio": 1,
+        "sample_details": [
+            {
+                "name": "Jembatan Sigagak-Medan",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Jembatan Sigagak-Siantar",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Jalan Medan-Simpang Karang Sari",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Jalan Medan-Simpang AMD Terminal",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Simpang Rambung Merah",
+                "ok": true,
+                "status": 200,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kota-semarang",
+        "total_cameras": 2630,
+        "sample_size": 5,
+        "sample_online": 0,
+        "sample_ratio": 0,
+        "sample_details": [
+            {
+                "name": "RT2RW3 KALIPANCUR",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            },
+            {
+                "name": "CAM 1",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            },
+            {
+                "name": "TIMUR",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            },
+            {
+                "name": "IP CAMERA",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            },
+            {
+                "name": "Camera 01",
+                "ok": false,
+                "status": 0,
+                "error": "timeout"
+            }
+        ]
+    },
+    {
+        "area_key": "kota-serang",
+        "total_cameras": 24,
+        "sample_size": 5,
+        "sample_online": 0,
+        "sample_ratio": 0,
+        "sample_details": [
+            {
+                "name": "BALAIKOTA SERANG",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Alun-alun 1",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Alun-alun 2",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Alun-alun 3",
+                "ok": false,
+                "status": 404,
+                "error": null
+            },
+            {
+                "name": "Alun-alun 4",
+                "ok": false,
+                "status": 404,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kota-sumedang",
+        "total_cameras": 44,
+        "sample_size": 5,
+        "sample_online": 5,
+        "sample_ratio": 1,
+        "sample_details": [
+            {
+                "name": "Alamsari Arah Terminal Ciakar",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Alamsari Arah Cirebon",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Alamsari Arah Kota",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Alamsari Arah Wado",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "Alamsari Fix 1",
+                "ok": true,
+                "status": 200,
+                "error": null
+            }
+        ]
+    },
+    {
+        "area_key": "kota-tasikmalaya",
+        "total_cameras": 41,
+        "sample_size": 5,
+        "sample_online": 5,
+        "sample_ratio": 1,
+        "sample_details": [
+            {
+                "name": "Simpang Jati",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "SIMPANG MITRA BATIK",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "SIMPANG CIMULU",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "SIMPANG MASJID AGUNG",
+                "ok": true,
+                "status": 200,
+                "error": null
+            },
+            {
+                "name": "SIMPANG RANCABANGO ARAH Arah Simpang Bantar",
+                "ok": true,
+                "status": 200,
+                "error": null
+            }
+        ]
+    }
+]
