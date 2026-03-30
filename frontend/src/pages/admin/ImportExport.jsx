@@ -9,6 +9,7 @@ const IMPORT_MODE_OPTIONS = [
 ];
 
 const PROFILE_OPTIONS = [
+    { value: 'internal_rtsp_live_only', label: 'Private RTSP (Live Only)' },
     { value: 'jombang_mjpeg', label: 'Jombang MJPEG' },
     { value: 'generic_hls', label: 'Generic HLS' },
     { value: 'surakarta_flv', label: 'Surakarta FLV' },
@@ -34,6 +35,7 @@ const DELIVERY_TYPE_OPTIONS = [
 
 const HEALTH_MODE_OPTIONS = [
     { value: '', label: 'Auto / Ikuti Profile' },
+    { value: 'default', label: 'Default' },
     { value: 'passive_first', label: 'Passive First' },
     { value: 'hybrid_probe', label: 'Hybrid Probe' },
     { value: 'probe_first', label: 'Probe First' },
@@ -68,7 +70,30 @@ const LOCATION_MAPPING_OPTIONS = [
     { value: 'area_plus_name', label: 'Area + Name' },
 ];
 
-const TEMPLATE_JSON = `[
+function getTemplateJson(profile) {
+    if (profile === 'internal_rtsp_live_only') {
+        return `{
+    "targetArea": "SURABAYA",
+    "sourceProfile": "internal_rtsp_live_only",
+    "cameras": [
+        {
+            "name": "A. YANI - JEMURSARI",
+            "private_rtsp_url": "rtsp://user:pass@host:554/Streaming/Channels/402",
+            "stream_source": "internal",
+            "delivery_type": "internal_hls",
+            "enable_recording": 0,
+            "latitude": null,
+            "longitude": null,
+            "status": "active",
+            "video_codec": "h264",
+            "source_tag": "surabaya_private_rtsp",
+            "notes": "live_only"
+        }
+    ]
+}`;
+    }
+
+    return `[
     {
         "name": "Contoh CCTV",
         "location": "Simpang A",
@@ -85,9 +110,22 @@ const TEMPLATE_JSON = `[
         "enabled": 1
     }
 ]`;
+}
 
 function getProfileDefaults(profile) {
     switch (profile) {
+        case 'internal_rtsp_live_only':
+            return {
+                delivery_type: 'internal_hls',
+                external_use_proxy: false,
+                enabled: true,
+                external_tls_mode: 'strict',
+                external_health_mode: 'default',
+                external_origin_mode: 'direct',
+                descriptionTemplate: 'SOURCE: PRIVATE RTSP LIVE ONLY | source_tag: {sourceTag} | notes: {notes}',
+                locationMapping: 'source_field',
+                sourceFilter: 'all',
+            };
         case 'jombang_mjpeg':
             return {
                 delivery_type: 'external_mjpeg',
@@ -237,6 +275,8 @@ export default function ImportExport() {
     }, [sourceProfile]);
 
     const sourceOptions = importMode === 'remote_preset' ? REMOTE_PROFILE_OPTIONS : PROFILE_OPTIONS;
+    const isPrivateRtspProfile = sourceProfile === 'internal_rtsp_live_only';
+    const templateJson = useMemo(() => getTemplateJson(sourceProfile), [sourceProfile]);
 
     const importPayload = useMemo(() => ({
         targetArea,
@@ -401,7 +441,7 @@ export default function ImportExport() {
                 <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                     <div className="p-4 bg-primary-50 dark:bg-primary-900/10 text-primary-900 dark:text-primary-100 rounded-xl border border-primary-200 dark:border-primary-800/30">
                         <h3 className="font-semibold text-lg mb-2">Full Database Export</h3>
-                        <p className="text-sm mb-4">Unduh snapshot JSON lengkap untuk seluruh kamera yang saat ini ada di database.</p>
+                        <p className="text-sm mb-4">Unduh snapshot JSON untuk seluruh kamera yang saat ini ada di database. Field private seperti `private_rtsp_url` tidak ikut diekspor di jalur umum ini.</p>
                         <button onClick={handleExport} disabled={isProcessing} className="bg-primary text-white py-2 px-6 rounded-xl hover:bg-primary-600 transition disabled:opacity-50">
                             {isProcessing ? 'Processing Download...' : 'Export to JSON'}
                         </button>
@@ -434,21 +474,27 @@ export default function ImportExport() {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Import Profile</label>
-                                <select value={sourceProfile} onChange={(event) => setSourceProfile(event.target.value)} className="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white">
+                                <label htmlFor="import-profile-select" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Import Profile</label>
+                                <select id="import-profile-select" value={sourceProfile} onChange={(event) => setSourceProfile(event.target.value)} className="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5 dark:bg-gray-800 dark:border-gray-600 dark:text-white">
                                     {sourceOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                 </select>
                             </div>
 
                             {importMode === 'upload_json' ? (
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Upload JSON</label>
-                                    <input type="file" accept=".json" onChange={handleFileUpload} ref={fileInputRef} className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100" />
+                                    <label htmlFor="import-json-file" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Upload JSON</label>
+                                    <input id="import-json-file" type="file" accept=".json" onChange={handleFileUpload} ref={fileInputRef} className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100" />
                                     {rawPayload.length > 0 && <p className="mt-3 text-sm text-green-600 dark:text-green-400 font-medium">Loaded {rawPayload.length} rows from {rawFileName || 'JSON'}.</p>}
                                 </div>
                             ) : (
                                 <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-200">
                                     Backend akan fetch source preset saat preview. Saat ini preset remote yang aktif adalah Jombang v2 dan Surakarta FLV.
+                                </div>
+                            )}
+
+                            {isPrivateRtspProfile && importMode === 'upload_json' && (
+                                <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                                    Profile ini khusus dataset private RTSP seperti Surabaya. Import akan dipaksa menjadi `internal_hls`, live-only, recording off, dan preview/export umum hanya menampilkan URL yang sudah disanitasi.
                                 </div>
                             )}
 
@@ -463,25 +509,26 @@ export default function ImportExport() {
                             <div className="grid grid-cols-1 gap-3">
                                 <div>
                                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Delivery Type Override</label>
-                                    <select value={globalOverrides.delivery_type} onChange={(event) => handleOverrideChange('delivery_type', event.target.value)} className="w-full rounded-lg border border-gray-300 bg-gray-50 p-2 text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-white">
+                                    <select value={globalOverrides.delivery_type} onChange={(event) => handleOverrideChange('delivery_type', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-gray-300 bg-gray-50 p-2 text-sm disabled:opacity-60 dark:bg-gray-800 dark:border-gray-600 dark:text-white">
                                         {DELIVERY_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                     </select>
+                                    {isPrivateRtspProfile && <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">Profile ini selalu dipaksa ke `internal_hls`.</p>}
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">External Health Mode</label>
-                                    <select value={globalOverrides.external_health_mode} onChange={(event) => handleOverrideChange('external_health_mode', event.target.value)} className="w-full rounded-lg border border-gray-300 bg-gray-50 p-2 text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-white">
+                                    <select value={globalOverrides.external_health_mode} onChange={(event) => handleOverrideChange('external_health_mode', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-gray-300 bg-gray-50 p-2 text-sm disabled:opacity-60 dark:bg-gray-800 dark:border-gray-600 dark:text-white">
                                         {HEALTH_MODE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                     </select>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">TLS Mode</label>
-                                    <select value={globalOverrides.external_tls_mode} onChange={(event) => handleOverrideChange('external_tls_mode', event.target.value)} className="w-full rounded-lg border border-gray-300 bg-gray-50 p-2 text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-white">
+                                    <select value={globalOverrides.external_tls_mode} onChange={(event) => handleOverrideChange('external_tls_mode', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-gray-300 bg-gray-50 p-2 text-sm disabled:opacity-60 dark:bg-gray-800 dark:border-gray-600 dark:text-white">
                                         {TLS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                     </select>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Origin Mode</label>
-                                    <select value={globalOverrides.external_origin_mode} onChange={(event) => handleOverrideChange('external_origin_mode', event.target.value)} className="w-full rounded-lg border border-gray-300 bg-gray-50 p-2 text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-white">
+                                    <select value={globalOverrides.external_origin_mode} onChange={(event) => handleOverrideChange('external_origin_mode', event.target.value)} disabled={isPrivateRtspProfile} className="w-full rounded-lg border border-gray-300 bg-gray-50 p-2 text-sm disabled:opacity-60 dark:bg-gray-800 dark:border-gray-600 dark:text-white">
                                         {ORIGIN_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                     </select>
                                 </div>
@@ -510,7 +557,7 @@ export default function ImportExport() {
                             </div>
                             <div className="space-y-3">
                                 <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"><input type="checkbox" checked={globalOverrides.enabled} onChange={(event) => handleOverrideChange('enabled', event.target.checked)} />Import as enabled</label>
-                                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"><input type="checkbox" checked={globalOverrides.external_use_proxy} onChange={(event) => handleOverrideChange('external_use_proxy', event.target.checked)} />Enable built-in proxy</label>
+                                <label className={`flex items-center gap-2 text-sm ${isPrivateRtspProfile ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'}`}><input type="checkbox" checked={globalOverrides.external_use_proxy} onChange={(event) => handleOverrideChange('external_use_proxy', event.target.checked)} disabled={isPrivateRtspProfile} />Enable built-in proxy</label>
                                 <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"><input type="checkbox" checked={globalOverrides.syncLocationWithName} onChange={(event) => handleOverrideChange('syncLocationWithName', event.target.checked)} />Pakai nama kamera sebagai location</label>
                                 <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"><input type="checkbox" checked={importPolicy.normalizeNames} onChange={(event) => handlePolicyChange('normalizeNames', event.target.checked)} />Normalize camera names</label>
                                 <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"><input type="checkbox" checked={importPolicy.dropOfflineSourceRows} onChange={(event) => handlePolicyChange('dropOfflineSourceRows', event.target.checked)} />Drop offline source rows</label>
@@ -544,7 +591,7 @@ export default function ImportExport() {
                             {showTemplate && (
                                 <div className="px-4 pt-4">
                                     <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-950">
-                                        <pre className="overflow-x-auto text-xs text-gray-700 dark:text-gray-300">{TEMPLATE_JSON}</pre>
+                                        <pre className="overflow-x-auto text-xs text-gray-700 dark:text-gray-300">{templateJson}</pre>
                                     </div>
                                 </div>
                             )}
@@ -616,7 +663,12 @@ export default function ImportExport() {
                                                         <tr key={`${row.index}-${row.resolvedName || 'row'}`} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800">
                                                             <td className="px-4 py-3"><span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${row.status === 'importable' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' : row.status === 'duplicate_name' || row.status === 'duplicate_url' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300' : row.status === 'filtered_out' ? 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200' : 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-300'}`}>{row.status}</span></td>
                                                             <td className="px-4 py-3 font-medium text-gray-900 dark:text-white max-w-[200px] truncate">{row.resolvedName || `Row ${row.index + 1}`}</td>
-                                                            <td className="px-4 py-3">{row.resolvedDeliveryType || '-'}</td>
+                                                            <td className="px-4 py-3">
+                                                                <div className="font-medium text-gray-900 dark:text-white">{row.resolvedDeliveryType || '-'}</div>
+                                                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                                    {(row.resolvedStreamSource || '-')}{row.resolvedRecordingEnabled === 0 ? ' • live only' : ''}
+                                                                </div>
+                                                            </td>
                                                             <td className="px-4 py-3 max-w-[260px] truncate" title={row.resolvedUrl || ''}>{row.resolvedUrl || '-'}</td>
                                                             <td className="px-4 py-3">{row.resolvedHealthMode || '-'}</td>
                                                             <td className="px-4 py-3">{row.resolvedTlsMode || '-'}</td>

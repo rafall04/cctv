@@ -58,6 +58,7 @@ tmp/
 temp/
 *.tmp
 private_exports/
+private_imports/
 
 # Backup files (SECURITY)
 *.bak

@@ -94,6 +94,7 @@ const IMPORT_PRESET_PROFILES = [
     'generic_hls',
     'generic_mjpeg',
     'embed_only',
+    'internal_rtsp_live_only',
     'jombang_mjpeg',
     'surakarta_flv',
 ];
@@ -761,6 +762,17 @@ function deriveSnapshotUrl(sourceRow = {}, snapshotHandling = 'preserve') {
 }
 
 function buildImportFieldMapping(sourceProfile = null) {
+    if (sourceProfile === 'internal_rtsp_live_only') {
+        return {
+            name: 'name',
+            streamUrl: 'private_rtsp_url (private only)',
+            coordinates: 'latitude/longitude | lat/lng',
+            sourceStatus: 'status',
+            sourceCategory: 'source_tag',
+            location: 'location | area_name | name',
+        };
+    }
+
     if (sourceProfile === 'jombang_mjpeg') {
         return {
             name: 'nama',
@@ -797,6 +809,17 @@ function buildImportFieldMapping(sourceProfile = null) {
 
 function getImportProfileDefaults(sourceProfile = null) {
     switch (sourceProfile) {
+        case 'internal_rtsp_live_only':
+            return {
+                delivery_type: 'internal_hls',
+                enabled: 1,
+                external_use_proxy: 0,
+                external_tls_mode: 'strict',
+                external_health_mode: 'default',
+                external_origin_mode: 'direct',
+                descriptionTemplate: 'SOURCE: PRIVATE RTSP LIVE ONLY | source_tag: {sourceTag} | notes: {notes}',
+                locationMapping: 'source_field',
+            };
         case 'jombang_mjpeg':
             return {
                 delivery_type: 'external_mjpeg',
@@ -863,6 +886,40 @@ function sourceFilterMatches(filterMode, sourceStatus) {
     return true;
 }
 
+function isInternalRtspLiveOnlyProfile(sourceProfile = null) {
+    return sourceProfile === 'internal_rtsp_live_only';
+}
+
+function isInternalRtspImportRow(item = {}, sourceProfile = null) {
+    const privateRtspUrl = typeof item.private_rtsp_url === 'string'
+        ? item.private_rtsp_url.trim()
+        : '';
+    return isInternalRtspLiveOnlyProfile(sourceProfile) || Boolean(privateRtspUrl);
+}
+
+function maskSensitiveImportUrl(url, deliveryType) {
+    if (deliveryType !== 'internal_hls' || typeof url !== 'string' || !url.trim()) {
+        return url || null;
+    }
+
+    try {
+        const parsed = new URL(url);
+        const protocol = parsed.protocol || 'rtsp:';
+        const host = parsed.hostname || '***';
+        const port = parsed.port ? `:${parsed.port}` : '';
+        const path = parsed.pathname || '';
+
+        if (parsed.username || parsed.password) {
+            const username = parsed.username ? decodeURIComponent(parsed.username) : 'user';
+            return `${protocol}//${username}:***@${host}${port}${path}`;
+        }
+
+        return `${protocol}//${host}${port}${path}`;
+    } catch {
+        return 'rtsp://***';
+    }
+}
+
 function buildImportWarnings(rows = [], sourceProfile = null) {
     const warningMap = new Map();
 
@@ -889,6 +946,10 @@ function buildImportWarnings(rows = [], sourceProfile = null) {
 
     if (sourceProfile === 'jombang_mjpeg') {
         addWarning('jombang_tokenized_source', 'Preset Jombang v2 menggunakan MJPEG tokenized. Passive-first direkomendasikan.');
+    }
+
+    if (sourceProfile === 'internal_rtsp_live_only') {
+        addWarning('private_rtsp_live_only', 'Profile ini private-only. RTSP tetap backend secret, preview/export umum akan disanitasi, dan recording dipaksa nonaktif.');
     }
 
     return Array.from(warningMap.values()).sort((left, right) => right.count - left.count);
@@ -2338,6 +2399,8 @@ class CameraService {
             const rawName = item.name || item.title || item.cctv_title || item.nama || '';
             const rawSourceUrl = item.external_stream_url || item.external_hls_url || item.url || item.stream || item.cctv_link || null;
             const rawRtspUrl = item.private_rtsp_url || null;
+            const rawSourceTag = item.source_tag || null;
+            const rawNotes = item.notes || null;
             const rawEmbedUrl = item.external_embed_url || item.embed_url || item.page_url || null;
             const wrappedSourceUrl = extractWrappedExternalTarget(rawSourceUrl) || extractWrappedExternalTarget(rawEmbedUrl);
             const effectiveSourceUrl = wrappedSourceUrl || rawSourceUrl;
@@ -2345,7 +2408,8 @@ class CameraService {
             const rawLat = item.latitude !== undefined ? item.latitude : (item.lat !== undefined ? item.lat : null);
             const rawLng = item.longitude !== undefined ? item.longitude : (item.lng !== undefined ? item.lng : null);
             const sourceStatus = normalizeImportStatus(item.source_status || item.status || (normalizedRequest.sourceProfile === 'surakarta_flv' ? 'online' : null));
-            const sourceCategory = item.source_category || item.kategori || item.category || (normalizedRequest.sourceProfile === 'surakarta_flv' ? 'surakarta_flv' : null);
+            const sourceCategory = item.source_category || item.kategori || item.category || rawSourceTag || (normalizedRequest.sourceProfile === 'surakarta_flv' ? 'surakarta_flv' : null);
+            const forceInternalLiveOnly = isInternalRtspImportRow(item, normalizedRequest.sourceProfile);
 
             if (sourceStatus === 'online') {
                 onlineSourceCount += 1;
@@ -2367,17 +2431,19 @@ class CameraService {
             }
 
             const resolvedName = normalizeImportName(rawName, normalizedRequest.importPolicy.normalizeNames);
-            const resolvedDeliveryType = DELIVERY_TYPES.includes(globalOverrides.delivery_type)
-                ? globalOverrides.delivery_type
-                : getEffectiveDeliveryType({
-                    stream_source: item.stream_source || (rawRtspUrl ? 'internal' : 'external'),
-                    delivery_type: item.delivery_type || inferImportDeliveryType(effectiveSourceUrl, effectiveEmbedUrl, item.stream_source),
-                    private_rtsp_url: rawRtspUrl,
-                    external_hls_url: item.external_hls_url || null,
-                    external_stream_url: effectiveSourceUrl,
-                    external_embed_url: effectiveEmbedUrl,
-                });
-            const resolvedStreamSource = resolvedDeliveryType === 'internal_hls' ? 'internal' : 'external';
+            const resolvedDeliveryType = forceInternalLiveOnly
+                ? 'internal_hls'
+                : (DELIVERY_TYPES.includes(globalOverrides.delivery_type)
+                    ? globalOverrides.delivery_type
+                    : getEffectiveDeliveryType({
+                        stream_source: item.stream_source || (rawRtspUrl ? 'internal' : 'external'),
+                        delivery_type: item.delivery_type || inferImportDeliveryType(effectiveSourceUrl, effectiveEmbedUrl, item.stream_source),
+                        private_rtsp_url: rawRtspUrl,
+                        external_hls_url: item.external_hls_url || null,
+                        external_stream_url: effectiveSourceUrl,
+                        external_embed_url: effectiveEmbedUrl,
+                    }));
+            const resolvedStreamSource = forceInternalLiveOnly || resolvedDeliveryType === 'internal_hls' ? 'internal' : 'external';
             const resolvedSourceUrl = typeof effectiveSourceUrl === 'string' ? effectiveSourceUrl.trim() : null;
             const resolvedEmbedUrl = typeof effectiveEmbedUrl === 'string' ? effectiveEmbedUrl.trim() : null;
             const snapshotHandling = IMPORT_SNAPSHOT_HANDLING_MODES.includes(globalOverrides.external_snapshot_url_handling)
@@ -2392,7 +2458,7 @@ class CameraService {
             const resolvedLocation = locationMapping === 'area_plus_name'
                 ? `${normalizedRequest.targetArea} - ${resolvedName}`
                 : (locationMapping === 'source_field'
-                    ? (item.location || item.alamat || item.address || resolvedName)
+                    ? (item.location || item.alamat || item.address || item.area_name || resolvedName)
                     : resolvedName);
             const resolvedDescription = applyDescriptionTemplate(
                 globalOverrides.descriptionTemplate || globalOverrides.description_template || profileDefaults.descriptionTemplate,
@@ -2403,6 +2469,8 @@ class CameraService {
                     sourceStatus,
                     sourceProfile: normalizedRequest.sourceProfile || 'manual_upload',
                     description: item.description || '',
+                    sourceTag: rawSourceTag || '',
+                    notes: rawNotes || '',
                 }
             ) || item.description || null;
             const resolvedTlsMode = globalOverrides.external_tls_mode || item.external_tls_mode || profileDefaults.external_tls_mode || 'strict';
@@ -2439,6 +2507,9 @@ class CameraService {
                 resolvedOriginMode,
                 resolvedSnapshotUrl,
                 resolvedLocation,
+                resolvedStreamSource,
+                resolvedRecordingEnabled: forceInternalLiveOnly ? 0 : null,
+                sourceTag: rawSourceTag,
                 latitude: rawLat !== null && rawLat !== '' ? parseFloat(rawLat) : null,
                 longitude: rawLng !== null && rawLng !== '' ? parseFloat(rawLng) : null,
                 status: 'importable',
@@ -2499,7 +2570,9 @@ class CameraService {
                     enabled: resolvedEnabled,
                     latitude: resolvedRow.latitude,
                     longitude: resolvedRow.longitude,
-                    enable_recording: deliveryConfig.deliveryType === 'internal_hls' && (item.enable_recording === true || item.enable_recording === 1) ? 1 : 0,
+                    enable_recording: deliveryConfig.deliveryType === 'internal_hls'
+                        ? (forceInternalLiveOnly ? 0 : (item.enable_recording === true || item.enable_recording === 1 ? 1 : 0))
+                        : 0,
                     stream_source: deliveryConfig.compatStreamSource,
                     delivery_type: deliveryConfig.deliveryType,
                     external_hls_url: deliveryConfig.externalHlsUrl,
@@ -2511,6 +2584,7 @@ class CameraService {
                     external_tls_mode: resolvedTlsMode === 'insecure' ? 'insecure' : 'strict',
                     external_health_mode: deliveryConfig.deliveryType === 'internal_hls' ? 'default' : resolvedHealthMode,
                 };
+                resolvedRow.resolvedRecordingEnabled = resolvedRow.importData.enable_recording;
                 importableRows.push(resolvedRow);
                 seenNames.add(duplicateNameKey);
                 if (duplicateUrlKey) {
@@ -2560,11 +2634,14 @@ class CameraService {
                 sourceStatus: row.sourceStatus,
                 resolvedName: row.resolvedName,
                 resolvedDeliveryType: row.resolvedDeliveryType,
-                resolvedUrl: row.resolvedUrl,
+                resolvedUrl: maskSensitiveImportUrl(row.resolvedUrl, row.resolvedDeliveryType),
                 resolvedArea: row.resolvedArea,
                 resolvedHealthMode: row.resolvedHealthMode,
                 resolvedTlsMode: row.resolvedTlsMode,
                 resolvedOriginMode: row.resolvedOriginMode,
+                resolvedStreamSource: row.resolvedStreamSource,
+                resolvedRecordingEnabled: row.resolvedRecordingEnabled,
+                sourceTag: row.sourceTag,
                 resolvedSnapshotUrl: row.resolvedSnapshotUrl,
                 resolvedLocation: row.resolvedLocation,
                 latitude: row.latitude,

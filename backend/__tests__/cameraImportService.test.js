@@ -137,4 +137,68 @@ describe('cameraService import preview', () => {
         }));
         expect(result.sourceFieldMapping.name).toBe('title');
     });
+
+    it('memaksa private RTSP upload menjadi internal_hls live-only dan menyamarkan preview URL', async () => {
+        vi.spyOn(connectionPool, 'query').mockReturnValue([
+            {
+                name: 'Existing Cam',
+                private_rtsp_url: 'rtsp://existing:pass@36.66.208.98:554/mpeg4/ch39/sub/av_stream',
+                external_hls_url: null,
+                external_stream_url: null,
+                external_embed_url: null,
+            },
+        ]);
+
+        const plan = await cameraService.buildImportPlan({
+            targetArea: 'Surabaya',
+            sourceProfile: 'internal_rtsp_live_only',
+            cameras: [
+                {
+                    name: 'A. YANI - JEMURSARI',
+                    private_rtsp_url: 'rtsp://edishub:g412uda5u12y426@36.66.208.98:554/mpeg4/ch39/sub/av_stream',
+                    delivery_type: 'external_hls',
+                    stream_source: 'external',
+                    enable_recording: 1,
+                    source_tag: 'surabaya_private_rtsp',
+                    notes: 'live_only',
+                },
+                {
+                    name: 'Duplicate Cam',
+                    private_rtsp_url: 'rtsp://existing:pass@36.66.208.98:554/mpeg4/ch39/sub/av_stream',
+                },
+            ],
+            globalOverrides: {
+                delivery_type: 'external_hls',
+            },
+            importPolicy: {},
+        });
+
+        const result = {
+            fieldMapping: plan.sourceFieldMapping,
+            summary: plan.summary,
+            rows: plan.rows,
+            warnings: plan.warnings,
+            importableRows: plan.importableRows,
+        };
+
+        expect(result.fieldMapping.streamUrl).toContain('private_rtsp_url');
+        expect(result.summary.importableCount).toBe(1);
+        expect(result.rows[0]).toEqual(expect.objectContaining({
+            resolvedDeliveryType: 'internal_hls',
+            resolvedStreamSource: 'internal',
+            resolvedRecordingEnabled: 0,
+            resolvedUrl: 'rtsp://edishub:***@36.66.208.98:554/mpeg4/ch39/sub/av_stream',
+        }));
+        expect(result.rows[1].status).toBe('duplicate_url');
+        expect(result.rows[0].resolvedUrl).not.toContain('g412uda5u12y426');
+        expect(result.warnings.some((warning) => warning.code === 'private_rtsp_live_only')).toBe(true);
+        expect(result.importableRows[0].importData).toEqual(expect.objectContaining({
+            delivery_type: 'internal_hls',
+            stream_source: 'internal',
+            private_rtsp_url: 'rtsp://edishub:g412uda5u12y426@36.66.208.98:554/mpeg4/ch39/sub/av_stream',
+            enable_recording: 0,
+            external_stream_url: null,
+            external_embed_url: null,
+        }));
+    });
 });

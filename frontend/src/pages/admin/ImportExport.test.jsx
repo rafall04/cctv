@@ -32,6 +32,26 @@ vi.mock('../../contexts/NotificationContext', () => ({
 
 describe('ImportExport', () => {
     beforeEach(() => {
+        class MockFileReader {
+            readAsText() {
+                this.onload({
+                    target: {
+                        result: JSON.stringify({
+                            targetArea: 'SURABAYA',
+                            sourceProfile: 'internal_rtsp_live_only',
+                            cameras: [
+                                {
+                                    name: 'A. YANI - JEMURSARI',
+                                    private_rtsp_url: 'rtsp://user:pass@host:554/Streaming/Channels/402',
+                                    source_tag: 'surabaya_private_rtsp',
+                                },
+                            ],
+                        }),
+                    },
+                });
+            }
+        }
+        vi.stubGlobal('FileReader', MockFileReader);
         exportCameras.mockReset();
         previewImportCameras.mockReset();
         importCameras.mockReset();
@@ -101,5 +121,76 @@ describe('ImportExport', () => {
 
         await screen.findByText('Perempatan A');
         expect(screen.getByRole('button', { name: 'Commit Import to DB' }).disabled).toBe(false);
+    });
+
+    it('menandai profile private RTSP sebagai internal live-only saat preview upload JSON', async () => {
+        previewImportCameras.mockResolvedValueOnce({
+            success: true,
+            data: {
+                canImport: true,
+                fieldMapping: { streamUrl: 'private_rtsp_url (private only)' },
+                sourceStats: {
+                    totalRows: 1,
+                    onlineCount: 0,
+                    offlineCount: 0,
+                    missingCoordsCount: 1,
+                    duplicateUrlCount: 0,
+                    categoryBreakdown: [{ category: 'surabaya_private_rtsp', count: 1 }],
+                },
+                summary: {
+                    totalRows: 1,
+                    importableCount: 1,
+                    duplicateCount: 0,
+                    invalidCount: 0,
+                    filteredOutCount: 0,
+                    deliveryTypeBreakdown: [{ deliveryType: 'internal_hls', count: 1 }],
+                },
+                rows: [
+                    {
+                        index: 0,
+                        resolvedName: 'A. YANI - JEMURSARI',
+                        resolvedDeliveryType: 'internal_hls',
+                        resolvedStreamSource: 'internal',
+                        resolvedRecordingEnabled: 0,
+                        resolvedUrl: 'rtsp://user:***@host:554/Streaming/Channels/402',
+                        resolvedHealthMode: 'default',
+                        resolvedTlsMode: 'strict',
+                        status: 'importable',
+                        reason: null,
+                    },
+                ],
+                warnings: [{ code: 'private_rtsp_live_only', count: 1, message: 'private-only' }],
+            },
+        });
+
+        render(
+            <MemoryRouter initialEntries={['/admin/import-export?area=Surabaya']}>
+                <ImportExport />
+            </MemoryRouter>
+        );
+
+        fireEvent.change(screen.getByLabelText('Import Profile'), {
+            target: { value: 'internal_rtsp_live_only' },
+        });
+
+        fireEvent.change(screen.getByLabelText('Upload JSON'), {
+            target: {
+                files: [new File(['{}'], 'surabaya-private.json', { type: 'application/json' })],
+            },
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Preview Import' }));
+
+        await waitFor(() => {
+            expect(previewImportCameras).toHaveBeenCalledWith(expect.objectContaining({
+                sourceProfile: 'internal_rtsp_live_only',
+                globalOverrides: expect.objectContaining({
+                    delivery_type: 'internal_hls',
+                }),
+            }));
+        });
+
+        expect(screen.getByText(/private rtsp seperti surabaya/i)).toBeTruthy();
+        expect(screen.getByText(/internal • live only/i)).toBeTruthy();
     });
 });

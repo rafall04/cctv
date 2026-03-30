@@ -1,7 +1,7 @@
 import { getRtspFormatHint } from '../../../utils/validators';
 
 const DELIVERY_OPTIONS = [
-    { value: 'internal_hls', label: 'Internal HLS', description: 'RTSP privat -> MediaMTX -> HLS/WebRTC', group: 'internal' },
+    { value: 'internal_hls', label: 'Internal HLS', description: 'RTSP privat -> MediaMTX -> HLS/WebRTC. Cocok untuk source private seperti Surabaya', group: 'internal' },
     { value: 'external_hls', label: 'External HLS', description: 'URL .m3u8 publik/third-party', group: 'external' },
     { value: 'external_flv', label: 'External FLV', description: 'HTTP-FLV live stream seperti Surakarta', group: 'external' },
     { value: 'external_mjpeg', label: 'External MJPEG', description: 'Popup-only, cocok untuk ZoneMinder/HTTP MJPEG', group: 'external' },
@@ -125,7 +125,7 @@ export default function CameraSourceFields({
                         {getFieldError('private_rtsp_url') ? (
                             <p className="mt-1 text-xs text-red-500">{getFieldError('private_rtsp_url')}</p>
                         ) : (
-                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{getRtspFormatHint()}</p>
+                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{getRtspFormatHint()} RTSP tetap backend-only; browser menerima HLS/WebRTC internal.</p>
                         )}
                     </div>
 
@@ -261,10 +261,17 @@ export default function CameraSourceFields({
                                         />
                                         {formData.external_tls_mode === 'insecure' ? 'Wajib Aktif' : (formData.external_use_proxy ? 'Aktif' : 'Nonaktif')}
                                     </label>
-                                </div>
-                            </div>
+                        </div>
+                    </div>
 
-                            <div>
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 dark:border-emerald-500/20 dark:bg-emerald-500/10">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">Internal RTSP Workflow</p>
+                        <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
+                            Gunakan mode ini untuk source private seperti Surabaya. Jalur yang dipakai adalah RTSP privat -&gt; MediaMTX -&gt; HLS/WebRTC. Jika recording dimatikan, kamera berjalan live-only tanpa playback.
+                        </p>
+                    </div>
+
+                    <div>
                                 <label htmlFor="camera-external-tls-mode" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                     Mode TLS
                                 </label>

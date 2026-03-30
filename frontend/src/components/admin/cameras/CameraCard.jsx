@@ -39,8 +39,18 @@ export default function CameraCard({
                     </svg>
                 </div>
                 <div className="absolute top-3 right-3 flex gap-2">
+                    <CameraBadge condition={camera.stream_source === 'internal'} className="bg-emerald-600/90 text-white" title="Stream internal melalui MediaMTX">
+                        Internal
+                    </CameraBadge>
                     <CameraBadge condition={camera.stream_source === 'external'} className="bg-blue-500/90 text-white" title="Stream Eksternal (Dishub/Pihak Ketiga)">
                         External
+                    </CameraBadge>
+                    <CameraBadge
+                        condition={camera.stream_source === 'internal' && !(camera.enable_recording === 1 || camera.enable_recording === true)}
+                        className="bg-slate-700/90 text-white"
+                        title="Source internal live-only tanpa recording"
+                    >
+                        Live Only
                     </CameraBadge>
                     <CameraBadge
                         condition={camera.stream_source === 'external' && (camera.external_use_proxy === 1 || camera.external_use_proxy === true)}
