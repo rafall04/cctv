@@ -1,4 +1,5 @@
 import axios from 'axios';
+import crypto from 'crypto';
 import https from 'https';
 import net from 'net';
 import { config } from '../config/config.js';
@@ -60,6 +61,8 @@ const FAILURE_WEIGHTS = {
     'http_403':                 0.8,
     'tls_verification_failed':  0.8,
     'invalid_rtsp_url':         1.0,
+    'rtsp_auth_failed':         1.0,
+    'rtsp_stream_not_found':    1.0,
     'missing_external_hls_url': 1.0,
     'master_has_no_variant':    0.7,
     'media_playlist_has_no_segments': 0.6,
@@ -81,6 +84,8 @@ const HARD_OFFLINE_REASONS = new Set([
     'missing_external_hls_url',
     'missing_external_probe_target',
     'invalid_rtsp_url',
+    'rtsp_auth_failed',
+    'rtsp_stream_not_found',
     'http_401',
     'http_403',
     'http_404',
@@ -121,28 +126,347 @@ function deriveMonitoringStateFromOnline(isOnline) {
     return isOnline ? 'online' : 'offline';
 }
 
-function checkTcpPort(host, port, timeoutMs = 3000) {
+function parseRtspResponse(rawResponse) {
+    const raw = String(rawResponse || '');
+    const [headerBlock = ''] = raw.split('\r\n\r\n');
+    const lines = headerBlock
+        .split('\r\n')
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+    if (lines.length === 0) {
+        return null;
+    }
+
+    const statusLine = lines[0];
+    const match = statusLine.match(/^RTSP\/1\.\d\s+(\d{3})\s*(.*)$/i);
+    if (!match) {
+        return null;
+    }
+
+    const headers = {};
+    for (const line of lines.slice(1)) {
+        const separatorIndex = line.indexOf(':');
+        if (separatorIndex <= 0) {
+            continue;
+        }
+        const headerName = line.slice(0, separatorIndex).trim().toLowerCase();
+        const headerValue = line.slice(separatorIndex + 1).trim();
+        headers[headerName] = headerValue;
+    }
+
+    return {
+        statusCode: parseInt(match[1], 10),
+        statusText: match[2] || '',
+        headers,
+        raw,
+    };
+}
+
+function parseRtspAuthHeader(headerValue) {
+    const normalized = String(headerValue || '').trim();
+    if (!normalized) {
+        return null;
+    }
+
+    const [schemeRaw, ...rest] = normalized.split(/\s+/);
+    const scheme = (schemeRaw || '').trim();
+    const parameterString = rest.join(' ').trim();
+    const parameters = {};
+    const regex = /([a-z0-9_-]+)=("([^"]*)"|([^,]+))/gi;
+    let match = regex.exec(parameterString);
+
+    while (match) {
+        parameters[match[1].toLowerCase()] = (match[3] ?? match[4] ?? '').trim();
+        match = regex.exec(parameterString);
+    }
+
+    return {
+        scheme: scheme.toLowerCase(),
+        parameters,
+    };
+}
+
+function buildDigestAuthorization({ method, uri, username, password, challenge }) {
+    const realm = challenge?.parameters?.realm;
+    const nonce = challenge?.parameters?.nonce;
+    if (!realm || !nonce || !username) {
+        return null;
+    }
+
+    const qopRaw = challenge.parameters.qop || '';
+    const qop = qopRaw
+        .split(',')
+        .map((value) => value.trim().toLowerCase())
+        .find((value) => value === 'auth');
+    const nc = '00000001';
+    const cnonce = crypto.randomBytes(8).toString('hex');
+    const ha1 = crypto.createHash('md5').update(`${username}:${realm}:${password}`).digest('hex');
+    const ha2 = crypto.createHash('md5').update(`${method}:${uri}`).digest('hex');
+    const response = qop
+        ? crypto.createHash('md5').update(`${ha1}:${nonce}:${nc}:${cnonce}:${qop}:${ha2}`).digest('hex')
+        : crypto.createHash('md5').update(`${ha1}:${nonce}:${ha2}`).digest('hex');
+
+    const parts = [
+        `username="${username}"`,
+        `realm="${realm}"`,
+        `nonce="${nonce}"`,
+        `uri="${uri}"`,
+        `response="${response}"`,
+    ];
+
+    if (challenge.parameters.opaque) {
+        parts.push(`opaque="${challenge.parameters.opaque}"`);
+    }
+    if (qop) {
+        parts.push(`qop=${qop}`);
+        parts.push(`nc=${nc}`);
+        parts.push(`cnonce="${cnonce}"`);
+    }
+    if (challenge.parameters.algorithm) {
+        parts.push(`algorithm=${challenge.parameters.algorithm}`);
+    }
+
+    return `Digest ${parts.join(', ')}`;
+}
+
+function buildBasicAuthorization({ username, password }) {
+    if (!username) {
+        return null;
+    }
+    const token = Buffer.from(`${username}:${password || ''}`).toString('base64');
+    return `Basic ${token}`;
+}
+
+function buildRtspRequest({ method, uri, cseq, authorization = null }) {
+    const lines = [
+        `${method} ${uri} RTSP/1.0`,
+        `CSeq: ${cseq}`,
+        'User-Agent: RAF-NET-CCTV-Health/1.0',
+        'Accept: application/sdp',
+    ];
+
+    if (authorization) {
+        lines.push(`Authorization: ${authorization}`);
+    }
+
+    return `${lines.join('\r\n')}\r\n\r\n`;
+}
+
+function sendRtspRequest({ host, port, request, timeoutMs = 4000 }) {
     return new Promise((resolve) => {
         const socket = new net.Socket();
+        let settled = false;
+        let buffer = '';
+
+        const settle = (result) => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            socket.destroy();
+            resolve(result);
+        };
 
         socket.setTimeout(timeoutMs);
 
         socket.on('connect', () => {
-            socket.destroy();
-            resolve(true);
+            socket.write(request);
+        });
+
+        socket.on('data', (chunk) => {
+            buffer += chunk.toString('utf8');
+            if (buffer.includes('\r\n\r\n')) {
+                const parsed = parseRtspResponse(buffer);
+                settle(parsed || { errorCode: 'request_error', raw: buffer });
+            }
         });
 
         socket.on('timeout', () => {
-            socket.destroy();
-            resolve(false);
+            settle({ errorCode: 'ETIMEDOUT' });
         });
 
-        socket.on('error', () => {
-            resolve(false);
+        socket.on('error', (error) => {
+            settle({ errorCode: error?.code || 'request_error' });
         });
 
         socket.connect(port, host);
     });
+}
+
+async function probeRtspSource(rtspUrl, timeoutMs = 4000) {
+    let parsedUrl;
+    try {
+        parsedUrl = new URL(rtspUrl);
+    } catch {
+        return {
+            online: false,
+            reason: 'invalid_rtsp_url',
+            details: {
+                probeTarget: rtspUrl,
+            },
+        };
+    }
+
+    const host = parsedUrl.hostname;
+    const port = parseInt(parsedUrl.port, 10) || 554;
+    const requestUri = `${parsedUrl.protocol}//${parsedUrl.host}${parsedUrl.pathname}${parsedUrl.search}`;
+    const username = decodeURIComponent(parsedUrl.username || '');
+    const password = decodeURIComponent(parsedUrl.password || '');
+
+    const firstResponse = await sendRtspRequest({
+        host,
+        port,
+        request: buildRtspRequest({
+            method: 'DESCRIBE',
+            uri: requestUri,
+            cseq: 1,
+        }),
+        timeoutMs,
+    });
+
+    if (!firstResponse || firstResponse.errorCode) {
+        return {
+            online: false,
+            reason: firstResponse?.errorCode || 'internal_stream_unreachable',
+            details: {
+                probeTarget: rtspUrl,
+                rtspHost: host,
+                rtspPort: port,
+            },
+        };
+    }
+
+    if (firstResponse.statusCode === 200) {
+        return {
+            online: true,
+            reason: 'rtsp_describe_ok',
+            details: {
+                probeTarget: rtspUrl,
+                rtspHost: host,
+                rtspPort: port,
+                rtspStatusCode: firstResponse.statusCode,
+            },
+        };
+    }
+
+    if ([404, 454].includes(firstResponse.statusCode)) {
+        return {
+            online: false,
+            reason: 'rtsp_stream_not_found',
+            details: {
+                probeTarget: rtspUrl,
+                rtspHost: host,
+                rtspPort: port,
+                rtspStatusCode: firstResponse.statusCode,
+            },
+        };
+    }
+
+    if (firstResponse.statusCode !== 401) {
+        return {
+            online: false,
+            reason: 'internal_stream_unreachable',
+            details: {
+                probeTarget: rtspUrl,
+                rtspHost: host,
+                rtspPort: port,
+                rtspStatusCode: firstResponse.statusCode,
+            },
+        };
+    }
+
+    const challenge = parseRtspAuthHeader(firstResponse.headers['www-authenticate']);
+    const authorization = challenge?.scheme === 'digest'
+        ? buildDigestAuthorization({
+            method: 'DESCRIBE',
+            uri: requestUri,
+            username,
+            password,
+            challenge,
+        })
+        : challenge?.scheme === 'basic'
+            ? buildBasicAuthorization({ username, password })
+            : null;
+
+    if (!authorization) {
+        return {
+            online: false,
+            reason: 'rtsp_auth_failed',
+            details: {
+                probeTarget: rtspUrl,
+                rtspHost: host,
+                rtspPort: port,
+                rtspStatusCode: firstResponse.statusCode,
+                rtspAuthScheme: challenge?.scheme || null,
+            },
+        };
+    }
+
+    const authenticatedResponse = await sendRtspRequest({
+        host,
+        port,
+        request: buildRtspRequest({
+            method: 'DESCRIBE',
+            uri: requestUri,
+            cseq: 2,
+            authorization,
+        }),
+        timeoutMs,
+    });
+
+    if (!authenticatedResponse || authenticatedResponse.errorCode) {
+        return {
+            online: false,
+            reason: authenticatedResponse?.errorCode || 'internal_stream_unreachable',
+            details: {
+                probeTarget: rtspUrl,
+                rtspHost: host,
+                rtspPort: port,
+                rtspAuthScheme: challenge?.scheme || null,
+            },
+        };
+    }
+
+    if (authenticatedResponse.statusCode === 200) {
+        return {
+            online: true,
+            reason: 'rtsp_auth_ok',
+            details: {
+                probeTarget: rtspUrl,
+                rtspHost: host,
+                rtspPort: port,
+                rtspStatusCode: authenticatedResponse.statusCode,
+                rtspAuthScheme: challenge?.scheme || null,
+            },
+        };
+    }
+
+    if ([404, 454].includes(authenticatedResponse.statusCode)) {
+        return {
+            online: false,
+            reason: 'rtsp_stream_not_found',
+            details: {
+                probeTarget: rtspUrl,
+                rtspHost: host,
+                rtspPort: port,
+                rtspStatusCode: authenticatedResponse.statusCode,
+                rtspAuthScheme: challenge?.scheme || null,
+            },
+        };
+    }
+
+    return {
+        online: false,
+        reason: authenticatedResponse.statusCode === 401 ? 'rtsp_auth_failed' : 'internal_stream_unreachable',
+        details: {
+            probeTarget: rtspUrl,
+            rtspHost: host,
+            rtspPort: port,
+            rtspStatusCode: authenticatedResponse.statusCode,
+            rtspAuthScheme: challenge?.scheme || null,
+        },
+    };
 }
 
 function parsePlaylist(playlistText) {
@@ -286,6 +610,7 @@ function resolveErrorClass(reason) {
         'missing_external_hls_url',
         'missing_external_probe_target',
         'invalid_rtsp_url',
+        'rtsp_stream_not_found',
     ].includes(reason)) {
         return 'config';
     }
@@ -297,6 +622,7 @@ function resolveErrorClass(reason) {
     if ([
         'http_401',
         'http_403',
+        'rtsp_auth_failed',
     ].includes(reason)) {
         return 'auth_policy';
     }
@@ -493,6 +819,10 @@ class CameraHealthService {
         this.healthState = new Map();
         this.domainHealth = new Map();
         this.probeCache = new Map();
+    }
+
+    async probeInternalRtspSource(rtspUrl, timeoutMs = 4000) {
+        return probeRtspSource(rtspUrl, timeoutMs);
     }
 
     start(intervalMs = 30000) {
@@ -1851,37 +2181,20 @@ class CameraHealthService {
         const pathName = camera.stream_key || `camera${camera.id}`;
         const pathInfo = activePaths.get(pathName);
 
-        if (camera.private_rtsp_url) {
-            try {
-                const parsedUrl = new URL(camera.private_rtsp_url);
-                const host = parsedUrl.hostname;
-                const port = parseInt(parsedUrl.port, 10) || 554;
-                const tcpOnline = await checkTcpPort(host, port);
-                if (tcpOnline) {
-                    return {
-                        online: true,
-                        reason: 'rtsp_tcp_online',
-                        details: withProbeDetails(baseDetails, {
-                            probeTarget: camera.private_rtsp_url,
-                        }),
-                    };
-                }
-            } catch {
-                return {
-                    online: false,
-                    reason: 'invalid_rtsp_url',
-                    details: withProbeDetails(baseDetails, {
-                        probeTarget: camera.private_rtsp_url,
-                    }),
-                };
-            }
-        }
-
         if (pathInfo && (pathInfo.ready || pathInfo.sourceReady || pathInfo.readers > 0)) {
             return {
                 online: true,
                 reason: 'mediamtx_path_ready',
                 details: withProbeDetails(baseDetails),
+            };
+        }
+
+        if (camera.private_rtsp_url) {
+            const rtspResult = await this.probeInternalRtspSource(camera.private_rtsp_url);
+            return {
+                online: rtspResult.online,
+                reason: rtspResult.reason,
+                details: withProbeDetails(baseDetails, rtspResult.details),
             };
         }
 
@@ -2565,7 +2878,8 @@ export {
     buildExternalRequestOptions,
     mapExternalFetchError,
     normalizeExternalTlsMode,
-    parsePlaylist
+    parsePlaylist,
+    probeRtspSource,
 };
 export default cameraHealthService;
 

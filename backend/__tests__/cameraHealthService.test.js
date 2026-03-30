@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import axios from 'axios';
+import net from 'net';
 import { PassThrough } from 'stream';
 
 const {
@@ -30,7 +31,8 @@ import {
     buildExternalRequestOptions,
     mapExternalFetchError,
     normalizeExternalTlsMode,
-    parsePlaylist
+    parsePlaylist,
+    probeRtspSource,
 } from '../services/cameraHealthService.js';
 
 vi.mock('axios', () => ({
@@ -44,6 +46,48 @@ function createReadableStream() {
     const stream = new PassThrough();
     stream.end('frame');
     return stream;
+}
+
+async function createRtspTestServer(handler) {
+    const server = net.createServer((socket) => {
+        let requestBuffer = '';
+
+        socket.on('data', (chunk) => {
+            requestBuffer += chunk.toString('utf8');
+            if (requestBuffer.includes('\r\n\r\n')) {
+                handler(socket, requestBuffer);
+            }
+        });
+    });
+
+    await new Promise((resolve, reject) => {
+        server.listen(0, '127.0.0.1', (error) => {
+            if (error) {
+                reject(error);
+                return;
+            }
+            resolve();
+        });
+    });
+
+    const address = server.address();
+    if (!address || typeof address === 'string') {
+        throw new Error('Failed to bind RTSP test server');
+    }
+
+    return {
+        server,
+        port: address.port,
+        close: () => new Promise((resolve, reject) => {
+            server.close((error) => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
+                resolve();
+            });
+        }),
+    };
 }
 
 describe('cameraHealthService.parsePlaylist', () => {
@@ -204,6 +248,67 @@ describe('cameraHealthService weighted scoring', () => {
     });
 });
 
+describe('cameraHealthService internal RTSP probe', () => {
+    it('marks RTSP online after digest auth succeeds', async () => {
+        let requestCount = 0;
+        const testServer = await createRtspTestServer((socket, requestText) => {
+            requestCount += 1;
+
+            if (requestCount === 1) {
+                socket.end([
+                    'RTSP/1.0 401 Unauthorized',
+                    'CSeq: 1',
+                    'WWW-Authenticate: Digest realm="Surabaya", nonce="abc123", qop="auth"',
+                    '',
+                    '',
+                ].join('\r\n'));
+                return;
+            }
+
+            expect(requestText).toContain('Authorization: Digest ');
+            expect(requestText).toContain('username="admin"');
+            socket.end([
+                'RTSP/1.0 200 OK',
+                'CSeq: 2',
+                'Content-Length: 0',
+                '',
+                '',
+            ].join('\r\n'));
+        });
+
+        try {
+            const result = await probeRtspSource(`rtsp://admin:secret@127.0.0.1:${testServer.port}/mpeg4/ch39/sub/av_stream`, 2000);
+
+            expect(result.online).toBe(true);
+            expect(result.reason).toBe('rtsp_auth_ok');
+            expect(result.details.rtspAuthScheme).toBe('digest');
+        } finally {
+            await testServer.close();
+        }
+    });
+
+    it('marks RTSP offline when auth challenge cannot be satisfied', async () => {
+        const testServer = await createRtspTestServer((socket) => {
+            socket.end([
+                'RTSP/1.0 401 Unauthorized',
+                'CSeq: 1',
+                'WWW-Authenticate: Digest realm="Surabaya", nonce="abc123", qop="auth"',
+                '',
+                '',
+            ].join('\r\n'));
+        });
+
+        try {
+            const result = await probeRtspSource(`rtsp://127.0.0.1:${testServer.port}/mpeg4/ch39/sub/av_stream`, 2000);
+
+            expect(result.online).toBe(false);
+            expect(result.reason).toBe('rtsp_auth_failed');
+        } finally {
+            await testServer.close();
+        }
+    });
+});
+
 describe('cameraHealthService external TLS policy', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -327,6 +432,52 @@ describe('cameraHealthService external TLS policy', () => {
 
         expect(result.online).toBe(false);
         expect(result.reason).toBe('tls_verification_failed');
+    });
+
+    it('keeps internal cameras online from MediaMTX path readiness without probing RTSP again', async () => {
+        const service = new CameraHealthService();
+        const probeSpy = vi.spyOn(service, 'probeInternalRtspSource');
+
+        const result = await service.evaluateCameraRaw({
+            id: 130,
+            enabled: 1,
+            is_online: 1,
+            delivery_type: 'internal_hls',
+            stream_source: 'internal',
+            stream_key: 'surabaya-130',
+            private_rtsp_url: 'rtsp://admin:secret@127.0.0.1:554/live',
+        }, new Map([
+            ['surabaya-130', { ready: true, sourceReady: true, readers: 1 }],
+        ]));
+
+        expect(result.online).toBe(true);
+        expect(result.reason).toBe('mediamtx_path_ready');
+        expect(probeSpy).not.toHaveBeenCalled();
+    });
+
+    it('marks internal cameras offline when RTSP auth fails and MediaMTX path is idle', async () => {
+        const service = new CameraHealthService();
+        vi.spyOn(service, 'probeInternalRtspSource').mockResolvedValue({
+            online: false,
+            reason: 'rtsp_auth_failed',
+            details: {
+                probeTarget: 'rtsp://masked',
+            },
+        });
+
+        const result = await service.evaluateCameraRaw({
+            id: 131,
+            enabled: 1,
+            is_online: 1,
+            delivery_type: 'internal_hls',
+            stream_source: 'internal',
+            stream_key: 'surabaya-131',
+            private_rtsp_url: 'rtsp://admin:wrong@127.0.0.1:554/live',
+        }, new Map());
+
+        expect(result.online).toBe(false);
+        expect(result.reason).toBe('rtsp_auth_failed');
+        expect(result.details.probeTarget).toBe('rtsp://masked');
     });
 
     it('recovers external MJPEG cameras from offline when the live stream opens even if snapshot is broken', async () => {
