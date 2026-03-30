@@ -53,7 +53,8 @@ const MIGRATIONS = [
     'add_playback_viewer_sessions.js',
     'create_camera_discovery_table.js',
     'add_camera_delivery_types.js',
-    'backfill_camera_delivery_types.js'
+    'backfill_camera_delivery_types.js',
+    'add_runtime_state_and_history_retention.js'
 ];
 
 console.log('🚀 Starting migration process...\n');

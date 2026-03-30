@@ -3,7 +3,7 @@ import cameraService from '../services/cameraService.js';
 // Get all cameras (admin only - includes disabled cameras)
 export async function getAllCameras(request, reply) {
     try {
-        const cameras = cameraService.getAllCameras();
+        const cameras = cameraService.getAdminCameraList();
         return reply.send({ success: true, data: cameras });
     } catch (error) {
         console.error('Get all cameras error:', error);
@@ -14,7 +14,10 @@ export async function getAllCameras(request, reply) {
 // Get active cameras (public - only enabled cameras, no RTSP URLs)
 export async function getActiveCameras(request, reply) {
     try {
-        const cameras = cameraService.getActiveCameras();
+        const view = request.query?.view === 'map' ? 'map' : 'landing';
+        const cameras = view === 'map'
+            ? cameraService.getPublicMapCameraList()
+            : cameraService.getPublicLandingCameraList();
         return reply.send({ success: true, data: cameras });
     } catch (error) {
         console.error('Get active cameras error:', error);
@@ -26,7 +29,7 @@ export async function getActiveCameras(request, reply) {
 export async function getCameraById(request, reply) {
     try {
         const { id } = request.params;
-        const camera = cameraService.getCameraById(id);
+        const camera = cameraService.getCameraDetailById(id);
         return reply.send({ success: true, data: camera });
     } catch (error) {
         console.error('Get camera by ID error:', error);

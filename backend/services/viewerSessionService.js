@@ -21,6 +21,7 @@ import { query, queryOne, execute } from '../database/connectionPool.js';
 import { v4 as uuidv4 } from 'uuid';
 import { getTimezone } from './timezoneService.js';
 import viewerAnalyticsService from './viewerAnalyticsService.js';
+import { cacheGetOrSetSync, cacheKey, CacheNamespace, CacheTTL } from './cacheService.js';
 
 /**
  * Get current timestamp in configured timezone format for SQLite
@@ -134,6 +135,8 @@ function resolveHistorySort(sortBy = 'started_at', sortDirection = 'desc') {
 
 // Session timeout in seconds (if no heartbeat received)
 const SESSION_TIMEOUT = 15;
+const HISTORY_RETENTION_DAYS = 90;
+const RETENTION_RUN_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 // Cleanup interval in milliseconds - OPTIMIZED (reduced from 5s to 60s)
 // Less frequent cleanup reduces database writes while maintaining effectiveness
@@ -142,6 +145,7 @@ const CLEANUP_INTERVAL = 60000;
 class ViewerSessionService {
     constructor() {
         this.cleanupInterval = null;
+        this.lastRetentionRunAt = 0;
     }
 
     startCleanup() {
@@ -280,8 +284,68 @@ class ViewerSessionService {
             if (staleSessions.length > 0) {
                 console.log(`[ViewerSession] Cleaned up ${staleSessions.length} stale sessions`);
             }
+
+            this.runRetentionIfDue();
         } catch (error) {
             console.error('[ViewerSession] Error cleaning up sessions:', error);
+        }
+    }
+
+    runRetentionIfDue() {
+        const now = Date.now();
+        if (now - this.lastRetentionRunAt < RETENTION_RUN_INTERVAL_MS) {
+            return;
+        }
+
+        this.lastRetentionRunAt = now;
+        this.archiveOldHistory();
+    }
+
+    archiveOldHistory(retentionDays = HISTORY_RETENTION_DAYS) {
+        try {
+            execute(`
+                INSERT INTO viewer_session_history_archive (
+                    id,
+                    camera_id,
+                    camera_name,
+                    ip_address,
+                    user_agent,
+                    device_type,
+                    started_at,
+                    ended_at,
+                    duration_seconds,
+                    created_at,
+                    archived_at
+                )
+                SELECT
+                    id,
+                    camera_id,
+                    camera_name,
+                    ip_address,
+                    user_agent,
+                    device_type,
+                    started_at,
+                    ended_at,
+                    duration_seconds,
+                    created_at,
+                    CURRENT_TIMESTAMP
+                FROM viewer_session_history
+                WHERE datetime(started_at) < datetime('now', ?)
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM viewer_session_history_archive archive
+                    WHERE archive.id = viewer_session_history.id
+                )
+            `, [`-${retentionDays} days`]);
+
+            execute(`
+                DELETE FROM viewer_session_history
+                WHERE datetime(started_at) < datetime('now', ?)
+            `, [`-${retentionDays} days`]);
+        } catch (error) {
+            if (!String(error?.message || '').includes('no such table')) {
+                console.error('[ViewerSession] Error archiving history:', error);
+            }
         }
     }
 
@@ -453,30 +517,36 @@ class ViewerSessionService {
 
     getViewerStats() {
         try {
-            const activeViewers = this.getTotalActiveViewers();
-            const activeSessions = this.getActiveSessions();
-            const viewersByCamera = this.getViewerCountByCamera();
-            const todayDate = getDate();
+            return cacheGetOrSetSync(
+                cacheKey(CacheNamespace.STATS, 'camera-viewer-stats', 'today'),
+                () => {
+                    const activeViewers = this.getTotalActiveViewers();
+                    const activeSessions = this.getActiveSessions();
+                    const viewersByCamera = this.getViewerCountByCamera();
+                    const todayDate = getDate();
 
-            const todayStats = queryOne(`
-                SELECT 
-                    COUNT(DISTINCT ip_address) as unique_viewers,
-                    COUNT(*) as total_sessions,
-                    SUM(duration_seconds) as total_watch_time
-                FROM viewer_session_history
-                WHERE date(started_at) = ?
-            `, [todayDate]);
+                    const todayStats = queryOne(`
+                        SELECT 
+                            COUNT(DISTINCT ip_address) as unique_viewers,
+                            COUNT(*) as total_sessions,
+                            SUM(duration_seconds) as total_watch_time
+                        FROM viewer_session_history
+                        WHERE date(started_at) = ?
+                    `, [todayDate]);
 
-            return {
-                activeViewers,
-                activeSessions,
-                viewersByCamera,
-                today: {
-                    uniqueViewers: todayStats?.unique_viewers || 0,
-                    totalSessions: todayStats?.total_sessions || 0,
-                    totalWatchTime: todayStats?.total_watch_time || 0
-                }
-            };
+                    return {
+                        activeViewers,
+                        activeSessions,
+                        viewersByCamera,
+                        today: {
+                            uniqueViewers: todayStats?.unique_viewers || 0,
+                            totalSessions: todayStats?.total_sessions || 0,
+                            totalWatchTime: todayStats?.total_watch_time || 0
+                        }
+                    };
+                },
+                CacheTTL.SHORT
+            );
         } catch (error) {
             console.error('[ViewerSession] Error getting stats:', error);
             return {
@@ -495,10 +565,15 @@ class ViewerSessionService {
      * Uses WIB timezone for date filtering
      */
     getAnalytics(period = '7days') {
-        // Delegated to newly created viewerAnalyticsService to separate concerns (Single Responsibility Principle)
-        const activeViewers = this.getTotalActiveViewers();
-        const activeSessions = this.getActiveSessions();
-        return viewerAnalyticsService.getAnalytics(period, activeViewers, activeSessions);
+        return cacheGetOrSetSync(
+            cacheKey(CacheNamespace.STATS, 'camera-viewer-analytics', period),
+            () => {
+                const activeViewers = this.getTotalActiveViewers();
+                const activeSessions = this.getActiveSessions();
+                return viewerAnalyticsService.getAnalytics(period, activeViewers, activeSessions);
+            },
+            CacheTTL.SHORT
+        );
     }
 
     /**

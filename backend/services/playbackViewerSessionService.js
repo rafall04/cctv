@@ -1,9 +1,12 @@
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import { v4 as uuidv4 } from 'uuid';
 import { getTimezone } from './timezoneService.js';
+import { cacheGetOrSetSync, cacheKey, CacheNamespace, CacheTTL } from './cacheService.js';
 
 const SESSION_TIMEOUT = 15;
 const CLEANUP_INTERVAL = 60000;
+const HISTORY_RETENTION_DAYS = 90;
+const RETENTION_RUN_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const PLAYBACK_ACCESS_MODES = new Set(['public_preview', 'admin_full']);
 
 function getTimestamp() {
@@ -132,6 +135,7 @@ function resolveHistorySort(sortBy = 'started_at', sortDirection = 'desc') {
 class PlaybackViewerSessionService {
     constructor() {
         this.cleanupInterval = null;
+        this.lastRetentionRunAt = 0;
     }
 
     startCleanup() {
@@ -303,6 +307,76 @@ class PlaybackViewerSessionService {
         for (const session of staleSessions) {
             this.endSession(session.session_id);
         }
+
+        this.runRetentionIfDue();
+    }
+
+    runRetentionIfDue() {
+        const now = Date.now();
+        if (now - this.lastRetentionRunAt < RETENTION_RUN_INTERVAL_MS) {
+            return;
+        }
+
+        this.lastRetentionRunAt = now;
+        this.archiveOldHistory();
+    }
+
+    archiveOldHistory(retentionDays = HISTORY_RETENTION_DAYS) {
+        try {
+            execute(`
+                INSERT INTO playback_viewer_session_history_archive (
+                    id,
+                    camera_id,
+                    camera_name,
+                    segment_filename,
+                    segment_started_at,
+                    playback_access_mode,
+                    ip_address,
+                    user_agent,
+                    device_type,
+                    admin_user_id,
+                    admin_username,
+                    started_at,
+                    ended_at,
+                    duration_seconds,
+                    created_at,
+                    archived_at
+                )
+                SELECT
+                    id,
+                    camera_id,
+                    camera_name,
+                    segment_filename,
+                    segment_started_at,
+                    playback_access_mode,
+                    ip_address,
+                    user_agent,
+                    device_type,
+                    admin_user_id,
+                    admin_username,
+                    started_at,
+                    ended_at,
+                    duration_seconds,
+                    created_at,
+                    CURRENT_TIMESTAMP
+                FROM playback_viewer_session_history
+                WHERE datetime(started_at) < datetime('now', ?)
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM playback_viewer_session_history_archive archive
+                    WHERE archive.id = playback_viewer_session_history.id
+                )
+            `, [`-${retentionDays} days`]);
+
+            execute(`
+                DELETE FROM playback_viewer_session_history
+                WHERE datetime(started_at) < datetime('now', ?)
+            `, [`-${retentionDays} days`]);
+        } catch (error) {
+            if (!String(error?.message || '').includes('no such table')) {
+                console.error('[PlaybackViewerSession] Error archiving history:', error);
+            }
+        }
     }
 
     getActiveSessions(filters = {}) {
@@ -435,52 +509,70 @@ class PlaybackViewerSessionService {
     }
 
     getStats(filters = {}) {
-        const { clause, params } = buildSessionFilters(filters);
-        const activeResult = queryOne(`
-            SELECT COUNT(*) as count
-            FROM playback_viewer_sessions
-            WHERE is_active = 1
-            ${clause}
-        `, params);
+        const statsKey = cacheKey(
+            CacheNamespace.STATS,
+            'playback-viewer-stats',
+            filters.cameraId || 'all',
+            filters.accessMode || 'all'
+        );
 
-        const historyResult = queryOne(`
-            SELECT
-                COUNT(*) as total_sessions,
-                COUNT(DISTINCT ip_address) as unique_viewers,
-                COALESCE(SUM(duration_seconds), 0) as total_watch_time,
-                COALESCE(AVG(duration_seconds), 0) as avg_session_duration
-            FROM playback_viewer_session_history
-            WHERE 1 = 1
-            ${clause}
-        `, params);
+        return cacheGetOrSetSync(statsKey, () => {
+            const { clause, params } = buildSessionFilters(filters);
+            const activeResult = queryOne(`
+                SELECT COUNT(*) as count
+                FROM playback_viewer_sessions
+                WHERE is_active = 1
+                ${clause}
+            `, params);
 
-        const accessBreakdown = query(`
-            SELECT playback_access_mode, COUNT(*) as count
-            FROM playback_viewer_session_history
-            WHERE 1 = 1
-            ${clause}
-            GROUP BY playback_access_mode
-            ORDER BY count DESC
-        `, params);
+            const historyResult = queryOne(`
+                SELECT
+                    COUNT(*) as total_sessions,
+                    COUNT(DISTINCT ip_address) as unique_viewers,
+                    COALESCE(SUM(duration_seconds), 0) as total_watch_time,
+                    COALESCE(AVG(duration_seconds), 0) as avg_session_duration
+                FROM playback_viewer_session_history
+                WHERE 1 = 1
+                ${clause}
+            `, params);
 
-        return {
-            activeViewers: activeResult?.count || 0,
-            totalSessions: historyResult?.total_sessions || 0,
-            uniqueViewers: historyResult?.unique_viewers || 0,
-            totalWatchTime: historyResult?.total_watch_time || 0,
-            avgSessionDuration: Math.round(historyResult?.avg_session_duration || 0),
-            accessBreakdown,
-        };
+            const accessBreakdown = query(`
+                SELECT playback_access_mode, COUNT(*) as count
+                FROM playback_viewer_session_history
+                WHERE 1 = 1
+                ${clause}
+                GROUP BY playback_access_mode
+                ORDER BY count DESC
+            `, params);
+
+            return {
+                activeViewers: activeResult?.count || 0,
+                totalSessions: historyResult?.total_sessions || 0,
+                uniqueViewers: historyResult?.unique_viewers || 0,
+                totalWatchTime: historyResult?.total_watch_time || 0,
+                avgSessionDuration: Math.round(historyResult?.avg_session_duration || 0),
+                accessBreakdown,
+            };
+        }, CacheTTL.SHORT);
     }
 
     getAnalytics(period = '7days', filters = {}) {
-        const dateFilter = buildHistoryDateFilter(period);
-        const historyFilters = buildSessionFilters(filters);
-        const activeSessions = this.getActiveSessions(filters);
-        const stats = this.getStats(filters);
-        const sharedParams = [...dateFilter.params, ...historyFilters.params];
+        const analyticsKey = cacheKey(
+            CacheNamespace.STATS,
+            'playback-viewer-analytics',
+            period,
+            filters.cameraId || 'all',
+            filters.accessMode || 'all'
+        );
 
-        const topCameras = query(`
+        return cacheGetOrSetSync(analyticsKey, () => {
+            const dateFilter = buildHistoryDateFilter(period);
+            const historyFilters = buildSessionFilters(filters);
+            const activeSessions = this.getActiveSessions(filters);
+            const stats = this.getStats(filters);
+            const sharedParams = [...dateFilter.params, ...historyFilters.params];
+
+            const topCameras = query(`
             SELECT
                 camera_id,
                 camera_name,
@@ -494,9 +586,9 @@ class PlaybackViewerSessionService {
             GROUP BY camera_id, camera_name
             ORDER BY total_sessions DESC
             LIMIT 10
-        `, sharedParams);
+            `, sharedParams);
 
-        const topSegments = query(`
+            const topSegments = query(`
             SELECT
                 camera_id,
                 camera_name,
@@ -513,9 +605,9 @@ class PlaybackViewerSessionService {
             GROUP BY camera_id, camera_name, segment_filename, segment_started_at, playback_access_mode
             ORDER BY total_sessions DESC
             LIMIT 15
-        `, sharedParams);
+            `, sharedParams);
 
-        const recentSessions = query(`
+            const recentSessions = query(`
             SELECT
                 id,
                 camera_id,
@@ -536,9 +628,9 @@ class PlaybackViewerSessionService {
             ${historyFilters.clause}
             ORDER BY started_at DESC
             LIMIT 50
-        `, sharedParams);
+            `, sharedParams);
 
-        const accessBreakdown = query(`
+            const accessBreakdown = query(`
             SELECT playback_access_mode, COUNT(*) as count
             FROM playback_viewer_session_history
             WHERE 1 = 1
@@ -546,9 +638,9 @@ class PlaybackViewerSessionService {
             ${historyFilters.clause}
             GROUP BY playback_access_mode
             ORDER BY count DESC
-        `, sharedParams);
+            `, sharedParams);
 
-        const deviceBreakdown = query(`
+            const deviceBreakdown = query(`
             SELECT
                 device_type,
                 COUNT(*) as count,
@@ -559,9 +651,9 @@ class PlaybackViewerSessionService {
             ${historyFilters.clause}
             GROUP BY device_type
             ORDER BY count DESC
-        `, [...sharedParams, ...sharedParams]);
+            `, [...sharedParams, ...sharedParams]);
 
-        const topViewers = query(`
+            const topViewers = query(`
             SELECT
                 ip_address,
                 COUNT(*) as total_sessions,
@@ -575,24 +667,24 @@ class PlaybackViewerSessionService {
             GROUP BY ip_address
             ORDER BY total_sessions DESC
             LIMIT 20
-        `, sharedParams);
+            `, sharedParams);
 
-        return {
-            period,
-            overview: {
-                activeViewers: activeSessions.length,
-                totalSessions: stats.totalSessions,
-                uniqueViewers: stats.uniqueViewers,
-                totalWatchTime: stats.totalWatchTime,
-                avgSessionDuration: stats.avgSessionDuration,
-            },
-            accessBreakdown,
-            deviceBreakdown,
-            topViewers,
-            topCameras,
-            topSegments,
-            recentSessions,
-            activeSessions: activeSessions.map((session) => ({
+            return {
+                period,
+                overview: {
+                    activeViewers: activeSessions.length,
+                    totalSessions: stats.totalSessions,
+                    uniqueViewers: stats.uniqueViewers,
+                    totalWatchTime: stats.totalWatchTime,
+                    avgSessionDuration: stats.avgSessionDuration,
+                },
+                accessBreakdown,
+                deviceBreakdown,
+                topViewers,
+                topCameras,
+                topSegments,
+                recentSessions,
+                activeSessions: activeSessions.map((session) => ({
                 sessionId: session.session_id,
                 cameraId: session.camera_id,
                 cameraName: session.camera_name,
@@ -605,8 +697,9 @@ class PlaybackViewerSessionService {
                 adminUsername: session.admin_username,
                 startedAt: session.started_at,
                 durationSeconds: session.duration_seconds,
-            })),
-        };
+                })),
+            };
+        }, CacheTTL.SHORT);
     }
 }
 

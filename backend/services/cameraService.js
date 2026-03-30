@@ -9,8 +9,10 @@ import {
     logCameraDeleted
 } from './securityAuditLogger.js';
 import { invalidateCache } from '../middleware/cacheMiddleware.js';
+import { cacheGetOrSetSync, cacheInvalidate, cacheKey, CacheNamespace } from './cacheService.js';
 import { sanitizeCameraThumbnail, sanitizeCameraThumbnailList } from './thumbnailPathService.js';
 import cameraHealthService from './cameraHealthService.js';
+import cameraRuntimeStateService from './cameraRuntimeStateService.js';
 import {
     DELIVERY_TYPES,
     DELIVERY_TYPE_PATTERNS,
@@ -104,6 +106,125 @@ const PUBLIC_PLAYBACK_MODES = [
 ];
 
 const PUBLIC_PLAYBACK_PREVIEW_MINUTES = new Set([0, 10, 20, 30, 60]);
+const CAMERA_READ_MODEL_TTL_MS = 15 * 1000;
+
+const CAMERA_RUNTIME_STATE_PROJECTION = `
+    COALESCE(crs.is_online, c.is_online, 0) as is_online,
+    COALESCE(crs.monitoring_state, CASE WHEN c.is_online = 1 THEN 'online' WHEN c.is_online = 0 THEN 'offline' ELSE 'unknown' END) as monitoring_state,
+    COALESCE(crs.monitoring_reason, NULL) as monitoring_reason,
+    COALESCE(crs.last_runtime_signal_at, NULL) as last_runtime_signal_at,
+    COALESCE(crs.last_runtime_signal_type, NULL) as last_runtime_signal_type,
+    COALESCE(crs.last_health_check_at, c.last_online_check) as last_health_check_at,
+    COALESCE(crs.updated_at, c.last_online_check) as runtime_state_updated_at
+`;
+
+const PUBLIC_MAP_CAMERA_PROJECTION = `
+    c.id,
+    c.name,
+    c.description,
+    c.location,
+    c.group_name,
+    c.area_id,
+    c.is_tunnel,
+    c.latitude,
+    c.longitude,
+    c.status,
+    c.enabled,
+    c.thumbnail_path,
+    c.thumbnail_updated_at,
+    c.delivery_type,
+    c.enable_recording,
+    a.name as area_name,
+    ${CAMERA_RUNTIME_STATE_PROJECTION}
+`;
+
+const PUBLIC_LANDING_CAMERA_PROJECTION = `
+    c.id,
+    c.name,
+    c.description,
+    c.location,
+    c.group_name,
+    c.area_id,
+    c.is_tunnel,
+    c.latitude,
+    c.longitude,
+    c.status,
+    c.enabled,
+    c.enable_recording,
+    c.video_codec,
+    c.stream_key,
+    c.thumbnail_path,
+    c.thumbnail_updated_at,
+    c.stream_source,
+    c.external_hls_url,
+    c.delivery_type,
+    c.external_stream_url,
+    c.external_embed_url,
+    c.external_snapshot_url,
+    CASE
+        WHEN c.external_origin_mode IN ('direct', 'embed') THEN c.external_origin_mode
+        ELSE 'direct'
+    END as external_origin_mode,
+    COALESCE(c.external_use_proxy, 1) as external_use_proxy,
+    CASE
+        WHEN c.external_tls_mode IN ('strict', 'insecure') THEN c.external_tls_mode
+        ELSE 'strict'
+    END as external_tls_mode,
+    CASE
+        WHEN c.external_health_mode IN ('default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled') THEN c.external_health_mode
+        ELSE 'default'
+    END as external_health_mode,
+    a.name as area_name,
+    CASE
+        WHEN a.external_health_mode_override IN ('default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled')
+            THEN a.external_health_mode_override
+        ELSE 'default'
+    END as area_external_health_mode_override,
+    ${CAMERA_RUNTIME_STATE_PROJECTION}
+`;
+
+const ADMIN_CAMERA_LIST_PROJECTION = `
+    c.id,
+    c.name,
+    c.description,
+    c.location,
+    c.group_name,
+    c.area_id,
+    c.enabled,
+    c.is_tunnel,
+    c.latitude,
+    c.longitude,
+    c.status,
+    c.enable_recording,
+    c.recording_duration_hours,
+    c.recording_status,
+    c.last_recording_start,
+    c.video_codec,
+    c.stream_key,
+    c.stream_source,
+    c.delivery_type,
+    c.external_hls_url,
+    c.external_stream_url,
+    c.external_embed_url,
+    c.external_snapshot_url,
+    c.external_origin_mode,
+    c.external_use_proxy,
+    c.external_tls_mode,
+    c.external_health_mode,
+    c.public_playback_mode,
+    c.public_playback_preview_minutes,
+    c.thumbnail_path,
+    c.thumbnail_updated_at,
+    c.created_at,
+    c.updated_at,
+    a.name as area_name,
+    CASE
+        WHEN a.external_health_mode_override IN ('default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled')
+            THEN a.external_health_mode_override
+        ELSE 'default'
+    END as area_external_health_mode_override,
+    ${CAMERA_RUNTIME_STATE_PROJECTION}
+`;
 
 function normalizePublicPlaybackMode(value) {
     return PUBLIC_PLAYBACK_MODES.includes(value) ? value : 'inherit';
@@ -956,61 +1077,74 @@ class CameraService {
     invalidateCameraCache() {
         invalidateCache('/api/cameras');
         invalidateCache('/api/stream');
+        cacheInvalidate(`${CacheNamespace.CAMERAS}:`);
+        cacheInvalidate(`${CacheNamespace.STATS}:camera-`);
         console.log('[Cache] Camera cache invalidated');
     }
 
     getAllCameras() {
-        return sanitizeCameraThumbnailList(query(
+        return this.getAdminCameraList();
+    }
+
+    getActiveCameras() {
+        return this.getPublicLandingCameraList();
+    }
+
+    getCameraById(id) {
+        return this.getCameraDetailById(id);
+    }
+
+    getPublicMapCameraList() {
+        cameraRuntimeStateService.seedMissingRows();
+        const key = cacheKey(CacheNamespace.CAMERAS, 'public-map-camera-list');
+        return cacheGetOrSetSync(key, () => sanitizeCameraThumbnailList(query(`
+            SELECT ${PUBLIC_MAP_CAMERA_PROJECTION}
+            FROM cameras c
+            LEFT JOIN areas a ON c.area_id = a.id
+            LEFT JOIN camera_runtime_state crs ON crs.camera_id = c.id
+            WHERE c.enabled = 1
+            ORDER BY c.is_tunnel ASC, c.id ASC
+        `)).map((camera) => cameraHealthService.enrichCameraAvailability(camera)), CAMERA_READ_MODEL_TTL_MS);
+    }
+
+    getPublicLandingCameraList() {
+        cameraRuntimeStateService.seedMissingRows();
+        const key = cacheKey(CacheNamespace.CAMERAS, 'public-landing-camera-list');
+        return cacheGetOrSetSync(key, () => sanitizeCameraThumbnailList(query(`
+            SELECT ${PUBLIC_LANDING_CAMERA_PROJECTION}
+            FROM cameras c
+            LEFT JOIN areas a ON c.area_id = a.id
+            LEFT JOIN camera_runtime_state crs ON crs.camera_id = c.id
+            WHERE c.enabled = 1
+            ORDER BY c.is_tunnel ASC, c.id ASC
+        `)).map((camera) => cameraHealthService.enrichCameraAvailability(camera)), CAMERA_READ_MODEL_TTL_MS);
+    }
+
+    getAdminCameraList() {
+        cameraRuntimeStateService.seedMissingRows();
+        const key = cacheKey(CacheNamespace.CAMERAS, 'admin-camera-list');
+        return cacheGetOrSetSync(key, () => sanitizeCameraThumbnailList(query(`
+            SELECT ${ADMIN_CAMERA_LIST_PROJECTION}
+            FROM cameras c
+            LEFT JOIN areas a ON c.area_id = a.id
+            LEFT JOIN camera_runtime_state crs ON crs.camera_id = c.id
+            ORDER BY c.id ASC
+        `)).map((camera) => cameraHealthService.enrichCameraAvailability(camera)), CAMERA_READ_MODEL_TTL_MS);
+    }
+
+    getCameraDetailById(id) {
+        cameraRuntimeStateService.seedMissingRows();
+        const camera = queryOne(
             `SELECT c.*, a.name as area_name,
                     CASE
                         WHEN a.external_health_mode_override IN ('default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled')
                             THEN a.external_health_mode_override
                         ELSE 'default'
-                    END as area_external_health_mode_override
-             FROM cameras c 
-             LEFT JOIN areas a ON c.area_id = a.id 
-             ORDER BY c.id ASC`
-        )).map((camera) => cameraHealthService.enrichCameraAvailability(camera));
-    }
-
-    getActiveCameras() {
-        return sanitizeCameraThumbnailList(query(
-            `SELECT c.id, c.name, c.description, c.location, c.group_name, c.area_id, c.is_tunnel, 
-                    c.latitude, c.longitude, c.status, c.enable_recording, c.video_codec, c.stream_key, 
-                    c.thumbnail_path, c.thumbnail_updated_at, c.stream_source, c.external_hls_url,
-                    c.is_online, c.last_online_check,
-                    c.delivery_type, c.external_stream_url, c.external_embed_url, c.external_snapshot_url,
-                    CASE
-                        WHEN c.external_origin_mode IN ('direct', 'embed') THEN c.external_origin_mode
-                        ELSE 'direct'
-                    END as external_origin_mode,
-                    COALESCE(c.external_use_proxy, 1) as external_use_proxy,
-                    CASE
-                        WHEN c.external_tls_mode IN ('strict', 'insecure') THEN c.external_tls_mode
-                        ELSE 'strict'
-                    END as external_tls_mode,
-                    CASE
-                        WHEN c.external_health_mode IN ('default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled') THEN c.external_health_mode
-                        ELSE 'default'
-                    END as external_health_mode,
-                    a.name as area_name,
-                    CASE
-                        WHEN a.external_health_mode_override IN ('default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled')
-                            THEN a.external_health_mode_override
-                        ELSE 'default'
-                    END as area_external_health_mode_override
-             FROM cameras c 
-             LEFT JOIN areas a ON c.area_id = a.id 
-             WHERE c.enabled = 1
-             ORDER BY c.is_tunnel ASC, c.id ASC`
-        )).map((camera) => cameraHealthService.enrichCameraAvailability(camera));
-    }
-
-    getCameraById(id) {
-        const camera = queryOne(
-            `SELECT c.*, a.name as area_name 
-             FROM cameras c 
-             LEFT JOIN areas a ON c.area_id = a.id 
+                    END as area_external_health_mode_override,
+                    ${CAMERA_RUNTIME_STATE_PROJECTION}
+             FROM cameras c
+             LEFT JOIN areas a ON c.area_id = a.id
+             LEFT JOIN camera_runtime_state crs ON crs.camera_id = c.id
              WHERE c.id = ?`,
             [id]
         );

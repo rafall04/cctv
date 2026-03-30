@@ -12,6 +12,7 @@ import { getTimezone } from './timezoneService.js';
 import { recordingService } from './recordingService.js';
 import thumbnailService from './thumbnailService.js';
 import settingsService from './settingsService.js';
+import cameraRuntimeStateService from './cameraRuntimeStateService.js';
 import {
     getCameraDeliveryProfile,
     getEffectiveDeliveryType,
@@ -114,6 +115,10 @@ function getTimestamp() {
         second: '2-digit',
         hour12: false
     });
+}
+
+function deriveMonitoringStateFromOnline(isOnline) {
+    return isOnline ? 'online' : 'offline';
 }
 
 function checkTcpPort(host, port, timeoutMs = 3000) {
@@ -841,6 +846,14 @@ class CameraHealthService {
                 'UPDATE cameras SET is_online = 1, last_online_check = ? WHERE id = ? AND (is_online IS NULL OR is_online = 0)',
                 [currentTimestamp, cameraId]
             );
+            cameraRuntimeStateService.upsertRuntimeState(cameraId, {
+                is_online: 1,
+                monitoring_state: state.state || 'degraded_runtime_recent',
+                monitoring_reason: state.lastReason || 'runtime_recent_success',
+                last_runtime_signal_at: currentTimestamp,
+                last_runtime_signal_type: signalType,
+                last_health_check_at: currentTimestamp,
+            });
         }
 
         return state;
@@ -2076,6 +2089,12 @@ class CameraHealthService {
                     execute('UPDATE cameras SET is_online = ?, last_online_check = ? WHERE id = ? AND (is_online != ? OR last_online_check IS NULL OR ? = 1)',
                         [res.isOnline, res.timestamp, res.cameraId, res.isOnline, shouldCheckpoint ? 1 : 0]
                     );
+                    cameraRuntimeStateService.upsertRuntimeState(res.cameraId, {
+                        is_online: res.isOnline,
+                        monitoring_state: deriveMonitoringStateFromOnline(res.isOnline),
+                        monitoring_reason: res.isOnline ? 'health_check_online' : 'health_check_offline',
+                        last_health_check_at: res.timestamp,
+                    });
                 }
             });
             batchUpdate(finalResults);
@@ -2519,6 +2538,12 @@ class CameraHealthService {
                 'UPDATE cameras SET is_online = ?, last_online_check = ? WHERE id = ? AND (is_online != ? OR last_online_check IS NULL OR ? = 1)',
                 [result.isOnline, timestamp, camera.id, result.isOnline, 1]
             );
+            cameraRuntimeStateService.upsertRuntimeState(camera.id, {
+                is_online: result.isOnline,
+                monitoring_state: deriveMonitoringStateFromOnline(result.isOnline),
+                monitoring_reason: result.rawReason || (result.isOnline ? 'health_check_online' : 'health_check_offline'),
+                last_health_check_at: timestamp,
+            });
 
             if (camera.is_online !== result.isOnline) {
                 await this.handleCameraStatusTransition(camera, camera.is_online, result.isOnline, result.rawReason);
