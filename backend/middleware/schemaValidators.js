@@ -472,6 +472,9 @@ export const createAreaSchema = {
             },
             viewport_zoom_override: {
                 anyOf: [{ type: 'integer', minimum: 1, maximum: 20 }, { type: 'string' }, { type: 'null' }]
+            },
+            show_on_grid_default: {
+                anyOf: [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }]
             }
         },
         additionalProperties: false
@@ -518,6 +521,9 @@ export const updateAreaSchema = {
             },
             viewport_zoom_override: {
                 anyOf: [{ type: 'integer', minimum: 1, maximum: 20 }, { type: 'string' }, { type: 'null' }]
+            },
+            show_on_grid_default: {
+                anyOf: [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }]
             }
         },
         additionalProperties: false

@@ -97,7 +97,7 @@ export default function AreaManagement() {
     const [showModal, setShowModal] = useState(false);
     const [editingArea, setEditingArea] = useState(null);
     const [formData, setFormData] = useState({ 
-        name: '', description: '', rt: '', rw: '', kelurahan: '', kecamatan: '', latitude: '', longitude: '', external_health_mode_override: 'default', coverage_scope: 'default', viewport_zoom_override: ''
+        name: '', description: '', rt: '', rw: '', kelurahan: '', kecamatan: '', latitude: '', longitude: '', external_health_mode_override: 'default', coverage_scope: 'default', viewport_zoom_override: '', show_on_grid_default: true
     });
     const [formErrors, setFormErrors] = useState({});
     const [error, setError] = useState('');
@@ -189,7 +189,7 @@ export default function AreaManagement() {
 
     const openAddModal = () => {
         setEditingArea(null);
-        setFormData({ name: '', description: '', rt: '', rw: '', kelurahan: '', kecamatan: '', latitude: '', longitude: '', external_health_mode_override: 'default', coverage_scope: 'default', viewport_zoom_override: '' });
+        setFormData({ name: '', description: '', rt: '', rw: '', kelurahan: '', kecamatan: '', latitude: '', longitude: '', external_health_mode_override: 'default', coverage_scope: 'default', viewport_zoom_override: '', show_on_grid_default: true });
         setFormErrors({});
         setError('');
         setShowModal(true);
@@ -204,6 +204,7 @@ export default function AreaManagement() {
             external_health_mode_override: area.external_health_mode_override || 'default',
             coverage_scope: area.coverage_scope || 'default',
             viewport_zoom_override: area.viewport_zoom_override || '',
+            show_on_grid_default: area.show_on_grid_default === 1 || area.show_on_grid_default === true,
         });
         setFormErrors({});
         setError('');
@@ -211,8 +212,8 @@ export default function AreaManagement() {
     };
 
     const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData({ ...formData, [name]: value });
+        const { name, value, type, checked } = e.target;
+        setFormData({ ...formData, [name]: type === 'checkbox' ? checked : value });
         if (formErrors[name]) setFormErrors({ ...formErrors, [name]: '' });
     };
 
@@ -565,6 +566,15 @@ export default function AreaManagement() {
                                 <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-700/50 text-slate-700 dark:text-slate-200">
                                     {getAreaCoverageLabel(area.coverage_scope)}
                                 </span>
+                                {(area.show_on_grid_default === 1 || area.show_on_grid_default === true) ? (
+                                    <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-sky-100 dark:bg-sky-500/20 text-sky-700 dark:text-sky-300">
+                                        Grid Default On
+                                    </span>
+                                ) : (
+                                    <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700/60 text-gray-600 dark:text-gray-300">
+                                        Grid Default Off
+                                    </span>
+                                )}
                                 {area.externalUnresolvedCount > 0 && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300">{area.externalUnresolvedCount} unresolved</span>}
                                 {area.degradedCount > 0 && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300">{area.degradedCount} degraded</span>}
                                 {area.offlineCount > 0 && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300">{area.offlineCount} offline</span>}
@@ -600,6 +610,10 @@ export default function AreaManagement() {
                                 <div className="flex items-center justify-between gap-3 text-xs mt-2">
                                     <span className="text-gray-500 dark:text-gray-400">Focus Zoom</span>
                                     <span className="font-semibold text-indigo-700 dark:text-indigo-300">{resolveAreaFocusZoom(area.coverage_scope, area.viewport_zoom_override, 15)}</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-3 text-xs mt-2">
+                                    <span className="text-gray-500 dark:text-gray-400">Grid Default</span>
+                                    <span className="font-semibold text-gray-900 dark:text-white">{(area.show_on_grid_default === 1 || area.show_on_grid_default === true) ? 'Enabled' : 'Hidden'}</span>
                                 </div>
                             </div>
                             <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700/50">
@@ -724,6 +738,24 @@ export default function AreaManagement() {
                                         Jika diisi, zoom ini akan dipakai saat area difokuskan di map view.
                                     </p>
                                 </div>
+                            </div>
+
+                            <div className="rounded-2xl border border-sky-100 bg-sky-50/70 px-4 py-3 dark:border-sky-500/20 dark:bg-sky-500/10">
+                                <label className="flex items-start gap-3">
+                                    <input
+                                        type="checkbox"
+                                        name="show_on_grid_default"
+                                        checked={Boolean(formData.show_on_grid_default)}
+                                        onChange={handleChange}
+                                        className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                    />
+                                    <span>
+                                        <span className="block text-sm font-medium text-gray-900 dark:text-white">Tampilkan di Grid Default</span>
+                                        <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+                                            Saat Grid View masih di "Semua Lokasi", hanya area yang dicentang di sini yang dimuat default. Jika user memilih area tertentu, area itu tetap tampil walau opsi ini dimatikan.
+                                        </span>
+                                    </span>
+                                </label>
                             </div>
 
                             {/* Koordinat dengan LocationPicker */}

@@ -36,9 +36,16 @@ function normalizeViewportZoomOverride(value) {
     return Math.max(1, Math.min(parsed, 20));
 }
 
+function normalizeShowOnGridDefault(value) {
+    if (value === undefined) {
+        return 1;
+    }
+    return value === true || value === 1 || value === '1' ? 1 : 0;
+}
+
 function buildAreaOverviewRows(areas, cameras, healthItems) {
     const healthByCameraId = new Map(healthItems.map((item) => [item.cameraId, item]));
-    const overviewByArea = new Map(
+        const overviewByArea = new Map(
         areas.map((area) => [area.id, {
             ...area,
             cameraCount: 0,
@@ -226,7 +233,7 @@ class AreaService {
 
         const areas = query(`
             SELECT a.id, a.name, a.description, a.rt, a.rw, a.kelurahan, a.kecamatan, a.latitude, a.longitude,
-                   a.coverage_scope, a.viewport_zoom_override
+                   a.coverage_scope, a.viewport_zoom_override, COALESCE(a.show_on_grid_default, 1) as show_on_grid_default
                    , CASE
                         WHEN a.external_health_mode_override IN ('default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled')
                             THEN a.external_health_mode_override
@@ -279,6 +286,7 @@ class AreaService {
             external_health_mode_override,
             coverage_scope,
             viewport_zoom_override,
+            show_on_grid_default,
         } = data;
 
         if (!name) {
@@ -290,8 +298,8 @@ class AreaService {
         try {
             const result = execute(
                 `INSERT INTO areas (
-                    name, description, rt, rw, kelurahan, kecamatan, latitude, longitude, external_health_mode_override, coverage_scope, viewport_zoom_override
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    name, description, rt, rw, kelurahan, kecamatan, latitude, longitude, external_health_mode_override, coverage_scope, viewport_zoom_override, show_on_grid_default
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     name,
                     description || null,
@@ -304,6 +312,7 @@ class AreaService {
                     normalizeExternalHealthMode(external_health_mode_override),
                     normalizeAreaCoverageScope(coverage_scope),
                     normalizeViewportZoomOverride(viewport_zoom_override),
+                    normalizeShowOnGridDefault(show_on_grid_default),
                 ]
             );
 
@@ -333,6 +342,7 @@ class AreaService {
             external_health_mode_override,
             coverage_scope,
             viewport_zoom_override,
+            show_on_grid_default,
         } = data;
 
         const area = queryOne('SELECT * FROM areas WHERE id = ?', [id]);
@@ -346,7 +356,7 @@ class AreaService {
             execute(
                 `UPDATE areas
                  SET name = ?, description = ?, rt = ?, rw = ?, kelurahan = ?, kecamatan = ?, latitude = ?, longitude = ?,
-                     external_health_mode_override = ?, coverage_scope = ?, viewport_zoom_override = ?
+                     external_health_mode_override = ?, coverage_scope = ?, viewport_zoom_override = ?, show_on_grid_default = ?
                  WHERE id = ?`,
                 [
                     name || area.name,
@@ -366,6 +376,9 @@ class AreaService {
                     viewport_zoom_override !== undefined
                         ? normalizeViewportZoomOverride(viewport_zoom_override)
                         : normalizeViewportZoomOverride(area.viewport_zoom_override),
+                    show_on_grid_default !== undefined
+                        ? normalizeShowOnGridDefault(show_on_grid_default)
+                        : normalizeShowOnGridDefault(area.show_on_grid_default),
                     id
                 ]
             );

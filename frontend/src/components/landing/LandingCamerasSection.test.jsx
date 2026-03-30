@@ -9,8 +9,12 @@ vi.mock('../../contexts/CameraContext', () => ({
         cameras: [
             { id: 1, name: 'Lobby', area_name: 'Dander', latitude: '-7.1', longitude: '111.8', is_tunnel: 0, status: 'active', enable_recording: 1 },
             { id: 2, name: 'Gate', area_name: 'Dander', latitude: '-7.2', longitude: '111.9', is_tunnel: 1, status: 'active', enable_recording: 1 },
+            { id: 3, name: 'Square', area_name: 'Baureno', latitude: '-7.3', longitude: '112.0', is_tunnel: 0, status: 'active', enable_recording: 1 },
         ],
-        areas: [{ id: 1, name: 'Dander' }],
+        areas: [
+            { id: 1, name: 'Dander', show_on_grid_default: 1 },
+            { id: 2, name: 'Baureno', show_on_grid_default: 0 },
+        ],
         loading: false,
     }),
 }));
@@ -24,7 +28,7 @@ vi.mock('./LandingPlaybackPanel', () => ({
 }));
 
 vi.mock('./LandingResultsGrid', () => ({
-    default: () => <div>results-grid</div>,
+    default: ({ cameras }) => <div>results-grid:{cameras.map((camera) => camera.name).join(',')}</div>,
 }));
 
 describe('LandingCamerasSection controls', () => {
@@ -72,5 +76,18 @@ describe('LandingCamerasSection controls', () => {
         expect(screen.queryByText(/Tidak ditemukan kamera/i)).toBeNull();
         expect(screen.queryByText('Lobby')).toBeNull();
         expect(screen.queryByText('Gate')).toBeNull();
+    });
+
+    it('grid default hanya memuat area yang diizinkan sampai user memilih area lain', () => {
+        render(<LandingCamerasSection {...commonProps} viewMode="grid" />);
+
+        expect(screen.getByText('results-grid:Lobby,Gate')).toBeTruthy();
+        expect(screen.queryByText(/Square/)).toBeNull();
+
+        fireEvent.change(screen.getByRole('combobox'), {
+            target: { value: 'Baureno' },
+        });
+
+        expect(screen.getByText('results-grid:Square')).toBeTruthy();
     });
 });

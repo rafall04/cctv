@@ -58,6 +58,12 @@ db.exec(`
     rw TEXT,
     kelurahan TEXT,
     kecamatan TEXT,
+    latitude REAL,
+    longitude REAL,
+    external_health_mode_override TEXT DEFAULT 'default',
+    coverage_scope TEXT NOT NULL DEFAULT 'default',
+    viewport_zoom_override INTEGER,
+    show_on_grid_default INTEGER NOT NULL DEFAULT 1,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )
 `);

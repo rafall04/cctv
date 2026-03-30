@@ -48,18 +48,40 @@ export function useLandingCameraFilters(cameras, areas, favorites, viewMode, onC
         return searchFilteredCameras.filter((camera) => camera.area_name === selectedArea);
     }, [searchFilteredCameras, selectedArea]);
 
+    const defaultGridAreaNames = useMemo(() => {
+        const names = areas
+            .filter((area) => area?.show_on_grid_default === 1 || area?.show_on_grid_default === true)
+            .map((area) => area.name)
+            .filter(Boolean);
+        return new Set(names);
+    }, [areas]);
+
+    const gridAreaScopedCameras = useMemo(() => {
+        if (viewMode !== 'grid' || selectedArea !== 'all') {
+            return areaFilteredCameras;
+        }
+
+        if (defaultGridAreaNames.size === 0) {
+            return areaFilteredCameras;
+        }
+
+        return areaFilteredCameras.filter((camera) => (
+            camera?.area_name && defaultGridAreaNames.has(camera.area_name)
+        ));
+    }, [areaFilteredCameras, defaultGridAreaNames, selectedArea, viewMode]);
+
     const filteredForGrid = useMemo(() => {
         if (connectionTab === 'stable') {
-            return areaFilteredCameras.filter((camera) => camera.is_tunnel !== 1);
+            return gridAreaScopedCameras.filter((camera) => camera.is_tunnel !== 1);
         }
         if (connectionTab === 'tunnel') {
-            return areaFilteredCameras.filter((camera) => camera.is_tunnel === 1);
+            return gridAreaScopedCameras.filter((camera) => camera.is_tunnel === 1);
         }
         if (connectionTab === 'favorites') {
-            return areaFilteredCameras.filter((camera) => favorites.includes(camera.id));
+            return gridAreaScopedCameras.filter((camera) => favorites.includes(camera.id));
         }
-        return areaFilteredCameras;
-    }, [areaFilteredCameras, connectionTab, favorites]);
+        return gridAreaScopedCameras;
+    }, [gridAreaScopedCameras, connectionTab, favorites]);
 
     const favoritesInAreaCount = useMemo(() => (
         areaFilteredCameras.filter((camera) => favorites.includes(camera.id)).length

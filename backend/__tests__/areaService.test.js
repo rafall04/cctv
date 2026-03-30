@@ -29,6 +29,7 @@ describe('areaService.getAdminOverview', () => {
                     longitude: null,
                     coverage_scope: 'kecamatan',
                     viewport_zoom_override: 12,
+                    show_on_grid_default: 0,
                 },
             ])
             .mockReturnValueOnce([
@@ -89,6 +90,7 @@ describe('areaService.getAdminOverview', () => {
                 name: 'Area Dishub',
                 coverage_scope: 'kecamatan',
                 viewport_zoom_override: 12,
+                show_on_grid_default: 0,
                 cameraCount: 3,
                 onlineCount: 1,
                 offlineCount: 2,
