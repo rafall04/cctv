@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useBranding } from '../contexts/BrandingContext';
 import { updateMetaTags } from '../utils/metaUpdater';
@@ -19,13 +19,14 @@ import MultiViewButton from '../components/MultiView/MultiViewButton';
 import InlineAdSlot from '../components/ads/InlineAdSlot';
 import GlobalAdScript from '../components/ads/GlobalAdScript';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../components/ads/adsConfig';
+import lazyWithRetry from '../utils/lazyWithRetry';
 
-const LandingPageSimple = lazy(() => import('../components/LandingPageSimple'));
-const MultiViewLayout = lazy(() => import('../components/MultiView/MultiViewLayout'));
-const VideoPopup = lazy(() => import('../components/MultiView/VideoPopup'));
-const SaweriaLeaderboard = lazy(() => import('../components/SaweriaLeaderboard'));
-const FeedbackWidget = lazy(() => import('../components/FeedbackWidget'));
-const SaweriaSupport = lazy(() => import('../components/SaweriaSupport'));
+const LandingPageSimple = lazyWithRetry(() => import('../components/LandingPageSimple'), 'landing-page-simple');
+const MultiViewLayout = lazyWithRetry(() => import('../components/MultiView/MultiViewLayout'), 'multi-view-layout');
+const VideoPopup = lazyWithRetry(() => import('../components/MultiView/VideoPopup'), 'video-popup');
+const SaweriaLeaderboard = lazyWithRetry(() => import('../components/SaweriaLeaderboard'), 'saweria-leaderboard');
+const FeedbackWidget = lazyWithRetry(() => import('../components/FeedbackWidget'), 'feedback-widget');
+const SaweriaSupport = lazyWithRetry(() => import('../components/SaweriaSupport'), 'saweria-support');
 
 function DeferredSurfaceFallback({ className = '' }) {
     return (

@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { SecurityProvider } from './contexts/SecurityContext';
@@ -10,23 +10,24 @@ import ErrorBoundary from './components/ui/ErrorBoundary';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import ProtectedRoute from './components/ProtectedRoute';
+import lazyWithRetry from './utils/lazyWithRetry';
 
 // Lazy load admin pages for better code splitting
-const AdminLayout = lazy(() => import('./layouts/AdminLayout'));
-const CameraManagement = lazy(() => import('./pages/CameraManagement'));
-const ImportExport = lazy(() => import('./pages/admin/ImportExport'));
-const BackupRestore = lazy(() => import('./pages/admin/BackupRestore'));
-const HealthDebug = lazy(() => import('./pages/admin/HealthDebug'));
-const AreaManagement = lazy(() => import('./pages/AreaManagement'));
-const UserManagement = lazy(() => import('./pages/UserManagement'));
-const FeedbackManagement = lazy(() => import('./pages/FeedbackManagement'));
-const ViewerAnalytics = lazy(() => import('./pages/ViewerAnalytics'));
-const PlaybackAnalytics = lazy(() => import('./pages/PlaybackAnalytics'));
-const UnifiedSettings = lazy(() => import('./pages/UnifiedSettings'));
-const Dashboard = lazy(() => import('./pages/Dashboard'));
-const SponsorManagement = lazy(() => import('./pages/SponsorManagement'));
-const RecordingDashboard = lazy(() => import('./pages/RecordingDashboard'));
-const Playback = lazy(() => import('./pages/Playback'));
+const AdminLayout = lazyWithRetry(() => import('./layouts/AdminLayout'), 'admin-layout');
+const CameraManagement = lazyWithRetry(() => import('./pages/CameraManagement'), 'camera-management');
+const ImportExport = lazyWithRetry(() => import('./pages/admin/ImportExport'), 'import-export');
+const BackupRestore = lazyWithRetry(() => import('./pages/admin/BackupRestore'), 'backup-restore');
+const HealthDebug = lazyWithRetry(() => import('./pages/admin/HealthDebug'), 'health-debug');
+const AreaManagement = lazyWithRetry(() => import('./pages/AreaManagement'), 'area-management');
+const UserManagement = lazyWithRetry(() => import('./pages/UserManagement'), 'user-management');
+const FeedbackManagement = lazyWithRetry(() => import('./pages/FeedbackManagement'), 'feedback-management');
+const ViewerAnalytics = lazyWithRetry(() => import('./pages/ViewerAnalytics'), 'viewer-analytics');
+const PlaybackAnalytics = lazyWithRetry(() => import('./pages/PlaybackAnalytics'), 'playback-analytics');
+const UnifiedSettings = lazyWithRetry(() => import('./pages/UnifiedSettings'), 'unified-settings');
+const Dashboard = lazyWithRetry(() => import('./pages/Dashboard'), 'dashboard');
+const SponsorManagement = lazyWithRetry(() => import('./pages/SponsorManagement'), 'sponsor-management');
+const RecordingDashboard = lazyWithRetry(() => import('./pages/RecordingDashboard'), 'recording-dashboard');
+const Playback = lazyWithRetry(() => import('./pages/Playback'), 'playback');
 
 function AdminPageRoute({ children }) {
     return (

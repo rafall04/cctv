@@ -1,14 +1,15 @@
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useBranding } from '../contexts/BrandingContext';
 import InlineAdSlot from './ads/InlineAdSlot';
 import { isAdsMobileViewport, shouldRenderAdSlot } from './ads/adsConfig';
 import { shouldDisableAnimations } from '../utils/animationControl';
+import lazyWithRetry from '../utils/lazyWithRetry';
 import LayoutModeToggle from './landing/LayoutModeToggle';
 import LandingPublicTopStack from './landing/LandingPublicTopStack';
 
-const FeedbackWidget = lazy(() => import('./FeedbackWidget'));
-const SaweriaSupport = lazy(() => import('./SaweriaSupport'));
+const FeedbackWidget = lazyWithRetry(() => import('./FeedbackWidget'), 'feedback-widget-inline');
+const SaweriaSupport = lazyWithRetry(() => import('./SaweriaSupport'), 'saweria-support-inline');
 
 const Icons = {
     Sun: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></svg>,

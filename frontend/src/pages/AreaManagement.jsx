@@ -1,13 +1,14 @@
-import { useEffect, useState, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { areaService } from '../services/areaService';
 import { cameraService } from '../services/cameraService';
 import { settingsService } from '../services/settingsService';
 import { useNotification } from '../contexts/NotificationContext';
 import { StatCardSkeleton, CameraCardSkeleton, NoAreasEmptyState, Alert } from '../components/ui';
+import lazyWithRetry from '../utils/lazyWithRetry';
 
 // Lazy load LocationPicker to avoid conflicts with CameraManagement
-const LocationPicker = lazy(() => import('../components/LocationPicker'));
+const LocationPicker = lazyWithRetry(() => import('../components/LocationPicker'), 'location-picker');
 
 const defaultBulkConfig = {
     targetFilter: 'all',
