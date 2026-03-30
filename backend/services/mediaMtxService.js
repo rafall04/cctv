@@ -80,11 +80,16 @@ class MediaMtxService {
             const configuredCameraCount = dbCameras.filter(cam =>
                 configPaths.includes(cam.path_name)
             ).length;
+            const missingPathCount = Math.max(dbCameras.length - configuredCameraCount, 0);
 
-            // Only sync if NO cameras are configured (complete loss)
-            // Don't sync if some cameras are missing - that's handled by camera CRUD operations
-            if (dbCameras.length > 0 && configuredCameraCount === 0) {
-                console.log('[MediaMTX] All paths missing - re-syncing cameras...');
+            // Re-sync when no paths exist at all or when DB has internal cameras with missing path configs.
+            // This keeps imports and legacy rows from getting stuck on 404 HLS URLs.
+            if (dbCameras.length > 0 && missingPathCount > 0) {
+                console.log(
+                    configuredCameraCount === 0
+                        ? '[MediaMTX] All paths missing - re-syncing cameras...'
+                        : `[MediaMTX] Detected ${missingPathCount} missing path config(s) - re-syncing cameras...`
+                );
                 await this.syncCameras(1);
             }
         } catch (error) {
@@ -313,6 +318,8 @@ class MediaMtxService {
         if (added > 0 || updated > 0 || orphanedPaths.length > 0) {
             console.log(`[MediaMTX] Sync complete: +${added} added, ~${updated} updated, -${orphanedPaths.length} removed`);
         }
+
+        this.lastSyncTime = Date.now();
     }
 
     /**

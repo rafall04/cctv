@@ -2727,6 +2727,13 @@ class CameraService {
 
         const imported = performImport(plan.importableRows);
         const skipped = plan.summary.totalRows - imported;
+        const importedInternalRows = plan.importableRows.filter((row) => (
+            row.importData?.stream_source === 'internal'
+            && row.importData?.delivery_type === 'internal_hls'
+            && row.importData?.enabled !== 0
+            && typeof row.importData?.private_rtsp_url === 'string'
+            && row.importData.private_rtsp_url.startsWith('rtsp://')
+        ));
         const errors = plan.rows
             .filter((row) => row.status !== 'importable')
             .map((row) => `Skipped '${row.resolvedName || `row ${row.index + 1}`}': ${row.reason || row.status}`);
@@ -2742,6 +2749,14 @@ class CameraService {
                 ]
             );
             this.invalidateCameraCache();
+
+            if (importedInternalRows.length > 0) {
+                try {
+                    await mediaMtxService.syncCameras(1);
+                } catch (error) {
+                    console.error('[Camera Import] MediaMTX sync after internal import failed:', error.message);
+                }
+            }
         }
 
         return {
