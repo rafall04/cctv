@@ -478,6 +478,27 @@ describe('cameraHealthService external TLS policy', () => {
         expect(probeSpy).not.toHaveBeenCalled();
     });
 
+    it('keeps local internal cameras online when MediaMTX path is missing but source is non-strict internal RTSP', async () => {
+        const service = new CameraHealthService();
+        const probeSpy = vi.spyOn(service, 'probeInternalRtspSource');
+
+        const result = await service.evaluateCameraRaw({
+            id: 132,
+            enabled: 1,
+            is_online: 1,
+            delivery_type: 'internal_hls',
+            stream_source: 'internal',
+            stream_key: 'local-132',
+            private_rtsp_url: 'rtsp://admin:secret@10.0.0.6:554/live',
+            enable_recording: 1,
+            description: 'Warehouse camera',
+        }, new Map());
+
+        expect(result.online).toBe(true);
+        expect(result.reason).toBe('internal_source_unverified_assumed_online');
+        expect(probeSpy).not.toHaveBeenCalled();
+    });
+
     it('marks private RTSP live-only cameras offline when RTSP auth fails and MediaMTX path is idle', async () => {
         const service = new CameraHealthService();
         vi.spyOn(service, 'probeInternalRtspSource').mockResolvedValue({

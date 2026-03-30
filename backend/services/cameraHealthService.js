@@ -2217,6 +2217,14 @@ class CameraHealthService {
             };
         }
 
+        if (camera.private_rtsp_url) {
+            return {
+                online: camera.enabled === 1,
+                reason: 'internal_source_unverified_assumed_online',
+                details: withProbeDetails(baseDetails),
+            };
+        }
+
         return {
             online: false,
             reason: 'internal_stream_unreachable',
