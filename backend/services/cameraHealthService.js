@@ -14,6 +14,7 @@ import { recordingService } from './recordingService.js';
 import thumbnailService from './thumbnailService.js';
 import settingsService from './settingsService.js';
 import cameraRuntimeStateService from './cameraRuntimeStateService.js';
+import mediaMtxService from './mediaMtxService.js';
 import {
     getCameraDeliveryProfile,
     getEffectiveDeliveryType,
@@ -43,6 +44,7 @@ const DOMAIN_BACKOFF_BASE_MS = 60 * 1000;
 const DOMAIN_BACKOFF_MAX_MS = 10 * 60 * 1000;
 const HEALTH_LOOP_FLOOR_MS = 5 * 1000;
 const HEALTH_LOOP_CEIL_MS = 30 * 1000;
+const INTERNAL_PATH_REPAIR_BACKOFF_MS = 2 * 60 * 1000;
 
 const PROBE_CACHE_TTLS_MS = {
     external_hls_playlist: 15 * 1000,
@@ -830,10 +832,38 @@ class CameraHealthService {
         this.healthState = new Map();
         this.domainHealth = new Map();
         this.probeCache = new Map();
+        this.internalPathRepairBackoff = new Map();
     }
 
     async probeInternalRtspSource(rtspUrl, timeoutMs = 4000) {
         return probeRtspSource(rtspUrl, timeoutMs);
+    }
+
+    async ensureInternalCameraPath(camera) {
+        const pathName = camera.stream_key || `camera${camera.id}`;
+        if (!camera?.private_rtsp_url || camera.enabled !== 1) {
+            return { attempted: false, success: false, pathName };
+        }
+
+        const now = Date.now();
+        const nextAllowedAt = this.internalPathRepairBackoff.get(pathName) || 0;
+        if (nextAllowedAt > now) {
+            return { attempted: false, success: false, pathName };
+        }
+
+        this.internalPathRepairBackoff.set(pathName, now + INTERNAL_PATH_REPAIR_BACKOFF_MS);
+
+        try {
+            const result = await mediaMtxService.updateCameraPath(pathName, camera.private_rtsp_url);
+            if (result?.success) {
+                this.internalPathRepairBackoff.delete(pathName);
+                return { attempted: true, success: true, pathName, action: result.action || null };
+            }
+        } catch (error) {
+            console.error(`[CameraHealth] Failed to self-heal MediaMTX path ${pathName}:`, error.message);
+        }
+
+        return { attempted: true, success: false, pathName };
     }
 
     start(intervalMs = 30000) {
@@ -2191,6 +2221,7 @@ class CameraHealthService {
 
         const pathName = camera.stream_key || `camera${camera.id}`;
         const pathInfo = activePaths.get(pathName);
+        const strictRtspHealth = camera.private_rtsp_url && isStrictInternalRtspHealthCamera(camera);
 
         if (pathInfo && (pathInfo.ready || pathInfo.sourceReady || pathInfo.readers > 0)) {
             return {
@@ -2200,7 +2231,21 @@ class CameraHealthService {
             };
         }
 
-        if (camera.private_rtsp_url && isStrictInternalRtspHealthCamera(camera)) {
+        if (!pathInfo?.configured && camera.private_rtsp_url) {
+            const repairResult = await this.ensureInternalCameraPath(camera);
+            if (repairResult.success && !strictRtspHealth) {
+                return {
+                    online: true,
+                    reason: 'mediamtx_path_repaired',
+                    details: withProbeDetails(baseDetails, {
+                        repairedPathName: repairResult.pathName,
+                        repairedPathAction: repairResult.action || null,
+                    }),
+                };
+            }
+        }
+
+        if (strictRtspHealth) {
             const rtspResult = await this.probeInternalRtspSource(camera.private_rtsp_url);
             return {
                 online: rtspResult.online,

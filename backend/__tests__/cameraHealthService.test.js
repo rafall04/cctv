@@ -7,10 +7,12 @@ const {
     handleCameraBecameOnlineMock,
     handleCameraBecameOfflineMock,
     refreshCameraThumbnailMock,
+    updateCameraPathMock,
 } = vi.hoisted(() => ({
     handleCameraBecameOnlineMock: vi.fn(),
     handleCameraBecameOfflineMock: vi.fn(),
     refreshCameraThumbnailMock: vi.fn(),
+    updateCameraPathMock: vi.fn(),
 }));
 
 vi.mock('../services/recordingService.js', () => ({
@@ -23,6 +25,12 @@ vi.mock('../services/recordingService.js', () => ({
 vi.mock('../services/thumbnailService.js', () => ({
     default: {
         refreshCameraThumbnail: refreshCameraThumbnailMock,
+    },
+}));
+
+vi.mock('../services/mediaMtxService.js', () => ({
+    default: {
+        updateCameraPath: updateCameraPathMock,
     },
 }));
 
@@ -312,6 +320,7 @@ describe('cameraHealthService internal RTSP probe', () => {
 describe('cameraHealthService external TLS policy', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        updateCameraPathMock.mockResolvedValue({ success: true, action: 'added' });
     });
 
     it('normalizes invalid TLS mode to strict', () => {
@@ -495,7 +504,8 @@ describe('cameraHealthService external TLS policy', () => {
         }, new Map());
 
         expect(result.online).toBe(true);
-        expect(result.reason).toBe('internal_source_unverified_assumed_online');
+        expect(result.reason).toBe('mediamtx_path_repaired');
+        expect(updateCameraPathMock).toHaveBeenCalledWith('local-132', 'rtsp://admin:secret@10.0.0.6:554/live');
         expect(probeSpy).not.toHaveBeenCalled();
     });
 
