@@ -1930,10 +1930,12 @@ const MapView = memo(({
     ), [debouncedViewportState.currentBounds, filteredBase]);
 
     const effectiveZoom = debouncedViewportState.currentZoom || mapSettings.zoom || defaultZoom;
-
-    const shouldUseAllAreaSuperAggregateMarkers = selectedAreaValue === 'all'
-        && filteredBase.length > DENSE_AREA_THRESHOLD
+    const hasMultipleCamerasInScope = filteredBase.length > 1;
+    const shouldForceAllAreaSuperAggregate = selectedAreaValue === 'all'
+        && hasMultipleCamerasInScope
         && effectiveZoom < ALL_AREA_SUPER_AGGREGATE_ZOOM;
+
+    const shouldUseAllAreaSuperAggregateMarkers = shouldForceAllAreaSuperAggregate;
     const shouldUseAggregateMarkers = filteredBase.length > DENSE_AREA_THRESHOLD
         && effectiveZoom >= ALL_AREA_SUPER_AGGREGATE_ZOOM
         && effectiveZoom < AREA_AGGREGATE_ZOOM;

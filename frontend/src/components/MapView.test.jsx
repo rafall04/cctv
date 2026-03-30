@@ -1268,5 +1268,61 @@ describe('MapView area filter visibility', () => {
 
         expect(setViewMock).not.toHaveBeenCalledWith([-7.15, 111.9], 15, { animate: true, duration: 0.5 });
     });
+
+    it('tetap memakai marker aggregate saat zoom sangat rendah di mode all-area meski jumlah kamera sedikit', async () => {
+        setMockZoom(10);
+
+        render(
+            <MapView
+                cameras={[
+                    {
+                        id: 21,
+                        name: 'Cam 1',
+                        latitude: '-7.1500',
+                        longitude: '111.8800',
+                        area_name: 'Dander',
+                        is_online: 1,
+                        status: 'active',
+                        is_tunnel: 0,
+                    },
+                    {
+                        id: 22,
+                        name: 'Cam 2',
+                        latitude: '-7.1510',
+                        longitude: '111.8810',
+                        area_name: 'Dander',
+                        is_online: 1,
+                        status: 'active',
+                        is_tunnel: 0,
+                    },
+                    {
+                        id: 23,
+                        name: 'Cam 3',
+                        latitude: '-7.2900',
+                        longitude: '111.7200',
+                        area_name: 'Baureno',
+                        is_online: 1,
+                        status: 'active',
+                        is_tunnel: 0,
+                    },
+                ]}
+                areas={[
+                    { name: 'Dander', latitude: '-7.1500', longitude: '111.8800' },
+                    { name: 'Baureno', latitude: '-7.2900', longitude: '111.7200' },
+                ]}
+                showAreaFilter
+                selectedArea="all"
+            />
+        );
+
+        await waitFor(() => {
+            const aggregateIconCalls = L.divIcon.mock.calls
+                .map((call) => call[0])
+                .filter((call) => Array.isArray(call?.iconSize) && call.iconSize[0] === 58);
+
+            expect(aggregateIconCalls.some((call) => call.html.includes('2'))).toBe(true);
+            expect(aggregateIconCalls.some((call) => call.html.includes('1'))).toBe(true);
+        });
+    });
 });
 
