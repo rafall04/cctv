@@ -455,7 +455,30 @@ describe('cameraHealthService external TLS policy', () => {
         expect(probeSpy).not.toHaveBeenCalled();
     });
 
-    it('marks internal cameras offline when RTSP auth fails and MediaMTX path is idle', async () => {
+    it('keeps local internal cameras online when MediaMTX path is configured but idle', async () => {
+        const service = new CameraHealthService();
+        const probeSpy = vi.spyOn(service, 'probeInternalRtspSource');
+
+        const result = await service.evaluateCameraRaw({
+            id: 131,
+            enabled: 1,
+            is_online: 1,
+            delivery_type: 'internal_hls',
+            stream_source: 'internal',
+            stream_key: 'local-131',
+            private_rtsp_url: 'rtsp://admin:secret@10.0.0.5:554/live',
+            enable_recording: 1,
+            description: 'Local gate camera',
+        }, new Map([
+            ['local-131', { configured: true, ready: false, sourceReady: false, readers: 0 }],
+        ]));
+
+        expect(result.online).toBe(true);
+        expect(result.reason).toBe('mediamtx_path_configured_idle');
+        expect(probeSpy).not.toHaveBeenCalled();
+    });
+
+    it('marks private RTSP live-only cameras offline when RTSP auth fails and MediaMTX path is idle', async () => {
         const service = new CameraHealthService();
         vi.spyOn(service, 'probeInternalRtspSource').mockResolvedValue({
             online: false,
@@ -473,6 +496,8 @@ describe('cameraHealthService external TLS policy', () => {
             stream_source: 'internal',
             stream_key: 'surabaya-131',
             private_rtsp_url: 'rtsp://admin:wrong@127.0.0.1:554/live',
+            enable_recording: 0,
+            description: 'SOURCE: PRIVATE RTSP LIVE ONLY | source_tag: surabaya_private_rtsp | notes: imported',
         }, new Map());
 
         expect(result.online).toBe(false);

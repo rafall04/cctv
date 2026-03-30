@@ -126,6 +126,17 @@ function deriveMonitoringStateFromOnline(isOnline) {
     return isOnline ? 'online' : 'offline';
 }
 
+function isStrictInternalRtspHealthCamera(camera) {
+    const description = String(camera?.description || '').toLowerCase();
+    return Boolean(camera?.private_rtsp_url)
+        && Number(camera?.enable_recording || 0) === 0
+        && (
+            description.includes('source: private rtsp live only')
+            || description.includes('source_tag: surabaya_private_rtsp')
+            || description.includes('surabaya_private_rtsp')
+        );
+}
+
 function parseRtspResponse(rawResponse) {
     const raw = String(rawResponse || '');
     const [headerBlock = ''] = raw.split('\r\n\r\n');
@@ -2189,12 +2200,20 @@ class CameraHealthService {
             };
         }
 
-        if (camera.private_rtsp_url) {
+        if (camera.private_rtsp_url && isStrictInternalRtspHealthCamera(camera)) {
             const rtspResult = await this.probeInternalRtspSource(camera.private_rtsp_url);
             return {
                 online: rtspResult.online,
                 reason: rtspResult.reason,
                 details: withProbeDetails(baseDetails, rtspResult.details),
+            };
+        }
+
+        if (pathInfo?.configured) {
+            return {
+                online: true,
+                reason: 'mediamtx_path_configured_idle',
+                details: withProbeDetails(baseDetails),
             };
         }
 
