@@ -1,0 +1,40 @@
+{
+    "area_key": "kota-tasikmalaya",
+    "area_name": "Kota Tasikmalaya",
+    "area_type": "kota",
+    "generated_at": "2026-03-30",
+    "source": "cctv_atcs_indonesia_apk",
+    "import_file": "imports/kota-tasikmalaya.json",
+    "camera_count": 41,
+    "source_jsons": [
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/tasikmalayacctv.json"
+    ],
+    "provider_sites": [
+        "https://atcs.tasikmalayakota.go.id"
+    ],
+    "coordinate_lookup": {
+        "provider_site_checked": "https://atcs.tasikmalayakota.go.id",
+        "provider_http_status": 200,
+        "coordinate_status": "exact_public_coordinates_extracted",
+        "exact_coordinate_matches": 29,
+        "coordinate_source_urls": [
+            "https://atcs.tasikmalayakota.go.id/"
+        ],
+        "evidence": [
+            "lokasi_lat",
+            "lokasi_lng",
+            "lokasi_lat",
+            "lokasi_lng",
+            "lokasi_lat",
+            "lokasi_lng",
+            "lokasi_lat",
+            "lokasi_lng",
+            "lokasi_lat",
+            "lokasi_lng"
+        ]
+    },
+    "notes": [
+        "Some or all cameras were enriched with exact public coordinates from the provider site.",
+        "This group prioritizes direct HLS sources only and excludes RTSP, FLV, webview-only, and toll/provincial aggregates."
+    ]
+}

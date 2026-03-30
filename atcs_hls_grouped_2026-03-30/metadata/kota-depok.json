@@ -1,0 +1,38 @@
+{
+    "area_key": "kota-depok",
+    "area_name": "Kota Depok",
+    "area_type": "kota",
+    "generated_at": "2026-03-30",
+    "source": "cctv_atcs_indonesia_apk",
+    "import_file": "imports/kota-depok.json",
+    "camera_count": 48,
+    "source_jsons": [
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/DEPOK_Kota_CCTV.json"
+    ],
+    "provider_sites": [
+        "https://dishub.depok.go.id"
+    ],
+    "coordinate_lookup": {
+        "provider_site_checked": "https://dishub.depok.go.id",
+        "provider_http_status": 200,
+        "coordinate_status": "coordinate_signal_found",
+        "exact_coordinate_matches": 0,
+        "coordinate_source_urls": [],
+        "evidence": [
+            "leaflet",
+            "leaflet",
+            "L.marker",
+            "-2.8542331, 113.2772504",
+            "-2.5489, 117.1250",
+            "-6.121360283139119, 106.15504312328267",
+            "-5.3974093522116275, 105.26703522749241",
+            "-2.859528453030223,  107.72174799179719",
+            "-2.861453001682788,  108.07403522934703",
+            "-6.492984258987628, 106.8215377468064"
+        ]
+    },
+    "notes": [
+        "Exact camera coordinates were not found in the checked public provider page; entries remain with null coordinates.",
+        "This group prioritizes direct HLS sources only and excludes RTSP, FLV, webview-only, and toll/provincial aggregates."
+    ]
+}

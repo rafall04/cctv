@@ -1,0 +1,27 @@
+{
+    "area_key": "kab-banyumas",
+    "area_name": "Kabupaten Banyumas",
+    "area_type": "kabupaten",
+    "generated_at": "2026-03-30",
+    "source": "cctv_atcs_indonesia_apk",
+    "import_file": "imports/kab-banyumas.json",
+    "camera_count": 30,
+    "source_jsons": [
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/banyumascctv.json"
+    ],
+    "provider_sites": [
+        "https://cctv.dev.banyumaskab.go.id"
+    ],
+    "coordinate_lookup": {
+        "provider_site_checked": "https://cctv.dev.banyumaskab.go.id",
+        "provider_http_status": 404,
+        "coordinate_status": "no_public_coordinates_detected",
+        "exact_coordinate_matches": 0,
+        "coordinate_source_urls": [],
+        "evidence": []
+    },
+    "notes": [
+        "Exact camera coordinates were not found in the checked public provider page; entries remain with null coordinates.",
+        "This group prioritizes direct HLS sources only and excludes RTSP, FLV, webview-only, and toll/provincial aggregates."
+    ]
+}

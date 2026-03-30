@@ -1,0 +1,53 @@
+{
+    "area_key": "kota-semarang",
+    "area_name": "Kota Semarang",
+    "area_type": "kota",
+    "generated_at": "2026-03-30",
+    "source": "cctv_atcs_indonesia_apk",
+    "import_file": "imports/kota-semarang.json",
+    "camera_count": 2630,
+    "source_jsons": [
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/KEC_NGALIYAN_SEMARANG_CCTV.json",
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/KEC_SEMARANG_UTARA_SEMARANG_CCTV.json",
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/KEC_PEDURUNGAN_SEMARANG_CCTV.json",
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/KEC_SEMARANG_TIMUR_SEMARANG_CCTV.json",
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/KEC_TEMBALANG_SEMARANG_CCTV.json",
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/KEC_GAYAMSARI_SEMARANG_CCTV.json",
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/KEC_GUNUNGPATI_SEMARANG_CCTV.json",
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/KEC_BANYUMANIK_SEMARANG_CCTV.json",
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/KEC_SEMARANG_TENGAH_SEMARANG_CCTV.json",
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/KEC_SEMARANG_SELATAN_SEMARANG_CCTV.json",
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/KEC_CANDISARI_SEMARANG_CCTV.json",
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/semarangcctvBARU2.json",
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/KEC_GENUK_SEMARANG_CCTV.json",
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/KEC_GAJAHMUNGKUR_SEMARANG_CCTV.json",
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/KEC_SEMARANG_BARAT_SEMARANG_CCTV.json",
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/semarang_POMPA_AIR_CCTV.json",
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/semarang_TPS_CCTV.json",
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/SEMARANG-DEMAK_SEKSI_2_(SAYUNG-DEMAK)_TOL.json",
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/Semarang-Demak_TOL.json",
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/KEC_MIJEN_SEMARANG_CCTV.json",
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/semarang_SUNGAI_CCTV.json",
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/semarang_GENANGAN_AIR_CCTV.json",
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/semarang_Kota_LamaCCTV.json",
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/semarang_KAMTIBKCCTV.json",
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/KEC_TUGU_SEMARANG_CCTV.json"
+    ],
+    "provider_sites": [
+        "https://103.182.222.51",
+        "https://43.240.81.140",
+        "https://livepantau.semarangkota.go.id"
+    ],
+    "coordinate_lookup": {
+        "provider_site_checked": "https://103.182.222.51",
+        "provider_http_status": 404,
+        "coordinate_status": "no_public_coordinates_detected",
+        "exact_coordinate_matches": 0,
+        "coordinate_source_urls": [],
+        "evidence": []
+    },
+    "notes": [
+        "Exact camera coordinates were not found in the checked public provider page; entries remain with null coordinates.",
+        "This group prioritizes direct HLS sources only and excludes RTSP, FLV, webview-only, and toll/provincial aggregates."
+    ]
+}

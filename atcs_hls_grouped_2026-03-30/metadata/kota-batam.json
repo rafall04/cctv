@@ -1,0 +1,28 @@
+{
+    "area_key": "kota-batam",
+    "area_name": "Kota Batam",
+    "area_type": "kota",
+    "generated_at": "2026-03-30",
+    "source": "cctv_atcs_indonesia_apk",
+    "import_file": "imports/kota-batam.json",
+    "camera_count": 46,
+    "source_jsons": [
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/batamcctv.json"
+    ],
+    "provider_sites": [
+        "http://103.248.199.102",
+        "https://matanya.batam.go.id"
+    ],
+    "coordinate_lookup": {
+        "provider_site_checked": "http://103.248.199.102",
+        "provider_http_status": 0,
+        "coordinate_status": "no_public_coordinates_detected",
+        "exact_coordinate_matches": 0,
+        "coordinate_source_urls": [],
+        "evidence": []
+    },
+    "notes": [
+        "Exact camera coordinates were not found in the checked public provider page; entries remain with null coordinates.",
+        "This group prioritizes direct HLS sources only and excludes RTSP, FLV, webview-only, and toll/provincial aggregates."
+    ]
+}

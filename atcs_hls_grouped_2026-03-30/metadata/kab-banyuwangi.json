@@ -1,0 +1,34 @@
+{
+    "area_key": "kab-banyuwangi",
+    "area_name": "Kabupaten Banyuwangi",
+    "area_type": "kabupaten",
+    "generated_at": "2026-03-30",
+    "source": "cctv_atcs_indonesia_apk",
+    "import_file": "imports/kab-banyuwangi.json",
+    "camera_count": 224,
+    "source_jsons": [
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/banyuwangicctvBARU2.json"
+    ],
+    "provider_sites": [
+        "https://live.banyuwangikab.go.id"
+    ],
+    "coordinate_lookup": {
+        "provider_site_checked": "https://live.banyuwangikab.go.id",
+        "provider_http_status": 200,
+        "coordinate_status": "exact_public_coordinates_extracted",
+        "exact_coordinate_matches": 197,
+        "coordinate_source_urls": [
+            "https://live.banyuwangikab.go.id/assets/cctvjs.php"
+        ],
+        "evidence": [
+            "leaflet",
+            "leaflet",
+            "leaflet",
+            "leaflet"
+        ]
+    },
+    "notes": [
+        "Some or all cameras were enriched with exact public coordinates from the provider site.",
+        "This group prioritizes direct HLS sources only and excludes RTSP, FLV, webview-only, and toll/provincial aggregates."
+    ]
+}

@@ -1,0 +1,27 @@
+{
+    "area_key": "kota-serang",
+    "area_name": "Kota Serang",
+    "area_type": "kota",
+    "generated_at": "2026-03-30",
+    "source": "cctv_atcs_indonesia_apk",
+    "import_file": "imports/kota-serang.json",
+    "camera_count": 24,
+    "source_jsons": [
+        "http://cariloka.com/atcscctvindon/cctvatcsindonlengkap/SERANG_KOTA_CCTV.json"
+    ],
+    "provider_sites": [
+        "https://stream.serangkota.go.id"
+    ],
+    "coordinate_lookup": {
+        "provider_site_checked": "https://stream.serangkota.go.id",
+        "provider_http_status": 200,
+        "coordinate_status": "no_public_coordinates_detected",
+        "exact_coordinate_matches": 0,
+        "coordinate_source_urls": [],
+        "evidence": []
+    },
+    "notes": [
+        "Exact camera coordinates were not found in the checked public provider page; entries remain with null coordinates.",
+        "This group prioritizes direct HLS sources only and excludes RTSP, FLV, webview-only, and toll/provincial aggregates."
+    ]
+}

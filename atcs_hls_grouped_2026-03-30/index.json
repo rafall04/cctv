@@ -1,0 +1,602 @@
+{
+    "generated_at": "2026-03-30",
+    "source": "cctv_atcs_indonesia_apk",
+    "grouping_rule": "kabupaten/kota only, HLS direct only, excluded existing requested areas and toll/province aggregates",
+    "groups": [
+        {
+            "area_key": "kota-semarang",
+            "area_name": "Kota Semarang",
+            "area_type": "kota",
+            "camera_count": 2630,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kota-semarang.json",
+            "metadata_file": "metadata/kota-semarang.json",
+            "provider_sites": [
+                "https://103.182.222.51",
+                "https://43.240.81.140",
+                "https://livepantau.semarangkota.go.id"
+            ],
+            "source_json_count": 25
+        },
+        {
+            "area_key": "kota-bandung",
+            "area_name": "Kota Bandung",
+            "area_type": "kota",
+            "camera_count": 307,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kota-bandung.json",
+            "metadata_file": "metadata/kota-bandung.json",
+            "provider_sites": [
+                "https://pelindung.bandung.go.id:3443"
+            ],
+            "source_json_count": 3
+        },
+        {
+            "area_key": "kab-nganjuk",
+            "area_name": "Kabupaten Nganjuk",
+            "area_type": "kabupaten",
+            "camera_count": 261,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kab-nganjuk.json",
+            "metadata_file": "metadata/kab-nganjuk.json",
+            "provider_sites": [
+                "https://wxyz.nganjukkab.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kab-banyuwangi",
+            "area_name": "Kabupaten Banyuwangi",
+            "area_type": "kabupaten",
+            "camera_count": 224,
+            "exact_coordinate_matches": 197,
+            "coordinate_status": "exact_public_coordinates_extracted",
+            "import_file": "imports/kab-banyuwangi.json",
+            "metadata_file": "metadata/kab-banyuwangi.json",
+            "provider_sites": [
+                "https://live.banyuwangikab.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kota-medan",
+            "area_name": "Kota Medan",
+            "area_type": "kota",
+            "camera_count": 182,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kota-medan.json",
+            "metadata_file": "metadata/kota-medan.json",
+            "provider_sites": [
+                "https://atcsdishub.medan.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kab-gunungkidul",
+            "area_name": "Kabupaten Gunungkidul",
+            "area_type": "kabupaten",
+            "camera_count": 111,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kab-gunungkidul.json",
+            "metadata_file": "metadata/kab-gunungkidul.json",
+            "provider_sites": [
+                "https://stream.gunungkidulkab.go.id:8888"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kab-bandung-barat",
+            "area_name": "Kabupaten Bandung Barat",
+            "area_type": "kabupaten",
+            "camera_count": 75,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kab-bandung-barat.json",
+            "metadata_file": "metadata/kab-bandung-barat.json",
+            "provider_sites": [
+                "https://cctv.atcs-dishubkbb.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kab-boyolali",
+            "area_name": "Kabupaten Boyolali",
+            "area_type": "kabupaten",
+            "camera_count": 58,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kab-boyolali.json",
+            "metadata_file": "metadata/kab-boyolali.json",
+            "provider_sites": [
+                "https://stream.boyolali.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kota-bukittinggi",
+            "area_name": "Kota Bukittinggi",
+            "area_type": "kota",
+            "camera_count": 56,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kota-bukittinggi.json",
+            "metadata_file": "metadata/kota-bukittinggi.json",
+            "provider_sites": [
+                "https://hls.bukittinggikota.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kota-banjarbaru",
+            "area_name": "Kota Banjarbaru",
+            "area_type": "kota",
+            "camera_count": 54,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kota-banjarbaru.json",
+            "metadata_file": "metadata/kota-banjarbaru.json",
+            "provider_sites": [
+                "https://stream.banjarbarukota.go.id",
+                "https://stream.rpd.my.id:8080"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kab-cianjur",
+            "area_name": "Kabupaten Cianjur",
+            "area_type": "kabupaten",
+            "camera_count": 52,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kab-cianjur.json",
+            "metadata_file": "metadata/kab-cianjur.json",
+            "provider_sites": [
+                "https://atcs.cianjurkab.go.id:5443",
+                "https://ruas-ciranjang.jaring.host"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kota-pekanbaru",
+            "area_name": "Kota Pekanbaru",
+            "area_type": "kota",
+            "camera_count": 50,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kota-pekanbaru.json",
+            "metadata_file": "metadata/kota-pekanbaru.json",
+            "provider_sites": [
+                "https://cctv.pekanbaru.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kota-depok",
+            "area_name": "Kota Depok",
+            "area_type": "kota",
+            "camera_count": 48,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "coordinate_signal_found",
+            "import_file": "imports/kota-depok.json",
+            "metadata_file": "metadata/kota-depok.json",
+            "provider_sites": [
+                "https://dishub.depok.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kota-pematang-siantar",
+            "area_name": "Kota Pematang Siantar",
+            "area_type": "kota",
+            "camera_count": 48,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kota-pematang-siantar.json",
+            "metadata_file": "metadata/kota-pematang-siantar.json",
+            "provider_sites": [
+                "https://stream.rekasadigital.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kota-batam",
+            "area_name": "Kota Batam",
+            "area_type": "kota",
+            "camera_count": 46,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kota-batam.json",
+            "metadata_file": "metadata/kota-batam.json",
+            "provider_sites": [
+                "http://103.248.199.102",
+                "https://matanya.batam.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kab-tabalong",
+            "area_name": "Kabupaten Tabalong",
+            "area_type": "kabupaten",
+            "camera_count": 45,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "coordinate_signal_found",
+            "import_file": "imports/kab-tabalong.json",
+            "metadata_file": "metadata/kab-tabalong.json",
+            "provider_sites": [
+                "https://cctv.tabalongkab.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kab-sampang",
+            "area_name": "Kabupaten Sampang",
+            "area_type": "kabupaten",
+            "camera_count": 44,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kab-sampang.json",
+            "metadata_file": "metadata/kab-sampang.json",
+            "provider_sites": [
+                "https://pantau.sampangkab.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kab-sleman",
+            "area_name": "Kabupaten Sleman",
+            "area_type": "kabupaten",
+            "camera_count": 44,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kab-sleman.json",
+            "metadata_file": "metadata/kab-sleman.json",
+            "provider_sites": [
+                "https://mam.jogjaprov.go.id:1937"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kota-sumedang",
+            "area_name": "Kota Sumedang",
+            "area_type": "kota",
+            "camera_count": 44,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kota-sumedang.json",
+            "metadata_file": "metadata/kota-sumedang.json",
+            "provider_sites": [
+                "https://shinobi.sumedangkab.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kab-klaten",
+            "area_name": "Kabupaten Klaten",
+            "area_type": "kabupaten",
+            "camera_count": 42,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kab-klaten.json",
+            "metadata_file": "metadata/kab-klaten.json",
+            "provider_sites": [
+                "https://stream.klaten.go.id:8080"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kota-magelang",
+            "area_name": "Kota Magelang",
+            "area_type": "kota",
+            "camera_count": 41,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kota-magelang.json",
+            "metadata_file": "metadata/kota-magelang.json",
+            "provider_sites": [
+                "https://dev.cctv.magelangkota.go.id",
+                "https://stream.cctv.magelangkota.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kota-tasikmalaya",
+            "area_name": "Kota Tasikmalaya",
+            "area_type": "kota",
+            "camera_count": 41,
+            "exact_coordinate_matches": 29,
+            "coordinate_status": "exact_public_coordinates_extracted",
+            "import_file": "imports/kota-tasikmalaya.json",
+            "metadata_file": "metadata/kota-tasikmalaya.json",
+            "provider_sites": [
+                "https://atcs.tasikmalayakota.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kab-cirebon",
+            "area_name": "Kabupaten Cirebon",
+            "area_type": "kabupaten",
+            "camera_count": 40,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kab-cirebon.json",
+            "metadata_file": "metadata/kab-cirebon.json",
+            "provider_sites": [
+                "https://cctv-backend.cirebonkab.go.id:6969"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kota-bekasi",
+            "area_name": "Kota Bekasi",
+            "area_type": "kota",
+            "camera_count": 40,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kota-bekasi.json",
+            "metadata_file": "metadata/kota-bekasi.json",
+            "provider_sites": [
+                "https://eofficev2.bekasikota.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kota-metro",
+            "area_name": "Kota Metro",
+            "area_type": "kota",
+            "camera_count": 40,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kota-metro.json",
+            "metadata_file": "metadata/kota-metro.json",
+            "provider_sites": [
+                "https://rstp2hls.metrokota.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kota-banjar",
+            "area_name": "Kota Banjar",
+            "area_type": "kota",
+            "camera_count": 38,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kota-banjar.json",
+            "metadata_file": "metadata/kota-banjar.json",
+            "provider_sites": [
+                "https://atcs.banjarkota.go.id:5443"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kota-batu",
+            "area_name": "Kota Batu",
+            "area_type": "kota",
+            "camera_count": 38,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kota-batu.json",
+            "metadata_file": "metadata/kota-batu.json",
+            "provider_sites": [
+                "https://stream.batukota.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kab-pasuruan",
+            "area_name": "Kabupaten Pasuruan",
+            "area_type": "kabupaten",
+            "camera_count": 32,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kab-pasuruan.json",
+            "metadata_file": "metadata/kab-pasuruan.json",
+            "provider_sites": [
+                "https://dishub.pasuruankab.go.id:5444"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kota-palembang",
+            "area_name": "Kota Palembang",
+            "area_type": "kota",
+            "camera_count": 31,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kota-palembang.json",
+            "metadata_file": "metadata/kota-palembang.json",
+            "provider_sites": [
+                "https://stream.palembang.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kab-banyumas",
+            "area_name": "Kabupaten Banyumas",
+            "area_type": "kabupaten",
+            "camera_count": 30,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kab-banyumas.json",
+            "metadata_file": "metadata/kab-banyumas.json",
+            "provider_sites": [
+                "https://cctv.dev.banyumaskab.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kota-banjarmasin",
+            "area_name": "Kota Banjarmasin",
+            "area_type": "kota",
+            "camera_count": 30,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kota-banjarmasin.json",
+            "metadata_file": "metadata/kota-banjarmasin.json",
+            "provider_sites": [
+                "https://atcs.banjarmasinkota.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kab-kudus",
+            "area_name": "Kabupaten Kudus",
+            "area_type": "kabupaten",
+            "camera_count": 28,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kab-kudus.json",
+            "metadata_file": "metadata/kab-kudus.json",
+            "provider_sites": [
+                "https://stream.kuduskab.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kab-sanggau",
+            "area_name": "Kabupaten Sanggau",
+            "area_type": "kabupaten",
+            "camera_count": 28,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kab-sanggau.json",
+            "metadata_file": "metadata/kab-sanggau.json",
+            "provider_sites": [
+                "https://cintadilanhost.sanggau.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kab-tangerang",
+            "area_name": "Kabupaten Tangerang",
+            "area_type": "kabupaten",
+            "camera_count": 28,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kab-tangerang.json",
+            "metadata_file": "metadata/kab-tangerang.json",
+            "provider_sites": [
+                "https://cctv-dishub.tangerangkab.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kab-belitung",
+            "area_name": "Kabupaten Belitung",
+            "area_type": "kabupaten",
+            "camera_count": 27,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kab-belitung.json",
+            "metadata_file": "metadata/kab-belitung.json",
+            "provider_sites": [
+                "https://hls.belitung.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kota-bogor",
+            "area_name": "Kota Bogor",
+            "area_type": "kota",
+            "camera_count": 27,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kota-bogor.json",
+            "metadata_file": "metadata/kota-bogor.json",
+            "provider_sites": [
+                "https://restreamer2.kotabogor.go.id",
+                "https://restreamer3.kotabogor.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kab-indramayu",
+            "area_name": "Kabupaten Indramayu",
+            "area_type": "kabupaten",
+            "camera_count": 25,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kab-indramayu.json",
+            "metadata_file": "metadata/kab-indramayu.json",
+            "provider_sites": [
+                "https://streamer.indramayukab.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kota-padang",
+            "area_name": "Kota Padang",
+            "area_type": "kota",
+            "camera_count": 24,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kota-padang.json",
+            "metadata_file": "metadata/kota-padang.json",
+            "provider_sites": [
+                "https://streamcctv.padang.go.id:3000"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kota-serang",
+            "area_name": "Kota Serang",
+            "area_type": "kota",
+            "camera_count": 24,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kota-serang.json",
+            "metadata_file": "metadata/kota-serang.json",
+            "provider_sites": [
+                "https://stream.serangkota.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kab-wonosobo",
+            "area_name": "Kabupaten Wonosobo",
+            "area_type": "kabupaten",
+            "camera_count": 23,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kab-wonosobo.json",
+            "metadata_file": "metadata/kab-wonosobo.json",
+            "provider_sites": [
+                "https://mata.wonosobokab.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kota-cirebon",
+            "area_name": "Kota Cirebon",
+            "area_type": "kota",
+            "camera_count": 22,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kota-cirebon.json",
+            "metadata_file": "metadata/kota-cirebon.json",
+            "provider_sites": [
+                "https://cctv.cirebonkota.go.id"
+            ],
+            "source_json_count": 1
+        },
+        {
+            "area_key": "kab-tasikmalaya",
+            "area_name": "Kabupaten Tasikmalaya",
+            "area_type": "kabupaten",
+            "camera_count": 11,
+            "exact_coordinate_matches": 0,
+            "coordinate_status": "no_public_coordinates_detected",
+            "import_file": "imports/kab-tasikmalaya.json",
+            "metadata_file": "metadata/kab-tasikmalaya.json",
+            "provider_sites": [
+                "https://cctv.tasikmalayakab.go.id"
+            ],
+            "source_json_count": 1
+        }
+    ]
+}
