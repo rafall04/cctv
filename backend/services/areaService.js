@@ -43,6 +43,23 @@ function normalizeShowOnGridDefault(value) {
     return value === true || value === 1 || value === '1' ? 1 : 0;
 }
 
+function normalizeGridDefaultCameraLimit(value) {
+    if (value === undefined) {
+        return 12;
+    }
+
+    if (value === null || value === '') {
+        return null;
+    }
+
+    const parsed = parseInt(value, 10);
+    if (Number.isNaN(parsed)) {
+        return 12;
+    }
+
+    return Math.max(1, Math.min(parsed, 100));
+}
+
 function buildAreaOverviewRows(areas, cameras, healthItems) {
     const healthByCameraId = new Map(healthItems.map((item) => [item.cameraId, item]));
         const overviewByArea = new Map(
@@ -233,7 +250,8 @@ class AreaService {
 
         const areas = query(`
             SELECT a.id, a.name, a.description, a.rt, a.rw, a.kelurahan, a.kecamatan, a.latitude, a.longitude,
-                   a.coverage_scope, a.viewport_zoom_override, COALESCE(a.show_on_grid_default, 1) as show_on_grid_default
+                   a.coverage_scope, a.viewport_zoom_override, COALESCE(a.show_on_grid_default, 1) as show_on_grid_default,
+                   COALESCE(a.grid_default_camera_limit, 12) as grid_default_camera_limit
                    , CASE
                         WHEN a.external_health_mode_override IN ('default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled')
                             THEN a.external_health_mode_override
@@ -287,6 +305,7 @@ class AreaService {
             coverage_scope,
             viewport_zoom_override,
             show_on_grid_default,
+            grid_default_camera_limit,
         } = data;
 
         if (!name) {
@@ -298,8 +317,8 @@ class AreaService {
         try {
             const result = execute(
                 `INSERT INTO areas (
-                    name, description, rt, rw, kelurahan, kecamatan, latitude, longitude, external_health_mode_override, coverage_scope, viewport_zoom_override, show_on_grid_default
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    name, description, rt, rw, kelurahan, kecamatan, latitude, longitude, external_health_mode_override, coverage_scope, viewport_zoom_override, show_on_grid_default, grid_default_camera_limit
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     name,
                     description || null,
@@ -313,6 +332,7 @@ class AreaService {
                     normalizeAreaCoverageScope(coverage_scope),
                     normalizeViewportZoomOverride(viewport_zoom_override),
                     normalizeShowOnGridDefault(show_on_grid_default),
+                    normalizeGridDefaultCameraLimit(grid_default_camera_limit),
                 ]
             );
 
@@ -343,6 +363,7 @@ class AreaService {
             coverage_scope,
             viewport_zoom_override,
             show_on_grid_default,
+            grid_default_camera_limit,
         } = data;
 
         const area = queryOne('SELECT * FROM areas WHERE id = ?', [id]);
@@ -356,7 +377,7 @@ class AreaService {
             execute(
                 `UPDATE areas
                  SET name = ?, description = ?, rt = ?, rw = ?, kelurahan = ?, kecamatan = ?, latitude = ?, longitude = ?,
-                     external_health_mode_override = ?, coverage_scope = ?, viewport_zoom_override = ?, show_on_grid_default = ?
+                     external_health_mode_override = ?, coverage_scope = ?, viewport_zoom_override = ?, show_on_grid_default = ?, grid_default_camera_limit = ?
                  WHERE id = ?`,
                 [
                     name || area.name,
@@ -379,6 +400,9 @@ class AreaService {
                     show_on_grid_default !== undefined
                         ? normalizeShowOnGridDefault(show_on_grid_default)
                         : normalizeShowOnGridDefault(area.show_on_grid_default),
+                    grid_default_camera_limit !== undefined
+                        ? normalizeGridDefaultCameraLimit(grid_default_camera_limit)
+                        : normalizeGridDefaultCameraLimit(area.grid_default_camera_limit),
                     id
                 ]
             );

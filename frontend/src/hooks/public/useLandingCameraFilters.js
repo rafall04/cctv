@@ -48,12 +48,26 @@ export function useLandingCameraFilters(cameras, areas, favorites, viewMode, onC
         return searchFilteredCameras.filter((camera) => camera.area_name === selectedArea);
     }, [searchFilteredCameras, selectedArea]);
 
-    const defaultGridAreaNames = useMemo(() => {
-        const names = areas
-            .filter((area) => area?.show_on_grid_default === 1 || area?.show_on_grid_default === true)
-            .map((area) => area.name)
-            .filter(Boolean);
-        return new Set(names);
+    const defaultGridAreaConfigs = useMemo(() => {
+        const configs = new Map();
+        areas.forEach((area) => {
+            if (!area?.name) {
+                return;
+            }
+            if (!(area?.show_on_grid_default === 1 || area?.show_on_grid_default === true)) {
+                return;
+            }
+
+            const rawLimit = area?.grid_default_camera_limit;
+            const parsedLimit = rawLimit === null || rawLimit === undefined || rawLimit === ''
+                ? null
+                : Number.parseInt(rawLimit, 10);
+
+            configs.set(area.name, {
+                limit: Number.isNaN(parsedLimit) ? null : parsedLimit,
+            });
+        });
+        return configs;
     }, [areas]);
 
     const gridAreaScopedCameras = useMemo(() => {
@@ -61,14 +75,43 @@ export function useLandingCameraFilters(cameras, areas, favorites, viewMode, onC
             return areaFilteredCameras;
         }
 
-        if (defaultGridAreaNames.size === 0) {
+        if (defaultGridAreaConfigs.size === 0) {
             return areaFilteredCameras;
         }
 
-        return areaFilteredCameras.filter((camera) => (
-            camera?.area_name && defaultGridAreaNames.has(camera.area_name)
-        ));
-    }, [areaFilteredCameras, defaultGridAreaNames, selectedArea, viewMode]);
+        const grouped = new Map();
+        areaFilteredCameras.forEach((camera) => {
+            if (!camera?.area_name || !defaultGridAreaConfigs.has(camera.area_name)) {
+                return;
+            }
+            if (!grouped.has(camera.area_name)) {
+                grouped.set(camera.area_name, []);
+            }
+            grouped.get(camera.area_name).push(camera);
+        });
+
+        const scoped = [];
+        grouped.forEach((areaCameras, areaName) => {
+            const { limit } = defaultGridAreaConfigs.get(areaName) || {};
+            const sortedAreaCameras = [...areaCameras].sort((left, right) => {
+                const leftOnline = left?.is_online === 1 || left?.is_online === true ? 1 : 0;
+                const rightOnline = right?.is_online === 1 || right?.is_online === true ? 1 : 0;
+                if (leftOnline !== rightOnline) {
+                    return rightOnline - leftOnline;
+                }
+
+                return (left?.name || '').localeCompare(right?.name || '');
+            });
+
+            if (limit && limit > 0) {
+                scoped.push(...sortedAreaCameras.slice(0, limit));
+            } else {
+                scoped.push(...sortedAreaCameras);
+            }
+        });
+
+        return scoped;
+    }, [areaFilteredCameras, defaultGridAreaConfigs, selectedArea, viewMode]);
 
     const filteredForGrid = useMemo(() => {
         if (connectionTab === 'stable') {

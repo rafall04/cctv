@@ -64,6 +64,7 @@ db.exec(`
     coverage_scope TEXT NOT NULL DEFAULT 'default',
     viewport_zoom_override INTEGER,
     show_on_grid_default INTEGER NOT NULL DEFAULT 1,
+    grid_default_camera_limit INTEGER DEFAULT 12,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )
 `);

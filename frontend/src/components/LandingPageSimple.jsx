@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useBranding } from '../contexts/BrandingContext';
+import { useCameras } from '../contexts/CameraContext';
 import InlineAdSlot from './ads/InlineAdSlot';
 import { isAdsMobileViewport, shouldRenderAdSlot } from './ads/adsConfig';
 import { shouldDisableAnimations } from '../utils/animationControl';
@@ -98,6 +99,42 @@ function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
     );
 }
 
+function SimpleStatusOverview() {
+    const { cameras, loading } = useCameras();
+
+    const onlineCount = cameras.filter((camera) => camera?.is_online === 1 || camera?.is_online === true).length;
+    const offlineCount = Math.max(cameras.length - onlineCount, 0);
+
+    return (
+        <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6 lg:px-8">
+            <div className="rounded-2xl border border-emerald-200/40 bg-white/90 p-4 shadow-sm dark:border-emerald-700/30 dark:bg-gray-900/70">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white">Status CCTV Publik</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Ringkasan cepat untuk kondisi kamera yang sedang dimuat di mode simpel.
+                        </p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 sm:min-w-[320px]">
+                        <div className="rounded-xl bg-emerald-50 px-4 py-3 text-center dark:bg-emerald-500/10">
+                            <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-emerald-700 dark:text-emerald-300">Online</div>
+                            <div className="mt-1 text-2xl font-bold text-emerald-800 dark:text-emerald-200">{loading ? '...' : onlineCount}</div>
+                        </div>
+                        <div className="rounded-xl bg-rose-50 px-4 py-3 text-center dark:bg-rose-500/10">
+                            <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-rose-700 dark:text-rose-300">Offline</div>
+                            <div className="mt-1 text-2xl font-bold text-rose-800 dark:text-rose-200">{loading ? '...' : offlineCount}</div>
+                        </div>
+                        <div className="rounded-xl bg-sky-50 px-4 py-3 text-center dark:bg-sky-500/10">
+                            <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-sky-700 dark:text-sky-300">Total</div>
+                            <div className="mt-1 text-2xl font-bold text-sky-800 dark:text-sky-200">{loading ? '...' : cameras.length}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function LandingPageSimple({
     onCameraClick,
     onAddMulti,
@@ -136,6 +173,8 @@ export default function LandingPageSimple({
                 eventBanner={eventBanner}
                 announcement={announcement}
             />
+
+            <SimpleStatusOverview />
 
             <main className="flex-1 min-h-0 pb-4 sm:pb-6">
                 {CamerasSection && (

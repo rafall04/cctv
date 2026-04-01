@@ -30,6 +30,7 @@ describe('areaService.getAdminOverview', () => {
                     coverage_scope: 'kecamatan',
                     viewport_zoom_override: 12,
                     show_on_grid_default: 0,
+                    grid_default_camera_limit: 15,
                 },
             ])
             .mockReturnValueOnce([
@@ -91,6 +92,7 @@ describe('areaService.getAdminOverview', () => {
                 coverage_scope: 'kecamatan',
                 viewport_zoom_override: 12,
                 show_on_grid_default: 0,
+                grid_default_camera_limit: 15,
                 cameraCount: 3,
                 onlineCount: 1,
                 offlineCount: 2,

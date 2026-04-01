@@ -20,6 +20,17 @@ vi.mock('../contexts/BrandingContext', () => ({
     }),
 }));
 
+vi.mock('../contexts/CameraContext', () => ({
+    useCameras: () => ({
+        cameras: [
+            { id: 1, is_online: 1 },
+            { id: 2, is_online: 0 },
+            { id: 3, is_online: 1 },
+        ],
+        loading: false,
+    }),
+}));
+
 vi.mock('../utils/animationControl', () => ({
     shouldDisableAnimations: () => false,
 }));
@@ -90,5 +101,36 @@ describe('LandingPageSimple', () => {
         expect(
             footerBanner.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING
         ).toBeTruthy();
+    });
+
+    it('menampilkan ringkasan online dan offline di bagian atas mode simpel', () => {
+        const CamerasSection = () => <div data-testid="cameras-section">cameras</div>;
+
+        render(
+            <LandingPageSimple
+                onCameraClick={vi.fn()}
+                onAddMulti={vi.fn()}
+                multiCameras={[]}
+                saweriaEnabled={false}
+                saweriaLink=""
+                CamerasSection={CamerasSection}
+                layoutMode="simple"
+                onLayoutToggle={vi.fn()}
+                favorites={[]}
+                onToggleFavorite={vi.fn()}
+                isFavorite={vi.fn(() => false)}
+                viewMode="grid"
+                setViewMode={vi.fn()}
+                adsConfig={null}
+            />
+        );
+
+        expect(screen.getByText('Status CCTV Publik')).toBeTruthy();
+        expect(screen.getByText('Online')).toBeTruthy();
+        expect(screen.getByText('Offline')).toBeTruthy();
+        expect(screen.getByText('Total')).toBeTruthy();
+        expect(screen.getByText('2')).toBeTruthy();
+        expect(screen.getByText('1')).toBeTruthy();
+        expect(screen.getByText('3')).toBeTruthy();
     });
 });

@@ -475,6 +475,9 @@ export const createAreaSchema = {
             },
             show_on_grid_default: {
                 anyOf: [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }]
+            },
+            grid_default_camera_limit: {
+                anyOf: [{ type: 'integer', minimum: 1, maximum: 100 }, { type: 'string' }, { type: 'null' }]
             }
         },
         additionalProperties: false
@@ -524,6 +527,9 @@ export const updateAreaSchema = {
             },
             show_on_grid_default: {
                 anyOf: [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }]
+            },
+            grid_default_camera_limit: {
+                anyOf: [{ type: 'integer', minimum: 1, maximum: 100 }, { type: 'string' }, { type: 'null' }]
             }
         },
         additionalProperties: false

@@ -86,6 +86,7 @@ describe('AreaManagement', () => {
                 viewport_zoom_override: null,
                 external_health_mode_override: 'default',
                 show_on_grid_default: 1,
+                grid_default_camera_limit: 12,
                 topReasons: [],
             }],
         });
@@ -198,6 +199,28 @@ describe('AreaManagement', () => {
             expect(updateArea).toHaveBeenCalledWith(1, expect.objectContaining({
                 name: 'Area A',
                 show_on_grid_default: false,
+                grid_default_camera_limit: 12,
+            }));
+        });
+    });
+
+    it('menyimpan limit kamera grid default dari kartu area', async () => {
+        render(
+            <MemoryRouter>
+                <AreaManagement />
+            </MemoryRouter>
+        );
+
+        await screen.findByLabelText('Limit Grid Area A');
+
+        fireEvent.change(screen.getByLabelText('Limit Grid Area A'), {
+            target: { value: '15' },
+        });
+
+        await waitFor(() => {
+            expect(updateArea).toHaveBeenCalledWith(1, expect.objectContaining({
+                name: 'Area A',
+                grid_default_camera_limit: '15',
             }));
         });
     });

@@ -33,6 +33,16 @@ const AREA_HEALTH_MODE_OPTIONS = [
     { value: 'disabled', label: 'Disabled' },
 ];
 
+const GRID_DEFAULT_LIMIT_OPTIONS = [
+    { value: '6', label: '6 kamera' },
+    { value: '10', label: '10 kamera' },
+    { value: '12', label: '12 kamera' },
+    { value: '15', label: '15 kamera' },
+    { value: '20', label: '20 kamera' },
+    { value: '30', label: '30 kamera' },
+    { value: '', label: 'Tanpa batas' },
+];
+
 function requiresExternalHlsTarget(config) {
     if (config.operation !== 'policy_update' && config.operation !== 'maintenance') {
         return false;
@@ -97,7 +107,7 @@ export default function AreaManagement() {
     const [showModal, setShowModal] = useState(false);
     const [editingArea, setEditingArea] = useState(null);
     const [formData, setFormData] = useState({ 
-        name: '', description: '', rt: '', rw: '', kelurahan: '', kecamatan: '', latitude: '', longitude: '', external_health_mode_override: 'default', coverage_scope: 'default', viewport_zoom_override: '', show_on_grid_default: true
+        name: '', description: '', rt: '', rw: '', kelurahan: '', kecamatan: '', latitude: '', longitude: '', external_health_mode_override: 'default', coverage_scope: 'default', viewport_zoom_override: '', show_on_grid_default: true, grid_default_camera_limit: '12'
     });
     const [formErrors, setFormErrors] = useState({});
     const [error, setError] = useState('');
@@ -190,7 +200,7 @@ export default function AreaManagement() {
 
     const openAddModal = () => {
         setEditingArea(null);
-        setFormData({ name: '', description: '', rt: '', rw: '', kelurahan: '', kecamatan: '', latitude: '', longitude: '', external_health_mode_override: 'default', coverage_scope: 'default', viewport_zoom_override: '', show_on_grid_default: true });
+        setFormData({ name: '', description: '', rt: '', rw: '', kelurahan: '', kecamatan: '', latitude: '', longitude: '', external_health_mode_override: 'default', coverage_scope: 'default', viewport_zoom_override: '', show_on_grid_default: true, grid_default_camera_limit: '12' });
         setFormErrors({});
         setError('');
         setShowModal(true);
@@ -206,6 +216,7 @@ export default function AreaManagement() {
             coverage_scope: area.coverage_scope || 'default',
             viewport_zoom_override: area.viewport_zoom_override || '',
             show_on_grid_default: area.show_on_grid_default === 1 || area.show_on_grid_default === true,
+            grid_default_camera_limit: area.grid_default_camera_limit === null || area.grid_default_camera_limit === undefined ? '' : String(area.grid_default_camera_limit),
         });
         setFormErrors({});
         setError('');
@@ -281,6 +292,7 @@ export default function AreaManagement() {
                 coverage_scope: area.coverage_scope || 'default',
                 viewport_zoom_override: area.viewport_zoom_override || '',
                 show_on_grid_default: nextValue,
+                grid_default_camera_limit: area.grid_default_camera_limit === null || area.grid_default_camera_limit === undefined ? '' : area.grid_default_camera_limit,
             };
             const result = await areaService.updateArea(area.id, payload);
             if (result.success) {
@@ -293,6 +305,7 @@ export default function AreaManagement() {
                     'Grid Default Diperbarui',
                     `Area "${area.name}" sekarang ${nextValue ? 'ditampilkan' : 'disembunyikan'} pada Grid View default.`
                 );
+                loadAreas();
             } else {
                 showError('Gagal Memperbarui Grid Default', result.message);
             }
@@ -441,6 +454,46 @@ export default function AreaManagement() {
         () => areas.reduce((sum, area) => ((area.show_on_grid_default === 1 || area.show_on_grid_default === true) ? sum + (area.cameraCount || 0) : sum), 0),
         [areas]
     );
+
+    const handleGridDefaultLimitChange = async (area, nextLimit) => {
+        setTogglingGridAreaId(area.id);
+        try {
+            const payload = {
+                name: area.name,
+                description: area.description || '',
+                rt: area.rt || '',
+                rw: area.rw || '',
+                kelurahan: area.kelurahan || '',
+                kecamatan: area.kecamatan || '',
+                latitude: area.latitude || '',
+                longitude: area.longitude || '',
+                external_health_mode_override: area.external_health_mode_override || 'default',
+                coverage_scope: area.coverage_scope || 'default',
+                viewport_zoom_override: area.viewport_zoom_override || '',
+                show_on_grid_default: area.show_on_grid_default === 1 || area.show_on_grid_default === true,
+                grid_default_camera_limit: nextLimit,
+            };
+            const result = await areaService.updateArea(area.id, payload);
+            if (result.success) {
+                setAreas((currentAreas) => currentAreas.map((currentArea) => (
+                    currentArea.id === area.id
+                        ? { ...currentArea, grid_default_camera_limit: nextLimit === '' ? null : parseInt(nextLimit, 10) }
+                        : currentArea
+                )));
+                success(
+                    'Limit Grid Default Diperbarui',
+                    `Area "${area.name}" sekarang memakai limit ${nextLimit === '' ? 'tanpa batas' : `${nextLimit} kamera`} pada Grid View default.`
+                );
+                loadAreas();
+            } else {
+                showError('Gagal Memperbarui Limit Grid Default', result.message);
+            }
+        } catch (err) {
+            showError('Gagal Memperbarui Limit Grid Default', err.response?.data?.message || 'Terjadi kesalahan saat menyimpan limit area.');
+        } finally {
+            setTogglingGridAreaId(null);
+        }
+    };
 
     const getLocationString = (area) => {
         const parts = [];
@@ -684,6 +737,10 @@ export default function AreaManagement() {
                                     <span className="text-gray-500 dark:text-gray-400">Grid Default</span>
                                     <span className="font-semibold text-gray-900 dark:text-white">{(area.show_on_grid_default === 1 || area.show_on_grid_default === true) ? 'Enabled' : 'Hidden'}</span>
                                 </div>
+                                <div className="flex items-center justify-between gap-3 text-xs mt-2">
+                                    <span className="text-gray-500 dark:text-gray-400">Limit Grid</span>
+                                    <span className="font-semibold text-gray-900 dark:text-white">{area.grid_default_camera_limit ? `${area.grid_default_camera_limit} kamera` : 'Tanpa batas'}</span>
+                                </div>
                             </div>
                             <button
                                 type="button"
@@ -719,6 +776,27 @@ export default function AreaManagement() {
                                     </span>
                                 </div>
                             </button>
+                            <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700/50 dark:bg-gray-900/40">
+                                <div className="flex items-center justify-between gap-4">
+                                    <div>
+                                        <div className="text-sm font-semibold text-gray-900 dark:text-white">Limit Kamera Grid Default</div>
+                                        <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                            Berlaku hanya saat Grid View masih di semua area. Saat area dipilih manual, semua kamera area tetap tampil.
+                                        </div>
+                                    </div>
+                                    <select
+                                        aria-label={`Limit Grid ${area.name}`}
+                                        value={area.grid_default_camera_limit === null || area.grid_default_camera_limit === undefined ? '' : String(area.grid_default_camera_limit)}
+                                        onChange={(event) => handleGridDefaultLimitChange(area, event.target.value)}
+                                        disabled={togglingGridAreaId === area.id}
+                                        className="min-w-[140px] rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                                    >
+                                        {GRID_DEFAULT_LIMIT_OPTIONS.map((option) => (
+                                            <option key={option.value || 'unlimited'} value={option.value}>{option.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
                             <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700/50">
                                 <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{area.cameraCount || 0} Kamera</span>
                                 <div className="flex items-center gap-3">
@@ -859,6 +937,23 @@ export default function AreaManagement() {
                                         </span>
                                     </span>
                                 </label>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Limit Kamera di Grid Default</label>
+                                <select
+                                    name="grid_default_camera_limit"
+                                    value={formData.grid_default_camera_limit}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                                >
+                                    {GRID_DEFAULT_LIMIT_OPTIONS.map((option) => (
+                                        <option key={`form-${option.value || 'unlimited'}`} value={option.value}>{option.label}</option>
+                                    ))}
+                                </select>
+                                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                    Untuk area padat, batasi jumlah kamera default seperti 10 atau 15 agar Grid View tetap ringan. Saat user memilih area tertentu, limit ini diabaikan.
+                                </p>
                             </div>
 
                             {/* Koordinat dengan LocationPicker */}
