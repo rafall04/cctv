@@ -142,6 +142,37 @@ describe('thumbnailService external thumbnails', () => {
         expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('WHERE c.enabled = 1'));
     });
 
+    it('skips strict on-demand Surabaya RTSP cameras during background generation', async () => {
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        queryMock.mockReturnValue([
+            {
+                id: 22,
+                name: 'Surabaya Camera',
+                description: 'source_tag: surabaya_private_rtsp',
+                enabled: 1,
+                status: 'active',
+                is_online: 1,
+                runtime_is_online: 1,
+                enable_recording: 0,
+                stream_key: 'camera22',
+                stream_source: 'internal',
+                delivery_type: 'internal_hls',
+                private_rtsp_url: 'rtsp://user:pass@36.66.208.112:554/Streaming/Channels/402',
+                external_hls_url: null,
+                external_stream_url: null,
+                external_snapshot_url: null,
+                external_embed_url: null,
+                external_tls_mode: 'strict',
+                thumbnail_path: null,
+            },
+        ]);
+
+        await thumbnailService.generateAllThumbnails();
+
+        expect(execFileMock).not.toHaveBeenCalled();
+    });
+
     it('refreshes a single camera only when it is eligible and online', async () => {
         const { default: thumbnailService } = await import('../services/thumbnailService.js');
 

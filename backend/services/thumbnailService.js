@@ -84,6 +84,17 @@ class ThumbnailService {
         return value === 'insecure' ? 'insecure' : 'strict';
     }
 
+    isStrictOnDemandRtspCamera(camera) {
+        const description = String(camera?.description || '').toLowerCase();
+        return Boolean(camera?.private_rtsp_url)
+            && Number(camera?.enable_recording || 0) === 0
+            && (
+                description.includes('source: private rtsp live only')
+                || description.includes('source_tag: surabaya_private_rtsp')
+                || description.includes('surabaya_private_rtsp')
+            );
+    }
+
     setThumbnailState(cameraId, patch = {}) {
         const previous = this.thumbnailState.get(cameraId) || {
             thumbnail_source_type: null,
@@ -190,6 +201,10 @@ class ThumbnailService {
             return { skipped: true, reason: 'camera_offline' };
         }
 
+        if (camera?._skipStrictOnDemandIdleThumbnail && this.isStrictOnDemandRtspCamera(camera)) {
+            return { skipped: true, reason: 'strict_on_demand_idle_thumbnail' };
+        }
+
         return { skipped: false };
     }
 
@@ -244,7 +259,7 @@ class ThumbnailService {
 
         try {
             const cameras = query(`
-                SELECT c.id, c.name, c.enabled, c.status, c.is_online, c.stream_key, c.stream_source, c.delivery_type,
+                SELECT c.id, c.name, c.description, c.enabled, c.status, c.is_online, c.enable_recording, c.stream_key, c.stream_source, c.delivery_type,
                        c.private_rtsp_url,
                        external_hls_url, external_stream_url, external_snapshot_url,
                        external_embed_url, external_tls_mode, thumbnail_path,
@@ -275,9 +290,10 @@ class ThumbnailService {
                         break;
                     }
 
-                    const camera = cameras[currentIndex];
-                    try {
-                        const result = await this.processCamera(camera);
+                const camera = cameras[currentIndex];
+                try {
+                    camera._skipStrictOnDemandIdleThumbnail = true;
+                    const result = await this.processCamera(camera);
                         if (!result?.skipped) {
                             success += 1;
                         }
@@ -436,7 +452,7 @@ class ThumbnailService {
 
     async refreshCameraThumbnail(cameraId) {
         const camera = query(
-            `SELECT c.id, c.name, c.enabled, c.status, c.is_online, c.stream_key, c.stream_source, c.delivery_type,
+            `SELECT c.id, c.name, c.description, c.enabled, c.status, c.is_online, c.enable_recording, c.stream_key, c.stream_source, c.delivery_type,
                     c.private_rtsp_url, c.external_hls_url, c.external_stream_url, c.external_snapshot_url,
                     c.external_embed_url, c.external_tls_mode, c.thumbnail_path,
                     crs.is_online as runtime_is_online

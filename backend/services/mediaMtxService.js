@@ -17,6 +17,28 @@ class MediaMtxService {
         this.maxConsecutiveFailures = 3;
     }
 
+    buildOnDemandPathConfig(rtspUrl) {
+        return {
+            source: rtspUrl,
+            sourceProtocol: 'tcp',
+            sourceOnDemand: true,
+            sourceOnDemandStartTimeout: '10s',
+            sourceOnDemandCloseAfter: '30s',
+        };
+    }
+
+    pathConfigNeedsUpdate(currentConfig, desiredConfig) {
+        if (!currentConfig) {
+            return true;
+        }
+
+        return currentConfig.source !== desiredConfig.source
+            || currentConfig.sourceProtocol !== desiredConfig.sourceProtocol
+            || Boolean(currentConfig.sourceOnDemand) !== Boolean(desiredConfig.sourceOnDemand)
+            || currentConfig.sourceOnDemandStartTimeout !== desiredConfig.sourceOnDemandStartTimeout
+            || currentConfig.sourceOnDemandCloseAfter !== desiredConfig.sourceOnDemandCloseAfter;
+    }
+
     /**
      * Start the auto-sync and health check mechanism
      */
@@ -285,13 +307,7 @@ class MediaMtxService {
                 continue;
             }
 
-            const pathConfig = {
-                source: camera.rtsp_url,
-                sourceProtocol: 'tcp',
-                sourceOnDemand: true,
-                sourceOnDemandStartTimeout: '10s',
-                sourceOnDemandCloseAfter: '30s',
-            };
+            const pathConfig = this.buildOnDemandPathConfig(camera.rtsp_url);
 
             try {
                 if (!configuredPathsSet.has(camera.path_name)) {
@@ -301,10 +317,7 @@ class MediaMtxService {
                 } else {
                     // Always check for config drift (e.g. timeout changes)
                     const currentConfig = await this.getPathConfig(camera.path_name);
-                    if (currentConfig && (
-                        currentConfig.source !== camera.rtsp_url ||
-                        currentConfig.sourceOnDemandStartTimeout !== pathConfig.sourceOnDemandStartTimeout
-                    )) {
+                    if (this.pathConfigNeedsUpdate(currentConfig, pathConfig)) {
                         await mtxApi.patch(`/config/paths/patch/${camera.path_name}`, pathConfig);
                         console.log(`[MediaMTX] Updated path: ${camera.path_name}`);
                         updated++;
@@ -343,20 +356,14 @@ class MediaMtxService {
             return { success: false, error: 'Invalid RTSP URL' };
         }
 
-        const pathConfig = {
-            source: rtspUrl,
-            sourceProtocol: 'tcp',
-            sourceOnDemand: true,
-            sourceOnDemandStartTimeout: '10s',
-            sourceOnDemandCloseAfter: '30s',
-        };
+        const pathConfig = this.buildOnDemandPathConfig(rtspUrl);
 
         try {
             const exists = await this.pathConfigExists(pathName);
             if (exists) {
                 // Check if source is different before updating
                 const currentConfig = await this.getPathConfig(pathName);
-                if (currentConfig && currentConfig.source === rtspUrl) {
+                if (!this.pathConfigNeedsUpdate(currentConfig, pathConfig)) {
                     console.log(`[MediaMTX] Path ${pathName} already has correct source, skipping update`);
                     return { success: true, action: 'unchanged' };
                 }
