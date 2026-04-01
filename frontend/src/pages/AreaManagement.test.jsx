@@ -72,6 +72,7 @@ describe('AreaManagement', () => {
             data: [{
                 id: 1,
                 name: 'Area A',
+                description: 'Area uji',
                 kecamatan: 'Kecamatan A',
                 kelurahan: 'Kelurahan A',
                 cameraCount: 4,
@@ -81,10 +82,21 @@ describe('AreaManagement', () => {
                 externalValidCount: 3,
                 externalUnresolvedCount: 0,
                 recordingEnabledCount: 1,
+                coverage_scope: 'default',
+                viewport_zoom_override: null,
+                external_health_mode_override: 'default',
+                show_on_grid_default: 1,
                 topReasons: [],
             }],
         });
         getMapCenter.mockResolvedValue({ success: true, data: { latitude: -7.1, longitude: 111.9, zoom: 13, name: 'Bojonegoro' } });
+        updateArea.mockResolvedValue({
+            success: true,
+            data: {
+                id: 1,
+                show_on_grid_default: 0,
+            },
+        });
         bulkUpdateByArea.mockResolvedValue({
             success: true,
             data: {
@@ -165,6 +177,27 @@ describe('AreaManagement', () => {
                 payload: expect.objectContaining({
                     external_health_mode: 'passive_first',
                 }),
+            }));
+        });
+    });
+
+    it('menampilkan dan mengubah toggle grid default langsung dari kartu area', async () => {
+        render(
+            <MemoryRouter>
+                <AreaManagement />
+            </MemoryRouter>
+        );
+
+        await screen.findByText('Grid View Default');
+        expect(screen.getByText('Area aktif')).toBeTruthy();
+        expect(screen.getByRole('button', { name: /Grid Default Aktif/i })).toBeTruthy();
+
+        fireEvent.click(screen.getByRole('button', { name: /Grid Default Aktif/i }));
+
+        await waitFor(() => {
+            expect(updateArea).toHaveBeenCalledWith(1, expect.objectContaining({
+                name: 'Area A',
+                show_on_grid_default: false,
             }));
         });
     });

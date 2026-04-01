@@ -105,6 +105,7 @@ export default function AreaManagement() {
     const [filterKecamatan, setFilterKecamatan] = useState('');
     const [deleteConfirm, setDeleteConfirm] = useState(null);
     const [deleting, setDeleting] = useState(false);
+    const [togglingGridAreaId, setTogglingGridAreaId] = useState(null);
     
     // Map center settings
     const [showMapCenterModal, setShowMapCenterModal] = useState(false);
@@ -263,6 +264,45 @@ export default function AreaManagement() {
         }
     };
 
+    const handleToggleGridDefault = async (area) => {
+        const nextValue = !Boolean(area.show_on_grid_default === 1 || area.show_on_grid_default === true);
+        setTogglingGridAreaId(area.id);
+        try {
+            const payload = {
+                name: area.name,
+                description: area.description || '',
+                rt: area.rt || '',
+                rw: area.rw || '',
+                kelurahan: area.kelurahan || '',
+                kecamatan: area.kecamatan || '',
+                latitude: area.latitude || '',
+                longitude: area.longitude || '',
+                external_health_mode_override: area.external_health_mode_override || 'default',
+                coverage_scope: area.coverage_scope || 'default',
+                viewport_zoom_override: area.viewport_zoom_override || '',
+                show_on_grid_default: nextValue,
+            };
+            const result = await areaService.updateArea(area.id, payload);
+            if (result.success) {
+                setAreas((currentAreas) => currentAreas.map((currentArea) => (
+                    currentArea.id === area.id
+                        ? { ...currentArea, show_on_grid_default: nextValue ? 1 : 0 }
+                        : currentArea
+                )));
+                success(
+                    'Grid Default Diperbarui',
+                    `Area "${area.name}" sekarang ${nextValue ? 'ditampilkan' : 'disembunyikan'} pada Grid View default.`
+                );
+            } else {
+                showError('Gagal Memperbarui Grid Default', result.message);
+            }
+        } catch (err) {
+            showError('Gagal Memperbarui Grid Default', err.response?.data?.message || 'Terjadi kesalahan saat menyimpan area.');
+        } finally {
+            setTogglingGridAreaId(null);
+        }
+    };
+
     const handleMapCenterChange = (lat, lng) => {
         setMapCenter({ ...mapCenter, latitude: parseFloat(lat), longitude: parseFloat(lng) });
     };
@@ -393,6 +433,14 @@ export default function AreaManagement() {
     const kecamatans = [...new Set(areas.map(a => a.kecamatan).filter(Boolean))].sort();
     const filteredAreas = filterKecamatan ? areas.filter(a => a.kecamatan === filterKecamatan) : areas;
     const effectiveBulkTargetFilter = useMemo(() => getEffectiveTargetFilter(bulkConfig), [bulkConfig]);
+    const gridDefaultEnabledAreaCount = useMemo(
+        () => areas.filter((area) => area.show_on_grid_default === 1 || area.show_on_grid_default === true).length,
+        [areas]
+    );
+    const gridDefaultCameraCount = useMemo(
+        () => areas.reduce((sum, area) => ((area.show_on_grid_default === 1 || area.show_on_grid_default === true) ? sum + (area.cameraCount || 0) : sum), 0),
+        [areas]
+    );
 
     const getLocationString = (area) => {
         const parts = [];
@@ -488,6 +536,27 @@ export default function AreaManagement() {
                         {areas.reduce((sum, a) => sum + (a.cameraCount || 0), 0)}
                     </p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">Total Kamera</p>
+                </div>
+            </div>
+
+            <div className="rounded-2xl border border-sky-200 dark:border-sky-500/20 bg-sky-50/80 dark:bg-sky-500/10 px-5 py-4">
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <p className="text-sm font-semibold text-sky-800 dark:text-sky-200">Grid View Default</p>
+                        <p className="text-sm text-sky-700/90 dark:text-sky-100/80">
+                            Saat filter masih di semua area, grid hanya memuat area yang ditandai aktif di sini. Jika user memilih area tertentu, area itu tetap tampil penuh.
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-5 text-sm">
+                        <div>
+                            <div className="font-bold text-sky-900 dark:text-white">{gridDefaultEnabledAreaCount}</div>
+                            <div className="text-sky-700/80 dark:text-sky-100/70">Area aktif</div>
+                        </div>
+                        <div>
+                            <div className="font-bold text-sky-900 dark:text-white">{gridDefaultCameraCount}</div>
+                            <div className="text-sky-700/80 dark:text-sky-100/70">Kamera default</div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -616,6 +685,40 @@ export default function AreaManagement() {
                                     <span className="font-semibold text-gray-900 dark:text-white">{(area.show_on_grid_default === 1 || area.show_on_grid_default === true) ? 'Enabled' : 'Hidden'}</span>
                                 </div>
                             </div>
+                            <button
+                                type="button"
+                                onClick={() => handleToggleGridDefault(area)}
+                                disabled={togglingGridAreaId === area.id}
+                                className={`w-full mb-4 rounded-xl border px-4 py-3 text-left transition-colors ${
+                                    (area.show_on_grid_default === 1 || area.show_on_grid_default === true)
+                                        ? 'border-sky-200 bg-sky-50 text-sky-900 hover:bg-sky-100 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-100 dark:hover:bg-sky-500/20'
+                                        : 'border-gray-200 bg-gray-50 text-gray-800 hover:bg-gray-100 dark:border-gray-700/60 dark:bg-gray-900/40 dark:text-gray-100 dark:hover:bg-gray-800/70'
+                                } ${togglingGridAreaId === area.id ? 'cursor-wait opacity-70' : ''}`}
+                            >
+                                <div className="flex items-center justify-between gap-4">
+                                    <div>
+                                        <div className="text-sm font-semibold">
+                                            {togglingGridAreaId === area.id
+                                                ? 'Menyimpan...'
+                                                : ((area.show_on_grid_default === 1 || area.show_on_grid_default === true)
+                                                    ? 'Grid Default Aktif'
+                                                    : 'Grid Default Nonaktif')}
+                                        </div>
+                                        <div className="mt-1 text-xs opacity-80">
+                                            Toggle cepat untuk menentukan apakah area ini ikut dimuat saat Grid View masih di semua area.
+                                        </div>
+                                    </div>
+                                    <span className={`inline-flex h-7 w-12 items-center rounded-full px-1 transition-colors ${
+                                        (area.show_on_grid_default === 1 || area.show_on_grid_default === true)
+                                            ? 'bg-sky-500'
+                                            : 'bg-gray-300 dark:bg-gray-600'
+                                    }`}>
+                                        <span className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                                            (area.show_on_grid_default === 1 || area.show_on_grid_default === true) ? 'translate-x-5' : 'translate-x-0'
+                                        }`} />
+                                    </span>
+                                </div>
+                            </button>
                             <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700/50">
                                 <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{area.cameraCount || 0} Kamera</span>
                                 <div className="flex items-center gap-3">
