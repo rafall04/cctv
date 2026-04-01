@@ -126,7 +126,7 @@ describe('AreaManagement', () => {
         );
 
         await screen.findByText('Area A');
-        expect(screen.getByText('4 Kamera')).toBeTruthy();
+        expect(screen.getByText('1 Internal • 3 External')).toBeTruthy();
         expect(getAdminOverview).toHaveBeenCalled();
     });
 

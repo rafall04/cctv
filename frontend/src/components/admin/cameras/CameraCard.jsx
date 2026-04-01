@@ -30,6 +30,34 @@ export default function CameraCard({
                 ? 'bg-slate-600/90 text-white'
                 : 'bg-red-500/90 text-white'));
 
+    const secondaryBadges = [
+        camera.stream_source === 'external' && {
+            label: camera.external_health_mode || 'default',
+            className: 'bg-sky-600/90 text-white',
+            title: 'Health mode kamera external',
+        },
+        camera.stream_source === 'external' && (camera.external_use_proxy === 1 || camera.external_use_proxy === true) && {
+            label: 'Proxy',
+            className: 'bg-slate-700/90 text-white',
+            title: 'External stream tetap melewati proxy backend',
+        },
+        camera.stream_source === 'external' && {
+            label: camera.external_tls_mode === 'insecure' ? 'TLS Insecure' : 'TLS Strict',
+            className: camera.external_tls_mode === 'insecure' ? 'bg-amber-500/90 text-white' : 'bg-emerald-500/90 text-white',
+            title: camera.external_tls_mode === 'insecure' ? 'TLS Insecure darurat' : 'TLS Strict default',
+        },
+        camera.status === 'maintenance' && {
+            label: 'Perbaikan',
+            className: 'bg-red-500/90 text-white',
+            title: 'Dalam Perbaikan',
+        },
+        camera.is_tunnel === 1 && camera.status !== 'maintenance' && {
+            label: 'Tunnel',
+            className: 'bg-amber-500/90 text-white',
+            title: 'Koneksi Tunnel - Kurang Stabil',
+        },
+    ].filter(Boolean);
+
     return (
         <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl overflow-hidden hover:shadow-xl hover:border-primary/30 transition-all group">
             <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 relative">
@@ -38,7 +66,7 @@ export default function CameraCard({
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
                 </div>
-                <div className="absolute top-3 right-3 flex gap-2">
+                <div className="absolute top-3 right-3 flex flex-wrap justify-end gap-2 max-w-[85%]">
                     <CameraBadge condition={camera.stream_source === 'internal'} className="bg-emerald-600/90 text-white" title="Stream internal melalui MediaMTX">
                         Internal
                     </CameraBadge>
@@ -53,38 +81,11 @@ export default function CameraCard({
                         Live Only
                     </CameraBadge>
                     <CameraBadge
-                        condition={camera.stream_source === 'external' && (camera.external_use_proxy === 1 || camera.external_use_proxy === true)}
-                        className="bg-slate-700/90 text-white"
-                        title="External stream tetap melewati proxy backend"
-                    >
-                        Proxy
-                    </CameraBadge>
-                    <CameraBadge
-                        condition={camera.stream_source === 'external'}
-                        className={`${camera.external_tls_mode === 'insecure' ? 'bg-amber-500/90 text-white' : 'bg-emerald-500/90 text-white'}`}
-                        title={camera.external_tls_mode === 'insecure' ? 'TLS Insecure darurat' : 'TLS Strict default'}
-                    >
-                        {camera.external_tls_mode === 'insecure' ? 'TLS Insecure' : 'TLS Strict'}
-                    </CameraBadge>
-                    <CameraBadge
                         condition={Boolean(camera.delivery_type)}
                         className="bg-white/90 text-slate-700"
                         title="Delivery type kamera"
                     >
                         {camera.delivery_type || 'unknown'}
-                    </CameraBadge>
-                    <CameraBadge
-                        condition={camera.stream_source === 'external'}
-                        className="bg-sky-600/90 text-white"
-                        title="Health mode kamera external"
-                    >
-                        {camera.external_health_mode || 'default'}
-                    </CameraBadge>
-                    <CameraBadge condition={camera.status === 'maintenance'} className="bg-red-500/90 text-white" title="Dalam Perbaikan">
-                        Perbaikan
-                    </CameraBadge>
-                    <CameraBadge condition={camera.is_tunnel === 1 && camera.status !== 'maintenance'} className="bg-amber-500/90 text-white" title="Koneksi Tunnel - Kurang Stabil">
-                        Tunnel
                     </CameraBadge>
                     <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold shadow-sm ${availabilityTone}`}>
                         {camera.availability_state || (camera.enabled ? 'online' : 'offline')}
@@ -108,6 +109,15 @@ export default function CameraCard({
                             <span className="rounded-full bg-gray-100 px-2.5 py-1 font-medium text-gray-700 dark:bg-gray-700/60 dark:text-gray-200">
                                 Monitor: {camera.monitoring_state || 'unknown'}
                             </span>
+                            {secondaryBadges.map((badge) => (
+                                <span
+                                    key={badge.label}
+                                    title={badge.title}
+                                    className={`rounded-full px-2.5 py-1 font-medium ${badge.className}`}
+                                >
+                                    {badge.label}
+                                </span>
+                            ))}
                         </div>
                     </div>
                     <div className="flex gap-1">

@@ -104,30 +104,52 @@ function SimpleStatusOverview() {
 
     const onlineCount = cameras.filter((camera) => camera?.is_online === 1 || camera?.is_online === true).length;
     const offlineCount = Math.max(cameras.length - onlineCount, 0);
+    const cards = [
+        {
+            label: 'Online',
+            value: loading ? '...' : onlineCount,
+            tone: 'border-emerald-200/60 bg-emerald-50/80 text-emerald-800 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200',
+            accent: 'text-emerald-600 dark:text-emerald-300',
+        },
+        {
+            label: 'Offline',
+            value: loading ? '...' : offlineCount,
+            tone: 'border-rose-200/60 bg-rose-50/80 text-rose-800 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200',
+            accent: 'text-rose-600 dark:text-rose-300',
+        },
+        {
+            label: 'Total',
+            value: loading ? '...' : cameras.length,
+            tone: 'border-sky-200/60 bg-sky-50/80 text-sky-800 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-200',
+            accent: 'text-sky-600 dark:text-sky-300',
+        },
+    ];
 
     return (
-        <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6 lg:px-8">
-            <div className="rounded-2xl border border-emerald-200/40 bg-white/90 p-4 shadow-sm dark:border-emerald-700/30 dark:bg-gray-900/70">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <p className="text-sm font-semibold text-gray-900 dark:text-white">Status CCTV Publik</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
+        <div className="mx-auto max-w-7xl px-4 pt-3 sm:px-6 lg:px-8">
+            <div className="overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.16),_transparent_35%),linear-gradient(135deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))] shadow-[0_18px_60px_rgba(2,6,23,0.28)]">
+                <div className="flex flex-col gap-5 px-5 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="max-w-2xl">
+                        <div className="inline-flex items-center gap-2 rounded-full border border-sky-400/20 bg-sky-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-200">
+                            Status CCTV Publik
+                        </div>
+                        <p className="mt-3 text-sm font-medium text-white sm:text-base">
                             Ringkasan cepat untuk kondisi kamera yang sedang dimuat di mode simpel.
                         </p>
+                        <p className="mt-1 text-xs text-slate-300/80 sm:text-sm">
+                            Online dan offline dihitung dari dataset publik aktif yang sedang dibaca landing page.
+                        </p>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 sm:min-w-[320px]">
-                        <div className="rounded-xl bg-emerald-50 px-4 py-3 text-center dark:bg-emerald-500/10">
-                            <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-emerald-700 dark:text-emerald-300">Online</div>
-                            <div className="mt-1 text-2xl font-bold text-emerald-800 dark:text-emerald-200">{loading ? '...' : onlineCount}</div>
-                        </div>
-                        <div className="rounded-xl bg-rose-50 px-4 py-3 text-center dark:bg-rose-500/10">
-                            <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-rose-700 dark:text-rose-300">Offline</div>
-                            <div className="mt-1 text-2xl font-bold text-rose-800 dark:text-rose-200">{loading ? '...' : offlineCount}</div>
-                        </div>
-                        <div className="rounded-xl bg-sky-50 px-4 py-3 text-center dark:bg-sky-500/10">
-                            <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-sky-700 dark:text-sky-300">Total</div>
-                            <div className="mt-1 text-2xl font-bold text-sky-800 dark:text-sky-200">{loading ? '...' : cameras.length}</div>
-                        </div>
+                    <div className="grid grid-cols-3 gap-3 lg:min-w-[420px]">
+                        {cards.map((card) => (
+                            <div
+                                key={card.label}
+                                className={`rounded-2xl border px-4 py-3 shadow-inner ${card.tone}`}
+                            >
+                                <div className={`text-[11px] font-semibold uppercase tracking-[0.18em] ${card.accent}`}>{card.label}</div>
+                                <div className="mt-2 text-3xl font-bold leading-none">{card.value}</div>
+                            </div>
+                        ))}
                     </div>
                 </div>
             </div>

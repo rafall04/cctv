@@ -570,21 +570,21 @@ export default function AreaManagement() {
 
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4">
+                <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-4 shadow-sm">
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">{areas.length}</p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">Total Area</p>
                 </div>
-                <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4">
+                <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-4 shadow-sm">
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">{kecamatans.length}</p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">Kecamatan</p>
                 </div>
-                <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4">
+                <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-4 shadow-sm">
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
                         {[...new Set(areas.map(a => a.kelurahan).filter(Boolean))].length}
                     </p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">Kelurahan</p>
                 </div>
-                <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4">
+                <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-4 shadow-sm">
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
                         {areas.reduce((sum, a) => sum + (a.cameraCount || 0), 0)}
                     </p>
@@ -592,20 +592,20 @@ export default function AreaManagement() {
                 </div>
             </div>
 
-            <div className="rounded-2xl border border-sky-200 dark:border-sky-500/20 bg-sky-50/80 dark:bg-sky-500/10 px-5 py-4">
-                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div className="rounded-[26px] border border-sky-200/70 dark:border-sky-500/20 bg-[linear-gradient(135deg,rgba(14,165,233,0.09),rgba(59,130,246,0.03))] px-5 py-4 shadow-sm">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
                         <p className="text-sm font-semibold text-sky-800 dark:text-sky-200">Grid View Default</p>
                         <p className="text-sm text-sky-700/90 dark:text-sky-100/80">
                             Saat filter masih di semua area, grid hanya memuat area yang ditandai aktif di sini. Jika user memilih area tertentu, area itu tetap tampil penuh.
                         </p>
                     </div>
-                    <div className="flex items-center gap-5 text-sm">
-                        <div>
+                    <div className="grid grid-cols-2 gap-3 text-sm md:min-w-[240px]">
+                        <div className="rounded-2xl border border-sky-200/60 bg-white/70 px-4 py-3 text-center dark:border-sky-500/10 dark:bg-slate-900/40">
                             <div className="font-bold text-sky-900 dark:text-white">{gridDefaultEnabledAreaCount}</div>
                             <div className="text-sky-700/80 dark:text-sky-100/70">Area aktif</div>
                         </div>
-                        <div>
+                        <div className="rounded-2xl border border-sky-200/60 bg-white/70 px-4 py-3 text-center dark:border-sky-500/10 dark:bg-slate-900/40">
                             <div className="font-bold text-sky-900 dark:text-white">{gridDefaultCameraCount}</div>
                             <div className="text-sky-700/80 dark:text-sky-100/70">Kamera default</div>
                         </div>
@@ -628,17 +628,17 @@ export default function AreaManagement() {
                     </div>
                 )
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                     {filteredAreas.map((area) => (
-                        <div key={area.id} className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6 hover:shadow-xl hover:border-primary/30 transition-all group">
+                        <div key={area.id} className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-[26px] p-5 hover:shadow-xl hover:border-primary/30 transition-all group shadow-sm">
                             <div className="flex justify-between items-start mb-4">
-                                <div className="w-12 h-12 bg-gradient-to-br from-primary-400 to-primary-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/30 group-hover:scale-110 transition-transform">
+                                <div className="w-12 h-12 bg-gradient-to-br from-primary-400 to-primary-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-primary/30 group-hover:scale-110 transition-transform">
                                     <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
                                         <circle cx="12" cy="11" r="3" />
                                     </svg>
                                 </div>
-                                <div className="flex gap-1">
+                                <div className="flex flex-wrap justify-end gap-1.5">
                                     <button title="Pengaturan Massal Kamera" onClick={() => openBulkConfigModal(area)} className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-all">
                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -672,7 +672,7 @@ export default function AreaManagement() {
                                     </button>
                                 </div>
                             </div>
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{area.name}</h3>
+                            <h3 className="text-[1.7rem] leading-tight font-bold text-gray-900 dark:text-white mb-2">{area.name}</h3>
                             <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2 mb-3">
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
@@ -702,103 +702,97 @@ export default function AreaManagement() {
                                 {area.offlineCount > 0 && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300">{area.offlineCount} offline</span>}
                                 {area.maintenanceCount > 0 && <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-slate-200 dark:bg-slate-700/70 text-slate-700 dark:text-slate-200">{area.maintenanceCount} maintenance</span>}
                             </div>
-                            <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
+                            <div className="grid grid-cols-3 gap-2 mb-3 text-xs">
                                 <div className="rounded-xl border border-gray-200 dark:border-gray-700/50 bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
-                                    <div className="text-gray-500 dark:text-gray-400">Internal</div>
-                                    <div className="font-semibold text-gray-900 dark:text-white">{area.internalValidCount}</div>
+                                    <div className="text-gray-500 dark:text-gray-400">Kamera</div>
+                                    <div className="font-semibold text-gray-900 dark:text-white">{area.cameraCount || 0}</div>
                                 </div>
                                 <div className="rounded-xl border border-gray-200 dark:border-gray-700/50 bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
-                                    <div className="text-gray-500 dark:text-gray-400">External</div>
-                                    <div className="font-semibold text-gray-900 dark:text-white">{area.externalValidCount}</div>
+                                    <div className="text-gray-500 dark:text-gray-400">Online</div>
+                                    <div className="font-semibold text-emerald-700 dark:text-emerald-300">{area.onlineCount || 0}</div>
+                                </div>
+                                <div className="rounded-xl border border-gray-200 dark:border-gray-700/50 bg-gray-50 dark:bg-gray-900/40 px-3 py-2">
+                                    <div className="text-gray-500 dark:text-gray-400">Offline</div>
+                                    <div className="font-semibold text-red-700 dark:text-red-300">{area.offlineCount || 0}</div>
                                 </div>
                             </div>
-                            <div className="rounded-xl border border-gray-200 dark:border-gray-700/50 bg-gray-50 dark:bg-gray-900/40 px-3 py-3 mb-4">
-                                <div className="flex items-center justify-between gap-3 text-xs">
-                                    <span className="text-gray-500 dark:text-gray-400">Health Default Area</span>
-                                    <span className="font-semibold text-gray-900 dark:text-white">{area.external_health_mode_override || 'default'}</span>
-                                </div>
-                                <div className="flex items-center justify-between gap-3 text-xs mt-2">
-                                    <span className="text-gray-500 dark:text-gray-400">Dominant External Mode</span>
-                                    <span className="font-semibold text-sky-700 dark:text-sky-300">{area.dominantExternalHealthMode || 'default'}</span>
-                                </div>
-                                <div className="flex items-center justify-between gap-3 text-xs mt-2">
-                                    <span className="text-gray-500 dark:text-gray-400">Passive Monitored</span>
-                                    <span className="font-semibold text-emerald-700 dark:text-emerald-300">{area.passiveMonitoredCount || 0}</span>
-                                </div>
-                                <div className="flex items-center justify-between gap-3 text-xs mt-2">
-                                    <span className="text-gray-500 dark:text-gray-400">Coverage Area</span>
-                                    <span className="font-semibold text-gray-900 dark:text-white">{getAreaCoverageLabel(area.coverage_scope)}</span>
-                                </div>
-                                <div className="flex items-center justify-between gap-3 text-xs mt-2">
-                                    <span className="text-gray-500 dark:text-gray-400">Focus Zoom</span>
-                                    <span className="font-semibold text-indigo-700 dark:text-indigo-300">{resolveAreaFocusZoom(area.coverage_scope, area.viewport_zoom_override, 15)}</span>
-                                </div>
-                                <div className="flex items-center justify-between gap-3 text-xs mt-2">
-                                    <span className="text-gray-500 dark:text-gray-400">Grid Default</span>
-                                    <span className="font-semibold text-gray-900 dark:text-white">{(area.show_on_grid_default === 1 || area.show_on_grid_default === true) ? 'Enabled' : 'Hidden'}</span>
-                                </div>
-                                <div className="flex items-center justify-between gap-3 text-xs mt-2">
-                                    <span className="text-gray-500 dark:text-gray-400">Limit Grid</span>
-                                    <span className="font-semibold text-gray-900 dark:text-white">{area.grid_default_camera_limit ? `${area.grid_default_camera_limit} kamera` : 'Tanpa batas'}</span>
+                            <div className="rounded-2xl border border-gray-200 dark:border-gray-700/50 bg-gray-50/80 dark:bg-gray-900/40 px-4 py-3 mb-4">
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                                    <div className="text-gray-500 dark:text-gray-400">Health Default Area</div>
+                                    <div className="text-right font-semibold text-gray-900 dark:text-white">{area.external_health_mode_override || 'default'}</div>
+                                    <div className="text-gray-500 dark:text-gray-400">Dominant External Mode</div>
+                                    <div className="text-right font-semibold text-sky-700 dark:text-sky-300">{area.dominantExternalHealthMode || 'default'}</div>
+                                    <div className="text-gray-500 dark:text-gray-400">Passive Monitored</div>
+                                    <div className="text-right font-semibold text-emerald-700 dark:text-emerald-300">{area.passiveMonitoredCount || 0}</div>
+                                    <div className="text-gray-500 dark:text-gray-400">Coverage Area</div>
+                                    <div className="text-right font-semibold text-gray-900 dark:text-white">{getAreaCoverageLabel(area.coverage_scope)}</div>
+                                    <div className="text-gray-500 dark:text-gray-400">Focus Zoom</div>
+                                    <div className="text-right font-semibold text-indigo-700 dark:text-indigo-300">{resolveAreaFocusZoom(area.coverage_scope, area.viewport_zoom_override, 15)}</div>
+                                    <div className="text-gray-500 dark:text-gray-400">Grid Default</div>
+                                    <div className="text-right font-semibold text-gray-900 dark:text-white">{(area.show_on_grid_default === 1 || area.show_on_grid_default === true) ? 'Enabled' : 'Hidden'}</div>
+                                    <div className="text-gray-500 dark:text-gray-400">Limit Grid</div>
+                                    <div className="text-right font-semibold text-gray-900 dark:text-white">{area.grid_default_camera_limit ? `${area.grid_default_camera_limit} kamera` : 'Tanpa batas'}</div>
                                 </div>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => handleToggleGridDefault(area)}
-                                disabled={togglingGridAreaId === area.id}
-                                className={`w-full mb-4 rounded-xl border px-4 py-3 text-left transition-colors ${
+                            <div className="mb-4 grid gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => handleToggleGridDefault(area)}
+                                    disabled={togglingGridAreaId === area.id}
+                                    className={`w-full rounded-2xl border px-4 py-3 text-left transition-colors ${
                                     (area.show_on_grid_default === 1 || area.show_on_grid_default === true)
                                         ? 'border-sky-200 bg-sky-50 text-sky-900 hover:bg-sky-100 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-100 dark:hover:bg-sky-500/20'
                                         : 'border-gray-200 bg-gray-50 text-gray-800 hover:bg-gray-100 dark:border-gray-700/60 dark:bg-gray-900/40 dark:text-gray-100 dark:hover:bg-gray-800/70'
-                                } ${togglingGridAreaId === area.id ? 'cursor-wait opacity-70' : ''}`}
-                            >
-                                <div className="flex items-center justify-between gap-4">
-                                    <div>
-                                        <div className="text-sm font-semibold">
-                                            {togglingGridAreaId === area.id
-                                                ? 'Menyimpan...'
-                                                : ((area.show_on_grid_default === 1 || area.show_on_grid_default === true)
-                                                    ? 'Grid Default Aktif'
-                                                    : 'Grid Default Nonaktif')}
+                                    } ${togglingGridAreaId === area.id ? 'cursor-wait opacity-70' : ''}`}
+                                >
+                                    <div className="flex items-center justify-between gap-4">
+                                        <div>
+                                            <div className="text-sm font-semibold">
+                                                {togglingGridAreaId === area.id
+                                                    ? 'Menyimpan...'
+                                                    : ((area.show_on_grid_default === 1 || area.show_on_grid_default === true)
+                                                        ? 'Grid Default Aktif'
+                                                        : 'Grid Default Nonaktif')}
+                                            </div>
+                                            <div className="mt-1 text-xs opacity-80">
+                                                Toggle cepat untuk menentukan apakah area ini ikut dimuat saat Grid View masih di semua area.
+                                            </div>
                                         </div>
-                                        <div className="mt-1 text-xs opacity-80">
-                                            Toggle cepat untuk menentukan apakah area ini ikut dimuat saat Grid View masih di semua area.
-                                        </div>
+                                        <span className={`inline-flex h-7 w-12 items-center rounded-full px-1 transition-colors ${
+                                            (area.show_on_grid_default === 1 || area.show_on_grid_default === true)
+                                                ? 'bg-sky-500'
+                                                : 'bg-gray-300 dark:bg-gray-600'
+                                        }`}>
+                                            <span className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                                                (area.show_on_grid_default === 1 || area.show_on_grid_default === true) ? 'translate-x-5' : 'translate-x-0'
+                                            }`} />
+                                        </span>
                                     </div>
-                                    <span className={`inline-flex h-7 w-12 items-center rounded-full px-1 transition-colors ${
-                                        (area.show_on_grid_default === 1 || area.show_on_grid_default === true)
-                                            ? 'bg-sky-500'
-                                            : 'bg-gray-300 dark:bg-gray-600'
-                                    }`}>
-                                        <span className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                                            (area.show_on_grid_default === 1 || area.show_on_grid_default === true) ? 'translate-x-5' : 'translate-x-0'
-                                        }`} />
-                                    </span>
-                                </div>
-                            </button>
-                            <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700/50 dark:bg-gray-900/40">
-                                <div className="flex items-center justify-between gap-4">
-                                    <div>
-                                        <div className="text-sm font-semibold text-gray-900 dark:text-white">Limit Kamera Grid Default</div>
-                                        <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                            Berlaku hanya saat Grid View masih di semua area. Saat area dipilih manual, semua kamera area tetap tampil.
+                                </button>
+                                <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700/50 dark:bg-gray-900/40">
+                                    <div className="flex items-center justify-between gap-4">
+                                        <div>
+                                            <div className="text-sm font-semibold text-gray-900 dark:text-white">Limit Kamera Grid Default</div>
+                                            <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                                Berlaku hanya saat Grid View masih di semua area. Saat area dipilih manual, semua kamera area tetap tampil.
+                                            </div>
                                         </div>
+                                        <select
+                                            aria-label={`Limit Grid ${area.name}`}
+                                            value={area.grid_default_camera_limit === null || area.grid_default_camera_limit === undefined ? '' : String(area.grid_default_camera_limit)}
+                                            onChange={(event) => handleGridDefaultLimitChange(area, event.target.value)}
+                                            disabled={togglingGridAreaId === area.id}
+                                            className="min-w-[140px] rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                                        >
+                                            {GRID_DEFAULT_LIMIT_OPTIONS.map((option) => (
+                                                <option key={option.value || 'unlimited'} value={option.value}>{option.label}</option>
+                                            ))}
+                                        </select>
                                     </div>
-                                    <select
-                                        aria-label={`Limit Grid ${area.name}`}
-                                        value={area.grid_default_camera_limit === null || area.grid_default_camera_limit === undefined ? '' : String(area.grid_default_camera_limit)}
-                                        onChange={(event) => handleGridDefaultLimitChange(area, event.target.value)}
-                                        disabled={togglingGridAreaId === area.id}
-                                        className="min-w-[140px] rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                                    >
-                                        {GRID_DEFAULT_LIMIT_OPTIONS.map((option) => (
-                                            <option key={option.value || 'unlimited'} value={option.value}>{option.label}</option>
-                                        ))}
-                                    </select>
                                 </div>
                             </div>
                             <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700/50">
-                                <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{area.cameraCount || 0} Kamera</span>
+                                <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{area.internalValidCount || 0} Internal • {area.externalValidCount || 0} External</span>
                                 <div className="flex items-center gap-3">
                                     <Link to={`/admin/import-export?area=${encodeURIComponent(area.name)}`} className="text-sm font-semibold text-emerald-600 hover:text-emerald-700">
                                         Import
