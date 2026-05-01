@@ -7,7 +7,7 @@
 import { spawn } from 'child_process';
 import { existsSync, mkdirSync, unlinkSync, statSync, renameSync, readdirSync } from 'fs';
 import { promises as fsPromises } from 'fs';
-import { join, dirname } from 'path';
+import { basename, isAbsolute, join, dirname, relative, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import { promisify } from 'util';
@@ -21,6 +21,11 @@ const __dirname = dirname(__filename);
 
 // Base path untuk recordings
 const RECORDINGS_BASE_PATH = join(__dirname, '..', '..', 'recordings');
+const RECORDING_RETENTION_GRACE_MS = 10 * 60 * 1000;
+const NORMAL_CLEANUP_DELETE_BATCH_SIZE = 6;
+const SCHEDULED_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+const SCHEDULED_CLEANUP_INITIAL_DELAY_MS = 2 * 60 * 1000;
+const QUARANTINE_DIR_NAME = '.quarantine';
 
 // Stream health monitoring
 const streamHealthMap = new Map();
@@ -96,6 +101,94 @@ const removeFailedFile = (cameraId, filename) => {
         console.error('[FailedFiles] Error removing failed file:', error);
     }
 };
+
+function getCameraRecordingDir(cameraId) {
+    return join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
+}
+
+function isPathInside(parentPath, candidatePath) {
+    const parent = resolve(parentPath);
+    const candidate = resolve(candidatePath);
+    const pathDiff = relative(parent, candidate);
+    return Boolean(pathDiff) && !pathDiff.startsWith('..') && !isAbsolute(pathDiff);
+}
+
+export function isSafeRecordingFilePath(cameraId, filePath, filename = null) {
+    if (!cameraId || !filePath) {
+        return false;
+    }
+
+    const cameraDir = getCameraRecordingDir(cameraId);
+    const resolvedPath = resolve(filePath);
+
+    if (!isPathInside(cameraDir, resolvedPath)) {
+        return false;
+    }
+
+    if (filename && basename(resolvedPath) !== filename) {
+        return false;
+    }
+
+    const fileName = filename || basename(resolvedPath);
+    return /^\d{8}_\d{6}\.mp4$/.test(fileName)
+        || fileName.includes('.remux.mp4')
+        || fileName.includes('.temp.mp4');
+}
+
+async function deleteRecordingFileSafely({ cameraId, filename, filePath, reason }) {
+    if (!isSafeRecordingFilePath(cameraId, filePath, filename)) {
+        console.warn(`[Cleanup] Refusing unsafe delete for camera${cameraId}/${filename || basename(filePath || '')} (${reason})`);
+        return { success: false, skipped: true, reason: 'unsafe_path', size: 0 };
+    }
+
+    try {
+        const stats = await fsPromises.stat(filePath);
+        await fsPromises.unlink(filePath);
+        return { success: true, size: stats.size };
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            return { success: true, missing: true, size: 0 };
+        }
+
+        console.error(`[Cleanup] Error deleting ${filename || basename(filePath)} (${reason}):`, error.message);
+        return { success: false, reason: error.message, size: 0 };
+    }
+}
+
+async function quarantineRecordingFile(cameraId, filename, filePath, reason) {
+    if (!isSafeRecordingFilePath(cameraId, filePath, filename)) {
+        console.warn(`[Segment] Refusing unsafe quarantine for camera${cameraId}/${filename || basename(filePath || '')} (${reason})`);
+        return { success: false, skipped: true, reason: 'unsafe_path' };
+    }
+
+    try {
+        await fsPromises.access(filePath);
+    } catch {
+        return { success: true, missing: true };
+    }
+
+    const quarantineDir = join(RECORDINGS_BASE_PATH, QUARANTINE_DIR_NAME, `camera${cameraId}`);
+    const safeReason = String(reason || 'unknown').replace(/[^a-z0-9_-]/gi, '_').slice(0, 40);
+    const quarantineName = `${Date.now()}_${safeReason}_${filename}`;
+    const quarantinePath = join(quarantineDir, quarantineName);
+
+    try {
+        await fsPromises.mkdir(quarantineDir, { recursive: true });
+        await fsPromises.rename(filePath, quarantinePath);
+        console.warn(`[Segment] Quarantined file: camera${cameraId}/${filename} -> ${QUARANTINE_DIR_NAME}/camera${cameraId}/${quarantineName}`);
+        return { success: true, path: quarantinePath };
+    } catch (error) {
+        if (error.code === 'EXDEV') {
+            await fsPromises.copyFile(filePath, quarantinePath);
+            await fsPromises.unlink(filePath);
+            console.warn(`[Segment] Quarantined file with copy fallback: camera${cameraId}/${filename}`);
+            return { success: true, path: quarantinePath };
+        }
+
+        console.error(`[Segment] Failed to quarantine ${filename}:`, error.message);
+        return { success: false, reason: error.message };
+    }
+}
 
 const EXTERNAL_RECORDING_PROTOCOL_WHITELIST = 'file,http,https,tcp,tls,crypto';
 const RECORDING_RETRY_BASE_COOLDOWN_MS = 15000;
@@ -580,6 +673,13 @@ class RecordingService {
             const cameraDir = join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
             const failedPath = join(cameraDir, filename);
             if (existsSync(failedPath)) {
+                quarantineRecordingFile(cameraId, filename, failedPath, 'remux_failed_3x').catch((err) => {
+                    console.error(`[Segment] Failed to quarantine permanently failed file ${filename}:`, err.message);
+                });
+            }
+            removeFailedFile(cameraId, filename);
+            return;
+            if (existsSync(failedPath)) {
                 try {
                     unlinkSync(failedPath);
                     console.log(`[Segment] ✓ Deleted permanently failed file (3+ remux failures): ${filename}`);
@@ -661,6 +761,10 @@ class RecordingService {
 
                         // Track failed attempt in database
                         incrementFailCount(cameraId, filename);
+
+                        await quarantineRecordingFile(cameraId, filename, filePath, 'invalid_duration');
+                        cleanup();
+                        return;
 
                         // Safely remove the invalid 0-byte or <1s file
                         try {
@@ -868,12 +972,12 @@ class RecordingService {
                 return;
             }
 
-            // Calculate retention period in milliseconds
-            // Add 10% buffer to retention period for safety
+            // Calculate retention period in milliseconds.
+            // Add a grace window so cleanup only removes clearly old segments.
             // SAFETY: Default to 5 hours if recording_duration_hours is NULL/undefined/0
             const retentionHours = camera.recording_duration_hours || 5;
             const retentionMs = retentionHours * 60 * 60 * 1000;
-            const retentionWithBuffer = retentionMs * 1.1; // +10% safety buffer
+            const retentionWithBuffer = retentionMs + Math.max(RECORDING_RETENTION_GRACE_MS, retentionMs * 0.1);
 
             console.log(`[Cleanup] Camera ${cameraId} (${camera.name}): retention ${retentionHours}h (${Math.round(retentionWithBuffer / 3600000)}h with buffer)`);
 
@@ -947,13 +1051,12 @@ class RecordingService {
             let dbDeletedSize = 0;
 
             if (filesToDelete.length > 0) {
-                console.log(`[Cleanup] Deleting ${filesToDelete.length} old DB-tracked segments in batches...`);
+                const DELETE_BATCH_SIZE = NORMAL_CLEANUP_DELETE_BATCH_SIZE;
+                const selectedFilesToDelete = filesToDelete.slice(0, DELETE_BATCH_SIZE);
+                console.log(`[Cleanup] Deleting ${selectedFilesToDelete.length}/${filesToDelete.length} old DB-tracked segments this cycle...`);
 
-                // RAM FIX: Process deletions in batches of 50 instead of all-at-once
-                const DELETE_BATCH_SIZE = 50;
-
-                for (let i = 0; i < filesToDelete.length; i += DELETE_BATCH_SIZE) {
-                    const batch = filesToDelete.slice(i, i + DELETE_BATCH_SIZE);
+                for (let i = 0; i < selectedFilesToDelete.length; i += DELETE_BATCH_SIZE) {
+                    const batch = selectedFilesToDelete.slice(i, i + DELETE_BATCH_SIZE);
                     const batchResults = await Promise.allSettled(batch.map(async ({ segment, segmentAge }) => {
                         try {
                             let fileExists = true;
@@ -964,18 +1067,25 @@ class RecordingService {
                                 return { success: true, size: 0, nonExistent: true };
                             }
 
-                            const stats = await fsPromises.stat(segment.file_path);
-                            const fileSizeMB = (stats.size / (1024 * 1024)).toFixed(2);
+                            const deleteResult = await deleteRecordingFileSafely({
+                                cameraId,
+                                filename: segment.filename,
+                                filePath: segment.file_path,
+                                reason: 'retention_expired',
+                            });
 
-                            // Non-blocking async delete
-                            await fsPromises.unlink(segment.file_path);
+                            if (!deleteResult.success) {
+                                return { success: false, error: deleteResult.reason || 'delete_failed' };
+                            }
+
+                            const fileSizeMB = (deleteResult.size / (1024 * 1024)).toFixed(2);
 
                             console.log(`[Cleanup] ✓ Deleted: ${segment.filename} (age: ${Math.round(segmentAge / 3600000)}h, size: ${fileSizeMB}MB)`);
 
                             // Delete from database
                             execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
 
-                            return { success: true, size: stats.size };
+                            return { success: true, size: deleteResult.size };
                         } catch (error) {
                             console.error(`[Cleanup] ✗ Error deleting ${segment.filename}:`, error.message);
                             if (error.code === 'ENOENT') {
@@ -994,7 +1104,7 @@ class RecordingService {
                 }
 
                 const totalSizeMB = (dbDeletedSize / (1024 * 1024)).toFixed(2);
-                const failedCount = filesToDelete.length - dbDeletedCount;
+                const failedCount = selectedFilesToDelete.length - dbDeletedCount;
                 const remainingSegments = segments.length - dbDeletedCount - skippedCount - failedCount;
 
                 console.log(`[Cleanup] Camera ${cameraId} DB segments summary:`);
@@ -1051,10 +1161,18 @@ class RecordingService {
 
                             // Only delete if older than retention period
                             if (ageToUse > retentionWithBuffer) {
-                                const fileSizeMB = (stats.size / (1024 * 1024)).toFixed(2);
-                                await fsPromises.unlink(filePath);
+                                const deleteResult = await deleteRecordingFileSafely({
+                                    cameraId,
+                                    filename,
+                                    filePath,
+                                    reason: 'filesystem_orphan_retention_expired',
+                                });
+                                if (!deleteResult.success) {
+                                    throw new Error(deleteResult.reason || 'delete_failed');
+                                }
+                                const fileSizeMB = (deleteResult.size / (1024 * 1024)).toFixed(2);
                                 fsOrphanDeletedCount++;
-                                fsOrphanDeletedSize += stats.size;
+                                fsOrphanDeletedSize += deleteResult.size;
                                 console.log(`[Cleanup] ✓ Deleted filesystem orphan: ${filename} (age: ${Math.round(ageToUse / 3600000)}h, size: ${fileSizeMB}MB)`);
 
                                 // Also clean up any failed_remux_files entry
@@ -1072,9 +1190,17 @@ class RecordingService {
                             const tempAge = now - stats.mtimeMs;
                             // Delete temp files older than 10 minutes
                             if (tempAge > 10 * 60 * 1000) {
-                                await fsPromises.unlink(tempPath);
+                                const deleteResult = await deleteRecordingFileSafely({
+                                    cameraId,
+                                    filename: tempFile,
+                                    filePath: tempPath,
+                                    reason: 'stale_temp_file',
+                                });
+                                if (!deleteResult.success) {
+                                    throw new Error(deleteResult.reason || 'delete_failed');
+                                }
                                 fsOrphanDeletedCount++;
-                                fsOrphanDeletedSize += stats.size;
+                                fsOrphanDeletedSize += deleteResult.size;
                                 console.log(`[Cleanup] ✓ Deleted stale temp file: ${tempFile} (age: ${Math.round(tempAge / 60000)}min)`);
                             }
                         } catch (err) { }
@@ -1255,6 +1381,10 @@ class RecordingService {
                                 try {
                                     try {
                                         await fsPromises.access(failedPath);
+                                        await quarantineRecordingFile(cameraId, filename, failedPath, 'scanner_remux_failed_3x');
+                                        console.log(`[Scanner] Quarantined permanently failed file: ${filename}`);
+                                        removeFailedFile(cameraId, filename);
+                                        continue;
                                         await fsPromises.unlink(failedPath);
                                         console.log(`[Scanner] ✓ Deleted permanently failed file: ${filename}`);
                                     } catch (e) { }
@@ -1494,6 +1624,7 @@ class RecordingService {
 
                     const camera = queryOne('SELECT recording_duration_hours FROM cameras WHERE id = ?', [cameraId]);
                     const retentionMs = ((camera && camera.recording_duration_hours) ? camera.recording_duration_hours : 5) * 60 * 60 * 1000;
+                    const retentionWithGrace = retentionMs + Math.max(RECORDING_RETENTION_GRACE_MS, retentionMs * 0.1);
 
                     const allFiles = await fsPromises.readdir(fullPath);
                     const files = allFiles.filter(f => /^\d{8}_\d{6}\.mp4$/.test(f));
@@ -1521,7 +1652,7 @@ class RecordingService {
                                 if (ageToUse > 30 * 60 * 1000) {
                                     unregistered.push({
                                         cameraId, filename, path: filePath, age: ageToUse, fileSize: stats.size,
-                                        retentionMs, beyondRetention: ageToUse > retentionMs * 1.1
+                                        retentionMs, beyondRetention: ageToUse > retentionWithGrace
                                     });
                                 }
                             } catch { }
@@ -1558,8 +1689,16 @@ class RecordingService {
                             console.log(`[BGCleanup] File being processed, skipping: ${file.filename}`);
                         } else if (file.beyondRetention) {
                             try {
-                                const fileSizeMB = (file.fileSize / (1024 * 1024)).toFixed(2);
-                                await fsPromises.unlink(file.path);
+                                const deleteResult = await deleteRecordingFileSafely({
+                                    cameraId: file.cameraId,
+                                    filename: file.filename,
+                                    filePath: file.path,
+                                    reason: 'background_orphan_retention_expired',
+                                });
+                                if (!deleteResult.success) {
+                                    throw new Error(deleteResult.reason || 'delete_failed');
+                                }
+                                const fileSizeMB = (deleteResult.size / (1024 * 1024)).toFixed(2);
                                 console.log(`[BGCleanup] ✓ Deleted old unregistered file beyond retention: camera${file.cameraId}/${file.filename} (age: ${Math.round(file.age / 3600000)}h, size: ${fileSizeMB}MB)`);
                                 removeFailedFile(file.cameraId, file.filename);
                             } catch (err) {
@@ -1572,7 +1711,7 @@ class RecordingService {
                                 this.onSegmentCreated(file.cameraId, file.filename);
                             } catch (error) {
                                 console.log(`[BGCleanup] Deleting corrupt file (age: ${Math.round(file.age / 60000)}min): camera${file.cameraId}/${file.filename}`);
-                                try { await fsPromises.unlink(file.path); } catch (unlinkErr) { }
+                                await quarantineRecordingFile(file.cameraId, file.filename, file.path, 'background_ffprobe_failed');
                                 removeFailedFile(file.cameraId, file.filename);
                             }
                         }
@@ -1595,12 +1734,12 @@ class RecordingService {
     }
 
     /**
-     * Scheduled cleanup - runs every 30 minutes
+     * Scheduled cleanup - runs every 5 minutes
      * This is the PRIMARY cleanup mechanism (not per-segment cleanup)
      * FIX: Also includes emergency disk space check
      */
     startScheduledCleanup() {
-        console.log('[Cleanup] Starting scheduled cleanup service (every 30 minutes)');
+        console.log('[Cleanup] Starting scheduled cleanup service (every 5 minutes)');
 
         const runScheduledClean = async () => {
             try {
@@ -1627,10 +1766,10 @@ class RecordingService {
             } catch (error) {
                 console.error('[Cleanup] Scheduled cleanup error:', error);
             }
-            setTimeout(runScheduledClean, 30 * 60 * 1000);
+            setTimeout(runScheduledClean, SCHEDULED_CLEANUP_INTERVAL_MS);
         };
 
-        setTimeout(runScheduledClean, 2 * 60 * 1000);
+        setTimeout(runScheduledClean, SCHEDULED_CLEANUP_INITIAL_DELAY_MS);
     }
 
     /**
@@ -1701,9 +1840,16 @@ class RecordingService {
 
                     if (fileExists) {
                         try {
-                            const stats = await fsPromises.stat(segment.file_path);
-                            await fsPromises.unlink(segment.file_path);
-                            freedBytes += stats.size;
+                            const deleteResult = await deleteRecordingFileSafely({
+                                cameraId: segment.camera_id,
+                                filename: segment.filename,
+                                filePath: segment.file_path,
+                                reason: 'emergency_disk_cleanup',
+                            });
+                            if (!deleteResult.success) {
+                                continue;
+                            }
+                            freedBytes += deleteResult.size;
                             deletedCount++;
                             deletedInBatch++;
                             execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
@@ -1747,9 +1893,18 @@ class RecordingService {
                     for (const file of files) {
                         if ((freeBytes + freedBytes) > 2 * 1024 * 1024 * 1024) break;
                         try {
-                            await fsPromises.unlink(file.path);
-                            freedBytes += file.size;
-                            deletedCount++;
+                            const cameraIdMatch = dir.match(/camera(\d+)/);
+                            const cameraId = cameraIdMatch ? parseInt(cameraIdMatch[1]) : null;
+                            const deleteResult = await deleteRecordingFileSafely({
+                                cameraId,
+                                filename: file.name,
+                                filePath: file.path,
+                                reason: 'emergency_filesystem_cleanup',
+                            });
+                            if (deleteResult.success) {
+                                freedBytes += deleteResult.size;
+                                deletedCount++;
+                            }
                         } catch { }
                     }
                 }

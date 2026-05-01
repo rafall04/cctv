@@ -1,4 +1,12 @@
+/**
+ * Purpose: Validate recording source selection, lifecycle recovery, and cleanup safety guards.
+ * Caller: Vitest backend test suite.
+ * Deps: mocked child_process, fs, and database connection pool.
+ * MainFuncs: recordingService cleanup and process lifecycle tests.
+ * SideEffects: Uses fake timers and module mocks; no real filesystem or database writes.
+ */
 import { EventEmitter } from 'events';
+import { promisify } from 'util';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
 const spawnMock = vi.fn();
@@ -19,6 +27,7 @@ const fsPromisesMock = {
     rename: vi.fn(),
     copyFile: vi.fn(),
     readdir: vi.fn(),
+    mkdir: vi.fn(),
 };
 
 vi.mock('child_process', () => ({
@@ -71,6 +80,7 @@ describe('recordingService external recording support', () => {
         vi.useFakeTimers();
         vi.resetModules();
         vi.clearAllMocks();
+        delete execMock[promisify.custom];
 
         existsSyncMock.mockReturnValue(true);
         statSyncMock.mockReturnValue({ size: 1024 });
@@ -81,6 +91,7 @@ describe('recordingService external recording support', () => {
         fsPromisesMock.rename.mockResolvedValue(undefined);
         fsPromisesMock.copyFile.mockResolvedValue(undefined);
         fsPromisesMock.readdir.mockResolvedValue([]);
+        fsPromisesMock.mkdir.mockResolvedValue(undefined);
         execMock.mockImplementation((command, options, callback) => {
             if (typeof options === 'function') {
                 callback = options;
@@ -405,5 +416,95 @@ describe('recordingService external recording support', () => {
         second.emit('close', 255, null);
 
         await expect(shutdownPromise).resolves.toHaveLength(2);
+    });
+
+    it('refuses cleanup delete when DB file path escapes the recording directory', async () => {
+        const { join } = await import('path');
+        const { recordingService } = await import('../services/recordingService.js');
+        const oldStart = new Date(Date.now() - (2 * 60 * 60 * 1000)).toISOString();
+
+        queryOneMock.mockReturnValue({ recording_duration_hours: 1, name: 'Guarded Camera' });
+        queryMock.mockImplementation((sql) => {
+            if (sql.includes('SELECT id, start_time, file_path, filename FROM recording_segments')) {
+                return [{
+                    id: 501,
+                    start_time: oldStart,
+                    filename: '20260502_000000.mp4',
+                    file_path: join(process.cwd(), 'outside-recordings', '20260502_000000.mp4'),
+                }];
+            }
+
+            if (sql.includes('SELECT filename FROM recording_segments')) {
+                return [];
+            }
+
+            return [];
+        });
+
+        await recordingService.cleanupOldSegments(1);
+
+        expect(fsPromisesMock.unlink).not.toHaveBeenCalledWith(expect.stringContaining('outside-recordings'));
+        expect(executeMock).not.toHaveBeenCalledWith('DELETE FROM recording_segments WHERE id = ?', [501]);
+    });
+
+    it('deletes only oldest expired DB segments in a bounded normal cleanup batch', async () => {
+        const { join } = await import('path');
+        const { recordingService } = await import('../services/recordingService.js');
+        const oldStart = new Date(Date.now() - (2 * 60 * 60 * 1000)).toISOString();
+
+        queryOneMock.mockReturnValue({ recording_duration_hours: 1, name: 'Bounded Camera' });
+        queryMock.mockImplementation((sql) => {
+            if (sql.includes('SELECT id, start_time, file_path, filename FROM recording_segments')) {
+                return Array.from({ length: 8 }, (_, index) => ({
+                    id: 600 + index,
+                    start_time: oldStart,
+                    filename: `20260502_00000${index}.mp4`,
+                    file_path: join(process.cwd(), 'recordings', 'camera1', `20260502_00000${index}.mp4`),
+                }));
+            }
+
+            if (sql.includes('SELECT filename FROM recording_segments')) {
+                return [];
+            }
+
+            return [];
+        });
+
+        await recordingService.cleanupOldSegments(1);
+
+        expect(fsPromisesMock.unlink).toHaveBeenCalledTimes(6);
+        expect(executeMock.mock.calls.filter(([sql]) => sql === 'DELETE FROM recording_segments WHERE id = ?')).toHaveLength(6);
+    });
+
+    it('quarantines invalid short segments instead of deleting them immediately', async () => {
+        const { join } = await import('path');
+        execMock[promisify.custom] = vi.fn(async () => ({ stdout: '0.2\n', stderr: '' }));
+        const { recordingService } = await import('../services/recordingService.js');
+        const child = createSpawnProcess();
+
+        queryOneMock.mockImplementation((sql) => {
+            if (sql.includes('SELECT fail_count FROM failed_remux_files')) {
+                return null;
+            }
+            return null;
+        });
+        execMock.mockImplementation((command, options, callback) => {
+            if (typeof options === 'function') {
+                callback = options;
+            }
+            callback?.(null, '0.2\n', '');
+        });
+        spawnMock.mockReturnValue(child);
+
+        recordingService.onSegmentCreated(3, '20260502_000000.mp4');
+        await vi.advanceTimersByTimeAsync(3000);
+        await Promise.resolve();
+
+        expect(fsPromisesMock.mkdir).toHaveBeenCalled();
+        expect(fsPromisesMock.rename).toHaveBeenCalledWith(
+            join(process.cwd(), 'recordings', 'camera3', '20260502_000000.mp4'),
+            expect.stringContaining('.quarantine')
+        );
+        expect(fsPromisesMock.unlink).not.toHaveBeenCalledWith(join(process.cwd(), 'recordings', 'camera3', '20260502_000000.mp4'));
     });
 });
