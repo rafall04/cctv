@@ -1,3 +1,11 @@
+/*
+Purpose: Camera CRUD, import/export, delivery policy normalization, and bulk area update orchestration.
+Caller: Backend routes, background services, and admin operations.
+Deps: connectionPool, camera delivery utilities, audit logger, cache middleware, health/runtime services.
+MainFuncs: CameraService CRUD methods, bulkUpdateArea(), delivery normalization helpers.
+SideEffects: Reads/writes camera data, updates runtime services, invalidates caches, writes audit logs.
+*/
+
 import axios from 'axios';
 import { query, queryOne, execute, transaction } from '../database/connectionPool.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -1010,6 +1018,22 @@ function matchesBulkTargetFilter(camera, targetFilter) {
     }
 }
 
+function isRecordingDisable(payload = {}) {
+    return payload.enable_recording === 0 || payload.enable_recording === false;
+}
+
+function isRecordingEnable(payload = {}) {
+    return payload.enable_recording === 1 || payload.enable_recording === true;
+}
+
+function isPublicStatusDisable(payload = {}) {
+    return payload.enabled === 0 || payload.enabled === false;
+}
+
+function isHealthMonitoringDisable(payload = {}) {
+    return payload.external_health_mode === 'disabled';
+}
+
 function requiresExternalHlsAreaPolicy(operation, payload = {}) {
     if (operation !== 'policy_update' && operation !== 'maintenance') {
         return false;
@@ -1025,20 +1049,25 @@ function requiresExternalStreamAreaPolicy(operation, payload = {}) {
         return false;
     }
 
-    return payload.external_health_mode !== undefined;
+    return isHealthMonitoringDisable(payload) || payload.external_health_mode !== undefined;
 }
 
 function getBulkEligibility(camera, operation, payload = {}) {
     const deliveryProfile = getCameraDeliveryProfile(camera);
     const effectiveDeliveryType = payload.delivery_type || deliveryProfile.effectiveDeliveryType;
+    const isAreaPolicyOperation = operation === 'policy_update' || operation === 'maintenance';
 
-    if ((operation === 'policy_update' || operation === 'maintenance') && payload.enable_recording !== undefined) {
+    if (isAreaPolicyOperation && isPublicStatusDisable(payload) && Object.keys(payload).length === 1) {
+        return { eligible: true, reason: null };
+    }
+
+    if (isAreaPolicyOperation && isRecordingEnable(payload) && !isRecordingDisable(payload)) {
         if (deliveryProfile.classification !== 'internal_hls') {
             return { eligible: false, reason: 'internal_only_policy' };
         }
     }
 
-    if ((operation === 'policy_update' || operation === 'maintenance') && payload.video_codec !== undefined) {
+    if (isAreaPolicyOperation && payload.video_codec !== undefined) {
         if (deliveryProfile.classification !== 'internal_hls') {
             return { eligible: false, reason: 'internal_only_policy' };
         }
