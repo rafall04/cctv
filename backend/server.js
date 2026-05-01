@@ -1,3 +1,9 @@
+// Purpose: Bootstrap Fastify API server and orchestrate process-level startup/shutdown.
+// Caller: Node.js runtime via npm start/dev.
+// Deps: Fastify plugins, route modules, background services, database connection pool.
+// MainFuncs: start, shutdown.
+// SideEffects: Starts HTTP server, background services, recording service, and exits process on shutdown.
+
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
@@ -412,7 +418,14 @@ const start = async () => {
 // ============================================
 // GRACEFUL SHUTDOWN
 // ============================================
+let shutdownInProgress = false;
+
 const shutdown = async () => {
+    if (shutdownInProgress) {
+        return;
+    }
+    shutdownInProgress = true;
+
     console.log('\n[Server] Shutting down gracefully...');
     
     try {
@@ -461,6 +474,14 @@ const shutdown = async () => {
             console.log(`[Shutdown] Closed ${activePlaybackSessions.length} playback viewer sessions`);
         } catch (error) {
             console.error('[Shutdown] Playback session cleanup error:', error.message);
+        }
+
+        console.log('[Shutdown] Stopping active recordings...');
+        try {
+            const results = await recordingService.shutdown();
+            console.log(`[Shutdown] Stopped ${results.length} active recording processes`);
+        } catch (error) {
+            console.error('[Shutdown] Recording cleanup error:', error.message);
         }
         
         // Close database connections
