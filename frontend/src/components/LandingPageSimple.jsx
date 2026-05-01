@@ -1,3 +1,10 @@
+/**
+ * Purpose: Renders the lightweight public landing mode with status, camera list, and footer.
+ * Caller: LandingPage when layoutMode is simple.
+ * Deps: Camera, branding, theme, landing config, ads, feedback, and support components.
+ * MainFuncs: LandingPageSimple, SimpleHeader, SimpleStatusOverview, SimpleFooter.
+ * SideEffects: Lazy-loads optional floating widgets and ad slots.
+ */
 import { Suspense } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useBranding } from '../contexts/BrandingContext';
@@ -131,13 +138,13 @@ function SimpleStatusOverview() {
                 <div className="flex flex-col gap-5 px-5 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
                     <div className="max-w-2xl">
                         <div className="inline-flex items-center gap-2 rounded-full border border-sky-400/20 bg-sky-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-200">
-                            Status CCTV Publik
+                            Status Kamera
                         </div>
                         <p className="mt-3 text-sm font-medium text-white sm:text-base">
-                            Ringkasan cepat untuk kondisi kamera yang sedang dimuat di mode simpel.
+                            Ringkasan cepat kamera publik saat ini.
                         </p>
                         <p className="mt-1 text-xs text-slate-300/80 sm:text-sm">
-                            Online dan offline dihitung dari dataset publik aktif yang sedang dibaca landing page.
+                            Pantau kondisi kamera sebelum membuka live view.
                         </p>
                     </div>
                     <div className="grid grid-cols-3 gap-3 lg:min-w-[420px]">

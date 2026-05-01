@@ -1,3 +1,10 @@
+/**
+ * Purpose: Renders playback video, controls, and compact in-panel status messages.
+ * Caller: Playback page content area.
+ * Deps: CodecBadge and HTML video APIs.
+ * MainFuncs: PlaybackVideo component.
+ * SideEffects: Invokes handler props for speed, snapshot, fullscreen, retry, and notification close.
+ */
 import CodecBadge from '../CodecBadge';
 
 export default function PlaybackVideo({
@@ -159,7 +166,24 @@ export default function PlaybackVideo({
                     muted
                 />
                 
-                {(isBuffering || isSeeking) && !videoError && (
+                {!selectedSegment && !videoError && (
+                    <div
+                        data-testid="playback-empty-state"
+                        className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-950/95 to-black p-6"
+                    >
+                        <div className="max-w-sm text-center">
+                            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-sky-200 ring-1 ring-white/15">
+                                <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                            </div>
+                            <h3 className="text-lg font-semibold text-white">Belum ada rekaman</h3>
+                            <p className="mt-2 text-sm text-slate-300">Pilih kamera lain atau coba lagi nanti.</p>
+                        </div>
+                    </div>
+                )}
+
+                {(isBuffering || isSeeking) && !videoError && selectedSegment && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/60 pointer-events-none z-40">
                         <div className="text-center bg-black/80 px-8 py-6 rounded-xl">
                             <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-white mb-4 mx-auto"></div>

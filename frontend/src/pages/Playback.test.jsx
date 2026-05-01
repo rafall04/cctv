@@ -1,5 +1,12 @@
 // @vitest-environment jsdom
 
+/**
+ * Purpose: Verifies public/admin playback routing, segment loading, media states, and sharing behavior.
+ * Caller: Frontend Vitest suite.
+ * Deps: mocked recording/playback viewer services and playback child components.
+ * MainFuncs: Playback page behavior tests.
+ * SideEffects: Mocks localStorage, media element methods, clipboard, and router location.
+ */
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useLocation } from 'react-router-dom';
@@ -684,6 +691,45 @@ describe('Playback', () => {
 
         expect(getSegmentStreamUrl).toHaveBeenCalledWith(2, 'gate-2.mp4', 'public_preview');
         expect(getSegmentStreamUrl.mock.calls).not.toContainEqual([2, 'seg-2.mp4', 'public_preview']);
+    });
+
+    it('header tetap bisa mengganti kamera saat kamera terpilih tidak punya segment', async () => {
+        getSegments
+            .mockResolvedValueOnce({
+                success: true,
+                data: {
+                    segments: [],
+                },
+            })
+            .mockResolvedValueOnce({
+                success: true,
+                data: {
+                    segments: buildSegments('gate'),
+                },
+            });
+
+        render(
+            <TestRouter initialEntries={['/playback?mode=full&view=playback&cam=1']}>
+                <Playback
+                    cameras={[
+                        { id: 1, name: 'Lobby', enable_recording: 1, location: 'Area A' },
+                        { id: 2, name: 'Gate', enable_recording: 1, location: 'Area B' },
+                    ]}
+                />
+            </TestRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('video-segment').textContent).toBe('none');
+        });
+
+        fireEvent.click(screen.getByText('ganti-kamera'));
+
+        await waitFor(() => {
+            expect(screen.getByTestId('video-segment').textContent).toBe('gate-2');
+        });
+
+        expect(getSegments).toHaveBeenCalledWith(2, 'blocking', {}, 'public_preview');
     });
 
     it('mengabaikan respons segmen lama yang datang terlambat setelah user pindah kamera', async () => {

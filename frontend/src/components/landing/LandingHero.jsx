@@ -1,6 +1,23 @@
+/**
+ * Purpose: Renders the public landing hero with centered brand, status copy, and stats.
+ * Caller: LandingPage full mode.
+ * Deps: LandingStatsBar and public branding/settings payloads.
+ * MainFuncs: LandingHero component and default copy simplification helpers.
+ * SideEffects: Renders sanitized HTML from configured area coverage.
+ */
 import LandingStatsBar from './LandingStatsBar';
 
 export default function Hero({ branding, landingSettings, disableHeavyEffects, onCameraClick }) {
+    const heroTitle = branding.hero_title === 'Pantau CCTV Secara Real-Time'
+        ? 'Pantau CCTV Real-Time'
+        : branding.hero_title;
+    const heroSubtitle = branding.hero_subtitle === 'Pantau CCTV secara real-time dengan sistem CCTV RAF NET. Akses gratis 24 jam untuk memantau berbagai lokasi.'
+        ? 'Akses CCTV publik 24 jam dari satu halaman.'
+        : branding.hero_subtitle;
+    const footerText = branding.footer_text === 'Layanan pemantauan CCTV publik oleh RAF NET'
+        ? 'Pemantauan publik oleh RAF NET'
+        : branding.footer_text;
+
     return (
         <header className="relative overflow-hidden bg-gradient-to-br from-amber-50/80 via-transparent to-emerald-50/80 dark:from-amber-950/30 dark:via-transparent dark:to-emerald-950/30">
             {!disableHeavyEffects && (
@@ -20,10 +37,10 @@ export default function Hero({ branding, landingSettings, disableHeavyEffects, o
                 </>
             )}
 
-            <div className="relative mx-auto flex min-h-[30rem] max-w-7xl flex-col justify-center px-4 py-12 text-center sm:min-h-[34rem] sm:px-6 sm:py-16 lg:px-8">
+            <div className="relative mx-auto flex min-h-[28rem] max-w-7xl flex-col items-center justify-center px-4 py-10 text-center sm:min-h-[31rem] sm:px-6 sm:py-14 lg:px-8">
                 <div
                     data-testid="landing-hero-badge-stack"
-                    className="mx-auto mb-6 flex max-w-sm flex-col items-center gap-2.5 sm:gap-3"
+                    className="mx-auto mb-5 flex max-w-sm flex-col items-center gap-2.5 sm:gap-3"
                 >
                     {branding.show_powered_by === 'true' && (
                         <div className="flex items-center gap-2 rounded-full bg-sky-100 px-4 py-1.5 text-xs font-semibold text-primary-600 shadow-sm dark:bg-primary/20 dark:text-primary-400">
@@ -40,17 +57,17 @@ export default function Hero({ branding, landingSettings, disableHeavyEffects, o
                         {landingSettings.hero_badge}
                     </div>
                 </div>
-                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-4">
-                    {branding.hero_title}
+                <h1 className="mb-4 max-w-4xl text-balance text-3xl font-bold leading-tight text-gray-900 dark:text-white sm:text-4xl lg:text-5xl">
+                    {heroTitle}
                 </h1>
-                <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mb-3 text-sm sm:text-base">
-                    {branding.hero_subtitle}
+                <p className="mx-auto mb-3 max-w-xl text-sm leading-6 text-gray-600 dark:text-gray-400 sm:text-base">
+                    {heroSubtitle}
                 </p>
-                <p className="text-gray-500 dark:text-gray-500 max-w-xl mx-auto mb-6 text-xs sm:text-sm">
-                    {branding.footer_text}
+                <p className="mx-auto mb-6 max-w-lg text-xs text-gray-500 dark:text-gray-500 sm:text-sm">
+                    {footerText}
                 </p>
 
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 mb-8">
+                <div className="mb-8 inline-flex max-w-full items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-center dark:border-amber-500/20 dark:bg-amber-500/10">
                     <svg className="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
                         <circle cx="12" cy="11" r="3" />

@@ -1,5 +1,12 @@
 // @vitest-environment jsdom
 
+/**
+ * Purpose: Verifies the lightweight landing mode composition, status copy, and ad placement.
+ * Caller: Frontend Vitest suite.
+ * Deps: mocked theme, branding, cameras, public config, ads, and floating widgets.
+ * MainFuncs: LandingPageSimple render tests.
+ * SideEffects: Renders into jsdom only.
+ */
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import LandingPageSimple from './LandingPageSimple';
@@ -125,7 +132,9 @@ describe('LandingPageSimple', () => {
             />
         );
 
-        expect(screen.getByText('Status CCTV Publik')).toBeTruthy();
+        expect(screen.getByText('Status Kamera')).toBeTruthy();
+        expect(screen.getByText('Ringkasan cepat kamera publik saat ini.')).toBeTruthy();
+        expect(screen.queryByText(/dataset publik/i)).toBeNull();
         expect(screen.getByText('Online')).toBeTruthy();
         expect(screen.getByText('Offline')).toBeTruthy();
         expect(screen.getByText('Total')).toBeTruthy();
