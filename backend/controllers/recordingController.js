@@ -1,5 +1,14 @@
-import recordingPlaybackService from '../services/recordingPlaybackService.js';
+/**
+ * Purpose: HTTP handlers for recording control, playback segment access, and recording assurance.
+ * Caller: recordingRoutes mounted under /api.
+ * Deps: recordingPlaybackService, recordingAssuranceService, and fs streaming utilities.
+ * MainFuncs: startRecording(), stopRecording(), getRecordingsOverview(), getRecordingAssurance(), getSegments().
+ * SideEffects: Starts/stops recordings, updates settings, streams MP4 files, and returns read-only assurance data.
+ */
+
 import { createReadStream } from 'fs';
+import recordingPlaybackService from '../services/recordingPlaybackService.js';
+import recordingAssuranceService from '../services/recordingAssuranceService.js';
 
 // Start recording untuk camera
 export async function startRecording(request, reply) {
@@ -57,6 +66,17 @@ export async function getRecordingsOverview(request, reply) {
         return reply.send({ success: true, data: overviewData });
     } catch (error) {
         console.error('Get recordings overview error:', error);
+        return reply.code(500).send({ success: false, message: 'Internal server error' });
+    }
+}
+
+// Get recording assurance snapshot for operational monitoring
+export async function getRecordingAssurance(request, reply) {
+    try {
+        const snapshot = recordingAssuranceService.getSnapshot();
+        return reply.send({ success: true, data: snapshot });
+    } catch (error) {
+        console.error('Get recording assurance error:', error);
         return reply.code(500).send({ success: false, message: 'Internal server error' });
     }
 }

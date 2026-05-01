@@ -451,6 +451,7 @@ describe('recordingService external recording support', () => {
         const { join } = await import('path');
         const { recordingService } = await import('../services/recordingService.js');
         const oldStart = new Date(Date.now() - (2 * 60 * 60 * 1000)).toISOString();
+        const recordingsBasePath = join(process.cwd(), '..', 'recordings');
 
         queryOneMock.mockReturnValue({ recording_duration_hours: 1, name: 'Bounded Camera' });
         queryMock.mockImplementation((sql) => {
@@ -459,7 +460,7 @@ describe('recordingService external recording support', () => {
                     id: 600 + index,
                     start_time: oldStart,
                     filename: `20260502_00000${index}.mp4`,
-                    file_path: join(process.cwd(), 'recordings', 'camera1', `20260502_00000${index}.mp4`),
+                    file_path: join(recordingsBasePath, 'camera1', `20260502_00000${index}.mp4`),
                 }));
             }
 
@@ -481,8 +482,9 @@ describe('recordingService external recording support', () => {
         const { recordingService } = await import('../services/recordingService.js');
         const oldStart = new Date(Date.now() - (2 * 60 * 60 * 1000)).toISOString();
         const recentStart = new Date(Date.now() - (20 * 60 * 1000)).toISOString();
-        const oldPath = join(process.cwd(), 'recordings', 'camera1', '20260502_000000.mp4');
-        const recentPath = join(process.cwd(), 'recordings', 'camera1', '20260502_010000.mp4');
+        const recordingsBasePath = join(process.cwd(), '..', 'recordings');
+        const oldPath = join(recordingsBasePath, 'camera1', '20260502_000000.mp4');
+        const recentPath = join(recordingsBasePath, 'camera1', '20260502_010000.mp4');
 
         queryOneMock.mockReturnValue({ recording_duration_hours: 1, name: 'Mixed Retention Camera' });
         queryMock.mockImplementation((sql) => {
@@ -523,6 +525,7 @@ describe('recordingService external recording support', () => {
         execMock[promisify.custom] = vi.fn(async () => ({ stdout: '0.2\n', stderr: '' }));
         const { recordingService } = await import('../services/recordingService.js');
         const child = createSpawnProcess();
+        const recordingsBasePath = join(process.cwd(), '..', 'recordings');
 
         queryOneMock.mockImplementation((sql) => {
             if (sql.includes('SELECT fail_count FROM failed_remux_files')) {
@@ -544,9 +547,9 @@ describe('recordingService external recording support', () => {
 
         expect(fsPromisesMock.mkdir).toHaveBeenCalled();
         expect(fsPromisesMock.rename).toHaveBeenCalledWith(
-            join(process.cwd(), 'recordings', 'camera3', '20260502_000000.mp4'),
+            join(recordingsBasePath, 'camera3', '20260502_000000.mp4'),
             expect.stringContaining('.quarantine')
         );
-        expect(fsPromisesMock.unlink).not.toHaveBeenCalledWith(join(process.cwd(), 'recordings', 'camera3', '20260502_000000.mp4'));
+        expect(fsPromisesMock.unlink).not.toHaveBeenCalledWith(join(recordingsBasePath, 'camera3', '20260502_000000.mp4'));
     });
 });

@@ -545,7 +545,11 @@ describe('cameraHealthService external TLS policy', () => {
 
         expect(result.online).toBe(true);
         expect(result.reason).toBe('mediamtx_path_repaired');
-        expect(updateCameraPathMock).toHaveBeenCalledWith('local-132', 'rtsp://admin:secret@10.0.0.6:554/live');
+        expect(updateCameraPathMock).toHaveBeenCalledWith(
+            'local-132',
+            'rtsp://admin:secret@10.0.0.6:554/live',
+            expect.objectContaining({ id: 132 })
+        );
         expect(probeSpy).not.toHaveBeenCalled();
     });
 

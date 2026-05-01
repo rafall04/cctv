@@ -1,8 +1,17 @@
+/**
+ * Purpose: Register recording control, assurance, restart log, and playback segment HTTP routes.
+ * Caller: backend/server.js under the /api prefix.
+ * Deps: recordingController handlers and auth middleware.
+ * MainFuncs: recordingRoutes().
+ * SideEffects: Adds protected admin recording routes and optional-auth playback routes to Fastify.
+ */
+
 import {
     startRecording,
     stopRecording,
     getRecordingStatus,
     getRecordingsOverview,
+    getRecordingAssurance,
     getSegments,
     streamSegment,
     generatePlaylist,
@@ -27,6 +36,11 @@ export default async function recordingRoutes(fastify) {
     fastify.get('/recordings/overview', {
         onRequest: [authMiddleware]
     }, getRecordingsOverview);
+
+    // Get recording assurance snapshot - MUST BE BEFORE :cameraId routes
+    fastify.get('/recordings/assurance', {
+        onRequest: [authMiddleware]
+    }, getRecordingAssurance);
 
     // Get restart logs - MUST BE BEFORE :cameraId routes
     fastify.get('/recordings/restarts', {
