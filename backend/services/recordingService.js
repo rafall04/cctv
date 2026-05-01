@@ -1,3 +1,9 @@
+// Purpose: Coordinate recording facade behavior, DB state, health recovery, and segment processing.
+// Caller: recording routes, camera health service, server shutdown lifecycle.
+// Deps: FFmpeg process manager, SQLite connection pool, filesystem, camera delivery utilities.
+// MainFuncs: startRecording, stopRecording, restartRecording, shutdown, getRecordingStatus.
+// SideEffects: Starts/stops FFmpeg via process manager, updates DB state, remuxes segment files.
+
 import { spawn } from 'child_process';
 import { existsSync, mkdirSync, unlinkSync, statSync, renameSync, readdirSync } from 'fs';
 import { promises as fsPromises } from 'fs';
@@ -7,6 +13,7 @@ import { query, queryOne, execute } from '../database/connectionPool.js';
 import { promisify } from 'util';
 import { exec } from 'child_process';
 import { getEffectiveDeliveryType, getPrimaryExternalStreamUrl } from '../utils/cameraDelivery.js';
+import recordingProcessManager from './recordingProcessManager.js';
 const execPromise = promisify(exec);
 
 const __filename = fileURLToPath(import.meta.url);
@@ -14,9 +21,6 @@ const __dirname = dirname(__filename);
 
 // Base path untuk recordings
 const RECORDINGS_BASE_PATH = join(__dirname, '..', '..', 'recordings');
-
-// Active recording processes
-const activeRecordings = new Map();
 
 // Stream health monitoring
 const streamHealthMap = new Map();
@@ -27,22 +31,6 @@ const filesBeingProcessed = new Set();
 // RAM FIX: Limit concurrent re-mux operations to prevent memory spike
 const MAX_CONCURRENT_REMUX = 3;
 let activeRemuxCount = 0;
-
-// Cleanup ffmpeg processes on Node.js exit to prevent zombie processes
-const cleanupAllFfmpeg = () => {
-    console.log('[Service] Cleaning up FFmpeg zombie processes...');
-    activeRecordings.forEach((recording, cameraId) => {
-        try {
-            if (recording.process) {
-                recording.process.kill('SIGKILL');
-                console.log(`[Service] Killed FFmpeg for camera ${cameraId}`);
-            }
-        } catch (error) { }
-    });
-};
-process.on('exit', cleanupAllFfmpeg);
-process.on('SIGINT', () => { cleanupAllFfmpeg(); process.exit(); });
-process.on('SIGTERM', () => { cleanupAllFfmpeg(); process.exit(); });
 
 // Failed re-mux tracking (prevent infinite loop on corrupt files)
 // Using database for persistence across restarts
@@ -260,6 +248,8 @@ export function classifyRecordingFailure(ffmpegOutput = '', streamSource = 'inte
  */
 class RecordingService {
     constructor() {
+        this.isShuttingDown = false;
+
         // Ensure recordings directory exists
         if (!existsSync(RECORDINGS_BASE_PATH)) {
             mkdirSync(RECORDINGS_BASE_PATH, { recursive: true });
@@ -366,15 +356,15 @@ class RecordingService {
     async handleCameraBecameOffline(cameraId, now = Date.now()) {
         this.suspendRecordingForOffline(cameraId, now);
 
-        if (activeRecordings.has(cameraId)) {
-            await this.stopRecording(cameraId, { removeHealthState: false });
+        if (recordingProcessManager.getStatus(cameraId).status !== 'stopped') {
+            await this.stopRecording(cameraId, { removeHealthState: false, reason: 'camera_offline' });
         }
 
         return this.getRecordingStatus(cameraId);
     }
 
     async handleCameraBecameOnline(cameraId, now = Date.now()) {
-        if (activeRecordings.has(cameraId)) {
+        if (recordingProcessManager.getStatus(cameraId).status !== 'stopped') {
             return this.getRecordingStatus(cameraId);
         }
 
@@ -393,7 +383,7 @@ class RecordingService {
     async startRecording(cameraId) {
         try {
             // Check if already recording
-            if (activeRecordings.has(cameraId)) {
+            if (recordingProcessManager.getStatus(cameraId).status !== 'stopped') {
                 console.log(`Camera ${cameraId} already recording`);
                 return { success: false, message: 'Already recording' };
             }
@@ -439,88 +429,25 @@ class RecordingService {
 
             console.log(`FFmpeg recording: stream copy with web-compatible MP4 (0% CPU overhead)`);
 
-            // Spawn ffmpeg process
-            const ffmpeg = spawn('ffmpeg', ffmpegArgs);
-
-            // Store process
-            activeRecordings.set(cameraId, {
-                process: ffmpeg,
-                startTime: new Date(),
-                camera: camera,
-                currentSegment: null,
+            const startResult = await recordingProcessManager.start(cameraId, {
+                ffmpegArgs,
+                camera,
                 streamSource: sourceConfig.streamSource,
+                onStdout: () => this.updateRecordingDataTime(cameraId),
+                onStderr: (output) => this.handleRecordingStderr(cameraId, output),
+                onError: (error) => {
+                    console.error(`FFmpeg spawn error for camera ${cameraId}:`, error);
+                    this.markRecordingFailure(cameraId, 'spawn_error');
+                },
+                onClose: (result) => this.handleRecordingClosed(cameraId, result, sourceConfig.streamSource),
             });
+
+            if (!startResult.success) {
+                return startResult;
+            }
 
             // Initialize stream health
             this.markRecordingRecovered(cameraId, Date.now());
-
-            // Handle ffmpeg output (using array ring buffer to prevent memory leak)
-            const ffmpegOutput = [];
-
-            ffmpeg.stdout.on('data', () => {
-                // Update last data time
-                const health = streamHealthMap.get(cameraId);
-                if (health) {
-                    health.lastDataTime = Date.now();
-                }
-            });
-
-            ffmpeg.stderr.on('data', (data) => {
-                const output = data.toString();
-
-                ffmpegOutput.push(output);
-                if (ffmpegOutput.length > 50) { // Limit to last 50 chunks to prevent V8 reference memory leak
-                    ffmpegOutput.shift();
-                }
-
-                // Update last data time
-                const health = streamHealthMap.get(cameraId);
-                if (health) {
-                    health.lastDataTime = Date.now();
-                }
-
-                // FIX: Detect Segment Completion ONLY on "Closing".
-                // We MUST not trigger on "Opening" to prevent manipulating a file that FFmpeg is still writing to,
-                // which resulted in the premature deletion bug!
-                if (output.includes('Closing') && output.includes('.mp4')) {
-                    const match = output.match(/(\d{8}_\d{6}\.mp4)/);
-                    if (match) {
-                        const filename = match[1];
-                        console.log(`[FFmpeg] Detected segment completion (CLOSING): ${filename}`);
-                        this.onSegmentCreated(cameraId, filename);
-                    }
-                }
-
-                // Log all segment-related messages for debugging
-                if (output.includes('.mp4') && (output.includes('segment') || output.includes('Opening') || output.includes('Closing'))) {
-                    console.log(`[FFmpeg Segment Debug] ${output.trim()}`);
-                }
-
-                // Log errors
-                if ((output.includes('error') || output.includes('Error') || output.includes('failed')) && !output.includes('Closing')) {
-                    console.error(`[FFmpeg Camera ${cameraId}] ${output.trim()}`);
-                }
-            });
-
-            ffmpeg.on('error', (error) => {
-                console.error(`FFmpeg spawn error for camera ${cameraId}:`, error);
-                activeRecordings.delete(cameraId);
-                this.markRecordingFailure(cameraId, 'spawn_error');
-            });
-
-            ffmpeg.on('close', (code) => {
-                if (code !== 0 && code !== null) {
-                    const failureReason = classifyRecordingFailure(ffmpegOutput.join(''), sourceConfig.streamSource);
-                    console.error(`FFmpeg process for camera ${cameraId} exited with code ${code}`);
-                    console.error(`[Recording] Failure reason (${sourceConfig.streamSource}): ${failureReason}`);
-                    console.error(`Last FFmpeg output:\n${ffmpegOutput.join('').slice(-1000)}`); // Last 1000 chars
-                    this.markRecordingFailure(cameraId, failureReason);
-                    this.logRestart(cameraId, 'process_crashed', false);
-                } else {
-                    console.log(`FFmpeg process for camera ${cameraId} stopped normally`);
-                }
-                activeRecordings.delete(cameraId);
-            });
 
             // Update camera status
             execute(
@@ -543,14 +470,13 @@ class RecordingService {
     async stopRecording(cameraId, options = {}) {
         try {
             const shouldRemoveHealthState = options.removeHealthState !== false;
-            const recording = activeRecordings.get(cameraId);
-            if (!recording) {
+            const reason = options.reason ?? 'manual_stop';
+            const activeStatus = recordingProcessManager.getStatus(cameraId);
+            if (activeStatus.status === 'stopped') {
                 return { success: false, message: 'Not recording' };
             }
 
-            // Kill ffmpeg process
-            recording.process.kill('SIGTERM');
-            activeRecordings.delete(cameraId);
+            await recordingProcessManager.stop(cameraId, reason);
             if (shouldRemoveHealthState) {
                 this.clearRuntimeHealthState(cameraId);
             }
@@ -581,7 +507,10 @@ class RecordingService {
         health.lastRestartAt = restartTime.getTime();
 
         // Stop current recording
-        await this.stopRecording(cameraId, { removeHealthState: reason === 'manual' });
+        await this.stopRecording(cameraId, {
+            removeHealthState: reason === 'manual',
+            reason: reason === 'manual' ? 'manual_restart' : `${reason}_restart`,
+        });
 
         // Wait 3 seconds
         await new Promise(resolve => setTimeout(resolve, 3000));
@@ -597,6 +526,48 @@ class RecordingService {
         this.logRestart(cameraId, reason, result.success, restartTime, recoveryTime);
 
         return result;
+    }
+
+    updateRecordingDataTime(cameraId) {
+        const health = streamHealthMap.get(cameraId);
+        if (health) {
+            health.lastDataTime = Date.now();
+        }
+    }
+
+    handleRecordingStderr(cameraId, output) {
+        this.updateRecordingDataTime(cameraId);
+
+        // Detect segment completion only on "Closing" so remux never touches files still being written.
+        if (output.includes('Closing') && output.includes('.mp4')) {
+            const match = output.match(/(\d{8}_\d{6}\.mp4)/);
+            if (match) {
+                const filename = match[1];
+                console.log(`[FFmpeg] Detected segment completion (CLOSING): ${filename}`);
+                this.onSegmentCreated(cameraId, filename);
+            }
+        }
+
+        if (output.includes('.mp4') && (output.includes('segment') || output.includes('Opening') || output.includes('Closing'))) {
+            console.log(`[FFmpeg Segment Debug] ${output.trim()}`);
+        }
+
+        if ((output.includes('error') || output.includes('Error') || output.includes('failed')) && !output.includes('Closing')) {
+            console.error(`[FFmpeg Camera ${cameraId}] ${output.trim()}`);
+        }
+    }
+
+    handleRecordingClosed(cameraId, result, streamSource) {
+        if (['intentional_stop', 'intentional_shutdown', 'restart_requested', 'not_recording'].includes(result.reason)) {
+            console.log(`FFmpeg process for camera ${cameraId} stopped with lifecycle reason: ${result.reason}`);
+            return;
+        }
+
+        console.error(`FFmpeg process for camera ${cameraId} exited with code ${result.exitCode}`);
+        console.error(`[Recording] Failure reason (${streamSource}): ${result.reason}`);
+        console.error(`Last FFmpeg output:\n${recordingProcessManager.getOutput(cameraId).slice(-1000)}`);
+        this.markRecordingFailure(cameraId, result.reason);
+        this.logRestart(cameraId, 'process_crashed', false);
     }
 
     /**
@@ -1156,6 +1127,10 @@ class RecordingService {
     }
 
     async tickHealthMonitoring(now = Date.now()) {
+        if (this.isShuttingDown) {
+            return;
+        }
+
         for (const [cameraId, health] of streamHealthMap.entries()) {
             const camera = queryOne(
                 'SELECT is_tunnel, is_online, enabled, enable_recording, recording_status FROM cameras WHERE id = ?',
@@ -1168,14 +1143,14 @@ class RecordingService {
             }
 
             if (!camera.enabled || !camera.enable_recording) {
-                if (!activeRecordings.has(cameraId)) {
+                if (recordingProcessManager.getStatus(cameraId).status === 'stopped') {
                     this.clearRuntimeHealthState(cameraId);
                 }
                 continue;
             }
 
-            const activeRecording = activeRecordings.get(cameraId);
-            if (!activeRecording) {
+            const activeRecording = recordingProcessManager.getStatus(cameraId);
+            if (activeRecording.status === 'stopped') {
                 if (camera.is_online === 1 && health.suspendedReason && now >= (health.cooldownUntil || 0)) {
                     await this.attemptRecordingRecovery(cameraId, health.suspendedReason, now);
                 } else if (camera.is_online !== 1) {
@@ -1219,6 +1194,11 @@ class RecordingService {
                 }
             }
         }
+    }
+
+    async shutdown() {
+        this.isShuttingDown = true;
+        return recordingProcessManager.shutdownAll('server_shutdown');
     }
 
     /**
@@ -1425,10 +1405,10 @@ class RecordingService {
      * Get recording status
      */
     getRecordingStatus(cameraId) {
-        const recording = activeRecordings.get(cameraId);
+        const recording = recordingProcessManager.getStatus(cameraId);
         const health = streamHealthMap.get(cameraId);
 
-        if (!recording) {
+        if (recording.status === 'stopped') {
             if (health?.suspendedReason) {
                 return {
                     isRecording: false,
@@ -1447,10 +1427,10 @@ class RecordingService {
         }
 
         return {
-            isRecording: true,
-            status: 'recording',
+            isRecording: recording.isRecording,
+            status: recording.status,
             startTime: recording.startTime,
-            duration: Math.floor((Date.now() - recording.startTime.getTime()) / 1000),
+            duration: recording.startTime ? Math.floor((Date.now() - recording.startTime.getTime()) / 1000) : 0,
             restartCount: health ? health.restartCount : 0,
             consecutiveFailureCount: health ? health.consecutiveFailureCount || 0 : 0,
             cooldownUntil: health ? health.cooldownUntil || 0 : 0,
