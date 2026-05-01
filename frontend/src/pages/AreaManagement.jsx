@@ -1,3 +1,11 @@
+/*
+Purpose: Admin Area Management page for area CRUD, display settings, and area-level camera bulk actions.
+Caller: React router admin pages.
+Deps: area/camera/settings services, notification context, UI components, location picker.
+MainFuncs: AreaManagement(), bulk preview/apply handlers, area form handlers.
+SideEffects: Calls backend APIs, updates area/camera settings, shows notifications.
+*/
+
 import { useEffect, useState, useCallback, useMemo, useRef, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { areaService } from '../services/areaService';
@@ -284,7 +292,7 @@ export default function AreaManagement() {
     };
 
     const handleToggleGridDefault = async (area) => {
-        const nextValue = !Boolean(area.show_on_grid_default === 1 || area.show_on_grid_default === true);
+        const nextValue = !(area.show_on_grid_default === 1 || area.show_on_grid_default === true);
         setTogglingGridAreaId(area.id);
         try {
             const payload = {
@@ -943,7 +951,7 @@ export default function AreaManagement() {
                                     <span>
                                         <span className="block text-sm font-medium text-gray-900 dark:text-white">Tampilkan di Grid Default</span>
                                         <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
-                                            Saat Grid View masih di "Semua Lokasi", hanya area yang dicentang di sini yang dimuat default. Jika user memilih area tertentu, area itu tetap tampil walau opsi ini dimatikan.
+                                            Saat Grid View masih di &quot;Semua Lokasi&quot;, hanya area yang dicentang di sini yang dimuat default. Jika user memilih area tertentu, area itu tetap tampil walau opsi ini dimatikan.
                                         </span>
                                     </span>
                                 </label>
@@ -1105,6 +1113,9 @@ export default function AreaManagement() {
                                             <option value="probe_first">Probe First</option>
                                             <option value="disabled">Disabled</option>
                                         </select>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                                            Berlaku untuk kamera external valid; kamera internal atau metadata belum lengkap akan dilewati oleh preview.
+                                        </p>
                                     </div>
                                     <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
                                         <label className="text-sm font-semibold text-gray-900 dark:text-white">Delivery Type</label>
@@ -1145,6 +1156,9 @@ export default function AreaManagement() {
                                             <option value="1">Aktifkan</option>
                                             <option value="0">Matikan</option>
                                         </select>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                                            Matikan aman untuk semua tipe kamera; aktifkan recording tetap diproteksi untuk kamera internal.
+                                        </p>
                                     </div>
                                     <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
                                         <label className="text-sm font-semibold text-gray-900 dark:text-white">Mode TLS</label>
@@ -1169,6 +1183,9 @@ export default function AreaManagement() {
                                             <option value="1">Aktifkan</option>
                                             <option value="0">Matikan</option>
                                         </select>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                                            Matikan menyembunyikan semua kamera terpilih dari publik tanpa bergantung pada tipe delivery.
+                                        </p>
                                     </div>
                                     <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
                                         <label className="text-sm font-semibold text-gray-900 dark:text-white">Status Publik</label>
