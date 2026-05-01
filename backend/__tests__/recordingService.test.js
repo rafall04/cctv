@@ -273,11 +273,14 @@ describe('recordingService external recording support', () => {
         });
 
         await recordingService.startRecording(12);
+        const child = spawnMock.mock.results.at(-1).value;
         vi.advanceTimersByTime(31000);
 
         const restartSpy = vi.spyOn(recordingService, 'restartRecording');
 
-        await recordingService.tickHealthMonitoring(Date.now());
+        const tickPromise = recordingService.tickHealthMonitoring(Date.now());
+        child.emit('close', 255, null);
+        await tickPromise;
 
         expect(restartSpy).not.toHaveBeenCalled();
         expect(recordingService.getRecordingStatus(12)).toMatchObject({
@@ -309,8 +312,11 @@ describe('recordingService external recording support', () => {
         });
 
         await recordingService.startRecording(13);
+        const child = spawnMock.mock.results.at(-1).value;
         vi.advanceTimersByTime(31000);
-        await recordingService.tickHealthMonitoring(Date.now());
+        const offlineTickPromise = recordingService.tickHealthMonitoring(Date.now());
+        child.emit('close', 255, null);
+        await offlineTickPromise;
 
         expect(recordingService.getRecordingStatus(13).status).toBe('suspended_offline');
 
@@ -330,7 +336,10 @@ describe('recordingService external recording support', () => {
         queryOneMock.mockReturnValue(createCamera({ id: 14 }));
 
         await recordingService.startRecording(14);
-        const status = await recordingService.handleCameraBecameOffline(14);
+        const child = spawnMock.mock.results.at(-1).value;
+        const offlinePromise = recordingService.handleCameraBecameOffline(14);
+        child.emit('close', 255, null);
+        const status = await offlinePromise;
 
         expect(status).toMatchObject({
             isRecording: false,
@@ -353,5 +362,48 @@ describe('recordingService external recording support', () => {
             isRecording: true,
             status: 'recording',
         });
+    });
+
+    it('does not mark intentional stop exit as ffmpeg_failed', async () => {
+        const { recordingService } = await import('../services/recordingService.js');
+        const child = createSpawnProcess();
+        child.pid = 707;
+        spawnMock.mockReturnValue(child);
+        queryOneMock.mockReturnValue(createCamera({ id: 70 }));
+
+        await recordingService.startRecording(70);
+        const stopPromise = recordingService.stopRecording(70);
+
+        expect(child.kill).toHaveBeenCalledWith('SIGINT');
+        child.emit('close', 255, null);
+
+        await expect(stopPromise).resolves.toMatchObject({ success: true });
+        expect(executeMock).toHaveBeenCalledWith(
+            'UPDATE cameras SET recording_status = ? WHERE id = ?',
+            ['stopped', 70]
+        );
+        expect(executeMock.mock.calls.some(([sql]) => String(sql).includes('recording_restart_logs'))).toBe(false);
+    });
+
+    it('stops all active recordings during service shutdown', async () => {
+        const { recordingService } = await import('../services/recordingService.js');
+        const first = createSpawnProcess();
+        const second = createSpawnProcess();
+        first.pid = 801;
+        second.pid = 802;
+        spawnMock.mockReturnValueOnce(first).mockReturnValueOnce(second);
+        queryOneMock.mockImplementation((sql, params) => createCamera({ id: params?.[0] ?? 1 }));
+
+        await recordingService.startRecording(81);
+        await recordingService.startRecording(82);
+
+        const shutdownPromise = recordingService.shutdown();
+        expect(first.kill).toHaveBeenCalledWith('SIGINT');
+        expect(second.kill).toHaveBeenCalledWith('SIGINT');
+
+        first.emit('close', 255, null);
+        second.emit('close', 255, null);
+
+        await expect(shutdownPromise).resolves.toHaveLength(2);
     });
 });
