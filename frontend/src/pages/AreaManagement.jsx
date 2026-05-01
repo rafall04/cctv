@@ -1156,9 +1156,6 @@ export default function AreaManagement() {
                                             <option value="1">Aktifkan</option>
                                             <option value="0">Matikan</option>
                                         </select>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                                            Matikan aman untuk semua tipe kamera; aktifkan recording tetap diproteksi untuk kamera internal.
-                                        </p>
                                     </div>
                                     <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
                                         <label className="text-sm font-semibold text-gray-900 dark:text-white">Mode TLS</label>
@@ -1184,7 +1181,7 @@ export default function AreaManagement() {
                                             <option value="0">Matikan</option>
                                         </select>
                                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                                            Matikan menyembunyikan semua kamera terpilih dari publik tanpa bergantung pada tipe delivery.
+                                            Matikan aman untuk semua tipe kamera; aktifkan recording tetap diproteksi untuk kamera internal.
                                         </p>
                                     </div>
                                     <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
@@ -1198,6 +1195,9 @@ export default function AreaManagement() {
                                             <option value="1">Aktifkan</option>
                                             <option value="0">Matikan</option>
                                         </select>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                                            Matikan menyembunyikan semua kamera terpilih dari publik tanpa bergantung pada tipe delivery.
+                                        </p>
                                     </div>
                                     <div className="flex flex-col gap-1.5 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-200 dark:border-gray-700">
                                         <label className="text-sm font-semibold text-gray-900 dark:text-white">Video Codec</label>

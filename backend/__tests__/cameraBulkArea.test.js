@@ -9,6 +9,7 @@ SideEffects: Mocks database reads/writes and camera update calls during tests.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as connectionPool from '../database/connectionPool.js';
 import cameraService from '../services/cameraService.js';
+import mediaMtxService from '../services/mediaMtxService.js';
 
 function createMixedAreaCameras() {
     return [
@@ -309,5 +310,69 @@ describe('cameraService.bulkUpdateArea', () => {
         expect(updateSpy).toHaveBeenNthCalledWith(2, 12, expect.objectContaining({ enable_recording: 0 }), expect.any(Object), expect.any(Object));
         expect(updateSpy).toHaveBeenNthCalledWith(3, 13, expect.objectContaining({ enable_recording: 0 }), expect.any(Object), expect.any(Object));
         expect(updateSpy).toHaveBeenNthCalledWith(4, 14, expect.objectContaining({ enable_recording: 0 }), expect.any(Object), expect.any(Object));
+    });
+
+    it('apply bulk recording matikan tetap berhasil untuk kamera external unresolved', async () => {
+        const [camera] = createMixedAreaCameras().filter((item) => item.id === 14);
+        vi.spyOn(connectionPool, 'queryOne').mockImplementation((sql, params = []) => {
+            if (sql.includes('FROM areas')) {
+                return { id: 7, name: 'Area Mixed' };
+            }
+            if (sql.includes('FROM cameras')) {
+                return params[0] === 14 ? camera : null;
+            }
+            return null;
+        });
+        vi.spyOn(connectionPool, 'query').mockReturnValue([camera]);
+        vi.spyOn(connectionPool, 'execute').mockReturnValue({ changes: 1 });
+        vi.spyOn(cameraService, 'invalidateCameraCache').mockImplementation(() => {});
+        vi.spyOn(mediaMtxService, 'removeCameraPathByKey').mockResolvedValue({ success: true });
+
+        const result = await cameraService.bulkUpdateArea(7, {
+            targetFilter: 'all',
+            operation: 'policy_update',
+            payload: {
+                enable_recording: 0,
+            },
+        }, { user: { id: 1, username: 'admin' }, ip: '127.0.0.1' });
+
+        expect(result.success).toBe(true);
+        expect(result.changes).toBe(1);
+        expect(connectionPool.execute).toHaveBeenCalledWith(
+            expect.stringContaining('UPDATE cameras SET'),
+            expect.arrayContaining([0, 14])
+        );
+    });
+
+    it('apply bulk status publik matikan tetap berhasil untuk kamera external unresolved', async () => {
+        const [camera] = createMixedAreaCameras().filter((item) => item.id === 14);
+        vi.spyOn(connectionPool, 'queryOne').mockImplementation((sql, params = []) => {
+            if (sql.includes('FROM areas')) {
+                return { id: 7, name: 'Area Mixed' };
+            }
+            if (sql.includes('FROM cameras')) {
+                return params[0] === 14 ? camera : null;
+            }
+            return null;
+        });
+        vi.spyOn(connectionPool, 'query').mockReturnValue([camera]);
+        vi.spyOn(connectionPool, 'execute').mockReturnValue({ changes: 1 });
+        vi.spyOn(cameraService, 'invalidateCameraCache').mockImplementation(() => {});
+        vi.spyOn(mediaMtxService, 'removeCameraPathByKey').mockResolvedValue({ success: true });
+
+        const result = await cameraService.bulkUpdateArea(7, {
+            targetFilter: 'all',
+            operation: 'policy_update',
+            payload: {
+                enabled: 0,
+            },
+        }, { user: { id: 1, username: 'admin' }, ip: '127.0.0.1' });
+
+        expect(result.success).toBe(true);
+        expect(result.changes).toBe(1);
+        expect(connectionPool.execute).toHaveBeenCalledWith(
+            expect.stringContaining('UPDATE cameras SET'),
+            expect.arrayContaining([0, 14])
+        );
     });
 });

@@ -1,3 +1,11 @@
+/*
+Purpose: Admin dashboard for monitoring and controlling CCTV recording state.
+Caller: Admin router recording page.
+Deps: recordingService, NotificationContext, recording dashboard data hook, recording UI components.
+MainFuncs: RecordingDashboard(), recording start/stop/settings handlers.
+SideEffects: Calls recording APIs, refreshes dashboard data, displays operator notifications.
+*/
+
 import { useState } from 'react';
 import recordingService from '../services/recordingService';
 import { useNotification } from '../contexts/NotificationContext';
@@ -22,7 +30,7 @@ function RecordingLoadingState() {
 }
 
 export default function RecordingDashboard() {
-    const { showNotification } = useNotification();
+    const { success, error: notifyError } = useNotification();
     const [updatingCameraId, setUpdatingCameraId] = useState(null);
     const {
         recordings,
@@ -47,11 +55,11 @@ export default function RecordingDashboard() {
         try {
             const response = await recordingService.startRecording(cameraId);
             if (response.success) {
-                showNotification('Recording started successfully', 'success');
+                success('Recording Dimulai', `Kamera ${cameraId} mulai direkam.`);
                 fetchData({ mode: 'initial' });
             }
         } catch (error) {
-            showNotification(error.response?.data?.message || 'Failed to start recording', 'error');
+            notifyError('Gagal Memulai Recording', error.response?.data?.message || 'Failed to start recording');
         }
     };
 
@@ -59,11 +67,11 @@ export default function RecordingDashboard() {
         try {
             const response = await recordingService.stopRecording(cameraId);
             if (response.success) {
-                showNotification('Recording stopped successfully', 'success');
+                success('Recording Dihentikan', `Kamera ${cameraId} berhenti direkam.`);
                 fetchData({ mode: 'initial' });
             }
         } catch (error) {
-            showNotification(error.response?.data?.message || 'Failed to stop recording', 'error');
+            notifyError('Gagal Menghentikan Recording', error.response?.data?.message || 'Failed to stop recording');
         }
     };
 
@@ -72,11 +80,11 @@ export default function RecordingDashboard() {
             setUpdatingCameraId(cameraId);
             const response = await recordingService.updateRecordingSettings(cameraId, settings);
             if (response.success) {
-                showNotification('Recording settings updated successfully', 'success');
+                success('Pengaturan Recording Tersimpan', `Pengaturan kamera ${cameraId} berhasil diperbarui.`);
                 await fetchData({ mode: 'initial' });
             }
         } catch (error) {
-            showNotification(error.response?.data?.message || 'Failed to update recording settings', 'error');
+            notifyError('Gagal Menyimpan Recording', error.response?.data?.message || 'Failed to update recording settings');
             throw error;
         } finally {
             setUpdatingCameraId(null);

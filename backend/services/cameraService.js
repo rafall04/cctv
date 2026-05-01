@@ -1034,6 +1034,14 @@ function isHealthMonitoringDisable(payload = {}) {
     return payload.external_health_mode === 'disabled';
 }
 
+function isBulkSafeDisablePatch(patch = {}) {
+    const patchKeys = Object.keys(patch);
+    return patchKeys.length > 0
+        && patchKeys.every((key) => ['enabled', 'enable_recording'].includes(key))
+        && (patch.enabled === undefined || patch.enabled === 0 || patch.enabled === false)
+        && (patch.enable_recording === undefined || patch.enable_recording === 0 || patch.enable_recording === false);
+}
+
 function requiresExternalHlsAreaPolicy(operation, payload = {}) {
     if (operation !== 'policy_update' && operation !== 'maintenance') {
         return false;
@@ -1567,14 +1575,14 @@ class CameraService {
         }
 
         const deliveryConfig = normalizeCameraPersistencePayload({
-            stream_source,
-            delivery_type,
+            stream_source: stream_source !== undefined ? stream_source : existingCamera.stream_source,
+            delivery_type: delivery_type !== undefined ? delivery_type : existingCamera.delivery_type,
             private_rtsp_url: private_rtsp_url !== undefined ? private_rtsp_url : existingCamera.private_rtsp_url,
-            external_hls_url,
-            external_stream_url,
-            external_embed_url,
-            external_snapshot_url,
-            external_origin_mode,
+            external_hls_url: external_hls_url !== undefined ? external_hls_url : existingCamera.external_hls_url,
+            external_stream_url: external_stream_url !== undefined ? external_stream_url : existingCamera.external_stream_url,
+            external_embed_url: external_embed_url !== undefined ? external_embed_url : existingCamera.external_embed_url,
+            external_snapshot_url: external_snapshot_url !== undefined ? external_snapshot_url : existingCamera.external_snapshot_url,
+            external_origin_mode: external_origin_mode !== undefined ? external_origin_mode : existingCamera.external_origin_mode,
         }, existingCamera, options);
 
         const updates = [];
@@ -2069,11 +2077,13 @@ class CameraService {
 
         let changes = 0;
         for (const item of patches) {
+            const allowIncompleteExternalMetadata = operation === 'normalization'
+                || isBulkSafeDisablePatch(item.patch);
             await this.updateCamera(item.camera.id, {
                 ...item.patch,
                 private_rtsp_url: toNullableRtspValue(item.patch.private_rtsp_url),
             }, request, {
-                allowIncompleteExternalMetadata: operation === 'normalization',
+                allowIncompleteExternalMetadata,
             });
             changes += 1;
         }
