@@ -476,6 +476,48 @@ describe('recordingService external recording support', () => {
         expect(executeMock.mock.calls.filter(([sql]) => sql === 'DELETE FROM recording_segments WHERE id = ?')).toHaveLength(6);
     });
 
+    it('keeps recent DB segments while deleting only expired old segments', async () => {
+        const { join } = await import('path');
+        const { recordingService } = await import('../services/recordingService.js');
+        const oldStart = new Date(Date.now() - (2 * 60 * 60 * 1000)).toISOString();
+        const recentStart = new Date(Date.now() - (20 * 60 * 1000)).toISOString();
+        const oldPath = join(process.cwd(), 'recordings', 'camera1', '20260502_000000.mp4');
+        const recentPath = join(process.cwd(), 'recordings', 'camera1', '20260502_010000.mp4');
+
+        queryOneMock.mockReturnValue({ recording_duration_hours: 1, name: 'Mixed Retention Camera' });
+        queryMock.mockImplementation((sql) => {
+            if (sql.includes('SELECT id, start_time, file_path, filename FROM recording_segments')) {
+                return [
+                    {
+                        id: 701,
+                        start_time: oldStart,
+                        filename: '20260502_000000.mp4',
+                        file_path: oldPath,
+                    },
+                    {
+                        id: 702,
+                        start_time: recentStart,
+                        filename: '20260502_010000.mp4',
+                        file_path: recentPath,
+                    },
+                ];
+            }
+
+            if (sql.includes('SELECT filename FROM recording_segments')) {
+                return [];
+            }
+
+            return [];
+        });
+
+        await recordingService.cleanupOldSegments(1);
+
+        expect(fsPromisesMock.unlink).toHaveBeenCalledWith(oldPath);
+        expect(fsPromisesMock.unlink).not.toHaveBeenCalledWith(recentPath);
+        expect(executeMock).toHaveBeenCalledWith('DELETE FROM recording_segments WHERE id = ?', [701]);
+        expect(executeMock).not.toHaveBeenCalledWith('DELETE FROM recording_segments WHERE id = ?', [702]);
+    });
+
     it('quarantines invalid short segments instead of deleting them immediately', async () => {
         const { join } = await import('path');
         execMock[promisify.custom] = vi.fn(async () => ({ stdout: '0.2\n', stderr: '' }));
