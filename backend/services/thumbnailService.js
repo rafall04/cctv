@@ -1,3 +1,11 @@
+/*
+Purpose: Generate and maintain camera thumbnail images from internal RTSP/HLS and external stream sources.
+Caller: Backend startup thumbnail scheduler, camera recovery hooks, and thumbnail refresh actions.
+Deps: ffmpeg, filesystem thumbnail storage, database camera rows, delivery and internal ingest policy utilities.
+MainFuncs: ThumbnailService, buildFfmpegInputArgs(), generateAllThumbnails(), generateSingle(), generateThumbnail().
+SideEffects: Executes ffmpeg, writes thumbnail files, updates camera thumbnail metadata in SQLite.
+*/
+
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import { existsSync, mkdirSync, unlinkSync, copyFileSync } from 'fs';
@@ -116,9 +124,11 @@ class ThumbnailService {
 
         if (isRtsp) {
             args.push('-rtsp_transport', 'tcp');
+            args.push('-stimeout', '10000000');
+        } else {
+            args.push('-rw_timeout', '10000000');
         }
 
-        args.push('-rw_timeout', '10000000');
         args.push('-i', sourceUrl);
         return args;
     }

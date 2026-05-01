@@ -1,3 +1,11 @@
+/*
+Purpose: Regression coverage for thumbnail source selection and FFmpeg argument construction.
+Caller: Vitest backend suite.
+Deps: Mocked child_process, filesystem, database, and backend config.
+MainFuncs: thumbnailService.generateSingle(), generateAllThumbnails(), buildFfmpegInputArgs().
+SideEffects: No real ffmpeg, filesystem, or database writes; all external dependencies are mocked.
+*/
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const execMock = vi.fn();
@@ -77,6 +85,35 @@ describe('thumbnailService external thumbnails', () => {
             'UPDATE cameras SET thumbnail_path = ?, thumbnail_updated_at = CURRENT_TIMESTAMP WHERE id = ?',
             ['/api/thumbnails/18.jpg', 18]
         );
+    });
+
+    it('uses RTSP-compatible timeout args without rw_timeout for internal RTSP thumbnails', async () => {
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        const args = thumbnailService.buildFfmpegInputArgs('rtsp://admin:secret@192.168.14.2:554/stream1');
+
+        expect(args).toEqual([
+            '-rtsp_transport',
+            'tcp',
+            '-stimeout',
+            '10000000',
+            '-i',
+            'rtsp://admin:secret@192.168.14.2:554/stream1',
+        ]);
+        expect(args).not.toContain('-rw_timeout');
+    });
+
+    it('keeps rw_timeout for HTTP and HLS thumbnail inputs', async () => {
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        const args = thumbnailService.buildFfmpegInputArgs('https://example.com/live/index.m3u8');
+
+        expect(args).toEqual([
+            '-rw_timeout',
+            '10000000',
+            '-i',
+            'https://example.com/live/index.m3u8',
+        ]);
     });
 
     it('captures MJPEG thumbnails from snapshot url when available', async () => {

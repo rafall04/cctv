@@ -1,3 +1,11 @@
+/*
+Purpose: Regression coverage for MediaMTX path synchronization and database camera reads.
+Caller: Vitest backend suite.
+Deps: Mocked axios MediaMTX API client, config, and connectionPool query helpers.
+MainFuncs: mediaMtxService.updateCameraPath(), mediaMtxService.getDatabaseCameras().
+SideEffects: No real MediaMTX or database calls; all external dependencies are mocked.
+*/
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const getMock = vi.fn();
@@ -62,5 +70,38 @@ describe('mediaMtxService on-demand path sync', () => {
             sourceOnDemand: true,
             sourceOnDemandCloseAfter: '30s',
         }));
+    });
+
+    it('qualifies joined camera columns when reading database cameras', async () => {
+        const { default: mediaMtxService } = await import('../services/mediaMtxService.js');
+
+        queryMock.mockReturnValue([
+            {
+                id: 2,
+                name: 'Internal Camera',
+                rtsp_url: 'rtsp://admin:secret@192.168.14.2:554/stream1',
+                stream_key: null,
+                internal_ingest_policy_override: 'default',
+                internal_on_demand_close_after_seconds_override: null,
+                source_profile: null,
+                description: null,
+                enable_recording: 1,
+                area_internal_ingest_policy_default: 'on_demand',
+                area_internal_on_demand_close_after_seconds: 45,
+                path_name: 'camera2',
+            },
+        ]);
+
+        const cameras = mediaMtxService.getDatabaseCameras();
+        const sql = queryMock.mock.calls[0][0];
+
+        expect(sql).toContain('cameras.id');
+        expect(sql).toContain('COALESCE(cameras.stream_key');
+        expect(sql).toContain("'camera' || cameras.id");
+        expect(sql).toContain('WHERE cameras.enabled = 1');
+        expect(cameras[0]._areaPolicy).toEqual({
+            internal_ingest_policy_default: 'on_demand',
+            internal_on_demand_close_after_seconds: 45,
+        });
     });
 });

@@ -1,3 +1,11 @@
+/*
+Purpose: Keep MediaMTX path configuration synchronized with enabled internal CCTV cameras.
+Caller: Backend startup, MediaMTX health timer, camera service path repair, and health checks.
+Deps: axios MediaMTX API client, connectionPool camera reads, config, internal ingest policy resolver.
+MainFuncs: MediaMtxService, healthCheck(), getDatabaseCameras(), updateCameraPath(), syncCameras().
+SideEffects: Reads camera/area DB rows and creates, patches, or deletes MediaMTX path configuration.
+*/
+
 import axios from 'axios';
 import { config } from '../config/config.js';
 import { query, queryOne } from '../database/connectionPool.js';
@@ -210,10 +218,10 @@ class MediaMtxService {
             // Fallback to 'camera' + id if stream_key is not set
             const cameras = query(`
                 SELECT 
-                    id, 
-                    name, 
-                    private_rtsp_url as rtsp_url,
-                    stream_key,
+                    cameras.id,
+                    cameras.name,
+                    cameras.private_rtsp_url as rtsp_url,
+                    cameras.stream_key,
                     CASE
                         WHEN cameras.internal_ingest_policy_override IN ('default', 'always_on', 'on_demand')
                             THEN cameras.internal_ingest_policy_override
@@ -229,10 +237,10 @@ class MediaMtxService {
                         ELSE 'default'
                     END as area_internal_ingest_policy_default,
                     areas.internal_on_demand_close_after_seconds as area_internal_on_demand_close_after_seconds,
-                    COALESCE(stream_key, 'camera' || id) as path_name 
+                    COALESCE(cameras.stream_key, 'camera' || cameras.id) as path_name
                 FROM cameras
                 LEFT JOIN areas ON areas.id = cameras.area_id
-                WHERE enabled = 1 AND (stream_source = 'internal' OR stream_source IS NULL)
+                WHERE cameras.enabled = 1 AND (cameras.stream_source = 'internal' OR cameras.stream_source IS NULL)
             `);
             return cameras.map((camera) => ({
                 ...camera,
