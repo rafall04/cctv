@@ -1,18 +1,35 @@
+/*
+Purpose: Regression coverage for camera health monitoring, probing, and recording transition behavior.
+Caller: Vitest backend suite.
+Deps: CameraHealthService, mocked recording/thumbnail/media services, connectionPool spies.
+MainFuncs: CameraHealthService test cases for probes, scoring, transitions, and health loops.
+SideEffects: Mocks network, database, MediaMTX, recording, and thumbnail interactions.
+*/
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import axios from 'axios';
 import net from 'net';
 import { PassThrough } from 'stream';
+import * as connectionPool from '../database/connectionPool.js';
 
 const {
     handleCameraBecameOnlineMock,
     handleCameraBecameOfflineMock,
     refreshCameraThumbnailMock,
     updateCameraPathMock,
+    queryMock,
+    executeMock,
+    transactionMock,
+    upsertRuntimeStateMock,
 } = vi.hoisted(() => ({
     handleCameraBecameOnlineMock: vi.fn(),
     handleCameraBecameOfflineMock: vi.fn(),
     refreshCameraThumbnailMock: vi.fn(),
     updateCameraPathMock: vi.fn(),
+    queryMock: vi.fn(),
+    executeMock: vi.fn(),
+    transactionMock: vi.fn((fn) => (...args) => fn(...args)),
+    upsertRuntimeStateMock: vi.fn(),
 }));
 
 vi.mock('../services/recordingService.js', () => ({
@@ -31,6 +48,29 @@ vi.mock('../services/thumbnailService.js', () => ({
 vi.mock('../services/mediaMtxService.js', () => ({
     default: {
         updateCameraPath: updateCameraPathMock,
+    },
+}));
+
+vi.mock('../services/telegramService.js', () => ({
+    sendCameraOfflineNotification: vi.fn(),
+    sendCameraOnlineNotification: vi.fn(),
+    isTelegramConfigured: vi.fn(() => false),
+}));
+
+vi.mock('../database/connectionPool.js', () => ({
+    query: queryMock,
+    queryOne: vi.fn(),
+    execute: executeMock,
+    transaction: transactionMock,
+}));
+
+vi.mock('../services/timezoneService.js', () => ({
+    getTimezone: vi.fn(() => 'Asia/Jakarta'),
+}));
+
+vi.mock('../services/cameraRuntimeStateService.js', () => ({
+    default: {
+        upsertRuntimeState: upsertRuntimeStateMock,
     },
 }));
 
@@ -934,6 +974,46 @@ describe('cameraHealthService status transitions', () => {
 
         expect(handleCameraBecameOnlineMock).not.toHaveBeenCalled();
         expect(refreshCameraThumbnailMock).toHaveBeenCalledWith(43);
+    });
+});
+
+describe('cameraHealthService check loop', () => {
+    beforeEach(() => {
+        vi.restoreAllMocks();
+        vi.clearAllMocks();
+    });
+
+    it('processes fulfilled probe results without camera variable shadowing failures', async () => {
+        const service = new CameraHealthService();
+        const camera = {
+            id: 51,
+            name: 'Camera Check Loop',
+            enabled: 1,
+            is_online: 1,
+            stream_source: 'internal',
+            delivery_type: 'internal_hls',
+            private_rtsp_url: 'rtsp://admin:secret@10.0.0.51/stream',
+            stream_key: 'camera-51',
+        };
+
+        vi.spyOn(service, 'getActivePaths').mockResolvedValue(new Map());
+        vi.spyOn(service, 'evaluateCameraStatus').mockResolvedValue({
+            camera,
+            isOnline: 1,
+            rawReason: 'ok',
+            rawDetails: null,
+        });
+        queryMock.mockReturnValue([camera]);
+        executeMock.mockReturnValue({ changes: 1 });
+        upsertRuntimeStateMock.mockImplementation(() => {});
+
+        await expect(service.checkAllCameras()).resolves.toBeUndefined();
+
+        expect(service.evaluateCameraStatus).toHaveBeenCalledWith(camera, expect.any(Map));
+        expect(connectionPool.execute).toHaveBeenCalledWith(
+            expect.stringContaining('UPDATE cameras SET is_online'),
+            expect.arrayContaining([1, expect.any(String), 51])
+        );
     });
 });
 

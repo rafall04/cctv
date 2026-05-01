@@ -1,3 +1,11 @@
+/*
+Purpose: Monitor camera availability, update runtime health state, and trigger recording/thumbnail transitions.
+Caller: Backend server startup, camera health routes, and runtime stream signal handlers.
+Deps: connectionPool, cameraRuntimeStateService, mediaMtxService, recordingService, thumbnailService.
+MainFuncs: CameraHealthService, checkAllCameras(), checkCamera(), evaluateCameraStatus(), recordRuntimeSignal().
+SideEffects: Updates camera online state/runtime state, repairs MediaMTX paths, sends notifications, pauses/resumes recording.
+*/
+
 import axios from 'axios';
 import crypto from 'crypto';
 import https from 'https';
@@ -2527,14 +2535,14 @@ class CameraHealthService {
             const wentOnline = [];
 
             const processedIds = new Set();
-            for (const { result, camera } of probeResults) {
+            for (const { result, camera: probedCamera } of probeResults) {
                 if (result.status !== 'fulfilled') {
-                    console.error(`[CameraHealth] Camera ${camera.id} (${camera.name}) probe failed:`, result.reason?.message || result.reason);
+                    console.error(`[CameraHealth] Camera ${probedCamera.id} (${probedCamera.name}) probe failed:`, result.reason?.message || result.reason);
                     continue;
                 }
 
-                processedIds.add(camera.id);
                 const { camera, isOnline, rawReason } = result.value;
+                processedIds.add(camera.id);
                 const statusChanged = camera.is_online !== isOnline;
 
                 if (statusChanged) {

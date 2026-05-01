@@ -1,15 +1,25 @@
 // @vitest-environment jsdom
+/*
+Purpose: Regression coverage for admin Recording Dashboard rendering and operator notifications.
+Caller: Vitest frontend jsdom suite.
+Deps: RecordingDashboard, mocked recordingService, mocked useRecordingDashboardData.
+MainFuncs: RecordingDashboard interaction assertions.
+SideEffects: Mocks recording API calls and notification context methods.
+*/
+
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import RecordingDashboard from './RecordingDashboard.jsx';
 import recordingService from '../services/recordingService';
 
-const showNotification = vi.fn();
+const success = vi.fn();
+const notifyError = vi.fn();
 const fetchData = vi.fn();
 
 vi.mock('../contexts/NotificationContext', () => ({
     useNotification: () => ({
-        showNotification,
+        success,
+        error: notifyError,
     }),
 }));
 
@@ -56,6 +66,10 @@ vi.mock('../hooks/admin/useRecordingDashboardData', () => ({
 }));
 
 describe('RecordingDashboard', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
     it('merender header overview dan pill update dengan tone dark-mode yang eksplisit', () => {
         render(<RecordingDashboard />);
 
@@ -83,6 +97,23 @@ describe('RecordingDashboard', () => {
         await waitFor(() => {
             expect(fetchData).toHaveBeenCalledWith({ mode: 'initial' });
         });
-        expect(showNotification).toHaveBeenCalledWith('Recording settings updated successfully', 'success');
+        expect(success).toHaveBeenCalledWith(
+            'Pengaturan Recording Tersimpan',
+            'Pengaturan kamera 3 berhasil diperbarui.'
+        );
+    });
+
+    it('menampilkan notifikasi start recording dengan title dan message eksplisit', async () => {
+        recordingService.startRecording.mockResolvedValue({ success: true });
+
+        render(<RecordingDashboard />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Start Recording' }));
+
+        await waitFor(() => {
+            expect(recordingService.startRecording).toHaveBeenCalledWith(3);
+        });
+        expect(success).toHaveBeenCalledWith('Recording Dimulai', 'Kamera 3 mulai direkam.');
+        expect(fetchData).toHaveBeenCalledWith({ mode: 'initial' });
     });
 });
