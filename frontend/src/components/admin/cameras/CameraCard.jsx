@@ -31,6 +31,25 @@ export default function CameraCard({
                 : 'bg-red-500/90 text-white'));
 
     const secondaryBadges = [
+        camera.stream_source === 'internal' && {
+            label: camera.internal_ingest_policy_override && camera.internal_ingest_policy_override !== 'default'
+                ? camera.internal_ingest_policy_override === 'always_on' ? 'Always On' : 'On-Demand'
+                : 'Area Default',
+            className: camera.internal_ingest_policy_override === 'always_on'
+                ? 'bg-amber-500/90 text-white'
+                : 'bg-emerald-600/90 text-white',
+            title: 'Policy ingest internal RTSP',
+        },
+        camera.stream_source === 'internal' && camera.internal_on_demand_close_after_seconds_override && {
+            label: `${camera.internal_on_demand_close_after_seconds_override}s`,
+            className: 'bg-slate-700/90 text-white',
+            title: 'Idle close timeout override',
+        },
+        camera.stream_source === 'internal' && camera.source_profile && {
+            label: camera.source_profile,
+            className: 'bg-indigo-600/90 text-white',
+            title: 'Source profile internal',
+        },
         camera.stream_source === 'external' && {
             label: camera.external_health_mode || 'default',
             className: 'bg-sky-600/90 text-white',

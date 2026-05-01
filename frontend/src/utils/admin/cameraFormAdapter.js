@@ -27,6 +27,9 @@ export const defaultCameraFormValues = {
     external_health_mode: 'default',
     public_playback_mode: 'inherit',
     public_playback_preview_minutes: '',
+    internal_ingest_policy_override: 'default',
+    internal_on_demand_close_after_seconds_override: '',
+    source_profile: '',
 };
 
 export const recordingDurationOptions = [
@@ -184,6 +187,9 @@ export function mapCameraToFormValues(camera) {
         external_health_mode: camera.external_health_mode || 'default',
         public_playback_mode: camera.public_playback_mode || 'inherit',
         public_playback_preview_minutes: camera.public_playback_preview_minutes ?? '',
+        internal_ingest_policy_override: camera.internal_ingest_policy_override || 'default',
+        internal_on_demand_close_after_seconds_override: camera.internal_on_demand_close_after_seconds_override ?? '',
+        source_profile: camera.source_profile || '',
     };
 }
 
@@ -223,5 +229,16 @@ export function buildCameraPayload(formData) {
         public_playback_preview_minutes: formData.public_playback_preview_minutes === '' || formData.public_playback_preview_minutes === null || formData.public_playback_preview_minutes === undefined
             ? null
             : parseInt(formData.public_playback_preview_minutes, 10),
+        internal_ingest_policy_override: deliveryType === 'internal_hls'
+            ? (formData.internal_ingest_policy_override || 'default')
+            : 'default',
+        internal_on_demand_close_after_seconds_override: deliveryType === 'internal_hls'
+            ? (formData.internal_on_demand_close_after_seconds_override === '' || formData.internal_on_demand_close_after_seconds_override === null || formData.internal_on_demand_close_after_seconds_override === undefined
+                ? null
+                : parseInt(formData.internal_on_demand_close_after_seconds_override, 10))
+            : null,
+        source_profile: deliveryType === 'internal_hls'
+            ? (formData.source_profile || null)
+            : null,
     };
 }

@@ -43,6 +43,12 @@ const GRID_DEFAULT_LIMIT_OPTIONS = [
     { value: '', label: 'Tanpa batas' },
 ];
 
+const INTERNAL_INGEST_POLICY_OPTIONS = [
+    { value: 'default', label: 'Ikuti Default Sistem' },
+    { value: 'always_on', label: 'Always On' },
+    { value: 'on_demand', label: 'On-Demand' },
+];
+
 function requiresExternalHlsTarget(config) {
     if (config.operation !== 'policy_update' && config.operation !== 'maintenance') {
         return false;
@@ -107,7 +113,7 @@ export default function AreaManagement() {
     const [showModal, setShowModal] = useState(false);
     const [editingArea, setEditingArea] = useState(null);
     const [formData, setFormData] = useState({ 
-        name: '', description: '', rt: '', rw: '', kelurahan: '', kecamatan: '', latitude: '', longitude: '', external_health_mode_override: 'default', coverage_scope: 'default', viewport_zoom_override: '', show_on_grid_default: true, grid_default_camera_limit: '12'
+        name: '', description: '', rt: '', rw: '', kelurahan: '', kecamatan: '', latitude: '', longitude: '', external_health_mode_override: 'default', coverage_scope: 'default', viewport_zoom_override: '', show_on_grid_default: true, grid_default_camera_limit: '12', internal_ingest_policy_default: 'default', internal_on_demand_close_after_seconds: ''
     });
     const [formErrors, setFormErrors] = useState({});
     const [error, setError] = useState('');
@@ -200,7 +206,7 @@ export default function AreaManagement() {
 
     const openAddModal = () => {
         setEditingArea(null);
-        setFormData({ name: '', description: '', rt: '', rw: '', kelurahan: '', kecamatan: '', latitude: '', longitude: '', external_health_mode_override: 'default', coverage_scope: 'default', viewport_zoom_override: '', show_on_grid_default: true, grid_default_camera_limit: '12' });
+        setFormData({ name: '', description: '', rt: '', rw: '', kelurahan: '', kecamatan: '', latitude: '', longitude: '', external_health_mode_override: 'default', coverage_scope: 'default', viewport_zoom_override: '', show_on_grid_default: true, grid_default_camera_limit: '12', internal_ingest_policy_default: 'default', internal_on_demand_close_after_seconds: '' });
         setFormErrors({});
         setError('');
         setShowModal(true);
@@ -217,6 +223,8 @@ export default function AreaManagement() {
             viewport_zoom_override: area.viewport_zoom_override || '',
             show_on_grid_default: area.show_on_grid_default === 1 || area.show_on_grid_default === true,
             grid_default_camera_limit: area.grid_default_camera_limit === null || area.grid_default_camera_limit === undefined ? '' : String(area.grid_default_camera_limit),
+            internal_ingest_policy_default: area.internal_ingest_policy_default || 'default',
+            internal_on_demand_close_after_seconds: area.internal_on_demand_close_after_seconds === null || area.internal_on_demand_close_after_seconds === undefined ? '' : String(area.internal_on_demand_close_after_seconds),
         });
         setFormErrors({});
         setError('');
@@ -293,6 +301,8 @@ export default function AreaManagement() {
                 viewport_zoom_override: area.viewport_zoom_override || '',
                 show_on_grid_default: nextValue,
                 grid_default_camera_limit: area.grid_default_camera_limit === null || area.grid_default_camera_limit === undefined ? '' : area.grid_default_camera_limit,
+                internal_ingest_policy_default: area.internal_ingest_policy_default || 'default',
+                internal_on_demand_close_after_seconds: area.internal_on_demand_close_after_seconds === null || area.internal_on_demand_close_after_seconds === undefined ? '' : area.internal_on_demand_close_after_seconds,
             };
             const result = await areaService.updateArea(area.id, payload);
             if (result.success) {
@@ -472,6 +482,8 @@ export default function AreaManagement() {
                 viewport_zoom_override: area.viewport_zoom_override || '',
                 show_on_grid_default: area.show_on_grid_default === 1 || area.show_on_grid_default === true,
                 grid_default_camera_limit: nextLimit,
+                internal_ingest_policy_default: area.internal_ingest_policy_default || 'default',
+                internal_on_demand_close_after_seconds: area.internal_on_demand_close_after_seconds === null || area.internal_on_demand_close_after_seconds === undefined ? '' : area.internal_on_demand_close_after_seconds,
             };
             const result = await areaService.updateArea(area.id, payload);
             if (result.success) {
@@ -732,6 +744,10 @@ export default function AreaManagement() {
                                     <div className="text-right font-semibold text-gray-900 dark:text-white">{(area.show_on_grid_default === 1 || area.show_on_grid_default === true) ? 'Enabled' : 'Hidden'}</div>
                                     <div className="text-gray-500 dark:text-gray-400">Limit Grid</div>
                                     <div className="text-right font-semibold text-gray-900 dark:text-white">{area.grid_default_camera_limit ? `${area.grid_default_camera_limit} kamera` : 'Tanpa batas'}</div>
+                                    <div className="text-gray-500 dark:text-gray-400">Internal RTSP Policy</div>
+                                    <div className="text-right font-semibold text-gray-900 dark:text-white">{INTERNAL_INGEST_POLICY_OPTIONS.find((option) => option.value === (area.internal_ingest_policy_default || 'default'))?.label || 'Ikuti Default Sistem'}</div>
+                                    <div className="text-gray-500 dark:text-gray-400">Idle Close</div>
+                                    <div className="text-right font-semibold text-gray-900 dark:text-white">{area.internal_on_demand_close_after_seconds ? `${area.internal_on_demand_close_after_seconds} detik` : 'Ikuti default'}</div>
                                 </div>
                             </div>
                             <div className="mb-4 grid gap-3">
@@ -948,6 +964,45 @@ export default function AreaManagement() {
                                 <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                                     Untuk area padat, batasi jumlah kamera default seperti 10 atau 15 agar Grid View tetap ringan. Saat user memilih area tertentu, limit ini diabaikan.
                                 </p>
+                            </div>
+
+                            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-4 dark:border-emerald-500/20 dark:bg-emerald-500/10">
+                                <div className="mb-3">
+                                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Internal RTSP / MediaMTX Policy</h4>
+                                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                        Default area ini hanya dipakai oleh kamera internal yang tidak punya override sendiri di form kamera.
+                                    </p>
+                                </div>
+
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Default Ingest Mode</label>
+                                        <select
+                                            name="internal_ingest_policy_default"
+                                            value={formData.internal_ingest_policy_default}
+                                            onChange={handleChange}
+                                            className="w-full px-4 py-2.5 bg-white dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                                        >
+                                            {INTERNAL_INGEST_POLICY_OPTIONS.map((option) => (
+                                                <option key={option.value} value={option.value}>{option.label}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Idle Close Timeout (detik)</label>
+                                        <input
+                                            type="number"
+                                            min="5"
+                                            max="300"
+                                            name="internal_on_demand_close_after_seconds"
+                                            value={formData.internal_on_demand_close_after_seconds}
+                                            onChange={handleChange}
+                                            className="w-full px-4 py-2.5 bg-white dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                                            placeholder="Kosong = ikuti default"
+                                        />
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Koordinat dengan LocationPicker */}

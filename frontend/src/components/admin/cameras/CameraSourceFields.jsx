@@ -38,6 +38,12 @@ const EXTERNAL_HEALTH_MODE_OPTIONS = [
     },
 ];
 
+const INTERNAL_INGEST_POLICY_OPTIONS = [
+    { value: 'default', label: 'Ikuti Area', description: 'Gunakan default policy internal dari area kamera ini.' },
+    { value: 'always_on', label: 'Always On', description: 'MediaMTX menjaga source tetap tersambung walau tidak ada viewer.' },
+    { value: 'on_demand', label: 'On-Demand', description: 'Source hanya dibuka saat ada viewer lalu ditutup lagi saat idle.' },
+];
+
 export default function CameraSourceFields({
     formData,
     isSubmitting,
@@ -157,6 +163,76 @@ export default function CameraSourceFields({
                                 <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-purple-600 dark:group-hover:text-purple-400">H.265 (Safari only)</span>
                             </label>
                         </div>
+                    </div>
+
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 dark:border-emerald-500/20 dark:bg-emerald-500/10">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">Internal RTSP / MediaMTX Policy</p>
+                        <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
+                            Gunakan override ini jika kamera internal perlu berbeda dari default area, misalnya Surabaya harus on-demand dan mati saat idle.
+                        </p>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                            <label htmlFor="camera-internal-ingest-policy" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Ingest Policy Override
+                            </label>
+                            <select
+                                id="camera-internal-ingest-policy"
+                                name="internal_ingest_policy_override"
+                                value={formData.internal_ingest_policy_override || 'default'}
+                                onChange={onChange}
+                                disabled={isSubmitting}
+                                className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 border-gray-200 dark:border-gray-700/50"
+                            >
+                                {INTERNAL_INGEST_POLICY_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                ))}
+                            </select>
+                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                {INTERNAL_INGEST_POLICY_OPTIONS.find((option) => option.value === (formData.internal_ingest_policy_override || 'default'))?.description}
+                            </p>
+                        </div>
+
+                        <div>
+                            <label htmlFor="camera-close-after-seconds" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Idle Close Timeout Override (detik)
+                            </label>
+                            <input
+                                id="camera-close-after-seconds"
+                                type="number"
+                                min="5"
+                                max="300"
+                                name="internal_on_demand_close_after_seconds_override"
+                                value={formData.internal_on_demand_close_after_seconds_override}
+                                onChange={onChange}
+                                disabled={isSubmitting}
+                                className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 border-gray-200 dark:border-gray-700/50"
+                                placeholder="Kosong = ikuti area/default"
+                            />
+                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                Dipakai hanya untuk mode on-demand. Kosongkan agar mengikuti area atau default sistem.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label htmlFor="camera-source-profile" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Source Profile
+                        </label>
+                        <input
+                            id="camera-source-profile"
+                            type="text"
+                            name="source_profile"
+                            value={formData.source_profile}
+                            onChange={onChange}
+                            disabled={isSubmitting}
+                            className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 border-gray-200 dark:border-gray-700/50"
+                            placeholder="Contoh: surabaya_private_rtsp"
+                        />
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Tag operasional internal untuk policy dan troubleshooting. Contoh Surabaya: <span className="font-mono">surabaya_private_rtsp</span>.
+                        </p>
                     </div>
                 </>
             )}

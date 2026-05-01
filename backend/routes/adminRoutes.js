@@ -119,9 +119,14 @@ export default async function adminRoutes(fastify, options) {
                         cameraName: cam.name,
                         pathName: cam.path_name,
                         dbRtspUrl: cam.rtsp_url,
+                        sourceProfile: cam.source_profile || null,
+                        policyMode: cam.internal_ingest_policy_override || 'default',
+                        closeAfterSeconds: cam.internal_on_demand_close_after_seconds_override || cam.area_internal_on_demand_close_after_seconds || null,
                         mtxSource: mtxPath?.source || null,
                         inMediaMTX: !!mtxPath,
-                        sourceMatch: mtxPath?.source === cam.rtsp_url
+                        sourceMatch: mtxPath?.source === cam.rtsp_url,
+                        sourceOnDemand: mtxPath?.sourceOnDemand ?? null,
+                        sourceOnDemandCloseAfter: mtxPath?.sourceOnDemandCloseAfter ?? null,
                     };
                 });
                 

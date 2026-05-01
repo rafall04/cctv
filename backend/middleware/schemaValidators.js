@@ -154,6 +154,16 @@ export const createCameraSchema = {
             },
             recording_duration_hours: {
                 anyOf: [{ type: 'integer', minimum: 1, maximum: 2160 }, { type: 'null' }]
+            },
+            internal_ingest_policy_override: {
+                type: 'string',
+                enum: ['default', 'always_on', 'on_demand']
+            },
+            internal_on_demand_close_after_seconds_override: {
+                anyOf: [{ type: 'integer', minimum: 5, maximum: 300 }, { type: 'null' }]
+            },
+            source_profile: {
+                anyOf: [{ type: 'string', maxLength: 120 }, { type: 'null' }]
             }
         },
         additionalProperties: false
@@ -262,6 +272,16 @@ export const updateCameraSchema = {
             },
             recording_duration_hours: {
                 anyOf: [{ type: 'integer', minimum: 1, maximum: 2160 }, { type: 'null' }]
+            },
+            internal_ingest_policy_override: {
+                type: 'string',
+                enum: ['default', 'always_on', 'on_demand']
+            },
+            internal_on_demand_close_after_seconds_override: {
+                anyOf: [{ type: 'integer', minimum: 5, maximum: 300 }, { type: 'null' }]
+            },
+            source_profile: {
+                anyOf: [{ type: 'string', maxLength: 120 }, { type: 'null' }]
             }
         },
         additionalProperties: false

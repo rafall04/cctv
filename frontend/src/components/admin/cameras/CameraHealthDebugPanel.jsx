@@ -102,7 +102,7 @@ export default function CameraHealthDebugPanel({
                     </div>
                 </div>
 
-                <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-8">
                     <label className="space-y-1 text-sm">
                         <span className="font-medium text-gray-700 dark:text-gray-200">State</span>
                         <select
@@ -141,6 +141,19 @@ export default function CameraHealthDebugPanel({
                     </label>
 
                     <label className="space-y-1 text-sm">
+                        <span className="font-medium text-gray-700 dark:text-gray-200">Policy Mode</span>
+                        <select
+                            value={query.policyMode}
+                            onChange={(event) => onFilterChange('policyMode', event.target.value)}
+                            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                        >
+                            <option value="">Semua</option>
+                            <option value="on_demand">On-Demand</option>
+                            <option value="always_on">Always On</option>
+                        </select>
+                    </label>
+
+                    <label className="space-y-1 text-sm">
                         <span className="font-medium text-gray-700 dark:text-gray-200">Search</span>
                         <input
                             value={query.search}
@@ -148,6 +161,29 @@ export default function CameraHealthDebugPanel({
                             placeholder="camera, area, provider"
                             className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                         />
+                    </label>
+
+                    <label className="space-y-1 text-sm">
+                        <span className="font-medium text-gray-700 dark:text-gray-200">Source Profile</span>
+                        <input
+                            value={query.sourceProfile}
+                            onChange={(event) => onFilterChange('sourceProfile', event.target.value)}
+                            placeholder="surabaya_private_rtsp"
+                            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                        />
+                    </label>
+
+                    <label className="space-y-1 text-sm">
+                        <span className="font-medium text-gray-700 dark:text-gray-200">Active Tanpa Viewer</span>
+                        <select
+                            value={query.activeWithoutViewer}
+                            onChange={(event) => onFilterChange('activeWithoutViewer', event.target.value)}
+                            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                        >
+                            <option value="">Semua</option>
+                            <option value="yes">Ya</option>
+                            <option value="no">Tidak</option>
+                        </select>
                     </label>
 
                     <label className="space-y-1 text-sm">
@@ -248,6 +284,14 @@ export default function CameraHealthDebugPanel({
                                                 <div className="mt-1 text-gray-400 dark:text-gray-500">
                                                     {item.healthStrategy}
                                                 </div>
+                                                <div className="mt-1 text-gray-500 dark:text-gray-400">
+                                                    policy {item.policy_mode || '-'}
+                                                </div>
+                                                {item.source_profile ? (
+                                                    <div className="mt-1 break-all text-gray-400 dark:text-gray-500">
+                                                        {item.source_profile}
+                                                    </div>
+                                                ) : null}
                                             </td>
                                             <td className="px-3 py-3 text-xs">
                                                 <div>{formatReason(item.lastReason)}</div>
@@ -273,6 +317,13 @@ export default function CameraHealthDebugPanel({
                                                     {item.usedFallback ? (
                                                         <div><span className="font-medium text-gray-500 dark:text-gray-400">Fallback:</span> yes</div>
                                                     ) : null}
+                                                    <div><span className="font-medium text-gray-500 dark:text-gray-400">Configured:</span> {item.configured ? 'yes' : 'no'}</div>
+                                                    <div><span className="font-medium text-gray-500 dark:text-gray-400">Ready:</span> {item.ready ? 'yes' : 'no'}</div>
+                                                    <div><span className="font-medium text-gray-500 dark:text-gray-400">SourceReady:</span> {item.sourceReady ? 'yes' : 'no'}</div>
+                                                    <div><span className="font-medium text-gray-500 dark:text-gray-400">Readers:</span> {item.reader_count || 0}</div>
+                                                    <div><span className="font-medium text-gray-500 dark:text-gray-400">Real Viewers:</span> {item.real_viewer_count || 0}</div>
+                                                    <div><span className="font-medium text-gray-500 dark:text-gray-400">Internal Reader Only:</span> {item.has_internal_reader_only ? 'yes' : 'no'}</div>
+                                                    <div><span className="font-medium text-gray-500 dark:text-gray-400">Close After:</span> {item.close_after_seconds ? `${item.close_after_seconds}s` : '-'}</div>
                                                 </div>
                                             </td>
                                             <td className="px-3 py-3 text-xs text-gray-500 dark:text-gray-400">

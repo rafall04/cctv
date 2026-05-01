@@ -7,6 +7,7 @@ import { dirname } from 'path';
 import { query, execute } from '../database/database.js';
 import { config } from '../config/config.js';
 import { getEffectiveDeliveryType, getPrimaryExternalStreamUrl } from '../utils/cameraDelivery.js';
+import { resolveInternalIngestPolicy } from '../utils/internalIngestPolicy.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -85,14 +86,10 @@ class ThumbnailService {
     }
 
     isStrictOnDemandRtspCamera(camera) {
-        const description = String(camera?.description || '').toLowerCase();
-        return Boolean(camera?.private_rtsp_url)
-            && Number(camera?.enable_recording || 0) === 0
-            && (
-                description.includes('source: private rtsp live only')
-                || description.includes('source_tag: surabaya_private_rtsp')
-                || description.includes('surabaya_private_rtsp')
-            );
+        return resolveInternalIngestPolicy(camera, {
+            internal_ingest_policy_default: camera?.area_internal_ingest_policy_default,
+            internal_on_demand_close_after_seconds: camera?.area_internal_on_demand_close_after_seconds,
+        }).isStrictOnDemandProfile;
     }
 
     setThumbnailState(cameraId, patch = {}) {
@@ -260,12 +257,20 @@ class ThumbnailService {
         try {
             const cameras = query(`
                 SELECT c.id, c.name, c.description, c.enabled, c.status, c.is_online, c.enable_recording, c.stream_key, c.stream_source, c.delivery_type,
+                       c.internal_ingest_policy_override, c.internal_on_demand_close_after_seconds_override, c.source_profile,
                        c.private_rtsp_url,
                        external_hls_url, external_stream_url, external_snapshot_url,
                        external_embed_url, external_tls_mode, thumbnail_path,
-                       crs.is_online as runtime_is_online
+                       crs.is_online as runtime_is_online,
+                       CASE
+                            WHEN a.internal_ingest_policy_default IN ('default', 'always_on', 'on_demand')
+                                THEN a.internal_ingest_policy_default
+                            ELSE 'default'
+                       END as area_internal_ingest_policy_default,
+                       a.internal_on_demand_close_after_seconds as area_internal_on_demand_close_after_seconds
                 FROM cameras c
                 LEFT JOIN camera_runtime_state crs ON crs.camera_id = c.id
+                LEFT JOIN areas a ON a.id = c.area_id
                 WHERE c.enabled = 1
             `);
 
@@ -453,11 +458,19 @@ class ThumbnailService {
     async refreshCameraThumbnail(cameraId) {
         const camera = query(
             `SELECT c.id, c.name, c.description, c.enabled, c.status, c.is_online, c.enable_recording, c.stream_key, c.stream_source, c.delivery_type,
+                    c.internal_ingest_policy_override, c.internal_on_demand_close_after_seconds_override, c.source_profile,
                     c.private_rtsp_url, c.external_hls_url, c.external_stream_url, c.external_snapshot_url,
                     c.external_embed_url, c.external_tls_mode, c.thumbnail_path,
-                    crs.is_online as runtime_is_online
+                    crs.is_online as runtime_is_online,
+                    CASE
+                        WHEN a.internal_ingest_policy_default IN ('default', 'always_on', 'on_demand')
+                            THEN a.internal_ingest_policy_default
+                        ELSE 'default'
+                    END as area_internal_ingest_policy_default,
+                    a.internal_on_demand_close_after_seconds as area_internal_on_demand_close_after_seconds
              FROM cameras c
              LEFT JOIN camera_runtime_state crs ON crs.camera_id = c.id
+             LEFT JOIN areas a ON a.id = c.area_id
              WHERE c.id = ?`,
             [cameraId]
         )?.[0];

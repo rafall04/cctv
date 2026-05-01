@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { config } from '../config/config.js';
 import { query, queryOne } from '../database/connectionPool.js';
+import { resolveInternalIngestPolicy } from '../utils/internalIngestPolicy.js';
 
 // Centralized Axios instance for MediaMTX API to avoid repetition and enforce standard timeouts
 const mtxApi = axios.create({
@@ -17,13 +18,56 @@ class MediaMtxService {
         this.maxConsecutiveFailures = 3;
     }
 
-    buildOnDemandPathConfig(rtspUrl) {
+    static isRealViewer(reader, debug = false) {
+        if (reader.type === 'hlsMuxer' && !reader.remoteAddr) {
+            if (debug) {
+                console.log('[MediaMTX] Filtered out internal hlsMuxer (no remoteAddr)');
+            }
+            return false;
+        }
+
+        if (reader.remoteAddr) {
+            const addr = reader.remoteAddr.toLowerCase();
+            if (
+                addr.includes('127.0.0.1')
+                || addr.includes('localhost')
+                || addr.startsWith('[::1]')
+                || addr.includes('::1]')
+                || addr === '::1'
+                || addr.includes('::ffff:127.0.0.1')
+            ) {
+                if (debug) {
+                    console.log(`[MediaMTX] Filtered out localhost reader: ${addr}`);
+                }
+                return false;
+            }
+        }
+
+        if (reader.id) {
+            const id = reader.id.toLowerCase();
+            if (
+                id.includes('127.0.0.1')
+                || id.includes('localhost')
+                || id.includes('::1')
+            ) {
+                if (debug) {
+                    console.log(`[MediaMTX] Filtered out localhost reader by id: ${id}`);
+                }
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    buildInternalPathConfig(camera) {
+        const resolvedPolicy = resolveInternalIngestPolicy(camera, camera._areaPolicy || null);
         return {
-            source: rtspUrl,
+            source: camera.rtsp_url,
             sourceProtocol: 'tcp',
-            sourceOnDemand: true,
+            sourceOnDemand: resolvedPolicy.mode !== 'always_on',
             sourceOnDemandStartTimeout: '10s',
-            sourceOnDemandCloseAfter: '30s',
+            sourceOnDemandCloseAfter: `${resolvedPolicy.closeAfterSeconds || 30}s`,
         };
     }
 
@@ -170,11 +214,33 @@ class MediaMtxService {
                     name, 
                     private_rtsp_url as rtsp_url,
                     stream_key,
+                    CASE
+                        WHEN cameras.internal_ingest_policy_override IN ('default', 'always_on', 'on_demand')
+                            THEN cameras.internal_ingest_policy_override
+                        ELSE 'default'
+                    END as internal_ingest_policy_override,
+                    cameras.internal_on_demand_close_after_seconds_override,
+                    cameras.source_profile,
+                    cameras.description,
+                    cameras.enable_recording,
+                    CASE
+                        WHEN areas.internal_ingest_policy_default IN ('default', 'always_on', 'on_demand')
+                            THEN areas.internal_ingest_policy_default
+                        ELSE 'default'
+                    END as area_internal_ingest_policy_default,
+                    areas.internal_on_demand_close_after_seconds as area_internal_on_demand_close_after_seconds,
                     COALESCE(stream_key, 'camera' || id) as path_name 
-                FROM cameras 
+                FROM cameras
+                LEFT JOIN areas ON areas.id = cameras.area_id
                 WHERE enabled = 1 AND (stream_source = 'internal' OR stream_source IS NULL)
             `);
-            return cameras;
+            return cameras.map((camera) => ({
+                ...camera,
+                _areaPolicy: {
+                    internal_ingest_policy_default: camera.area_internal_ingest_policy_default,
+                    internal_on_demand_close_after_seconds: camera.area_internal_on_demand_close_after_seconds,
+                },
+            }));
         } catch (error) {
             console.error('[MediaMTX Service] Error fetching cameras from database:', error.message);
             return [];
@@ -307,7 +373,7 @@ class MediaMtxService {
                 continue;
             }
 
-            const pathConfig = this.buildOnDemandPathConfig(camera.rtsp_url);
+            const pathConfig = this.buildInternalPathConfig(camera);
 
             try {
                 if (!configuredPathsSet.has(camera.path_name)) {
@@ -342,7 +408,7 @@ class MediaMtxService {
      * @param {string} rtspUrl - The RTSP URL
      * @returns {Promise<object>}
      */
-    async updateCameraPath(streamKey, rtspUrl) {
+    async updateCameraPath(streamKey, rtspUrl, policyCamera = null) {
         const pathName = streamKey;
 
         // Validate inputs
@@ -356,7 +422,21 @@ class MediaMtxService {
             return { success: false, error: 'Invalid RTSP URL' };
         }
 
-        const pathConfig = this.buildOnDemandPathConfig(rtspUrl);
+        const camera = policyCamera
+            ? {
+                ...policyCamera,
+                rtsp_url: rtspUrl,
+            }
+            : {
+                rtsp_url: rtspUrl,
+                internal_ingest_policy_override: 'default',
+                internal_on_demand_close_after_seconds_override: null,
+                source_profile: null,
+                description: null,
+                enable_recording: 1,
+                _areaPolicy: null,
+            };
+        const pathConfig = this.buildInternalPathConfig(camera);
 
         try {
             const exists = await this.pathConfigExists(pathName);
@@ -409,57 +489,9 @@ class MediaMtxService {
 
             // Filter function to exclude internal/preload readers
             // Real viewers have remoteAddr populated, internal muxers don't
-            const isRealViewer = (reader) => {
-                // hlsMuxer without remoteAddr is internal (from preload/warming service)
-                // Real HLS viewers have remoteAddr populated
-                if (reader.type === 'hlsMuxer' && !reader.remoteAddr) {
-                    if (debug) {
-                        console.log(`[MediaMTX] Filtered out internal hlsMuxer (no remoteAddr)`);
-                    }
-                    return false;
-                }
-
-                // Check remoteAddr if available - filter localhost
-                if (reader.remoteAddr) {
-                    const addr = reader.remoteAddr.toLowerCase();
-                    // Exclude localhost readers (these are from preload/warming service)
-                    // Handle various formats: 127.0.0.1, localhost, ::1, ::ffff:127.0.0.1
-                    if (
-                        addr.includes('127.0.0.1') ||
-                        addr.includes('localhost') ||
-                        addr.startsWith('[::1]') ||
-                        addr.includes('::1]') ||
-                        addr === '::1' ||
-                        addr.includes('::ffff:127.0.0.1')
-                    ) {
-                        if (debug) {
-                            console.log(`[MediaMTX] Filtered out localhost reader: ${addr}`);
-                        }
-                        return false;
-                    }
-                }
-
-                // Also check id field which may contain IP info in some MediaMTX versions
-                if (reader.id) {
-                    const id = reader.id.toLowerCase();
-                    if (
-                        id.includes('127.0.0.1') ||
-                        id.includes('localhost') ||
-                        id.includes('::1')
-                    ) {
-                        if (debug) {
-                            console.log(`[MediaMTX] Filtered out localhost reader by id: ${id}`);
-                        }
-                        return false;
-                    }
-                }
-
-                return true;
-            };
-
             // Process paths and filter readers
             const processedPaths = paths.map(path => {
-                const realReaders = (path.readers || []).filter(isRealViewer);
+                const realReaders = (path.readers || []).filter((reader) => MediaMtxService.isRealViewer(reader, debug));
                 return {
                     ...path,
                     readers: realReaders,

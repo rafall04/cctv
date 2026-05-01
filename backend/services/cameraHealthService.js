@@ -25,6 +25,10 @@ import {
     SHARED_CAMERA_STREAM_PROJECTION,
     SHARED_CAMERA_STREAM_WITH_AREA_PROJECTION,
 } from '../utils/cameraProjection.js';
+import {
+    buildInternalIngestPolicySummary,
+    isStrictOnDemandSourceProfile,
+} from '../utils/internalIngestPolicy.js';
 
 const mediaMtxApiBaseUrl = `${(config.mediamtx?.apiUrl || 'http://localhost:9997').replace(/\/$/, '')}/v3`;
 
@@ -129,14 +133,7 @@ function deriveMonitoringStateFromOnline(isOnline) {
 }
 
 function isStrictInternalRtspHealthCamera(camera) {
-    const description = String(camera?.description || '').toLowerCase();
-    return Boolean(camera?.private_rtsp_url)
-        && Number(camera?.enable_recording || 0) === 0
-        && (
-            description.includes('source: private rtsp live only')
-            || description.includes('source_tag: surabaya_private_rtsp')
-            || description.includes('surabaya_private_rtsp')
-        );
+    return isStrictOnDemandSourceProfile(camera);
 }
 
 function parseRtspResponse(rawResponse) {
@@ -833,6 +830,7 @@ class CameraHealthService {
         this.domainHealth = new Map();
         this.probeCache = new Map();
         this.internalPathRepairBackoff = new Map();
+        this.lastActivePathMap = new Map();
     }
 
     async probeInternalRtspSource(rtspUrl, timeoutMs = 4000) {
@@ -854,7 +852,7 @@ class CameraHealthService {
         this.internalPathRepairBackoff.set(pathName, now + INTERNAL_PATH_REPAIR_BACKOFF_MS);
 
         try {
-            const result = await mediaMtxService.updateCameraPath(pathName, camera.private_rtsp_url);
+            const result = await mediaMtxService.updateCameraPath(pathName, camera.private_rtsp_url, camera);
             if (result?.success) {
                 this.internalPathRepairBackoff.delete(pathName);
                 return { attempted: true, success: true, pathName, action: result.action || null };
@@ -1345,9 +1343,22 @@ class CameraHealthService {
 
     getNextCadenceMs(camera, state, rawResult = null) {
         const deliveryProfile = getCameraDeliveryProfile(camera);
+        const lastDetails = rawResult?.details || state?.lastDetails || {};
+        const internalPolicy = buildInternalIngestPolicySummary(camera, {
+            internal_ingest_policy_default: camera?.area_internal_ingest_policy_default,
+            internal_on_demand_close_after_seconds: camera?.area_internal_on_demand_close_after_seconds,
+        });
 
         if (deliveryProfile.classification === 'external_unresolved') {
             return COLD_CADENCE_MS;
+        }
+
+        if (
+            deliveryProfile.effectiveDeliveryType === 'internal_hls'
+            && internalPolicy.isStrictOnDemandProfile
+            && Number(lastDetails.real_viewer_count || 0) === 0
+        ) {
+            return PASSIVE_ONLY_CADENCE_MS;
         }
 
         if ((deliveryProfile.classification === 'external_jsmpeg' || deliveryProfile.classification === 'external_custom_ws')
@@ -1925,7 +1936,9 @@ class CameraHealthService {
                     configured: true,
                     ready: false,
                     sourceReady: false,
-                    readers: 0
+                    readers: 0,
+                    realViewerCount: 0,
+                    hasInternalReaderOnly: false,
                 });
             }
         } catch (error) {
@@ -1945,12 +1958,16 @@ class CameraHealthService {
                     configured: false,
                     ready: false,
                     sourceReady: false,
-                    readers: 0
+                    readers: 0,
+                    realViewerCount: 0,
+                    hasInternalReaderOnly: false,
                 };
 
                 existing.ready = item.ready || false;
                 existing.sourceReady = item.sourceReady || false;
                 existing.readers = item.readers?.length || 0;
+                existing.realViewerCount = (item.readers || []).filter((reader) => mediaMtxService.constructor.isRealViewer(reader)).length;
+                existing.hasInternalReaderOnly = existing.readers > 0 && existing.realViewerCount === 0;
 
                 pathMap.set(item.name, existing);
             }
@@ -1958,6 +1975,7 @@ class CameraHealthService {
             console.warn('[CameraHealth] Failed to get active paths:', error.message);
         }
 
+        this.lastActivePathMap = pathMap;
         return pathMap;
     }
 
@@ -2221,7 +2239,21 @@ class CameraHealthService {
 
         const pathName = camera.stream_key || `camera${camera.id}`;
         const pathInfo = activePaths.get(pathName);
-        const strictRtspHealth = camera.private_rtsp_url && isStrictInternalRtspHealthCamera(camera);
+        const internalPolicy = buildInternalIngestPolicySummary(camera, {
+            internal_ingest_policy_default: camera.area_internal_ingest_policy_default,
+            internal_on_demand_close_after_seconds: camera.area_internal_on_demand_close_after_seconds,
+        });
+        const strictRtspHealth = camera.private_rtsp_url && internalPolicy.isStrictOnDemandProfile;
+        baseDetails.policy_mode = internalPolicy.mode;
+        baseDetails.close_after_seconds = internalPolicy.closeAfterSeconds;
+        baseDetails.source_profile = internalPolicy.sourceProfile;
+        baseDetails.pathName = pathName;
+        baseDetails.pathConfigured = Boolean(pathInfo?.configured);
+        baseDetails.pathReady = Boolean(pathInfo?.ready);
+        baseDetails.pathSourceReady = Boolean(pathInfo?.sourceReady);
+        baseDetails.reader_count = pathInfo?.readers ?? 0;
+        baseDetails.real_viewer_count = pathInfo?.realViewerCount ?? 0;
+        baseDetails.has_internal_reader_only = Boolean(pathInfo?.hasInternalReaderOnly);
 
         if (pathInfo && (pathInfo.ready || pathInfo.sourceReady || pathInfo.readers > 0)) {
             return {
@@ -2615,6 +2647,11 @@ class CameraHealthService {
             const state = this.ensureCameraState(camera.id, camera.is_online);
             const availability = this.getPublicAvailability(camera);
             const monitoring = this.getMonitoringState(camera, state);
+            const internalPolicy = buildInternalIngestPolicySummary(camera, {
+                internal_ingest_policy_default: camera.area_internal_ingest_policy_default,
+                internal_on_demand_close_after_seconds: camera.area_internal_on_demand_close_after_seconds,
+            });
+            const activePath = this.lastActivePathMap.get(camera.stream_key || `camera${camera.id}`) || null;
 
             return {
                 cameraId: camera.id,
@@ -2630,6 +2667,18 @@ class CameraHealthService {
                 healthMode: monitoring.health_mode,
                 monitoring_state: monitoring.monitoring_state,
                 monitoring_reason: monitoring.monitoring_reason,
+                source_profile: camera.source_profile || null,
+                policy_mode: internalPolicy.mode,
+                close_after_seconds: internalPolicy.closeAfterSeconds,
+                camera_policy_override: internalPolicy.cameraPolicyOverride,
+                area_policy_default: internalPolicy.areaPolicyDefault,
+                path_name: camera.stream_key || `camera${camera.id}`,
+                configured: activePath?.configured ?? Boolean(state.lastDetails?.pathConfigured),
+                ready: activePath?.ready ?? Boolean(state.lastDetails?.pathReady),
+                sourceReady: activePath?.sourceReady ?? Boolean(state.lastDetails?.pathSourceReady),
+                reader_count: activePath?.readers ?? (state.lastDetails?.reader_count ?? 0),
+                real_viewer_count: activePath?.realViewerCount ?? (state.lastDetails?.real_viewer_count ?? 0),
+                has_internal_reader_only: activePath?.hasInternalReaderOnly ?? Boolean(state.lastDetails?.has_internal_reader_only),
                 effectiveOnline: state.effectiveOnline,
                 state: state.state,
                 confidence: state.confidence,
@@ -2698,6 +2747,9 @@ class CameraHealthService {
             state: normalizeString(queryParams.state).toLowerCase() || 'problem',
             deliveryType: normalizeString(queryParams.deliveryType).toLowerCase(),
             errorClass: normalizeString(queryParams.errorClass).toLowerCase(),
+            policyMode: normalizeString(queryParams.policyMode).toLowerCase(),
+            sourceProfile: normalizeString(queryParams.sourceProfile).toLowerCase(),
+            activeWithoutViewer: normalizeString(queryParams.activeWithoutViewer).toLowerCase(),
             search: normalizeString(queryParams.search).toLowerCase(),
             page,
             limit,
@@ -2778,6 +2830,22 @@ class CameraHealthService {
                 return false;
             }
 
+            if (filters.policyMode && (item.policy_mode || '').toLowerCase() !== filters.policyMode) {
+                return false;
+            }
+
+            if (filters.sourceProfile && (item.source_profile || '').toLowerCase() !== filters.sourceProfile) {
+                return false;
+            }
+
+            if (filters.activeWithoutViewer === 'yes' && !(item.reader_count > 0 && item.real_viewer_count === 0)) {
+                return false;
+            }
+
+            if (filters.activeWithoutViewer === 'no' && item.reader_count > 0 && item.real_viewer_count === 0) {
+                return false;
+            }
+
             if (filters.search) {
                 const haystack = [
                     item.cameraName,
@@ -2786,6 +2854,8 @@ class CameraHealthService {
                     item.lastReason,
                     item.runtimeTarget,
                     item.probeTarget,
+                    item.source_profile,
+                    item.policy_mode,
                 ]
                     .filter(Boolean)
                     .join(' ')

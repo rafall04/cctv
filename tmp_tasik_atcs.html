@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+
+	<meta content="index,follow" name="robots"/>
+	<meta content="id" name="geo.country"/>
+	<meta name="author" content="ATCS Kota Tasikmalaya">
+	<meta name="keywords" itemprop="keywords" content="atcs kota tasikmalaya, atcs dishub kota tasikmalaya, live streaming cctv kota tasikmalaya" />
+	<meta name="description" itemprop="description" content="ATCS adalah suatu sistem pengendalian lalu lintas berbasis teknologi informasi pada suatu kawasan yang bertujuan untuk mengoptimalkan kinerja jaringan jalan melalui optimasi dan koordinasi pengaturan lampu lalu lintas di setiap persimpangan." />
+	<link rel="canonical" href="https://atcs.tasikmalayakota.go.id/" />
+
+	<meta property="og:title" content="ATCS Kota Tasikmalaya"/>
+	<meta property="og:type" content="article"/>
+	<meta property="og:url" content="https://atcs.tasikmalayakota.go.id/"/>
+	<meta property="og:site_name" content="ATCS Kota Tasikmalaya" />
+	<meta property="og:description" content="ATCS adalah suatu sistem pengendalian lalu lintas berbasis teknologi informasi pada suatu kawasan yang bertujuan untuk mengoptimalkan kinerja jaringan jalan melalui optimasi dan koordinasi pengaturan lampu lalu lintas di setiap persimpangan." />
+	<meta property="og:image" content="uploads/pengaturan/logo.png" />
+
+	<meta name="theme-color" content="#5684ea"/>
+
+	<title>ATCS Kota Tasikmalaya</title>
+	<link rel="shortcut icon" href="https://atcs.tasikmalayakota.go.id/uploads/pengaturan/favicon.png">
+	<link rel="manifest" href="https://atcs.tasikmalayakota.go.id/manifest.json">
+
+	<link rel="stylesheet" type="text/css" href="https://atcs.tasikmalayakota.go.id/assets/bootstrap-4/css/bootstrap.min.css">
+	<link rel="stylesheet" type="text/css" href="https://atcs.tasikmalayakota.go.id/assets/font-awesome/css/font-awesome.min.css">
+	<style type="text/css">
+		html{scroll-behavior: smooth}
+		body{background: #EBEBEB}
+		a:hover{text-decoration: none}
+		h1{font-size: 32px}
+		h2{font-size: 24px}
+		h3{font-size: 18px}
+		.list-cctv{max-height: 500px;overflow-y: scroll}
+		.list-cctv li{cursor: pointer}
+
+		.section{padding-top: 60px}
+		.section .section-title{background: #5684ea;color: #fff;outline: 4px solid #5684ea;border: 1px dashed #fff}
+		.section .container{margin-top: 15px}
+
+		.social-icon{margin-right: 10px;color: #fff}
+
+		.map-label{position:absolute;bottom:0;left:-50%;display:flex;flex-direction:column;text-align:center}
+		.map-label-content{order:1;position:relative;left:-50%;background-color:#fff;border-radius:5px;border-width:2px;border-style:solid;border-color:#444;padding:3px;white-space:nowrap}
+		.map-label-arrow{order:2;width:0;height:0;left:50%;border-style:solid;border-color:#444 transparent transparent;border-width:10px 6px 0;margin-left:-6px}
+		.map-label.inactive{opacity:.5}
+		.map-label.redborder > .map-label-content{border-color:#e00}
+		.map-label.redborder > .map-label-arrow{border-top-color:#e00}
+		.map-label.redbackground > .map-label-content{white-space:default;color:#fff;background-color:#e00}
+
+		.bottom{padding: 20px 0}
+		.bottom .holder{color: #fff}
+		.bottom p{text-align: justify}
+		.bottom .section-title{margin: 0;border-bottom: 1px solid #fff;margin-bottom: 10px;color: #fff;font-size: 24px}
+		.bottom .section-title span{padding: 10px;display: inline-block;position: relative}
+		.bottom .section-title span:after{position: absolute;bottom: -1px;left: 0;width: 100%;height: 1px;background: #5685EA;display: block;content: ""}
+		.main-footer{background: #1F2124;color: #fff}
+	</style>
+
+	<!--[if lt IE 9]>
+	    <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js" async></script>
+	    <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js" async></script>
+	<![endif]-->
+
+	<script type="text/javascript" src="https://atcs.tasikmalayakota.go.id/assets/js/jquery.min.js"></script>
+	<script src="https://atcs.tasikmalayakota.go.id/assets/bootstrap-4/js/bootstrap.bundle.min.js"></script>
+	</head>
+
+<body data-spy="scroll" data-target="#menu-utama">
+		<nav class="navbar navbar-expand-lg fixed-top navbar-dark bg-dark" id="menu-utama">
+		<div class="container">
+			<a class="navbar-brand" href="https://atcs.tasikmalayakota.go.id/"><img src="https://atcs.tasikmalayakota.go.id/uploads/pengaturan/logo.png" alt="Logo" width="32"></a>
+
+			<button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#menu" aria-controls="menu" aria-expanded="false" aria-label="Menu">
+				<span class="navbar-toggler-icon"></span>
+			</button>
+
+			<div class="collapse navbar-collapse" id="menu">
+				<ul class="navbar-nav mr-auto">
+					<li class="nav-item"><a class="nav-link" itemprop="url" href="#beranda">Beranda</a></li>
+					<li class="nav-item"><a class="nav-link" itemprop="url" href="#live">Live Streaming</a></li>
+					<li class="nav-item"><a class="nav-link" itemprop="url" href="#lokasi">Lokasi</a></li>
+				</ul>
+			</div>
+		</div>
+	</nav>
+
+	<div id="beranda" class="section">
+    <div class="container">
+        <h1 class="mb-3">ATCS Kota Tasikmalaya</h1>
+        <div id="accordion">
+            <div class="card">
+                <div class="card-header bg-danger" id="heading1">
+                <h5 class="mb-0">
+                    <button class="btn btn-link text-light" data-toggle="collapse" data-target="#collapse-apa" aria-expanded="true" aria-controls="collapse-apa">
+                    Area Traffic Control System (ATCS)
+                    </button>
+                </h5>
+                </div>
+                <div id="collapse-apa" class="collapse show" aria-labelledby="heading1" data-parent="#accordion">
+                    <div class="card-body">
+                        <p>Area Traffic Control System atau yang lebih dikenal dengan istilah ATCS adalah suatu sistem pengendalian lalu lintas berbasis teknologi informasi pada suatu kawasan yang bertujuan untuk mengoptimalkan kinerja jaringan jalan melalui optimasi dan koordinasi pengaturan lampu lalu lintas di setiap persimpangan. ATCS terdiri dari beberapa sistem utama yaitu :</p>
+                        <ul>
+                        <li>Server, Workstation, yang berfungsi sebagai pusat operasional untuk memonitor dan mengontrol kondisi lalu lintas dari seluruh persimpangan dalam satu area.</li>
+                        <li>Wall map, yang berfungsi menyediakan informasi status dan kondisi dari Local Controller.</li>
+                        <li>Local Controller (pengontrol persimpangan).</li>
+                        <li>Video Surveilance (CCTV).</li>
+                        <li>Vehicle Detector.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header bg-warning" id="heading2">
+                    <h5 class="mb-0">
+                        <button class="btn btn-link collapsed text-light" data-toggle="collapse" data-target="#collapse-fungsi" aria-expanded="false" aria-controls="collapseTwo">
+                        Fungsi ATCS
+                        </button>
+                    </h5>
+                </div>
+                <div id="collapse-fungsi" class="collapse" aria-labelledby="heading2" data-parent="#accordion">
+                    <div class="card-body">
+                        <ol>
+                            <li>Mengatur waktu sinyal di persimpangan secara responsif dan terkoordinasi.</li>
+                            <li>Dalam keadaan tertentu, memberikan waktu hijau pada kendaraan yang memiliki prioritas (Pemadam Kebakaran, Ambulance, VVIP, Konvoi, Dll).</li>
+                            <li>Menyampaikan informasi kondisi lalu lintas dan alternatif lintasan.</li>
+                            <li>Menyediakan rekaman data lalu lintas, kejadian kecelakaan, dan kejadian lainnya di persimpangan.</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header bg-success" id="heading3">
+                    <h5 class="mb-0">
+                        <button class="btn btn-link collapsed text-light" data-toggle="collapse" data-target="#collapse-manfaat" aria-expanded="false" aria-controls="collapseTwo">
+                        Manfaat ATCS
+                        </button>
+                    </h5>
+                </div>
+                <div id="collapse-manfaat" class="collapse" aria-labelledby="heading3" data-parent="#accordion">
+                    <div class="card-body">
+                        <ol>
+                            <li>Terciptanya optimasi kinerja jaringan jalan.</li>
+                            <li>Mewujudkan sistem lalu lintas dan angkutan jalan yang aman, selamat dan berwawasan lingkungan.</li>
+                            <li>Mengurangi jumlah dan beban petugas pengatur lalu lintas di persimpangan.</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="live" class="section mb-3">
+    <div class="container">
+        <h1 class="mb-3 p-2 section-title">Live Streaming</h1>
+                <div class="row">
+            <div class="col-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Jalan Kota <span class="badge badge-dark">20</span></h2>
+                        <input type="text" class="form-control cctv-cari" data-target="kota-cctv" id="kota-cari" placeholder="Cari">
+                    </div>
+                    <ul class="list-group list-group-flush list-cctv" id="kota-cctv">
+                        <li onclick="stream('4');" class="list-group-item list-group-item-action">Simpang Rancabango Arah Simpang Bantar</li>
+<li onclick="stream('34');" class="list-group-item list-group-item-action">Simpang Rancabango Arah Jati</li>
+<li onclick="stream('35');" class="list-group-item list-group-item-action">Simpang Rancabango Arah Letnan Harun</li>
+<li onclick="stream('9');" class="list-group-item list-group-item-action">Simpang Cimulu</li>
+<li onclick="stream('21');" class="list-group-item list-group-item-action">Simpang Dewi Sartika Arah Cimulu</li>
+<li onclick="stream('22');" class="list-group-item list-group-item-action">Simpang Dewi Sartika Arah Masjid Agung</li>
+<li onclick="stream('10');" class="list-group-item list-group-item-action">Simpang Masjid Agung</li>
+<li onclick="stream('24');" class="list-group-item list-group-item-action">Simpang Nagarawangi</li>
+<li onclick="stream('26');" class="list-group-item list-group-item-action">Simpang Alun-alun Arah Otista</li>
+<li onclick="stream('27');" class="list-group-item list-group-item-action">Simpang Alun-alun Arah Tentara Pelajar</li>
+<li onclick="stream('28');" class="list-group-item list-group-item-action">Simpang Alun-alun Arah Sutisna Senjaya</li>
+<li onclick="stream('14');" class="list-group-item list-group-item-action">Simpang Sutisna Senjaya</li>
+<li onclick="stream('33');" class="list-group-item list-group-item-action">Simpang Gunung Sabeulah</li>
+<li onclick="stream('39');" class="list-group-item list-group-item-action">Simpang Pataruman PTZ</li>
+<li onclick="stream('40');" class="list-group-item list-group-item-action">Simpang Pataruman FIX</li>
+<li onclick="stream('41');" class="list-group-item list-group-item-action">Simpang Panyerutan PTZ</li>
+<li onclick="stream('42');" class="list-group-item list-group-item-action">Simpang Panyerutan FIX</li>
+<li onclick="stream('43');" class="list-group-item list-group-item-action">Simpang Paseh</li>
+<li onclick="stream('44');" class="list-group-item list-group-item-action">Simpang Padayungan</li>
+<li onclick="stream('45');" class="list-group-item list-group-item-action">Simpang Rumah Sakit</li>                    </ul>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Jalan Nasional <span class="badge badge-dark">9</span></h2>
+                        <input type="text" class="form-control cctv-cari" data-target="nasional-cctv" id="nasional-cari" placeholder="Cari">
+                    </div>
+                    <ul class="list-group list-group-flush list-cctv" id="nasional-cctv">
+                        <li onclick="stream('15');" class="list-group-item list-group-item-action">Batas Kota Arah Bandung</li>
+<li onclick="stream('5');" class="list-group-item list-group-item-action">Simpang Wasita Kusuma Arah Bandung</li>
+<li onclick="stream('7');" class="list-group-item list-group-item-action">Simpang Wasita Kusuma Arah Bojong Jengkol</li>
+<li onclick="stream('16');" class="list-group-item list-group-item-action">Simpang Bojong Jengkol Arah Wasita Kusuma</li>
+<li onclick="stream('17');" class="list-group-item list-group-item-action">Simpang Bojong Jengkol Arah Leuwidahu</li>
+<li onclick="stream('1');" class="list-group-item list-group-item-action">Simpang Jati</li>
+<li onclick="stream('3');" class="list-group-item list-group-item-action">Simpang Mitra Batik</li>
+<li onclick="stream('8');" class="list-group-item list-group-item-action">Simpang Lima</li>
+<li onclick="stream('25');" class="list-group-item list-group-item-action">Ruas M. Hatta</li>                    </ul>
+                </div>
+            </div>
+        </div>
+            </div>
+</div>
+
+<div id="lokasi" class="section">
+    <div id="map" style="height: 600px"></div>
+</div>
+
+<script type="text/javascript">
+var cctv={"15":{"id":"15","nama":"Batas Kota Arah Bandung","jenis":"PTZ","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/bataskotaarahbandung.m3u8","jalan_status":"Nasional","lokasi_lat":"-7.27380239","lokasi_lng":"108.19348812"},"5":{"id":"5","nama":"Simpang Wasita Kusuma Arah Bandung","jenis":"FIX","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/wasitakusumaarahbandung.m3u8","jalan_status":"Nasional","lokasi_lat":"-7.28333264","lokasi_lng":"108.19812298"},"7":{"id":"7","nama":"Simpang Wasita Kusuma Arah Bojong Jengkol","jenis":"FIX","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/wasitakusumaarahletnanharun.m3u8","jalan_status":"Nasional","lokasi_lat":"-7.28314108","lokasi_lng":"108.19807470"},"16":{"id":"16","nama":"Simpang Bojong Jengkol Arah Wasita Kusuma","jenis":"FIX","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/bojongjengkolarahwasita.m3u8","jalan_status":"Nasional","lokasi_lat":"-7.28802586","lokasi_lng":"108.20033312"},"17":{"id":"17","nama":"Simpang Bojong Jengkol Arah Leuwidahu","jenis":"FIX","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/bojongjengkolarahleuwidahu.m3u8","jalan_status":"Nasional","lokasi_lat":"-7.28782898","lokasi_lng":"108.20052624"},"1":{"id":"1","nama":"Simpang Jati","jenis":"PTZ","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/jati.m3u8","jalan_status":"Nasional","lokasi_lat":"-7.30405798","lokasi_lng":"108.20548296"},"4":{"id":"4","nama":"Simpang Rancabango Arah Simpang Bantar","jenis":"PTZ","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/rancabangoptz.m3u8","jalan_status":"Kota","lokasi_lat":"-7.31782823","lokasi_lng":"108.19884181"},"34":{"id":"34","nama":"Simpang Rancabango Arah Jati","jenis":"FIX","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/rancabangoarahjati.m3u8","jalan_status":"Kota","lokasi_lat":"-7.31824857","lokasi_lng":"108.19898665"},"35":{"id":"35","nama":"Simpang Rancabango Arah Letnan Harun","jenis":"FIX","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/rancabangoarahletnanharun.m3u8","jalan_status":"Kota","lokasi_lat":"-7.31827517","lokasi_lng":"108.19899738"},"3":{"id":"3","nama":"Simpang Mitra Batik","jenis":"PTZ","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/mitrabatik.m3u8","jalan_status":"Nasional","lokasi_lat":"-7.31573718","lokasi_lng":"108.21582556"},"8":{"id":"8","nama":"Simpang Lima","jenis":"PTZ","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/simpanglima.m3u8","jalan_status":"Nasional","lokasi_lat":"-7.31983946","lokasi_lng":"108.21993470"},"25":{"id":"25","nama":"Ruas M. Hatta","jenis":"FIX","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/mhatta.m3u8","jalan_status":"Nasional","lokasi_lat":"-7.31804106","lokasi_lng":"108.22813153"},"9":{"id":"9","nama":"Simpang Cimulu","jenis":"PTZ","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/cimulu.m3u8","jalan_status":"Kota","lokasi_lat":"-7.32110046","lokasi_lng":"108.22129726"},"21":{"id":"21","nama":"Simpang Dewi Sartika Arah Cimulu","jenis":"FIX","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/dewisartikaarahcimulu.m3u8","jalan_status":"Kota","lokasi_lat":"-7.32348299","lokasi_lng":"108.22138300"},"22":{"id":"22","nama":"Simpang Dewi Sartika Arah Masjid Agung","jenis":"FIX","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/dewisartikaarahmasjidagung.m3u8","jalan_status":"Kota","lokasi_lat":"-7.32334046","lokasi_lng":"108.22167277"},"10":{"id":"10","nama":"Simpang Masjid Agung","jenis":"PTZ","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/masjidagungptz.m3u8","jalan_status":"Kota","lokasi_lat":"-7.32582520","lokasi_lng":"108.22079837"},"24":{"id":"24","nama":"Simpang Nagarawangi","jenis":"PTZ","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/nagarawangi.m3u8","jalan_status":"Kota","lokasi_lat":"-7.33444986","lokasi_lng":"108.21906567"},"26":{"id":"26","nama":"Simpang Alun-alun Arah Otista","jenis":"FIX","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/alunalunarahotista.m3u8","jalan_status":"Kota","lokasi_lat":"-7.32683612","lokasi_lng":"108.22484314"},"27":{"id":"27","nama":"Simpang Alun-alun Arah Tentara Pelajar","jenis":"FIX","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/alunalunarahtentarapelajar.m3u8","jalan_status":"Kota","lokasi_lat":"-7.32684144","lokasi_lng":"108.22468758"},"28":{"id":"28","nama":"Simpang Alun-alun Arah Sutisna Senjaya","jenis":"FIX","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/alunalunarahsutsen.m3u8","jalan_status":"Kota","lokasi_lat":"-7.32680420","lokasi_lng":"108.22466612"},"14":{"id":"14","nama":"Simpang Sutisna Senjaya","jenis":"PTZ","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/sutisnasenjaya.m3u8","jalan_status":"Kota","lokasi_lat":"-7.32757569","lokasi_lng":"108.22712302"},"33":{"id":"33","nama":"Simpang Gunung Sabeulah","jenis":"PTZ","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/gunungsabeulah.m3u8","jalan_status":"Kota","lokasi_lat":"-7.32293900","lokasi_lng":"108.21570600"},"39":{"id":"39","nama":"Simpang Pataruman PTZ","jenis":"PTZ","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/patarumanptz.m3u8","jalan_status":"Kota","lokasi_lat":"-7.33084554","lokasi_lng":"108.21940362"},"40":{"id":"40","nama":"Simpang Pataruman FIX","jenis":"FIX","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/patarumanarahnagarawangi.m3u8","jalan_status":"Kota","lokasi_lat":"-7.33067529","lokasi_lng":"108.21973622"},"41":{"id":"41","nama":"Simpang Panyerutan PTZ","jenis":"PTZ","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/panyerutanptz.m3u8","jalan_status":"Kota","lokasi_lat":"-7.33245617","lokasi_lng":"108.21920782"},"42":{"id":"42","nama":"Simpang Panyerutan FIX","jenis":"FIX","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/panyerutanarahnagarawangi.m3u8","jalan_status":"Kota","lokasi_lat":"-7.33264771","lokasi_lng":"108.21917027"},"43":{"id":"43","nama":"Simpang Paseh","jenis":"PTZ","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/pasehptz.m3u8","jalan_status":"Kota","lokasi_lat":"-7.33389191","lokasi_lng":"108.21521401"},"44":{"id":"44","nama":"Simpang Padayungan","jenis":"FIX","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/padayunganarahkawalu.m3u8","jalan_status":"Kota","lokasi_lat":"-7.34821456","lokasi_lng":"108.21789622"},"45":{"id":"45","nama":"Simpang Rumah Sakit","jenis":"PTZ","link":"https:\/\/atcs.tasikmalayakota.go.id\/camera\/rumahsakit.m3u8","jalan_status":"Kota","lokasi_lat":"-7.33153300","lokasi_lng":"108.22239500"}};
+var lokasi=[{"lat":"-7.27380239","lng":"108.19348812","nama":"Batas Kota Arah Bandung","id":"15"},{"lat":"-7.28333264","lng":"108.19812298","nama":"Simpang Wasita Kusuma Arah Bandung","id":"5"},{"lat":"-7.28314108","lng":"108.19807470","nama":"Simpang Wasita Kusuma Arah Bojong Jengkol","id":"7"},{"lat":"-7.28802586","lng":"108.20033312","nama":"Simpang Bojong Jengkol Arah Wasita Kusuma","id":"16"},{"lat":"-7.28782898","lng":"108.20052624","nama":"Simpang Bojong Jengkol Arah Leuwidahu","id":"17"},{"lat":"-7.30405798","lng":"108.20548296","nama":"Simpang Jati","id":"1"},{"lat":"-7.31782823","lng":"108.19884181","nama":"Simpang Rancabango Arah Simpang Bantar","id":"4"},{"lat":"-7.31824857","lng":"108.19898665","nama":"Simpang Rancabango Arah Jati","id":"34"},{"lat":"-7.31827517","lng":"108.19899738","nama":"Simpang Rancabango Arah Letnan Harun","id":"35"},{"lat":"-7.31573718","lng":"108.21582556","nama":"Simpang Mitra Batik","id":"3"},{"lat":"-7.31983946","lng":"108.21993470","nama":"Simpang Lima","id":"8"},{"lat":"-7.31804106","lng":"108.22813153","nama":"Ruas M. Hatta","id":"25"},{"lat":"-7.32110046","lng":"108.22129726","nama":"Simpang Cimulu","id":"9"},{"lat":"-7.32348299","lng":"108.22138300","nama":"Simpang Dewi Sartika Arah Cimulu","id":"21"},{"lat":"-7.32334046","lng":"108.22167277","nama":"Simpang Dewi Sartika Arah Masjid Agung","id":"22"},{"lat":"-7.32582520","lng":"108.22079837","nama":"Simpang Masjid Agung","id":"10"},{"lat":"-7.33444986","lng":"108.21906567","nama":"Simpang Nagarawangi","id":"24"},{"lat":"-7.32683612","lng":"108.22484314","nama":"Simpang Alun-alun Arah Otista","id":"26"},{"lat":"-7.32684144","lng":"108.22468758","nama":"Simpang Alun-alun Arah Tentara Pelajar","id":"27"},{"lat":"-7.32680420","lng":"108.22466612","nama":"Simpang Alun-alun Arah Sutisna Senjaya","id":"28"},{"lat":"-7.32757569","lng":"108.22712302","nama":"Simpang Sutisna Senjaya","id":"14"},{"lat":"-7.32293900","lng":"108.21570600","nama":"Simpang Gunung Sabeulah","id":"33"},{"lat":"-7.33084554","lng":"108.21940362","nama":"Simpang Pataruman PTZ","id":"39"},{"lat":"-7.33067529","lng":"108.21973622","nama":"Simpang Pataruman FIX","id":"40"},{"lat":"-7.33245617","lng":"108.21920782","nama":"Simpang Panyerutan PTZ","id":"41"},{"lat":"-7.33264771","lng":"108.21917027","nama":"Simpang Panyerutan FIX","id":"42"},{"lat":"-7.33389191","lng":"108.21521401","nama":"Simpang Paseh","id":"43"},{"lat":"-7.34821456","lng":"108.21789622","nama":"Simpang Padayungan","id":"44"},{"lat":"-7.33153300","lng":"108.22239500","nama":"Simpang Rumah Sakit","id":"45"}];
+</script>
+	<div class="bottom bg-dark text-light">
+		<div class="container">
+			<div class="row">
+				<div class="col-md-4">
+					<h3 class="section-title"><span>Kontak</span></h3>
+					<p><i class="fa fa-map-marker fa-fw"></i> Jl. Ir. H. Juanda No. 191, Kelurahan Bantarsari, Kecamatan Bungursari, Kota Tasikmalaya, Jawa Barat 46151</p>
+					<p><i class="fa fa-phone fa-fw"></i> -</p>
+					<p><i class="fa fa-envelope fa-fw"></i> atcs.tasikmalayakota@gmail.com</p>
+				</div>
+				<div class="col-md-4">
+					<h3 class="section-title"><span>Media Sosial</span></h3>
+					<div class="section-content">
+						<a class="social-icon" target="_blank" href="https://www.facebook.com/atcs.kotatasikmalaya/"><i class="fa fa-facebook-square fa-3x"></i></a>						<a class="social-icon" target="_blank" href="https://www.instagram.com/atcs.kotatasikmalaya/"><i class="fa fa-instagram fa-3x"></i></a>						<a class="social-icon" target="_blank" href="https://m.youtube.com/@atcskotatasikmalaya6468"><i class="fa fa-youtube-square fa-3x"></i></a>											</div>
+				</div>
+				<div class="col-md-4">
+					<a href='https://play.google.com/store/apps/details?id=com.tasikmalayakota.atcs&pcampaignid=pcampaignidMKT-Other-global-all-co-prtnr-py-PartBadge-Mar2515-1' target="_blank"><img alt='Temukan di Google Play' src='https://play.google.com/intl/en_us/badges/static/images/badges/id_badge_web_generic.png' class="img-fluid"/></a>
+				</div>
+			</div>
+		</div>
+	</div>
+	<footer class="main-footer">
+		<div class="container py-2" align="center">
+			&copy; 2026 <a href="https://atcs.tasikmalayakota.go.id/" title="ATCS Kota Tasikmalaya">ATCS Kota Tasikmalaya</a>
+		</div>
+	</footer>
+
+	<div class="modal fade" id="modal-stream" tabindex="-1" role="dialog" aria-labelledby="modal-streamL" aria-hidden="true">
+		<div class="modal-dialog modal-lg" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h5 class="modal-title" id="modal-streamL">Live Streaming</h5>
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+				</div>
+				<div class="modal-body">
+					<div id="player"></div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-secondary" data-dismiss="modal">Tutup</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<script type="text/javascript" src="https://atcs.tasikmalayakota.go.id/main.js"></script>
+	<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/clappr@latest/dist/clappr.min.js"></script>
+
+	<link rel="stylesheet" href="https://atcs.tasikmalayakota.go.id/assets/leaflet/leaflet.css" /><script src="https://atcs.tasikmalayakota.go.id/assets/leaflet/leaflet.js"></script><link rel="stylesheet" href="https://atcs.tasikmalayakota.go.id/assets/leaflet/fullscreen/Control.FullScreen.css" /><script src="https://atcs.tasikmalayakota.go.id/assets/leaflet/fullscreen/Control.FullScreen.js"></script>
+<script type="text/javascript" src="https://atcs.tasikmalayakota.go.id/script/home.js"></script></body>
+</html>

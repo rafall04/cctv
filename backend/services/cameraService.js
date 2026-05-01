@@ -24,6 +24,10 @@ import {
     normalizeExternalHealthMode,
     normalizeExternalOriginMode,
 } from '../utils/cameraDelivery.js';
+import {
+    normalizeInternalIngestPolicy,
+    normalizeOnDemandCloseAfterSeconds,
+} from '../utils/internalIngestPolicy.js';
 
 const BULK_AREA_TARGET_FILTERS = [
     'all',
@@ -197,6 +201,12 @@ const ADMIN_CAMERA_LIST_PROJECTION = `
     c.longitude,
     c.status,
     c.enable_recording,
+    CASE
+        WHEN c.internal_ingest_policy_override IN ('default', 'always_on', 'on_demand') THEN c.internal_ingest_policy_override
+        ELSE 'default'
+    END as internal_ingest_policy_override,
+    c.internal_on_demand_close_after_seconds_override,
+    c.source_profile,
     c.recording_duration_hours,
     c.recording_status,
     c.last_recording_start,
@@ -224,6 +234,12 @@ const ADMIN_CAMERA_LIST_PROJECTION = `
             THEN a.external_health_mode_override
         ELSE 'default'
     END as area_external_health_mode_override,
+    CASE
+        WHEN a.internal_ingest_policy_default IN ('default', 'always_on', 'on_demand')
+            THEN a.internal_ingest_policy_default
+        ELSE 'default'
+    END as area_internal_ingest_policy_default,
+    a.internal_on_demand_close_after_seconds as area_internal_on_demand_close_after_seconds,
     ${CAMERA_RUNTIME_STATE_PROJECTION}
 `;
 
@@ -819,6 +835,9 @@ function getImportProfileDefaults(sourceProfile = null) {
                 external_origin_mode: 'direct',
                 descriptionTemplate: 'SOURCE: PRIVATE RTSP LIVE ONLY | source_tag: {sourceTag} | notes: {notes}',
                 locationMapping: 'source_field',
+                source_profile: 'surabaya_private_rtsp',
+                internal_ingest_policy_override: 'on_demand',
+                internal_on_demand_close_after_seconds_override: 15,
             };
         case 'jombang_mjpeg':
             return {
@@ -1245,12 +1264,20 @@ class CameraService {
             external_health_mode,
             public_playback_mode,
             public_playback_preview_minutes,
+            internal_ingest_policy_override,
+            internal_on_demand_close_after_seconds_override,
+            source_profile,
         } = data;
         const externalUseProxy = external_use_proxy === false || external_use_proxy === 0 ? 0 : 1;
         const externalTlsMode = external_tls_mode === 'insecure' ? 'insecure' : 'strict';
         const externalHealthMode = normalizeExternalHealthMode(external_health_mode);
         const publicPlaybackMode = normalizePublicPlaybackMode(public_playback_mode);
         const publicPlaybackPreviewMinutes = normalizePublicPlaybackPreviewMinutes(public_playback_preview_minutes);
+        const internalIngestPolicyOverride = normalizeInternalIngestPolicy(internal_ingest_policy_override);
+        const internalOnDemandCloseAfterSecondsOverride = normalizeOnDemandCloseAfterSeconds(
+            internal_on_demand_close_after_seconds_override,
+            null
+        );
 
         if (!name) {
             const err = new Error('Camera name is required');
@@ -1328,7 +1355,7 @@ class CameraService {
         const cameraStatus = status || 'active';
 
         const result = execute(
-            'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, recording_duration_hours, video_codec, stream_source, delivery_type, external_hls_url, external_stream_url, external_embed_url, external_snapshot_url, external_origin_mode, external_use_proxy, external_tls_mode, external_health_mode, public_playback_mode, public_playback_preview_minutes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, recording_duration_hours, video_codec, stream_source, delivery_type, external_hls_url, external_stream_url, external_embed_url, external_snapshot_url, external_origin_mode, external_use_proxy, external_tls_mode, external_health_mode, public_playback_mode, public_playback_preview_minutes, internal_ingest_policy_override, internal_on_demand_close_after_seconds_override, source_profile) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 name,
                 deliveryConfig.deliveryType === 'internal_hls' ? private_rtsp_url : '',
@@ -1357,6 +1384,9 @@ class CameraService {
                 externalHealthMode,
                 publicPlaybackMode,
                 publicPlaybackPreviewMinutes,
+                internalIngestPolicyOverride,
+                internalOnDemandCloseAfterSecondsOverride,
+                source_profile || null,
             ]
         );
 
@@ -1430,6 +1460,9 @@ class CameraService {
             external_health_mode,
             public_playback_mode,
             public_playback_preview_minutes,
+            internal_ingest_policy_override,
+            internal_on_demand_close_after_seconds_override,
+            source_profile,
         } = data;
 
         const existingCamera = queryOne(
@@ -1453,7 +1486,13 @@ class CameraService {
                         WHEN public_playback_mode IN ('inherit', 'disabled', 'preview_only', 'admin_only') THEN public_playback_mode
                         ELSE 'inherit'
                     END as public_playback_mode,
-                    public_playback_preview_minutes
+                    public_playback_preview_minutes,
+                    CASE
+                        WHEN internal_ingest_policy_override IN ('default', 'always_on', 'on_demand') THEN internal_ingest_policy_override
+                        ELSE 'default'
+                    END as internal_ingest_policy_override,
+                    internal_on_demand_close_after_seconds_override,
+                    source_profile
              FROM cameras WHERE id = ?`,
             [id]
         );
@@ -1482,6 +1521,11 @@ class CameraService {
 
         if (public_playback_mode !== undefined && !PUBLIC_PLAYBACK_MODES.includes(public_playback_mode)) {
             const err = new Error('Invalid public playback mode');
+            err.statusCode = 400;
+            throw err;
+        }
+        if (internal_ingest_policy_override !== undefined && !['default', 'always_on', 'on_demand'].includes(internal_ingest_policy_override)) {
+            const err = new Error('Invalid internal ingest policy override');
             err.statusCode = 400;
             throw err;
         }
@@ -1612,6 +1656,18 @@ class CameraService {
         if (public_playback_preview_minutes !== undefined) {
             updates.push('public_playback_preview_minutes = ?');
             values.push(normalizePublicPlaybackPreviewMinutes(public_playback_preview_minutes));
+        }
+        if (internal_ingest_policy_override !== undefined) {
+            updates.push('internal_ingest_policy_override = ?');
+            values.push(normalizeInternalIngestPolicy(internal_ingest_policy_override));
+        }
+        if (internal_on_demand_close_after_seconds_override !== undefined) {
+            updates.push('internal_on_demand_close_after_seconds_override = ?');
+            values.push(normalizeOnDemandCloseAfterSeconds(internal_on_demand_close_after_seconds_override, null));
+        }
+        if (source_profile !== undefined) {
+            updates.push('source_profile = ?');
+            values.push(source_profile || null);
         }
 
         if (updates.length === 0) {
@@ -2510,6 +2566,9 @@ class CameraService {
                 resolvedStreamSource,
                 resolvedRecordingEnabled: forceInternalLiveOnly ? 0 : null,
                 sourceTag: rawSourceTag,
+                sourceProfile: forceInternalLiveOnly
+                    ? (item.source_profile || globalOverrides.source_profile || profileDefaults.source_profile || 'surabaya_private_rtsp')
+                    : (item.source_profile || null),
                 latitude: rawLat !== null && rawLat !== '' ? parseFloat(rawLat) : null,
                 longitude: rawLng !== null && rawLng !== '' ? parseFloat(rawLng) : null,
                 status: 'importable',
@@ -2573,6 +2632,26 @@ class CameraService {
                     enable_recording: deliveryConfig.deliveryType === 'internal_hls'
                         ? (forceInternalLiveOnly ? 0 : (item.enable_recording === true || item.enable_recording === 1 ? 1 : 0))
                         : 0,
+                    internal_ingest_policy_override: deliveryConfig.deliveryType === 'internal_hls'
+                        ? normalizeInternalIngestPolicy(
+                            item.internal_ingest_policy_override
+                            || globalOverrides.internal_ingest_policy_override
+                            || profileDefaults.internal_ingest_policy_override
+                            || 'default'
+                        )
+                        : 'default',
+                    internal_on_demand_close_after_seconds_override: deliveryConfig.deliveryType === 'internal_hls'
+                        ? normalizeOnDemandCloseAfterSeconds(
+                            item.internal_on_demand_close_after_seconds_override
+                            ?? globalOverrides.internal_on_demand_close_after_seconds_override
+                            ?? profileDefaults.internal_on_demand_close_after_seconds_override
+                            ?? null,
+                            null
+                        )
+                        : null,
+                    source_profile: deliveryConfig.deliveryType === 'internal_hls'
+                        ? (resolvedRow.sourceProfile || null)
+                        : null,
                     stream_source: deliveryConfig.compatStreamSource,
                     delivery_type: deliveryConfig.deliveryType,
                     external_hls_url: deliveryConfig.externalHlsUrl,
@@ -2693,7 +2772,7 @@ class CameraService {
                 const importData = row.importData;
                 const streamKey = uuidv4();
                 execute(
-                    'INSERT INTO cameras (name, private_rtsp_url, description, location, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, stream_source, delivery_type, external_hls_url, external_stream_url, external_embed_url, external_snapshot_url, external_origin_mode, external_use_proxy, external_tls_mode, external_health_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    'INSERT INTO cameras (name, private_rtsp_url, description, location, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, stream_source, delivery_type, external_hls_url, external_stream_url, external_embed_url, external_snapshot_url, external_origin_mode, external_use_proxy, external_tls_mode, external_health_mode, internal_ingest_policy_override, internal_on_demand_close_after_seconds_override, source_profile) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                     [
                         importData.name,
                         importData.private_rtsp_url || '',
@@ -2717,6 +2796,9 @@ class CameraService {
                         importData.external_use_proxy === 0 ? 0 : 1,
                         importData.external_tls_mode === 'insecure' ? 'insecure' : 'strict',
                         normalizeExternalHealthMode(importData.external_health_mode),
+                        normalizeInternalIngestPolicy(importData.internal_ingest_policy_override),
+                        normalizeOnDemandCloseAfterSeconds(importData.internal_on_demand_close_after_seconds_override, null),
+                        importData.source_profile || null,
                     ]
                 );
                 importedCount += 1;

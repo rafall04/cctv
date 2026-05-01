@@ -2,6 +2,10 @@ import { query, queryOne, execute } from '../database/connectionPool.js';
 import cache, { CacheTTL, CacheNamespace, cacheKey } from './cacheService.js';
 import cameraHealthService from './cameraHealthService.js';
 import { getCameraDeliveryProfile, normalizeExternalHealthMode } from '../utils/cameraDelivery.js';
+import {
+    normalizeInternalIngestPolicy,
+    normalizeOnDemandCloseAfterSeconds,
+} from '../utils/internalIngestPolicy.js';
 
 const CACHE_ALL_AREAS = cacheKey(CacheNamespace.AREAS, 'all');
 const CACHE_AREA_FILTERS = cacheKey(CacheNamespace.AREAS, 'filters');
@@ -58,6 +62,10 @@ function normalizeGridDefaultCameraLimit(value) {
     }
 
     return Math.max(1, Math.min(parsed, 100));
+}
+
+function normalizeInternalIngestPolicyDefault(value) {
+    return normalizeInternalIngestPolicy(value);
 }
 
 function buildAreaOverviewRows(areas, cameras, healthItems) {
@@ -251,7 +259,13 @@ class AreaService {
         const areas = query(`
             SELECT a.id, a.name, a.description, a.rt, a.rw, a.kelurahan, a.kecamatan, a.latitude, a.longitude,
                    a.coverage_scope, a.viewport_zoom_override, COALESCE(a.show_on_grid_default, 1) as show_on_grid_default,
-                   COALESCE(a.grid_default_camera_limit, 12) as grid_default_camera_limit
+                   COALESCE(a.grid_default_camera_limit, 12) as grid_default_camera_limit,
+                   CASE
+                        WHEN a.internal_ingest_policy_default IN ('default', 'always_on', 'on_demand')
+                            THEN a.internal_ingest_policy_default
+                        ELSE 'default'
+                   END as internal_ingest_policy_default,
+                   a.internal_on_demand_close_after_seconds
                    , CASE
                         WHEN a.external_health_mode_override IN ('default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled')
                             THEN a.external_health_mode_override
@@ -263,7 +277,14 @@ class AreaService {
         const cameras = query(`
             SELECT c.id, c.name, c.area_id, c.is_online, c.enable_recording, c.stream_source,
                    c.delivery_type, c.private_rtsp_url, c.external_hls_url, c.external_stream_url,
-                   c.external_embed_url, c.external_snapshot_url
+                   c.external_embed_url, c.external_snapshot_url,
+                   CASE
+                        WHEN c.internal_ingest_policy_override IN ('default', 'always_on', 'on_demand')
+                            THEN c.internal_ingest_policy_override
+                        ELSE 'default'
+                   END as internal_ingest_policy_override,
+                   c.internal_on_demand_close_after_seconds_override,
+                   c.source_profile
                    , CASE
                         WHEN c.external_health_mode IN ('default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled')
                             THEN c.external_health_mode
@@ -306,6 +327,8 @@ class AreaService {
             viewport_zoom_override,
             show_on_grid_default,
             grid_default_camera_limit,
+            internal_ingest_policy_default,
+            internal_on_demand_close_after_seconds,
         } = data;
 
         if (!name) {
@@ -318,7 +341,8 @@ class AreaService {
             const result = execute(
                 `INSERT INTO areas (
                     name, description, rt, rw, kelurahan, kecamatan, latitude, longitude, external_health_mode_override, coverage_scope, viewport_zoom_override, show_on_grid_default, grid_default_camera_limit
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    , internal_ingest_policy_default, internal_on_demand_close_after_seconds
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     name,
                     description || null,
@@ -333,6 +357,8 @@ class AreaService {
                     normalizeViewportZoomOverride(viewport_zoom_override),
                     normalizeShowOnGridDefault(show_on_grid_default),
                     normalizeGridDefaultCameraLimit(grid_default_camera_limit),
+                    normalizeInternalIngestPolicyDefault(internal_ingest_policy_default),
+                    normalizeOnDemandCloseAfterSeconds(internal_on_demand_close_after_seconds, null),
                 ]
             );
 
@@ -364,6 +390,8 @@ class AreaService {
             viewport_zoom_override,
             show_on_grid_default,
             grid_default_camera_limit,
+            internal_ingest_policy_default,
+            internal_on_demand_close_after_seconds,
         } = data;
 
         const area = queryOne('SELECT * FROM areas WHERE id = ?', [id]);
@@ -377,7 +405,8 @@ class AreaService {
             execute(
                 `UPDATE areas
                  SET name = ?, description = ?, rt = ?, rw = ?, kelurahan = ?, kecamatan = ?, latitude = ?, longitude = ?,
-                     external_health_mode_override = ?, coverage_scope = ?, viewport_zoom_override = ?, show_on_grid_default = ?, grid_default_camera_limit = ?
+                     external_health_mode_override = ?, coverage_scope = ?, viewport_zoom_override = ?, show_on_grid_default = ?, grid_default_camera_limit = ?,
+                     internal_ingest_policy_default = ?, internal_on_demand_close_after_seconds = ?
                  WHERE id = ?`,
                 [
                     name || area.name,
@@ -403,6 +432,12 @@ class AreaService {
                     grid_default_camera_limit !== undefined
                         ? normalizeGridDefaultCameraLimit(grid_default_camera_limit)
                         : normalizeGridDefaultCameraLimit(area.grid_default_camera_limit),
+                    internal_ingest_policy_default !== undefined
+                        ? normalizeInternalIngestPolicyDefault(internal_ingest_policy_default)
+                        : normalizeInternalIngestPolicyDefault(area.internal_ingest_policy_default),
+                    internal_on_demand_close_after_seconds !== undefined
+                        ? normalizeOnDemandCloseAfterSeconds(internal_on_demand_close_after_seconds, null)
+                        : normalizeOnDemandCloseAfterSeconds(area.internal_on_demand_close_after_seconds, null),
                     id
                 ]
             );

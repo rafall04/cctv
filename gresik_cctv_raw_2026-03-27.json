@@ -1,0 +1,2567 @@
+﻿[
+    {
+        "id":  "vu38zvns0x3462p4n2846e2t",
+        "name":  "CCTV JALAN DESA BEDANTEN",
+        "locationName":  "DESA BEDANTEN",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.58886032414809,
+                         "y":  -7.050977865134107
+                     },
+        "ipAddress":  "192.168.31.160",
+        "rtspUrl":  "rtsp://admin:MULAR2025%40@192.168.31.160:554/streaming/channels/2702",
+        "videoUrl":  "/uploads/hls/vu38zvns0x3462p4n2846e2t.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-10-08T14:16:10.322Z",
+        "createdAt":  "2025-10-08T14:16:10.322Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "goq8iro9lxq6mmh5a3001gzn",
+        "name":  "CCTV JALAN DESA BEDANTEN",
+        "locationName":  "DESA BEDANTEN",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.584609,
+                         "y":  -7.0553703
+                     },
+        "ipAddress":  "192.168.31.82",
+        "rtspUrl":  "rtsp://admin:MULAR2025%40@192.168.31.82:554/streaming/channels/0202",
+        "videoUrl":  "/uploads/hls/goq8iro9lxq6mmh5a3001gzn.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-10-08T14:08:23.780Z",
+        "createdAt":  "2025-10-08T14:08:23.780Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "yhh9g958cr8lf3qdrhdj8jqw",
+        "name":  "CCTV JALAN DESA BEDANTEN",
+        "locationName":  "DESA BEDANTEN",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.584844,
+                         "y":  -7.055383
+                     },
+        "ipAddress":  "192.168.31.82",
+        "rtspUrl":  "rtsp://admin:MULAR2025%40@192.168.31.82:554/streaming/channels/0802",
+        "videoUrl":  "/uploads/hls/yhh9g958cr8lf3qdrhdj8jqw.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-10-08T10:24:30.077Z",
+        "createdAt":  "2025-10-08T10:24:30.077Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "omb87er57ju7g4wyd3m5j7kv",
+        "name":  "CCTV PANORAMIK MBAH CONDRO",
+        "locationName":  "MBAH CONDRO",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.6172829,
+                         "y":  -7.1697878
+                     },
+        "ipAddress":  "10.120.0.172",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/1902",
+        "videoUrl":  "/uploads/hls/omb87er57ju7g4wyd3m5j7kv.m3u8",
+        "status":  "INACTIVE",
+        "updatedAt":  "2025-07-15T17:41:41.575Z",
+        "createdAt":  "2025-07-15T17:41:41.575Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "c05kvo7yhzvahh28w966sx0u",
+        "name":  "CCTV PARKIR PASAR GRESIK 4",
+        "locationName":  "PASAR GRESIK",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.651877,
+                         "y":  -7.152965
+                     },
+        "ipAddress":  "10.55.3.101",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/0502",
+        "videoUrl":  "/uploads/hls/c05kvo7yhzvahh28w966sx0u.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:40:40.447Z",
+        "createdAt":  "2025-07-15T17:40:40.447Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "cmdvuqac42v795dyv1r6tmwx",
+        "name":  "CCTV-PANO-ISLAMIK-CENTER",
+        "locationName":  ". Raya Pilangrejo, Area Sawah, Wahas, Kec. Balongpanggang, Kabupaten Gresik, Jawa Timur 61173",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.442111,
+                         "y":  -7.280576
+                     },
+        "ipAddress":  "10.120.0.163",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/2902",
+        "videoUrl":  "/uploads/hls/cmdvuqac42v795dyv1r6tmwx.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:39:27.736Z",
+        "createdAt":  "2025-07-15T17:39:27.736Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "ihdbdbk0ijezifw2b33xl6zh",
+        "name":  "CCTV PANORAMIC MASJID JAMI",
+        "locationName":  "MASJID JAMI GRESIK",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.655326,
+                         "y":  -7.157297
+                     },
+        "ipAddress":  "10.1.21.105",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/2402",
+        "videoUrl":  "/uploads/hls/ihdbdbk0ijezifw2b33xl6zh.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:37:30.742Z",
+        "createdAt":  "2025-07-15T17:37:30.742Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "aofq9sffedg0ne0jqowzjuhn",
+        "name":  "CCTV PANORAMIC PUTRI CEMPO",
+        "locationName":  "Sidokumpul, Kec. Gresik, Kabupaten Gresik, Jawa Timur 61123",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.64031248,
+                         "y":  -7.1751183
+                     },
+        "ipAddress":  "10.1.21.2",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/2201",
+        "videoUrl":  "/uploads/hls/aofq9sffedg0ne0jqowzjuhn.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:36:15.972Z",
+        "createdAt":  "2025-07-15T17:36:15.972Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "bpq9fht94zb9l0xw5bnv2z24",
+        "name":  "CCTV PANORAMIC KANTOR BUPATI",
+        "locationName":  "KANTOR BUPATI",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.59963338,
+                         "y":  -7.17072595
+                     },
+        "ipAddress":  "192.168.112.12",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/3401",
+        "videoUrl":  "/uploads/hls/bpq9fht94zb9l0xw5bnv2z24.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:35:13.679Z",
+        "createdAt":  "2025-07-15T17:35:13.679Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "hq3tf0caellocpt0yeeir4l5",
+        "name":  "CCTV PARKIR PASAR GRESIK 3",
+        "locationName":  "PASAR GERSIK",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.6525392,
+                         "y":  -7.15305696
+                     },
+        "ipAddress":  "10.55.3.104",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/1402",
+        "videoUrl":  "/uploads/hls/hq3tf0caellocpt0yeeir4l5.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:33:43.513Z",
+        "createdAt":  "2025-07-15T17:33:43.513Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "gosswlb6qcrtgu9mkoqt9zqn",
+        "name":  "CCTV PARKIR PASAR GRESIK 2",
+        "locationName":  "PASAR GERSIK",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.65232,
+                         "y":  -7.153042
+                     },
+        "ipAddress":  "10.55.3.103",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/1102",
+        "videoUrl":  "/uploads/hls/gosswlb6qcrtgu9mkoqt9zqn.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:32:58.695Z",
+        "createdAt":  "2025-07-15T17:32:58.695Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "mx4nryf6sz4u8f6pgznoc48y",
+        "name":  "CCTV PARKIR PASAR GRESIK 1",
+        "locationName":  "PASAR GERSIK",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.652103,
+                         "y":  -7.152994
+                     },
+        "ipAddress":  "10.55.3.102",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/0902",
+        "videoUrl":  "/uploads/hls/mx4nryf6sz4u8f6pgznoc48y.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:32:05.184Z",
+        "createdAt":  "2025-07-15T17:32:05.184Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "wfpgw7rc8lt60qanrqu30hur",
+        "name":  "CCTV BANDARA BAWEAN 3",
+        "locationName":  "BANDARA BAWEAN",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.682491,
+                         "y":  -5.727144
+                     },
+        "ipAddress":  "10.120.0.130",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/11802",
+        "videoUrl":  "/uploads/hls/wfpgw7rc8lt60qanrqu30hur.m3u8",
+        "status":  "INACTIVE",
+        "updatedAt":  "2025-07-15T17:30:15.205Z",
+        "createdAt":  "2025-07-15T17:30:15.205Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "rsnvckl7vveda1t72cd52vqz",
+        "name":  "CCTV BANDARA BAWEAN 2",
+        "locationName":  "BANDARA BAWEAN",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.682599,
+                         "y":  -5.72708
+                     },
+        "ipAddress":  "10.120.0.128",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/11602",
+        "videoUrl":  "/uploads/hls/rsnvckl7vveda1t72cd52vqz.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:29:35.828Z",
+        "createdAt":  "2025-07-15T17:29:35.828Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "xfr55w697fbx0elbni0wrc04",
+        "name":  "CCTV BANDARA BAWEAN 1",
+        "locationName":  "BANDARA BAWEAN",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.682341,
+                         "y":  -5.72723
+                     },
+        "ipAddress":  "10.120.0.127",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/11502",
+        "videoUrl":  "/uploads/hls/xfr55w697fbx0elbni0wrc04.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:28:33.388Z",
+        "createdAt":  "2025-07-15T17:28:33.388Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "rzmhytcvipre323yklbnk0h9",
+        "name":  "CCTV PELABUHAN PROV BAWEAN 3",
+        "locationName":  "PELABUHAN PROV BAWEAN",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.648916,
+                         "y":  -5.84879
+                     },
+        "ipAddress":  "10.120.0.125",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/11302",
+        "videoUrl":  "/uploads/hls/rzmhytcvipre323yklbnk0h9.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:27:03.584Z",
+        "createdAt":  "2025-07-15T17:27:03.584Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "p84dhdmf2xm0kwmt59vk9l7s",
+        "name":  "CCTV PELABUHAN PROV BAWEAN 2",
+        "locationName":  "PELABUHAN PROV BAWEAN",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.648822,
+                         "y":  -5.848694
+                     },
+        "ipAddress":  "10.120.0.123",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/11102",
+        "videoUrl":  "/uploads/hls/p84dhdmf2xm0kwmt59vk9l7s.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:26:08.571Z",
+        "createdAt":  "2025-07-15T17:26:08.571Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "w3xv4ehpswtnmgn21ystgysx",
+        "name":  "CCTV PELABUHAN PROV BAWEAN 1",
+        "locationName":  "PELABUHAN PROV BAWEAN",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.649026,
+                         "y":  -5.848913
+                     },
+        "ipAddress":  "10.120.0.122",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/11002",
+        "videoUrl":  "/uploads/hls/w3xv4ehpswtnmgn21ystgysx.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:25:07.725Z",
+        "createdAt":  "2025-07-15T17:25:07.725Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "g9ble7yvt45az7dcjwnx4y37",
+        "name":  "CCTV PELABUHAN KAPAL CEPAT BAWEAN 3",
+        "locationName":  "PELABUHAN KAPAL CEPAT BAWEAN",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.643227,
+                         "y":  -5.84569
+                     },
+        "ipAddress":  "10.120.0.70",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/5802",
+        "videoUrl":  "/uploads/hls/g9ble7yvt45az7dcjwnx4y37.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:23:58.785Z",
+        "createdAt":  "2025-07-15T17:23:58.785Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "abz8k6cdzfvn64j4bojqrc58",
+        "name":  "CCTV PELABUHAN KAPAL CEPAT BAWEAN 2",
+        "locationName":  "PELABUHAN KAPAL CEPAT BAWEAN",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.642992,
+                         "y":  -5.845732
+                     },
+        "ipAddress":  "10.120.0.69",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/5702",
+        "videoUrl":  "/uploads/hls/abz8k6cdzfvn64j4bojqrc58.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:23:08.488Z",
+        "createdAt":  "2025-07-15T17:23:08.488Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "nimy107o1k4jdab1723691ce",
+        "name":  "CCTV PELABUHAN KAPAL CEPAT BAWEAN 1",
+        "locationName":  "PELABUHAN KAPAL CEPAT BAWEAN",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.642983,
+                         "y":  -5.845583
+                     },
+        "ipAddress":  "10.120.0.67",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/5502",
+        "videoUrl":  "/uploads/hls/nimy107o1k4jdab1723691ce.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:21:55.775Z",
+        "createdAt":  "2025-07-15T17:21:55.775Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "jzov5yvk8ax1o0llzgp8kor4",
+        "name":  "CCTV PEREMPATAN SEDAYU 4",
+        "locationName":  "PEREMPATAN SEDAYU",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.564,
+                         "y":  -6.990825
+                     },
+        "ipAddress":  "10.120.0.115",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/10302",
+        "videoUrl":  "/uploads/hls/jzov5yvk8ax1o0llzgp8kor4.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:19:53.003Z",
+        "createdAt":  "2025-07-15T17:19:53.003Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "wj9lzzv7qr8v9w7mha4pb7bs",
+        "name":  "CCTV PEREMPATAN SEDAYU 3",
+        "locationName":  "PEREMPATAN SEDAYU",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.56424,
+                         "y":  -6.990892
+                     },
+        "ipAddress":  "10.120.0.114",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/10202",
+        "videoUrl":  "/uploads/hls/wj9lzzv7qr8v9w7mha4pb7bs.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:18:54.996Z",
+        "createdAt":  "2025-07-15T17:18:54.996Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "tlgti061ybvtosb2iz5cohbl",
+        "name":  "CCTV PEREMPATAN SEDAYU 2",
+        "locationName":  "Jl. Kanjeng Sepuh 2-10, Kec. Sidayu, Kabupaten Gresik, Jawa Timur 61153",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.564134,
+                         "y":  -6.990754
+                     },
+        "ipAddress":  "10.120.0.113",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/10102",
+        "videoUrl":  "/uploads/hls/tlgti061ybvtosb2iz5cohbl.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:18:07.131Z",
+        "createdAt":  "2025-07-15T17:18:07.131Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "ljlivg7m282kjuuzfbzsznw2",
+        "name":  "CCTV PEREMPATAN SEDAYU 1",
+        "locationName":  "Jl. Kanjeng Sepuh 2-10, Kec. Sidayu, Kabupaten Gresik, Jawa Timur 61153",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.564084,
+                         "y":  -6.991008
+                     },
+        "ipAddress":  "10.120.0.112",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/10002",
+        "videoUrl":  "/uploads/hls/ljlivg7m282kjuuzfbzsznw2.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:17:10.266Z",
+        "createdAt":  "2025-07-15T17:17:10.266Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "ukyf7uyuai5n8hvvacnpyrmb",
+        "name":  "CCTV PERTIGAAN GOLOKAN SEDAYU 3",
+        "locationName":  "Pos Pantau, Gerdugeneng, Golokan, Kec. Sidayu, Kabupaten Gresik, Jawa Timur",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.533091,
+                         "y":  -6.974264
+                     },
+        "ipAddress":  "10.120.0.109",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/9702",
+        "videoUrl":  "/uploads/hls/ukyf7uyuai5n8hvvacnpyrmb.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:15:46.702Z",
+        "createdAt":  "2025-07-15T17:15:46.702Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "scjnbtdshqi6erj1ypnpewt8",
+        "name":  "CCTV PERTIGAAN GOLOKAN SEDAYU 2",
+        "locationName":  "Pos Pantau, Gerdugeneng, Golokan, Kec. Sidayu, Kabupaten Gresik, Jawa Timur",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.532978,
+                         "y":  -6.974173
+                     },
+        "ipAddress":  "10.120.0.108",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/9602",
+        "videoUrl":  "/uploads/hls/scjnbtdshqi6erj1ypnpewt8.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:14:49.200Z",
+        "createdAt":  "2025-07-15T17:14:49.200Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "y5a2sjg9efmuj6hds1sx58g8",
+        "name":  "CCTV PERTIGAAN GOLOKAN SEDAYU 1",
+        "locationName":  "Pos Pantau, Gerdugeneng, Golokan, Kec. Sidayu, Kabupaten Gresik, Jawa Timur",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.532834,
+                         "y":  -6.974143
+                     },
+        "ipAddress":  "10.120.0.107",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/9502",
+        "videoUrl":  "/uploads/hls/y5a2sjg9efmuj6hds1sx58g8.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:13:50.023Z",
+        "createdAt":  "2025-07-15T17:13:50.023Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "lbxsxep7wbp69sqs2zxmlay8",
+        "name":  "CCTV PASAR KEC DUKUN 4",
+        "locationName":  "Jl. Deket - Karangbinangun, Kalirejo, Kec. Dukun, Kabupaten Gresik, Jawa Timur 61155",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.507229,
+                         "y":  -7.009124
+                     },
+        "ipAddress":  "10.120.0.105",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/9302",
+        "videoUrl":  "/uploads/hls/lbxsxep7wbp69sqs2zxmlay8.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:12:20.756Z",
+        "createdAt":  "2025-07-15T17:12:20.756Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "dk8eh0u9jz1orzd9x1wq4k6y",
+        "name":  "CCTV PASAR KEC DUKUN 3",
+        "locationName":  "Jl. Deket - Karangbinangun, Kalirejo, Kec. Dukun, Kabupaten Gresik, Jawa Timur 61155",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.507076,
+                         "y":  -7.009401
+                     },
+        "ipAddress":  "10.120.0.104",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/9202",
+        "videoUrl":  "/uploads/hls/dk8eh0u9jz1orzd9x1wq4k6y.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:11:34.981Z",
+        "createdAt":  "2025-07-15T17:11:34.981Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "gtyff7wpztesge2k9p2mffex",
+        "name":  "CCTV PASAR KEC DUKUN 2",
+        "locationName":  "Jl. Deket - Karangbinangun, Kalirejo, Kec. Dukun, Kabupaten Gresik, Jawa Timur 61155",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.507244,
+                         "y":  -7.009467
+                     },
+        "ipAddress":  "10.120.0.103",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/9102",
+        "videoUrl":  "/uploads/hls/gtyff7wpztesge2k9p2mffex.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:10:47.065Z",
+        "createdAt":  "2025-07-15T17:10:47.065Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "pv6khvtklp93h9coj0jm46qc",
+        "name":  "CCTV PASAR KEC DUKUN 1",
+        "locationName":  "Jl. Deket - Karangbinangun, Kalirejo, Kec. Dukun, Kabupaten Gresik, Jawa Timur 61155",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.506953,
+                         "y":  -7.00934
+                     },
+        "ipAddress":  "10.120.0.102",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/9002",
+        "videoUrl":  "/uploads/hls/pv6khvtklp93h9coj0jm46qc.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:09:51.378Z",
+        "createdAt":  "2025-07-15T17:09:51.378Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "zo9t19q4zpv4vzb4nsccqerz",
+        "name":  "CCTV PERTIGAAN PASAR BUNGAH 3",
+        "locationName":  "warkop punden99, WHWG+VF4, Jalan Raya, Lemahdelik, Bungah, Kec. Bungah, Kabupaten Gresik, Jawa Timur 61152",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.576221,
+                         "y":  -7.052779
+                     },
+        "ipAddress":  "10.120.0.100",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/8802",
+        "videoUrl":  "/uploads/hls/zo9t19q4zpv4vzb4nsccqerz.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:08:34.299Z",
+        "createdAt":  "2025-07-15T17:08:34.299Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "eg42o2380l92c78e857opuz4",
+        "name":  "CCTV PERTIGAAN PASAR BUNGAH 2",
+        "locationName":  "warkop punden99, WHWG+VF4, Jalan Raya, Lemahdelik, Bungah, Kec. Bungah, Kabupaten Gresik, Jawa Timur 61152",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.576235,
+                         "y":  -7.052958
+                     },
+        "ipAddress":  "10.120.0.99",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/8702",
+        "videoUrl":  "/uploads/hls/eg42o2380l92c78e857opuz4.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:07:47.283Z",
+        "createdAt":  "2025-07-15T17:07:47.283Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "l6gmbtesu8d8fitm4h38xg1b",
+        "name":  "CCTV PERTIGAAN PASAR BUNGAH 1",
+        "locationName":  "warkop punden99, WHWG+VF4, Jalan Raya, Lemahdelik, Bungah, Kec. Bungah, Kabupaten Gresik, Jawa Timur 61152",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.57618,
+                         "y":  -7.052552
+                     },
+        "ipAddress":  "10.120.0.98",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/8602",
+        "videoUrl":  "/uploads/hls/l6gmbtesu8d8fitm4h38xg1b.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T17:06:51.608Z",
+        "createdAt":  "2025-07-15T17:06:51.608Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "fru9l2bv2xwvv8anfshug1kg",
+        "name":  "CCTV PERTIGAAN MANYAR 3",
+        "locationName":  "Pertigaan Sukomulyo Manyar, VJ87+9QV, Maduran, Roomo, Kec. Manyar, Kabupaten Gresik, Jawa Timur",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.61434,
+                         "y":  -7.134088
+                     },
+        "ipAddress":  "10.120.0.94",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/8202",
+        "videoUrl":  "/uploads/hls/fru9l2bv2xwvv8anfshug1kg.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T16:52:22.751Z",
+        "createdAt":  "2025-07-15T16:52:22.751Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "rn00k3bcle24m8d1azjyrl60",
+        "name":  "CCTV PERTIGAAN MANYAR 2",
+        "locationName":  "Pertigaan Sukomulyo Manyar, VJ87+9QV, Maduran, Roomo, Kec. Manyar, Kabupaten Gresik, Jawa Timur",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.614544,
+                         "y":  -7.134093
+                     },
+        "ipAddress":  "10.120.0.93",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/8102",
+        "videoUrl":  "/uploads/hls/rn00k3bcle24m8d1azjyrl60.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T16:51:14.872Z",
+        "createdAt":  "2025-07-15T16:51:14.872Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "y15wsnfmldd6vfj1wstfvlux",
+        "name":  "CCTV PERTIGAAN MANYAR 1",
+        "locationName":  "Pertigaan Sukomulyo Manyar, VJ87+9QV, Maduran, Roomo, Kec. Manyar, Kabupaten Gresik, Jawa Timur",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.614355,
+                         "y":  -7.133889
+                     },
+        "ipAddress":  "10.120.0.92",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/8002",
+        "videoUrl":  "/uploads/hls/y15wsnfmldd6vfj1wstfvlux.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T16:49:34.551Z",
+        "createdAt":  "2025-07-15T16:49:34.551Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "ixnd84xn3mm5aztagj2zyqer",
+        "name":  "CCTV PEREMPATAN GKB YOSOWILANGUN 4",
+        "locationName":  "Jl. Kng Brotonegoro, Karanggondang, Yosowilangun, Kec. Manyar, Kabupaten Gresik, Jawa Timur 61151",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.614552,
+                         "y":  -7.147312
+                     },
+        "ipAddress":  "10.1.21.50",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/4802",
+        "videoUrl":  "/uploads/hls/ixnd84xn3mm5aztagj2zyqer.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T16:48:33.267Z",
+        "createdAt":  "2025-07-15T16:48:33.267Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "fh1c3gad00e3hjt4rt1mpyf1",
+        "name":  "CCTV PEREMPATAN GKB YOSOWILANGUN 3",
+        "locationName":  "Jl. Kng Brotonegoro, Karanggondang, Yosowilangun, Kec. Manyar, Kabupaten Gresik, Jawa Timur 61151",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.614471,
+                         "y":  -7.147165
+                     },
+        "ipAddress":  "10.1.21.54",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/4402",
+        "videoUrl":  "/uploads/hls/fh1c3gad00e3hjt4rt1mpyf1.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T16:47:45.823Z",
+        "createdAt":  "2025-07-15T16:47:45.823Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "gnvnwetvnjyxfctxzci7ah68",
+        "name":  "CCTV PEREMPATAN GKB YOSOWILANGUN 2",
+        "locationName":  "Jl. Kng Brotonegoro, Karanggondang, Yosowilangun, Kec. Manyar, Kabupaten Gresik, Jawa Timur 61151",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.61428,
+                         "y":  -7.147242
+                     },
+        "ipAddress":  "10.1.21.53",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/4302",
+        "videoUrl":  "/uploads/hls/gnvnwetvnjyxfctxzci7ah68.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T16:46:57.370Z",
+        "createdAt":  "2025-07-15T16:46:57.370Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "nk168hqm4i6i0ipd5nhdyv9u",
+        "name":  "CCTV PEREMPATAN GKB YOSOWILANGUN 1",
+        "locationName":  "Jl. Kng Brotonegoro, Karanggondang, Yosowilangun, Kec. Manyar, Kabupaten Gresik, Jawa Timur 61151",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.614422,
+                         "y":  -7.147403
+                     },
+        "ipAddress":  "10.1.21.52",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/3902",
+        "videoUrl":  "/uploads/hls/nk168hqm4i6i0ipd5nhdyv9u.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T16:46:18.414Z",
+        "createdAt":  "2025-07-15T16:46:18.414Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "u4yffckhj0vsfl7inssnm2wn",
+        "name":  "CCTV PEREMPATAN PASAR GRESIK 4",
+        "locationName":  "Toko Emas Permata Ikan mas, Jalan Sindujoyo Gang 23 Pasar Gresik Lantai 1 Blok D No. 03, Kebungson, Kemuteran, Kec. Gresik, Kabupaten Gresik, Jawa Timur 61117",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.651249,
+                         "y":  -7.152696
+                     },
+        "ipAddress":  "10.1.21.55",
+        "rtspUrl":  "rtsp://admin:kmzway87aa@10.1.21.55:554/streaming/channels/0402",
+        "videoUrl":  "/uploads/hls/u4yffckhj0vsfl7inssnm2wn.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T16:37:03.241Z",
+        "createdAt":  "2025-07-15T16:37:03.241Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "kv17w3qfxq72mppwwxh1ups6",
+        "name":  "CCTV PEREMPATAN PASAR GRESIK 3",
+        "locationName":  "Toko Emas Permata Ikan mas, Jalan Sindujoyo Gang 23 Pasar Gresik Lantai 1 Blok D No. 03, Kebungson, Kemuteran, Kec. Gresik, Kabupaten Gresik, Jawa Timur 61117",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.651357,
+                         "y":  -7.152866
+                     },
+        "ipAddress":  "10.1.21.59",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/5602",
+        "videoUrl":  "/uploads/hls/kv17w3qfxq72mppwwxh1ups6.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T16:36:12.307Z",
+        "createdAt":  "2025-07-15T16:36:12.307Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "jwq9d74w3r6ypghi80g7rkzy",
+        "name":  "CCTV PEREMPATAN PASAR GRESIK 2",
+        "locationName":  "Toko Emas Permata Ikan mas, Jalan Sindujoyo Gang 23 Pasar Gresik Lantai 1 Blok D No. 03, Kebungson, Kemuteran, Kec. Gresik, Kabupaten Gresik, Jawa Timur 61117",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.651073,
+                         "y":  -7.1527
+                     },
+        "ipAddress":  "10.1.21.58",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/5402",
+        "videoUrl":  "/uploads/hls/jwq9d74w3r6ypghi80g7rkzy.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T16:34:53.877Z",
+        "createdAt":  "2025-07-15T16:34:53.877Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "ifyktopyhtaqtjwu7h2yqh56",
+        "name":  "CCTV PEREMPATAN PASAR GRESIK 1",
+        "locationName":  "Toko Emas Permata Ikan mas, Jalan Sindujoyo Gang 23 Pasar Gresik Lantai 1 Blok D No. 03, Kebungson, Kemuteran, Kec. Gresik, Kabupaten Gresik, Jawa Timur 61117",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.651121,
+                         "y":  -7.15289
+                     },
+        "ipAddress":  "10.1.21.57",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/4902",
+        "videoUrl":  "/uploads/hls/ifyktopyhtaqtjwu7h2yqh56.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T16:34:07.606Z",
+        "createdAt":  "2025-07-15T16:34:07.606Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "xoodj59xa9qhrndzh7ca0d1g",
+        "name":  "CCTV EXIT TOL MANYAR 3",
+        "locationName":  "Jl. Raya Daendles, Tenger, Roomo, Kec. Manyar, Kabupaten Gresik, Jawa Timur 61151",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.606669,
+                         "y":  -7.123503
+                     },
+        "ipAddress":  "10.120.0.80",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/6802",
+        "videoUrl":  "/uploads/hls/xoodj59xa9qhrndzh7ca0d1g.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T16:32:35.171Z",
+        "createdAt":  "2025-07-15T16:32:35.171Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "qd9pxjy124igecgux9vtt037",
+        "name":  "CCTV EXIT TOL MANYAR 2",
+        "locationName":  "Jl. Raya Daendles, Tenger, Roomo, Kec. Manyar, Kabupaten Gresik, Jawa Timur 61151",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.606891,
+                         "y":  -7.123753
+                     },
+        "ipAddress":  "10.120.0.79",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/6702",
+        "videoUrl":  "/uploads/hls/qd9pxjy124igecgux9vtt037.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T16:31:45.108Z",
+        "createdAt":  "2025-07-15T16:31:45.108Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "z8t10b9quhh4w0pa6lxz69kw",
+        "name":  "CCTV EXIT TOL MANYAR 1",
+        "locationName":  "Jl. Raya Daendles, Tenger, Roomo, Kec. Manyar, Kabupaten Gresik, Jawa Timur 61151",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.606344,
+                         "y":  -7.123391
+                     },
+        "ipAddress":  "10.120.0.77",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/6502",
+        "videoUrl":  "/uploads/hls/z8t10b9quhh4w0pa6lxz69kw.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T16:30:56.466Z",
+        "createdAt":  "2025-07-15T16:30:56.466Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "nb7pzbmeznir1u9erko6ea88",
+        "name":  "CCTV EXIT TOL CERME 3",
+        "locationName":  "Jl. Raya Banjarsari, Cerme Lor, Kec. Cerme, Kabupaten Gresik, Jawa Timur 61171",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.571018,
+                         "y":  -7.215751
+                     },
+        "ipAddress":  "10.120.0.74",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/6202",
+        "videoUrl":  "/uploads/hls/nb7pzbmeznir1u9erko6ea88.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T16:29:13.795Z",
+        "createdAt":  "2025-07-15T16:29:13.795Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "f312y02lil9rtqtp999lluq4",
+        "name":  "CCTV EXIT TOL CERME 2",
+        "locationName":  "Jl. Raya Banjarsari, Cerme Lor, Kec. Cerme, Kabupaten Gresik, Jawa Timur 61171",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.571126,
+                         "y":  -7.215418
+                     },
+        "ipAddress":  "10.120.0.73",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/6102",
+        "videoUrl":  "/uploads/hls/f312y02lil9rtqtp999lluq4.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T16:24:50.196Z",
+        "createdAt":  "2025-07-15T16:24:50.196Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "hsorjpzok6d6xge6h6gfsvrd",
+        "name":  "CCTV EXIT TOL CERME 1",
+        "locationName":  "Jl. Raya Banjarsari, Cerme Lor, Kec. Cerme, Kabupaten Gresik, Jawa Timur 61171",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.57118,
+                         "y":  -7.215074
+                     },
+        "ipAddress":  "10.120.0.72",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/6002",
+        "videoUrl":  "/uploads/hls/hsorjpzok6d6xge6h6gfsvrd.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T16:23:32.718Z",
+        "createdAt":  "2025-07-15T16:23:32.718Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "tbe0l9twnxn81xdv08gw4pjt",
+        "name":  "CCTV PEREMPATAN SEGOROMADU 4",
+        "locationName":  "Jl. Kapten Darmo Sugondo, Tenggulunan, Kec. Kebomas, Kabupaten Gresik, Jawa Timur 61123",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.646204,
+                         "y":  -7.191959
+                     },
+        "ipAddress":  "10.1.21.99",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/4302",
+        "videoUrl":  "/uploads/hls/tbe0l9twnxn81xdv08gw4pjt.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T16:10:47.705Z",
+        "createdAt":  "2025-07-15T16:10:47.705Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "qmxkpjga7u032w3pkbgqjtzv",
+        "name":  "CCTV PEREMPATAN SEGOROMADU 3",
+        "locationName":  "Jl. Kapten Darmo Sugondo, Tenggulunan, Kec. Kebomas, Kabupaten Gresik, Jawa Timur 61123",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.646023,
+                         "y":  -7.191785
+                     },
+        "ipAddress":  "10.1.21.96",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/6302",
+        "videoUrl":  "/uploads/hls/qmxkpjga7u032w3pkbgqjtzv.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T16:10:07.484Z",
+        "createdAt":  "2025-07-15T16:10:07.484Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "mna7tfue93n3kfgh5x95nrhc",
+        "name":  "CCTV PEREMPATAN SEGOROMADU 2",
+        "locationName":  "Jl. Kapten Darmo Sugondo, Tenggulunan, Kec. Kebomas, Kabupaten Gresik, Jawa Timur 61123",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.645732,
+                         "y":  -7.191901
+                     },
+        "ipAddress":  "10.1.21.97",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/6402",
+        "videoUrl":  "/uploads/hls/mna7tfue93n3kfgh5x95nrhc.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T15:41:24.646Z",
+        "createdAt":  "2025-07-15T15:41:24.646Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "nd9rop4f5zha53ejhkntd8m3",
+        "name":  "CCTV PEREMPATAN SEGOROMADU 1",
+        "locationName":  "Jl. Kapten Darmo Sugondo, Tenggulunan, Kec. Kebomas, Kabupaten Gresik, Jawa Timur 61123",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.645884,
+                         "y":  -7.192127
+                     },
+        "ipAddress":  "10.1.21.98",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/6602",
+        "videoUrl":  "/uploads/hls/nd9rop4f5zha53ejhkntd8m3.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T15:39:15.711Z",
+        "createdAt":  "2025-07-15T15:39:15.711Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "btbgwubqi4kpsm1a7mv7j5ga",
+        "name":  "CCTV PEREMPATAN PASAR MENGANTI 4",
+        "locationName":  " Jl. Raya Menganti, Plosorejo, Menganti, Kec. Menganti, Kabupaten Gresik, Jawa Timur 61174",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.587805,
+                         "y":  -7.294118
+                     },
+        "ipAddress":  "10.120.0.65",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/5302",
+        "videoUrl":  "/uploads/hls/btbgwubqi4kpsm1a7mv7j5ga.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T15:37:01.455Z",
+        "createdAt":  "2025-07-15T15:37:01.455Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "whzjmzur78uiyc0ocdc9coz5",
+        "name":  "CCTV PEREMPATAN PASAR MENGANTI 3",
+        "locationName":  " Jl. Raya Menganti, Plosorejo, Menganti, Kec. Menganti, Kabupaten Gresik, Jawa Timur 61174",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.58840769167756,
+                         "y":  -7.2938959624744575
+                     },
+        "ipAddress":  "10.120.0.64",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/5202",
+        "videoUrl":  "/uploads/hls/whzjmzur78uiyc0ocdc9coz5.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T15:34:02.165Z",
+        "createdAt":  "2025-07-15T15:34:02.165Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "q42zxqlx6o750do8p40fa0sm",
+        "name":  "CCTV PEREMPATAN PASAR MENGANTI 2",
+        "locationName":  " Jl. Raya Menganti, Plosorejo, Menganti, Kec. Menganti, Kabupaten Gresik, Jawa Timur 61174",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.587911,
+                         "y":  -7.293914
+                     },
+        "ipAddress":  "10.120.0.63",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/5102",
+        "videoUrl":  "/uploads/hls/q42zxqlx6o750do8p40fa0sm.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T15:31:57.017Z",
+        "createdAt":  "2025-07-15T15:31:57.017Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "c6mkub4xcjmvaftk225wgq7a",
+        "name":  "CCTV PEREMPATAN PASAR MENGANTI 1",
+        "locationName":  " Jl. Raya Menganti, Plosorejo, Menganti, Kec. Menganti, Kabupaten Gresik, Jawa Timur 61174",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.588025,
+                         "y":  -7.294112
+                     },
+        "ipAddress":  "10.120.0.62",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/5002",
+        "videoUrl":  "/uploads/hls/c6mkub4xcjmvaftk225wgq7a.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T15:31:02.936Z",
+        "createdAt":  "2025-07-15T15:31:02.936Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "z9wm16ca6n5e19u0kc3o1md7",
+        "name":  "CCTV PERTIGAAN KEPATIHAN 3",
+        "locationName":  "NOL KILOMETER KEPATIHAN Gresik, QH4P+3CR, Jl. Raya Kepatihan, Hendrosari, Kepatihan, Kec. Menganti, Kabupaten Gresik, Jawa Timur 61174",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.58618228,
+                         "y":  -7.24475688
+                     },
+        "ipAddress":  "10.120.0.59",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/4702",
+        "videoUrl":  "/uploads/hls/z9wm16ca6n5e19u0kc3o1md7.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T15:28:51.193Z",
+        "createdAt":  "2025-07-15T15:28:51.193Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "r5vqqibl0jhz98suonubij0x",
+        "name":  "CCTV PERTIGAAN KEPATIHAN 2",
+        "locationName":  "NOL KILOMETER KEPATIHAN Gresik, QH4P+3CR, Jl. Raya Kepatihan, Hendrosari, Kepatihan, Kec. Menganti, Kabupaten Gresik, Jawa Timur 61174",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.58589031,
+                         "y":  -7.24487455
+                     },
+        "ipAddress":  "10.120.0.58",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/4602",
+        "videoUrl":  "/uploads/hls/r5vqqibl0jhz98suonubij0x.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T15:28:07.200Z",
+        "createdAt":  "2025-07-15T15:28:07.200Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "aryp5iz46xpg5r6vxt5q5xa3",
+        "name":  "CCTV PERTIGAAN KEPATIHAN 1",
+        "locationName":  "NOL KILOMETER KEPATIHAN Gresik, QH4P+3CR, Jl. Raya Kepatihan, Hendrosari, Kepatihan, Kec. Menganti, Kabupaten Gresik, Jawa Timur 61174",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.58649882,
+                         "y":  -7.24462817
+                     },
+        "ipAddress":  "10.120.0.57",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/4502",
+        "videoUrl":  "/uploads/hls/aryp5iz46xpg5r6vxt5q5xa3.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T15:27:03.547Z",
+        "createdAt":  "2025-07-15T15:27:03.547Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "souwf58z86qq3irfh64w7vwp",
+        "name":  "CCTV EXIT TOL BELAHANREJO 3",
+        "locationName":  "Jl. Dawarblandong - kedamean, Tj. Dukuhan, Tanjung, Kec. Kedamean, Kabupaten Gresik, Jawa Timur 61175",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.532777,
+                         "y":  -7.325473
+                     },
+        "ipAddress":  "10.120.0.54",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/4202",
+        "videoUrl":  "/uploads/hls/souwf58z86qq3irfh64w7vwp.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T15:25:15.551Z",
+        "createdAt":  "2025-07-15T15:25:15.551Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "a4e2ojasf8wrr848vmm85h37",
+        "name":  "CCTV EXIT TOL BELAHANREJO 2",
+        "locationName":  "Jl. Dawarblandong - kedamean, Tj. Dukuhan, Tanjung, Kec. Kedamean, Kabupaten Gresik, Jawa Timur 61175",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.533308,
+                         "y":  -7.325527
+                     },
+        "ipAddress":  "10.120.0.53",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/4102",
+        "videoUrl":  "/uploads/hls/a4e2ojasf8wrr848vmm85h37.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T15:24:29.455Z",
+        "createdAt":  "2025-07-15T15:24:29.455Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "fyqcj5pxe0qt86q6bso36gzv",
+        "name":  "CCTV EXIT TOL BELAHANREJO 1",
+        "locationName":  "Jl. Dawarblandong - kedamean, Tj. Dukuhan, Tanjung, Kec. Kedamean, Kabupaten Gresik, Jawa Timur 61175",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.533033,
+                         "y":  -7.32551
+                     },
+        "ipAddress":  "10.120.0.52",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/4002",
+        "videoUrl":  "/uploads/hls/fyqcj5pxe0qt86q6bso36gzv.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T15:01:57.649Z",
+        "createdAt":  "2025-07-15T15:01:57.649Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "gtysrztznptamshxmvufmwi4",
+        "name":  "CCTV PEREMPATAN PASAR BENJENG 4",
+        "locationName":  "TUGU BENJENG NOL KILOMETER, Jl. Raya Klampok No.9b, Boro, Bengkelolor, Kec. Benjeng, Kabupaten Gresik, Jawa Timur 61172",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.501127,
+                         "y":  -7.262168
+                     },
+        "ipAddress":  "10.120.0.50",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/3802",
+        "videoUrl":  "/uploads/hls/gtysrztznptamshxmvufmwi4.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T14:59:40.839Z",
+        "createdAt":  "2025-07-15T14:59:40.839Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "dpzk4cfr2gasw6wnp4xzaf3y",
+        "name":  "CCTV PEREMPATAN PASAR BENJENG 3",
+        "locationName":  "TUGU BENJENG NOL KILOMETER, Jl. Raya Klampok No.9b, Boro, Bengkelolor, Kec. Benjeng, Kabupaten Gresik, Jawa Timur 61172",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.501172,
+                         "y":  -7.262044
+                     },
+        "ipAddress":  "10.120.0.49",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/3702",
+        "videoUrl":  "/uploads/hls/dpzk4cfr2gasw6wnp4xzaf3y.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T14:58:36.186Z",
+        "createdAt":  "2025-07-15T14:58:36.186Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "ep2yrf3bqrh0sk1c2bhgdv6m",
+        "name":  "CCTV PEREMPATAN PASAR BENJENG 2",
+        "locationName":  "TUGU BENJENG NOL KILOMETER, Jl. Raya Klampok No.9b, Boro, Bengkelolor, Kec. Benjeng, Kabupaten Gresik, Jawa Timur 61172",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.501025,
+                         "y":  -7.261976
+                     },
+        "ipAddress":  "10.120.0.48",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/3602",
+        "videoUrl":  "/uploads/hls/ep2yrf3bqrh0sk1c2bhgdv6m.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T14:57:46.517Z",
+        "createdAt":  "2025-07-15T14:57:46.517Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "pinpzhz1zgqy7cidzx8dbjsw",
+        "name":  "CCTV PEREMPATAN PASAR BENJENG 1",
+        "locationName":  "TUGU BENJENG NOL KILOMETER, Jl. Raya Klampok No.9b, Boro, Bengkelolor, Kec. Benjeng, Kabupaten Gresik, Jawa Timur 61172",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.500971,
+                         "y":  -7.262124
+                     },
+        "ipAddress":  "10.120.0.47",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/3502",
+        "videoUrl":  "/uploads/hls/pinpzhz1zgqy7cidzx8dbjsw.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T14:56:55.326Z",
+        "createdAt":  "2025-07-15T14:56:55.326Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "ujc9ue74moblozi2th4ljx1j",
+        "name":  "CCTV PEREMPATAN DUDUKSAMPEAN 4",
+        "locationName":  "Jl. Raya Gresik - Lamongan 60-42, Duduksampean, Duduk Sampeyan, Kec. Duduksampeyan, Kabupaten Gresik, Jawa Timur 61162",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.5180426803112,
+                         "y":  -7.153150525846832
+                     },
+        "ipAddress":  "10.120.0.1",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/3302",
+        "videoUrl":  "/uploads/hls/ujc9ue74moblozi2th4ljx1j.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T14:48:00.560Z",
+        "createdAt":  "2025-07-15T14:48:00.560Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "hgr9f7ua7hnnwjrtzm0u6a8q",
+        "name":  "CCTV PEREMPATAN DUDUKSAMPEAN 3",
+        "locationName":  "Jl. Raya Gresik - Lamongan 60-42, Duduksampean, Duduk Sampeyan, Kec. Duduksampeyan, Kabupaten Gresik, Jawa Timur 61162",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.51914667691787,
+                         "y":  -7.153700519681605
+                     },
+        "ipAddress":  "10.120.0.1",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/3202",
+        "videoUrl":  "/uploads/hls/hgr9f7ua7hnnwjrtzm0u6a8q.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T14:46:53.335Z",
+        "createdAt":  "2025-07-15T14:46:53.335Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "evla6pspb5od3co9z3wxp7un",
+        "name":  "CCTV PEREMPATAN DUDUKSAMPEAN 2",
+        "locationName":  "Jl. Raya Gresik - Lamongan 60-42, Duduksampean, Duduk Sampeyan, Kec. Duduksampeyan, Kabupaten Gresik, Jawa Timur 61162",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.51878833437019,
+                         "y":  -7.153006813845845
+                     },
+        "ipAddress":  "10.120.0.1",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/3102",
+        "videoUrl":  "/uploads/hls/evla6pspb5od3co9z3wxp7un.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T14:46:07.541Z",
+        "createdAt":  "2025-07-15T14:46:07.541Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "xjagn6fdnzodbm6ei6e2v3k6",
+        "name":  "CCTV PEREMPATAN DUDUKSAMPEAN 1",
+        "locationName":  "Jl. Raya Gresik - Lamongan 60-42, Duduksampean, Duduk Sampeyan, Kec. Duduksampeyan, Kabupaten Gresik, Jawa Timur 61162",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.5183197557688,
+                         "y":  -7.153851067200527
+                     },
+        "ipAddress":  "10.120.0.1",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/3002",
+        "videoUrl":  "/uploads/hls/xjagn6fdnzodbm6ei6e2v3k6.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T14:45:00.188Z",
+        "createdAt":  "2025-07-15T14:45:00.188Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "xuym55br0eku02zwpum3lkm8",
+        "name":  "CCTV PEREMPATAN NGEPUNG 4",
+        "locationName":  "MHC8+VHQ, Jalan Raya, Ngepung, Kedamean, Gresik Regency, East Java 61175",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.566169,
+                         "y":  -7.327676
+                     },
+        "ipAddress":  "10.120.0.40",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/2802",
+        "videoUrl":  "/uploads/hls/xuym55br0eku02zwpum3lkm8.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T14:31:12.094Z",
+        "createdAt":  "2025-07-15T14:31:12.094Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "b5y3cx1ykpxelwbs6923lb3g",
+        "name":  "CCTV PEREMPATAN NGEPUNG 3",
+        "locationName":  "MHC8+VHQ, Jalan Raya, Ngepung, Kedamean, Gresik Regency, East Java 61175",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.566307,
+                         "y":  -7.327557
+                     },
+        "ipAddress":  "10.120.0.39",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/2702",
+        "videoUrl":  "/uploads/hls/b5y3cx1ykpxelwbs6923lb3g.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T14:30:17.079Z",
+        "createdAt":  "2025-07-15T14:30:17.079Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "n6tsjmz3qwf17szgz3lfvmce",
+        "name":  "CCTV PEREMPATAN NGEPUNG 2",
+        "locationName":  "MHC8+VHQ, Jalan Raya, Ngepung, Kedamean, Gresik Regency, East Java 61175",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.566401,
+                         "y":  -7.327685
+                     },
+        "ipAddress":  "10.120.0.38",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/2602",
+        "videoUrl":  "/uploads/hls/n6tsjmz3qwf17szgz3lfvmce.m3u8",
+        "status":  "INACTIVE",
+        "updatedAt":  "2025-07-15T14:29:16.217Z",
+        "createdAt":  "2025-07-15T14:29:16.217Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "j512qmz954xhf2o0u6izn6lw",
+        "name":  "CCTV PEREMPATAN NGEPUNG 1",
+        "locationName":  "MHC8+VHQ, Jalan Raya, Ngepung, Kedamean, Gresik Regency, East Java 61175",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.566323,
+                         "y":  -7.327887
+                     },
+        "ipAddress":  "10.120.0.37",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/2502",
+        "videoUrl":  "/uploads/hls/j512qmz954xhf2o0u6izn6lw.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T14:28:19.269Z",
+        "createdAt":  "2025-07-15T14:28:19.269Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "dx4epl1nhsbgltyvu8y8gi4k",
+        "name":  "CCTV PERTIGAAN KEDUNGPRING BALONGPANGGANG 3",
+        "locationName":  "Jl. Kedungpring 8, Kedungpiring, Kedungpring, Kec. Balongpanggang, Kabupaten Gresik, Jawa Timur 61173",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.443081,
+                         "y":  -7.268512
+                     },
+        "ipAddress":  "10.120.0.35",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/2302",
+        "videoUrl":  "/uploads/hls/dx4epl1nhsbgltyvu8y8gi4k.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T14:16:21.480Z",
+        "createdAt":  "2025-07-15T14:16:21.480Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "srpp37mxjvj5ap1m9rh4e7f4",
+        "name":  "CCTV PERTIGAAN KEDUNGPRING BALONGPANGGANG 2",
+        "locationName":  "Jl. Kedungpring 8, Kedungpiring, Kedungpring, Kec. Balongpanggang, Kabupaten Gresik, Jawa Timur 61173",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.442957,
+                         "y":  -7.26853
+                     },
+        "ipAddress":  "10.120.0.33",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/2102",
+        "videoUrl":  "/uploads/hls/srpp37mxjvj5ap1m9rh4e7f4.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T14:15:17.893Z",
+        "createdAt":  "2025-07-15T14:15:17.893Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "jmg85kodg16b25s87pn9r24n",
+        "name":  "CCTV PERTIGAAN KEDUNGPRING BALONGPANGGANG 1",
+        "locationName":  "Jl. Kedungpring 8, Kedungpiring, Kedungpring, Kec. Balongpanggang, Kabupaten Gresik, Jawa Timur 61173",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.443019,
+                         "y":  -7.268421
+                     },
+        "ipAddress":  "10.120.0.32",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/2002",
+        "videoUrl":  "/uploads/hls/jmg85kodg16b25s87pn9r24n.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T14:14:01.122Z",
+        "createdAt":  "2025-07-15T14:14:01.122Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "mcmzak7rdeequ2frj6oyprxq",
+        "name":  "CCTV PEREMPATAN WRINGINANOM 4",
+        "locationName":  "Jl. Raya Wringinanom 27, Wringianom, Pasinan Lemahputih, Kec. Wringinanom, Kabupaten Gresik, Jawa Timur 61176",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.529979,
+                         "y":  -7.395773
+                     },
+        "ipAddress":  "10.120.0.30",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/1802",
+        "videoUrl":  "/uploads/hls/mcmzak7rdeequ2frj6oyprxq.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T14:04:53.327Z",
+        "createdAt":  "2025-07-15T14:04:53.327Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "imioh0wjxyjwsd4m4fbfthip",
+        "name":  "CCTV PEREMPATAN WRINGINANOM 3",
+        "locationName":  "Jl. Raya Wringinanom 27, Wringianom, Pasinan Lemahputih, Kec. Wringinanom, Kabupaten Gresik, Jawa Timur 61176",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.530068,
+                         "y":  -7.39564
+                     },
+        "ipAddress":  "10.120.0.29",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/1702",
+        "videoUrl":  "/uploads/hls/imioh0wjxyjwsd4m4fbfthip.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T14:02:17.368Z",
+        "createdAt":  "2025-07-15T14:02:17.368Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "qvb4b6y9jrtu0gallxcrhh9p",
+        "name":  "CCTV PEREMPATAN WRINGINANOM 2",
+        "locationName":  "Jl. Raya Wringinanom 27, Wringianom, Pasinan Lemahputih, Kec. Wringinanom, Kabupaten Gresik, Jawa Timur 61176",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.530184,
+                         "y":  -7.395787
+                     },
+        "ipAddress":  "10.120.0.28",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/1602",
+        "videoUrl":  "/uploads/hls/qvb4b6y9jrtu0gallxcrhh9p.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T14:01:14.232Z",
+        "createdAt":  "2025-07-15T14:01:14.232Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "gydjo2zm1z3vzgg76xksv030",
+        "name":  "CCTV PEREMPATAN WRINGINANOM 1",
+        "locationName":  "Jl. Raya Wringinanom 27, Wringianom, Pasinan Lemahputih, Kec. Wringinanom, Kabupaten Gresik, Jawa Timur 61176",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.530069,
+                         "y":  -7.395952
+                     },
+        "ipAddress":  "10.120.0.27",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/1502",
+        "videoUrl":  "/uploads/hls/gydjo2zm1z3vzgg76xksv030.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T14:00:03.325Z",
+        "createdAt":  "2025-07-15T14:00:03.325Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "b6e20ejf1o1woe3gvy3kmkyp",
+        "name":  "CCTV PERTIGAAN BAMBE 3",
+        "locationName":  "Jl. Raya Bambe No.79, 03, Bangkingan, Kec. Lakarsantri, Kabupaten Gresik, Jawa Timur 61177",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.661526,
+                         "y":  -7.350829
+                     },
+        "ipAddress":  "10.120.0.13",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/1302",
+        "videoUrl":  "/uploads/hls/b6e20ejf1o1woe3gvy3kmkyp.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T13:56:24.197Z",
+        "createdAt":  "2025-07-15T13:56:24.197Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "b9ejrs7bawqpxo49gzvf6rre",
+        "name":  "CCTV PERTIGAAN BAMBE 2",
+        "locationName":  "Jl. Raya Bambe No.79, 03, Bangkingan, Kec. Lakarsantri, Kabupaten Gresik, Jawa Timur 61177",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.661397,
+                         "y":  -7.350905
+                     },
+        "ipAddress":  "10.120.0.24",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/1202",
+        "videoUrl":  "/uploads/hls/b9ejrs7bawqpxo49gzvf6rre.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T13:55:05.309Z",
+        "createdAt":  "2025-07-15T13:55:05.309Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "iedpcmp1xxax1xj75bpq8hyw",
+        "name":  "CCTV PERTIGAAN BAMBE 1",
+        "locationName":  "Jl. Raya Bambe No.79, 03, Bangkingan, Kec. Lakarsantri, Kabupaten Gresik, Jawa Timur 61177",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.661357,
+                         "y":  -7.350757
+                     },
+        "ipAddress":  "10.120.0.22",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/1002",
+        "videoUrl":  "/uploads/hls/iedpcmp1xxax1xj75bpq8hyw.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T13:53:28.517Z",
+        "createdAt":  "2025-07-15T13:53:28.517Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "kktfq0wgxtjg4s5b8zmski1n",
+        "name":  "CCTV PERTIGAAN CANGKIR 3",
+        "locationName":  "Pertigaan Cangkir, Jl. Raya Cangkir No.60, Dusun Gading, Cangkir, Kec. Driyorejo, Kabupaten Gresik, Jawa Timur 61177",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.627249,
+                         "y":  -7.365771
+                     },
+        "ipAddress":  "10.120.0.20",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/0802",
+        "videoUrl":  "/uploads/hls/kktfq0wgxtjg4s5b8zmski1n.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T13:36:14.902Z",
+        "createdAt":  "2025-07-15T13:36:14.902Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "r5ocrhqqkn9j4szwuszcmr0w",
+        "name":  "CCTV PERTIGAAN CANGKIR 2",
+        "locationName":  "Pertigaan Cangkir, Jl. Raya Cangkir No.60, Dusun Gading, Cangkir, Kec. Driyorejo, Kabupaten Gresik, Jawa Timur 61177",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.627499,
+                         "y":  -7.365793
+                     },
+        "ipAddress":  "10.120.0.19",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/0702",
+        "videoUrl":  "/uploads/hls/r5ocrhqqkn9j4szwuszcmr0w.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T13:35:05.569Z",
+        "createdAt":  "2025-07-15T13:35:05.569Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "kwzk3qbtjn950hpk0mlcu8wz",
+        "name":  "CCTV PERTIGAAN CANGKIR 1",
+        "locationName":  "Pertigaan Cangkir, Jl. Raya Cangkir No.60, Dusun Gading, Cangkir, Kec. Driyorejo, Kabupaten Gresik, Jawa Timur 61177",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.627424,
+                         "y":  -7.365638
+                     },
+        "ipAddress":  "10.120.0.18",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/0602",
+        "videoUrl":  "/uploads/hls/kwzk3qbtjn950hpk0mlcu8wz.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T13:33:31.042Z",
+        "createdAt":  "2025-07-15T13:33:31.042Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "y90ww9dd4gselm2marpztixz",
+        "name":  "CCTV PEREMPATAN LEGUNDI 4",
+        "locationName":  "Perempatan Legundi, JH8G+6F2, Dusun Larangan, Krikilan, Kec. Driyorejo, Kabupaten Gresik, Jawa Timur 61177",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.575893,
+                         "y":  -7.384755
+                     },
+        "ipAddress":  "10.120.0.15",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/0402",
+        "videoUrl":  "/uploads/hls/y90ww9dd4gselm2marpztixz.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T13:28:35.792Z",
+        "createdAt":  "2025-07-15T13:28:35.792Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "ganjt6ywriwze624h02oljnv",
+        "name":  "CCTV PEREMPATAN LEGUNDI 3",
+        "locationName":  "Perempatan Legundi, JH8G+6F2, Dusun Larangan, Krikilan, Kec. Driyorejo, Kabupaten Gresik, Jawa Timur 61177",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.57607,
+                         "y":  -7.384351
+                     },
+        "ipAddress":  "10.120.0.14",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/0302",
+        "videoUrl":  "/uploads/hls/ganjt6ywriwze624h02oljnv.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T13:27:42.006Z",
+        "createdAt":  "2025-07-15T13:27:42.006Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "u5v8keentvfz2othtyd8r0hp",
+        "name":  "CCTV PEREMPATAN LEGUNDI 2",
+        "locationName":  "Perempatan Legundi, JH8G+6F2, Dusun Larangan, Krikilan, Kec. Driyorejo, Kabupaten Gresik, Jawa Timur 61177",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.576261,
+                         "y":  -7.384439
+                     },
+        "ipAddress":  "10.120.0.13",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/0202",
+        "videoUrl":  "/uploads/hls/u5v8keentvfz2othtyd8r0hp.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T13:21:11.558Z",
+        "createdAt":  "2025-07-15T13:21:11.558Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    },
+    {
+        "id":  "sav3cqer7ghe580s0ktrbncp",
+        "name":  "CCTV PEREMPATAN LEGUNDI 1",
+        "locationName":  "Perempatan Legundi, JH8G+6F2, Dusun Larangan, Krikilan, Kec. Driyorejo, Kabupaten Gresik, Jawa Timur 61177",
+        "brandId":  "pg9iyyveby9e0ib2966tvv7r",
+        "location":  {
+                         "x":  112.576177,
+                         "y":  -7.384675
+                     },
+        "ipAddress":  "10.120.0.12",
+        "rtspUrl":  "rtsp://admin:Namakamu12@10.120.0.151:554/streaming/channels/0102",
+        "videoUrl":  "/uploads/hls/sav3cqer7ghe580s0ktrbncp.m3u8",
+        "status":  "ACTIVE",
+        "updatedAt":  "2025-07-15T13:16:59.764Z",
+        "createdAt":  "2025-07-15T13:16:59.764Z",
+        "deletedAt":  null,
+        "brand":  {
+                      "id":  "pg9iyyveby9e0ib2966tvv7r",
+                      "name":  "CCTV",
+                      "specification":  "",
+                      "icon":  "/uploads/brand-icons/pngegg-12-ca1qmabq1bmbavim9srfw8hq.png",
+                      "color":  "#3b82f6",
+                      "updatedAt":  "2025-07-13T15:55:51.013Z",
+                      "createdAt":  "2025-07-13T15:55:51.013Z",
+                      "deletedAt":  null
+                  }
+    }
+]

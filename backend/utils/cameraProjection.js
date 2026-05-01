@@ -13,6 +13,12 @@ export const SHARED_CAMERA_STREAM_PROJECTION = `
     c.last_online_check,
     c.enabled,
     c.enable_recording,
+    CASE
+        WHEN c.internal_ingest_policy_override IN ('default', 'always_on', 'on_demand') THEN c.internal_ingest_policy_override
+        ELSE 'default'
+    END as internal_ingest_policy_override,
+    c.internal_on_demand_close_after_seconds_override,
+    c.source_profile,
     c.stream_key,
     c.private_rtsp_url,
     c.video_codec,
@@ -51,6 +57,12 @@ export const SHARED_CAMERA_STREAM_WITH_AREA_PROJECTION = `
     a.rw,
     a.kelurahan,
     a.kecamatan,
+    CASE
+        WHEN a.internal_ingest_policy_default IN ('default', 'always_on', 'on_demand')
+            THEN a.internal_ingest_policy_default
+        ELSE 'default'
+    END as area_internal_ingest_policy_default,
+    a.internal_on_demand_close_after_seconds,
     CASE
         WHEN a.external_health_mode_override IN ('default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled')
             THEN a.external_health_mode_override

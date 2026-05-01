@@ -82,10 +82,13 @@ function getTemplateJson(profile) {
             "stream_source": "internal",
             "delivery_type": "internal_hls",
             "enable_recording": 0,
+            "internal_ingest_policy_override": "on_demand",
+            "internal_on_demand_close_after_seconds_override": 15,
             "latitude": null,
             "longitude": null,
             "status": "active",
             "video_codec": "h264",
+            "source_profile": "surabaya_private_rtsp",
             "source_tag": "surabaya_private_rtsp",
             "notes": "live_only"
         }
@@ -125,6 +128,9 @@ function getProfileDefaults(profile) {
                 descriptionTemplate: 'SOURCE: PRIVATE RTSP LIVE ONLY | source_tag: {sourceTag} | notes: {notes}',
                 locationMapping: 'source_field',
                 sourceFilter: 'all',
+                source_profile: 'surabaya_private_rtsp',
+                internal_ingest_policy_override: 'on_demand',
+                internal_on_demand_close_after_seconds_override: 15,
             };
         case 'jombang_mjpeg':
             return {
