@@ -1,7 +1,7 @@
 // Purpose: Provide pure retention and recording filename decisions for cleanup flows.
 // Caller: recordingService, recordingCleanupService, recordingRetentionPolicy tests.
 // Deps: Node path basename utility.
-// MainFuncs: computeRetentionWindow, parseSegmentFilenameTimeMs, isSafeRecordingFilename, canDeleteRecordingFile.
+// MainFuncs: computeRetentionWindow, parseSegmentFilenameTimeMs, isSafeRecordingFilename, canDeleteRecordingFile, describeRecordingRetentionDecision.
 // SideEffects: None.
 
 import { basename } from 'path';
@@ -93,4 +93,10 @@ export function canDeleteRecordingFile({
     }
 
     return { allowed: true, reason: 'retention_expired', ageMs };
+}
+
+export function describeRecordingRetentionDecision({ filename, decision }) {
+    const reason = decision?.reason || 'unknown';
+    const ageSeconds = Math.round((decision?.ageMs || 0) / 1000);
+    return `${reason} filename=${filename} age_seconds=${ageSeconds}`;
 }

@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import {
     canDeleteRecordingFile,
     computeRetentionWindow,
+    describeRecordingRetentionDecision,
     getSegmentAgeMs,
     isExpiredByRetention,
     isSafeRecordingFilename,
@@ -105,5 +106,23 @@ describe('recordingRetentionPolicy', () => {
         });
 
         expect(ageMs).toBe(2 * 60 * 1000);
+    });
+
+    it('describes recent retention skip decisions consistently', () => {
+        const result = describeRecordingRetentionDecision({
+            filename: '20260502_095800.mp4',
+            decision: { allowed: false, reason: 'retention_not_expired', ageMs: 120000 },
+        });
+
+        expect(result).toBe('retention_not_expired filename=20260502_095800.mp4 age_seconds=120');
+    });
+
+    it('describes expired retention delete decisions consistently', () => {
+        const result = describeRecordingRetentionDecision({
+            filename: '20260502_080000.mp4',
+            decision: { allowed: true, reason: 'retention_expired', ageMs: 7200000 },
+        });
+
+        expect(result).toBe('retention_expired filename=20260502_080000.mp4 age_seconds=7200');
     });
 });

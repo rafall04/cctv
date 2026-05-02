@@ -9,6 +9,7 @@ import { join } from 'path';
 import {
     canDeleteRecordingFile,
     computeRetentionWindow,
+    describeRecordingRetentionDecision,
     isSafeRecordingFilename,
 } from './recordingRetentionPolicy.js';
 
@@ -121,6 +122,10 @@ export function createRecordingCleanupService({
                 nowMs,
             });
             if (!deletePolicy.allowed) {
+                logger.log?.(`[Cleanup] Keeping orphan recording: camera${cameraId}/${describeRecordingRetentionDecision({
+                    filename,
+                    decision: deletePolicy,
+                })}`);
                 continue;
             }
 
@@ -225,6 +230,10 @@ export function createRecordingCleanupService({
                 });
                 if (!deletePolicy.allowed) {
                     result.processingSkipped++;
+                    logger.log?.(`[Cleanup] Keeping emergency candidate: camera${segment.camera_id}/${describeRecordingRetentionDecision({
+                        filename: segment.filename,
+                        decision: deletePolicy,
+                    })}`);
                     continue;
                 }
 
