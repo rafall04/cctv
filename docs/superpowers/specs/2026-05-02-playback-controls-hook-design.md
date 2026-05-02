@@ -39,6 +39,7 @@ The hook returns:
 - `autoPlayEnabled`
 - `autoPlayNotification`
 - `setAutoPlayNotification`
+- `setSeekWarning`
 - `clearAutoPlayNotification`
 - `clearSeekWarning`
 - `handleAutoPlayToggle`
@@ -58,7 +59,7 @@ Control behavior stays unchanged:
 - Timeline seeking limits each jump to `maxSeekDistance` seconds from `lastSeekTimeRef.current`.
 - Seek limit warnings keep the existing `{ type: 'limit' }` shape.
 
-The hook returns `setAutoPlayNotification` because `Playback.jsx` still needs to set autoplay messages from media lifecycle and auto-next-segment behavior. A later extraction can move that media/autoplay flow separately.
+The hook returns `setAutoPlayNotification` because `Playback.jsx` still needs to set autoplay messages from media lifecycle and auto-next-segment behavior. It returns `setSeekWarning` because the existing media `seeking` listener still raises seek-limit warnings outside timeline clicks. A later extraction can move those media/autoplay flows separately.
 
 ## Data Flow
 
