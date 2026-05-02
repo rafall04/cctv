@@ -41,7 +41,7 @@ SideEffects: None; documentation only.
 **Files:**
 - Create: `frontend/src/hooks/playback/usePlaybackShareAndSnapshot.test.jsx`
 
-- [ ] **Step 1: Write the failing hook tests**
+- [x] **Step 1: Write the failing hook tests**
 
 Create `frontend/src/hooks/playback/usePlaybackShareAndSnapshot.test.jsx`:
 
@@ -183,7 +183,7 @@ describe('usePlaybackShareAndSnapshot', () => {
 });
 ```
 
-- [ ] **Step 2: Run tests and verify RED**
+- [x] **Step 2: Run tests and verify RED**
 
 Run:
 
@@ -201,7 +201,7 @@ Expected: FAIL because `usePlaybackShareAndSnapshot.js` does not exist.
 **Files:**
 - Create: `frontend/src/hooks/playback/usePlaybackShareAndSnapshot.js`
 
-- [ ] **Step 1: Implement the hook**
+- [x] **Step 1: Implement the hook**
 
 Create `frontend/src/hooks/playback/usePlaybackShareAndSnapshot.js`:
 
@@ -407,7 +407,7 @@ export function usePlaybackShareAndSnapshot({
 }
 ```
 
-- [ ] **Step 2: Run the hook tests and verify GREEN**
+- [x] **Step 2: Run the hook tests and verify GREEN**
 
 Run:
 
@@ -418,7 +418,7 @@ npm test -- src/hooks/playback/usePlaybackShareAndSnapshot.test.jsx
 
 Expected: PASS with 4 tests.
 
-- [ ] **Step 3: Commit the hook implementation**
+- [x] **Step 3: Commit the hook implementation**
 
 Run:
 
@@ -437,7 +437,7 @@ Expected: commit succeeds and branch pushes.
 **Files:**
 - Modify: `frontend/src/pages/Playback.jsx`
 
-- [ ] **Step 1: Import the hook**
+- [x] **Step 1: Import the hook**
 
 In `frontend/src/pages/Playback.jsx`, add:
 
@@ -457,7 +457,7 @@ Keep this import because `Playback.jsx` still uses camera slugs for playback URL
 import { createCameraSlug, parseCameraIdFromSlug } from '../utils/slugify';
 ```
 
-- [ ] **Step 2: Replace page notification state**
+- [x] **Step 2: Replace page notification state**
 
 Remove this state:
 
@@ -483,7 +483,7 @@ const {
 });
 ```
 
-- [ ] **Step 3: Remove inline snapshot/share functions**
+- [x] **Step 3: Remove inline snapshot/share functions**
 
 Delete the inline `takeSnapshot` function from `Playback.jsx`.
 
@@ -502,7 +502,7 @@ Update the notification close prop:
 onSnapshotNotificationClose={clearSnapshotNotification}
 ```
 
-- [ ] **Step 4: Run focused route tests**
+- [x] **Step 4: Run focused route tests**
 
 Run:
 
@@ -513,7 +513,7 @@ npm test -- src/hooks/playback/usePlaybackShareAndSnapshot.test.jsx Playback.tes
 
 Expected: PASS. Existing `Playback.test.jsx` share assertions should still pass, including simple/full mode public share URLs.
 
-- [ ] **Step 5: Commit Playback wiring**
+- [x] **Step 5: Commit Playback wiring**
 
 Run:
 
@@ -534,7 +534,7 @@ Expected: commit succeeds and branch pushes.
 - Modify: `frontend/src/pages/.module_map.md`
 - Modify: `docs/superpowers/plans/2026-05-02-playback-share-snapshot-hook.md`
 
-- [ ] **Step 1: Update frontend module map**
+- [x] **Step 1: Update frontend module map**
 
 In `frontend/src/.module_map.md`, update the playback stabilization target to mention share/snapshot:
 
@@ -542,7 +542,7 @@ In `frontend/src/.module_map.md`, update the playback stabilization target to me
 - `pages/Playback.jsx`: route shell should delegate URL state to `utils/playbackUrlState.js`, segment loading, viewer/media lifecycle, and share/snapshot behavior to `hooks/playback/*`; keep future playback features in these boundaries.
 ```
 
-- [ ] **Step 2: Update pages module map**
+- [x] **Step 2: Update pages module map**
 
 In `frontend/src/pages/.module_map.md`, replace the `Playback.jsx` extraction target:
 
@@ -551,7 +551,7 @@ In `frontend/src/pages/.module_map.md`, replace the `Playback.jsx` extraction ta
   - any future playback feature state that does not belong in `../hooks/playback/*`
 ```
 
-- [ ] **Step 3: Run final frontend gate**
+- [x] **Step 3: Run final frontend gate**
 
 Run:
 
@@ -565,7 +565,7 @@ Expected:
 - Hook, page, and URL tests pass.
 - Build exits 0.
 
-- [ ] **Step 4: Check git status**
+- [x] **Step 4: Check git status**
 
 Run:
 
@@ -575,7 +575,7 @@ git status --short
 
 Expected: only intended map and plan files are modified.
 
-- [ ] **Step 5: Commit docs and map updates**
+- [x] **Step 5: Commit docs and map updates**
 
 Run:
 
