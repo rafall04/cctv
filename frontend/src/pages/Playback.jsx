@@ -28,6 +28,7 @@ import PlaybackTimeline from '../components/playback/PlaybackTimeline';
 import PlaybackSegmentList from '../components/playback/PlaybackSegmentList';
 import { useAdminReconnectRefresh } from '../hooks/admin/useAdminReconnectRefresh';
 import { usePlaybackMediaSource } from '../hooks/playback/usePlaybackMediaSource.js';
+import { usePlaybackSelectionActions } from '../hooks/playback/usePlaybackSelectionActions.js';
 import { usePlaybackSegments } from '../hooks/playback/usePlaybackSegments.js';
 import { usePlaybackShareAndSnapshot } from '../hooks/playback/usePlaybackShareAndSnapshot.js';
 import { usePlaybackViewerTracking } from '../hooks/playback/usePlaybackViewerTracking.js';
@@ -255,37 +256,32 @@ function Playback({
         video.load();
     }, []);
 
-    const resetPlaybackSession = useCallback(({
-        clearSegment = false,
-        clearSegments = false,
-        preserveAutoPlayNotification = false,
-    } = {}) => {
-        sourceLoadTokenRef.current += 1;
-        playbackSourceRef.current = { segmentKey: null, streamUrl: null };
-        lastSeekTimeRef.current = 0;
-        playbackSeekTargetRef.current = null;
-        resetSourcePlaybackState();
-
-        setCurrentTime(0);
-        setDuration(0);
-        setVideoError(null);
-        setErrorType(null);
-        setSeekWarning(null);
-
-        if (!preserveAutoPlayNotification) {
-            setAutoPlayNotification(null);
-        }
-
-        if (clearSegment) {
-            setSelectedSegment(null);
-        }
-
-        if (clearSegments) {
-            segmentsRef.current = [];
-        }
-
-        resetVideoElement();
-    }, [resetSourcePlaybackState, resetVideoElement, setSelectedSegment]);
+    const {
+        resetPlaybackSession,
+        handleSegmentClick,
+    } = usePlaybackSelectionActions({
+        sourceLoadTokenRef,
+        playbackSourceRef,
+        lastSeekTimeRef,
+        playbackSeekTargetRef,
+        segmentsRef,
+        queuedPlaybackPopunderRef,
+        selectedCamera,
+        showPlaybackPopunder,
+        updatePlaybackSearchParams,
+        resetSourcePlaybackState,
+        resetVideoElement,
+        setCurrentTime,
+        setDuration,
+        setVideoError,
+        setErrorType,
+        setSeekWarning,
+        setAutoPlayNotification,
+        setIsSeeking,
+        setIsBuffering,
+        setSelectedSegment,
+        getSegmentKey,
+    });
 
     const handleAutoPlayToggle = useCallback(() => {
         const newValue = !autoPlayEnabled;
@@ -797,30 +793,6 @@ function Playback({
             videoRef.current.playbackRate = speed;
         }
     };
-
-    const handleSegmentClick = useCallback((segment) => {
-        if (showPlaybackPopunder) {
-            queuedPlaybackPopunderRef.current = {
-                segmentKey: getSegmentKey(segment),
-                reason: 'manual-segment-change',
-            };
-        }
-        const timestamp = new Date(segment.start_time).getTime();
-        updatePlaybackSearchParams({
-            camera: selectedCamera,
-            cameraId: selectedCamera?.id,
-            timestamp,
-            replace: false,
-        });
-        setSelectedSegment(segment);
-        setSeekWarning(null);
-        setAutoPlayNotification(null);
-        setIsSeeking(false);
-        setIsBuffering(false);
-        lastSeekTimeRef.current = 0;
-        playbackSeekTargetRef.current = 0; // Reset saat diklik manual dari list agar selalu play dari awal segmen
-        resetSourcePlaybackState();
-    }, [resetSourcePlaybackState, selectedCamera, setSelectedSegment, showPlaybackPopunder, updatePlaybackSearchParams]);
 
     const formatTimestamp = (timestamp) => {
         return new Date(timestamp).toLocaleString('id-ID', {
