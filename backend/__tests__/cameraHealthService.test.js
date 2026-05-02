@@ -1019,6 +1019,52 @@ describe('cameraHealthService check loop', () => {
             expect.arrayContaining([1, expect.any(String), 51])
         );
     });
+
+    it('hydrates detailed camera rows only for due cameras in the health loop', async () => {
+        const service = new CameraHealthService();
+        const dueCamera = {
+            id: 51,
+            name: 'Due Camera',
+            enabled: 1,
+            is_online: 1,
+            stream_source: 'internal',
+            delivery_type: 'internal_hls',
+            private_rtsp_url: 'rtsp://admin:secret@10.0.0.51/stream',
+            stream_key: 'camera-51',
+        };
+
+        service.ensureCameraState(52, 1).nextCheckAt = Date.now() + 60_000;
+
+        vi.spyOn(service, 'getActivePaths').mockResolvedValue(new Map());
+        vi.spyOn(service, 'evaluateCameraStatus').mockResolvedValue({
+            camera: dueCamera,
+            isOnline: 1,
+            rawReason: 'ok',
+            rawDetails: null,
+        });
+        queryMock
+            .mockReturnValueOnce([
+                { id: 51, is_online: 1 },
+                { id: 52, is_online: 1 },
+            ])
+            .mockReturnValueOnce([dueCamera]);
+        executeMock.mockReturnValue({ changes: 1 });
+        upsertRuntimeStateMock.mockImplementation(() => {});
+
+        await expect(service.checkAllCameras()).resolves.toBeUndefined();
+
+        expect(queryMock).toHaveBeenNthCalledWith(
+            1,
+            expect.stringContaining('SELECT c.id, c.is_online')
+        );
+        expect(queryMock).toHaveBeenNthCalledWith(
+            2,
+            expect.stringContaining('AND c.id IN (?)'),
+            [51]
+        );
+        expect(service.evaluateCameraStatus).toHaveBeenCalledTimes(1);
+        expect(service.evaluateCameraStatus).toHaveBeenCalledWith(dueCamera, expect.any(Map));
+    });
 });
 
 describe('cameraHealthService health debug pagination', () => {

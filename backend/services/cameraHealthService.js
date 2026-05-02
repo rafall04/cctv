@@ -1041,6 +1041,31 @@ class CameraHealthService {
         }
     }
 
+    getEnabledCameraCandidates() {
+        return query(`
+            SELECT c.id, c.is_online
+            FROM cameras c
+            WHERE c.enabled = 1
+            ORDER BY c.id ASC
+        `);
+    }
+
+    getDetailedEnabledCamerasByIds(cameraIds) {
+        if (!cameraIds.length) {
+            return [];
+        }
+
+        const placeholders = cameraIds.map(() => '?').join(', ');
+        return query(`
+            SELECT ${SHARED_CAMERA_STREAM_WITH_AREA_PROJECTION}
+            FROM cameras c
+            LEFT JOIN areas a ON c.area_id = a.id
+            WHERE c.enabled = 1
+              AND c.id IN (${placeholders})
+            ORDER BY c.id ASC
+        `, cameraIds);
+    }
+
     hasRecentRuntimeSuccess(state, now = Date.now()) {
         return Boolean(state?.lastRuntimeSuccessAt && (now - state.lastRuntimeSuccessAt) <= RUNTIME_SUCCESS_WINDOW_MS);
     }
@@ -2448,20 +2473,16 @@ class CameraHealthService {
         try {
             this.cleanupProbeCache();
             const activePaths = await this.getActivePaths();
-            const cameras = query(`
-                SELECT ${SHARED_CAMERA_STREAM_WITH_AREA_PROJECTION}
-                FROM cameras c
-                LEFT JOIN areas a ON c.area_id = a.id
-                WHERE c.enabled = 1
-            `);
+            const candidateCameras = this.getEnabledCameraCandidates();
 
             const timestamp = getTimestamp();
-            const activeCameraIds = new Set(cameras.map((camera) => camera.id));
+            const activeCameraIds = new Set(candidateCameras.map((camera) => camera.id));
             const now = Date.now();
-            const dueCameras = cameras.filter((camera) => {
+            const dueCameraIds = candidateCameras.filter((camera) => {
                 const state = this.ensureCameraState(camera.id, camera.is_online);
                 return !state.nextCheckAt || state.nextCheckAt <= now;
-            });
+            }).map((camera) => camera.id);
+            const dueCameras = this.getDetailedEnabledCamerasByIds(dueCameraIds);
 
             const probeResults = await batchProbe(dueCameras, async (camera) => {
                 return this.evaluateCameraStatus(camera, activePaths);
@@ -2527,7 +2548,7 @@ class CameraHealthService {
                 }
             }
 
-            for (const camera of cameras) {
+            for (const camera of candidateCameras) {
                 if (processedIds.has(camera.id)) {
                     continue;
                 }
@@ -2571,7 +2592,7 @@ class CameraHealthService {
             }
 
             this.lastCheck = new Date();
-            console.log(`[CameraHealth] Check complete: ${onlineCount} online, ${offlineCount} offline (${changedCount} changed, ${dueCameras.length}/${cameras.length} probed)`);
+            console.log(`[CameraHealth] Check complete: ${onlineCount} online, ${offlineCount} offline (${changedCount} changed, ${dueCameras.length}/${candidateCameras.length} probed)`);
         } catch (error) {
             console.error('[CameraHealth] Check failed:', error.message);
         } finally {

@@ -11,6 +11,9 @@ import recordingService from '../../services/recordingService';
 import { REQUEST_POLICY } from '../../services/requestPolicy';
 import { useAdminReconnectRefresh } from './useAdminReconnectRefresh';
 
+const DEFAULT_POLL_INTERVAL_MS = 10000;
+const ERROR_BACKOFF_POLL_INTERVAL_MS = 30000;
+
 export function useRecordingDashboardData() {
     const [recordings, setRecordings] = useState([]);
     const [restartLogs, setRestartLogs] = useState([]);
@@ -23,6 +26,7 @@ export function useRecordingDashboardData() {
     const recordingsRef = useRef([]);
     const restartLogsRef = useRef([]);
     const assuranceRef = useRef(null);
+    const hasCachedDataRef = useRef(false);
     const mountedRef = useRef(true);
 
     useEffect(() => {
@@ -63,6 +67,7 @@ export function useRecordingDashboardData() {
 
             if (recordingsRes.success && recordingsRes.data) {
                 setRecordings(recordingsRes.data.cameras || recordingsRes.data || []);
+                hasCachedDataRef.current = true;
             } else if (isBackgroundMode && hasCachedData) {
                 setRefreshError(true);
             } else if (!isBackgroundMode) {
@@ -71,6 +76,7 @@ export function useRecordingDashboardData() {
 
             if (restartsRes.success && restartsRes.data) {
                 setRestartLogs(restartsRes.data);
+                hasCachedDataRef.current = true;
             } else if (isBackgroundMode && hasCachedData) {
                 setRefreshError(true);
             } else if (!isBackgroundMode) {
@@ -79,6 +85,7 @@ export function useRecordingDashboardData() {
 
             if (assuranceRes.success && assuranceRes.data) {
                 setAssurance(assuranceRes.data);
+                hasCachedDataRef.current = true;
             } else if (isBackgroundMode && hasCachedData) {
                 setRefreshError(true);
             } else if (!isBackgroundMode) {
@@ -99,7 +106,7 @@ export function useRecordingDashboardData() {
                 setRecordings([]);
                 setRestartLogs([]);
                 setAssurance(null);
-            } else if (recordingsRef.current.length > 0 || restartLogsRef.current.length > 0) {
+            } else if (hasCachedDataRef.current) {
                 setRefreshError(true);
             }
         } finally {
@@ -112,12 +119,24 @@ export function useRecordingDashboardData() {
     useEffect(() => {
         mountedRef.current = true;
         fetchData({ mode: 'initial' });
-        const interval = setInterval(() => fetchData({ mode: 'background' }), 10000);
         return () => {
             mountedRef.current = false;
-            clearInterval(interval);
         };
     }, [fetchData]);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (document.visibilityState === 'hidden') {
+                return;
+            }
+
+            fetchData({ mode: 'background' });
+        }, refreshError ? ERROR_BACKOFF_POLL_INTERVAL_MS : DEFAULT_POLL_INTERVAL_MS);
+
+        return () => {
+            clearInterval(interval);
+        };
+    }, [fetchData, refreshError]);
 
     useAdminReconnectRefresh(() => fetchData({ mode: 'resume' }));
 

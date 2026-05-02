@@ -55,7 +55,7 @@ This work spans multiple related subsystems, but they are coupled enough that on
 ### Task 1: Enforce Segment Identity In SQLite
 
 **Files:**
-- Create: `backend/database/migrations/20260503_add_recording_segment_uniqueness.js`
+- Create: `backend/database/migrations/zz_20260503_add_recording_segment_uniqueness.js`
 - Modify: `backend/services/recordingSegmentRepository.js`
 - Create: `backend/__tests__/recordingSegmentUniqueness.test.js`
 - Modify: `backend/__tests__/recordingSegmentRepository.test.js`
@@ -136,7 +136,7 @@ Expected: FAIL because `upsertSegment` does not exist and the repository does no
 
 - [ ] **Step 3: Add the migration skeleton**
 
-Create `backend/database/migrations/20260503_add_recording_segment_uniqueness.js`:
+Create `backend/database/migrations/zz_20260503_add_recording_segment_uniqueness.js`:
 
 ```javascript
 // Purpose: Reconcile duplicate recording segments and enforce unique segment identity per camera.
@@ -236,7 +236,7 @@ Expected: PASS.
 
 ```bash
 git status
-git add backend/database/migrations/20260503_add_recording_segment_uniqueness.js backend/services/recordingSegmentRepository.js backend/__tests__/recordingSegmentUniqueness.test.js backend/__tests__/recordingSegmentRepository.test.js
+git add backend/database/migrations/zz_20260503_add_recording_segment_uniqueness.js backend/services/recordingSegmentRepository.js backend/__tests__/recordingSegmentUniqueness.test.js backend/__tests__/recordingSegmentRepository.test.js
 git commit -m "Fix: enforce unique recording segment identity"
 git push
 ```

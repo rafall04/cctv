@@ -29,6 +29,18 @@ describe('migration runner helpers', () => {
         ]);
     });
 
+    it('runs recording segment uniqueness after the recording system table migration', () => {
+        const files = selectRunnableMigrationFiles([
+            'zz_20260503_add_recording_segment_uniqueness.js',
+            'add_recording_system.js',
+        ]);
+
+        expect(files).toEqual([
+            'add_recording_system.js',
+            'zz_20260503_add_recording_segment_uniqueness.js',
+        ]);
+    });
+
     it('creates the database directory before SQLite migrations open the DB file', async () => {
         const baseDir = await mkdtemp(join(tmpdir(), 'cctv-migrations-'));
         const dataDir = join(baseDir, 'backend', 'data');

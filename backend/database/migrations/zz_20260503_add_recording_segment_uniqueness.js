@@ -21,8 +21,7 @@ try {
     `).get();
 
     if (!table) {
-        console.log('recording_segments table does not exist yet; skipping uniqueness migration');
-        process.exit(0);
+        throw new Error('recording_segments table does not exist yet');
     }
 
     db.exec(`
