@@ -32,15 +32,15 @@ vi.mock('../components/admin/settings/PlaybackSettingsPanel', () => ({
     default: () => <div>playback-panel</div>,
 }));
 
-vi.mock('../components/settings/TimezoneSettingsTab', () => ({
+vi.mock('../components/admin/settings/TimezoneSettingsTab', () => ({
     default: () => <div>timezone-panel</div>,
 }));
 
-vi.mock('../components/settings/BackupSettingsTab', () => ({
+vi.mock('../components/admin/settings/BackupSettingsTab', () => ({
     default: () => <div>backup-panel</div>,
 }));
 
-vi.mock('../components/settings/ApiKeySettings', () => ({
+vi.mock('../components/admin/settings/ApiKeySettings', () => ({
     default: () => <div>apikey-panel</div>,
 }));
 

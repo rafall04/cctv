@@ -82,7 +82,7 @@ SideEffects: None; documentation only.
 - Resolve legacy duplicate frontend locations:
   - Prefer `frontend/src/layouts/AdminLayout.jsx`; phase out `frontend/src/components/AdminLayout.jsx`.
   - Prefer `frontend/src/components/landing/LandingPageSimple.jsx`; phase out `frontend/src/components/LandingPageSimple.jsx`.
-  - Prefer `frontend/src/components/admin/settings/`; phase out `frontend/src/components/settings/`.
+  - Prefer `frontend/src/components/admin/settings/`; `frontend/src/components/settings/` now contains compatibility re-exports only.
 - Add Header Docs to active entrypoints that still lack them before modifying those files.
 
 ## Local Map Policy

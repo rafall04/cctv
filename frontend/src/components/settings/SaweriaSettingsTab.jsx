@@ -1,5 +1,9 @@
-// Import existing SaweriaSettings.jsx content and rename export
-import SaweriaSettings from '../../pages/SaweriaSettings';
+/*
+Purpose: Compatibility re-export for legacy Saweria settings imports.
+Caller: Older code paths importing components/settings/SaweriaSettingsTab.jsx.
+Deps: ../admin/settings/SaweriaSettingsTab.
+MainFuncs: default re-export.
+SideEffects: None.
+*/
 
-// Re-export as SaweriaSettingsTab
-export default SaweriaSettings;
+export { default } from '../admin/settings/SaweriaSettingsTab';

@@ -1,5 +1,9 @@
-// Import existing Settings.jsx content and rename export
-import Settings from '../../pages/Settings';
+/*
+Purpose: Compatibility re-export for legacy telegram settings imports.
+Caller: Older code paths importing components/settings/TelegramSettings.jsx.
+Deps: ../admin/settings/TelegramSettings.
+MainFuncs: default re-export.
+SideEffects: None.
+*/
 
-// Re-export as TelegramSettings
-export default Settings;
+export { default } from '../admin/settings/TelegramSettings';

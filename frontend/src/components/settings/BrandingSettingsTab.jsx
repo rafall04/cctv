@@ -1,5 +1,9 @@
-// Import existing BrandingSettings.jsx content and rename export
-import BrandingSettings from '../../pages/BrandingSettings';
+/*
+Purpose: Compatibility re-export for legacy branding settings imports.
+Caller: Older code paths importing components/settings/BrandingSettingsTab.jsx.
+Deps: ../admin/settings/BrandingSettingsTab.
+MainFuncs: default re-export.
+SideEffects: None.
+*/
 
-// Re-export as BrandingSettingsTab
-export default BrandingSettings;
+export { default } from '../admin/settings/BrandingSettingsTab';

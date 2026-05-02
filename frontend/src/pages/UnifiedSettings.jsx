@@ -6,9 +6,9 @@ import GeneralSettingsPanel from '../components/admin/settings/GeneralSettingsPa
 import AdsSettingsPanel from '../components/admin/settings/AdsSettingsPanel';
 import StreamHealthSettingsPanel from '../components/admin/settings/StreamHealthSettingsPanel';
 import PlaybackSettingsPanel from '../components/admin/settings/PlaybackSettingsPanel';
-import ApiKeySettings from '../components/settings/ApiKeySettings';
-import TimezoneSettingsTab from '../components/settings/TimezoneSettingsTab';
-import BackupSettingsTab from '../components/settings/BackupSettingsTab';
+import ApiKeySettings from '../components/admin/settings/ApiKeySettings';
+import TimezoneSettingsTab from '../components/admin/settings/TimezoneSettingsTab';
+import BackupSettingsTab from '../components/admin/settings/BackupSettingsTab';
 
 const Icons = {
     General: () => (
