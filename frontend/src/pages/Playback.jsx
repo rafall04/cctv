@@ -645,6 +645,10 @@ function Playback({
             return;
         }
 
+        if (selectedCameraIdRef.current !== selectedCameraId || selectedSegmentRef.current !== selectedSegment) {
+            return;
+        }
+
         if (!selectedSegment.filename || selectedSegment.filename.trim() === '') {
             return;
         }
@@ -1167,6 +1171,9 @@ function Playback({
             clearSegment: true,
             clearSegments: true,
         });
+        selectedSegmentRef.current = null;
+        segmentsRef.current = [];
+        selectedCameraIdRef.current = camera.id;
         setSelectedCameraId(camera.id);
         updatePlaybackSearchParams({
             camera,
