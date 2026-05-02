@@ -170,6 +170,8 @@ describe('recordingCleanupService', () => {
             freeBytes: 100,
             targetFreeBytes: 2000,
             batchLimit: 2,
+            nowMs: Date.parse('2026-05-02T10:00:00.000Z'),
+            getCameraRetentionHours: () => 1,
         });
 
         expect(repositoryMock.deleteSegmentById).toHaveBeenCalledWith(2);
@@ -215,5 +217,32 @@ describe('recordingCleanupService', () => {
             reason: 'filesystem_orphan_retention_expired',
         }));
         expect(result.orphanDeleted).toBe(1);
+    });
+
+    it('does not emergency-delete DB segments that are inside retention', async () => {
+        repositoryMock.findOldestSegmentsForEmergency = vi.fn()
+            .mockReturnValueOnce([
+                {
+                    id: 9,
+                    camera_id: 7,
+                    filename: '20260502_095800.mp4',
+                    start_time: '2026-05-02T09:58:00.000Z',
+                    file_path: join(recordingsBasePath, 'camera7', '20260502_095800.mp4'),
+                },
+            ])
+            .mockReturnValueOnce([]);
+        fsMock.stat.mockResolvedValue({ size: 4096, mtimeMs: Date.parse('2026-05-02T09:59:00.000Z') });
+
+        const service = createService();
+        const result = await service.emergencyCleanup({
+            freeBytes: 100,
+            targetFreeBytes: 2000,
+            nowMs: Date.parse('2026-05-02T10:00:00.000Z'),
+            getCameraRetentionHours: () => 5,
+        });
+
+        expect(safeDeleteMock).not.toHaveBeenCalled();
+        expect(repositoryMock.deleteSegmentById).not.toHaveBeenCalledWith(9);
+        expect(result.deleted).toBe(0);
     });
 });

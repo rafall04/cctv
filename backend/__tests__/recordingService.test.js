@@ -549,4 +549,24 @@ describe('recordingService external recording support', () => {
         );
         expect(fsPromisesMock.unlink).not.toHaveBeenCalledWith(join(recordingsBasePath, 'camera3', '20260502_000000.mp4'));
     });
+
+    it('does not emergency-delete recent filesystem orphan recordings', async () => {
+        execMock[promisify.custom] = vi.fn(async () => ({ stdout: '100\n', stderr: '' }));
+        const { recordingService } = await import('../services/recordingService.js');
+        queryMock.mockReturnValue([]);
+        queryOneMock.mockReturnValue({ recording_duration_hours: 5 });
+        fsPromisesMock.readdir.mockImplementation(async (targetPath) => {
+            if (String(targetPath).endsWith('recordings')) return ['camera7'];
+            return ['20260502_095800.mp4'];
+        });
+        fsPromisesMock.stat.mockResolvedValue({
+            isDirectory: () => true,
+            mtimeMs: Date.parse('2026-05-02T09:59:00.000Z'),
+            size: 4096,
+        });
+
+        await recordingService.emergencyDiskSpaceCheck();
+
+        expect(fsPromisesMock.unlink).not.toHaveBeenCalledWith(expect.stringContaining('20260502_095800.mp4'));
+    });
 });

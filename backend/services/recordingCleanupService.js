@@ -169,7 +169,13 @@ export function createRecordingCleanupService({
         }
     }
 
-    async function emergencyCleanup({ freeBytes, targetFreeBytes, batchLimit = 200 }) {
+    async function emergencyCleanup({
+        freeBytes,
+        targetFreeBytes,
+        batchLimit = 200,
+        nowMs = Date.now(),
+        getCameraRetentionHours = () => null,
+    }) {
         const result = createEmptyResult();
         let cursor = null;
         let keepScanning = true;
@@ -194,6 +200,30 @@ export function createRecordingCleanupService({
                 }
 
                 if (isFileBeingProcessed?.(segment.camera_id, segment.filename)) {
+                    result.processingSkipped++;
+                    continue;
+                }
+
+                let fileMtimeMs = null;
+                try {
+                    const stats = await fs.stat(segment.file_path);
+                    fileMtimeMs = stats.mtimeMs;
+                } catch {
+                    fileMtimeMs = null;
+                }
+
+                const retentionWindow = computeRetentionWindow({
+                    retentionHours: getCameraRetentionHours(segment.camera_id),
+                    nowMs,
+                });
+                const deletePolicy = canDeleteRecordingFile({
+                    filename: segment.filename,
+                    startTime: segment.start_time,
+                    fileMtimeMs,
+                    retentionWindow,
+                    nowMs,
+                });
+                if (!deletePolicy.allowed) {
                     result.processingSkipped++;
                     continue;
                 }

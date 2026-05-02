@@ -15,7 +15,7 @@ import { exec } from 'child_process';
 import { getEffectiveDeliveryType, getPrimaryExternalStreamUrl } from '../utils/cameraDelivery.js';
 import recordingProcessManager from './recordingProcessManager.js';
 import { createRecordingCleanupService } from './recordingCleanupService.js';
-import { isSafeRecordingFilename } from './recordingRetentionPolicy.js';
+import { canDeleteRecordingFile, computeRetentionWindow, isSafeRecordingFilename } from './recordingRetentionPolicy.js';
 import recordingSegmentRepository from './recordingSegmentRepository.js';
 const execPromise = promisify(exec);
 
@@ -1594,6 +1594,10 @@ class RecordingService {
                 freeBytes,
                 targetFreeBytes: 2 * 1024 * 1024 * 1024,
                 batchLimit: 200,
+                getCameraRetentionHours: (cameraId) => {
+                    const camera = queryOne('SELECT recording_duration_hours FROM cameras WHERE id = ?', [cameraId]);
+                    return camera?.recording_duration_hours;
+                },
             });
 
             freedBytes += emergencyResult.deletedBytes;
@@ -1632,6 +1636,25 @@ class RecordingService {
                         try {
                             const cameraIdMatch = dir.match(/camera(\d+)/);
                             const cameraId = cameraIdMatch ? parseInt(cameraIdMatch[1]) : null;
+                            const camera = cameraId
+                                ? queryOne('SELECT recording_duration_hours FROM cameras WHERE id = ?', [cameraId])
+                                : null;
+                            const nowMs = Date.now();
+                            const retentionWindow = computeRetentionWindow({
+                                retentionHours: camera?.recording_duration_hours,
+                                nowMs,
+                            });
+                            const deletePolicy = canDeleteRecordingFile({
+                                filename: file.name,
+                                fileMtimeMs: file.mtime,
+                                retentionWindow,
+                                nowMs,
+                            });
+
+                            if (!deletePolicy.allowed) {
+                                continue;
+                            }
+
                             const deleteResult = await deleteRecordingFileSafely({
                                 cameraId,
                                 filename: file.name,
