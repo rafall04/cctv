@@ -7,8 +7,8 @@
 import { promises as defaultFs } from 'fs';
 import { join } from 'path';
 import {
+    canDeleteRecordingFile,
     computeRetentionWindow,
-    getSegmentAgeMs,
     isSafeRecordingFilename,
 } from './recordingRetentionPolicy.js';
 
@@ -114,8 +114,13 @@ export function createRecordingCleanupService({
                 continue;
             }
 
-            const ageMs = getSegmentAgeMs({ filename, fileMtimeMs: stats.mtimeMs, nowMs });
-            if (ageMs <= retentionWindow.retentionWithGraceMs) {
+            const deletePolicy = canDeleteRecordingFile({
+                filename,
+                fileMtimeMs: stats.mtimeMs,
+                retentionWindow,
+                nowMs,
+            });
+            if (!deletePolicy.allowed) {
                 continue;
             }
 

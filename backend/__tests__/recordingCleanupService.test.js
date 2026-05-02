@@ -176,4 +176,44 @@ describe('recordingCleanupService', () => {
         expect(result.processingSkipped).toBe(1);
         expect(result.deleted).toBe(1);
     });
+
+    it('keeps recent filesystem orphans until retention expires', async () => {
+        fsMock.readdir.mockResolvedValueOnce(['20260502_095800.mp4']);
+        repositoryMock.listFilenamesByCamera.mockReturnValueOnce([]);
+        fsMock.stat.mockResolvedValueOnce({
+            size: 2048,
+            mtimeMs: Date.parse('2026-05-02T09:59:00.000Z'),
+        });
+
+        const service = createService();
+        const result = await service.cleanupCamera({
+            cameraId: 7,
+            camera: { recording_duration_hours: 5, name: 'Camera 7' },
+            nowMs: Date.parse('2026-05-02T10:00:00.000Z'),
+        });
+
+        expect(safeDeleteMock).not.toHaveBeenCalled();
+        expect(result.orphanDeleted).toBe(0);
+    });
+
+    it('deletes filesystem orphans only after retention expires', async () => {
+        fsMock.readdir.mockResolvedValueOnce(['20260502_020000.mp4']);
+        repositoryMock.listFilenamesByCamera.mockReturnValueOnce([]);
+        fsMock.stat.mockResolvedValueOnce({
+            size: 2048,
+            mtimeMs: Date.parse('2026-05-02T02:01:00.000Z'),
+        });
+
+        const service = createService();
+        const result = await service.cleanupCamera({
+            cameraId: 7,
+            camera: { recording_duration_hours: 5, name: 'Camera 7' },
+            nowMs: Date.parse('2026-05-02T10:00:00.000Z'),
+        });
+
+        expect(safeDeleteMock).toHaveBeenCalledWith(expect.objectContaining({
+            reason: 'filesystem_orphan_retention_expired',
+        }));
+        expect(result.orphanDeleted).toBe(1);
+    });
 });
