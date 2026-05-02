@@ -14,6 +14,10 @@ import { useBranding } from '../contexts/BrandingContext';
 import playbackViewerService from '../services/playbackViewerService';
 import { createCameraSlug, parseCameraIdFromSlug } from '../utils/slugify';
 import { buildPublicPlaybackShareUrl } from '../utils/publicShareUrl';
+import {
+    buildPlaybackSearchParams,
+    getPlaybackUrlState,
+} from '../utils/playbackUrlState.js';
 import { REQUEST_POLICY } from '../services/requestPolicy';
 import GlobalAdScript from '../components/ads/GlobalAdScript';
 import InlineAdSlot from '../components/ads/InlineAdSlot';
@@ -63,7 +67,7 @@ function Playback({
     accessScope = 'public_preview',
 }) {
     const [searchParams, setSearchParams] = useSearchParams();
-    const cameraIdFromUrl = searchParams.get('cam');
+    const { cameraParam: cameraIdFromUrl, timestampParam: timestampFromUrl } = getPlaybackUrlState(searchParams);
     const { branding } = useBranding();
     const isAdminPlayback = accessScope === 'admin_full';
 
@@ -289,7 +293,11 @@ function Playback({
         replace = false,
     }) => {
         setSearchParams((previous) => {
-            const next = new URLSearchParams(previous);
+            const next = buildPlaybackSearchParams({
+                currentParams: previous,
+                camera: camera ? createCameraSlug(camera) : cameraId,
+                timestamp,
+            });
             const nextMode = next.get('mode');
 
             if (!nextMode || !['full', 'simple'].includes(nextMode)) {
@@ -297,18 +305,6 @@ function Playback({
             }
 
             next.set('view', 'playback');
-
-            if (camera) {
-                next.set('cam', createCameraSlug(camera));
-            } else if (cameraId) {
-                next.set('cam', String(cameraId));
-            }
-
-            if (timestamp !== null && timestamp !== undefined) {
-                next.set('t', String(timestamp));
-            } else {
-                next.delete('t');
-            }
 
             return next;
         }, { replace });
@@ -525,7 +521,6 @@ function Playback({
     useEffect(() => {
         if (segments.length === 0) return;
 
-        const timestampFromUrl = searchParams.get('t');
         if (timestampFromUrl && (!selectedSegment || isInitialMountRef.current)) {
             const targetTime = parseInt(timestampFromUrl, 10);
             const segmentFromUrl = findSegmentForTimestamp(segments, targetTime);
