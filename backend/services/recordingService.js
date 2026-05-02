@@ -1,8 +1,8 @@
 // Purpose: Coordinate recording facade behavior, DB state, health recovery, and segment processing.
 // Caller: recording routes, camera health service, server shutdown lifecycle.
 // Deps: FFmpeg process manager, SQLite connection pool, filesystem, camera delivery utilities.
-// MainFuncs: startRecording, stopRecording, restartRecording, shutdown, getRecordingStatus.
-// SideEffects: Starts/stops FFmpeg via process manager, updates DB state, remuxes segment files.
+// MainFuncs: startRecording, stopRecording, restartRecording, shutdown, getRecordingStatus, quarantineFailedRemuxFileIfExpired.
+// SideEffects: Starts/stops FFmpeg via process manager, updates DB state, remuxes segment files, quarantines expired invalid files.
 
 import { spawn } from 'child_process';
 import { existsSync, mkdirSync, unlinkSync, statSync, renameSync, readdirSync } from 'fs';
@@ -188,6 +188,37 @@ async function quarantineRecordingFile(cameraId, filename, filePath, reason) {
         console.error(`[Segment] Failed to quarantine ${filename}:`, error.message);
         return { success: false, reason: error.message };
     }
+}
+
+async function quarantineFailedRemuxFileIfExpired(cameraId, filename, filePath, reason) {
+    let fileMtimeMs = null;
+    try {
+        const stats = await fsPromises.stat(filePath);
+        fileMtimeMs = stats.mtimeMs;
+    } catch {
+        fileMtimeMs = null;
+    }
+
+    const camera = queryOne('SELECT recording_duration_hours FROM cameras WHERE id = ?', [cameraId]);
+    const retentionWindow = computeRetentionWindow({
+        retentionHours: camera?.recording_duration_hours,
+    });
+    const deletePolicy = canDeleteRecordingFile({
+        filename,
+        fileMtimeMs,
+        retentionWindow,
+    });
+
+    if (!deletePolicy.allowed) {
+        console.warn(`[Segment] Keeping failed remux segment until retention expiry: camera${cameraId}/${filename}`);
+        return { success: true, retained: true };
+    }
+
+    const result = await quarantineRecordingFile(cameraId, filename, filePath, reason);
+    if (result.success) {
+        removeFailedFile(cameraId, filename);
+    }
+    return result;
 }
 
 const cleanupService = createRecordingCleanupService({
@@ -677,26 +708,14 @@ class RecordingService {
     onSegmentCreated(cameraId, filename) {
         // CRITICAL: Check if this file has failed re-mux before (prevent infinite loop)
         if (isFileFailed(cameraId, filename)) {
-            // File has failed 3+ times (likely corrupt) - delete it from disk
+            // File has failed 3+ times; keep it in place until retention expiry.
             const cameraDir = join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
             const failedPath = join(cameraDir, filename);
             if (existsSync(failedPath)) {
-                quarantineRecordingFile(cameraId, filename, failedPath, 'remux_failed_3x').catch((err) => {
-                    console.error(`[Segment] Failed to quarantine permanently failed file ${filename}:`, err.message);
+                quarantineFailedRemuxFileIfExpired(cameraId, filename, failedPath, 'remux_failed_3x').catch((err) => {
+                    console.error(`[Segment] Failed to process failed-remux file ${filename}:`, err.message);
                 });
             }
-            removeFailedFile(cameraId, filename);
-            return;
-            if (existsSync(failedPath)) {
-                try {
-                    unlinkSync(failedPath);
-                    console.log(`[Segment] ✓ Deleted permanently failed file (3+ remux failures): ${filename}`);
-                } catch (err) {
-                    console.error(`[Segment] Failed to delete permanently failed file ${filename}:`, err.message);
-                }
-            }
-            // Also clean up the failed_remux_files tracking entry
-            removeFailedFile(cameraId, filename);
             return;
         }
 
@@ -1163,12 +1182,11 @@ class RecordingService {
                                 try {
                                     try {
                                         await fsPromises.access(failedPath);
-                                        await quarantineRecordingFile(cameraId, filename, failedPath, 'scanner_remux_failed_3x');
-                                        console.log(`[Scanner] Quarantined permanently failed file: ${filename}`);
-                                        removeFailedFile(cameraId, filename);
+                                        const quarantineResult = await quarantineFailedRemuxFileIfExpired(cameraId, filename, failedPath, 'scanner_remux_failed_3x');
+                                        if (!quarantineResult.retained) {
+                                            console.log(`[Scanner] Quarantined expired failed-remux file: ${filename}`);
+                                        }
                                         continue;
-                                        await fsPromises.unlink(failedPath);
-                                        console.log(`[Scanner] ✓ Deleted permanently failed file: ${filename}`);
                                     } catch (e) { }
                                     removeFailedFile(cameraId, filename);
                                 } catch (delErr) {
@@ -1492,9 +1510,7 @@ class RecordingService {
                                 console.log(`[BGCleanup] File valid but unregistered (age: ${Math.round(file.age / 60000)}min), triggering registration: ${file.filename}`);
                                 this.onSegmentCreated(file.cameraId, file.filename);
                             } catch (error) {
-                                console.log(`[BGCleanup] Deleting corrupt file (age: ${Math.round(file.age / 60000)}min): camera${file.cameraId}/${file.filename}`);
-                                await quarantineRecordingFile(file.cameraId, file.filename, file.path, 'background_ffprobe_failed');
-                                removeFailedFile(file.cameraId, file.filename);
+                                console.log(`[BGCleanup] Keeping corrupt/unplayable file until retention expiry: camera${file.cameraId}/${file.filename} (age: ${Math.round(file.age / 60000)}min)`);
                             }
                         }
                     }

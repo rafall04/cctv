@@ -605,4 +605,36 @@ describe('recordingService external recording support', () => {
             expect.stringContaining('.quarantine')
         );
     });
+
+    it('keeps recent failed-remux segments in place until retention expiry', async () => {
+        const { join } = await import('path');
+        vi.setSystemTime(Date.parse('2026-05-02T10:00:00.000Z'));
+        const { recordingService } = await import('../services/recordingService.js');
+        const recordingsBasePath = join(process.cwd(), '..', 'recordings');
+
+        queryOneMock.mockImplementation((sql) => {
+            if (sql.includes('SELECT fail_count FROM failed_remux_files')) return { fail_count: 3 };
+            if (sql.includes('SELECT recording_duration_hours FROM cameras')) return { recording_duration_hours: 5 };
+            return null;
+        });
+        fsPromisesMock.stat.mockResolvedValue({
+            size: 512,
+            mtimeMs: Date.parse('2026-05-02T09:59:30.000Z'),
+        });
+        executeMock.mockClear();
+
+        recordingService.onSegmentCreated(3, '20260502_095800.mp4');
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(fsPromisesMock.rename).not.toHaveBeenCalledWith(
+            join(recordingsBasePath, 'camera3', '20260502_095800.mp4'),
+            expect.stringContaining('.quarantine')
+        );
+        expect(fsPromisesMock.unlink).not.toHaveBeenCalledWith(join(recordingsBasePath, 'camera3', '20260502_095800.mp4'));
+        expect(executeMock).not.toHaveBeenCalledWith(
+            'DELETE FROM failed_remux_files WHERE camera_id = ? AND filename = ?',
+            [3, '20260502_095800.mp4']
+        );
+    });
 });
