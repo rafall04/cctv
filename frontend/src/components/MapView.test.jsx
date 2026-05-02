@@ -1,3 +1,10 @@
+/*
+ * Purpose: Regression tests for the public CCTV map aggregation, viewport, and popup behavior.
+ * Caller: Frontend Vitest suites for landing/map interactions.
+ * Deps: React Testing Library, Vitest, mocked react-leaflet/Leaflet, MapView.
+ * MainFuncs: Verifies marker aggregation, map chrome layering, viewport commands, and stream modal flows.
+ * SideEffects: Mocks browser media APIs and map services during test execution.
+ */
 // @vitest-environment jsdom
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -796,11 +803,14 @@ describe('MapView area filter visibility', () => {
         });
 
         const zoomHint = screen.getByTestId('map-zoom-hint');
+        const areaFilterPanel = screen.getByTestId('map-area-filter-panel');
         const mapChrome = zoomHint.closest('[data-testid="map-top-chrome"]');
         const mapChromeControls = zoomHint.closest('[data-testid="map-top-chrome-controls"]');
 
         expect(mapChrome?.className).toContain('pointer-events-none');
-        expect(mapChromeControls?.className).toContain('pointer-events-auto');
+        expect(mapChromeControls?.className).toContain('pointer-events-none');
+        expect(zoomHint.className).toContain('pointer-events-none');
+        expect(areaFilterPanel.className).toContain('pointer-events-auto');
     });
 
     it('menggunakan hotspot spasial di mode all-area untuk area besar yang tersebar', async () => {

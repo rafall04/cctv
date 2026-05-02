@@ -2177,10 +2177,13 @@ const MapView = memo(({
             >
                 <div
                     data-testid="map-top-chrome-controls"
-                    className="pointer-events-auto flex max-w-[min(100%,24rem)] flex-col gap-2"
+                    className="pointer-events-none flex max-w-[min(100%,24rem)] flex-col gap-2"
                 >
                     {showAreaFilter && (
-                        <div className="rounded-2xl border border-white/55 bg-white/78 p-1.5 shadow-[0_14px_30px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-gray-900/72">
+                        <div
+                            data-testid="map-area-filter-panel"
+                            className="pointer-events-auto rounded-2xl border border-white/55 bg-white/78 p-1.5 shadow-[0_14px_30px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-gray-900/72"
+                        >
                             <div className="flex items-center gap-2 px-2 pb-1.5 pt-1">
                                 <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-gray-500 dark:text-gray-400">
                                     Area View
@@ -2214,7 +2217,7 @@ const MapView = memo(({
                     {shouldShowZoomHint && (
                         <div
                             data-testid="map-zoom-hint"
-                            className="inline-flex max-w-fit items-center gap-2 rounded-full border border-white/55 bg-white/78 px-3 py-1.5 text-[11px] font-medium text-gray-600 shadow-[0_12px_28px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-gray-900/72 dark:text-gray-300"
+                            className="pointer-events-none inline-flex max-w-fit items-center gap-2 rounded-full border border-white/55 bg-white/78 px-3 py-1.5 text-[11px] font-medium text-gray-600 shadow-[0_12px_28px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-gray-900/72 dark:text-gray-300"
                         >
                             <span className="inline-flex h-2 w-2 rounded-full bg-sky-500" />
                             Zoom in untuk lihat kamera individual
