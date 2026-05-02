@@ -177,7 +177,7 @@ export default function ViewerAnalytics() {
 
     const analyticsPreviewSessions = useMemo(() => (analytics?.recentSessions || []).slice(0, 5), [analytics?.recentSessions]);
     const topVisitors = useMemo(() => analytics?.topVisitors || [], [analytics?.topVisitors]);
-    const activeSessions = analytics?.activeSessions || [];
+    const activeSessions = useMemo(() => analytics?.activeSessions || [], [analytics?.activeSessions]);
     const topCameras = analytics?.topCameras || [];
     const deviceBreakdown = analytics?.deviceBreakdown || [];
     const peakHours = analytics?.peakHours || [];
