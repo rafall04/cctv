@@ -1,3 +1,11 @@
+/*
+ * Purpose: Admin viewer analytics workspace with summary, history, active sessions, and chart tabs.
+ * Caller: Protected admin analytics route.
+ * Deps: Analytics components, admin/camera services, viewer analytics hooks, export adapter.
+ * MainFuncs: ViewerAnalytics.
+ * SideEffects: Fetches analytics/history data and can export CSV files.
+ */
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert } from '../components/ui/Alert';
 import { HeatmapDetailModal } from '../components/ActivityHeatmap';
