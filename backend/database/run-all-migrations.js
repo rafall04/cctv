@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Purpose: Run database migration files safely without recursively invoking aggregate runners.
  * Caller: `npm run migrate`, deployment scripts, and migration runner tests.
