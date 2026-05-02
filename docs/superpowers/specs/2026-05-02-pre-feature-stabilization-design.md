@@ -23,10 +23,11 @@ Stabilize the project before adding new features. The current baseline is functi
 ## Goals
 
 1. Keep public/admin behavior unchanged while reducing large-file risk.
-2. Split high-change modules into focused helpers, hooks, and services.
-3. Clean up test noise so future failures are easier to see.
-4. Preserve playback/live tracking separation.
-5. Keep database-heavy changes indexed, batched, and covered by focused tests.
+2. Fix the admin login bounce when the app is accessed through a server IP before doing larger refactors.
+3. Split high-change modules into focused helpers, hooks, and services.
+4. Clean up test noise so future failures are easier to see.
+5. Preserve playback/live tracking separation.
+6. Keep database-heavy changes indexed, batched, and covered by focused tests.
 
 ## Non-Goals
 
@@ -37,6 +38,20 @@ Stabilize the project before adding new features. The current baseline is functi
 - No deletion or archival of operational artifacts without approval.
 
 ## Recommended Approach
+
+### 0. Admin Auth IP Access Stabilization
+
+Treat direct-IP admin access as a production-supported entry point. The observed failure mode is: login returns success, the frontend stores the user, then the first protected admin API request fails and the global session-expired handler sends the user back to `/admin/login`.
+
+Root-cause investigation should start at the session boundary, not the page:
+
+- verify whether `/api/auth/login` sets `token` and `refreshToken` cookies for `http://SERVER_IP`, `http://SERVER_IP:PORT_PUBLIC`, and HTTPS proxy access
+- verify whether `/api/admin/stats` receives the `token` cookie immediately after login
+- verify whether runtime config keeps admin API calls same-origin when the UI is opened by IP
+- verify whether generated Nginx/Apache proxy configs preserve `Host`, `X-Forwarded-Proto`, and `X-Forwarded-For`
+- add tests around cookie option derivation and frontend session-expired behavior before changing auth code
+
+The expected fix should keep HttpOnly cookie auth as the primary path. Avoid localStorage JWT fallback unless evidence shows no same-origin deployment path can be made reliable.
 
 ### 1. Backend Health Boundary
 

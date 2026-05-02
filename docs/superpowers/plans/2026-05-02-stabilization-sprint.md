@@ -12,6 +12,16 @@
 
 ## File Structure
 
+- Create: `backend/utils/authCookieOptions.js`
+  - Centralize request-aware auth cookie option derivation for login and refresh responses.
+- Modify: `backend/controllers/authController.js`
+  - Use the shared auth cookie option helper for `token` and `refreshToken` cookies.
+- Test: `backend/__tests__/authCookieOptions.test.js`
+  - Verify direct-IP, IP-with-port, forwarded HTTPS, and backend-domain cookie settings.
+- Modify: `deployment/generate-env.sh`
+  - Ensure generated reverse proxy config forwards `X-Forwarded-Proto` for `/api`, `/hls`, and recording API locations.
+- Modify: `frontend/src/services/apiClient.js`
+  - Add a focused regression only if investigation shows runtime API base can become cross-origin for IP access.
 - Modify: `frontend/src/components/landing/LandingCameraCard.jsx`
   - Remove unused computed state while preserving existing availability behavior.
 - Modify: `frontend/src/pages/ViewerAnalytics.jsx`
@@ -38,6 +48,195 @@
   - Delegate external health mode resolution to the policy module.
 - Test: `backend/__tests__/cameraHealthPolicy.test.js`
   - Verify explicit, area override, delivery default, and fallback policy behavior.
+
+---
+
+## Task 0: Fix Admin Login Bounce On IP Access
+
+**Files:**
+- Create: `backend/utils/authCookieOptions.js`
+- Modify: `backend/controllers/authController.js`
+- Test: `backend/__tests__/authCookieOptions.test.js`
+- Modify: `deployment/generate-env.sh`
+- Optional Modify: `frontend/src/services/apiClient.js`
+
+- [ ] **Step 1: Write backend cookie option tests**
+
+Create `backend/__tests__/authCookieOptions.test.js` covering:
+
+```javascript
+/*
+ * Purpose: Verify auth cookie options for domain and direct-IP admin access.
+ * Caller: Backend Vitest suite before auth cookie changes.
+ * Deps: authCookieOptions helper.
+ * MainFuncs: getAuthCookieOptions.
+ * SideEffects: None.
+ */
+
+import { describe, expect, it } from 'vitest';
+import { getAuthCookieOptions } from '../utils/authCookieOptions.js';
+
+const makeRequest = ({ host, forwardedProto, protocol = 'http' }) => ({
+    headers: {
+        host,
+        ...(forwardedProto ? { 'x-forwarded-proto': forwardedProto } : {}),
+    },
+    protocol,
+});
+
+describe('getAuthCookieOptions', () => {
+    it('uses lax non-secure cookies for direct HTTP IP same-origin access', () => {
+        const options = getAuthCookieOptions(makeRequest({ host: '172.17.11.12:800' }));
+
+        expect(options.access).toMatchObject({
+            path: '/',
+            httpOnly: true,
+            secure: false,
+            sameSite: 'lax',
+        });
+    });
+
+    it('uses secure none cookies when proxy reports HTTPS', () => {
+        const options = getAuthCookieOptions(makeRequest({
+            host: '172.17.11.12',
+            forwardedProto: 'https',
+        }));
+
+        expect(options.access.secure).toBe(true);
+        expect(options.access.sameSite).toBe('none');
+    });
+
+    it('keeps refresh token scoped to refresh route', () => {
+        const options = getAuthCookieOptions(makeRequest({ host: 'cctv.example.test' }));
+
+        expect(options.refresh.path).toBe('/api/auth/refresh');
+        expect(options.refresh.maxAge).toBe(7 * 24 * 60 * 60);
+    });
+});
+```
+
+- [ ] **Step 2: Run test to verify RED**
+
+Run:
+
+```powershell
+Push-Location backend
+npm test -- authCookieOptions.test.js
+Pop-Location
+```
+
+Expected: fail because `backend/utils/authCookieOptions.js` does not exist.
+
+- [ ] **Step 3: Create cookie option helper**
+
+Create `backend/utils/authCookieOptions.js`:
+
+```javascript
+/*
+ * Purpose: Derive auth cookie options consistently for domain and direct-IP access.
+ * Caller: authController login and refresh handlers.
+ * Deps: Fastify request headers/protocol.
+ * MainFuncs: getAuthCookieOptions.
+ * SideEffects: None.
+ */
+
+export function isHttpsRequest(request) {
+    return request.headers?.['x-forwarded-proto'] === 'https'
+        || request.protocol === 'https'
+        || request.socket?.encrypted === true;
+}
+
+export function getAuthCookieOptions(request) {
+    const isHttps = isHttpsRequest(request);
+    const shared = {
+        httpOnly: true,
+        secure: isHttps,
+        sameSite: isHttps ? 'none' : 'lax',
+    };
+
+    return {
+        access: {
+            ...shared,
+            path: '/',
+            maxAge: 60 * 60,
+        },
+        refresh: {
+            ...shared,
+            path: '/api/auth/refresh',
+            maxAge: 7 * 24 * 60 * 60,
+        },
+    };
+}
+```
+
+- [ ] **Step 4: Wire helper into auth controller**
+
+In `backend/controllers/authController.js`, import:
+
+```javascript
+import { getAuthCookieOptions } from '../utils/authCookieOptions.js';
+```
+
+Replace duplicated login and refresh cookie option blocks with:
+
+```javascript
+const cookieOptions = getAuthCookieOptions(request);
+reply.setCookie('token', data.accessToken, cookieOptions.access);
+reply.setCookie('refreshToken', data.refreshToken, cookieOptions.refresh);
+```
+
+and in refresh:
+
+```javascript
+const cookieOptions = getAuthCookieOptions(request);
+reply.setCookie('token', data.newAccessToken, cookieOptions.access);
+reply.setCookie('refreshToken', data.newRefreshToken, cookieOptions.refresh);
+```
+
+- [ ] **Step 5: Patch generated proxy config**
+
+In `deployment/generate-env.sh`, ensure every generated `location` that proxies to `localhost:BACKEND_PORT_PLACEHOLDER` includes:
+
+```nginx
+proxy_set_header X-Forwarded-Proto $scheme;
+```
+
+This keeps HTTPS/IP cookie derivation consistent behind generated Nginx configs.
+
+- [ ] **Step 6: Verify focused auth tests**
+
+Run:
+
+```powershell
+Push-Location backend
+npm test -- authCookieOptions.test.js
+Pop-Location
+```
+
+Expected: `Test Files 1 passed`.
+
+- [ ] **Step 7: Verify backend full gate**
+
+Run:
+
+```powershell
+Push-Location backend
+npm run migrate
+npm test
+Pop-Location
+```
+
+Expected: migrations pass with 0 failed; backend tests pass.
+
+- [ ] **Step 8: Commit and push**
+
+Run:
+
+```powershell
+git add backend/utils/authCookieOptions.js backend/controllers/authController.js backend/__tests__/authCookieOptions.test.js deployment/generate-env.sh docs/superpowers/specs/2026-05-02-pre-feature-stabilization-design.md docs/superpowers/plans/2026-05-02-stabilization-sprint.md
+git commit -m "Fix: stabilize admin auth cookies for IP access"
+git push origin main
+```
 
 ---
 
