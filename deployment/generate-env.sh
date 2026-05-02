@@ -1,4 +1,9 @@
 #!/bin/bash
+# Purpose: Generate backend/frontend environment files and Nginx config from client.config.sh.
+# Caller: Deployment/install scripts and operators refreshing deployment configuration.
+# Deps: deployment/client.config.sh, bash, sed, project deployment templates.
+# MainFuncs: Generate backend .env, frontend .env, and nginx.generated.conf placeholders.
+# SideEffects: Writes deployment-generated config files under the project deployment/frontend/backend paths.
 # ============================================
 # RAF NET CCTV - Environment File Generator
 # ============================================
@@ -216,6 +221,7 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header Range $http_range;
         proxy_buffering off;
         proxy_read_timeout 300s;
@@ -228,6 +234,7 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 
     # HLS Stream Proxy
@@ -236,6 +243,8 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
         proxy_buffering off;
         proxy_cache hls_cache;
         proxy_cache_valid 200 2s;

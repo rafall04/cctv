@@ -1,5 +1,13 @@
-import { config } from '../config/config.js';
+/*
+ * Purpose: Handle admin authentication, logout, refresh, and token verification responses.
+ * Caller: authRoutes.js for /api/auth endpoints.
+ * Deps: authService domain logic and authCookieOptions cookie policy helper.
+ * MainFuncs: login, logout, refreshTokens, verifyToken.
+ * SideEffects: Sets/clears HttpOnly auth cookies and writes auth/audit side effects through services.
+ */
+
 import authService from '../services/authService.js';
+import { getAuthCookieOptions } from '../utils/authCookieOptions.js';
 
 export async function login(request, reply) {
     try {
@@ -15,25 +23,9 @@ export async function login(request, reply) {
 
         const data = await authService.login(username, password, clientIp, request, request.server);
 
-        const isHttps = request.headers['x-forwarded-proto'] === 'https' ||
-            request.protocol === 'https' ||
-            request.headers.host?.includes(config.security.backendDomain);
-
-        reply.setCookie('token', data.accessToken, {
-            path: '/',
-            httpOnly: true,
-            secure: isHttps,
-            sameSite: isHttps ? 'none' : 'lax',
-            maxAge: 60 * 60,
-        });
-
-        reply.setCookie('refreshToken', data.refreshToken, {
-            path: '/api/auth/refresh',
-            httpOnly: true,
-            secure: isHttps,
-            sameSite: isHttps ? 'none' : 'lax',
-            maxAge: 7 * 24 * 60 * 60,
-        });
+        const cookieOptions = getAuthCookieOptions(request);
+        reply.setCookie('token', data.accessToken, cookieOptions.access);
+        reply.setCookie('refreshToken', data.refreshToken, cookieOptions.refresh);
 
         const responseData = {
             token: data.accessToken,
@@ -102,25 +94,9 @@ export async function refreshTokens(request, reply) {
 
         const data = await authService.refreshTokens(refreshToken, request.server, request);
 
-        const isHttps = request.headers['x-forwarded-proto'] === 'https' ||
-            request.protocol === 'https' ||
-            request.headers.host?.includes(config.security.backendDomain);
-
-        reply.setCookie('token', data.newAccessToken, {
-            path: '/',
-            httpOnly: true,
-            secure: isHttps,
-            sameSite: isHttps ? 'none' : 'lax',
-            maxAge: 60 * 60,
-        });
-
-        reply.setCookie('refreshToken', data.newRefreshToken, {
-            path: '/api/auth/refresh',
-            httpOnly: true,
-            secure: isHttps,
-            sameSite: isHttps ? 'none' : 'lax',
-            maxAge: 7 * 24 * 60 * 60,
-        });
+        const cookieOptions = getAuthCookieOptions(request);
+        reply.setCookie('token', data.newAccessToken, cookieOptions.access);
+        reply.setCookie('refreshToken', data.newRefreshToken, cookieOptions.refresh);
 
         return reply.send({
             success: true,

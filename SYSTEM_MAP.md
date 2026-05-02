@@ -42,6 +42,7 @@ SideEffects: None; documentation only.
 ## Critical Runtime Flows
 
 - Live public viewing: `LandingPage` -> `CameraContext`/camera services -> `MapView` or landing grid -> `VideoPopup`/`VideoPlayer` -> `/api/hls/*` or external stream handling.
+- Admin authentication: `LoginPage` -> `authService` frontend -> `/api/auth/login` -> `authController`/`authService` backend; HttpOnly cookie options are derived by `backend/utils/authCookieOptions.js` so same-origin domain and direct-IP access keep session cookies valid.
 - Playback public/admin: `/playback` uses `accessScope='public_preview'`; `/admin/playback` uses `accessScope='admin_full'`; `Playback.jsx` -> `recordingService` -> recording routes -> segment stream endpoint.
 - Playback tracking: media `playing`/progress starts `/api/playback-viewer/*`; changing camera/segment must stop old playback session before new tracking starts.
 - Live tracking: HLS proxy/viewer routes use `/api/viewer/*`; keep live tracking separate from playback tracking.
