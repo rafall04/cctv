@@ -1,136 +1,125 @@
 #!/usr/bin/env node
 /**
- * Run All Database Migrations
- * 
- * This script runs all migration files in the migrations directory
- * in alphabetical order. Each migration is idempotent (safe to run multiple times).
- * 
- * Usage:
- *   node backend/database/run-all-migrations.js
+ * Purpose: Run database migration files safely without recursively invoking aggregate runners.
+ * Caller: `npm run migrate`, deployment scripts, and migration runner tests.
+ * Deps: Node fs/path/url/child_process, backend/database/migrations.
+ * MainFuncs: selectRunnableMigrationFiles, ensureDatabaseDirectory, runMigrations.
+ * SideEffects: Creates backend/data and spawns migration Node processes when run as CLI.
  */
 
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import { readdirSync } from 'fs';
 import { spawn } from 'child_process';
+import { existsSync, readdirSync, mkdirSync } from 'fs';
+import { dirname, join, resolve } from 'path';
+import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const migrationsDir = join(__dirname, 'migrations');
+const databaseDir = join(__dirname, '..', 'data');
 
-console.log('🚀 Running All Database Migrations');
-console.log('=====================================\n');
+const AGGREGATE_MIGRATION_RUNNERS = new Set([
+    'run_all_migrations.js',
+]);
 
-// Get all migration files
-const migrationFiles = readdirSync(migrationsDir)
-    .filter(file => file.endsWith('.js'))
-    .sort(); // Run in alphabetical order
+export function selectRunnableMigrationFiles(files) {
+    return files
+        .filter((file) => file.endsWith('.js'))
+        .filter((file) => !AGGREGATE_MIGRATION_RUNNERS.has(file))
+        .sort();
+}
 
-console.log(`Found ${migrationFiles.length} migration files:\n`);
-migrationFiles.forEach((file, index) => {
-    console.log(`  ${index + 1}. ${file}`);
-});
-console.log('');
-
-// Run migrations sequentially
-async function runMigrations() {
-    let successCount = 0;
-    let failCount = 0;
-    const failed = [];
-    const skipped = [];
-
-    for (const file of migrationFiles) {
-        const migrationPath = join(migrationsDir, file);
-        
-        console.log(`\n📦 Running: ${file}`);
-        console.log('─'.repeat(60));
-        
-        try {
-            const exitCode = await runMigration(migrationPath);
-            if (exitCode === 0) {
-                successCount++;
-                console.log(`✅ Success: ${file}\n`);
-            } else {
-                // Exit code 0 = success, anything else = failure
-                // But we continue with next migration
-                skipped.push(file);
-                console.log(`⚠️  Skipped: ${file} (will retry after dependencies)\n`);
-            }
-        } catch (error) {
-            failCount++;
-            failed.push({ file, error: error.message });
-            console.error(`❌ Failed: ${file}`);
-            console.error(`   Error: ${error.message}\n`);
-            // Continue with next migration even if one fails
-        }
-    }
-
-    // Retry skipped migrations (for dependency issues)
-    if (skipped.length > 0) {
-        console.log('\n🔄 Retrying skipped migrations...');
-        console.log('─'.repeat(60));
-        
-        for (const file of skipped) {
-            const migrationPath = join(migrationsDir, file);
-            console.log(`\n📦 Retry: ${file}`);
-            
-            try {
-                await runMigration(migrationPath);
-                successCount++;
-                console.log(`✅ Success: ${file}\n`);
-            } catch (error) {
-                failCount++;
-                failed.push({ file, error: error.message });
-                console.error(`❌ Still failed: ${file}`);
-                console.error(`   Error: ${error.message}\n`);
-            }
-        }
-    }
-
-    // Summary
-    console.log('\n=====================================');
-    console.log('📊 Migration Summary');
-    console.log('=====================================');
-    console.log(`✅ Successful: ${successCount}`);
-    console.log(`❌ Failed: ${failCount}`);
-    
-    if (failed.length > 0) {
-        console.log('\n❌ Failed Migrations:');
-        failed.forEach(({ file, error }) => {
-            console.log(`   - ${file}: ${error}`);
-        });
-        console.log('\n⚠️  Some migrations failed. Please check the errors above.');
-        process.exit(1);
-    } else {
-        console.log('\n✅ All migrations completed successfully!');
-        process.exit(0);
+export function ensureDatabaseDirectory(targetDir = databaseDir) {
+    if (!existsSync(targetDir)) {
+        mkdirSync(targetDir, { recursive: true });
     }
 }
 
-// Run a single migration file
+export function getMigrationFiles(targetMigrationsDir = migrationsDir) {
+    return selectRunnableMigrationFiles(readdirSync(targetMigrationsDir));
+}
+
 function runMigration(migrationPath) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolvePromise, reject) => {
         const child = spawn('node', [migrationPath], {
             stdio: 'inherit',
-            shell: true
+            shell: true,
         });
 
         child.on('close', (code) => {
             if (code === 0) {
-                resolve();
-            } else {
-                reject(new Error(`Migration exited with code ${code}`));
+                resolvePromise();
+                return;
             }
+            reject(new Error(`Migration exited with code ${code}`));
         });
 
-        child.on('error', (error) => {
-            reject(error);
-        });
+        child.on('error', reject);
     });
 }
 
-// Run all migrations
-runMigrations().catch(error => {
-    console.error('\n❌ Fatal error running migrations:', error);
-    process.exit(1);
-});
+async function runMigrationFile({ file, targetMigrationsDir }) {
+    const migrationPath = join(targetMigrationsDir, file);
+    console.log(`\n[Migration] Running: ${file}`);
+    console.log('-'.repeat(60));
+    await runMigration(migrationPath);
+    console.log(`[Migration] Success: ${file}`);
+}
+
+export async function runMigrations({
+    targetMigrationsDir = migrationsDir,
+    targetDatabaseDir = databaseDir,
+    logger = console,
+} = {}) {
+    ensureDatabaseDirectory(targetDatabaseDir);
+
+    const migrationFiles = getMigrationFiles(targetMigrationsDir);
+    logger.log('Running database migrations');
+    logger.log(`Found ${migrationFiles.length} migration files`);
+    migrationFiles.forEach((file, index) => logger.log(`  ${index + 1}. ${file}`));
+
+    const failed = [];
+    const skipped = [];
+
+    for (const file of migrationFiles) {
+        try {
+            await runMigrationFile({ file, targetMigrationsDir });
+        } catch (error) {
+            skipped.push(file);
+            logger.warn(`[Migration] Deferred: ${file} (${error.message})`);
+        }
+    }
+
+    if (skipped.length > 0) {
+        logger.log('\nRetrying deferred migrations');
+        for (const file of skipped) {
+            try {
+                await runMigrationFile({ file, targetMigrationsDir });
+            } catch (error) {
+                failed.push({ file, error: error.message });
+                logger.error(`[Migration] Failed: ${file} (${error.message})`);
+            }
+        }
+    }
+
+    if (failed.length > 0) {
+        const error = new Error(`Failed migrations: ${failed.map((item) => item.file).join(', ')}`);
+        error.failed = failed;
+        throw error;
+    }
+
+    logger.log('\nAll migrations completed successfully');
+    return { successful: migrationFiles.length, failed: 0 };
+}
+
+const invokedPath = process.argv[1] ? resolve(process.argv[1]) : null;
+if (invokedPath === __filename) {
+    runMigrations().catch((error) => {
+        console.error('\nFatal error running migrations:', error.message);
+        if (error.failed) {
+            error.failed.forEach(({ file, error: itemError }) => {
+                console.error(`- ${file}: ${itemError}`);
+            });
+        }
+        process.exit(1);
+    });
+}
