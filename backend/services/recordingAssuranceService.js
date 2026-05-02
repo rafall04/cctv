@@ -7,7 +7,7 @@
  */
 
 import { existsSync, statSync } from 'fs';
-import { query } from '../database/database.js';
+import { query } from '../database/connectionPool.js';
 import { recordingService } from './recordingService.js';
 
 const DEFAULT_STALE_AFTER_MS = 15 * 60 * 1000;

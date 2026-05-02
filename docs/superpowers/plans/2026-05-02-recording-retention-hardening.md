@@ -8,6 +8,8 @@ SideEffects: Documentation only; no runtime behavior changes.
 
 # Recording Retention Hardening Implementation Plan
 
+> Execution order note: this plan is still valid, but cross-plan priority and missing integrity work are now coordinated by `docs/superpowers/plans/2026-05-03-recording-stabilization-priority-plan.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make recording cleanup behave like an NVR: no final recording segment is permanently deleted until its configured retention period plus grace has expired, even when the segment is short, corrupt, unregistered, orphaned, or produced during unstable connectivity.

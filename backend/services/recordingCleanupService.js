@@ -94,11 +94,15 @@ export function createRecordingCleanupService({
             return;
         }
 
-        const filenames = await fs.readdir(cameraDir);
-        const dbFilenames = new Set(repository.listFilenamesByCamera(cameraId));
+        const filenames = (await fs.readdir(cameraDir))
+            .filter((filename) => isSafeRecordingFilename(filename));
+        const dbFilenames = new Set(repository.findExistingFilenames({
+            cameraId,
+            filenames,
+        }));
 
         for (const filename of filenames) {
-            if (!isSafeRecordingFilename(filename) || dbFilenames.has(filename)) {
+            if (dbFilenames.has(filename)) {
                 continue;
             }
             if (isFileBeingProcessed?.(cameraId, filename)) {

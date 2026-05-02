@@ -1,3 +1,11 @@
+/*
+Purpose: Frontend API client for recording control, playback, restart logs, and assurance snapshots.
+Caller: Admin recording dashboard, playback pages, and recording controls.
+Deps: apiClient, request policy helpers, frontend config.
+MainFuncs: startRecording, stopRecording, getRecordingsOverview, getRestartLogs, getRecordingAssurance, getSegments.
+SideEffects: Issues HTTP requests to backend recording endpoints.
+*/
+
 import apiClient from './apiClient';
 import { getApiUrl } from '../config/config.js';
 import { getRequestPolicyConfig, REQUEST_POLICY } from './requestPolicy';
@@ -75,6 +83,14 @@ export const getRestartLogs = async (cameraId = null, limit = 50, policy = REQUE
     return response.data;
 };
 
+/**
+ * Get recording assurance snapshot
+ */
+export const getRecordingAssurance = async (policy = REQUEST_POLICY.BLOCKING, config = {}) => {
+    const response = await apiClient.get('/api/recordings/assurance', getRequestPolicyConfig(policy, config));
+    return response.data;
+};
+
 // ============================================
 // PUBLIC - Playback
 // ============================================
@@ -113,6 +129,7 @@ export default {
     getRecordingsOverview,
     updateRecordingSettings,
     getRestartLogs,
+    getRecordingAssurance,
     getSegments,
     getSegmentStreamUrl,
     getPlaylistUrl

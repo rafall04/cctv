@@ -7,13 +7,14 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFile } from 'fs/promises';
 
 const queryMock = vi.fn();
 const getRecordingStatusMock = vi.fn();
 const existsSyncMock = vi.fn();
 const statSyncMock = vi.fn();
 
-vi.mock('../database/database.js', () => ({
+vi.mock('../database/connectionPool.js', () => ({
     query: queryMock,
 }));
 
@@ -145,5 +146,12 @@ describe('recordingAssuranceService', () => {
             'recording_process_down',
             'no_segments_after_start',
         ]));
+    });
+
+    it('uses connectionPool query helpers instead of legacy database.js helpers', async () => {
+        const source = await readFile(new URL('../services/recordingAssuranceService.js', import.meta.url), 'utf8');
+
+        expect(source).toContain("../database/connectionPool.js");
+        expect(source).not.toContain("../database/database.js");
     });
 });

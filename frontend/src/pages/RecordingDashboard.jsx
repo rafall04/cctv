@@ -12,6 +12,8 @@ import { useNotification } from '../contexts/NotificationContext';
 import { TableSkeleton, StatCardSkeleton } from '../components/ui/Skeleton';
 import { useRecordingDashboardData } from '../hooks/admin/useRecordingDashboardData';
 import RecordingSummaryCards from '../components/admin/recordings/RecordingSummaryCards';
+import RecordingAssuranceSummary from '../components/admin/recordings/RecordingAssuranceSummary';
+import RecordingAssuranceTable from '../components/admin/recordings/RecordingAssuranceTable';
 import RecordingCameraGrid from '../components/admin/recordings/RecordingCameraGrid';
 import RecordingRestartLogs from '../components/admin/recordings/RecordingRestartLogs';
 
@@ -35,6 +37,7 @@ export default function RecordingDashboard() {
     const {
         recordings,
         restartLogs,
+        assurance,
         loading,
         error,
         refreshError,
@@ -150,6 +153,8 @@ export default function RecordingDashboard() {
             )}
 
             <RecordingSummaryCards summary={summary} />
+            <RecordingAssuranceSummary summary={assurance?.summary} />
+            <RecordingAssuranceTable cameras={assurance?.cameras || []} />
             <RecordingCameraGrid
                 recordings={recordings}
                 onStartRecording={handleStartRecording}

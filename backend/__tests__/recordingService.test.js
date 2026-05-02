@@ -559,6 +559,7 @@ describe('recordingService external recording support', () => {
     });
 
     it('does not emergency-delete recent filesystem orphan recordings', async () => {
+        vi.setSystemTime(Date.parse('2026-05-02T10:00:00.000Z'));
         execMock[promisify.custom] = vi.fn(async () => ({ stdout: '100\n', stderr: '' }));
         const { recordingService } = await import('../services/recordingService.js');
         queryMock.mockReturnValue([]);
@@ -636,5 +637,52 @@ describe('recordingService external recording support', () => {
             'DELETE FROM failed_remux_files WHERE camera_id = ? AND filename = ?',
             [3, '20260502_095800.mp4']
         );
+    });
+
+    it('registers the same segment idempotently when scanner and ffmpeg close detect it together', async () => {
+        execMock[promisify.custom] = vi.fn(async () => ({ stdout: '12\n', stderr: '' }));
+        const repository = (await import('../services/recordingSegmentRepository.js')).default;
+        const upsertSpy = vi.spyOn(repository, 'upsertSegment').mockReturnValue({ changes: 1 });
+        const { recordingService } = await import('../services/recordingService.js');
+
+        queryOneMock.mockImplementation((sql) => {
+            if (sql.includes('SELECT fail_count FROM failed_remux_files')) {
+                return null;
+            }
+
+            return null;
+        });
+        fsPromisesMock.stat.mockResolvedValue({
+            size: 4096,
+            mtimeMs: Date.now(),
+        });
+        spawnMock.mockImplementation(() => {
+            const child = createSpawnProcess();
+            setTimeout(() => child.emit('close', 0), 0);
+            return child;
+        });
+
+        recordingService.onSegmentCreated(5, '20260503_020000.mp4');
+        recordingService.onSegmentCreated(5, '20260503_020000.mp4');
+
+        await vi.advanceTimersByTimeAsync(3001);
+        await Promise.resolve();
+
+        expect(upsertSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('starts and stops the attached recording scheduler explicitly', async () => {
+        const { recordingService } = await import('../services/recordingService.js');
+        const scheduler = {
+            start: vi.fn(),
+            stop: vi.fn(),
+        };
+
+        recordingService.attachScheduler(scheduler);
+        recordingService.initializeBackgroundWork();
+        await recordingService.shutdown();
+
+        expect(scheduler.start).toHaveBeenCalledTimes(1);
+        expect(scheduler.stop).toHaveBeenCalledTimes(1);
     });
 });

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFile } from 'fs/promises';
 
 const queryMock = vi.fn();
 const queryOneMock = vi.fn();
@@ -9,6 +10,8 @@ const getRecordingStatusMock = vi.fn();
 const getStorageUsageMock = vi.fn();
 const logAdminActionMock = vi.fn();
 const getPublicPlaybackSettingsMock = vi.fn();
+const existsSyncMock = vi.fn();
+const statSyncMock = vi.fn();
 
 vi.mock('../database/database.js', () => ({
     query: queryMock,
@@ -23,8 +26,8 @@ vi.mock('../database/connectionPool.js', () => ({
 }));
 
 vi.mock('fs', () => ({
-    existsSync: vi.fn(() => true),
-    statSync: vi.fn(() => ({ size: 100 })),
+    existsSync: existsSyncMock,
+    statSync: statSyncMock,
 }));
 
 vi.mock('../services/recordingService.js', () => ({
@@ -51,6 +54,8 @@ const { default: recordingPlaybackService } = await import('../services/recordin
 describe('recordingPlaybackService', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        existsSyncMock.mockReturnValue(true);
+        statSyncMock.mockReturnValue({ size: 100 });
         getPublicPlaybackSettingsMock.mockReturnValue({
             publicPlaybackEnabled: true,
             previewMinutes: 10,
@@ -210,5 +215,50 @@ describe('recordingPlaybackService', () => {
         expect(queryOneMock.mock.calls[2][0]).toContain('WHERE camera_id = ? AND filename = ?');
         expect(queryMock.mock.calls[0][0]).toContain('ORDER BY start_time DESC');
         expect(queryMock).not.toHaveBeenCalledWith(expect.stringContaining('ORDER BY start_time ASC'), [9]);
+    });
+
+    it('does not mutate recording_segments during stream lookup when file size differs on disk', () => {
+        queryOneMock
+            .mockReturnValueOnce({
+                id: 12,
+                name: 'CCTV TAMAN',
+                public_playback_mode: 'inherit',
+                public_playback_preview_minutes: null,
+            })
+            .mockReturnValueOnce({ value: '628111111111' })
+            .mockReturnValueOnce({
+                id: 4,
+                filename: 'mismatch.mp4',
+                start_time: '2026-03-20T10:10:00.000Z',
+                end_time: '2026-03-20T10:20:00.000Z',
+                duration: 600,
+                file_path: 'mismatch-path',
+                file_size: 100,
+                created_at: '2026-03-20T10:10:00.000Z',
+            });
+        queryMock.mockReturnValueOnce([
+            {
+                id: 4,
+                filename: 'mismatch.mp4',
+                start_time: '2026-03-20T10:10:00.000Z',
+            },
+        ]);
+
+        statSyncMock.mockReturnValue({ size: 2 * 1024 * 1024 });
+
+        const result = recordingPlaybackService.getStreamSegment(12, 'mismatch.mp4', { query: {} });
+
+        expect(result.segment.filename).toBe('mismatch.mp4');
+        expect(executeMock).not.toHaveBeenCalledWith(
+            'UPDATE recording_segments SET file_size = ? WHERE id = ?',
+            [2 * 1024 * 1024, 4]
+        );
+    });
+
+    it('uses connectionPool helpers instead of legacy database.js helpers', async () => {
+        const source = await readFile(new URL('../services/recordingPlaybackService.js', import.meta.url), 'utf8');
+
+        expect(source).toContain("../database/connectionPool.js");
+        expect(source).not.toContain("../database/database.js");
     });
 });

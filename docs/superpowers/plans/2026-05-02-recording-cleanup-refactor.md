@@ -8,6 +8,8 @@ SideEffects: Documentation only; no runtime behavior changes.
 
 # Recording Cleanup Refactor Implementation Plan
 
+> Execution order note: this plan is still valid, but cross-plan priority and missing integrity work are now coordinated by `docs/superpowers/plans/2026-05-03-recording-stabilization-priority-plan.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Refactor recording segment cleanup into focused policy, repository, and cleanup service units so retention cleanup is bounded, testable, and ready for future playback features.

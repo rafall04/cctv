@@ -1,3 +1,11 @@
+/*
+Purpose: Coordinate recording dashboard data loading, caching, and background refresh state.
+Caller: Admin recording dashboard page.
+Deps: recordingService, request policy helpers, reconnect refresh hook.
+MainFuncs: useRecordingDashboardData.
+SideEffects: Fetches overview, restart logs, and assurance snapshots from backend APIs.
+*/
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import recordingService from '../../services/recordingService';
 import { REQUEST_POLICY } from '../../services/requestPolicy';
@@ -6,6 +14,7 @@ import { useAdminReconnectRefresh } from './useAdminReconnectRefresh';
 export function useRecordingDashboardData() {
     const [recordings, setRecordings] = useState([]);
     const [restartLogs, setRestartLogs] = useState([]);
+    const [assurance, setAssurance] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [refreshError, setRefreshError] = useState(false);
@@ -13,6 +22,7 @@ export function useRecordingDashboardData() {
     const requestIdRef = useRef(0);
     const recordingsRef = useRef([]);
     const restartLogsRef = useRef([]);
+    const assuranceRef = useRef(null);
     const mountedRef = useRef(true);
 
     useEffect(() => {
@@ -22,6 +32,10 @@ export function useRecordingDashboardData() {
     useEffect(() => {
         restartLogsRef.current = restartLogs;
     }, [restartLogs]);
+
+    useEffect(() => {
+        assuranceRef.current = assurance;
+    }, [assurance]);
 
     const fetchData = useCallback(async ({ mode = 'initial' } = {}) => {
         const isBackgroundMode = mode === 'background' || mode === 'resume';
@@ -33,16 +47,19 @@ export function useRecordingDashboardData() {
             }
 
             const policy = isBackgroundMode ? REQUEST_POLICY.BACKGROUND : REQUEST_POLICY.BLOCKING;
-            const [recordingsRes, restartsRes] = await Promise.all([
+            const [recordingsRes, restartsRes, assuranceRes] = await Promise.all([
                 recordingService.getRecordingsOverview(policy),
                 recordingService.getRestartLogs(null, 50, policy),
+                recordingService.getRecordingAssurance(policy),
             ]);
 
             if (!mountedRef.current || requestId !== requestIdRef.current) {
                 return;
             }
 
-            const hasCachedData = recordingsRef.current.length > 0 || restartLogsRef.current.length > 0;
+            const hasCachedData = recordingsRef.current.length > 0
+                || restartLogsRef.current.length > 0
+                || !!assuranceRef.current;
 
             if (recordingsRes.success && recordingsRes.data) {
                 setRecordings(recordingsRes.data.cameras || recordingsRes.data || []);
@@ -60,7 +77,15 @@ export function useRecordingDashboardData() {
                 setRestartLogs([]);
             }
 
-            if (recordingsRes.success && restartsRes.success) {
+            if (assuranceRes.success && assuranceRes.data) {
+                setAssurance(assuranceRes.data);
+            } else if (isBackgroundMode && hasCachedData) {
+                setRefreshError(true);
+            } else if (!isBackgroundMode) {
+                setAssurance(null);
+            }
+
+            if (recordingsRes.success && restartsRes.success && assuranceRes.success) {
                 setRefreshError(false);
                 setLastSuccessfulUpdate(new Date());
             }
@@ -73,6 +98,7 @@ export function useRecordingDashboardData() {
                 setError(error.response?.data?.message || error.message || 'Failed to load recording data');
                 setRecordings([]);
                 setRestartLogs([]);
+                setAssurance(null);
             } else if (recordingsRef.current.length > 0 || restartLogsRef.current.length > 0) {
                 setRefreshError(true);
             }
@@ -111,6 +137,7 @@ export function useRecordingDashboardData() {
     return {
         recordings,
         restartLogs,
+        assurance,
         loading,
         error,
         refreshError,

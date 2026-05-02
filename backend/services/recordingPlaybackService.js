@@ -1,4 +1,4 @@
-import { query, queryOne, execute } from '../database/database.js';
+import { query, queryOne, execute } from '../database/connectionPool.js';
 import { recordingService } from './recordingService.js';
 import recordingSegmentRepository from './recordingSegmentRepository.js';
 import { logAdminAction } from './securityAuditLogger.js';
@@ -383,15 +383,11 @@ class RecordingPlaybackService {
 
         const stats = statSync(segment.file_path);
 
-        if (Math.abs(stats.size - segment.file_size) > 1024 * 1024) {
-            execute(
-                'UPDATE recording_segments SET file_size = ? WHERE id = ?',
-                [stats.size, segment.id]
-            );
-        }
-
         return {
-            segment,
+            segment: {
+                ...segment,
+                resolved_file_size: stats.size,
+            },
             stats,
         };
     }

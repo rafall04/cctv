@@ -55,7 +55,10 @@ import cameraHealthService from './services/cameraHealthService.js';
 import viewerSessionService from './services/viewerSessionService.js';
 import playbackViewerSessionService from './services/playbackViewerSessionService.js';
 import { recordingService } from './services/recordingService.js';
+import recordingScheduler from './services/recordingScheduler.js';
 import thumbnailService from './services/thumbnailService.js';
+
+recordingService.attachScheduler(recordingScheduler);
 
 const fastify = Fastify({
     logger: config.server.env === 'production' 
@@ -404,6 +407,8 @@ const start = async () => {
         // Auto-start recordings untuk cameras yang enable_recording = 1
         console.log('[Recording] Auto-starting recordings with retry logic...');
         await recordingService.autoStartRecordings();
+        recordingService.initializeBackgroundWork();
+        console.log('[Recording] Background scheduler initialized');
         console.log('[Recording] Recording service initialized');
         
         // Start thumbnail generation service

@@ -12,6 +12,7 @@ const repositoryMock = {
     findExpiredSegments: vi.fn(),
     findMissingFileCandidates: vi.fn(),
     listFilenamesByCamera: vi.fn(),
+    findExistingFilenames: vi.fn(),
     deleteSegmentById: vi.fn(),
 };
 
@@ -45,6 +46,7 @@ describe('recordingCleanupService', () => {
         repositoryMock.findExpiredSegments.mockReturnValue([]);
         repositoryMock.findMissingFileCandidates.mockReturnValue([]);
         repositoryMock.listFilenamesByCamera.mockReturnValue([]);
+        repositoryMock.findExistingFilenames.mockReturnValue([]);
         repositoryMock.deleteSegmentById.mockReturnValue(undefined);
         fsMock.access.mockResolvedValue(undefined);
         fsMock.readdir.mockResolvedValue([]);
@@ -181,7 +183,7 @@ describe('recordingCleanupService', () => {
 
     it('keeps recent filesystem orphans until retention expires', async () => {
         fsMock.readdir.mockResolvedValueOnce(['20260502_095800.mp4']);
-        repositoryMock.listFilenamesByCamera.mockReturnValueOnce([]);
+        repositoryMock.findExistingFilenames.mockReturnValueOnce([]);
         fsMock.stat.mockResolvedValueOnce({
             size: 2048,
             mtimeMs: Date.parse('2026-05-02T09:59:00.000Z'),
@@ -200,7 +202,7 @@ describe('recordingCleanupService', () => {
 
     it('deletes filesystem orphans only after retention expires', async () => {
         fsMock.readdir.mockResolvedValueOnce(['20260502_020000.mp4']);
-        repositoryMock.listFilenamesByCamera.mockReturnValueOnce([]);
+        repositoryMock.findExistingFilenames.mockReturnValueOnce([]);
         fsMock.stat.mockResolvedValueOnce({
             size: 2048,
             mtimeMs: Date.parse('2026-05-02T02:01:00.000Z'),
@@ -217,6 +219,28 @@ describe('recordingCleanupService', () => {
             reason: 'filesystem_orphan_retention_expired',
         }));
         expect(result.orphanDeleted).toBe(1);
+    });
+
+    it('does not require loading every DB filename to process orphan cleanup', async () => {
+        repositoryMock.findExistingFilenames.mockReturnValueOnce([]);
+        fsMock.readdir.mockResolvedValueOnce(['20260502_095800.mp4', 'ignore.txt']);
+        fsMock.stat.mockResolvedValueOnce({
+            size: 2048,
+            mtimeMs: Date.parse('2026-05-02T09:59:00.000Z'),
+        });
+
+        const service = createService();
+        await service.cleanupCamera({
+            cameraId: 2,
+            camera: { recording_duration_hours: 5, name: 'Camera 2' },
+            nowMs: Date.parse('2026-05-02T10:00:00.000Z'),
+        });
+
+        expect(repositoryMock.listFilenamesByCamera).not.toHaveBeenCalled();
+        expect(repositoryMock.findExistingFilenames).toHaveBeenCalledWith({
+            cameraId: 2,
+            filenames: ['20260502_095800.mp4'],
+        });
     });
 
     it('does not emergency-delete DB segments that are inside retention', async () => {

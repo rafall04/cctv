@@ -2,7 +2,7 @@
  * Purpose: Validate bounded SQL access for recording segment cleanup and playback.
  * Caller: Vitest backend test suite.
  * Deps: mocked connectionPool and recordingSegmentRepository.
- * MainFuncs: findExpiredSegments, findPlaybackSegments, findSegmentByFilename.
+ * MainFuncs: findExpiredSegments, findExistingFilenames, findPlaybackSegments, findSegmentByFilename.
  * SideEffects: None; database calls are mocked.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -58,6 +58,23 @@ describe('recordingSegmentRepository', () => {
         expect(queryMock.mock.calls[0][0]).toContain('LIMIT ?');
         expect(queryMock.mock.calls[0][1]).toEqual([9, 2]);
         expect(result.map((segment) => segment.id)).toEqual([1, 2]);
+    });
+
+    it('checks only the current filesystem batch when looking up known filenames', () => {
+        queryMock.mockReturnValueOnce([
+            { filename: '20260502_100000.mp4' },
+        ]);
+
+        const result = recordingSegmentRepository.findExistingFilenames({
+            cameraId: 7,
+            filenames: ['20260502_100000.mp4', '20260502_101000.mp4'],
+        });
+
+        expect(queryMock).toHaveBeenCalledWith(
+            expect.stringContaining('WHERE camera_id = ? AND filename IN (?, ?)'),
+            [7, '20260502_100000.mp4', '20260502_101000.mp4']
+        );
+        expect(result).toEqual(['20260502_100000.mp4']);
     });
 
     it('looks up a stream segment by camera and filename', () => {

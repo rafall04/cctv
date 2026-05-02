@@ -51,6 +51,31 @@ vi.mock('../hooks/admin/useRecordingDashboardData', () => ({
             },
         ],
         restartLogs: [],
+        assurance: {
+            summary: {
+                total_monitored: 3,
+                healthy: 1,
+                warning: 1,
+                critical: 1,
+                recording_down: 1,
+                stale_segments: 1,
+                missing_segments: 1,
+                recent_gap_cameras: 1,
+            },
+            cameras: [
+                {
+                    id: 8,
+                    name: 'CCTV PASAR',
+                    health: 'critical',
+                    reasons: ['recording_process_down', 'segment_stale'],
+                    seconds_since_latest_end: 420,
+                    recent_gap: {
+                        gap_count: 2,
+                        max_gap_seconds: 95,
+                    },
+                },
+            ],
+        },
         loading: false,
         error: null,
         refreshError: false,
@@ -77,6 +102,19 @@ describe('RecordingDashboard', () => {
         expect(screen.getByText(/Monitor recording aktif/i).className).toContain('dark:text-gray-200');
         expect(screen.getByText(/Update terakhir:/i).className).toContain('dark:text-gray-50');
         expect(screen.getByRole('button', { name: /Refresh/i }).className).toContain('dark:text-gray-100');
+    });
+
+    it('renders assurance counters and camera diagnostics when assurance data exists', () => {
+        render(<RecordingDashboard />);
+
+        expect(screen.getByText('Recording Down')).toBeTruthy();
+        expect(screen.getByText('Stale Segments')).toBeTruthy();
+        expect(screen.getByText('Missing Segments')).toBeTruthy();
+        expect(screen.getByText('Recent Gaps')).toBeTruthy();
+        expect(screen.getByText('Recording Assurance')).toBeTruthy();
+        expect(screen.getByText('CCTV PASAR')).toBeTruthy();
+        expect(screen.getByText('Recording process down')).toBeTruthy();
+        expect(screen.getByText('Latest segment stale')).toBeTruthy();
     });
 
     it('menyimpan quick edit recording lalu me-refresh dashboard', async () => {

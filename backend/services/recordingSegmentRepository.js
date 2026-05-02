@@ -19,6 +19,29 @@ const SEGMENT_SELECT_FIELDS = `
 `;
 
 class RecordingSegmentRepository {
+    upsertSegment({
+        cameraId,
+        filename,
+        startTime,
+        endTime,
+        fileSize,
+        duration,
+        filePath,
+    }) {
+        return execute(
+            `INSERT INTO recording_segments
+            (camera_id, filename, start_time, end_time, file_size, duration, file_path)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(camera_id, filename) DO UPDATE SET
+                start_time = excluded.start_time,
+                end_time = excluded.end_time,
+                file_size = excluded.file_size,
+                duration = excluded.duration,
+                file_path = excluded.file_path`,
+            [cameraId, filename, startTime, endTime, fileSize, duration, filePath]
+        );
+    }
+
     findExpiredSegments({ cameraId, cutoffIso, limit }) {
         return query(
             `SELECT ${SEGMENT_SELECT_FIELDS}
@@ -45,6 +68,20 @@ class RecordingSegmentRepository {
         return query(
             'SELECT filename FROM recording_segments WHERE camera_id = ?',
             [cameraId]
+        ).map((row) => row.filename);
+    }
+
+    findExistingFilenames({ cameraId, filenames }) {
+        if (!filenames.length) {
+            return [];
+        }
+
+        const placeholders = filenames.map(() => '?').join(', ');
+        return query(
+            `SELECT filename
+            FROM recording_segments
+            WHERE camera_id = ? AND filename IN (${placeholders})`,
+            [cameraId, ...filenames]
         ).map((row) => row.filename);
     }
 

@@ -381,6 +381,7 @@ export function classifyRecordingFailure(ffmpegOutput = '', streamSource = 'inte
 class RecordingService {
     constructor() {
         this.isShuttingDown = false;
+        this.scheduler = null;
 
         // Ensure recordings directory exists
         if (!existsSync(RECORDINGS_BASE_PATH)) {
@@ -392,16 +393,6 @@ class RecordingService {
 
         // Start health monitoring
         this.startHealthMonitoring();
-
-        // Start periodic segment scanner (fallback if FFmpeg output detection fails)
-        this.startSegmentScanner();
-
-        // Start background cleanup for corrupt files (gradual, non-blocking)
-        this.startBackgroundCleanup();
-
-        // CRITICAL: Start scheduled cleanup (every 30 minutes)
-        // This replaces per-segment cleanup to prevent aggressive deletion
-        this.startScheduledCleanup();
     }
 
     ensureRuntimeHealthState(cameraId) {
@@ -923,38 +914,15 @@ class RecordingService {
                     finalSize = finalStats.size;
                 } catch (e) { }
 
-                // Check if already in database (prevent duplicates)
-                const existing = queryOne(
-                    'SELECT id FROM recording_segments WHERE camera_id = ? AND filename = ?',
-                    [cameraId, filename]
-                );
-
-                if (existing) {
-                    console.log(`[Segment] Already in database, updating size: ${filename}`);
-                    // Update file size if different
-                    execute(
-                        'UPDATE recording_segments SET file_size = ? WHERE id = ?',
-                        [finalSize, existing.id]
-                    );
-                    cleanup();
-                    return;
-                }
-
-                // Save to database
-                execute(
-                    `INSERT INTO recording_segments 
-                    (camera_id, filename, start_time, end_time, file_size, duration, file_path) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                    [
-                        cameraId,
-                        filename,
-                        startTime.toISOString(),
-                        endTime.toISOString(),
-                        finalSize,
-                        actualDuration, // Use actual duration from ffprobe
-                        filePath
-                    ]
-                );
+                recordingSegmentRepository.upsertSegment({
+                    cameraId,
+                    filename,
+                    startTime: startTime.toISOString(),
+                    endTime: endTime.toISOString(),
+                    fileSize: finalSize,
+                    duration: actualDuration,
+                    filePath,
+                });
 
                 console.log(`✓ Segment saved: camera${cameraId}/${filename} (${(finalSize / 1024 / 1024).toFixed(2)} MB)`);
 
@@ -1125,7 +1093,27 @@ class RecordingService {
 
     async shutdown() {
         this.isShuttingDown = true;
+        this.scheduler?.stop();
         return recordingProcessManager.shutdownAll('server_shutdown');
+    }
+
+    attachScheduler(scheduler) {
+        this.scheduler = scheduler;
+    }
+
+    initializeBackgroundWork() {
+        if (!this.scheduler) {
+            this.startSegmentScanner();
+            this.startBackgroundCleanup();
+            this.startScheduledCleanup();
+            return;
+        }
+
+        this.scheduler.start({
+            startSegmentScanner: (scheduleTimeout) => this.startSegmentScanner(scheduleTimeout),
+            startBackgroundCleanup: (scheduleTimeout) => this.startBackgroundCleanup(scheduleTimeout),
+            startScheduledCleanup: (scheduleTimeout) => this.startScheduledCleanup(scheduleTimeout),
+        });
     }
 
     /**
@@ -1133,7 +1121,7 @@ class RecordingService {
      * Scans recording folders every 60 seconds for new MP4 files
      * FIX: Now scans ALL camera directories, not just active recordings
      */
-    startSegmentScanner() {
+    startSegmentScanner(scheduleTimeout = setTimeout) {
         // Initial cleanup of temp files
         this.cleanupTempFiles();
 
@@ -1141,7 +1129,7 @@ class RecordingService {
             try {
                 // FIX: Scan ALL camera directories on disk, not just active recordings
                 // This ensures stopped cameras with orphaned files are also processed
-                try { await fsPromises.access(RECORDINGS_BASE_PATH); } catch { setTimeout(scanCycle, 60000); return; }
+                try { await fsPromises.access(RECORDINGS_BASE_PATH); } catch { scheduleTimeout(scanCycle, 60000); return; }
 
                 const cameraDirs = await fsPromises.readdir(RECORDINGS_BASE_PATH);
 
@@ -1236,11 +1224,11 @@ class RecordingService {
             }
 
             // Recursive timeout to prevent intervals from overlapping each other
-            setTimeout(scanCycle, 60000);
+            scheduleTimeout(scanCycle, 60000);
         };
 
         // Delay first scan by 60s
-        setTimeout(scanCycle, 60000);
+        scheduleTimeout(scanCycle, 60000);
     }
 
     /**
@@ -1395,7 +1383,7 @@ class RecordingService {
      * FIX: Now respects retention period - deletes old files instead of re-registering
      * Only attempts registration for files within retention period
      */
-    startBackgroundCleanup() {
+    startBackgroundCleanup(scheduleTimeout = setTimeout) {
         console.log('[Cleanup] Starting background cleanup service (1 file per 10s)');
 
         let cleanupQueue = [];
@@ -1518,17 +1506,17 @@ class RecordingService {
                     console.error('[BGCleanup] Error processing file:', error);
                 }
             }
-            setTimeout(processQueueCycle, 10000);
+            scheduleTimeout(processQueueCycle, 10000);
         };
 
         const scheduledBuildQueue = async () => {
             await buildQueue();
-            setTimeout(scheduledBuildQueue, 5 * 60 * 1000);
+            scheduleTimeout(scheduledBuildQueue, 5 * 60 * 1000);
         };
 
         // Start tasks
-        setTimeout(scheduledBuildQueue, 30000);
-        setTimeout(processQueueCycle, 10000);
+        scheduleTimeout(scheduledBuildQueue, 30000);
+        scheduleTimeout(processQueueCycle, 10000);
     }
 
     /**
@@ -1536,7 +1524,7 @@ class RecordingService {
      * This is the PRIMARY cleanup mechanism (not per-segment cleanup)
      * FIX: Also includes emergency disk space check
      */
-    startScheduledCleanup() {
+    startScheduledCleanup(scheduleTimeout = setTimeout) {
         console.log('[Cleanup] Starting scheduled cleanup service (every 5 minutes)');
 
         const runScheduledClean = async () => {
@@ -1564,10 +1552,10 @@ class RecordingService {
             } catch (error) {
                 console.error('[Cleanup] Scheduled cleanup error:', error);
             }
-            setTimeout(runScheduledClean, SCHEDULED_CLEANUP_INTERVAL_MS);
+            scheduleTimeout(runScheduledClean, SCHEDULED_CLEANUP_INTERVAL_MS);
         };
 
-        setTimeout(runScheduledClean, SCHEDULED_CLEANUP_INITIAL_DELAY_MS);
+        scheduleTimeout(runScheduledClean, SCHEDULED_CLEANUP_INITIAL_DELAY_MS);
     }
 
     /**
