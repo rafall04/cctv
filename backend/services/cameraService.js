@@ -120,6 +120,7 @@ const PUBLIC_PLAYBACK_MODES = [
 
 const PUBLIC_PLAYBACK_PREVIEW_MINUTES = new Set([0, 10, 20, 30, 60]);
 const CAMERA_READ_MODEL_TTL_MS = 15 * 1000;
+const RECORDABLE_DELIVERY_TYPES = new Set(['internal_hls', 'external_hls']);
 
 const CAMERA_RUNTIME_STATE_PROJECTION = `
     COALESCE(crs.is_online, c.is_online, 0) as is_online,
@@ -1026,6 +1027,10 @@ function isRecordingEnable(payload = {}) {
     return payload.enable_recording === 1 || payload.enable_recording === true;
 }
 
+function isRecordableDeliveryType(deliveryType) {
+    return RECORDABLE_DELIVERY_TYPES.has(deliveryType);
+}
+
 function isPublicStatusDisable(payload = {}) {
     return payload.enabled === 0 || payload.enabled === false;
 }
@@ -1377,7 +1382,7 @@ class CameraService {
 
         const isEnabled = enabled === true || enabled === 1 ? 1 : (enabled === false || enabled === 0 ? 0 : 1);
         const isTunnel = is_tunnel === true || is_tunnel === 1 ? 1 : 0;
-        const isRecordingEnabled = deliveryConfig.deliveryType === 'internal_hls' && (enable_recording === true || enable_recording === 1) ? 1 : 0;
+        const isRecordingEnabled = isRecordableDeliveryType(deliveryConfig.deliveryType) && (enable_recording === true || enable_recording === 1) ? 1 : 0;
 
         const latValue = latitude !== undefined && latitude !== '' && latitude !== null ? parseFloat(latitude) : null;
         const lngValue = longitude !== undefined && longitude !== '' && longitude !== null ? parseFloat(longitude) : null;
@@ -1452,7 +1457,7 @@ class CameraService {
             }
         }
 
-        if (isEnabled && isRecordingEnabled && deliveryConfig.deliveryType === 'internal_hls') {
+        if (isEnabled && isRecordingEnabled && isRecordableDeliveryType(deliveryConfig.deliveryType)) {
             try {
                 const { recordingService } = await import('./recordingService.js');
                 console.log(`[Camera ${result.lastInsertRowid}] Auto-starting recording (camera created with recording enabled)`);
@@ -1637,7 +1642,7 @@ class CameraService {
         }
         if (enable_recording !== undefined) {
             updates.push('enable_recording = ?');
-            values.push(deliveryConfig.deliveryType === 'internal_hls' && (enable_recording === true || enable_recording === 1) ? 1 : 0);
+            values.push(isRecordableDeliveryType(deliveryConfig.deliveryType) && (enable_recording === true || enable_recording === 1) ? 1 : 0);
         }
         if (recording_duration_hours !== undefined) {
             updates.push('recording_duration_hours = ?');
@@ -1773,7 +1778,7 @@ class CameraService {
             const cameraEnabled = (newEnabled === 1 || newEnabled === true);
 
             if (newRecordingEnabled !== oldRecordingEnabled) {
-                if (newRecordingEnabled && cameraEnabled && currentDeliveryType === 'internal_hls') {
+                if (newRecordingEnabled && cameraEnabled && isRecordableDeliveryType(currentDeliveryType)) {
                     console.log(`[Camera ${id}] Auto-starting recording (enable_recording changed to true)`);
                     try {
                         await recordingService.startRecording(parseInt(id));

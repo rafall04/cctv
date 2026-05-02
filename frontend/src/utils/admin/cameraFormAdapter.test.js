@@ -1,3 +1,11 @@
+/*
+Purpose: Regression coverage for camera admin form payload and validation adapters.
+Caller: Frontend Vitest suite for Camera Management form behavior.
+Deps: cameraFormAdapter exports and frontend validators.
+MainFuncs: buildCameraPayload(), mapCameraToFormValues(), getCameraValidationRules().
+SideEffects: None; pure adapter tests only.
+*/
+
 import { describe, expect, it } from 'vitest';
 import {
     buildCameraPayload,
@@ -48,6 +56,25 @@ describe('cameraFormAdapter delivery type support', () => {
             private_rtsp_url: null,
             external_use_proxy: 1,
             external_tls_mode: 'strict',
+        });
+    });
+
+    it('keeps recording enabled for external HLS cameras because playback recording supports HLS inputs', () => {
+        const payload = buildCameraPayload({
+            ...defaultCameraFormValues,
+            name: 'External Recording Cam',
+            delivery_type: 'external_hls',
+            stream_source: 'external',
+            enable_recording: true,
+            recording_duration_hours: 24,
+            external_stream_url: 'https://example.com/live.m3u8',
+        });
+
+        expect(payload).toMatchObject({
+            delivery_type: 'external_hls',
+            stream_source: 'external',
+            enable_recording: 1,
+            recording_duration_hours: 24,
         });
     });
 

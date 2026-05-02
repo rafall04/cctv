@@ -1,3 +1,11 @@
+/*
+Purpose: Normalize Camera Management form state, validation rules, and API payloads.
+Caller: CameraManagement page hook, camera admin modal components, and frontend tests.
+Deps: validators and camera delivery form conventions.
+MainFuncs: defaultCameraFormValues, getCameraValidationRules(), mapCameraToFormValues(), buildCameraPayload().
+SideEffects: None; pure form adapter.
+*/
+
 import { validateRtspUrl } from '../validators';
 
 export const defaultCameraFormValues = {
@@ -31,6 +39,8 @@ export const defaultCameraFormValues = {
     internal_on_demand_close_after_seconds_override: '',
     source_profile: '',
 };
+
+const RECORDABLE_DELIVERY_TYPES = new Set(['internal_hls', 'external_hls']);
 
 export const recordingDurationOptions = [
     {
@@ -208,7 +218,7 @@ export function buildCameraPayload(formData) {
         enabled: formData.enabled ? 1 : 0,
         is_tunnel: formData.is_tunnel ? 1 : 0,
         status: formData.status,
-        enable_recording: deliveryType === 'internal_hls' && formData.enable_recording ? 1 : 0,
+        enable_recording: RECORDABLE_DELIVERY_TYPES.has(deliveryType) && formData.enable_recording ? 1 : 0,
         recording_duration_hours: recordingDuration,
         stream_source: compatStreamSource,
         delivery_type: deliveryType,

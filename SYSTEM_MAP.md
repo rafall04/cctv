@@ -45,7 +45,7 @@ SideEffects: None; documentation only.
 - Playback public/admin: `/playback` uses `accessScope='public_preview'`; `/admin/playback` uses `accessScope='admin_full'`; `Playback.jsx` -> `recordingService` -> recording routes -> segment stream endpoint.
 - Playback tracking: media `playing`/progress starts `/api/playback-viewer/*`; changing camera/segment must stop old playback session before new tracking starts.
 - Live tracking: HLS proxy/viewer routes use `/api/viewer/*`; keep live tracking separate from playback tracking.
-- Camera admin: `CameraManagement.jsx` -> camera admin components/hook -> `cameraService` frontend -> camera routes/controllers -> `backend/services/cameraService.js`.
+- Camera admin: `CameraManagement.jsx` -> camera admin components/hook -> `cameraService` frontend -> camera routes/controllers -> `backend/services/cameraService.js`; recording can be enabled for recordable HLS delivery types (`internal_hls`, `external_hls`).
 - Area admin bulk policy: `AreaManagement.jsx` -> area service -> `backend/services/areaService.js` and `cameraService.bulkUpdateArea`.
 - Health monitoring: `cameraHealthService` evaluates runtime/probe status, writes runtime state, and coordinates recording/thumbnail transitions.
 - Recording lifecycle: `recordingService` orchestrates FFmpeg, runtime state, segment discovery/remux/cleanup, and `recordingProcessManager`.
