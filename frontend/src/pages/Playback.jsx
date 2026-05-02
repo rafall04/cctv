@@ -22,16 +22,13 @@ import GlobalAdScript from '../components/ads/GlobalAdScript';
 import InlineAdSlot from '../components/ads/InlineAdSlot';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../components/ads/adsConfig.js';
 import { getStreamCapabilities } from '../utils/cameraDelivery.js';
-import {
-    findClosestSegmentByStartTime,
-    findSegmentForTimestamp,
-} from '../utils/playbackSegmentSelection.js';
 
 import PlaybackHeader from '../components/playback/PlaybackHeader';
 import PlaybackVideo from '../components/playback/PlaybackVideo';
 import PlaybackTimeline from '../components/playback/PlaybackTimeline';
 import PlaybackSegmentList from '../components/playback/PlaybackSegmentList';
 import { useAdminReconnectRefresh } from '../hooks/admin/useAdminReconnectRefresh';
+import { usePlaybackSegments } from '../hooks/playback/usePlaybackSegments.js';
 import { usePlaybackViewerTracking } from '../hooks/playback/usePlaybackViewerTracking.js';
 
 const MAX_SEEK_DISTANCE = 180;
@@ -47,18 +44,6 @@ function getSegmentKey(segment) {
 
     return `${segment.filename || 'no-file'}:${segment.start_time || 'no-start'}`;
 }
-
-const DEFAULT_PUBLIC_PLAYBACK_POLICY = {
-    accessMode: 'public_preview',
-    isPublicPreview: true,
-    previewMinutes: 10,
-    notice: {
-        enabled: true,
-        title: 'Akses Playback Publik Terbatas',
-        text: 'Playback publik dibatasi untuk menjaga privasi. Untuk akses lebih lanjut silakan hubungi admin.',
-    },
-    contact: null,
-};
 
 function Playback({
     cameras: propCameras,
@@ -84,10 +69,7 @@ function Playback({
 
         return supportedInitialCameras[0]?.id ?? null;
     });
-    const [segments, setSegments] = useState([]);
-    const [segmentsCameraId, setSegmentsCameraId] = useState(null);
-    const [selectedSegment, setSelectedSegment] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [camerasLoading, setCamerasLoading] = useState(true);
     const [playbackSpeed, setPlaybackSpeed] = useState(1);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
@@ -103,18 +85,26 @@ function Playback({
         const saved = localStorage.getItem('playback-autoplay-enabled');
         return saved !== null ? saved === 'true' : true;
     });
-    const [playbackPolicy, setPlaybackPolicy] = useState(() => (
-        isAdminPlayback
-            ? { accessMode: 'admin_full', isPublicPreview: false, previewMinutes: null, notice: null, contact: null }
-            : DEFAULT_PUBLIC_PLAYBACK_POLICY
-    ));
-    const [playbackDeniedMessage, setPlaybackDeniedMessage] = useState('');
-
+    const {
+        segments,
+        segmentsCameraId,
+        selectedSegment,
+        setSelectedSegment,
+        seekTargetSeconds,
+        playbackPolicy,
+        playbackDeniedMessage,
+        reload: reloadSegments,
+    } = usePlaybackSegments({
+        cameraId: selectedCameraId,
+        timestampParam: timestampFromUrl,
+        accessScope,
+        isAdminPlayback,
+    });
+    const loading = camerasLoading;
     const videoRef = useRef(null);
     const containerRef = useRef(null);
     const lastSeekTimeRef = useRef(0);
     const bufferingTimeoutRef = useRef(null);
-    const segmentsRequestIdRef = useRef(0);
     const playbackSourceRef = useRef({ segmentKey: null, streamUrl: null });
     const playbackSeekTargetRef = useRef(null);
     const sourceLoadTokenRef = useRef(0);
@@ -279,8 +269,7 @@ function Playback({
         }
 
         if (clearSegments) {
-            setSegments([]);
-            setSegmentsCameraId(null);
+            segmentsRef.current = [];
         }
 
         resetVideoElement();
@@ -327,7 +316,7 @@ function Playback({
                 setSelectedCameraId(propCameras[0].id);
             }
             if (isMounted) {
-                setLoading(false);
+                setCamerasLoading(false);
             }
             return;
         }
@@ -362,7 +351,7 @@ function Playback({
                 console.error('Failed to fetch cameras:', error);
             } finally {
                 if (isMounted) {
-                    setLoading(false);
+                    setCamerasLoading(false);
                 }
             }
         };
@@ -417,121 +406,14 @@ function Playback({
         }
     }, [selectedSegmentKey, showPlaybackPopunder]);
 
-    // Effect to select segment from URL or auto-select latest when segments are loaded
     useEffect(() => {
-        if (segments.length === 0) return;
-
-        if (timestampFromUrl && (!selectedSegment || isInitialMountRef.current)) {
-            const targetTime = parseInt(timestampFromUrl, 10);
-            const segmentFromUrl = findSegmentForTimestamp(segments, targetTime);
-
-            if (segmentFromUrl) {
-                if (getSegmentKey(segmentFromUrl) !== getSegmentKey(selectedSegment)) {
-                    setSelectedSegment(segmentFromUrl);
-                }
-                // Hitung selisih detik pencarian untuk dikonsumsi video nanti saat loadedMetadata
-                const sTime = new Date(segmentFromUrl.start_time).getTime();
-                const diffSeconds = (targetTime - sTime) / 1000;
-                playbackSeekTargetRef.current = diffSeconds > 0 ? diffSeconds : 0;
-            } else {
-                const closestSegment = findClosestSegmentByStartTime(segments, targetTime);
-                if (getSegmentKey(closestSegment) !== getSegmentKey(selectedSegment)) {
-                    setSelectedSegment(closestSegment);
-                }
-                // Karena fallback ke closest, seek ke awal saja
-                playbackSeekTargetRef.current = 0;
-            }
-        } else if (!selectedSegment && segments.length > 0) {
-            // Auto-select latest segment if no segment selected
-            const sortedSegments = [...segments].sort((a, b) =>
-                new Date(b.start_time) - new Date(a.start_time)
-            );
-            setSelectedSegment(sortedSegments[0]);
+        if (seekTargetSeconds !== null) {
+            playbackSeekTargetRef.current = seekTargetSeconds;
         }
-    }, [segments, selectedSegment, searchParams]);
-
-    const loadSegments = useCallback(async (cameraId, { mode = 'initial', reset = false } = {}) => {
-        if (!cameraId) {
-            return;
-        }
-
-        const isBackgroundMode = mode === 'background' || mode === 'resume';
-        const requestId = ++segmentsRequestIdRef.current;
-
-        if (reset) {
-            resetPlaybackSession({
-                clearSegment: true,
-                clearSegments: true,
-            });
-        }
-
-        try {
-            const response = await recordingService.getSegments(
-                cameraId,
-                isBackgroundMode ? REQUEST_POLICY.BACKGROUND : REQUEST_POLICY.BLOCKING,
-                {},
-                accessScope
-            );
-
-            if (requestId !== segmentsRequestIdRef.current) {
-                return;
-            }
-
-            if (response.success && response.data) {
-                const segmentsArray = response.data.segments || [];
-                setPlaybackPolicy(
-                    response.data.playback_policy
-                    || (isAdminPlayback
-                        ? { accessMode: 'admin_full', isPublicPreview: false, previewMinutes: null, notice: null, contact: null }
-                        : DEFAULT_PUBLIC_PLAYBACK_POLICY)
-                );
-                setPlaybackDeniedMessage('');
-                setSegments(segmentsArray);
-                setSegmentsCameraId(cameraId);
-
-                const activeSegmentKey = getSegmentKey(selectedSegmentRef.current);
-                if (activeSegmentKey) {
-                    const hasActiveSegment = segmentsArray.some((segment) => getSegmentKey(segment) === activeSegmentKey);
-                    if (!hasActiveSegment && !isBackgroundMode) {
-                        setSelectedSegment(null);
-                    }
-                }
-            } else if (!isBackgroundMode) {
-                console.warn('API response not successful:', response);
-            }
-        } catch (error) {
-            if (requestId !== segmentsRequestIdRef.current) {
-                return;
-            }
-
-            console.error('Failed to fetch segments:', error);
-            if (!isBackgroundMode) {
-                setPlaybackDeniedMessage(error?.response?.data?.message || '');
-                setSegments([]);
-                setSegmentsCameraId(null);
-                setSelectedSegment(null);
-            }
-        }
-    }, [accessScope, isAdminPlayback, resetPlaybackSession]);
-
-    // Fetch segments effect
-    useEffect(() => {
-        if (!selectedCameraId) {
-            return;
-        }
-
-        loadSegments(selectedCameraId, { mode: 'initial', reset: true });
-        const interval = setInterval(() => {
-            loadSegments(selectedCameraId, { mode: 'background' });
-        }, 10000);
-
-        return () => {
-            clearInterval(interval);
-        };
-    }, [loadSegments, selectedCameraId]);
+    }, [seekTargetSeconds]);
 
     useAdminReconnectRefresh(
-        () => loadSegments(selectedCameraId, { mode: 'resume' }),
+        () => reloadSegments(selectedCameraId, { mode: 'resume' }),
         { enabled: Boolean(selectedCameraId) }
     );
 
