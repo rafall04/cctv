@@ -28,6 +28,7 @@ import PlaybackVideo from '../components/playback/PlaybackVideo';
 import PlaybackTimeline from '../components/playback/PlaybackTimeline';
 import PlaybackSegmentList from '../components/playback/PlaybackSegmentList';
 import { useAdminReconnectRefresh } from '../hooks/admin/useAdminReconnectRefresh';
+import { usePlaybackMediaSource } from '../hooks/playback/usePlaybackMediaSource.js';
 import { usePlaybackSegments } from '../hooks/playback/usePlaybackSegments.js';
 import { usePlaybackViewerTracking } from '../hooks/playback/usePlaybackViewerTracking.js';
 
@@ -385,6 +386,14 @@ function Playback({
         return segmentExists ? segmentKey : null;
     }, [segments, segmentsCameraId, selectedCameraId, selectedSegment]);
 
+    const selectedPlaybackStreamUrl = useMemo(() => {
+        if (!selectedSegmentKey || !selectedSegment?.filename || !selectedCameraId) {
+            return null;
+        }
+
+        return recordingService.getSegmentStreamUrl(selectedCameraId, selectedSegment.filename, accessScope);
+    }, [accessScope, selectedCameraId, selectedSegment, selectedSegmentKey]);
+
     useEffect(() => {
         if (!showPlaybackPopunder || !selectedSegmentKey) {
             return;
@@ -417,6 +426,106 @@ function Playback({
         { enabled: Boolean(selectedCameraId) }
     );
 
+    const hasActiveSource = useCallback(() => {
+        return activeSourceTokenRef.current === sourceLoadTokenRef.current
+            && playbackSourceRef.current.streamUrl !== null;
+    }, []);
+
+    const markPlaybackProgress = useCallback((videoTime) => {
+        const now = Date.now();
+        lastPlaybackProgressRef.current = videoTime;
+        lastPlaybackProgressAtRef.current = now;
+        hasStartedPlaybackForSourceRef.current = true;
+        clearBufferingState();
+    }, [clearBufferingState]);
+
+    const handleVideoEnded = useCallback(() => {
+        clearBufferingState();
+
+        if (!autoPlayEnabledRef.current) {
+            setAutoPlayNotification({ type: 'stopped', message: 'Video selesai - Auto-play dinonaktifkan' });
+            setTimeout(() => setAutoPlayNotification(null), 5000);
+            return;
+        }
+
+        const currentSegment = selectedSegmentRef.current;
+        const currentSegments = segmentsRef.current;
+
+        if (!currentSegment || currentSegments.length === 0) return;
+
+        const currentIndex = currentSegments.findIndex(s => s.id === currentSegment.id);
+        if (currentIndex === -1) return;
+
+        const nextSegment = currentSegments[currentIndex - 1];
+
+        if (nextSegment) {
+            const currentEnd = new Date(currentSegment.end_time);
+            const nextStart = new Date(nextSegment.start_time);
+            const gapSeconds = (nextStart - currentEnd) / 1000;
+
+            if (gapSeconds > 30) {
+                const gapMinutes = Math.round(gapSeconds / 60);
+                setAutoPlayNotification({ type: 'gap', message: `Melewati ${gapMinutes} menit rekaman yang hilang` });
+            } else {
+                setAutoPlayNotification({ type: 'next', message: 'Memutar segment berikutnya...' });
+            }
+
+            setTimeout(() => setAutoPlayNotification(null), 3000);
+            setSelectedSegment(nextSegment);
+            const timestamp = new Date(nextSegment.start_time).getTime();
+            updatePlaybackSearchParams({
+                cameraId: selectedCameraIdRef.current,
+                timestamp,
+                replace: false,
+            });
+        } else {
+            setAutoPlayNotification({ type: 'complete', message: 'Playback selesai - tidak ada segment lagi' });
+            setTimeout(() => setAutoPlayNotification(null), 5000);
+        }
+    }, [clearBufferingState, setSelectedSegment, updatePlaybackSearchParams]);
+
+    const handlePlaybackStarted = useCallback(() => {
+        if (!hasActiveSource() || !videoRef.current) {
+            return;
+        }
+
+        hasLoadedDataForSourceRef.current = true;
+        markPlaybackProgress(videoRef.current.currentTime);
+        ensurePlaybackViewerSession();
+
+        const queuedPlaybackPopunder = queuedPlaybackPopunderRef.current;
+        if (
+            showPlaybackPopunder
+            && queuedPlaybackPopunder?.segmentKey
+            && queuedPlaybackPopunder.segmentKey === selectedSegmentKey
+        ) {
+            hasTriggeredInitialPlaybackPopunderRef.current = true;
+            queuedPlaybackPopunderRef.current = null;
+            setPlaybackPopunderTriggerId((previous) => previous + 1);
+        }
+    }, [ensurePlaybackViewerSession, hasActiveSource, markPlaybackProgress, selectedSegmentKey, showPlaybackPopunder]);
+
+    const handlePlaybackProgress = useCallback((videoTime) => {
+        if (hasActiveSource()) {
+            const previousTime = lastPlaybackProgressRef.current;
+            if (videoTime > previousTime + 0.01) {
+                markPlaybackProgress(videoTime);
+            }
+        }
+
+        setCurrentTime(videoTime);
+    }, [hasActiveSource, markPlaybackProgress]);
+
+    usePlaybackMediaSource({
+        videoRef,
+        streamUrl: selectedPlaybackStreamUrl,
+        selectedSegmentKey,
+        onPlaybackStarted: handlePlaybackStarted,
+        onEnded: handleVideoEnded,
+        onProgress: handlePlaybackProgress,
+        assignSource: false,
+    });
+
     useEffect(() => {
         if (loading || !selectedSegmentKey || !selectedSegment || !videoRef.current || !selectedCameraId) {
             return;
@@ -430,7 +539,11 @@ function Playback({
             return;
         }
 
-        const nextStreamUrl = recordingService.getSegmentStreamUrl(selectedCameraId, selectedSegment.filename, accessScope);
+        const nextStreamUrl = selectedPlaybackStreamUrl;
+        if (!nextStreamUrl) {
+            return;
+        }
+
         if (
             playbackSourceRef.current.segmentKey === selectedSegmentKey
             && playbackSourceRef.current.streamUrl === nextStreamUrl
@@ -547,7 +660,7 @@ function Playback({
                 resetVideoElement();
             }
         };
-    }, [accessScope, clearBufferingState, loading, resetSourcePlaybackState, resetVideoElement, selectedCameraId, selectedSegment, selectedSegmentKey]);
+    }, [clearBufferingState, loading, resetSourcePlaybackState, resetVideoElement, selectedCameraId, selectedPlaybackStreamUrl, selectedSegment, selectedSegmentKey]);
 
     useEffect(() => {
         const video = videoRef.current;
@@ -559,30 +672,6 @@ function Playback({
         const video = videoRef.current;
         if (!video) return;
 
-        const hasActiveSource = () => {
-            return activeSourceTokenRef.current === sourceLoadTokenRef.current
-                && playbackSourceRef.current.streamUrl !== null;
-        };
-
-        const markPlaybackProgress = () => {
-            const now = Date.now();
-            lastPlaybackProgressRef.current = video.currentTime;
-            lastPlaybackProgressAtRef.current = now;
-            hasStartedPlaybackForSourceRef.current = true;
-            clearBufferingState();
-        };
-
-        const handleTimeUpdate = () => {
-            if (hasActiveSource()) {
-                const previousTime = lastPlaybackProgressRef.current;
-                const currentVideoTime = video.currentTime;
-                if (currentVideoTime > previousTime + 0.01) {
-                    markPlaybackProgress();
-                }
-            }
-
-            setCurrentTime(video.currentTime);
-        };
         const handleLoadedMetadata = () => setDuration(video.duration);
         const handleLoadedData = () => {
             if (!hasActiveSource()) {
@@ -591,51 +680,6 @@ function Playback({
 
             hasLoadedDataForSourceRef.current = true;
             clearBufferingState();
-        };
-
-        const handleEnded = () => {
-            clearBufferingState();
-
-            if (!autoPlayEnabledRef.current) {
-                setAutoPlayNotification({ type: 'stopped', message: 'Video selesai - Auto-play dinonaktifkan' });
-                setTimeout(() => setAutoPlayNotification(null), 5000);
-                return;
-            }
-
-            const currentSegment = selectedSegmentRef.current;
-            const currentSegments = segmentsRef.current;
-
-            if (!currentSegment || currentSegments.length === 0) return;
-
-            const currentIndex = currentSegments.findIndex(s => s.id === currentSegment.id);
-            if (currentIndex === -1) return;
-
-            const nextSegment = currentSegments[currentIndex - 1];
-
-            if (nextSegment) {
-                const currentEnd = new Date(currentSegment.end_time);
-                const nextStart = new Date(nextSegment.start_time);
-                const gapSeconds = (nextStart - currentEnd) / 1000;
-
-                if (gapSeconds > 30) {
-                    const gapMinutes = Math.round(gapSeconds / 60);
-                    setAutoPlayNotification({ type: 'gap', message: `Melewati ${gapMinutes} menit rekaman yang hilang` });
-                } else {
-                    setAutoPlayNotification({ type: 'next', message: 'Memutar segment berikutnya...' });
-                }
-
-                setTimeout(() => setAutoPlayNotification(null), 3000);
-                setSelectedSegment(nextSegment);
-                const timestamp = new Date(nextSegment.start_time).getTime();
-                updatePlaybackSearchParams({
-                    cameraId: selectedCameraIdRef.current,
-                    timestamp,
-                    replace: false,
-                });
-            } else {
-                setAutoPlayNotification({ type: 'complete', message: 'Playback selesai - tidak ada segment lagi' });
-                setTimeout(() => setAutoPlayNotification(null), 5000);
-            }
         };
 
         const handleSeeking = () => {
@@ -675,26 +719,6 @@ function Playback({
 
             setIsBuffering(true);
         };
-        const handlePlaying = () => {
-            if (!hasActiveSource()) {
-                return;
-            }
-
-            hasLoadedDataForSourceRef.current = true;
-            markPlaybackProgress();
-            ensurePlaybackViewerSession();
-
-            const queuedPlaybackPopunder = queuedPlaybackPopunderRef.current;
-            if (
-                showPlaybackPopunder
-                && queuedPlaybackPopunder?.segmentKey
-                && queuedPlaybackPopunder.segmentKey === selectedSegmentKey
-            ) {
-                hasTriggeredInitialPlaybackPopunderRef.current = true;
-                queuedPlaybackPopunderRef.current = null;
-                setPlaybackPopunderTriggerId((previous) => previous + 1);
-            }
-        };
 
         const handleCanPlay = () => {
             if (!hasActiveSource()) {
@@ -733,34 +757,28 @@ function Playback({
             setIsBuffering(true);
         };
 
-        video.addEventListener('timeupdate', handleTimeUpdate);
         video.addEventListener('loadedmetadata', handleLoadedMetadata);
         video.addEventListener('loadeddata', handleLoadedData);
-        video.addEventListener('ended', handleEnded);
         video.addEventListener('seeking', handleSeeking);
         video.addEventListener('seeked', handleSeeked);
         video.addEventListener('waiting', handleWaiting);
-        video.addEventListener('playing', handlePlaying);
         video.addEventListener('canplay', handleCanPlay);
         video.addEventListener('canplaythrough', handleCanPlayThrough);
         video.addEventListener('stalled', handleStalled);
 
         return () => {
-            video.removeEventListener('timeupdate', handleTimeUpdate);
             video.removeEventListener('loadedmetadata', handleLoadedMetadata);
             video.removeEventListener('loadeddata', handleLoadedData);
-            video.removeEventListener('ended', handleEnded);
             video.removeEventListener('seeking', handleSeeking);
             video.removeEventListener('seeked', handleSeeked);
             video.removeEventListener('waiting', handleWaiting);
-            video.removeEventListener('playing', handlePlaying);
             video.removeEventListener('canplay', handleCanPlay);
             video.removeEventListener('canplaythrough', handleCanPlayThrough);
             video.removeEventListener('stalled', handleStalled);
 
             resetBufferingTimeout();
         };
-    }, [clearBufferingState, ensurePlaybackViewerSession, loading, resetBufferingTimeout, selectedSegmentKey, showPlaybackPopunder, updatePlaybackSearchParams]);
+    }, [clearBufferingState, hasActiveSource, loading, resetBufferingTimeout]);
 
     const handleSpeedChange = (speed) => {
         setPlaybackSpeed(speed);
