@@ -1,7 +1,7 @@
 /*
 Purpose: Monitor camera availability, update runtime health state, and trigger recording/thumbnail transitions.
 Caller: Backend server startup, camera health routes, and runtime stream signal handlers.
-Deps: connectionPool, cameraRuntimeStateService, mediaMtxService, recordingService, thumbnailService.
+Deps: connectionPool, cameraRuntimeStateService, mediaMtxService, recordingService, thumbnailService, cameraHealthPolicy.
 MainFuncs: CameraHealthService, checkAllCameras(), checkCamera(), evaluateCameraStatus(), recordRuntimeSignal().
 SideEffects: Updates camera online state/runtime state, repairs MediaMTX paths, sends notifications, pauses/resumes recording.
 */
@@ -27,7 +27,6 @@ import {
     getCameraDeliveryProfile,
     getEffectiveDeliveryType,
     getPrimaryExternalStreamUrl,
-    normalizeExternalHealthMode,
 } from '../utils/cameraDelivery.js';
 import {
     SHARED_CAMERA_STREAM_PROJECTION,
@@ -37,6 +36,7 @@ import {
     buildInternalIngestPolicySummary,
     isStrictOnDemandSourceProfile,
 } from '../utils/internalIngestPolicy.js';
+import { resolveExternalHealthMode as resolveExternalHealthModePolicy } from './cameraHealthPolicy.js';
 
 const mediaMtxApiBaseUrl = `${(config.mediamtx?.apiUrl || 'http://localhost:9997').replace(/\/$/, '')}/v3`;
 
@@ -1403,40 +1403,7 @@ class CameraHealthService {
     }
 
     resolveExternalHealthMode(camera) {
-        const explicitMode = normalizeExternalHealthMode(camera?.external_health_mode);
-        if (explicitMode !== 'default') {
-            return explicitMode;
-        }
-
-        const areaOverrideMode = normalizeExternalHealthMode(camera?.area_external_health_mode_override);
-        if (areaOverrideMode !== 'default') {
-            return areaOverrideMode;
-        }
-
-        const deliveryType = getEffectiveDeliveryType(camera);
-        const defaults = settingsService.getExternalHealthDefaults();
-
-        if (deliveryType === 'external_mjpeg') {
-            return defaults.external_mjpeg || 'passive_first';
-        }
-
-        if (deliveryType === 'external_hls') {
-            return defaults.external_hls || 'hybrid_probe';
-        }
-
-        if (deliveryType === 'external_flv') {
-            return defaults.external_flv || 'passive_first';
-        }
-
-        if (deliveryType === 'external_embed') {
-            return defaults.external_embed || 'passive_first';
-        }
-
-        if (deliveryType === 'external_jsmpeg' || deliveryType === 'external_custom_ws') {
-            return defaults[deliveryType] || 'disabled';
-        }
-
-        return 'hybrid_probe';
+        return resolveExternalHealthModePolicy(camera, settingsService.getExternalHealthDefaults());
     }
 
     getMonitoringState(camera, state) {

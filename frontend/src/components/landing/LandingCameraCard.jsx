@@ -1,13 +1,20 @@
+/*
+ * Purpose: Render a public landing camera card with thumbnail, status badges, and quick actions.
+ * Caller: Landing camera grids and public camera list views.
+ * Deps: Icons, CodecBadge, CameraThumbnail, animation and availability utilities.
+ * MainFuncs: CameraCard.
+ * SideEffects: Invokes caller-provided click, multiview, and favorite callbacks.
+ */
+
 import { memo } from 'react';
 import { Icons } from '../ui/Icons';
 import CodecBadge from '../CodecBadge';
 import CameraThumbnail from '../CameraThumbnail';
 import { shouldDisableAnimations } from '../../utils/animationControl';
-import { getCameraAvailabilityState, isCameraHardOffline, isCameraDegraded } from '../../utils/cameraAvailability.js';
+import { isCameraHardOffline, isCameraDegraded } from '../../utils/cameraAvailability.js';
 
 const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMulti, isFavorite, onToggleFavorite }) {
     const isMaintenance = camera.status === 'maintenance';
-    const availabilityState = getCameraAvailabilityState(camera);
     const isOffline = isCameraHardOffline(camera);
     const isDegraded = isCameraDegraded(camera);
     const isTunnel = camera.is_tunnel === 1;

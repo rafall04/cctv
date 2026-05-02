@@ -60,6 +60,17 @@ temp/
 private_exports/
 private_imports/
 
+# Local CCTV import/export and debug artifacts
+/tmp_*
+/*.dec.txt
+/*.sec
+/*.apk
+/*_import_*.json
+/*_raw_*.json
+/*_catalog_*.json
+/cctv_backup_*.json
+/private_exports/
+
 # Backup files (SECURITY)
 *.bak
 *.backup

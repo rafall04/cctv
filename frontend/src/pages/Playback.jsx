@@ -1,3 +1,11 @@
+/*
+ * Purpose: Public/admin recording playback page with camera selection, sharing, and playback viewer tracking.
+ * Caller: Public playback route and protected admin playback route.
+ * Deps: React, router search params, recording/camera/playback viewer services, playback UI components.
+ * MainFuncs: Playback, getSegmentKey, resolvePlaybackPolicy.
+ * SideEffects: Loads recordings, updates URL params, initializes media playback, tracks playback viewer sessions.
+ */
+
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { cameraService } from '../services/cameraService';
@@ -11,6 +19,10 @@ import GlobalAdScript from '../components/ads/GlobalAdScript';
 import InlineAdSlot from '../components/ads/InlineAdSlot';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../components/ads/adsConfig.js';
 import { getStreamCapabilities } from '../utils/cameraDelivery.js';
+import {
+    findClosestSegmentByStartTime,
+    findSegmentForTimestamp,
+} from '../utils/playbackSegmentSelection.js';
 
 import PlaybackHeader from '../components/playback/PlaybackHeader';
 import PlaybackVideo from '../components/playback/PlaybackVideo';
@@ -515,12 +527,8 @@ function Playback({
 
         const timestampFromUrl = searchParams.get('t');
         if (timestampFromUrl && (!selectedSegment || isInitialMountRef.current)) {
-            const targetTime = parseInt(timestampFromUrl);
-            const segmentFromUrl = segments.find(s => {
-                const startTime = new Date(s.start_time).getTime();
-                const endTime = new Date(s.end_time).getTime();
-                return targetTime >= startTime && targetTime <= endTime;
-            });
+            const targetTime = parseInt(timestampFromUrl, 10);
+            const segmentFromUrl = findSegmentForTimestamp(segments, targetTime);
 
             if (segmentFromUrl) {
                 if (getSegmentKey(segmentFromUrl) !== getSegmentKey(selectedSegment)) {
@@ -531,11 +539,7 @@ function Playback({
                 const diffSeconds = (targetTime - sTime) / 1000;
                 playbackSeekTargetRef.current = diffSeconds > 0 ? diffSeconds : 0;
             } else {
-                const closestSegment = segments.reduce((prev, curr) => {
-                    const prevDiff = Math.abs(new Date(prev.start_time).getTime() - targetTime);
-                    const currDiff = Math.abs(new Date(curr.start_time).getTime() - targetTime);
-                    return currDiff < prevDiff ? curr : prev;
-                }, segments[0]);
+                const closestSegment = findClosestSegmentByStartTime(segments, targetTime);
                 if (getSegmentKey(closestSegment) !== getSegmentKey(selectedSegment)) {
                     setSelectedSegment(closestSegment);
                 }
