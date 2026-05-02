@@ -1,3 +1,9 @@
+// Purpose: Verify Surabaya SITS extraction, sanitization, output path safety, and CLI parsing.
+// Caller: Vitest backend suite.
+// Deps: surabayaSitsExtractor service, node fs/path temp helpers, Vitest.
+// MainFuncs: surabayaSitsExtractor test cases.
+// SideEffects: Writes temporary private export JSON files in allowed private_exports paths.
+
 import { mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -86,10 +92,12 @@ describe('surabayaSitsExtractor', () => {
     });
 
     it('refuses repo-root json outputs and tracked repo paths', () => {
-        expect(() => validateOutputPath('C:/project/cctv/output.json', { privateOutput: false })).toThrow(
+        const repoRoot = resolve(getSurabayaSitsPrivateBaseDir(), '..', '..');
+
+        expect(() => validateOutputPath(resolve(repoRoot, 'output.json'), { privateOutput: false })).toThrow(
             /repo root/
         );
-        expect(() => validateOutputPath('C:/project/cctv/README.md', { privateOutput: false })).toThrow(
+        expect(() => validateOutputPath(resolve(repoRoot, 'README.md'), { privateOutput: false })).toThrow(
             /tracked repo file/
         );
     });

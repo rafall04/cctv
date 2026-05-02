@@ -1,5 +1,6 @@
 import { query, queryOne, execute } from '../database/database.js';
 import { recordingService } from './recordingService.js';
+import recordingSegmentRepository from './recordingSegmentRepository.js';
 import { logAdminAction } from './securityAuditLogger.js';
 import settingsService from './settingsService.js';
 import { existsSync, statSync } from 'fs';
@@ -286,7 +287,7 @@ class RecordingPlaybackService {
         };
     }
 
-    getAccessibleSegments(cameraId, request) {
+    resolvePlaybackContext(cameraId, request) {
         const camera = this.getPlaybackCamera(cameraId);
         const access = this.resolvePlaybackAccess(camera, request);
 
@@ -297,44 +298,28 @@ class RecordingPlaybackService {
             throw err;
         }
 
-        const allSegmentsAscending = query(
-            `SELECT
-                id,
-                filename,
-                start_time,
-                end_time,
-                file_size,
-                duration,
-                created_at,
-                file_path
-            FROM recording_segments
-            WHERE camera_id = ?
-            ORDER BY start_time ASC`,
-            [cameraId]
-        );
+        return { camera, access };
+    }
 
-        if (allSegmentsAscending.length === 0) {
+    getAccessibleSegments(cameraId, request) {
+        const { camera, access } = this.resolvePlaybackContext(cameraId, request);
+        const previewLimit = getPreviewSegmentLimit(access.previewMinutes);
+        const queryOptions = access.accessMode === 'admin_full'
+            ? { cameraId, order: 'oldest', limit: 1000, returnAscending: true }
+            : { cameraId, order: 'latest', limit: previewLimit, returnAscending: true };
+        const segmentsAscending = recordingSegmentRepository.findPlaybackSegments(queryOptions);
+
+        if (segmentsAscending.length === 0) {
             const err = new Error('No segments found');
             err.statusCode = 404;
-            throw err;
-        }
-
-        const allowedSegmentsAscending = access.accessMode === 'admin_full'
-            ? allSegmentsAscending
-            : allSegmentsAscending.slice(0, getPreviewSegmentLimit(access.previewMinutes));
-
-        if (!allowedSegmentsAscending.length) {
-            const err = new Error('Playback preview tidak tersedia');
-            err.statusCode = 403;
-            err.playbackAccess = access;
             throw err;
         }
 
         return {
             camera,
             access,
-            segmentsAscending: allowedSegmentsAscending,
-            segmentsDescending: [...allowedSegmentsAscending].sort(
+            segmentsAscending,
+            segmentsDescending: [...segmentsAscending].sort(
                 (left, right) => new Date(right.start_time) - new Date(left.start_time)
             ),
         };
@@ -366,13 +351,28 @@ class RecordingPlaybackService {
     }
 
     getStreamSegment(cameraId, filename, request) {
-        const { segmentsAscending } = this.getAccessibleSegments(cameraId, request);
-        const segment = segmentsAscending.find((item) => item.filename === filename);
+        const { access } = this.resolvePlaybackContext(cameraId, request);
+        const segment = recordingSegmentRepository.findSegmentByFilename({ cameraId, filename });
 
         if (!segment) {
             const err = new Error('Segment not available for this playback scope');
             err.statusCode = 403;
             throw err;
+        }
+
+        if (access.accessMode !== 'admin_full') {
+            const previewSegments = recordingSegmentRepository.findPlaybackSegments({
+                cameraId,
+                order: 'latest',
+                limit: getPreviewSegmentLimit(access.previewMinutes),
+                returnAscending: true,
+            });
+
+            if (!previewSegments.some((item) => item.filename === filename)) {
+                const err = new Error('Segment not available for this playback scope');
+                err.statusCode = 403;
+                throw err;
+            }
         }
 
         if (!existsSync(segment.file_path)) {

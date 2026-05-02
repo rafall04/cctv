@@ -16,6 +16,17 @@ vi.mock('../database/database.js', () => ({
     execute: executeMock,
 }));
 
+vi.mock('../database/connectionPool.js', () => ({
+    query: queryMock,
+    queryOne: queryOneMock,
+    execute: executeMock,
+}));
+
+vi.mock('fs', () => ({
+    existsSync: vi.fn(() => true),
+    statSync: vi.fn(() => ({ size: 100 })),
+}));
+
 vi.mock('../services/recordingService.js', () => ({
     recordingService: {
         startRecording: startRecordingMock,
@@ -109,7 +120,7 @@ describe('recordingPlaybackService', () => {
         expect(logAdminActionMock).toHaveBeenCalled();
     });
 
-    it('returns only preview segments for public playback', () => {
+    it('returns the latest preview segments for public playback', () => {
         queryOneMock
             .mockReturnValueOnce({
                 id: 9,
@@ -119,7 +130,6 @@ describe('recordingPlaybackService', () => {
             })
             .mockReturnValueOnce({ value: '628111111111' });
         queryMock.mockReturnValueOnce([
-            { id: 1, filename: 'first.mp4', start_time: '2026-03-20T10:00:00.000Z', end_time: '2026-03-20T10:10:00.000Z', duration: 600, file_path: 'a', file_size: 100, created_at: '2026-03-20T10:00:00.000Z' },
             { id: 2, filename: 'second.mp4', start_time: '2026-03-20T10:10:00.000Z', end_time: '2026-03-20T10:20:00.000Z', duration: 600, file_path: 'b', file_size: 100, created_at: '2026-03-20T10:10:00.000Z' },
         ]);
 
@@ -130,7 +140,9 @@ describe('recordingPlaybackService', () => {
             previewMinutes: 10,
         }));
         expect(result.segments).toHaveLength(1);
-        expect(result.segments[0].filename).toBe('first.mp4');
+        expect(result.segments[0].filename).toBe('second.mp4');
+        expect(queryMock.mock.calls[0][0]).toContain('ORDER BY start_time DESC');
+        expect(queryMock.mock.calls[0][0]).toContain('LIMIT ?');
     });
 
     it('allows admin full playback when admin scope is requested by authenticated user', () => {
@@ -163,5 +175,40 @@ describe('recordingPlaybackService', () => {
         });
 
         expect(() => recordingPlaybackService.getSegments(11, { query: {} })).toThrow('Playback publik tidak tersedia untuk kamera ini');
+    });
+
+    it('streams by filename without loading every segment for the camera', () => {
+        queryOneMock
+            .mockReturnValueOnce({
+                id: 9,
+                name: 'CCTV TAMAN',
+                public_playback_mode: 'inherit',
+                public_playback_preview_minutes: null,
+            })
+            .mockReturnValueOnce({ value: '628111111111' })
+            .mockReturnValueOnce({
+                id: 2,
+                filename: 'second.mp4',
+                start_time: '2026-03-20T10:10:00.000Z',
+                end_time: '2026-03-20T10:20:00.000Z',
+                duration: 600,
+                file_path: 'b',
+                file_size: 100,
+                created_at: '2026-03-20T10:10:00.000Z',
+            });
+        queryMock.mockReturnValueOnce([
+            {
+                id: 2,
+                filename: 'second.mp4',
+                start_time: '2026-03-20T10:10:00.000Z',
+            },
+        ]);
+
+        const result = recordingPlaybackService.getStreamSegment(9, 'second.mp4', { query: {} });
+
+        expect(result.segment.filename).toBe('second.mp4');
+        expect(queryOneMock.mock.calls[2][0]).toContain('WHERE camera_id = ? AND filename = ?');
+        expect(queryMock.mock.calls[0][0]).toContain('ORDER BY start_time DESC');
+        expect(queryMock).not.toHaveBeenCalledWith(expect.stringContaining('ORDER BY start_time ASC'), [9]);
     });
 });
