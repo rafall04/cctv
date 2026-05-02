@@ -151,7 +151,6 @@ function Playback({
 
     const {
         ensureSessionStarted: ensurePlaybackViewerSession,
-        stopSession: stopTrackedPlaybackViewerSession,
     } = usePlaybackViewerTracking({
         cameraId: selectedCameraId,
         segment: selectedSegment,
@@ -286,7 +285,7 @@ function Playback({
         }
 
         resetVideoElement();
-    }, [resetSourcePlaybackState, resetVideoElement]);
+    }, [resetSourcePlaybackState, resetVideoElement, setSelectedSegment]);
 
     const handleAutoPlayToggle = useCallback(() => {
         const newValue = !autoPlayEnabled;
@@ -821,7 +820,7 @@ function Playback({
         lastSeekTimeRef.current = 0;
         playbackSeekTargetRef.current = 0; // Reset saat diklik manual dari list agar selalu play dari awal segmen
         resetSourcePlaybackState();
-    }, [resetSourcePlaybackState, selectedCamera, showPlaybackPopunder, updatePlaybackSearchParams]);
+    }, [resetSourcePlaybackState, selectedCamera, setSelectedSegment, showPlaybackPopunder, updatePlaybackSearchParams]);
 
     const formatTimestamp = (timestamp) => {
         return new Date(timestamp).toLocaleString('id-ID', {

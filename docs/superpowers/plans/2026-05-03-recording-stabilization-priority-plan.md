@@ -29,7 +29,7 @@ This work spans multiple related subsystems, but they are coupled enough that on
 
 ## File Structure
 
-- Create `backend/database/migrations/2026xxxx_add_recording_segment_uniqueness.js`: enforce idempotent segment identity and reconcile duplicate rows before adding a unique index.
+- Create `backend/database/migrations/zz_20260503_add_recording_segment_uniqueness.js`: enforce idempotent segment identity and reconcile duplicate rows before adding a unique index.
 - Modify `backend/services/recordingService.js`: replace ad hoc insert flow with repository-backed idempotent registration and remove embedded timer ownership.
 - Modify `backend/services/recordingSegmentRepository.js`: add upsert/insert-or-ignore helpers, duplicate detection queries, cursor-based orphan helpers, and emergency candidate queries.
 - Modify `backend/services/recordingPlaybackService.js`: move from `database.js` to `connectionPool.js` and stop request-path size reconciliation writes.
