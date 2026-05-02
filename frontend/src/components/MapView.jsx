@@ -1,3 +1,11 @@
+/*
+ * Purpose: Public CCTV map with live stream markers, aggregation, and area-focused navigation.
+ * Caller: Public landing page and camera browsing routes.
+ * Deps: React, react-leaflet, Leaflet, stream/viewer services, map coordinate utilities.
+ * MainFuncs: MapView, createCameraIcon, buildBoundsFromCameras, buildAreaSummaryList.
+ * SideEffects: Initializes Leaflet default icons, opens viewer streams, tracks viewer sessions.
+ */
+
 import { useEffect, useRef, useState, memo, useCallback, useMemo, useLayoutEffect } from 'react';
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents, ZoomControl, LayersControl } from 'react-leaflet';
 import L from 'leaflet';
@@ -31,6 +39,12 @@ import {
 } from '../utils/publicPopupState.js';
 import { getCameraAvailabilityState, isCameraHardOffline } from '../utils/cameraAvailability.js';
 import { isBroadAreaCoverage, resolveAreaFocusZoom } from '../utils/areaCoverage';
+import {
+    getBoundsCenterFromCameras,
+    getValidCoordinatePair,
+    hasValidCoords,
+    normalizeAreaKey,
+} from '../utils/mapCoordinateUtils.js';
 
 // Fix Leaflet icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -146,50 +160,6 @@ const createCameraIcon = (status = 'active', isTunnel = false, isOnline = true, 
 
     iconCache.set(cacheKey, icon);
     return icon;
-};
-
-const hasValidCoords = (c) => {
-    const lat = parseFloat(c.latitude);
-    const lng = parseFloat(c.longitude);
-    return !isNaN(lat) && !isNaN(lng) && (lat !== 0 || lng !== 0);
-};
-
-const normalizeAreaKey = (value) => String(value || '')
-    .trim()
-    .replace(/\s+/g, ' ')
-    .toLowerCase();
-
-const getValidCoordinatePair = (value) => {
-    if (!value) {
-        return null;
-    }
-
-    const lat = parseFloat(value.latitude);
-    const lng = parseFloat(value.longitude);
-    if (Number.isNaN(lat) || Number.isNaN(lng) || (lat === 0 && lng === 0)) {
-        return null;
-    }
-
-    return { latitude: lat, longitude: lng };
-};
-
-const getBoundsCenterFromCameras = (cameras = []) => {
-    const validCameras = Array.isArray(cameras) ? cameras.filter(hasValidCoords) : [];
-    if (validCameras.length === 0) {
-        return null;
-    }
-
-    const latitudes = validCameras.map((camera) => parseFloat(camera.latitude));
-    const longitudes = validCameras.map((camera) => parseFloat(camera.longitude));
-
-    if (latitudes.some(Number.isNaN) || longitudes.some(Number.isNaN)) {
-        return null;
-    }
-
-    return {
-        latitude: (Math.min(...latitudes) + Math.max(...latitudes)) / 2,
-        longitude: (Math.min(...longitudes) + Math.max(...longitudes)) / 2,
-    };
 };
 
 const buildBoundsFromCameras = (cameras = []) => {
