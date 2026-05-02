@@ -14,7 +14,9 @@ import { promisify } from 'util';
 import { exec } from 'child_process';
 import { getEffectiveDeliveryType, getPrimaryExternalStreamUrl } from '../utils/cameraDelivery.js';
 import recordingProcessManager from './recordingProcessManager.js';
+import { createRecordingCleanupService } from './recordingCleanupService.js';
 import { isSafeRecordingFilename } from './recordingRetentionPolicy.js';
+import recordingSegmentRepository from './recordingSegmentRepository.js';
 const execPromise = promisify(exec);
 
 const __filename = fileURLToPath(import.meta.url);
@@ -23,7 +25,6 @@ const __dirname = dirname(__filename);
 // Base path untuk recordings
 const RECORDINGS_BASE_PATH = join(__dirname, '..', '..', 'recordings');
 const RECORDING_RETENTION_GRACE_MS = 10 * 60 * 1000;
-const NORMAL_CLEANUP_DELETE_BATCH_SIZE = 6;
 const SCHEDULED_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 const SCHEDULED_CLEANUP_INITIAL_DELAY_MS = 2 * 60 * 1000;
 const QUARANTINE_DIR_NAME = '.quarantine';
@@ -188,6 +189,14 @@ async function quarantineRecordingFile(cameraId, filename, filePath, reason) {
         return { success: false, reason: error.message };
     }
 }
+
+const cleanupService = createRecordingCleanupService({
+    repository: recordingSegmentRepository,
+    recordingsBasePath: RECORDINGS_BASE_PATH,
+    safeDelete: deleteRecordingFileSafely,
+    isFileBeingProcessed: (targetCameraId, filename) => filesBeingProcessed.has(`${targetCameraId}:${filename}`),
+    logger: console,
+});
 
 const EXTERNAL_RECORDING_PROTOCOL_WHITELIST = 'file,http,https,tcp,tls,crypto';
 const RECORDING_RETRY_BASE_COOLDOWN_MS = 15000;
@@ -970,6 +979,12 @@ class RecordingService {
                 console.log(`[Cleanup] Camera ${cameraId} not found, skipping cleanup`);
                 return;
             }
+
+            return await cleanupService.cleanupCamera({
+                cameraId,
+                camera,
+                nowMs: now,
+            });
 
             // Calculate retention period in milliseconds.
             // Add a grace window so cleanup only removes clearly old segments.

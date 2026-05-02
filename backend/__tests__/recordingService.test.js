@@ -425,9 +425,10 @@ describe('recordingService external recording support', () => {
 
         queryOneMock.mockReturnValue({ recording_duration_hours: 1, name: 'Guarded Camera' });
         queryMock.mockImplementation((sql) => {
-            if (sql.includes('SELECT id, start_time, file_path, filename FROM recording_segments')) {
+            if (sql.includes('FROM recording_segments') && sql.includes('start_time <')) {
                 return [{
                     id: 501,
+                    camera_id: 1,
                     start_time: oldStart,
                     filename: '20260502_000000.mp4',
                     file_path: join(process.cwd(), 'outside-recordings', '20260502_000000.mp4'),
@@ -455,9 +456,10 @@ describe('recordingService external recording support', () => {
 
         queryOneMock.mockReturnValue({ recording_duration_hours: 1, name: 'Bounded Camera' });
         queryMock.mockImplementation((sql) => {
-            if (sql.includes('SELECT id, start_time, file_path, filename FROM recording_segments')) {
-                return Array.from({ length: 8 }, (_, index) => ({
+            if (sql.includes('FROM recording_segments') && sql.includes('start_time <')) {
+                return Array.from({ length: 6 }, (_, index) => ({
                     id: 600 + index,
+                    camera_id: 1,
                     start_time: oldStart,
                     filename: `20260502_00000${index}.mp4`,
                     file_path: join(recordingsBasePath, 'camera1', `20260502_00000${index}.mp4`),
@@ -488,19 +490,14 @@ describe('recordingService external recording support', () => {
 
         queryOneMock.mockReturnValue({ recording_duration_hours: 1, name: 'Mixed Retention Camera' });
         queryMock.mockImplementation((sql) => {
-            if (sql.includes('SELECT id, start_time, file_path, filename FROM recording_segments')) {
+            if (sql.includes('FROM recording_segments') && sql.includes('start_time <')) {
                 return [
                     {
                         id: 701,
+                        camera_id: 1,
                         start_time: oldStart,
                         filename: '20260502_000000.mp4',
                         file_path: oldPath,
-                    },
-                    {
-                        id: 702,
-                        start_time: recentStart,
-                        filename: '20260502_010000.mp4',
-                        file_path: recentPath,
                     },
                 ];
             }
