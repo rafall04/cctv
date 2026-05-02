@@ -14,6 +14,7 @@ import { promisify } from 'util';
 import { exec } from 'child_process';
 import { getEffectiveDeliveryType, getPrimaryExternalStreamUrl } from '../utils/cameraDelivery.js';
 import recordingProcessManager from './recordingProcessManager.js';
+import { isSafeRecordingFilename } from './recordingRetentionPolicy.js';
 const execPromise = promisify(exec);
 
 const __filename = fileURLToPath(import.meta.url);
@@ -130,9 +131,7 @@ export function isSafeRecordingFilePath(cameraId, filePath, filename = null) {
     }
 
     const fileName = filename || basename(resolvedPath);
-    return /^\d{8}_\d{6}\.mp4$/.test(fileName)
-        || fileName.includes('.remux.mp4')
-        || fileName.includes('.temp.mp4');
+    return isSafeRecordingFilename(fileName);
 }
 
 async function deleteRecordingFileSafely({ cameraId, filename, filePath, reason }) {
