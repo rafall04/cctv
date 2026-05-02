@@ -1,8 +1,15 @@
+/*
+Purpose: Render a camera thumbnail or fallback camera status icon.
+Caller: Public/admin camera cards and grids.
+Deps: React state and buildApiAssetUrl.
+MainFuncs: CameraThumbnail.
+SideEffects: Tracks thumbnail load failure in local component state.
+*/
+
 import { useState } from 'react';
 import { buildApiAssetUrl } from '../config/config.js';
 
 export default function CameraThumbnail({ 
-    cameraId, 
     thumbnailPath,
     cameraName,
     isMaintenance = false,

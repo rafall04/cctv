@@ -1,3 +1,11 @@
+/*
+Purpose: Provide stack-based notification state and convenience notification helpers.
+Caller: App provider tree and API/client UI components.
+Deps: React context/state/callback refs.
+MainFuncs: NotificationProvider, useNotification, getNotificationConfig.
+SideEffects: Schedules and clears notification dismissal timers.
+*/
+
 import { createContext, useContext, useState, useCallback, useRef } from 'react';
 
 /**
@@ -62,6 +70,20 @@ export function NotificationProvider({ children }) {
     const timersRef = useRef({});
 
     /**
+     * Dismiss a notification by ID
+     * @param {string} id - Notification ID
+     */
+    const dismissNotification = useCallback((id) => {
+        // Clear timer if exists
+        if (timersRef.current[id]) {
+            clearTimeout(timersRef.current[id]);
+            delete timersRef.current[id];
+        }
+
+        setNotifications((prev) => prev.filter((n) => n.id !== id));
+    }, []);
+
+    /**
      * Add a notification to the stack
      * @param {Object} notification - Notification object
      * @returns {string} Notification ID
@@ -99,21 +121,7 @@ export function NotificationProvider({ children }) {
         }
 
         return id;
-    }, []);
-
-    /**
-     * Dismiss a notification by ID
-     * @param {string} id - Notification ID
-     */
-    const dismissNotification = useCallback((id) => {
-        // Clear timer if exists
-        if (timersRef.current[id]) {
-            clearTimeout(timersRef.current[id]);
-            delete timersRef.current[id];
-        }
-
-        setNotifications((prev) => prev.filter((n) => n.id !== id));
-    }, []);
+    }, [dismissNotification]);
 
     /**
      * Clear all notifications

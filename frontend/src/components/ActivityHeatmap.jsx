@@ -1,3 +1,11 @@
+/*
+Purpose: Render an admin viewer activity heatmap from hourly/day analytics data.
+Caller: Analytics pages/components that display viewer activity density.
+Deps: React state/memo and analytics bucket data.
+MainFuncs: ActivityHeatmap.
+SideEffects: Tracks hovered heatmap cell in local component state.
+*/
+
 import { useState, useMemo } from 'react';
 
 /**
@@ -15,7 +23,6 @@ export function ActivityHeatmap({ data, onCellClick }) {
 
     // Nama hari dalam Bahasa Indonesia
     const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-    const dayNamesShort = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
 
     // Process data menjadi matrix 7 hari x 24 jam
     const heatmapMatrix = useMemo(() => {

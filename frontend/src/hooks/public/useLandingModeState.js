@@ -1,3 +1,11 @@
+/*
+Purpose: Synchronize public landing layout/view mode state with URL params and localStorage.
+Caller: LandingPage public mode controller.
+Deps: React transition/effects/refs/state and router search param setter.
+MainFuncs: useLandingModeState.
+SideEffects: Updates search params and localStorage layout preference.
+*/
+
 import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
 
 function getInitialLayoutMode(searchParams) {
@@ -82,7 +90,7 @@ export function useLandingModeState(searchParams, setSearchParams) {
         if (needsUpdate) {
             setSearchParams(nextParams, { replace: true });
         }
-    }, [searchParams, viewMode]);
+    }, [layoutMode, searchParams, setSearchParams, viewMode]);
 
     useEffect(() => {
         if (isInitialMount.current) {

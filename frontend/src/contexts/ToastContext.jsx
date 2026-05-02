@@ -1,4 +1,12 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+/*
+Purpose: Provide lightweight toast state and auto-dismiss behavior.
+Caller: App provider tree and components needing toast notifications.
+Deps: React context/state/callback/effect hooks and UI icons.
+MainFuncs: ToastProvider, useToast, Toast.
+SideEffects: Schedules timeout-based toast dismissal.
+*/
+
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { Icons } from '../components/ui/Icons';
 
 // Toast Component

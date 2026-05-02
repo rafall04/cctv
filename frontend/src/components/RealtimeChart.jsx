@@ -1,3 +1,11 @@
+/*
+Purpose: Render lightweight canvas-based real-time viewer activity charts.
+Caller: Admin dashboard/analytics widgets.
+Deps: React hooks, canvas API, adminService.
+MainFuncs: RealtimeChart, RealtimeActivityChart.
+SideEffects: Polls realtime viewer API and schedules intervals/animation cleanup.
+*/
+
 import { useState, useEffect, useRef } from 'react';
 import { adminService } from '../services/adminService';
 
@@ -14,10 +22,8 @@ import { adminService } from '../services/adminService';
  */
 export function RealtimeChart({ 
     data = [], 
-    title = "Real-time Activity",
     height = 200,
     maxDataPoints = 20,
-    updateInterval = 5000,
     color = '#0ea5e9'
 }) {
     const canvasRef = useRef(null);
@@ -174,9 +180,10 @@ export function RealtimeChart({
 
     // Cleanup
     useEffect(() => {
+        const animationFrame = animationFrameRef.current;
         return () => {
-            if (animationFrameRef.current) {
-                cancelAnimationFrame(animationFrameRef.current);
+            if (animationFrame) {
+                cancelAnimationFrame(animationFrame);
             }
         };
     }, []);
@@ -205,7 +212,6 @@ export function RealtimeActivityChart() {
     const [data, setData] = useState([]);
     const [isLive, setIsLive] = useState(true);
     const [lastUpdate, setLastUpdate] = useState(null);
-    const [currentViewers, setCurrentViewers] = useState(0);
     const intervalRef = useRef(null);
 
     // Fetch real-time data dari API
@@ -229,7 +235,6 @@ export function RealtimeActivityChart() {
                     return updated.slice(-20); // Keep last 20 points (5 menit data)
                 });
 
-                setCurrentViewers(activeViewers);
                 setLastUpdate(now);
             }
         } catch (error) {

@@ -1,3 +1,11 @@
+/*
+Purpose: Render configured third-party ad banner placeholders and inject ad network scripts.
+Caller: Legacy/public ad placements.
+Deps: React effect/ref and browser document script APIs.
+MainFuncs: AdBanner.
+SideEffects: Mutates ad container DOM by appending third-party script tags.
+*/
+
 import { useEffect, useRef } from 'react';
 
 /**
@@ -28,7 +36,55 @@ function AdBanner({
     const currentSize = adSizes[size] || adSizes.leaderboard;
 
     useEffect(() => {
-        if (!adContainerRef.current) return;
+        const container = adContainerRef.current;
+        if (!container) return;
+
+        const loadMediaNetAd = () => {
+            const script = document.createElement('script');
+            script.innerHTML = `
+                window._mNHandle = window._mNHandle || {};
+                window._mNHandle.queue = window._mNHandle.queue || [];
+                medianet_width = "${currentSize.width}";
+                medianet_height = "${currentSize.height}";
+                medianet_crid = "YOUR_MEDIA_NET_CRID";
+                medianet_versionId = "3111299";
+            `;
+            container.appendChild(script);
+
+            const adScript = document.createElement('script');
+            adScript.src = '//contextual.media.net/nmedianet.js?cid=YOUR_MEDIA_NET_CID';
+            adScript.async = true;
+            container.appendChild(adScript);
+        };
+
+        const loadAdsterraAd = () => {
+            const script = document.createElement('script');
+            script.type = 'text/javascript';
+            script.innerHTML = `
+                atOptions = {
+                    'key' : 'YOUR_ADSTERRA_KEY',
+                    'format' : 'iframe',
+                    'height' : ${currentSize.height},
+                    'width' : ${currentSize.width},
+                    'params' : {}
+                };
+            `;
+            container.appendChild(script);
+
+            const adScript = document.createElement('script');
+            adScript.type = 'text/javascript';
+            adScript.src = '//www.topcreativeformat.com/YOUR_ADSTERRA_ID/invoke.js';
+            adScript.async = true;
+            container.appendChild(adScript);
+        };
+
+        const loadPropellerAd = () => {
+            const script = document.createElement('script');
+            script.async = true;
+            script.setAttribute('data-cfasync', 'false');
+            script.src = '//pl123456.puhtml.com/YOUR_ZONE_ID.js';
+            container.appendChild(script);
+        };
 
         // Load ad script based on network
         const loadAd = () => {
@@ -51,61 +107,9 @@ function AdBanner({
 
         // Cleanup
         return () => {
-            if (adContainerRef.current) {
-                adContainerRef.current.innerHTML = '';
-            }
+            container.innerHTML = '';
         };
-    }, [network, size]);
-
-    const loadMediaNetAd = () => {
-        // Media.net implementation
-        const script = document.createElement('script');
-        script.innerHTML = `
-            window._mNHandle = window._mNHandle || {};
-            window._mNHandle.queue = window._mNHandle.queue || [];
-            medianet_width = "${currentSize.width}";
-            medianet_height = "${currentSize.height}";
-            medianet_crid = "YOUR_MEDIA_NET_CRID";
-            medianet_versionId = "3111299";
-        `;
-        adContainerRef.current.appendChild(script);
-
-        const adScript = document.createElement('script');
-        adScript.src = '//contextual.media.net/nmedianet.js?cid=YOUR_MEDIA_NET_CID';
-        adScript.async = true;
-        adContainerRef.current.appendChild(adScript);
-    };
-
-    const loadAdsterraAd = () => {
-        // Adsterra native banner implementation
-        const script = document.createElement('script');
-        script.type = 'text/javascript';
-        script.innerHTML = `
-            atOptions = {
-                'key' : 'YOUR_ADSTERRA_KEY',
-                'format' : 'iframe',
-                'height' : ${currentSize.height},
-                'width' : ${currentSize.width},
-                'params' : {}
-            };
-        `;
-        adContainerRef.current.appendChild(script);
-
-        const adScript = document.createElement('script');
-        adScript.type = 'text/javascript';
-        adScript.src = '//www.topcreativeformat.com/YOUR_ADSTERRA_ID/invoke.js';
-        adScript.async = true;
-        adContainerRef.current.appendChild(adScript);
-    };
-
-    const loadPropellerAd = () => {
-        // PropellerAds implementation
-        const script = document.createElement('script');
-        script.async = true;
-        script.setAttribute('data-cfasync', 'false');
-        script.src = '//pl123456.puhtml.com/YOUR_ZONE_ID.js';
-        adContainerRef.current.appendChild(script);
-    };
+    }, [currentSize.height, currentSize.width, network]);
 
     return (
         <div 

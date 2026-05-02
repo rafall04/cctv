@@ -1,3 +1,11 @@
+/*
+Purpose: Manage multi-view stream lifecycle with staggered initialization, device limits, and isolated cleanup.
+Caller: Multi-view utilities and video layout orchestration.
+Deps: deviceDetector, timers, AbortController, HLS instances supplied by callers.
+MainFuncs: createMultiViewManager, delay, StreamStatus helpers.
+SideEffects: Schedules stream initialization and destroys stream resources during cleanup.
+*/
+
 /**
  * MultiViewManager Module
  * Manages multiple video streams with optimized performance
@@ -298,12 +306,12 @@ export const createMultiViewManager = (options = {}) => {
         cancelInitialization();
 
         // Destroy all HLS instances
-        for (const [cameraId, stream] of streams) {
+        for (const stream of streams.values()) {
             if (stream.hlsInstance) {
                 try {
                     stream.hlsInstance.destroy();
                 } catch (e) {
-                    // Ignore cleanup errors - error isolation
+                    void e;
                 }
             }
             stream.status = StreamStatus.DESTROYED;

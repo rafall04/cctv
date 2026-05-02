@@ -1,3 +1,11 @@
+/*
+Purpose: Render the fullscreen multi-view camera grid and coordinate per-stream status isolation.
+Caller: Multi-view launcher components.
+Deps: React refs/effects, UI icons, MultiViewVideoItem.
+MainFuncs: MultiViewLayout.
+SideEffects: Locks body scroll while mounted and listens for Escape/fullscreen controls.
+*/
+
 import { useRef, useEffect, useCallback } from 'react';
 import { Icons } from '../../components/ui/Icons';
 import MultiViewVideoItem from './MultiViewVideoItem';
@@ -25,9 +33,10 @@ function MultiViewLayout({ cameras, onRemove, onClose }) {
 
     // Cleanup all streams on unmount
     useEffect(() => {
+        const streamErrors = streamErrorsRef.current;
         return () => {
             // Clear error tracking
-            streamErrorsRef.current.clear();
+            streamErrors.clear();
         };
     }, []);
 
@@ -35,7 +44,9 @@ function MultiViewLayout({ cameras, onRemove, onClose }) {
         try {
             if (!document.fullscreenElement) await containerRef.current?.requestFullscreen?.();
             else await document.exitFullscreen?.();
-        } catch { }
+        } catch {
+            // Ignore fullscreen API failures.
+        }
     };
 
     // Handle stream errors with isolation - one error doesn't affect others

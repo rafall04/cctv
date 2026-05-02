@@ -1,7 +1,14 @@
-import { useRef, useState, useEffect, useCallback, memo } from 'react';
+/*
+Purpose: Render and manage one camera stream inside the multi-view experience.
+Caller: MultiViewLayout.
+Deps: React, HLS.js, stream utilities, viewerService, snapshot helper, branding context, stream timeout hook.
+MainFuncs: MultiViewVideoItem.
+SideEffects: Starts/stops viewer sessions, creates/destroys HLS instances, controls fullscreen/orientation, captures snapshots.
+*/
+
+import { useRef, useState, useEffect, useCallback } from 'react';
 import Hls from 'hls.js';
 import { Icons } from '../ui/Icons';
-import CodecBadge from '../CodecBadge';
 import ZoomableVideo from './ZoomableVideo';
 import { detectDeviceTier } from '../../utils/deviceDetector';
 import { shouldDisableAnimations } from '../../utils/animationControl';
@@ -63,8 +70,10 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
     const [autoRetryCount, setAutoRetryCount] = useState(0);
     const [isAutoRetrying, setIsAutoRetrying] = useState(false);
     const [forceProxyFallback, setForceProxyFallback] = useState(false);
+    const [errorType, setErrorType] = useState(null);
 
     const url = camera.streams?.hls;
+    const { branding } = useBranding();
     const deviceTier = detectDeviceTier();
     const { targetUrl: resolvedUrl, proxyFallbackUrl, isDirectStream } = resolveStreamUrl(camera, { forceProxy: forceProxyFallback });
     const effectiveUrl = resolvedUrl || url;
@@ -96,7 +105,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 }
             }
         };
-    }, []);
+    }, [clearStreamTimeout]);
 
     // Viewer session tracking - track when user starts/stops watching this camera
     useEffect(() => {
@@ -182,7 +191,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 fallbackHandlerRef.current = null;
             }
         };
-    }, []);
+    }, [clearStreamTimeout]);
 
     // Cleanup resources function - **Validates: Requirements 7.1, 7.2, 7.3**
     const cleanupResources = useCallback(() => {
@@ -203,7 +212,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         if (fallbackHandlerRef.current) {
             fallbackHandlerRef.current.clearPendingRetry();
         }
-    }, []);
+    }, [clearStreamTimeout]);
 
     useEffect(() => {
         // Skip HLS loading if camera is in maintenance or offline
@@ -407,8 +416,9 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                         });
 
                         if (result.action === 'manual-retry-required') {
-                            setStatus('error');
-                            setLoadingStage(LoadingStage.ERROR);
+                    setStatus('error');
+                    setErrorType(errorType);
+                    setLoadingStage(LoadingStage.ERROR);
                             onError?.(camera.id, new Error(`HLS fatal error: ${d.type}`));
                         }
                     } else {
@@ -467,7 +477,27 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 hlsRef.current = null;
             }
         };
-    }, [availabilityState, effectiveUrl, retryKey, initDelay, camera.id, onError, deviceTier, cleanupResources, isMaintenance, isOffline, forceProxyFallback]);
+    }, [
+        autoRetryCount,
+        availabilityState,
+        camera.id,
+        camera.stream_source,
+        cleanupResources,
+        clearStreamTimeout,
+        deviceTier,
+        effectiveUrl,
+        forceProxyFallback,
+        initDelay,
+        isDirectStream,
+        isMaintenance,
+        isOffline,
+        loadingStage,
+        onError,
+        proxyFallbackUrl,
+        retryKey,
+        startTimeout,
+        updateStreamStage,
+    ]);
 
     const handleRetry = useCallback(() => {
         cleanupResources();
@@ -480,7 +510,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             fallbackHandlerRef.current.reset();
         }
         setRetryKey(k => k + 1);
-    }, [cleanupResources]);
+    }, [cleanupResources, resetFailures]);
 
     const toggleFS = async () => {
         try {

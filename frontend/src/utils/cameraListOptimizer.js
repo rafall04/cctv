@@ -1,3 +1,13 @@
+/*
+Purpose: Optimize large camera list rendering through equality checks, batching, virtual ranges, and progressive rendering hooks.
+Caller: Camera grids/lists that need stable rendering with many cameras.
+Deps: React hooks.
+MainFuncs: areCamerasEqual, areCameraListsEqual, useOptimizedCameraList, CameraUpdateBatcher, calculateVisibleRange, chunkCameras, useProgressiveRender.
+SideEffects: CameraUpdateBatcher and progressive rendering schedule timers.
+*/
+
+import * as React from 'react';
+
 /**
  * Camera List Optimizer
  * Prevents unnecessary re-renders in grid view by memoizing camera data

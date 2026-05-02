@@ -1,3 +1,11 @@
+/*
+Purpose: Register API client notification and timeout retry callbacks inside the notification provider tree.
+Caller: App provider tree.
+Deps: React effects/refs, NotificationContext, apiClient callback setters.
+MainFuncs: ApiClientInitializer.
+SideEffects: Mutates apiClient callback registry while mounted.
+*/
+
 import { useEffect, useRef } from 'react';
 import { useNotification } from '../contexts/NotificationContext';
 import { setNotificationCallback, setTimeoutRetryCallback } from '../services/apiClient';
@@ -22,7 +30,7 @@ export function ApiClientInitializer({ children }) {
 
         // Set up timeout retry callback
         // This allows the apiClient to offer retry option on timeout
-        setTimeoutRetryCallback((retryFn, originalRequest) => {
+        setTimeoutRetryCallback((retryFn) => {
             retryFnRef.current = retryFn;
             
             // Show warning notification with retry action

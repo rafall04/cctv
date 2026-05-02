@@ -1,4 +1,12 @@
-import { useState, useEffect } from 'react';
+/*
+Purpose: Admin sponsor management page for sponsor CRUD, package stats, and sponsor form workflows.
+Caller: Protected admin sponsor route.
+Deps: React state/effects/callbacks, NotificationContext, sponsorService, skeleton UI components.
+MainFuncs: SponsorManagement.
+SideEffects: Loads and mutates sponsor data through API services.
+*/
+
+import { useState, useEffect, useCallback } from 'react';
 import { useNotification } from '../contexts/NotificationContext';
 import * as sponsorService from '../services/sponsorService';
 import { TableSkeleton, StatCardSkeleton } from '../components/ui/Skeleton';
@@ -46,11 +54,7 @@ function SponsorManagement() {
         }
     };
 
-    useEffect(() => {
-        loadData();
-    }, []);
-
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         try {
             setLoading(true);
             const [sponsorsRes, statsRes] = await Promise.all([
@@ -64,7 +68,11 @@ function SponsorManagement() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [showNotification]);
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();

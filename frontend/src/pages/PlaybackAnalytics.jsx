@@ -253,7 +253,7 @@ export default function PlaybackAnalytics() {
 
     useAdminReconnectRefresh(() => loadAnalytics('resume'));
 
-    const accessBreakdown = analytics?.accessBreakdown || [];
+    const accessBreakdown = useMemo(() => analytics?.accessBreakdown || [], [analytics?.accessBreakdown]);
     const topCameras = analytics?.topCameras || [];
     const topSegments = analytics?.topSegments || [];
     const topViewers = analytics?.topViewers || [];

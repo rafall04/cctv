@@ -1,3 +1,11 @@
+/*
+Purpose: Validate RTSP URL and generic form input values.
+Caller: Camera forms and reusable validation hooks.
+Deps: JavaScript string/regex utilities.
+MainFuncs: validateRtspUrl, createRtspUrlValidator, isValidRtspUrl, getRtspUrlHelpText.
+SideEffects: None.
+*/
+
 /**
  * Validators Module
  * 
@@ -5,18 +13,6 @@
  * 
  * Requirements: 4.3
  */
-
-/**
- * RTSP URL validation pattern
- * Matches: rtsp://[user:pass@]host[:port][/path]
- */
-const RTSP_URL_PATTERN = /^rtsp:\/\/([^:@\/]+:[^:@\/]+@)?([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(:\d{1,5})?(\/.*)?$/;
-
-/**
- * Simple RTSP URL pattern for basic validation
- * Matches: rtsp://host (with optional port and path)
- */
-const RTSP_URL_SIMPLE_PATTERN = /^rtsp:\/\/[^\s]+$/;
 
 /**
  * Validate an RTSP URL
@@ -120,7 +116,7 @@ export function validateRtspUrl(url) {
     }
 
     // Check for invalid characters in host
-    if (/[\s<>{}|\\^`\[\]]/.test(host)) {
+    if (/[\s<>{}|\\^`[\]]/.test(host)) {
         return {
             isValid: false,
             error: 'Host contains invalid characters'

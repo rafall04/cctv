@@ -1,4 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+/*
+Purpose: Track favorite and recent cameras in localStorage for public camera browsing.
+Caller: Public landing and camera browsing components.
+Deps: React state/callbacks and browser localStorage.
+MainFuncs: useCameraHistory.
+SideEffects: Reads/writes localStorage keys.
+*/
+
+import { useState, useCallback } from 'react';
 
 const FAVORITES_KEY = 'cctv_favorites';
 const RECENT_KEY = 'cctv_recent';

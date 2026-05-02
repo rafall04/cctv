@@ -1,3 +1,11 @@
+/*
+Purpose: Provide pointer/wheel zoom and pan behavior for multi-view video elements.
+Caller: MultiViewVideoItem.
+Deps: React refs/callbacks/effects, device tier detection, RAF transform throttle.
+MainFuncs: ZoomableVideo.
+SideEffects: Mutates wrapper/video DOM style and exposes zoom controls on wrapper element.
+*/
+
 import { useRef, useCallback, useEffect, memo } from 'react';
 import { detectDeviceTier } from '../../utils/deviceDetector.js';
 import { createTransformThrottle } from '../../utils/rafThrottle.js';
@@ -5,7 +13,7 @@ import { createTransformThrottle } from '../../utils/rafThrottle.js';
 // ZOOMABLE VIDEO COMPONENT - Optimized for low-end devices
 // Disables heavy features (willChange, RAF throttle) on low-end
 // ============================================
-const ZoomableVideo = memo(function ZoomableVideo({ videoRef, maxZoom = 4, onZoomChange, isFullscreen = false }) {
+const ZoomableVideo = memo(function ZoomableVideo({ videoRef, maxZoom = 4, onZoomChange }) {
     const wrapperRef = useRef(null);
     const transformThrottleRef = useRef(null);
     const stateRef = useRef({ zoom: 1, panX: 0, panY: 0, dragging: false, startX: 0, startY: 0, startPanX: 0, startPanY: 0 });
@@ -98,7 +106,11 @@ const ZoomableVideo = memo(function ZoomableVideo({ videoRef, maxZoom = 4, onZoo
         const s = stateRef.current;
         s.dragging = false;
         if (wrapperRef.current) wrapperRef.current.style.cursor = s.zoom > 1 ? 'grab' : 'default';
-        try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { }
+        try {
+            e.currentTarget.releasePointerCapture(e.pointerId);
+        } catch {
+            // Ignore pointer capture release races.
+        }
     }, []);
 
     const reset = useCallback(() => {

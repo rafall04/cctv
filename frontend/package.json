@@ -7,8 +7,8 @@
         "dev": "vite",
         "build": "vite build",
         "preview": "vite preview",
-        "lint": "npm run lint:admin",
-        "lint:admin": "eslint src/App.jsx src/App.admin.test.jsx src/layouts src/components/admin src/components/playback src/components/landing src/components/CameraStatusOverview.jsx src/components/DateRangeSelector.jsx src/components/QuickStatsCards.jsx src/components/TopCamerasWidget.jsx src/components/LandingPageSimple.jsx src/components/ui/EmptyState.jsx src/components/ui/Skeleton.jsx src/contexts/CameraContext.jsx src/pages/Dashboard.jsx src/pages/CameraManagement.jsx src/pages/AreaManagement.jsx src/pages/UserManagement.jsx src/pages/Playback.jsx src/pages/UnifiedSettings.jsx src/pages/ViewerAnalytics.jsx src/pages/LandingPage.jsx src/pages/*.test.jsx src/contexts/*.test.jsx src/services/adminService.js src/services/apiClient.js src/services/areaService.js src/services/brandingService.js src/services/cameraService.js src/services/recordingService.js src/services/saweriaService.js src/services/settingsService.js src/services/streamService.js src/services/userService.js --ext js,jsx --report-unused-disable-directives --max-warnings 0 --rule \"react-refresh/only-export-components: off\"",
+        "lint": "eslint src --ext js,jsx --report-unused-disable-directives --max-warnings 0 --rule \"react-refresh/only-export-components: off\"",
+        "lint:admin": "npm run lint",
         "test": "vitest run",
         "test:watch": "vitest"
     },

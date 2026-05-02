@@ -1,3 +1,11 @@
+/*
+Purpose: Catch React render errors and present fallback recovery UI.
+Caller: App route tree and page/layout boundaries.
+Deps: React Component API and optional fallback/onError/onReset props.
+MainFuncs: ErrorBoundary.
+SideEffects: Logs development errors and may reload the page on user action.
+*/
+
 import { Component } from 'react';
 
 /**
@@ -16,7 +24,7 @@ class ErrorBoundary extends Component {
         };
     }
 
-    static getDerivedStateFromError(error) {
+    static getDerivedStateFromError() {
         return { hasError: true };
     }
 

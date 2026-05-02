@@ -1,9 +1,17 @@
-import { useEffect, useRef, useState, memo, useCallback } from 'react';
+/*
+Purpose: Optimized HLS video player with adaptive loading, recovery, visibility pause, fullscreen, and zoom controls.
+Caller: Public live camera popup and video surfaces.
+Deps: React hooks, HLS/preload utilities, device/orientation/visibility observers, fallback and timeout helpers.
+MainFuncs: VideoPlayer.
+SideEffects: Creates/destroys HLS streams, starts direct-stream telemetry sessions, mutates media/fullscreen/orientation state.
+*/
+
+import { useEffect, useRef, useState, memo, useCallback, useMemo } from 'react';
 import { getDeviceCapabilities } from '../utils/deviceDetector';
 import { getHLSConfig } from '../utils/hlsConfig';
 import { createErrorRecoveryHandler } from '../utils/errorRecovery';
 import { createVisibilityObserver } from '../utils/visibilityObserver';
-import { createOrientationObserver, getCurrentOrientation } from '../utils/orientationObserver';
+import { createOrientationObserver } from '../utils/orientationObserver';
 import { preloadHls } from '../utils/preloadManager';
 import { useStreamTimeout } from '../hooks/useStreamTimeout';
 import { LoadingStage, getStageMessage, createStreamError } from '../utils/streamLoaderTypes';
@@ -21,6 +29,7 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
     const visibilityObserverRef = useRef(null);
     const orientationObserverRef = useRef(null);
     const errorRecoveryRef = useRef(null);
+    const handleRetryRef = useRef(null);
     const pauseTimeoutRef = useRef(null);
     const bufferSpinnerTimeoutRef = useRef(null);
     // New refs for stream loading fix
@@ -58,9 +67,7 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
     const [status, setStatus] = useState('loading'); // loading, playing, paused, error, timeout
     const [loadingStage, setLoadingStage] = useState(LoadingStage.CONNECTING);
     const [forceProxyFallback, setForceProxyFallback] = useState(false);
-    const [sessionTelemetryId, setSessionTelemetryId] = useState(null);
     const [error, setError] = useState(null);
-    const [retryCount, setRetryCount] = useState(0);
     const [showSpinner, setShowSpinner] = useState(true);
     const maxRetries = 4;
 
@@ -74,27 +81,29 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
     const [showTroubleshooting, setShowTroubleshooting] = useState(false);
 
     // Visibility state
-    const [isVisible, setIsVisible] = useState(true);
     const [isPausedByVisibility, setIsPausedByVisibility] = useState(false);
 
     // Fullscreen state
     const [isFullScreen, setIsFullScreen] = useState(false);
-
-    // Orientation state - **Validates: Requirements 7.4**
-    const [orientation, setOrientation] = useState(() => getCurrentOrientation());
 
     // Zoom & Pan State
     const [zoom, setZoom] = useState(1);
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+    const isExternalStream = camera?.stream_source === 'external';
+    const useDirectStream = useMemo(() => (
+        isExternalStream
+        && (camera?.external_use_proxy === 0 || camera?.external_use_proxy === false)
+        && !forceProxyFallback
+    ), [camera?.external_use_proxy, forceProxyFallback, isExternalStream]);
 
     // Detect device capabilities on mount
     useEffect(() => {
         const capabilities = getDeviceCapabilities();
         setDeviceCapabilities(capabilities);
         setDeviceTier(capabilities.tier);
-    }, []);
+    }, [clearStreamTimeout]);
 
     // Setup orientation observer - **Validates: Requirements 7.4**
     // Handles orientation changes without triggering stream reload
@@ -102,10 +111,7 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
         if (!deviceCapabilities?.isMobile) return;
 
         orientationObserverRef.current = createOrientationObserver({
-            onOrientationChange: ({ orientation: newOrientation }) => {
-                // Update orientation state without reloading stream
-                setOrientation(newOrientation);
-
+            onOrientationChange: () => {
                 // Reset zoom/pan on orientation change for better UX
                 if (zoom !== 1) {
                     setZoom(1);
@@ -132,7 +138,6 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
             maxRetries,
             onRetry: (count, delay) => {
                 setError(`Network error - retrying in ${delay / 1000}s...`);
-                setRetryCount(count);
             },
             onRecovery: (type) => {
                 if (type === 'network' || type === 'media') {
@@ -153,13 +158,13 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                 errorRecoveryRef.current.reset();
             }
         };
-    }, []);
+    }, [clearStreamTimeout]);
 
     // Initialize error recovery handler
     useEffect(() => {
         fallbackHandlerRef.current = createFallbackHandler({
             maxAutoRetries: 3,
-            onAutoRetry: ({ attempt, maxAttempts, delay, errorType }) => {
+            onAutoRetry: ({ attempt, maxAttempts, delay }) => {
                 setIsAutoRetrying(true);
                 setAutoRetryCount(attempt);
                 setRetryDelay(delay);
@@ -173,10 +178,10 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                 // Auto-reconnect when network is restored
                 // **Validates: Requirements 6.5**
                 if (status === 'error' || status === 'timeout') {
-                    handleRetry();
+                    handleRetryRef.current?.();
                 }
             },
-            onManualRetryRequired: ({ errorType, message }) => {
+            onManualRetryRequired: ({ message }) => {
                 setIsAutoRetrying(false);
                 setError(message);
             },
@@ -231,7 +236,7 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
             clearTimeout(bufferSpinnerTimeoutRef.current);
             bufferSpinnerTimeoutRef.current = null;
         }
-    }, []);
+    }, [clearStreamTimeout]);
 
     // Setup visibility observer for pause/resume based on visibility
     // **Property 9: Visibility-based Stream Control**
@@ -244,8 +249,6 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
         });
 
         visibilityObserverRef.current.observe(containerRef.current, (visible) => {
-            setIsVisible(visible);
-
             if (visible) {
                 // Clear any pending pause timeout
                 if (pauseTimeoutRef.current) {
@@ -294,7 +297,6 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
      */
     const handleRetry = useCallback(() => {
         // Reset states
-        setRetryCount(0);
         setAutoRetryCount(0);
         setIsAutoRetrying(false);
         setError(null);
@@ -318,7 +320,11 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
 
         // Force re-render to trigger initPlayer
         setDeviceCapabilities(prev => ({ ...prev }));
-    }, [cleanupResources]);
+    }, [cleanupResources, resetFailures]);
+
+    useEffect(() => {
+        handleRetryRef.current = handleRetry;
+    }, [handleRetry]);
 
     // Main HLS initialization effect - now using PreloadManager
     // **Validates: Requirements 2.1, 2.2, 2.3**
@@ -326,10 +332,7 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
         if (!streams || !videoRef.current || !deviceCapabilities) return;
 
         const video = videoRef.current;
-        const isExternal = camera?.stream_source === 'external';
-
         // Smart Routing Logic: Bypass proxy if configured, unless fallback tripped
-        const useDirectStream = isExternal && (camera.external_use_proxy === 0 || camera.external_use_proxy === false) && !forceProxyFallback;
         const targetHlsUrl = useDirectStream && camera.external_hls_url ? camera.external_hls_url : streams.hls;
 
         let hls = null;
@@ -402,7 +405,6 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
 
                                 setStatus('playing');
                                 setLoadingStage(LoadingStage.PLAYING);
-                                setRetryCount(0);
                                 setAutoRetryCount(0);
                                 setShowSpinner(false);
                                 setConsecutiveFailures(0);
@@ -435,7 +437,7 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                     // allowing Hls.js to accumulate stale buffers that lead to 404 segment errors.
                     // This forces the player to jump to the live edge when finally played.
                     video.addEventListener('play', () => {
-                        if (isDestroyed || !hls || !isExternal) return;
+                        if (isDestroyed || !hls || !isExternalStream) return;
 
                         if (hls.liveSyncPosition) {
                             const latency = hls.liveSyncPosition - video.currentTime;
@@ -471,7 +473,7 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                             });
 
                             // Aggressive network error recovery for external streams
-                            if (isExternal && data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                            if (isExternalStream && data.type === Hls.ErrorTypes.NETWORK_ERROR) {
                                 // Smart Fallback: if Direct Stream fails (CORS block/timeout), fallback to backend proxy
                                 if (useDirectStream) {
                                     console.warn(`[VideoPlayer] Direct stream failed (CORS/Timeout). Falling back to proxy...`);
@@ -599,13 +601,24 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                 hlsRef.current = null;
             }
         };
-    }, [streams, deviceCapabilities, deviceTier, cleanupResources, loadingStage, camera?.external_hls_url, camera?.external_use_proxy, camera?.stream_source, forceProxyFallback]);
+    }, [
+        autoRetryCount,
+        camera?.external_hls_url,
+        cleanupResources,
+        clearStreamTimeout,
+        deviceCapabilities,
+        deviceTier,
+        isExternalStream,
+        loadingStage,
+        resetFailures,
+        startTimeout,
+        streams,
+        updateStreamStage,
+        useDirectStream,
+    ]);
 
     // Out-of-band Telemetry Tracking for Direct Streams
     useEffect(() => {
-        const isExternal = camera?.stream_source === 'external';
-        const useDirectStream = isExternal && (camera?.external_use_proxy === 0 || camera?.external_use_proxy === false) && !forceProxyFallback;
-
         // Only run telemetry if proxy is bypassed and stream is actively playing
         if (!useDirectStream || status !== 'playing' || !camera?.id) {
             return;
@@ -627,7 +640,6 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                     const data = await response.json();
                     if (data.success && data.data?.sessionId) {
                         activeSessionId = data.data.sessionId;
-                        setSessionTelemetryId(activeSessionId);
                         
                         // Start heartbeat loop
                         telemetryInterval = setInterval(async () => {
@@ -660,7 +672,7 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
                 }).catch(() => {});
             }
         };
-    }, [useDirectStream, status, camera?.id, forceProxyFallback]);
+    }, [useDirectStream, status, camera?.id]);
 
     // Handle buffering events - **Property 8: Brief Buffer No Spinner**
     // Don't show spinner for brief buffers (< 2 seconds)

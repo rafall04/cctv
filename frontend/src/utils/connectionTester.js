@@ -1,3 +1,11 @@
+/*
+Purpose: Test stream/server reachability with lightweight HEAD requests and timeout handling.
+Caller: Stream recovery and public reachability utilities.
+Deps: fetch, AbortController, performance timer.
+MainFuncs: testConnection, testMultipleConnections, buildHlsTestUrl.
+SideEffects: Performs network requests.
+*/
+
 /**
  * ConnectionTester Module
  * 
@@ -40,7 +48,7 @@ export const testConnection = async (url, timeout = DEFAULT_TIMEOUT) => {
         // Use HEAD request for lightweight check (Requirement 3.3)
         // Note: mode 'no-cors' returns opaque response, so we can't check status
         // A successful fetch (even 404) means the server is reachable
-        const response = await fetch(url, {
+        await fetch(url, {
             method: 'HEAD',
             signal: controller.signal,
             mode: 'cors', // Use cors mode to get actual response status

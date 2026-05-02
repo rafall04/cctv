@@ -1,3 +1,11 @@
+/*
+Purpose: Serialize and limit concurrent stream initialization for multi-view/video startup.
+Caller: Video player and multi-view stream initialization flows.
+Deps: device detection and AbortController.
+MainFuncs: createStreamInitQueue, getGlobalStreamInitQueue, shouldUseQueuedInit.
+SideEffects: Queues async init work and may abort pending operations.
+*/
+
 /**
  * StreamInitQueue Module
  * Manages stream initialization queue for low-end devices
@@ -85,7 +93,7 @@ export const createStreamInitQueue = (options = {}) => {
         }
 
         isProcessing = true;
-        const { initFn, resolve, reject, id } = queue.shift();
+        const { initFn, resolve, reject } = queue.shift();
         activeCount++;
 
         try {

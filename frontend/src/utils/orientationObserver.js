@@ -1,3 +1,11 @@
+/*
+Purpose: Observe device orientation changes with debounce and expose orientation helpers.
+Caller: Video player and fullscreen media components.
+Deps: window, screen.orientation, resize/orientationchange events.
+MainFuncs: getCurrentOrientation, createOrientationObserver, useOrientationObserver.
+SideEffects: Registers browser orientation/resize listeners while observers are active.
+*/
+
 /**
  * OrientationObserver Module
  * Handles device orientation changes without triggering stream reloads
@@ -140,7 +148,7 @@ export const createOrientationObserver = (options = {}) => {
  * @param {Function} callback - Called when orientation changes
  * @returns {Object} Current orientation state
  */
-export const useOrientationObserver = (callback) => {
+export const useOrientationObserver = () => {
     // This is a utility function signature for documentation
     // Actual React hook implementation would be in the component
     return {

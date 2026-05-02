@@ -1,4 +1,12 @@
-import { useState, useEffect } from 'react';
+/*
+Purpose: Legacy general settings tab for landing page copy fields.
+Caller: Legacy settings page surfaces.
+Deps: React state/effects/callbacks, NotificationContext, adminAPI, axios.
+MainFuncs: GeneralSettingsTab.
+SideEffects: Loads public landing settings and writes admin settings.
+*/
+
+import { useState, useEffect, useCallback } from 'react';
 import { useNotification } from '../../contexts/NotificationContext';
 import { adminAPI } from '../../services/api';
 import axios from 'axios';
@@ -17,11 +25,7 @@ export default function GeneralSettingsTab() {
         landing_section_title: ''
     });
 
-    useEffect(() => {
-        fetchSettings();
-    }, []);
-
-    const fetchSettings = async () => {
+    const fetchSettings = useCallback(async () => {
         try {
             setLoading(true);
             const baseUrl = getApiUrl();
@@ -41,7 +45,11 @@ export default function GeneralSettingsTab() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [addNotification]);
+
+    useEffect(() => {
+        fetchSettings();
+    }, [fetchSettings]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
