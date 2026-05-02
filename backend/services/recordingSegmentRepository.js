@@ -78,6 +78,27 @@ class RecordingSegmentRepository {
             [cameraId, filename]
         );
     }
+
+    findOldestSegmentsForEmergency({ afterStartTime = null, afterId = 0, limit = 200 } = {}) {
+        if (!afterStartTime) {
+            return query(
+                `SELECT ${SEGMENT_SELECT_FIELDS}
+                FROM recording_segments
+                ORDER BY start_time ASC, id ASC
+                LIMIT ?`,
+                [limit]
+            );
+        }
+
+        return query(
+            `SELECT ${SEGMENT_SELECT_FIELDS}
+            FROM recording_segments
+            WHERE start_time > ? OR (start_time = ? AND id > ?)
+            ORDER BY start_time ASC, id ASC
+            LIMIT ?`,
+            [afterStartTime, afterStartTime, afterId, limit]
+        );
+    }
 }
 
 export default new RecordingSegmentRepository();

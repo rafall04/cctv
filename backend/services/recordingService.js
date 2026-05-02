@@ -1832,49 +1832,14 @@ class RecordingService {
             let freedBytes = 0;
             let deletedCount = 0;
 
-            const batchLimit = 200;
-            let keepScanning = true;
+            const emergencyResult = await cleanupService.emergencyCleanup({
+                freeBytes,
+                targetFreeBytes: 2 * 1024 * 1024 * 1024,
+                batchLimit: 200,
+            });
 
-            while (keepScanning && (freeBytes + freedBytes) <= 2 * 1024 * 1024 * 1024) { // target 2GB
-                const segments = query(`SELECT rs.* FROM recording_segments rs ORDER BY rs.start_time ASC LIMIT ${batchLimit}`);
-                if (!segments || segments.length === 0) break;
-
-                let deletedInBatch = 0;
-                for (const segment of segments) {
-                    if ((freeBytes + freedBytes) > 2 * 1024 * 1024 * 1024) {
-                        keepScanning = false;
-                        break;
-                    }
-
-                    const fileKey = `${segment.camera_id}:${segment.filename}`;
-                    if (filesBeingProcessed.has(fileKey)) continue;
-
-                    let fileExists = true;
-                    try { await fsPromises.access(segment.file_path); } catch { fileExists = false; }
-
-                    if (fileExists) {
-                        try {
-                            const deleteResult = await deleteRecordingFileSafely({
-                                cameraId: segment.camera_id,
-                                filename: segment.filename,
-                                filePath: segment.file_path,
-                                reason: 'emergency_disk_cleanup',
-                            });
-                            if (!deleteResult.success) {
-                                continue;
-                            }
-                            freedBytes += deleteResult.size;
-                            deletedCount++;
-                            deletedInBatch++;
-                            execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
-                        } catch (err) { }
-                    } else {
-                        execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
-                    }
-                }
-
-                if (deletedInBatch === 0) keepScanning = false;
-            }
+            freedBytes += emergencyResult.deletedBytes;
+            deletedCount += emergencyResult.deleted;
 
             // Also scan for filesystem orphans
             let baseDirExists = true;

@@ -141,4 +141,39 @@ describe('recordingCleanupService', () => {
         releaseDelete();
         await firstRun;
     });
+
+    it('continues emergency cleanup after skipped processing files', async () => {
+        repositoryMock.findOldestSegmentsForEmergency = vi.fn()
+            .mockReturnValueOnce([
+                {
+                    id: 1,
+                    camera_id: 7,
+                    filename: '20260502_080000.mp4',
+                    start_time: '2026-05-02T08:00:00.000Z',
+                    file_path: join(recordingsBasePath, 'camera7', '20260502_080000.mp4'),
+                },
+                {
+                    id: 2,
+                    camera_id: 7,
+                    filename: '20260502_081000.mp4',
+                    start_time: '2026-05-02T08:10:00.000Z',
+                    file_path: join(recordingsBasePath, 'camera7', '20260502_081000.mp4'),
+                },
+            ])
+            .mockReturnValueOnce([]);
+        isProcessingMock
+            .mockReturnValueOnce(true)
+            .mockReturnValueOnce(false);
+
+        const service = createService();
+        const result = await service.emergencyCleanup({
+            freeBytes: 100,
+            targetFreeBytes: 2000,
+            batchLimit: 2,
+        });
+
+        expect(repositoryMock.deleteSegmentById).toHaveBeenCalledWith(2);
+        expect(result.processingSkipped).toBe(1);
+        expect(result.deleted).toBe(1);
+    });
 });

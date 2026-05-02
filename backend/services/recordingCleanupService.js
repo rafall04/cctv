@@ -164,5 +164,59 @@ export function createRecordingCleanupService({
         }
     }
 
-    return { cleanupCamera };
+    async function emergencyCleanup({ freeBytes, targetFreeBytes, batchLimit = 200 }) {
+        const result = createEmptyResult();
+        let cursor = null;
+        let keepScanning = true;
+
+        while (keepScanning && (freeBytes + result.deletedBytes) <= targetFreeBytes) {
+            const segments = repository.findOldestSegmentsForEmergency({
+                afterStartTime: cursor?.start_time || null,
+                afterId: cursor?.id || 0,
+                limit: batchLimit,
+            });
+
+            if (!segments.length) {
+                break;
+            }
+
+            for (const segment of segments) {
+                cursor = { start_time: segment.start_time, id: segment.id };
+
+                if ((freeBytes + result.deletedBytes) > targetFreeBytes) {
+                    keepScanning = false;
+                    break;
+                }
+
+                if (isFileBeingProcessed?.(segment.camera_id, segment.filename)) {
+                    result.processingSkipped++;
+                    continue;
+                }
+
+                const deleteResult = await safeDelete({
+                    cameraId: segment.camera_id,
+                    filename: segment.filename,
+                    filePath: segment.file_path,
+                    reason: 'emergency_disk_cleanup',
+                });
+
+                if (!deleteResult.success) {
+                    if (deleteResult.reason === 'unsafe_path') {
+                        result.unsafeSkipped++;
+                    } else {
+                        result.failed++;
+                    }
+                    continue;
+                }
+
+                repository.deleteSegmentById(segment.id);
+                result.deleted++;
+                result.deletedBytes += deleteResult.size || 0;
+            }
+        }
+
+        return result;
+    }
+
+    return { cleanupCamera, emergencyCleanup };
 }
