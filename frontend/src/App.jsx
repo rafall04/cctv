@@ -1,3 +1,11 @@
+/*
+Purpose: Define React provider tree, route table, protected admin shell, and public/admin playback scopes.
+Caller: main.jsx after runtime config loads.
+Deps: React Router, context providers, ErrorBoundary, AdminLayout, page components, lazyWithRetry.
+MainFuncs: App, AdminPageRoute.
+SideEffects: Registers client-side routes and renders global toast/provider structure.
+*/
+
 import { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';

@@ -1,3 +1,11 @@
+/*
+Purpose: Bootstrap the React application after loading backend-provided runtime configuration.
+Caller: Browser module loader from index.html.
+Deps: React, ReactDOM, runtimeConfig, App, global CSS.
+MainFuncs: bootstrap.
+SideEffects: Loads runtime config, mounts React into #root, logs bootstrap failures.
+*/
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { loadRuntimeConfig } from './config/runtimeConfig.js';
