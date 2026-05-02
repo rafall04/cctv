@@ -777,6 +777,32 @@ describe('MapView area filter visibility', () => {
         expect(aggregateIconCall?.iconSize).toEqual([50, 50]);
     });
 
+    it('tidak membiarkan overlay zoom hint menutup kontrol layer map', async () => {
+        const denseCameras = Array.from({ length: 30 }, (_, index) => ({
+            id: index + 1,
+            name: `Dense ${index + 1}`,
+            latitude: (-7.1507 + (index * 0.0001)).toFixed(4),
+            longitude: (111.8815 + (index * 0.0001)).toFixed(4),
+            area_name: 'Dense Area',
+            is_online: 1,
+            status: 'active',
+            is_tunnel: 0,
+        }));
+
+        setMockZoom(11);
+
+        await act(async () => {
+            render(<MapView cameras={denseCameras} areas={[]} showAreaFilter />);
+        });
+
+        const zoomHint = screen.getByTestId('map-zoom-hint');
+        const mapChrome = zoomHint.closest('[data-testid="map-top-chrome"]');
+        const mapChromeControls = zoomHint.closest('[data-testid="map-top-chrome-controls"]');
+
+        expect(mapChrome?.className).toContain('pointer-events-none');
+        expect(mapChromeControls?.className).toContain('pointer-events-auto');
+    });
+
     it('menggunakan hotspot spasial di mode all-area untuk area besar yang tersebar', async () => {
         const makeCluster = (startId, count, baseLat, baseLng) => Array.from({ length: count }, (_, index) => ({
             id: startId + index,

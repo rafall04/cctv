@@ -2171,8 +2171,14 @@ const MapView = memo(({
                 <ImperativeMarkerLayer cameras={visibleIndividualMarkers} onClick={openModal} />
             </MapContainer>
 
-            <div className="absolute left-3 right-3 top-3 z-[1000] flex items-start justify-between gap-3">
-                <div className="flex max-w-[min(100%,24rem)] flex-col gap-2">
+            <div
+                data-testid="map-top-chrome"
+                className="pointer-events-none absolute left-3 right-3 top-3 z-[1000] flex items-start justify-between gap-3"
+            >
+                <div
+                    data-testid="map-top-chrome-controls"
+                    className="pointer-events-auto flex max-w-[min(100%,24rem)] flex-col gap-2"
+                >
                     {showAreaFilter && (
                         <div className="rounded-2xl border border-white/55 bg-white/78 p-1.5 shadow-[0_14px_30px_rgba(15,23,42,0.12)] backdrop-blur-xl dark:border-white/10 dark:bg-gray-900/72">
                             <div className="flex items-center gap-2 px-2 pb-1.5 pt-1">
