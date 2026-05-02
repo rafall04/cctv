@@ -1,3 +1,9 @@
+# Purpose: Prevent generated dependencies, secrets, local runtime data, and agent worktrees from entering git.
+# Caller: Git status/add/commit workflows for this CCTV repository.
+# Deps: Project build tools, local database/runtime outputs, Codex worktree isolation.
+# MainFuncs: Ignore dependency folders, env files, databases, build outputs, backups, exports, and `.worktrees/`.
+# SideEffects: Keeps local-only files untracked.
+
 # Dependencies
 node_modules/
 package-lock.json
@@ -57,6 +63,7 @@ mediamtx/logs/
 tmp/
 temp/
 *.tmp
+.worktrees/
 private_exports/
 private_imports/
 
