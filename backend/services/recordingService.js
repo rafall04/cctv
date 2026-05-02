@@ -770,15 +770,25 @@ class RecordingService {
                         // Track failed attempt in database
                         incrementFailCount(cameraId, filename);
 
-                        await quarantineRecordingFile(cameraId, filename, filePath, 'invalid_duration');
-                        cleanup();
-                        return;
+                        const camera = queryOne('SELECT recording_duration_hours FROM cameras WHERE id = ?', [cameraId]);
+                        const stats = await fsPromises.stat(filePath).catch(() => null);
+                        const nowMs = Date.now();
+                        const retentionWindow = computeRetentionWindow({
+                            retentionHours: camera?.recording_duration_hours,
+                            nowMs,
+                        });
+                        const deletePolicy = canDeleteRecordingFile({
+                            filename,
+                            fileMtimeMs: stats?.mtimeMs,
+                            retentionWindow,
+                            nowMs,
+                        });
 
-                        // Safely remove the invalid 0-byte or <1s file
-                        try {
-                            await fsPromises.unlink(filePath);
-                            console.log(`[Segment] ✓ Deleted corrupt/empty file: ${filename}`);
-                        } catch (delErr) { }
+                        if (deletePolicy.allowed) {
+                            await quarantineRecordingFile(cameraId, filename, filePath, 'invalid_duration_retention_expired');
+                        } else {
+                            console.warn(`[Segment] Keeping invalid segment until retention expiry: camera${cameraId}/${filename}`);
+                        }
 
                         cleanup();
                         return;

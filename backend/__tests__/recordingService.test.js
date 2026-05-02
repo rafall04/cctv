@@ -519,6 +519,7 @@ describe('recordingService external recording support', () => {
 
     it('quarantines invalid short segments instead of deleting them immediately', async () => {
         const { join } = await import('path');
+        vi.setSystemTime(Date.parse('2026-05-02T10:00:00.000Z'));
         execMock[promisify.custom] = vi.fn(async () => ({ stdout: '0.2\n', stderr: '' }));
         const { recordingService } = await import('../services/recordingService.js');
         const child = createSpawnProcess();
@@ -528,7 +529,14 @@ describe('recordingService external recording support', () => {
             if (sql.includes('SELECT fail_count FROM failed_remux_files')) {
                 return null;
             }
+            if (sql.includes('SELECT recording_duration_hours FROM cameras')) {
+                return { recording_duration_hours: 1 };
+            }
             return null;
+        });
+        fsPromisesMock.stat.mockResolvedValue({
+            size: 1024,
+            mtimeMs: Date.parse('2026-05-02T00:01:00.000Z'),
         });
         execMock.mockImplementation((command, options, callback) => {
             if (typeof options === 'function') {
@@ -568,5 +576,33 @@ describe('recordingService external recording support', () => {
         await recordingService.emergencyDiskSpaceCheck();
 
         expect(fsPromisesMock.unlink).not.toHaveBeenCalledWith(expect.stringContaining('20260502_095800.mp4'));
+    });
+
+    it('keeps short unstable-connection segments until retention expiry', async () => {
+        const { join } = await import('path');
+        vi.setSystemTime(Date.parse('2026-05-02T10:00:00.000Z'));
+        execMock[promisify.custom] = vi.fn(async () => ({ stdout: '0.2\n', stderr: '' }));
+        const { recordingService } = await import('../services/recordingService.js');
+        const recordingsBasePath = join(process.cwd(), '..', 'recordings');
+
+        queryOneMock.mockImplementation((sql) => {
+            if (sql.includes('SELECT fail_count FROM failed_remux_files')) return null;
+            if (sql.includes('SELECT recording_duration_hours FROM cameras')) return { recording_duration_hours: 5 };
+            return null;
+        });
+        fsPromisesMock.stat.mockResolvedValue({
+            size: 1024,
+            mtimeMs: Date.parse('2026-05-02T09:59:00.000Z'),
+        });
+
+        recordingService.onSegmentCreated(3, '20260502_095800.mp4');
+        await vi.advanceTimersByTimeAsync(3000);
+        await Promise.resolve();
+
+        expect(fsPromisesMock.unlink).not.toHaveBeenCalledWith(join(recordingsBasePath, 'camera3', '20260502_095800.mp4'));
+        expect(fsPromisesMock.rename).not.toHaveBeenCalledWith(
+            join(recordingsBasePath, 'camera3', '20260502_095800.mp4'),
+            expect.stringContaining('.quarantine')
+        );
     });
 });
