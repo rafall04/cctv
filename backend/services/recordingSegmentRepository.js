@@ -1,10 +1,10 @@
 // Purpose: Centralize bounded SQLite queries for recording segment cleanup and playback.
 // Caller: recordingCleanupService, recordingPlaybackService, repository tests.
 // Deps: SQLite connectionPool query/queryOne/execute helpers.
-// MainFuncs: findExpiredSegments, findPlaybackSegments, findSegmentByFilename, deleteSegmentById.
-// SideEffects: Reads and deletes recording_segments rows.
+// MainFuncs: upsertSegment, findExpiredSegments, findPlaybackSegments, findSegmentByFilename, deleteSegmentById.
+// SideEffects: Reads, inserts, updates, and deletes recording_segments rows.
 
-import { execute, query, queryOne } from '../database/connectionPool.js';
+import { execute, query, queryOne, transaction } from '../database/connectionPool.js';
 
 const SEGMENT_SELECT_FIELDS = `
     id,
@@ -28,18 +28,46 @@ class RecordingSegmentRepository {
         duration,
         filePath,
     }) {
-        return execute(
-            `INSERT INTO recording_segments
-            (camera_id, filename, start_time, end_time, file_size, duration, file_path)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(camera_id, filename) DO UPDATE SET
-                start_time = excluded.start_time,
-                end_time = excluded.end_time,
-                file_size = excluded.file_size,
-                duration = excluded.duration,
-                file_path = excluded.file_path`,
-            [cameraId, filename, startTime, endTime, fileSize, duration, filePath]
-        );
+        const persistSegment = transaction(() => {
+            const updateResult = execute(
+                `UPDATE recording_segments
+                SET
+                start_time = ?,
+                end_time = ?,
+                file_size = ?,
+                duration = ?,
+                file_path = ?
+                WHERE camera_id = ? AND filename = ?`,
+                [startTime, endTime, fileSize, duration, filePath, cameraId, filename]
+            );
+
+            if (updateResult.changes > 0) {
+                if (updateResult.changes > 1) {
+                    execute(
+                        `DELETE FROM recording_segments
+                        WHERE camera_id = ?
+                          AND filename = ?
+                          AND id NOT IN (
+                              SELECT MAX(id)
+                              FROM recording_segments
+                              WHERE camera_id = ? AND filename = ?
+                          )`,
+                        [cameraId, filename, cameraId, filename]
+                    );
+                }
+
+                return updateResult;
+            }
+
+            return execute(
+                `INSERT INTO recording_segments
+                (camera_id, filename, start_time, end_time, file_size, duration, file_path)
+                VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [cameraId, filename, startTime, endTime, fileSize, duration, filePath]
+            );
+        });
+
+        return persistSegment();
     }
 
     findExpiredSegments({ cameraId, cutoffIso, limit }) {
