@@ -21,7 +21,7 @@ import GlobalAdScript from '../components/ads/GlobalAdScript';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../components/ads/adsConfig';
 import lazyWithRetry from '../utils/lazyWithRetry';
 
-const LandingPageSimple = lazyWithRetry(() => import('../components/LandingPageSimple'), 'landing-page-simple');
+const LandingPageSimple = lazyWithRetry(() => import('../components/landing/LandingPageSimple'), 'landing-page-simple');
 const MultiViewLayout = lazyWithRetry(() => import('../components/MultiView/MultiViewLayout'), 'multi-view-layout');
 const VideoPopup = lazyWithRetry(() => import('../components/MultiView/VideoPopup'), 'video-popup');
 const SaweriaLeaderboard = lazyWithRetry(() => import('../components/SaweriaLeaderboard'), 'saweria-leaderboard');

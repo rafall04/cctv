@@ -11,14 +11,14 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import LandingPageSimple from './LandingPageSimple';
 
-vi.mock('../contexts/ThemeContext', () => ({
+vi.mock('../../contexts/ThemeContext', () => ({
     useTheme: () => ({
         isDark: false,
         toggleTheme: vi.fn(),
     }),
 }));
 
-vi.mock('../contexts/BrandingContext', () => ({
+vi.mock('../../contexts/BrandingContext', () => ({
     useBranding: () => ({
         branding: {
             company_name: 'RAF NET',
@@ -27,7 +27,7 @@ vi.mock('../contexts/BrandingContext', () => ({
     }),
 }));
 
-vi.mock('../contexts/CameraContext', () => ({
+vi.mock('../../contexts/CameraContext', () => ({
     useCameras: () => ({
         cameras: [
             { id: 1, is_online: 1 },
@@ -38,27 +38,27 @@ vi.mock('../contexts/CameraContext', () => ({
     }),
 }));
 
-vi.mock('../utils/animationControl', () => ({
+vi.mock('../../utils/animationControl', () => ({
     shouldDisableAnimations: () => false,
 }));
 
-vi.mock('./landing/LayoutModeToggle', () => ({
+vi.mock('./LayoutModeToggle', () => ({
     default: () => <div>layout-toggle</div>,
 }));
 
-vi.mock('./landing/LandingPublicTopStack', () => ({
+vi.mock('./LandingPublicTopStack', () => ({
     default: () => <div>top-stack</div>,
 }));
 
-vi.mock('./ads/InlineAdSlot', () => ({
+vi.mock('../ads/InlineAdSlot', () => ({
     default: ({ slotKey }) => <div data-testid={`ad-slot-${slotKey}`}>{slotKey}</div>,
 }));
 
-vi.mock('./FeedbackWidget', () => ({
+vi.mock('../FeedbackWidget', () => ({
     default: () => <div>feedback-widget</div>,
 }));
 
-vi.mock('./SaweriaSupport', () => ({
+vi.mock('../SaweriaSupport', () => ({
     default: () => <div>saweria-support</div>,
 }));
 

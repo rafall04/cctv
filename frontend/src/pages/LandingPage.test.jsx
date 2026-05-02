@@ -113,7 +113,7 @@ vi.mock('../components/landing/LandingStatsBar', () => ({
     default: () => <div>stats-bar</div>,
 }));
 
-vi.mock('../components/LandingPageSimple', () => ({
+vi.mock('../components/landing/LandingPageSimple', () => ({
     default: (props) => {
         landingPageSimplePropsSpy(props);
         return (
