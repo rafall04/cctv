@@ -1,3 +1,11 @@
+<!--
+Purpose: Track the playback lifecycle hardening implementation plan and execution status.
+Caller: Agents and maintainers extracting Playback.jsx lifecycle boundaries.
+Deps: frontend/src/pages/Playback.jsx, frontend/src/hooks/playback, frontend/src/utils/playbackUrlState.js.
+MainFuncs: Documents URL, segment, viewer tracking, media source, and documentation tasks.
+SideEffects: None; documentation only.
+-->
+
 # Playback Lifecycle Hardening Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -42,7 +50,7 @@
 - Create: `frontend/src/utils/playbackUrlState.test.js`
 - Modify: `frontend/src/pages/Playback.jsx`
 
-- [ ] **Step 1: Write failing tests for URL state helper**
+- [x] **Step 1: Write failing tests for URL state helper**
 
 Create `frontend/src/utils/playbackUrlState.test.js`:
 
@@ -106,7 +114,7 @@ describe('playbackUrlState', () => {
 });
 ```
 
-- [ ] **Step 2: Run tests and verify RED**
+- [x] **Step 2: Run tests and verify RED**
 
 Run:
 
@@ -117,7 +125,7 @@ npm test -- src/utils/playbackUrlState.test.js
 
 Expected: FAIL because `playbackUrlState.js` does not exist.
 
-- [ ] **Step 3: Implement helper**
+- [x] **Step 3: Implement helper**
 
 Create `frontend/src/utils/playbackUrlState.js`:
 
@@ -164,7 +172,7 @@ export function buildPlaybackSearchParams({
 }
 ```
 
-- [ ] **Step 4: Wire helper into Playback route**
+- [x] **Step 4: Wire helper into Playback route**
 
 In `frontend/src/pages/Playback.jsx`, import the helper:
 
@@ -200,7 +208,7 @@ setSearchParams(nextParams, { replace });
 
 Preserve the existing updater function name and call sites to keep the page diff small.
 
-- [ ] **Step 5: Run focused tests**
+- [x] **Step 5: Run focused tests**
 
 Run:
 
@@ -211,7 +219,7 @@ npm test -- src/utils/playbackUrlState.test.js Playback.test.jsx
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/utils/playbackUrlState.js frontend/src/utils/playbackUrlState.test.js frontend/src/pages/Playback.jsx
@@ -228,7 +236,7 @@ git push
 - Create: `frontend/src/hooks/playback/usePlaybackViewerTracking.test.jsx`
 - Modify: `frontend/src/pages/Playback.jsx`
 
-- [ ] **Step 1: Write failing hook tests**
+- [x] **Step 1: Write failing hook tests**
 
 Create `frontend/src/hooks/playback/usePlaybackViewerTracking.test.jsx`:
 
@@ -338,7 +346,7 @@ describe('usePlaybackViewerTracking', () => {
 });
 ```
 
-- [ ] **Step 2: Run tests and verify RED**
+- [x] **Step 2: Run tests and verify RED**
 
 Run:
 
@@ -349,7 +357,7 @@ npm test -- src/hooks/playback/usePlaybackViewerTracking.test.jsx
 
 Expected: FAIL because hook does not exist.
 
-- [ ] **Step 3: Implement hook**
+- [x] **Step 3: Implement hook**
 
 Create `frontend/src/hooks/playback/usePlaybackViewerTracking.js`:
 
@@ -475,7 +483,7 @@ export function usePlaybackViewerTracking({
 }
 ```
 
-- [ ] **Step 4: Wire hook into Playback**
+- [x] **Step 4: Wire hook into Playback**
 
 In `frontend/src/pages/Playback.jsx`:
 
@@ -510,7 +518,7 @@ const {
 
 Keep all existing call sites using `ensurePlaybackViewerSession()` and `stopTrackedPlaybackViewerSession()`.
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run:
 
@@ -521,7 +529,7 @@ npm test -- src/hooks/playback/usePlaybackViewerTracking.test.jsx Playback.test.
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/hooks/playback/usePlaybackViewerTracking.js frontend/src/hooks/playback/usePlaybackViewerTracking.test.jsx frontend/src/pages/Playback.jsx
@@ -538,7 +546,7 @@ git push
 - Create: `frontend/src/hooks/playback/usePlaybackSegments.test.jsx`
 - Modify: `frontend/src/pages/Playback.jsx`
 
-- [ ] **Step 1: Write failing hook tests**
+- [x] **Step 1: Write failing hook tests**
 
 Create `frontend/src/hooks/playback/usePlaybackSegments.test.jsx`:
 
@@ -649,7 +657,7 @@ describe('usePlaybackSegments', () => {
 });
 ```
 
-- [ ] **Step 2: Run tests and verify RED**
+- [x] **Step 2: Run tests and verify RED**
 
 Run:
 
@@ -660,7 +668,7 @@ npm test -- src/hooks/playback/usePlaybackSegments.test.jsx
 
 Expected: FAIL because hook does not exist.
 
-- [ ] **Step 3: Implement hook**
+- [x] **Step 3: Implement hook**
 
 Create `frontend/src/hooks/playback/usePlaybackSegments.js`:
 
@@ -779,7 +787,7 @@ export function usePlaybackSegments({
 }
 ```
 
-- [ ] **Step 4: Wire hook into Playback**
+- [x] **Step 4: Wire hook into Playback**
 
 In `frontend/src/pages/Playback.jsx`, import:
 
@@ -821,7 +829,7 @@ const loading = camerasLoading || segmentsLoading;
 
 If `Playback.jsx` currently has a `fetchSegments` function, remove it only after all its call sites are replaced with `reloadSegments` or covered by the hook.
 
-- [ ] **Step 5: Run focused tests**
+- [x] **Step 5: Run focused tests**
 
 Run:
 
@@ -832,7 +840,7 @@ npm test -- src/hooks/playback/usePlaybackSegments.test.jsx Playback.test.jsx sr
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/hooks/playback/usePlaybackSegments.js frontend/src/hooks/playback/usePlaybackSegments.test.jsx frontend/src/pages/Playback.jsx
@@ -849,7 +857,7 @@ git push
 - Create: `frontend/src/hooks/playback/usePlaybackMediaSource.test.jsx`
 - Modify: `frontend/src/pages/Playback.jsx`
 
-- [ ] **Step 1: Write failing media hook tests**
+- [x] **Step 1: Write failing media hook tests**
 
 Create `frontend/src/hooks/playback/usePlaybackMediaSource.test.jsx`:
 
@@ -954,7 +962,7 @@ describe('usePlaybackMediaSource', () => {
 });
 ```
 
-- [ ] **Step 2: Run tests and verify RED**
+- [x] **Step 2: Run tests and verify RED**
 
 Run:
 
@@ -965,7 +973,7 @@ npm test -- src/hooks/playback/usePlaybackMediaSource.test.jsx
 
 Expected: FAIL because hook does not exist.
 
-- [ ] **Step 3: Implement minimal media hook**
+- [x] **Step 3: Implement minimal media hook**
 
 Create `frontend/src/hooks/playback/usePlaybackMediaSource.js`:
 
@@ -1045,7 +1053,7 @@ export function usePlaybackMediaSource({
 }
 ```
 
-- [ ] **Step 4: Wire hook into Playback incrementally**
+- [x] **Step 4: Wire hook into Playback incrementally**
 
 In `frontend/src/pages/Playback.jsx`, import:
 
@@ -1068,7 +1076,7 @@ usePlaybackMediaSource({
 
 Then remove only the duplicated inline `playing`, `timeupdate`, and `ended` listener registration after confirming the hook receives the same callbacks. Keep buffering/error/listener logic inline until a follow-up task moves it, unless the diff is small and tests remain clear.
 
-- [ ] **Step 5: Run focused tests**
+- [x] **Step 5: Run focused tests**
 
 Run:
 
@@ -1079,7 +1087,7 @@ npm test -- src/hooks/playback/usePlaybackMediaSource.test.jsx Playback.test.jsx
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/hooks/playback/usePlaybackMediaSource.js frontend/src/hooks/playback/usePlaybackMediaSource.test.jsx frontend/src/pages/Playback.jsx
@@ -1095,7 +1103,7 @@ git push
 - Modify: `frontend/src/.module_map.md`
 - Modify: `docs/superpowers/plans/2026-05-02-playback-lifecycle-hardening.md`
 
-- [ ] **Step 1: Update frontend module map**
+- [x] **Step 1: Update frontend module map**
 
 In `frontend/src/.module_map.md`, update the public playback route ownership line to mention:
 
@@ -1109,7 +1117,7 @@ Update the stabilization target for `pages/Playback.jsx` to:
 - `pages/Playback.jsx`: route shell should delegate URL state to `utils/playbackUrlState.js`, segment loading and viewer/media lifecycle to `hooks/playback/*`; keep future playback features in these boundaries.
 ```
 
-- [ ] **Step 2: Run final focused frontend gate**
+- [x] **Step 2: Run final focused frontend gate**
 
 Run:
 
@@ -1121,7 +1129,7 @@ npm run build
 
 Expected: all tests PASS and build exits 0.
 
-- [ ] **Step 3: Run git status**
+- [x] **Step 3: Run git status**
 
 Run:
 
@@ -1131,7 +1139,7 @@ git status --short
 
 Expected: only intended frontend and plan files are modified.
 
-- [ ] **Step 4: Commit docs/final map**
+- [x] **Step 4: Commit docs/final map**
 
 ```bash
 git add frontend/src/.module_map.md docs/superpowers/plans/2026-05-02-playback-lifecycle-hardening.md
@@ -1161,4 +1169,3 @@ Expected:
 ## Rollback Plan
 
 Each task is committed separately. If a task introduces regressions that are not resolved within the task, revert only that task commit and keep earlier extracted helpers/hooks that passed their gates.
-
