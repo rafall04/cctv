@@ -1,7 +1,7 @@
 // Purpose: Provide pure retention and recording filename decisions for cleanup flows.
 // Caller: recordingService, recordingCleanupService, recordingRetentionPolicy tests.
 // Deps: Node path basename utility.
-// MainFuncs: computeRetentionWindow, parseSegmentFilenameTimeMs, isSafeRecordingFilename, isExpiredByRetention.
+// MainFuncs: computeRetentionWindow, parseSegmentFilenameTimeMs, isSafeRecordingFilename, canDeleteRecordingFile.
 // SideEffects: None.
 
 import { basename } from 'path';
@@ -67,11 +67,30 @@ export function getSegmentAgeMs({ filename, startTime, fileMtimeMs, nowMs = Date
         return 0;
     }
 
-    const oldestTimeMs = Math.min(...candidates);
-    return Math.max(0, nowMs - oldestTimeMs);
+    const newestTrustworthyTimeMs = Math.max(...candidates);
+    return Math.max(0, nowMs - newestTrustworthyTimeMs);
 }
 
 export function isExpiredByRetention(startTime, retentionWindow) {
     const startMs = Date.parse(startTime);
     return Number.isFinite(startMs) && startMs < retentionWindow.cutoffMs;
+}
+
+export function canDeleteRecordingFile({
+    filename,
+    startTime = null,
+    fileMtimeMs = null,
+    retentionWindow,
+    nowMs = Date.now(),
+}) {
+    if (!isSafeRecordingFilename(filename)) {
+        return { allowed: false, reason: 'unsafe_filename', ageMs: 0 };
+    }
+
+    const ageMs = getSegmentAgeMs({ filename, startTime, fileMtimeMs, nowMs });
+    if (ageMs <= retentionWindow.retentionWithGraceMs) {
+        return { allowed: false, reason: 'retention_not_expired', ageMs };
+    }
+
+    return { allowed: true, reason: 'retention_expired', ageMs };
 }

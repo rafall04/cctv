@@ -7,7 +7,9 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+    canDeleteRecordingFile,
     computeRetentionWindow,
+    getSegmentAgeMs,
     isExpiredByRetention,
     isSafeRecordingFilename,
     parseSegmentFilenameTimeMs,
@@ -61,5 +63,47 @@ describe('recordingRetentionPolicy', () => {
 
         expect(isExpiredByRetention('2026-05-02T08:40:00.000Z', window)).toBe(true);
         expect(isExpiredByRetention('2026-05-02T09:00:00.000Z', window)).toBe(false);
+    });
+
+    it('does not allow deleting recent final files even when they are orphaned or corrupt', () => {
+        const nowMs = Date.parse('2026-05-02T10:00:00.000Z');
+        const retentionWindow = computeRetentionWindow({ retentionHours: 5, nowMs });
+
+        const result = canDeleteRecordingFile({
+            filename: '20260502_095800.mp4',
+            fileMtimeMs: Date.parse('2026-05-02T09:59:00.000Z'),
+            retentionWindow,
+            nowMs,
+        });
+
+        expect(result.allowed).toBe(false);
+        expect(result.reason).toBe('retention_not_expired');
+    });
+
+    it('allows deleting final files only after retention plus grace expires', () => {
+        const nowMs = Date.parse('2026-05-02T10:00:00.000Z');
+        const retentionWindow = computeRetentionWindow({ retentionHours: 1, nowMs });
+
+        const result = canDeleteRecordingFile({
+            filename: '20260502_080000.mp4',
+            fileMtimeMs: Date.parse('2026-05-02T08:01:00.000Z'),
+            retentionWindow,
+            nowMs,
+        });
+
+        expect(result.allowed).toBe(true);
+        expect(result.reason).toBe('retention_expired');
+    });
+
+    it('uses the newest trustworthy timestamp so touched old-name files are not deleted prematurely', () => {
+        const nowMs = Date.parse('2026-05-02T10:00:00.000Z');
+        const ageMs = getSegmentAgeMs({
+            filename: '20260502_080000.mp4',
+            startTime: null,
+            fileMtimeMs: Date.parse('2026-05-02T09:58:00.000Z'),
+            nowMs,
+        });
+
+        expect(ageMs).toBe(2 * 60 * 1000);
     });
 });
