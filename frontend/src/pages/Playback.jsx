@@ -11,7 +11,6 @@ import { useSearchParams } from 'react-router-dom';
 import { cameraService } from '../services/cameraService';
 import recordingService from '../services/recordingService';
 import { useBranding } from '../contexts/BrandingContext';
-import playbackViewerService from '../services/playbackViewerService';
 import { createCameraSlug, parseCameraIdFromSlug } from '../utils/slugify';
 import { buildPublicPlaybackShareUrl } from '../utils/publicShareUrl';
 import {
@@ -33,6 +32,7 @@ import PlaybackVideo from '../components/playback/PlaybackVideo';
 import PlaybackTimeline from '../components/playback/PlaybackTimeline';
 import PlaybackSegmentList from '../components/playback/PlaybackSegmentList';
 import { useAdminReconnectRefresh } from '../hooks/admin/useAdminReconnectRefresh';
+import { usePlaybackViewerTracking } from '../hooks/playback/usePlaybackViewerTracking.js';
 
 const MAX_SEEK_DISTANCE = 180;
 const BUFFERING_STALL_THRESHOLD_MS = 350;
@@ -125,10 +125,6 @@ function Playback({
     const hasStartedPlaybackForSourceRef = useRef(false);
     const queuedPlaybackPopunderRef = useRef(null);
     const hasTriggeredInitialPlaybackPopunderRef = useRef(false);
-    const playbackViewerSessionIdRef = useRef(null);
-    const playbackViewerKeyRef = useRef(null);
-    const playbackViewerPendingKeyRef = useRef(null);
-    const playbackViewerPendingTokenRef = useRef(0);
 
     // Refs to avoid stale closures in event handlers
     const selectedSegmentRef = useRef(selectedSegment);
@@ -150,6 +146,15 @@ function Playback({
     const showPlaybackPopunder = shouldRenderAdSlot(adsConfig, 'playbackPopunder', isMobileAdsViewport);
     const [playbackPopunderTriggerId, setPlaybackPopunderTriggerId] = useState(0);
 
+    const {
+        ensureSessionStarted: ensurePlaybackViewerSession,
+        stopSession: stopTrackedPlaybackViewerSession,
+    } = usePlaybackViewerTracking({
+        cameraId: selectedCameraId,
+        segment: selectedSegment,
+        accessScope,
+    });
+
     // Keep refs in sync
     useEffect(() => {
         selectedSegmentRef.current = selectedSegment;
@@ -167,93 +172,6 @@ function Playback({
         selectedCameraIdRef.current = selectedCameraId;
     }, [selectedCameraId]);
 
-    const buildPlaybackViewerKey = useCallback((cameraId, segment, scope) => {
-        if (!cameraId || !segment?.filename) {
-            return null;
-        }
-
-        return `${cameraId}:${segment.filename}:${scope}`;
-    }, []);
-
-    const stopTrackedPlaybackViewerSession = useCallback(async () => {
-        const activeSessionId = playbackViewerSessionIdRef.current;
-        playbackViewerSessionIdRef.current = null;
-        playbackViewerKeyRef.current = null;
-        playbackViewerPendingKeyRef.current = null;
-        playbackViewerPendingTokenRef.current += 1;
-
-        if (!activeSessionId) {
-            return;
-        }
-
-        await playbackViewerService.stopSession(activeSessionId);
-    }, []);
-
-    const ensurePlaybackViewerSession = useCallback(async () => {
-        if (!selectedCameraIdRef.current || !selectedSegmentRef.current?.filename) {
-            return;
-        }
-
-        const nextKey = buildPlaybackViewerKey(
-            selectedCameraIdRef.current,
-            selectedSegmentRef.current,
-            accessScope
-        );
-
-        if (!nextKey) {
-            return;
-        }
-
-        if (playbackViewerSessionIdRef.current && playbackViewerKeyRef.current === nextKey) {
-            return;
-        }
-
-        if (playbackViewerPendingKeyRef.current === nextKey) {
-            return;
-        }
-
-        const pendingToken = playbackViewerPendingTokenRef.current + 1;
-        playbackViewerPendingTokenRef.current = pendingToken;
-        playbackViewerPendingKeyRef.current = nextKey;
-
-        if (playbackViewerSessionIdRef.current && playbackViewerKeyRef.current !== nextKey) {
-            await stopTrackedPlaybackViewerSession();
-        }
-
-        try {
-            const sessionId = await playbackViewerService.startSession({
-                cameraId: selectedCameraIdRef.current,
-                segmentFilename: selectedSegmentRef.current.filename,
-                segmentStartedAt: selectedSegmentRef.current.start_time || null,
-                accessMode: accessScope,
-            });
-
-            const currentKey = buildPlaybackViewerKey(
-                selectedCameraIdRef.current,
-                selectedSegmentRef.current,
-                accessScope
-            );
-
-            if (pendingToken !== playbackViewerPendingTokenRef.current) {
-                if (sessionId) {
-                    await playbackViewerService.stopSession(sessionId);
-                }
-                return;
-            }
-
-            if (sessionId && currentKey === nextKey) {
-                playbackViewerSessionIdRef.current = sessionId;
-                playbackViewerKeyRef.current = nextKey;
-            } else if (sessionId) {
-                await playbackViewerService.stopSession(sessionId);
-            }
-        } finally {
-            if (pendingToken === playbackViewerPendingTokenRef.current) {
-                playbackViewerPendingKeyRef.current = null;
-            }
-        }
-    }, [accessScope, buildPlaybackViewerKey, stopTrackedPlaybackViewerSession]);
-
     useEffect(() => {
         if (selectedCameraId && playbackCameras.some((camera) => camera.id === selectedCameraId)) {
             return;
@@ -261,24 +179,6 @@ function Playback({
 
         setSelectedCameraId(playbackCameras[0]?.id ?? null);
     }, [playbackCameras, selectedCameraId]);
-
-    useEffect(() => {
-        const nextKey = buildPlaybackViewerKey(selectedCameraId, selectedSegment, accessScope);
-        if (!playbackViewerKeyRef.current) {
-            return;
-        }
-
-        if (playbackViewerKeyRef.current !== nextKey) {
-            stopTrackedPlaybackViewerSession();
-        }
-    }, [accessScope, buildPlaybackViewerKey, selectedCameraId, selectedSegment, stopTrackedPlaybackViewerSession]);
-
-    useEffect(() => {
-        return () => {
-            stopTrackedPlaybackViewerSession();
-            playbackViewerService.stopAllSessions();
-        };
-    }, [stopTrackedPlaybackViewerSession]);
 
     useEffect(() => {
         if (!showPlaybackPopunder) {
