@@ -17,6 +17,7 @@ import AreaCard from '../components/admin/areas/AreaCard';
 import AreaFormModal from '../components/admin/areas/AreaFormModal';
 import BulkPolicyPreview from '../components/admin/areas/BulkPolicyPreview';
 import lazyWithRetry from '../utils/lazyWithRetry';
+import { useAreaFormState } from '../hooks/admin/useAreaFormState';
 import { buildBulkPayload, defaultBulkConfig, getEffectiveTargetFilter, requiresExternalHlsTarget, requiresExternalStreamsTarget } from '../utils/admin/areaBulkPolicy';
 
 // Lazy load LocationPicker to avoid conflicts with CameraManagement
@@ -26,14 +27,6 @@ export default function AreaManagement() {
     const [areas, setAreas] = useState([]);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState(null);
-    const [showModal, setShowModal] = useState(false);
-    const [editingArea, setEditingArea] = useState(null);
-    const [formData, setFormData] = useState({ 
-        name: '', description: '', rt: '', rw: '', kelurahan: '', kecamatan: '', latitude: '', longitude: '', external_health_mode_override: 'default', coverage_scope: 'default', viewport_zoom_override: '', show_on_grid_default: true, grid_default_camera_limit: '12', internal_ingest_policy_default: 'default', internal_on_demand_close_after_seconds: ''
-    });
-    const [formErrors, setFormErrors] = useState({});
-    const [error, setError] = useState('');
-    const [submitting, setSubmitting] = useState(false);
     const [filterKecamatan, setFilterKecamatan] = useState('');
     const [deleteConfirm, setDeleteConfirm] = useState(null);
     const [deleting, setDeleting] = useState(false);
@@ -57,6 +50,22 @@ export default function AreaManagement() {
     const { success, error: showError } = useNotification();
     const loadRequestRef = useRef(0);
     const hasLoadedAreasRef = useRef(false);
+    const {
+        showModal,
+        setShowModal,
+        editingArea,
+        formData,
+        formErrors,
+        error,
+        setError,
+        submitting,
+        setSubmitting,
+        validateForm,
+        openAddModal,
+        openEditModal,
+        handleChange,
+        handleLocationChange,
+    } = useAreaFormState({ areas });
 
     const loadAreas = useCallback(async () => {
         const requestId = ++loadRequestRef.current;
@@ -103,59 +112,6 @@ export default function AreaManagement() {
         loadAreas();
         loadMapCenter();
     }, [loadAreas, loadMapCenter]);
-
-    const validateForm = useCallback(() => {
-        const errors = {};
-        if (!formData.name.trim()) {
-            errors.name = 'Nama area wajib diisi';
-        } else if (formData.name.trim().length < 2) {
-            errors.name = 'Nama area minimal 2 karakter';
-        }
-        const duplicateName = areas.find(
-            a => a.name.toLowerCase() === formData.name.trim().toLowerCase() && 
-                 (!editingArea || a.id !== editingArea.id)
-        );
-        if (duplicateName) errors.name = 'Nama area sudah ada';
-        setFormErrors(errors);
-        return Object.keys(errors).length === 0;
-    }, [formData.name, areas, editingArea]);
-
-    const openAddModal = () => {
-        setEditingArea(null);
-        setFormData({ name: '', description: '', rt: '', rw: '', kelurahan: '', kecamatan: '', latitude: '', longitude: '', external_health_mode_override: 'default', coverage_scope: 'default', viewport_zoom_override: '', show_on_grid_default: true, grid_default_camera_limit: '12', internal_ingest_policy_default: 'default', internal_on_demand_close_after_seconds: '' });
-        setFormErrors({});
-        setError('');
-        setShowModal(true);
-    };
-
-    const openEditModal = (area) => {
-        setEditingArea(area);
-        setFormData({ 
-            name: area.name, description: area.description || '', rt: area.rt || '', rw: area.rw || '',
-            kelurahan: area.kelurahan || '', kecamatan: area.kecamatan || '',
-            latitude: area.latitude || '', longitude: area.longitude || '',
-            external_health_mode_override: area.external_health_mode_override || 'default',
-            coverage_scope: area.coverage_scope || 'default',
-            viewport_zoom_override: area.viewport_zoom_override || '',
-            show_on_grid_default: area.show_on_grid_default === 1 || area.show_on_grid_default === true,
-            grid_default_camera_limit: area.grid_default_camera_limit === null || area.grid_default_camera_limit === undefined ? '' : String(area.grid_default_camera_limit),
-            internal_ingest_policy_default: area.internal_ingest_policy_default || 'default',
-            internal_on_demand_close_after_seconds: area.internal_on_demand_close_after_seconds === null || area.internal_on_demand_close_after_seconds === undefined ? '' : String(area.internal_on_demand_close_after_seconds),
-        });
-        setFormErrors({});
-        setError('');
-        setShowModal(true);
-    };
-
-    const handleChange = (e) => {
-        const { name, value, type, checked } = e.target;
-        setFormData({ ...formData, [name]: type === 'checkbox' ? checked : value });
-        if (formErrors[name]) setFormErrors({ ...formErrors, [name]: '' });
-    };
-
-    const handleLocationChange = (lat, lng) => {
-        setFormData({ ...formData, latitude: lat, longitude: lng });
-    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
