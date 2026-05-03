@@ -2,7 +2,7 @@
  * Purpose: Public/admin recording playback page with camera selection, sharing, and playback viewer tracking.
  * Caller: Public playback route and protected admin playback route.
  * Deps: React, router search params, recording/camera/playback viewer services, playback UI components.
- * MainFuncs: Playback, getSegmentKey, resolvePlaybackPolicy.
+ * MainFuncs: Playback, getSegmentKey.
  * SideEffects: Loads recordings, updates URL params, initializes media playback, tracks playback viewer sessions.
  */
 
@@ -21,6 +21,7 @@ import GlobalAdScript from '../components/ads/GlobalAdScript';
 import InlineAdSlot from '../components/ads/InlineAdSlot';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../components/ads/adsConfig.js';
 import { getStreamCapabilities } from '../utils/cameraDelivery.js';
+import { isAdminPlaybackScope, PLAYBACK_ACCESS_SCOPES } from '../utils/playbackAccessPolicy.js';
 
 import PlaybackHeader from '../components/playback/PlaybackHeader';
 import PlaybackVideo from '../components/playback/PlaybackVideo';
@@ -52,12 +53,12 @@ function Playback({
     cameras: propCameras,
     selectedCamera: propSelectedCamera,
     adsConfig = null,
-    accessScope = 'public_preview',
+    accessScope = PLAYBACK_ACCESS_SCOPES.PUBLIC_PREVIEW,
 }) {
     const [searchParams, setSearchParams] = useSearchParams();
     const { cameraParam: cameraIdFromUrl, timestampParam: timestampFromUrl } = getPlaybackUrlState(searchParams);
     const { branding } = useBranding();
-    const isAdminPlayback = accessScope === 'admin_full';
+    const isAdminPlayback = isAdminPlaybackScope(accessScope);
 
     const [cameras, setCameras] = useState(propCameras || []);
     const supportedInitialCameras = (propCameras || []).filter((camera) => getStreamCapabilities(camera).playback);
@@ -100,7 +101,6 @@ function Playback({
         cameraId: selectedCameraId,
         timestampParam: timestampFromUrl,
         accessScope,
-        isAdminPlayback,
     });
     const loading = camerasLoading;
     const videoRef = useRef(null);

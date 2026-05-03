@@ -1,7 +1,7 @@
 /*
  * Purpose: Load playback recording segments for a selected camera with stale response protection.
  * Caller: Playback route and hook tests.
- * Deps: React hooks, recordingService, request policy, playback segment selection utils.
+ * Deps: React hooks, recordingService, request policy, playback policy and segment selection utils.
  * MainFuncs: usePlaybackSegments.
  * SideEffects: Fetches recording segments through recordingService.
  */
@@ -13,26 +13,7 @@ import {
     findClosestSegmentByStartTime,
     findSegmentForTimestamp,
 } from '../../utils/playbackSegmentSelection.js';
-
-const DEFAULT_PUBLIC_PLAYBACK_POLICY = {
-    accessMode: 'public_preview',
-    isPublicPreview: true,
-    previewMinutes: 10,
-    notice: {
-        enabled: true,
-        title: 'Akses Playback Publik Terbatas',
-        text: 'Playback publik dibatasi untuk menjaga privasi. Untuk akses lebih lanjut silakan hubungi admin.',
-    },
-    contact: null,
-};
-
-const DEFAULT_ADMIN_PLAYBACK_POLICY = {
-    accessMode: 'admin_full',
-    isPublicPreview: false,
-    previewMinutes: null,
-    notice: null,
-    contact: null,
-};
+import { getDefaultPlaybackPolicy } from '../../utils/playbackAccessPolicy.js';
 
 function getSegmentKey(segment) {
     if (!segment) {
@@ -44,10 +25,6 @@ function getSegmentKey(segment) {
     }
 
     return `${segment.filename || 'no-file'}:${segment.start_time || 'no-start'}`;
-}
-
-function getDefaultPolicy(isAdminPlayback) {
-    return isAdminPlayback ? DEFAULT_ADMIN_PLAYBACK_POLICY : DEFAULT_PUBLIC_PLAYBACK_POLICY;
 }
 
 function normalizeSegmentsData(data) {
@@ -115,14 +92,13 @@ export function usePlaybackSegments({
     cameraId,
     timestampParam,
     accessScope,
-    isAdminPlayback = false,
 }) {
     const [segments, setSegments] = useState([]);
     const [segmentsCameraId, setSegmentsCameraId] = useState(null);
     const [selectedSegment, setSelectedSegment] = useState(null);
     const [seekTargetSeconds, setSeekTargetSeconds] = useState(null);
     const [loading, setLoading] = useState(Boolean(cameraId));
-    const [playbackPolicy, setPlaybackPolicy] = useState(() => getDefaultPolicy(isAdminPlayback));
+    const [playbackPolicy, setPlaybackPolicy] = useState(() => getDefaultPlaybackPolicy(accessScope));
     const [playbackDeniedMessage, setPlaybackDeniedMessage] = useState('');
     const requestIdRef = useRef(0);
     const selectedSegmentRef = useRef(null);
@@ -137,8 +113,8 @@ export function usePlaybackSegments({
     }, [timestampParam]);
 
     useEffect(() => {
-        setPlaybackPolicy((currentPolicy) => currentPolicy || getDefaultPolicy(isAdminPlayback));
-    }, [isAdminPlayback]);
+        setPlaybackPolicy((currentPolicy) => currentPolicy || getDefaultPlaybackPolicy(accessScope));
+    }, [accessScope]);
 
     const loadSegments = useCallback(async (requestCameraId = cameraId, { mode = 'initial' } = {}) => {
         const requestId = requestIdRef.current + 1;
@@ -184,7 +160,7 @@ export function usePlaybackSegments({
             }
 
             const { segments: nextSegments, playbackPolicy: nextPlaybackPolicy } = normalizeSegmentsData(response.data);
-            setPlaybackPolicy(nextPlaybackPolicy || getDefaultPolicy(isAdminPlayback));
+            setPlaybackPolicy(nextPlaybackPolicy || getDefaultPlaybackPolicy(accessScope));
             setPlaybackDeniedMessage('');
             setSegments(nextSegments);
             setSegmentsCameraId(requestCameraId);
@@ -217,7 +193,7 @@ export function usePlaybackSegments({
                 setLoading(false);
             }
         }
-    }, [accessScope, cameraId, isAdminPlayback]);
+    }, [accessScope, cameraId]);
 
     useEffect(() => {
         if (!segments.length || segmentsCameraId !== cameraId) {
