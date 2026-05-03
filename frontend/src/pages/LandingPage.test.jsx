@@ -173,6 +173,7 @@ describe('LandingPage connectivity recovery', () => {
         getPublicAdsSettings.mockReset();
         videoPopupPropsSpy.mockReset();
         landingPageSimplePropsSpy.mockReset();
+        testBackendReachability.mockResolvedValue({ reachable: true, latency: 80 });
 
         getPublicSaweriaConfig.mockResolvedValue({
             success: true,
@@ -240,6 +241,7 @@ describe('LandingPage connectivity recovery', () => {
     });
 
     it('mengecek ulang konektivitas saat browser kembali online', async () => {
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
         testBackendReachability
             .mockResolvedValueOnce({ reachable: false, latency: -1 })
             .mockResolvedValueOnce({ reachable: true, latency: 120 });
@@ -257,6 +259,9 @@ describe('LandingPage connectivity recovery', () => {
         await waitFor(() => {
             expect(testBackendReachability).toHaveBeenCalledTimes(2);
         });
+
+        expect(warnSpy).toHaveBeenCalledWith('[LandingPage] Backend health check unreachable');
+        warnSpy.mockRestore();
     }, 10000);
 
     it('mengecek ulang konektivitas saat tab kembali focus setelah jeda throttle', async () => {

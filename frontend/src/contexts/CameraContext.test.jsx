@@ -1,5 +1,13 @@
 // @vitest-environment jsdom
 
+/*
+ * Purpose: Validate public camera context refresh behavior across resume and network recovery flows.
+ * Caller: Frontend Vitest suite for public camera data regressions.
+ * Deps: React Testing Library, CameraContext, mocked stream/area services, mocked device tier.
+ * MainFuncs: CameraProvider and useCameras integration tests.
+ * SideEffects: Renders jsdom providers and dispatches browser focus/online events.
+ */
+
 import { render, screen, waitFor, act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CameraProvider, useCameras } from './CameraContext';
@@ -52,6 +60,7 @@ describe('CameraContext', () => {
     });
 
     it('mempertahankan data lama saat refresh resume gagal', async () => {
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         getAllActiveStreams
             .mockResolvedValueOnce({ success: true, data: [{ id: 1, name: 'Cam 1' }] })
             .mockRejectedValue(new Error('network down'));
@@ -84,6 +93,11 @@ describe('CameraContext', () => {
             'background',
             expect.objectContaining({ skipGlobalErrorNotification: true })
         );
+        expect(errorSpy).toHaveBeenCalledWith(
+            'Failed to fetch camera and area data:',
+            expect.any(Error)
+        );
+        errorSpy.mockRestore();
     });
 
     it('merefresh data saat browser kembali online', async () => {
