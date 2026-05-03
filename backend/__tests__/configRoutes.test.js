@@ -1,5 +1,5 @@
 import Fastify from 'fastify';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const queryMock = vi.fn();
 
@@ -11,6 +11,10 @@ describe('configRoutes', () => {
     beforeEach(() => {
         vi.resetModules();
         queryMock.mockReset();
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
     });
 
     it('serves public runtime config for same-origin frontend bootstrapping', async () => {
@@ -69,6 +73,7 @@ describe('configRoutes', () => {
     });
 
     it('falls back to a valid default manifest when branding lookup fails', async () => {
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
         queryMock.mockImplementation(() => {
             throw new Error('db unavailable');
         });
@@ -89,6 +94,10 @@ describe('configRoutes', () => {
             start_url: '/',
             display: 'standalone',
         });
+        expect(warnSpy).toHaveBeenCalledWith(
+            '[ConfigRoutes] Failed to load branding settings for manifest:',
+            'db unavailable'
+        );
 
         await fastify.close();
     });

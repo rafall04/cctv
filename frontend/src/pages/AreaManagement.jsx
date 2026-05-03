@@ -17,51 +17,10 @@ import AreaCard from '../components/admin/areas/AreaCard';
 import AreaFormModal from '../components/admin/areas/AreaFormModal';
 import BulkPolicyPreview from '../components/admin/areas/BulkPolicyPreview';
 import lazyWithRetry from '../utils/lazyWithRetry';
+import { buildBulkPayload, defaultBulkConfig, getEffectiveTargetFilter, requiresExternalHlsTarget, requiresExternalStreamsTarget } from '../utils/admin/areaBulkPolicy';
 
 // Lazy load LocationPicker to avoid conflicts with CameraManagement
 const LocationPicker = lazyWithRetry(() => import('../components/LocationPicker'), 'location-picker');
-
-const defaultBulkConfig = {
-    targetFilter: 'all',
-    operation: 'policy_update',
-    delivery_type: 'ignore',
-    external_health_mode: 'ignore',
-    external_use_proxy: 'ignore',
-    enable_recording: 'ignore',
-    enabled: 'ignore',
-    external_tls_mode: 'ignore',
-    external_origin_mode: 'ignore',
-    video_codec: 'ignore',
-    clear_internal_rtsp: false,
-};
-
-function requiresExternalHlsTarget(config) {
-    if (config.operation !== 'policy_update' && config.operation !== 'maintenance') {
-        return false;
-    }
-
-    return config.external_use_proxy !== 'ignore'
-        || config.external_tls_mode !== 'ignore'
-        || config.external_origin_mode !== 'ignore';
-}
-
-function requiresExternalStreamsTarget(config) {
-    if (config.operation !== 'policy_update' && config.operation !== 'maintenance') {
-        return false;
-    }
-
-    return config.external_health_mode !== 'ignore';
-}
-
-function getEffectiveTargetFilter(config) {
-    if (requiresExternalHlsTarget(config)) {
-        return 'external_hls_only';
-    }
-    if (requiresExternalStreamsTarget(config)) {
-        return 'external_streams_only';
-    }
-    return config.targetFilter || 'all';
-}
 
 export default function AreaManagement() {
     const [areas, setAreas] = useState([]);
@@ -297,34 +256,12 @@ export default function AreaManagement() {
         setBulkPreview(null);
     };
 
-    const buildBulkPayload = useCallback(() => {
-        const payload = {};
-
-        if (bulkConfig.operation === 'policy_update' || bulkConfig.operation === 'maintenance') {
-            if (bulkConfig.delivery_type !== 'ignore') payload.delivery_type = bulkConfig.delivery_type;
-            if (bulkConfig.external_health_mode !== 'ignore') payload.external_health_mode = bulkConfig.external_health_mode;
-            if (bulkConfig.external_use_proxy !== 'ignore') payload.external_use_proxy = parseInt(bulkConfig.external_use_proxy, 10);
-            if (bulkConfig.enable_recording !== 'ignore') payload.enable_recording = parseInt(bulkConfig.enable_recording, 10);
-            if (bulkConfig.enabled !== 'ignore') payload.enabled = parseInt(bulkConfig.enabled, 10);
-            if (bulkConfig.external_tls_mode !== 'ignore') payload.external_tls_mode = bulkConfig.external_tls_mode;
-            if (bulkConfig.external_origin_mode !== 'ignore') payload.external_origin_mode = bulkConfig.external_origin_mode;
-            if (bulkConfig.video_codec !== 'ignore') payload.video_codec = bulkConfig.video_codec;
-        }
-
-        if (bulkConfig.operation === 'normalization') {
-            if (bulkConfig.delivery_type !== 'ignore') payload.delivery_type = bulkConfig.delivery_type;
-            if (bulkConfig.clear_internal_rtsp) payload.clear_internal_rtsp = true;
-        }
-
-        return payload;
-    }, [bulkConfig]);
-
     const loadBulkPreview = useCallback(async () => {
         if (!bulkConfigArea) return;
 
         setBulkPreviewLoading(true);
         try {
-            const payload = buildBulkPayload();
+            const payload = buildBulkPayload(bulkConfig);
             const result = await cameraService.bulkUpdateByArea(bulkConfigArea.id, {
                 targetFilter: getEffectiveTargetFilter(bulkConfig),
                 operation: bulkConfig.operation,
@@ -344,13 +281,13 @@ export default function AreaManagement() {
         } finally {
             setBulkPreviewLoading(false);
         }
-    }, [buildBulkPayload, bulkConfig, bulkConfigArea, showError]);
+    }, [bulkConfig, bulkConfigArea, showError]);
 
     const handleBulkUpdate = async () => {
         if (!bulkConfigArea) return;
         setApplyingBulk(true);
         try {
-            const payload = buildBulkPayload();
+            const payload = buildBulkPayload(bulkConfig);
 
             if (Object.keys(payload).length === 0) {
                 setApplyingBulk(false);

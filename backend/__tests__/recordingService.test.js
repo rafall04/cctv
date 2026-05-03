@@ -106,6 +106,7 @@ describe('recordingService external recording support', () => {
     afterEach(() => {
         vi.clearAllTimers();
         vi.useRealTimers();
+        vi.restoreAllMocks();
     });
 
     it('builds RTSP recording args for internal cameras', async () => {
@@ -175,6 +176,7 @@ describe('recordingService external recording support', () => {
     });
 
     it('rejects external recording when external_hls_url is missing', async () => {
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         const { recordingService } = await import('../services/recordingService.js');
 
         queryOneMock.mockReturnValue({
@@ -195,9 +197,11 @@ describe('recordingService external recording support', () => {
             reason: 'invalid_source',
         });
         expect(spawnMock).not.toHaveBeenCalled();
+        expect(errorSpy).toHaveBeenCalledWith('[Recording] Invalid source for camera 9: External HLS URL is required for external recording');
     });
 
     it('still rejects internal recording when RTSP URL is invalid', async () => {
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
         const { recordingService } = await import('../services/recordingService.js');
 
         queryOneMock.mockReturnValue({
@@ -218,6 +222,7 @@ describe('recordingService external recording support', () => {
             reason: 'invalid_source',
         });
         expect(spawnMock).not.toHaveBeenCalled();
+        expect(errorSpy).toHaveBeenCalledWith('[Recording] Invalid source for camera 10: Invalid RTSP URL');
     });
 
     it('exports deterministic recording cooldown that grows and caps', async () => {
@@ -419,6 +424,7 @@ describe('recordingService external recording support', () => {
     });
 
     it('refuses cleanup delete when DB file path escapes the recording directory', async () => {
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
         const { join } = await import('path');
         const { recordingService } = await import('../services/recordingService.js');
         const oldStart = new Date(Date.now() - (2 * 60 * 60 * 1000)).toISOString();
@@ -446,6 +452,7 @@ describe('recordingService external recording support', () => {
 
         expect(fsPromisesMock.unlink).not.toHaveBeenCalledWith(expect.stringContaining('outside-recordings'));
         expect(executeMock).not.toHaveBeenCalledWith('DELETE FROM recording_segments WHERE id = ?', [501]);
+        expect(warnSpy).toHaveBeenCalledWith('[Cleanup] Refusing unsafe delete for camera1/20260502_000000.mp4 (retention_expired)');
     });
 
     it('deletes only oldest expired DB segments in a bounded normal cleanup batch', async () => {
@@ -518,6 +525,7 @@ describe('recordingService external recording support', () => {
     });
 
     it('quarantines invalid short segments instead of deleting them immediately', async () => {
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
         const { join } = await import('path');
         vi.setSystemTime(Date.parse('2026-05-02T10:00:00.000Z'));
         execMock[promisify.custom] = vi.fn(async () => ({ stdout: '0.2\n', stderr: '' }));
@@ -556,9 +564,11 @@ describe('recordingService external recording support', () => {
             expect.stringContaining('.quarantine')
         );
         expect(fsPromisesMock.unlink).not.toHaveBeenCalledWith(join(recordingsBasePath, 'camera3', '20260502_000000.mp4'));
+        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[Segment] Quarantined file: camera3/20260502_000000.mp4 -> .quarantine/camera3/'));
     });
 
     it('does not emergency-delete recent filesystem orphan recordings', async () => {
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
         vi.setSystemTime(Date.parse('2026-05-02T10:00:00.000Z'));
         execMock[promisify.custom] = vi.fn(async () => ({ stdout: '100\n', stderr: '' }));
         const { recordingService } = await import('../services/recordingService.js');
@@ -577,9 +587,11 @@ describe('recordingService external recording support', () => {
         await recordingService.emergencyDiskSpaceCheck();
 
         expect(fsPromisesMock.unlink).not.toHaveBeenCalledWith(expect.stringContaining('20260502_095800.mp4'));
+        expect(warnSpy).toHaveBeenCalledWith('[DiskCheck] ⚠️ LOW DISK SPACE: 0.00GB free. Starting emergency cleanup...');
     });
 
     it('keeps short unstable-connection segments until retention expiry', async () => {
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
         const { join } = await import('path');
         vi.setSystemTime(Date.parse('2026-05-02T10:00:00.000Z'));
         execMock[promisify.custom] = vi.fn(async () => ({ stdout: '0.2\n', stderr: '' }));
@@ -605,9 +617,11 @@ describe('recordingService external recording support', () => {
             join(recordingsBasePath, 'camera3', '20260502_095800.mp4'),
             expect.stringContaining('.quarantine')
         );
+        expect(warnSpy).toHaveBeenCalledWith('[Segment] Keeping invalid segment until retention expiry: camera3/20260502_095800.mp4');
     });
 
     it('keeps recent failed-remux segments in place until retention expiry', async () => {
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
         const { join } = await import('path');
         vi.setSystemTime(Date.parse('2026-05-02T10:00:00.000Z'));
         const { recordingService } = await import('../services/recordingService.js');
@@ -637,6 +651,7 @@ describe('recordingService external recording support', () => {
             'DELETE FROM failed_remux_files WHERE camera_id = ? AND filename = ?',
             [3, '20260502_095800.mp4']
         );
+        expect(warnSpy).toHaveBeenCalledWith('[Segment] Keeping failed remux segment until retention expiry: camera3/20260502_095800.mp4');
     });
 
     it('registers the same segment idempotently when scanner and ffmpeg close detect it together', async () => {

@@ -14,6 +14,7 @@ describe('runtimeConfig', () => {
     });
 
     it('loads backend runtime config before consumers read the api base', async () => {
+        const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
             ok: true,
             json: async () => ({
@@ -35,5 +36,9 @@ describe('runtimeConfig', () => {
             appVersion: '1.0.0',
             buildId: 'build-123',
         });
+        expect(logSpy).toHaveBeenCalledWith(
+            '✅ Runtime config loaded from backend:',
+            expect.objectContaining({ apiUrl: '/api' })
+        );
     });
 });
