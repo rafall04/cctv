@@ -878,7 +878,9 @@ describe('Playback', () => {
         act(() => {
             dispatchMediaEvent(video, 'waiting');
         });
-        expect(screen.getByTestId('buffering-state').textContent).toBe('true');
+        await waitFor(() => {
+            expect(screen.getByTestId('buffering-state').textContent).toBe('true');
+        });
 
         video.currentTime = 2;
         act(() => {

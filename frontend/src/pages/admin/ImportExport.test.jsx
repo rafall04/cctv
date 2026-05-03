@@ -1,9 +1,17 @@
 // @vitest-environment jsdom
 
+/*
+ * Purpose: Verify import/export admin flows, query-prefill behavior, and preview normalization rules.
+ * Caller: Vitest frontend suite for admin import/export regressions.
+ * Deps: React Testing Library, TestRouter, mocked camera service and notification context.
+ * MainFuncs: ImportExport integration tests.
+ * SideEffects: Uses mocked FileReader and jsdom routing only.
+ */
+
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ImportExport from './ImportExport';
+import { TestRouter } from '../../test/renderWithRouter';
 
 const {
     exportCameras,
@@ -96,9 +104,9 @@ describe('ImportExport', () => {
 
     it('prefills target area from query string and previews remote Jombang preset', async () => {
         render(
-            <MemoryRouter initialEntries={['/admin/import-export?area=Jombang']}>
+            <TestRouter initialEntries={['/admin/import-export?area=Jombang']}>
                 <ImportExport />
-            </MemoryRouter>
+            </TestRouter>
         );
 
         expect(screen.getByDisplayValue('Jombang')).toBeTruthy();
@@ -164,9 +172,9 @@ describe('ImportExport', () => {
         });
 
         render(
-            <MemoryRouter initialEntries={['/admin/import-export?area=Surabaya']}>
+            <TestRouter initialEntries={['/admin/import-export?area=Surabaya']}>
                 <ImportExport />
-            </MemoryRouter>
+            </TestRouter>
         );
 
         fireEvent.change(screen.getByLabelText('Import Profile'), {

@@ -1,9 +1,17 @@
 // @vitest-environment jsdom
 
+/*
+ * Purpose: Verify admin navigation readability and playback links inside the active admin shell.
+ * Caller: Vitest frontend suite for admin layout regressions.
+ * Deps: React Testing Library, TestRouter, mocked auth/theme/branding/notification contexts.
+ * MainFuncs: AdminLayout dark mode readability tests.
+ * SideEffects: Renders jsdom UI with mocked providers only.
+ */
+
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import AdminLayout from './AdminLayout';
+import { TestRouter } from '../test/renderWithRouter';
 
 vi.mock('../services/authService', () => ({
     authService: {
@@ -40,11 +48,11 @@ vi.mock('../components/ui/NetworkStatusBanner', () => ({
 describe('AdminLayout dark mode readability', () => {
     it('memberi tone dark mode eksplisit pada heading navigasi dan quick links', () => {
         render(
-            <MemoryRouter initialEntries={['/admin/dashboard']}>
+            <TestRouter initialEntries={['/admin/dashboard']}>
                 <AdminLayout>
                     <div>Content</div>
                 </AdminLayout>
-            </MemoryRouter>
+            </TestRouter>
         );
 
         expect(screen.getByText('Main Menu').className).toContain('dark:text-gray-400');
@@ -54,11 +62,11 @@ describe('AdminLayout dark mode readability', () => {
 
     it('menampilkan tautan playback admin di navigasi utama', () => {
         render(
-            <MemoryRouter initialEntries={['/admin/dashboard']}>
+            <TestRouter initialEntries={['/admin/dashboard']}>
                 <AdminLayout>
                     <div>Content</div>
                 </AdminLayout>
-            </MemoryRouter>
+            </TestRouter>
         );
 
         const playbackLink = screen.getByRole('link', { name: /^Playback$/i });
@@ -67,11 +75,11 @@ describe('AdminLayout dark mode readability', () => {
 
     it('menampilkan tautan playback analytics di navigasi utama', () => {
         render(
-            <MemoryRouter initialEntries={['/admin/dashboard']}>
+            <TestRouter initialEntries={['/admin/dashboard']}>
                 <AdminLayout>
                     <div>Content</div>
                 </AdminLayout>
-            </MemoryRouter>
+            </TestRouter>
         );
 
         const playbackAnalyticsLink = screen.getByRole('link', { name: /^Playback Analytics$/i });

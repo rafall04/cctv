@@ -591,16 +591,7 @@ function Playback({
 
             const playPromise = video.play();
             if (playPromise !== undefined) {
-                playPromise
-                    .then(() => {
-                        if (isStale()) {
-                            return;
-                        }
-
-                        hasStartedPlaybackForSourceRef.current = true;
-                        clearBufferingState();
-                    })
-                    .catch(handleAutoPlayFailure);
+                playPromise.catch(handleAutoPlayFailure);
             }
         };
 

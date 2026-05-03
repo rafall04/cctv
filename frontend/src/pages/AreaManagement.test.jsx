@@ -1,9 +1,17 @@
 // @vitest-environment jsdom
 
+/*
+ * Purpose: Validate area management overview cards, policy previews, and inline default-grid controls.
+ * Caller: Vitest frontend suite for admin area regressions.
+ * Deps: React Testing Library, TestRouter, mocked area/camera/settings services, notification context.
+ * MainFuncs: AreaManagement integration tests.
+ * SideEffects: Renders jsdom UI with mocked async service responses only.
+ */
+
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AreaManagement from './AreaManagement';
+import { TestRouter } from '../test/renderWithRouter';
 
 const {
     getAdminOverview,
@@ -120,9 +128,9 @@ describe('AreaManagement', () => {
 
     it('menampilkan total kamera dari overview tunggal', async () => {
         render(
-            <MemoryRouter>
+            <TestRouter>
                 <AreaManagement />
-            </MemoryRouter>
+            </TestRouter>
         );
 
         await screen.findByText('Area A');
@@ -132,9 +140,9 @@ describe('AreaManagement', () => {
 
     it('memaksa preview proxy policy ke target external_hls_only', async () => {
         render(
-            <MemoryRouter>
+            <TestRouter>
                 <AreaManagement />
-            </MemoryRouter>
+            </TestRouter>
         );
 
         await screen.findByText('Area A');
@@ -159,9 +167,9 @@ describe('AreaManagement', () => {
 
     it('memaksa preview health policy ke target external_streams_only', async () => {
         render(
-            <MemoryRouter>
+            <TestRouter>
                 <AreaManagement />
-            </MemoryRouter>
+            </TestRouter>
         );
 
         await screen.findByText('Area A');
@@ -184,9 +192,9 @@ describe('AreaManagement', () => {
 
     it('menampilkan dan mengubah toggle grid default langsung dari kartu area', async () => {
         render(
-            <MemoryRouter>
+            <TestRouter>
                 <AreaManagement />
-            </MemoryRouter>
+            </TestRouter>
         );
 
         await screen.findByText('Grid View Default');
@@ -206,9 +214,9 @@ describe('AreaManagement', () => {
 
     it('menyimpan limit kamera grid default dari kartu area', async () => {
         render(
-            <MemoryRouter>
+            <TestRouter>
                 <AreaManagement />
-            </MemoryRouter>
+            </TestRouter>
         );
 
         await screen.findByLabelText('Limit Grid Area A');

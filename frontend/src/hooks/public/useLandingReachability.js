@@ -1,3 +1,11 @@
+/*
+ * Purpose: Check landing-page backend reachability and re-check on browser visibility/network events.
+ * Caller: Public landing page bootstrapping and connectivity recovery flows.
+ * Deps: React hooks, runtime API config, connectionTester reachability helper.
+ * MainFuncs: resolveHealthUrl, useLandingReachability.
+ * SideEffects: Issues health-check requests and logs reachability warnings.
+ */
+
 import { useCallback, useEffect, useRef } from 'react';
 import { getApiUrl } from '../../config/config.js';
 import { testBackendReachability } from '../../utils/connectionTester';
@@ -44,7 +52,9 @@ export function useLandingReachability() {
 
         try {
             const result = await testBackendReachability(resolveHealthUrl());
-            if (mountedRef.current && !result.reachable) {
+            const isReachable = result?.reachable === true;
+
+            if (mountedRef.current && !isReachable) {
                 console.warn('[LandingPage] Backend health check unreachable');
             }
         } catch (err) {

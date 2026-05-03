@@ -63,7 +63,7 @@ vi.mock('../SaweriaSupport', () => ({
 }));
 
 describe('LandingPageSimple', () => {
-    it('merender footer banner di bawah cameras section dan sebelum footer', () => {
+    it('merender footer banner di bawah cameras section dan sebelum footer', async () => {
         const CamerasSection = () => <div data-testid="cameras-section">cameras</div>;
 
         render(
@@ -98,6 +98,8 @@ describe('LandingPageSimple', () => {
             />
         );
 
+        await screen.findByText('feedback-widget');
+
         const camerasSection = screen.getByTestId('cameras-section');
         const footerBanner = screen.getByTestId('ad-slot-footer-banner-simple');
         const footer = document.querySelector('footer');
@@ -110,7 +112,7 @@ describe('LandingPageSimple', () => {
         ).toBeTruthy();
     });
 
-    it('menampilkan ringkasan online dan offline di bagian atas mode simpel', () => {
+    it('menampilkan ringkasan online dan offline di bagian atas mode simpel', async () => {
         const CamerasSection = () => <div data-testid="cameras-section">cameras</div>;
 
         render(
@@ -131,6 +133,8 @@ describe('LandingPageSimple', () => {
                 adsConfig={null}
             />
         );
+
+        await screen.findByText('feedback-widget');
 
         expect(screen.getByText('Status Kamera')).toBeTruthy();
         expect(screen.getByText('Ringkasan cepat kamera publik saat ini.')).toBeTruthy();
