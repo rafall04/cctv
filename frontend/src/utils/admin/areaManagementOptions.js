@@ -1,8 +1,8 @@
 /*
- * Purpose: Shared option lists for admin area management controls.
+ * Purpose: Shared option lists and labels for admin area management controls.
  * Caller: AreaManagement page and admin area presentation components.
  * Deps: None.
- * MainFuncs: GRID_DEFAULT_LIMIT_OPTIONS, INTERNAL_INGEST_POLICY_OPTIONS.
+ * MainFuncs: GRID_DEFAULT_LIMIT_OPTIONS, INTERNAL_INGEST_POLICY_OPTIONS, getBulkFilterLabel.
  * SideEffects: None.
  */
 
@@ -21,3 +21,32 @@ export const INTERNAL_INGEST_POLICY_OPTIONS = [
     { value: 'always_on', label: 'Always On' },
     { value: 'on_demand', label: 'On-Demand' },
 ];
+
+export function getBulkFilterLabel(targetFilter) {
+    switch (targetFilter) {
+        case 'internal_only':
+            return 'Hanya Internal';
+        case 'external_only':
+            return 'Hanya External';
+        case 'external_streams_only':
+            return 'Hanya External Valid';
+        case 'external_hls_only':
+            return 'Hanya External HLS';
+        case 'external_mjpeg_only':
+            return 'Hanya External MJPEG';
+        case 'external_probeable_only':
+            return 'Hanya External Probeable';
+        case 'external_passive_only':
+            return 'Hanya External Passive';
+        case 'external_unresolved_only':
+            return 'Hanya External Unresolved';
+        case 'online_only':
+            return 'Hanya Online';
+        case 'offline_only':
+            return 'Hanya Offline';
+        case 'recording_enabled_only':
+            return 'Hanya Recording Enabled';
+        default:
+            return 'Semua Kamera Area';
+    }
+}

@@ -14,9 +14,9 @@ import { settingsService } from '../services/settingsService';
 import { useNotification } from '../contexts/NotificationContext';
 import { StatCardSkeleton, CameraCardSkeleton, NoAreasEmptyState, Alert } from '../components/ui';
 import AreaCard from '../components/admin/areas/AreaCard';
+import AreaFormModal from '../components/admin/areas/AreaFormModal';
+import BulkPolicyPreview from '../components/admin/areas/BulkPolicyPreview';
 import lazyWithRetry from '../utils/lazyWithRetry';
-import { AREA_COVERAGE_OPTIONS } from '../utils/areaCoverage';
-import { GRID_DEFAULT_LIMIT_OPTIONS, INTERNAL_INGEST_POLICY_OPTIONS } from '../utils/admin/areaManagementOptions';
 
 // Lazy load LocationPicker to avoid conflicts with CameraManagement
 const LocationPicker = lazyWithRetry(() => import('../components/LocationPicker'), 'location-picker');
@@ -34,14 +34,6 @@ const defaultBulkConfig = {
     video_codec: 'ignore',
     clear_internal_rtsp: false,
 };
-
-const AREA_HEALTH_MODE_OPTIONS = [
-    { value: 'default', label: 'Ikuti Global Default' },
-    { value: 'passive_first', label: 'Passive First' },
-    { value: 'hybrid_probe', label: 'Hybrid Probe' },
-    { value: 'probe_first', label: 'Probe First' },
-    { value: 'disabled', label: 'Disabled' },
-];
 
 function requiresExternalHlsTarget(config) {
     if (config.operation !== 'policy_update' && config.operation !== 'maintenance') {
@@ -69,35 +61,6 @@ function getEffectiveTargetFilter(config) {
         return 'external_streams_only';
     }
     return config.targetFilter || 'all';
-}
-
-function getBulkFilterLabel(targetFilter) {
-    switch (targetFilter) {
-        case 'internal_only':
-            return 'Hanya Internal';
-        case 'external_only':
-            return 'Hanya External';
-        case 'external_streams_only':
-            return 'Hanya External Valid';
-        case 'external_hls_only':
-            return 'Hanya External HLS';
-        case 'external_mjpeg_only':
-            return 'Hanya External MJPEG';
-        case 'external_probeable_only':
-            return 'Hanya External Probeable';
-        case 'external_passive_only':
-            return 'Hanya External Passive';
-        case 'external_unresolved_only':
-            return 'Hanya External Unresolved';
-        case 'online_only':
-            return 'Hanya Online';
-        case 'offline_only':
-            return 'Hanya Offline';
-        case 'recording_enabled_only':
-            return 'Hanya Recording Enabled';
-        default:
-            return 'Semua Kamera Area';
-    }
 }
 
 export default function AreaManagement() {
@@ -644,205 +607,19 @@ export default function AreaManagement() {
 
             {/* Create/Edit Modal */}
             {showModal && (
-                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700/50 max-h-[90vh] overflow-y-auto">
-                        <div className="p-6 border-b border-gray-200 dark:border-gray-700/50 flex justify-between items-center sticky top-0 bg-white dark:bg-gray-800">
-                            <div>
-                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">{editingArea ? 'Edit Area' : 'Tambah Area'}</h3>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">Isi detail lokasi</p>
-                            </div>
-                            <button onClick={() => setShowModal(false)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/50 text-gray-600 dark:text-gray-300">
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M6 18L18 6M6 6l12 12"/></svg>
-                            </button>
-                        </div>
-                        <form onSubmit={handleSubmit} className="p-6 space-y-5">
-                            {error && <Alert type="error" message={error} dismissible onDismiss={() => setError('')} />}
-                            
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Nama Area *</label>
-                                <input type="text" name="name" value={formData.name} onChange={handleChange}
-                                    className={`w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary ${formErrors.name ? 'border-red-500' : 'border-gray-200 dark:border-gray-700/50'}`}
-                                    placeholder="Contoh: Pos Kamling RT 01" />
-                                {formErrors.name && <p className="mt-1.5 text-sm text-red-500">{formErrors.name}</p>}
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">RT</label>
-                                    <input type="text" name="rt" value={formData.rt} onChange={handleChange}
-                                        className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary" placeholder="01" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">RW</label>
-                                    <input type="text" name="rw" value={formData.rw} onChange={handleChange}
-                                        className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary" placeholder="05" />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Kelurahan</label>
-                                    <input type="text" name="kelurahan" value={formData.kelurahan} onChange={handleChange}
-                                        className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Nama kelurahan" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Kecamatan</label>
-                                    <input type="text" name="kecamatan" value={formData.kecamatan} onChange={handleChange}
-                                        className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Nama kecamatan" />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Deskripsi</label>
-                                <textarea name="description" value={formData.description} onChange={handleChange} rows="2"
-                                    className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary resize-none" placeholder="Catatan opsional..." />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Default Health Monitoring External</label>
-                                <select
-                                    name="external_health_mode_override"
-                                    value={formData.external_health_mode_override}
-                                    onChange={handleChange}
-                                    className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                                >
-                                    {AREA_HEALTH_MODE_OPTIONS.map((option) => (
-                                        <option key={option.value} value={option.value}>{option.label}</option>
-                                    ))}
-                                </select>
-                                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                    Override ini menjadi default steady-state untuk kamera external di area ini. Kamera dengan override sendiri tetap menang.
-                                </p>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Coverage Area</label>
-                                    <select
-                                        name="coverage_scope"
-                                        value={formData.coverage_scope}
-                                        onChange={handleChange}
-                                        className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                                    >
-                                        {AREA_COVERAGE_OPTIONS.map((option) => (
-                                            <option key={option.value} value={option.value}>{option.label}</option>
-                                        ))}
-                                    </select>
-                                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                        Menjelaskan skala area ini, misalnya titik kecil, kelurahan, kecamatan, atau kabupaten/kota.
-                                    </p>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Override Focus Zoom</label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        max="20"
-                                        name="viewport_zoom_override"
-                                        value={formData.viewport_zoom_override}
-                                        onChange={handleChange}
-                                        className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                                        placeholder="Kosongkan untuk auto"
-                                    />
-                                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                        Jika diisi, zoom ini akan dipakai saat area difokuskan di map view.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="rounded-2xl border border-sky-100 bg-sky-50/70 px-4 py-3 dark:border-sky-500/20 dark:bg-sky-500/10">
-                                <label className="flex items-start gap-3">
-                                    <input
-                                        type="checkbox"
-                                        name="show_on_grid_default"
-                                        checked={Boolean(formData.show_on_grid_default)}
-                                        onChange={handleChange}
-                                        className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                                    />
-                                    <span>
-                                        <span className="block text-sm font-medium text-gray-900 dark:text-white">Tampilkan di Grid Default</span>
-                                        <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
-                                            Saat Grid View masih di &quot;Semua Lokasi&quot;, hanya area yang dicentang di sini yang dimuat default. Jika user memilih area tertentu, area itu tetap tampil walau opsi ini dimatikan.
-                                        </span>
-                                    </span>
-                                </label>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Limit Kamera di Grid Default</label>
-                                <select
-                                    name="grid_default_camera_limit"
-                                    value={formData.grid_default_camera_limit}
-                                    onChange={handleChange}
-                                    className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                                >
-                                    {GRID_DEFAULT_LIMIT_OPTIONS.map((option) => (
-                                        <option key={`form-${option.value || 'unlimited'}`} value={option.value}>{option.label}</option>
-                                    ))}
-                                </select>
-                                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                    Untuk area padat, batasi jumlah kamera default seperti 10 atau 15 agar Grid View tetap ringan. Saat user memilih area tertentu, limit ini diabaikan.
-                                </p>
-                            </div>
-
-                            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-4 dark:border-emerald-500/20 dark:bg-emerald-500/10">
-                                <div className="mb-3">
-                                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Internal RTSP / MediaMTX Policy</h4>
-                                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                        Default area ini hanya dipakai oleh kamera internal yang tidak punya override sendiri di form kamera.
-                                    </p>
-                                </div>
-
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Default Ingest Mode</label>
-                                        <select
-                                            name="internal_ingest_policy_default"
-                                            value={formData.internal_ingest_policy_default}
-                                            onChange={handleChange}
-                                            className="w-full px-4 py-2.5 bg-white dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                                        >
-                                            {INTERNAL_INGEST_POLICY_OPTIONS.map((option) => (
-                                                <option key={option.value} value={option.value}>{option.label}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Idle Close Timeout (detik)</label>
-                                        <input
-                                            type="number"
-                                            min="5"
-                                            max="300"
-                                            name="internal_on_demand_close_after_seconds"
-                                            value={formData.internal_on_demand_close_after_seconds}
-                                            onChange={handleChange}
-                                            className="w-full px-4 py-2.5 bg-white dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                                            placeholder="Kosong = ikuti default"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Koordinat dengan LocationPicker */}
-                            <div className="pt-4 border-t border-gray-200 dark:border-gray-700/50">
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Koordinat Area (untuk Map View)</label>
-                                <Suspense fallback={<div className="text-sm text-gray-600 dark:text-gray-300">Loading map...</div>}>
-                                    <LocationPicker latitude={formData.latitude} longitude={formData.longitude} onLocationChange={handleLocationChange} />
-                                </Suspense>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Koordinat digunakan untuk memindahkan peta saat filter area dipilih</p>
-                            </div>
-
-                            <div className="flex gap-3 pt-2">
-                                <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700" disabled={submitting}>Batal</button>
-                                <button type="submit" className="flex-[2] px-4 py-2.5 bg-gradient-to-r from-primary to-primary-600 text-white font-medium rounded-xl shadow-lg shadow-primary/30 hover:from-primary-600 hover:to-blue-700 disabled:opacity-50 flex items-center justify-center gap-2" disabled={submitting}>
-                                    {submitting && <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>}
-                                    {submitting ? 'Menyimpan...' : (editingArea ? 'Perbarui' : 'Simpan')}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+                <AreaFormModal
+                    editingArea={editingArea}
+                    formData={formData}
+                    formErrors={formErrors}
+                    error={error}
+                    submitting={submitting}
+                    LocationPickerComponent={LocationPicker}
+                    onChange={handleChange}
+                    onSubmit={handleSubmit}
+                    onClose={() => setShowModal(false)}
+                    onErrorDismiss={() => setError('')}
+                    onLocationChange={handleLocationChange}
+                />
             )}
 
             {/* Bulk Config Modal */}
@@ -1038,135 +815,12 @@ export default function AreaManagement() {
                                 </label>
                             </div>
 
-                            <div className="space-y-4">
-                                <div className="rounded-2xl border border-gray-200 dark:border-gray-700/50 bg-gray-50 dark:bg-gray-900/40 p-4">
-                                    <div className="flex items-center justify-between gap-3 mb-3">
-                                        <div>
-                                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Preview Dampak</h4>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">Lihat target kamera dan breakdown sebelum apply.</p>
-                                        </div>
-                                        <button
-                                            onClick={loadBulkPreview}
-                                            className="px-3 py-2 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary-600 disabled:opacity-50"
-                                            disabled={bulkPreviewLoading}
-                                        >
-                                            {bulkPreviewLoading ? 'Memuat...' : 'Preview'}
-                                        </button>
-                                    </div>
-
-                                    {bulkPreview ? (
-                                        <div className="space-y-3 text-sm">
-                                            <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-3 border border-gray-200 dark:border-gray-700">
-                                                <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Target Aktif</div>
-                                                <div className="font-semibold text-gray-900 dark:text-white">{getBulkFilterLabel(bulkPreview.targetFilter || effectiveBulkTargetFilter)}</div>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-2 border border-gray-200 dark:border-gray-700">
-                                                    <div className="text-gray-500 dark:text-gray-400 text-xs">Total Area</div>
-                                                    <div className="font-semibold text-gray-900 dark:text-white">{bulkPreview.summary?.totalInArea || 0}</div>
-                                                </div>
-                                                <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-2 border border-gray-200 dark:border-gray-700">
-                                                    <div className="text-gray-500 dark:text-gray-400 text-xs">Matched Filter</div>
-                                                    <div className="font-semibold text-gray-900 dark:text-white">{bulkPreview.summary?.matchedCount || 0}</div>
-                                                </div>
-                                                <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-2 border border-gray-200 dark:border-gray-700">
-                                                    <div className="text-gray-500 dark:text-gray-400 text-xs">Eligible</div>
-                                                    <div className="font-semibold text-emerald-600 dark:text-emerald-300">{bulkPreview.summary?.eligibleCount || 0}</div>
-                                                </div>
-                                                <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-2 border border-gray-200 dark:border-gray-700">
-                                                    <div className="text-gray-500 dark:text-gray-400 text-xs">Blocked</div>
-                                                    <div className="font-semibold text-red-600 dark:text-red-300">{bulkPreview.summary?.blockedCount || 0}</div>
-                                                </div>
-                                            </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                                <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-2 border border-gray-200 dark:border-gray-700">
-                                                    <div className="text-gray-500 dark:text-gray-400 text-xs">Unresolved</div>
-                                                    <div className="font-semibold text-amber-600 dark:text-amber-300">{bulkPreview.summary?.unresolvedCount || 0}</div>
-                                                </div>
-                                                <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-2 border border-gray-200 dark:border-gray-700">
-                                                    <div className="text-gray-500 dark:text-gray-400 text-xs">Recording Enabled</div>
-                                                    <div className="font-semibold text-gray-900 dark:text-white">{bulkPreview.summary?.recordingEnabledCount || 0}</div>
-                                                </div>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-3 border border-gray-200 dark:border-gray-700">
-                                                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Delivery Mix</div>
-                                                    <div className="space-y-2">
-                                                        {(bulkPreview.summary?.deliveryTypeBreakdown || []).slice(0, 5).map((item) => (
-                                                            <div key={item.key} className="flex items-center justify-between gap-3 text-xs">
-                                                                <span className="text-gray-700 dark:text-gray-300">{item.key}</span>
-                                                                <span className="px-2 py-1 rounded-full bg-sky-100 dark:bg-sky-500/10 text-sky-700 dark:text-sky-300">{item.count}</span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                                <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-3 border border-gray-200 dark:border-gray-700">
-                                                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Current Health Modes</div>
-                                                    <div className="space-y-2">
-                                                        {(bulkPreview.summary?.externalHealthModeBreakdown || []).slice(0, 5).map((item) => (
-                                                            <div key={item.key} className="flex items-center justify-between gap-3 text-xs">
-                                                                <span className="text-gray-700 dark:text-gray-300">{item.key}</span>
-                                                                <span className="px-2 py-1 rounded-full bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">{item.count}</span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            {(bulkPreview.summary?.blockedReasons || []).length > 0 && (
-                                                <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-3 border border-gray-200 dark:border-gray-700">
-                                                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Blocked Reasons</div>
-                                                    <div className="space-y-2">
-                                                        {bulkPreview.summary.blockedReasons.map((item) => (
-                                                            <div key={item.reason} className="flex items-center justify-between gap-3 text-xs">
-                                                                <span className="text-gray-700 dark:text-gray-300">{item.reason}</span>
-                                                                <span className="px-2 py-1 rounded-full bg-red-100 dark:bg-red-500/10 text-red-700 dark:text-red-300 shrink-0">{item.count}</span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-                                            <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-3 border border-gray-200 dark:border-gray-700">
-                                                <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Contoh Kamera Terdampak</div>
-                                                <div className="space-y-2 max-h-48 overflow-y-auto">
-                                                    {(bulkPreview.summary?.examples || []).map((camera) => (
-                                                        <div key={camera.id} className="flex items-center justify-between gap-3 text-xs">
-                                                            <span className="text-gray-900 dark:text-white truncate">{camera.name}</span>
-                                                            <span className="px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 shrink-0">
-                                                                {camera.delivery_classification}
-                                                            </span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                            {(bulkPreview.summary?.blockedExamples || []).length > 0 && (
-                                                <div className="rounded-xl bg-white dark:bg-gray-800 px-3 py-3 border border-gray-200 dark:border-gray-700">
-                                                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">Contoh Kamera Tidak Eligible</div>
-                                                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                                                        {(bulkPreview.summary?.blockedExamples || []).map((camera) => (
-                                                            <div key={camera.id} className="flex items-center justify-between gap-3 text-xs">
-                                                                <div className="min-w-0">
-                                                                    <div className="text-gray-900 dark:text-white truncate">{camera.name}</div>
-                                                                    <div className="text-gray-500 dark:text-gray-400 truncate">{camera.reason}</div>
-                                                                </div>
-                                                                <span className="px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 shrink-0">
-                                                                    {camera.delivery_classification}
-                                                                </span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-                                            {bulkPreview.guidance && (
-                                                <div className="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-500/10 dark:border-amber-500/20 px-3 py-3 text-amber-800 dark:text-amber-300">
-                                                    {bulkPreview.guidance}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Belum ada preview. Klik Preview untuk melihat dampak target filter dan operasi.</p>
-                                    )}
-                                </div>
-                            </div>
+                            <BulkPolicyPreview
+                                bulkPreview={bulkPreview}
+                                bulkPreviewLoading={bulkPreviewLoading}
+                                effectiveBulkTargetFilter={effectiveBulkTargetFilter}
+                                onPreview={loadBulkPreview}
+                            />
                         </div>
                         <div className="flex gap-3 p-6 shrink-0 border-t border-gray-200 dark:border-gray-700/50 bg-white dark:bg-gray-800 rounded-b-2xl">
                             <button onClick={() => setBulkConfigArea(null)} className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700" disabled={applyingBulk}>Batal</button>
