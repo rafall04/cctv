@@ -66,7 +66,7 @@ SideEffects: None; documentation only.
 - Backend focused test: `cd backend && npm test -- <test-file>`.
 - Frontend full gate: `cd frontend && npm test && npm run build && npm run lint`.
 - Frontend focused test: `cd frontend && npm test -- <test-file>`.
-- Frontend lint currently uses a whitelist in `frontend/package.json`; expanding lint scope is a stabilization priority.
+- Frontend lint runs against full `src` via `frontend/package.json`.
 
 ## Stabilization Priorities
 
@@ -84,6 +84,7 @@ SideEffects: None; documentation only.
   - Prefer `frontend/src/layouts/AdminLayout.jsx`; phase out `frontend/src/components/AdminLayout.jsx`.
   - Prefer `frontend/src/components/landing/LandingPageSimple.jsx`; phase out `frontend/src/components/LandingPageSimple.jsx`.
   - Prefer `frontend/src/components/admin/settings/`; `frontend/src/components/settings/` now contains compatibility re-exports only.
+- Keep full-scope frontend lint passing before adding new feature surfaces.
 - Add Header Docs to active entrypoints that still lack them before modifying those files.
 
 ## Local Map Policy
