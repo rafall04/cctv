@@ -41,6 +41,7 @@ import {
 import { getCameraAvailabilityState, isCameraHardOffline } from '../utils/cameraAvailability.js';
 import { isBroadAreaCoverage, resolveAreaFocusZoom } from '../utils/areaCoverage';
 import { buildAreaSummaryList, getCentroidFromCameras } from '../utils/mapAreaSummary.js';
+import { applyMarkerOffset } from '../utils/mapMarkerLayout.js';
 import {
     getBoundsCenterFromCameras,
     hasValidCoords,
@@ -333,36 +334,6 @@ const createGroupIcon = (count, cameras = [], kind = 'group') => {
 
     iconCache.set(colorKey, icon);
     return icon;
-};
-
-// Fungsi untuk mendeteksi dan memberikan offset pada marker yang bertumpuk
-const applyMarkerOffset = (cameras) => {
-    const coordMap = new Map();
-    const OFFSET = 0.0003; // ~30 meter offset
-
-    return cameras.map(camera => {
-        const lat = parseFloat(camera.latitude);
-        const lng = parseFloat(camera.longitude);
-        const key = `${lat.toFixed(4)},${lng.toFixed(4)}`; // Group by ~11m precision
-
-        if (!coordMap.has(key)) {
-            coordMap.set(key, []);
-        }
-
-        const group = coordMap.get(key);
-        const index = group.length;
-        group.push(camera.id);
-
-        // Jika ada lebih dari 1 kamera di lokasi yang sama, beri offset melingkar
-        if (index > 0) {
-            const angle = (index * 60) * (Math.PI / 180); // 60 derajat per kamera
-            const offsetLat = lat + (OFFSET * Math.cos(angle));
-            const offsetLng = lng + (OFFSET * Math.sin(angle));
-            return { ...camera, _displayLat: offsetLat, _displayLng: offsetLng, _isGrouped: true, _groupIndex: index };
-        }
-
-        return { ...camera, _displayLat: lat, _displayLng: lng, _isGrouped: false, _groupIndex: 0 };
-    });
 };
 
 const bucketCamerasByCoordinate = (cameras, zoom) => {
