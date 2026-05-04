@@ -36,6 +36,7 @@ import {
     normalizeInternalIngestPolicy,
     normalizeOnDemandCloseAfterSeconds,
 } from '../utils/internalIngestPolicy.js';
+import { normalizeInternalRtspTransport } from '../utils/internalRtspTransportPolicy.js';
 
 const BULK_AREA_TARGET_FILTERS = [
     'all',
@@ -215,6 +216,10 @@ const ADMIN_CAMERA_LIST_PROJECTION = `
         ELSE 'default'
     END as internal_ingest_policy_override,
     c.internal_on_demand_close_after_seconds_override,
+    CASE
+        WHEN c.internal_rtsp_transport_override IN ('default', 'tcp', 'udp', 'auto') THEN c.internal_rtsp_transport_override
+        ELSE 'default'
+    END as internal_rtsp_transport_override,
     c.source_profile,
     c.recording_duration_hours,
     c.recording_status,
@@ -249,8 +254,42 @@ const ADMIN_CAMERA_LIST_PROJECTION = `
         ELSE 'default'
     END as area_internal_ingest_policy_default,
     a.internal_on_demand_close_after_seconds as area_internal_on_demand_close_after_seconds,
+    CASE
+        WHEN a.internal_rtsp_transport_default IN ('default', 'tcp', 'udp', 'auto')
+            THEN a.internal_rtsp_transport_default
+        ELSE 'default'
+    END as area_internal_rtsp_transport_default,
     ${CAMERA_RUNTIME_STATE_PROJECTION}
 `;
+
+function getAreaInternalPolicy(areaId) {
+    if (!areaId) {
+        return null;
+    }
+
+    const area = queryOne(
+        `SELECT
+            CASE
+                WHEN internal_ingest_policy_default IN ('default', 'always_on', 'on_demand')
+                    THEN internal_ingest_policy_default
+                ELSE 'default'
+            END as internal_ingest_policy_default,
+            internal_on_demand_close_after_seconds,
+            CASE
+                WHEN internal_rtsp_transport_default IN ('default', 'tcp', 'udp', 'auto')
+                    THEN internal_rtsp_transport_default
+                ELSE 'default'
+            END as internal_rtsp_transport_default
+         FROM areas WHERE id = ?`,
+        [areaId]
+    );
+
+    return area ? {
+        internal_ingest_policy_default: area.internal_ingest_policy_default,
+        internal_on_demand_close_after_seconds: area.internal_on_demand_close_after_seconds,
+        internal_rtsp_transport_default: area.internal_rtsp_transport_default,
+    } : null;
+}
 
 function normalizePublicPlaybackMode(value) {
     return PUBLIC_PLAYBACK_MODES.includes(value) ? value : 'inherit';
@@ -1308,6 +1347,7 @@ class CameraService {
             public_playback_preview_minutes,
             internal_ingest_policy_override,
             internal_on_demand_close_after_seconds_override,
+            internal_rtsp_transport_override,
             source_profile,
         } = data;
         const externalUseProxy = external_use_proxy === false || external_use_proxy === 0 ? 0 : 1;
@@ -1320,6 +1360,7 @@ class CameraService {
             internal_on_demand_close_after_seconds_override,
             null
         );
+        const internalRtspTransportOverride = normalizeInternalRtspTransport(internal_rtsp_transport_override);
 
         if (!name) {
             const err = new Error('Camera name is required');
@@ -1397,7 +1438,7 @@ class CameraService {
         const cameraStatus = status || 'active';
 
         const result = execute(
-            'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, recording_duration_hours, video_codec, stream_source, delivery_type, external_hls_url, external_stream_url, external_embed_url, external_snapshot_url, external_origin_mode, external_use_proxy, external_tls_mode, external_health_mode, public_playback_mode, public_playback_preview_minutes, internal_ingest_policy_override, internal_on_demand_close_after_seconds_override, source_profile) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, recording_duration_hours, video_codec, stream_source, delivery_type, external_hls_url, external_stream_url, external_embed_url, external_snapshot_url, external_origin_mode, external_use_proxy, external_tls_mode, external_health_mode, public_playback_mode, public_playback_preview_minutes, internal_ingest_policy_override, internal_on_demand_close_after_seconds_override, internal_rtsp_transport_override, source_profile) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 name,
                 deliveryConfig.deliveryType === 'internal_hls' ? private_rtsp_url : '',
@@ -1428,6 +1469,7 @@ class CameraService {
                 publicPlaybackPreviewMinutes,
                 internalIngestPolicyOverride,
                 internalOnDemandCloseAfterSecondsOverride,
+                internalRtspTransportOverride,
                 source_profile || null,
             ]
         );
@@ -1448,7 +1490,16 @@ class CameraService {
 
         if (isEnabled && deliveryConfig.deliveryType === 'internal_hls') {
             try {
-                const mtxResult = await mediaMtxService.updateCameraPath(streamKey, private_rtsp_url);
+                const areaPolicy = getAreaInternalPolicy(area_id);
+                const mtxResult = await mediaMtxService.updateCameraPath(streamKey, private_rtsp_url, {
+                    internal_ingest_policy_override: internalIngestPolicyOverride,
+                    internal_on_demand_close_after_seconds_override: internalOnDemandCloseAfterSecondsOverride,
+                    internal_rtsp_transport_override: internalRtspTransportOverride,
+                    _areaPolicy: areaPolicy,
+                    source_profile: source_profile || null,
+                    description,
+                    enable_recording: isRecordingEnabled,
+                });
                 if (!mtxResult.success) {
                     console.error(`[Camera] Failed to add MediaMTX path for camera ${result.lastInsertRowid}:`, mtxResult.error);
                 }
@@ -1504,11 +1555,12 @@ class CameraService {
             public_playback_preview_minutes,
             internal_ingest_policy_override,
             internal_on_demand_close_after_seconds_override,
+            internal_rtsp_transport_override,
             source_profile,
         } = data;
 
         const existingCamera = queryOne(
-            `SELECT id, name, private_rtsp_url, enabled, stream_key, enable_recording, stream_source,
+            `SELECT id, name, private_rtsp_url, area_id, enabled, stream_key, enable_recording, stream_source,
                     delivery_type, external_hls_url, external_stream_url, external_embed_url,
                     external_snapshot_url,
                     CASE
@@ -1534,6 +1586,10 @@ class CameraService {
                         ELSE 'default'
                     END as internal_ingest_policy_override,
                     internal_on_demand_close_after_seconds_override,
+                    CASE
+                        WHEN internal_rtsp_transport_override IN ('default', 'tcp', 'udp', 'auto') THEN internal_rtsp_transport_override
+                        ELSE 'default'
+                    END as internal_rtsp_transport_override,
                     source_profile
              FROM cameras WHERE id = ?`,
             [id]
@@ -1568,6 +1624,11 @@ class CameraService {
         }
         if (internal_ingest_policy_override !== undefined && !['default', 'always_on', 'on_demand'].includes(internal_ingest_policy_override)) {
             const err = new Error('Invalid internal ingest policy override');
+            err.statusCode = 400;
+            throw err;
+        }
+        if (internal_rtsp_transport_override !== undefined && !['default', 'tcp', 'udp', 'auto'].includes(internal_rtsp_transport_override)) {
+            const err = new Error('Invalid internal RTSP transport override');
             err.statusCode = 400;
             throw err;
         }
@@ -1707,6 +1768,10 @@ class CameraService {
             updates.push('internal_on_demand_close_after_seconds_override = ?');
             values.push(normalizeOnDemandCloseAfterSeconds(internal_on_demand_close_after_seconds_override, null));
         }
+        if (internal_rtsp_transport_override !== undefined) {
+            updates.push('internal_rtsp_transport_override = ?');
+            values.push(normalizeInternalRtspTransport(internal_rtsp_transport_override));
+        }
         if (source_profile !== undefined) {
             updates.push('source_profile = ?');
             values.push(source_profile || null);
@@ -1744,8 +1809,11 @@ class CameraService {
         const currentDeliveryType = deliveryConfig.deliveryType;
         const newEnabled = enabled !== undefined ? enabled : existingCamera.enabled;
         const newRtspUrl = private_rtsp_url !== undefined ? private_rtsp_url : existingCamera.private_rtsp_url;
+        const newAreaId = area_id !== undefined ? area_id : existingCamera.area_id;
         const rtspChanged = private_rtsp_url !== undefined && private_rtsp_url !== existingCamera.private_rtsp_url;
         const enabledChanged = enabled !== undefined && enabled !== existingCamera.enabled;
+        const rtspTransportChanged = internal_rtsp_transport_override !== undefined
+            && normalizeInternalRtspTransport(internal_rtsp_transport_override) !== existingCamera.internal_rtsp_transport_override;
 
         // If stream source changed to external, remove MediaMTX path
         if (currentDeliveryType !== 'internal_hls') {
@@ -1760,9 +1828,24 @@ class CameraService {
             } catch (err) {
                 console.error('MediaMTX remove path error:', err.message);
             }
-        } else if (rtspChanged || (enabledChanged && newEnabled)) {
+        } else if (rtspChanged || rtspTransportChanged || (enabledChanged && newEnabled)) {
             try {
-                const mtxResult = await mediaMtxService.updateCameraPath(streamKey, newRtspUrl);
+                const areaPolicy = getAreaInternalPolicy(newAreaId);
+                const mtxResult = await mediaMtxService.updateCameraPath(streamKey, newRtspUrl, {
+                    ...existingCamera,
+                    internal_ingest_policy_override: internal_ingest_policy_override !== undefined
+                        ? normalizeInternalIngestPolicy(internal_ingest_policy_override)
+                        : existingCamera.internal_ingest_policy_override,
+                    internal_on_demand_close_after_seconds_override: internal_on_demand_close_after_seconds_override !== undefined
+                        ? normalizeOnDemandCloseAfterSeconds(internal_on_demand_close_after_seconds_override, null)
+                        : existingCamera.internal_on_demand_close_after_seconds_override,
+                    internal_rtsp_transport_override: internal_rtsp_transport_override !== undefined
+                        ? normalizeInternalRtspTransport(internal_rtsp_transport_override)
+                        : existingCamera.internal_rtsp_transport_override,
+                    _areaPolicy: areaPolicy,
+                    source_profile: source_profile !== undefined ? (source_profile || null) : existingCamera.source_profile,
+                    private_rtsp_url: newRtspUrl,
+                });
                 if (!mtxResult.success) {
                     console.error(`[Camera] Failed to update MediaMTX path for camera ${id}:`, mtxResult.error);
                 }

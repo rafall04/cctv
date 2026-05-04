@@ -2,7 +2,7 @@
 Purpose: Keep MediaMTX path configuration synchronized with enabled internal CCTV cameras.
 Caller: Backend startup, MediaMTX health timer, camera service path repair, and health checks.
 Deps: axios MediaMTX API client, connectionPool camera reads, config, internal ingest policy resolver.
-MainFuncs: MediaMtxService, healthCheck(), getDatabaseCameras(), updateCameraPath(), syncCameras().
+MainFuncs: MediaMtxService, healthCheck(), getDatabaseCameras(), updateCameraPath(), syncCameras(), syncAreaCameras().
 SideEffects: Reads camera/area DB rows and creates, patches, or deletes MediaMTX path configuration.
 */
 
@@ -10,6 +10,7 @@ import axios from 'axios';
 import { config } from '../config/config.js';
 import { query, queryOne } from '../database/connectionPool.js';
 import { resolveInternalIngestPolicy } from '../utils/internalIngestPolicy.js';
+import { resolveInternalRtspTransport, toMediaMtxSourceProtocol } from '../utils/internalRtspTransportPolicy.js';
 
 // Centralized Axios instance for MediaMTX API to avoid repetition and enforce standard timeouts
 const mtxApi = axios.create({
@@ -70,9 +71,10 @@ class MediaMtxService {
 
     buildInternalPathConfig(camera) {
         const resolvedPolicy = resolveInternalIngestPolicy(camera, camera._areaPolicy || null);
+        const resolvedTransport = resolveInternalRtspTransport(camera, camera._areaPolicy || null);
         return {
             source: camera.rtsp_url,
-            sourceProtocol: 'tcp',
+            sourceProtocol: toMediaMtxSourceProtocol(resolvedTransport),
             sourceOnDemand: resolvedPolicy.mode !== 'always_on',
             sourceOnDemandStartTimeout: '10s',
             sourceOnDemandCloseAfter: `${resolvedPolicy.closeAfterSeconds || 30}s`,
@@ -220,6 +222,7 @@ class MediaMtxService {
                 SELECT 
                     cameras.id,
                     cameras.name,
+                    cameras.area_id,
                     cameras.private_rtsp_url as rtsp_url,
                     cameras.stream_key,
                     CASE
@@ -228,6 +231,11 @@ class MediaMtxService {
                         ELSE 'default'
                     END as internal_ingest_policy_override,
                     cameras.internal_on_demand_close_after_seconds_override,
+                    CASE
+                        WHEN cameras.internal_rtsp_transport_override IN ('default', 'tcp', 'udp', 'auto')
+                            THEN cameras.internal_rtsp_transport_override
+                        ELSE 'default'
+                    END as internal_rtsp_transport_override,
                     cameras.source_profile,
                     cameras.description,
                     cameras.enable_recording,
@@ -237,6 +245,11 @@ class MediaMtxService {
                         ELSE 'default'
                     END as area_internal_ingest_policy_default,
                     areas.internal_on_demand_close_after_seconds as area_internal_on_demand_close_after_seconds,
+                    CASE
+                        WHEN areas.internal_rtsp_transport_default IN ('default', 'tcp', 'udp', 'auto')
+                            THEN areas.internal_rtsp_transport_default
+                        ELSE 'default'
+                    END as area_internal_rtsp_transport_default,
                     COALESCE(cameras.stream_key, 'camera' || cameras.id) as path_name
                 FROM cameras
                 LEFT JOIN areas ON areas.id = cameras.area_id
@@ -247,6 +260,7 @@ class MediaMtxService {
                 _areaPolicy: {
                     internal_ingest_policy_default: camera.area_internal_ingest_policy_default,
                     internal_on_demand_close_after_seconds: camera.area_internal_on_demand_close_after_seconds,
+                    internal_rtsp_transport_default: camera.area_internal_rtsp_transport_default,
                 },
             }));
         } catch (error) {
@@ -409,6 +423,34 @@ class MediaMtxService {
         this.lastSyncTime = Date.now();
     }
 
+    async syncAreaCameras(areaId) {
+        if (!areaId) {
+            return { updated: 0 };
+        }
+
+        const cameras = this.getDatabaseCameras().filter((camera) => String(camera.area_id) === String(areaId));
+        let updated = 0;
+
+        for (const camera of cameras) {
+            if (!camera.path_name || !camera.rtsp_url?.startsWith('rtsp://')) {
+                continue;
+            }
+
+            try {
+                await this.addOrUpdatePath(camera.path_name, this.buildInternalPathConfig(camera));
+                updated += 1;
+            } catch (error) {
+                console.error(`[MediaMTX] Error syncing area path ${camera.path_name}:`, error.message);
+            }
+        }
+
+        if (updated > 0) {
+            console.log(`[MediaMTX] Area ${areaId} path sync complete: ~${updated} updated`);
+        }
+
+        return { updated };
+    }
+
     /**
      * Force update a specific camera path in MediaMTX
      * Called when camera RTSP URL is changed or camera is created/enabled
@@ -439,6 +481,7 @@ class MediaMtxService {
                 rtsp_url: rtspUrl,
                 internal_ingest_policy_override: 'default',
                 internal_on_demand_close_after_seconds_override: null,
+                internal_rtsp_transport_override: 'default',
                 source_profile: null,
                 description: null,
                 enable_recording: 1,

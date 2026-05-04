@@ -23,6 +23,7 @@ export const defaultAreaFormData = {
     grid_default_camera_limit: '12',
     internal_ingest_policy_default: 'default',
     internal_on_demand_close_after_seconds: '',
+    internal_rtsp_transport_default: 'default',
 };
 
 export function buildAreaFormData(area = null) {
@@ -46,6 +47,7 @@ export function buildAreaFormData(area = null) {
         grid_default_camera_limit: area.grid_default_camera_limit === null || area.grid_default_camera_limit === undefined ? '' : String(area.grid_default_camera_limit),
         internal_ingest_policy_default: area.internal_ingest_policy_default || 'default',
         internal_on_demand_close_after_seconds: area.internal_on_demand_close_after_seconds === null || area.internal_on_demand_close_after_seconds === undefined ? '' : String(area.internal_on_demand_close_after_seconds),
+        internal_rtsp_transport_default: area.internal_rtsp_transport_default || 'default',
     };
 }
 

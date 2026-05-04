@@ -103,6 +103,34 @@ describe('thumbnailService external thumbnails', () => {
         expect(args).not.toContain('-rw_timeout');
     });
 
+    it('uses UDP RTSP transport for thumbnail inputs when configured', async () => {
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        const args = thumbnailService.buildFfmpegInputArgs('rtsp://admin:secret@192.168.14.2:554/stream1', 'strict', 'udp');
+
+        expect(args).toEqual([
+            '-rtsp_transport',
+            'udp',
+            '-stimeout',
+            '10000000',
+            '-i',
+            'rtsp://admin:secret@192.168.14.2:554/stream1',
+        ]);
+    });
+
+    it('omits forced RTSP transport for auto thumbnail inputs', async () => {
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        const args = thumbnailService.buildFfmpegInputArgs('rtsp://admin:secret@192.168.14.2:554/stream1', 'strict', 'auto');
+
+        expect(args).toEqual([
+            '-stimeout',
+            '10000000',
+            '-i',
+            'rtsp://admin:secret@192.168.14.2:554/stream1',
+        ]);
+    });
+
     it('keeps rw_timeout for HTTP and HLS thumbnail inputs', async () => {
         const { default: thumbnailService } = await import('../services/thumbnailService.js');
 

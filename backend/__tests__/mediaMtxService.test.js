@@ -2,7 +2,7 @@
 Purpose: Regression coverage for MediaMTX path synchronization and database camera reads.
 Caller: Vitest backend suite.
 Deps: Mocked axios MediaMTX API client, config, and connectionPool query helpers.
-MainFuncs: mediaMtxService.updateCameraPath(), mediaMtxService.getDatabaseCameras().
+MainFuncs: mediaMtxService.updateCameraPath(), mediaMtxService.getDatabaseCameras(), mediaMtxService.syncAreaCameras().
 SideEffects: No real MediaMTX or database calls; all external dependencies are mocked.
 */
 
@@ -93,8 +93,10 @@ describe('mediaMtxService on-demand path sync', () => {
                 source_profile: null,
                 description: null,
                 enable_recording: 1,
+                area_id: 9,
                 area_internal_ingest_policy_default: 'on_demand',
                 area_internal_on_demand_close_after_seconds: 45,
+                area_internal_rtsp_transport_default: 'udp',
                 path_name: 'camera2',
             },
         ]);
@@ -109,7 +111,50 @@ describe('mediaMtxService on-demand path sync', () => {
         expect(cameras[0]._areaPolicy).toEqual({
             internal_ingest_policy_default: 'on_demand',
             internal_on_demand_close_after_seconds: 45,
+            internal_rtsp_transport_default: 'udp',
         });
+    });
+
+    it('syncs only MediaMTX paths for the changed area', async () => {
+        const { default: mediaMtxService } = await import('../services/mediaMtxService.js');
+
+        queryMock.mockReturnValue([
+            {
+                id: 2,
+                area_id: 9,
+                rtsp_url: 'rtsp://admin:secret@192.168.14.2:554/stream1',
+                stream_key: null,
+                internal_ingest_policy_override: 'default',
+                internal_on_demand_close_after_seconds_override: null,
+                internal_rtsp_transport_override: 'default',
+                area_internal_ingest_policy_default: 'default',
+                area_internal_on_demand_close_after_seconds: null,
+                area_internal_rtsp_transport_default: 'udp',
+                path_name: 'camera2',
+            },
+            {
+                id: 3,
+                area_id: 10,
+                rtsp_url: 'rtsp://admin:secret@192.168.14.3:554/stream1',
+                stream_key: null,
+                internal_ingest_policy_override: 'default',
+                internal_on_demand_close_after_seconds_override: null,
+                internal_rtsp_transport_override: 'default',
+                area_internal_ingest_policy_default: 'default',
+                area_internal_on_demand_close_after_seconds: null,
+                area_internal_rtsp_transport_default: 'tcp',
+                path_name: 'camera3',
+            },
+        ]);
+        getMock.mockResolvedValueOnce({ data: { items: [{ name: 'camera2' }] } });
+
+        const result = await mediaMtxService.syncAreaCameras(9);
+
+        expect(result).toEqual({ updated: 1 });
+        expect(patchMock).toHaveBeenCalledWith('/config/paths/patch/camera2', expect.objectContaining({
+            sourceProtocol: 'udp',
+        }));
+        expect(patchMock).toHaveBeenCalledTimes(1);
     });
 
     it('builds always-on MediaMTX path config for local cameras', async () => {
@@ -159,6 +204,54 @@ describe('mediaMtxService on-demand path sync', () => {
             sourceOnDemand: true,
             sourceOnDemandStartTimeout: '10s',
             sourceOnDemandCloseAfter: '45s',
+        });
+    });
+
+    it('builds UDP MediaMTX path config from RTSP transport override', async () => {
+        const { default: mediaMtxService } = await import('../services/mediaMtxService.js');
+
+        const pathConfig = mediaMtxService.buildInternalPathConfig({
+            rtsp_url: 'rtsp://udp-only-camera/stream',
+            internal_ingest_policy_override: 'default',
+            internal_on_demand_close_after_seconds_override: null,
+            internal_rtsp_transport_override: 'udp',
+            source_profile: null,
+            description: '',
+            enable_recording: 0,
+            _areaPolicy: {
+                internal_ingest_policy_default: 'default',
+                internal_on_demand_close_after_seconds: null,
+                internal_rtsp_transport_default: 'default',
+            },
+        });
+
+        expect(pathConfig).toMatchObject({
+            source: 'rtsp://udp-only-camera/stream',
+            sourceProtocol: 'udp',
+        });
+    });
+
+    it('builds automatic MediaMTX source protocol from area transport default', async () => {
+        const { default: mediaMtxService } = await import('../services/mediaMtxService.js');
+
+        const pathConfig = mediaMtxService.buildInternalPathConfig({
+            rtsp_url: 'rtsp://auto-camera/stream',
+            internal_ingest_policy_override: 'default',
+            internal_on_demand_close_after_seconds_override: null,
+            internal_rtsp_transport_override: 'default',
+            source_profile: null,
+            description: '',
+            enable_recording: 0,
+            _areaPolicy: {
+                internal_ingest_policy_default: 'default',
+                internal_on_demand_close_after_seconds: null,
+                internal_rtsp_transport_default: 'auto',
+            },
+        });
+
+        expect(pathConfig).toMatchObject({
+            source: 'rtsp://auto-camera/stream',
+            sourceProtocol: 'automatic',
         });
     });
 });

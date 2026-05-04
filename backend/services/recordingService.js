@@ -13,6 +13,7 @@ import { query, queryOne, execute } from '../database/connectionPool.js';
 import { promisify } from 'util';
 import { exec } from 'child_process';
 import { getEffectiveDeliveryType, getPrimaryExternalStreamUrl } from '../utils/cameraDelivery.js';
+import { buildFfmpegRtspInputArgs, resolveInternalRtspTransport } from '../utils/internalRtspTransportPolicy.js';
 import recordingProcessManager from './recordingProcessManager.js';
 import { createRecordingCleanupService } from './recordingCleanupService.js';
 import { canDeleteRecordingFile, computeRetentionWindow, isSafeRecordingFilename } from './recordingRetentionPolicy.js';
@@ -321,20 +322,18 @@ export function getRecordingSourceConfig(camera) {
         streamSource,
         inputUrl: rtspUrl,
         logSource: maskRecordingSourceForLog(rtspUrl),
+        rtspTransport: resolveInternalRtspTransport(camera),
     };
 }
 
-export function buildRecordingFfmpegArgs({ cameraDir, inputUrl, streamSource }) {
+export function buildRecordingFfmpegArgs({ cameraDir, inputUrl, streamSource, rtspTransport = 'tcp' }) {
     const outputPattern = join(cameraDir, '%Y%m%d_%H%M%S.mp4');
     const inputArgs = streamSource === 'external'
         ? [
             '-protocol_whitelist', EXTERNAL_RECORDING_PROTOCOL_WHITELIST,
             '-i', inputUrl,
         ]
-        : [
-            '-rtsp_transport', 'tcp',
-            '-i', inputUrl,
-        ];
+        : buildFfmpegRtspInputArgs(inputUrl, rtspTransport);
 
     return [
         ...inputArgs,
@@ -548,6 +547,7 @@ class RecordingService {
                 cameraDir,
                 inputUrl: sourceConfig.inputUrl,
                 streamSource: sourceConfig.streamSource,
+                rtspTransport: sourceConfig.rtspTransport,
             });
 
             console.log(`FFmpeg recording: stream copy with web-compatible MP4 (0% CPU overhead)`);

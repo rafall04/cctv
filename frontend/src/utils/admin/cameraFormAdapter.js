@@ -37,6 +37,7 @@ export const defaultCameraFormValues = {
     public_playback_preview_minutes: '',
     internal_ingest_policy_override: 'default',
     internal_on_demand_close_after_seconds_override: '',
+    internal_rtsp_transport_override: 'default',
     source_profile: '',
 };
 
@@ -199,6 +200,7 @@ export function mapCameraToFormValues(camera) {
         public_playback_preview_minutes: camera.public_playback_preview_minutes ?? '',
         internal_ingest_policy_override: camera.internal_ingest_policy_override || 'default',
         internal_on_demand_close_after_seconds_override: camera.internal_on_demand_close_after_seconds_override ?? '',
+        internal_rtsp_transport_override: camera.internal_rtsp_transport_override || 'default',
         source_profile: camera.source_profile || '',
     };
 }
@@ -247,6 +249,9 @@ export function buildCameraPayload(formData) {
                 ? null
                 : parseInt(formData.internal_on_demand_close_after_seconds_override, 10))
             : null,
+        internal_rtsp_transport_override: deliveryType === 'internal_hls'
+            ? (formData.internal_rtsp_transport_override || 'default')
+            : 'default',
         source_profile: deliveryType === 'internal_hls'
             ? (formData.source_profile || null)
             : null,

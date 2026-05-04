@@ -52,6 +52,13 @@ const INTERNAL_INGEST_POLICY_OPTIONS = [
     { value: 'on_demand', label: 'On Demand', description: 'Source hanya dibuka saat ada viewer lalu ditutup lagi saat idle.' },
 ];
 
+const INTERNAL_RTSP_TRANSPORT_OPTIONS = [
+    { value: 'default', label: 'Use Area Default', description: 'Aman untuk existing camera: area default tetap TCP kecuali diubah.' },
+    { value: 'tcp', label: 'TCP', description: 'Paksa RTSP over TCP. Ini default lama dan paling aman untuk kamera yang sudah berjalan.' },
+    { value: 'udp', label: 'UDP', description: 'Gunakan jika FFmpeg gagal dengan Nonmatching transport tetapi VLC bisa play.' },
+    { value: 'auto', label: 'Auto', description: 'Biarkan MediaMTX/FFmpeg negosiasi transport sendiri.' },
+];
+
 export default function CameraSourceFields({
     formData,
     isSubmitting,
@@ -199,6 +206,27 @@ export default function CameraSourceFields({
                             </select>
                             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                                 {INTERNAL_INGEST_POLICY_OPTIONS.find((option) => option.value === (formData.internal_ingest_policy_override || 'default'))?.description}
+                            </p>
+                        </div>
+
+                        <div>
+                            <label htmlFor="camera-rtsp-transport" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                RTSP Transport Override
+                            </label>
+                            <select
+                                id="camera-rtsp-transport"
+                                name="internal_rtsp_transport_override"
+                                value={formData.internal_rtsp_transport_override || 'default'}
+                                onChange={onChange}
+                                disabled={isSubmitting}
+                                className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 border-gray-200 dark:border-gray-700/50"
+                            >
+                                {INTERNAL_RTSP_TRANSPORT_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                ))}
+                            </select>
+                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                {INTERNAL_RTSP_TRANSPORT_OPTIONS.find((option) => option.value === (formData.internal_rtsp_transport_override || 'default'))?.description}
                             </p>
                         </div>
 

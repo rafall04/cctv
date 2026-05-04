@@ -1,7 +1,7 @@
 /*
 Purpose: Generate and maintain camera thumbnail images from internal RTSP/HLS and external stream sources.
 Caller: Backend startup thumbnail scheduler, camera recovery hooks, and thumbnail refresh actions.
-Deps: ffmpeg, filesystem thumbnail storage, database camera rows, delivery and internal ingest policy utilities.
+Deps: ffmpeg, filesystem thumbnail storage, database camera rows, delivery and internal RTSP policy utilities.
 MainFuncs: ThumbnailService, buildFfmpegInputArgs(), generateAllThumbnails(), generateSingle(), generateThumbnail().
 SideEffects: Executes ffmpeg, writes thumbnail files, updates camera thumbnail metadata in SQLite.
 */
@@ -16,6 +16,7 @@ import { query, execute } from '../database/database.js';
 import { config } from '../config/config.js';
 import { getEffectiveDeliveryType, getPrimaryExternalStreamUrl } from '../utils/cameraDelivery.js';
 import { resolveInternalIngestPolicy } from '../utils/internalIngestPolicy.js';
+import { buildFfmpegRtspInputArgs, resolveInternalRtspTransport } from '../utils/internalRtspTransportPolicy.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -112,7 +113,7 @@ class ThumbnailService {
         return next;
     }
 
-    buildFfmpegInputArgs(sourceUrl, externalTlsMode = 'strict') {
+    buildFfmpegInputArgs(sourceUrl, externalTlsMode = 'strict', rtspTransport = 'tcp') {
         const args = [];
         const normalizedTlsMode = this.normalizeExternalTlsMode(externalTlsMode);
         const isHttps = typeof sourceUrl === 'string' && sourceUrl.startsWith('https://');
@@ -123,7 +124,13 @@ class ThumbnailService {
         }
 
         if (isRtsp) {
-            args.push('-rtsp_transport', 'tcp');
+            const rtspArgs = buildFfmpegRtspInputArgs(sourceUrl, rtspTransport);
+            const inputIndex = rtspArgs.indexOf('-i');
+            if (inputIndex >= 0) {
+                rtspArgs.splice(inputIndex, 0, '-stimeout', '10000000');
+                args.push(...rtspArgs);
+                return args;
+            }
             args.push('-stimeout', '10000000');
         } else {
             args.push('-rw_timeout', '10000000');
@@ -146,6 +153,9 @@ class ThumbnailService {
                     type: 'internal_rtsp',
                     sourceUrl: privateRtspUrl,
                     externalTlsMode,
+                    rtspTransport: resolveInternalRtspTransport(camera, {
+                        internal_rtsp_transport_default: camera?.area_internal_rtsp_transport_default,
+                    }),
                 };
             }
 
@@ -268,6 +278,7 @@ class ThumbnailService {
             const cameras = query(`
                 SELECT c.id, c.name, c.description, c.enabled, c.status, c.is_online, c.enable_recording, c.stream_key, c.stream_source, c.delivery_type,
                        c.internal_ingest_policy_override, c.internal_on_demand_close_after_seconds_override, c.source_profile,
+                       c.internal_rtsp_transport_override,
                        c.private_rtsp_url,
                        external_hls_url, external_stream_url, external_snapshot_url,
                        external_embed_url, external_tls_mode, thumbnail_path,
@@ -277,7 +288,12 @@ class ThumbnailService {
                                 THEN a.internal_ingest_policy_default
                             ELSE 'default'
                        END as area_internal_ingest_policy_default,
-                       a.internal_on_demand_close_after_seconds as area_internal_on_demand_close_after_seconds
+                       a.internal_on_demand_close_after_seconds as area_internal_on_demand_close_after_seconds,
+                       CASE
+                            WHEN a.internal_rtsp_transport_default IN ('default', 'tcp', 'udp', 'auto')
+                                THEN a.internal_rtsp_transport_default
+                            ELSE 'default'
+                       END as area_internal_rtsp_transport_default
                 FROM cameras c
                 LEFT JOIN camera_runtime_state crs ON crs.camera_id = c.id
                 LEFT JOIN areas a ON a.id = c.area_id
@@ -391,7 +407,7 @@ class ThumbnailService {
         try {
             const ffmpegArgs = [
                 '-loglevel', 'error',
-                ...this.buildFfmpegInputArgs(strategy.sourceUrl, strategy.externalTlsMode),
+                ...this.buildFfmpegInputArgs(strategy.sourceUrl, strategy.externalTlsMode, strategy.rtspTransport),
                 '-vframes', '1',
                 '-vf', 'scale=320:180:force_original_aspect_ratio=decrease,pad=320:180:(ow-iw)/2:(oh-ih)/2',
                 '-q:v', '8',
@@ -469,6 +485,7 @@ class ThumbnailService {
         const camera = query(
             `SELECT c.id, c.name, c.description, c.enabled, c.status, c.is_online, c.enable_recording, c.stream_key, c.stream_source, c.delivery_type,
                     c.internal_ingest_policy_override, c.internal_on_demand_close_after_seconds_override, c.source_profile,
+                    c.internal_rtsp_transport_override,
                     c.private_rtsp_url, c.external_hls_url, c.external_stream_url, c.external_snapshot_url,
                     c.external_embed_url, c.external_tls_mode, c.thumbnail_path,
                     crs.is_online as runtime_is_online,
@@ -477,7 +494,12 @@ class ThumbnailService {
                             THEN a.internal_ingest_policy_default
                         ELSE 'default'
                     END as area_internal_ingest_policy_default,
-                    a.internal_on_demand_close_after_seconds as area_internal_on_demand_close_after_seconds
+                    a.internal_on_demand_close_after_seconds as area_internal_on_demand_close_after_seconds,
+                    CASE
+                        WHEN a.internal_rtsp_transport_default IN ('default', 'tcp', 'udp', 'auto')
+                            THEN a.internal_rtsp_transport_default
+                        ELSE 'default'
+                    END as area_internal_rtsp_transport_default
              FROM cameras c
              LEFT JOIN camera_runtime_state crs ON crs.camera_id = c.id
              LEFT JOIN areas a ON a.id = c.area_id

@@ -156,6 +156,7 @@ describe('cameraFormAdapter delivery type support', () => {
             private_rtsp_url: 'rtsp://example.local/stream',
             internal_ingest_policy_override: 'on_demand',
             internal_on_demand_close_after_seconds_override: '15',
+            internal_rtsp_transport_override: 'udp',
             source_profile: 'remote_private_rtsp',
         });
 
@@ -165,6 +166,7 @@ describe('cameraFormAdapter delivery type support', () => {
             private_rtsp_url: 'rtsp://example.local/stream',
             internal_ingest_policy_override: 'on_demand',
             internal_on_demand_close_after_seconds_override: 15,
+            internal_rtsp_transport_override: 'udp',
             source_profile: 'remote_private_rtsp',
         });
     });
@@ -177,6 +179,7 @@ describe('cameraFormAdapter delivery type support', () => {
             external_stream_url: 'https://example.com/live.m3u8',
             internal_ingest_policy_override: 'on_demand',
             internal_on_demand_close_after_seconds_override: '15',
+            internal_rtsp_transport_override: 'udp',
             source_profile: 'remote_private_rtsp',
         });
 
@@ -185,6 +188,7 @@ describe('cameraFormAdapter delivery type support', () => {
             stream_source: 'external',
             internal_ingest_policy_override: 'default',
             internal_on_demand_close_after_seconds_override: null,
+            internal_rtsp_transport_override: 'default',
             source_profile: null,
         });
     });

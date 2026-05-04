@@ -2,7 +2,7 @@
  * Purpose: Shared option lists and labels for admin area management controls.
  * Caller: AreaManagement page and admin area presentation components.
  * Deps: None.
- * MainFuncs: GRID_DEFAULT_LIMIT_OPTIONS, INTERNAL_INGEST_POLICY_OPTIONS, getBulkFilterLabel.
+ * MainFuncs: GRID_DEFAULT_LIMIT_OPTIONS, INTERNAL_INGEST_POLICY_OPTIONS, INTERNAL_RTSP_TRANSPORT_OPTIONS, getBulkFilterLabel.
  * SideEffects: None.
  */
 
@@ -20,6 +20,13 @@ export const INTERNAL_INGEST_POLICY_OPTIONS = [
     { value: 'default', label: 'Ikuti Default Sistem' },
     { value: 'always_on', label: 'Always On' },
     { value: 'on_demand', label: 'On-Demand' },
+];
+
+export const INTERNAL_RTSP_TRANSPORT_OPTIONS = [
+    { value: 'default', label: 'Ikuti Default Sistem' },
+    { value: 'tcp', label: 'TCP' },
+    { value: 'udp', label: 'UDP' },
+    { value: 'auto', label: 'Auto' },
 ];
 
 export function getBulkFilterLabel(targetFilter) {

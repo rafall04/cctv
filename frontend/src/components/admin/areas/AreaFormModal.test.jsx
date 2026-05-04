@@ -46,6 +46,7 @@ describe('AreaFormModal', () => {
                     grid_default_camera_limit: '12',
                     internal_ingest_policy_default: 'default',
                     internal_on_demand_close_after_seconds: '',
+                    internal_rtsp_transport_default: 'default',
                 }}
                 formErrors={{ name: 'Nama wajib diisi' }}
                 error="Gagal menyimpan"
@@ -63,16 +64,20 @@ describe('AreaFormModal', () => {
         expect(screen.getByText('Nama wajib diisi')).toBeTruthy();
         expect(screen.getByText('Gagal menyimpan')).toBeTruthy();
         expect(screen.getByText('Internal RTSP / MediaMTX Policy')).toBeTruthy();
-        expect(screen.getByDisplayValue('Ikuti Default Sistem')).toBeTruthy();
+        expect(screen.getByLabelText('Default Ingest Mode')).toBeTruthy();
+        expect(screen.getByLabelText('Default RTSP Transport')).toBeTruthy();
 
         fireEvent.change(screen.getByPlaceholderText('Contoh: Pos Kamling RT 01'), {
             target: { name: 'name', value: 'Area B' },
         });
-        fireEvent.change(screen.getByDisplayValue('Ikuti Default Sistem'), {
+        fireEvent.change(screen.getByLabelText('Default Ingest Mode'), {
             target: { name: 'internal_ingest_policy_default', value: 'on_demand' },
         });
         fireEvent.change(screen.getByPlaceholderText('Kosong = ikuti default'), {
             target: { name: 'internal_on_demand_close_after_seconds', value: '15' },
+        });
+        fireEvent.change(screen.getByLabelText('Default RTSP Transport'), {
+            target: { name: 'internal_rtsp_transport_default', value: 'udp' },
         });
         fireEvent.click(screen.getByText('mock-location-picker'));
         fireEvent.click(screen.getByRole('button', { name: 'Perbarui' }));
@@ -81,6 +86,7 @@ describe('AreaFormModal', () => {
         expect(onChange).toHaveBeenCalled();
         expect(onChange.mock.calls.some(([event]) => event.target.name === 'internal_ingest_policy_default')).toBe(true);
         expect(onChange.mock.calls.some(([event]) => event.target.name === 'internal_on_demand_close_after_seconds')).toBe(true);
+        expect(onChange.mock.calls.some(([event]) => event.target.name === 'internal_rtsp_transport_default')).toBe(true);
         expect(onLocationChange).toHaveBeenCalledWith('-7.1', '111.9');
         expect(onSubmit).toHaveBeenCalled();
         expect(onClose).toHaveBeenCalled();

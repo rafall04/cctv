@@ -9,7 +9,7 @@
 import { Suspense } from 'react';
 import { Alert } from '../../ui';
 import { AREA_COVERAGE_OPTIONS } from '../../../utils/areaCoverage';
-import { GRID_DEFAULT_LIMIT_OPTIONS, INTERNAL_INGEST_POLICY_OPTIONS } from '../../../utils/admin/areaManagementOptions';
+import { GRID_DEFAULT_LIMIT_OPTIONS, INTERNAL_INGEST_POLICY_OPTIONS, INTERNAL_RTSP_TRANSPORT_OPTIONS } from '../../../utils/admin/areaManagementOptions';
 
 export default function AreaFormModal({
     editingArea,
@@ -182,14 +182,30 @@ export default function AreaFormModal({
 
                         <div className="grid gap-4 md:grid-cols-2">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Default Ingest Mode</label>
+                                <label htmlFor="area-internal-ingest-policy" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Default Ingest Mode</label>
                                 <select
+                                    id="area-internal-ingest-policy"
                                     name="internal_ingest_policy_default"
                                     value={formData.internal_ingest_policy_default}
                                     onChange={onChange}
                                     className="w-full px-4 py-2.5 bg-white dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
                                 >
                                     {INTERNAL_INGEST_POLICY_OPTIONS.map((option) => (
+                                        <option key={option.value} value={option.value}>{option.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label htmlFor="area-internal-rtsp-transport" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Default RTSP Transport</label>
+                                <select
+                                    id="area-internal-rtsp-transport"
+                                    name="internal_rtsp_transport_default"
+                                    value={formData.internal_rtsp_transport_default || 'default'}
+                                    onChange={onChange}
+                                    className="w-full px-4 py-2.5 bg-white dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                                >
+                                    {INTERNAL_RTSP_TRANSPORT_OPTIONS.map((option) => (
                                         <option key={option.value} value={option.value}>{option.label}</option>
                                     ))}
                                 </select>

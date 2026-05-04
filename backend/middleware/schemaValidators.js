@@ -162,6 +162,10 @@ export const createCameraSchema = {
             internal_on_demand_close_after_seconds_override: {
                 anyOf: [{ type: 'integer', minimum: 5, maximum: 300 }, { type: 'null' }]
             },
+            internal_rtsp_transport_override: {
+                type: 'string',
+                enum: ['default', 'tcp', 'udp', 'auto']
+            },
             source_profile: {
                 anyOf: [{ type: 'string', maxLength: 120 }, { type: 'null' }]
             }
@@ -279,6 +283,10 @@ export const updateCameraSchema = {
             },
             internal_on_demand_close_after_seconds_override: {
                 anyOf: [{ type: 'integer', minimum: 5, maximum: 300 }, { type: 'null' }]
+            },
+            internal_rtsp_transport_override: {
+                type: 'string',
+                enum: ['default', 'tcp', 'udp', 'auto']
             },
             source_profile: {
                 anyOf: [{ type: 'string', maxLength: 120 }, { type: 'null' }]
@@ -498,6 +506,17 @@ export const createAreaSchema = {
             },
             grid_default_camera_limit: {
                 anyOf: [{ type: 'integer', minimum: 1, maximum: 100 }, { type: 'string' }, { type: 'null' }]
+            },
+            internal_ingest_policy_default: {
+                type: 'string',
+                enum: ['default', 'always_on', 'on_demand']
+            },
+            internal_on_demand_close_after_seconds: {
+                anyOf: [{ type: 'integer', minimum: 5, maximum: 300 }, { type: 'string' }, { type: 'null' }]
+            },
+            internal_rtsp_transport_default: {
+                type: 'string',
+                enum: ['default', 'tcp', 'udp', 'auto']
             }
         },
         additionalProperties: false
@@ -550,6 +569,17 @@ export const updateAreaSchema = {
             },
             grid_default_camera_limit: {
                 anyOf: [{ type: 'integer', minimum: 1, maximum: 100 }, { type: 'string' }, { type: 'null' }]
+            },
+            internal_ingest_policy_default: {
+                type: 'string',
+                enum: ['default', 'always_on', 'on_demand']
+            },
+            internal_on_demand_close_after_seconds: {
+                anyOf: [{ type: 'integer', minimum: 5, maximum: 300 }, { type: 'string' }, { type: 'null' }]
+            },
+            internal_rtsp_transport_default: {
+                type: 'string',
+                enum: ['default', 'tcp', 'udp', 'auto']
             }
         },
         additionalProperties: false

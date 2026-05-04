@@ -130,6 +130,41 @@ describe('recordingService external recording support', () => {
         expect(args).toContain('mp4');
     });
 
+    it('builds UDP RTSP recording args for cameras that require UDP transport', async () => {
+        const { buildRecordingFfmpegArgs } = await import('../services/recordingService.js');
+
+        const args = buildRecordingFfmpegArgs({
+            cameraDir: 'C:\\recordings\\camera1',
+            inputUrl: 'rtsp://user:pass@10.0.0.2/stream',
+            streamSource: 'internal',
+            rtspTransport: 'udp',
+        });
+
+        expect(args.slice(0, 4)).toEqual([
+            '-rtsp_transport',
+            'udp',
+            '-i',
+            'rtsp://user:pass@10.0.0.2/stream',
+        ]);
+    });
+
+    it('omits fixed RTSP transport for auto recording mode', async () => {
+        const { buildRecordingFfmpegArgs } = await import('../services/recordingService.js');
+
+        const args = buildRecordingFfmpegArgs({
+            cameraDir: 'C:\\recordings\\camera1',
+            inputUrl: 'rtsp://user:pass@10.0.0.2/stream',
+            streamSource: 'internal',
+            rtspTransport: 'auto',
+        });
+
+        expect(args.slice(0, 2)).toEqual([
+            '-i',
+            'rtsp://user:pass@10.0.0.2/stream',
+        ]);
+        expect(args).not.toContain('-rtsp_transport');
+    });
+
     it('builds direct HLS recording args for external cameras', async () => {
         const { buildRecordingFfmpegArgs } = await import('../services/recordingService.js');
 

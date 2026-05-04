@@ -1,11 +1,13 @@
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import cache, { CacheTTL, CacheNamespace, cacheKey } from './cacheService.js';
 import cameraHealthService from './cameraHealthService.js';
+import mediaMtxService from './mediaMtxService.js';
 import { getCameraDeliveryProfile, normalizeExternalHealthMode } from '../utils/cameraDelivery.js';
 import {
     normalizeInternalIngestPolicy,
     normalizeOnDemandCloseAfterSeconds,
 } from '../utils/internalIngestPolicy.js';
+import { normalizeInternalRtspTransport } from '../utils/internalRtspTransportPolicy.js';
 
 const CACHE_ALL_AREAS = cacheKey(CacheNamespace.AREAS, 'all');
 const CACHE_AREA_FILTERS = cacheKey(CacheNamespace.AREAS, 'filters');
@@ -265,7 +267,12 @@ class AreaService {
                             THEN a.internal_ingest_policy_default
                         ELSE 'default'
                    END as internal_ingest_policy_default,
-                   a.internal_on_demand_close_after_seconds
+                   a.internal_on_demand_close_after_seconds,
+                   CASE
+                        WHEN a.internal_rtsp_transport_default IN ('default', 'tcp', 'udp', 'auto')
+                            THEN a.internal_rtsp_transport_default
+                        ELSE 'default'
+                   END as internal_rtsp_transport_default
                    , CASE
                         WHEN a.external_health_mode_override IN ('default', 'passive_first', 'hybrid_probe', 'probe_first', 'disabled')
                             THEN a.external_health_mode_override
@@ -309,6 +316,12 @@ class AreaService {
             err.statusCode = 404;
             throw err;
         }
+
+        const previousInternalPolicy = {
+            ingest: normalizeInternalIngestPolicyDefault(area.internal_ingest_policy_default),
+            closeAfter: normalizeOnDemandCloseAfterSeconds(area.internal_on_demand_close_after_seconds, null),
+            transport: normalizeInternalRtspTransport(area.internal_rtsp_transport_default),
+        };
         return area;
     }
 
@@ -329,6 +342,7 @@ class AreaService {
             grid_default_camera_limit,
             internal_ingest_policy_default,
             internal_on_demand_close_after_seconds,
+            internal_rtsp_transport_default,
         } = data;
 
         if (!name) {
@@ -341,8 +355,8 @@ class AreaService {
             const result = execute(
                 `INSERT INTO areas (
                     name, description, rt, rw, kelurahan, kecamatan, latitude, longitude, external_health_mode_override, coverage_scope, viewport_zoom_override, show_on_grid_default, grid_default_camera_limit
-                    , internal_ingest_policy_default, internal_on_demand_close_after_seconds
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    , internal_ingest_policy_default, internal_on_demand_close_after_seconds, internal_rtsp_transport_default
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     name,
                     description || null,
@@ -359,6 +373,7 @@ class AreaService {
                     normalizeGridDefaultCameraLimit(grid_default_camera_limit),
                     normalizeInternalIngestPolicyDefault(internal_ingest_policy_default),
                     normalizeOnDemandCloseAfterSeconds(internal_on_demand_close_after_seconds, null),
+                    normalizeInternalRtspTransport(internal_rtsp_transport_default),
                 ]
             );
 
@@ -392,6 +407,7 @@ class AreaService {
             grid_default_camera_limit,
             internal_ingest_policy_default,
             internal_on_demand_close_after_seconds,
+            internal_rtsp_transport_default,
         } = data;
 
         const area = queryOne('SELECT * FROM areas WHERE id = ?', [id]);
@@ -406,7 +422,7 @@ class AreaService {
                 `UPDATE areas
                  SET name = ?, description = ?, rt = ?, rw = ?, kelurahan = ?, kecamatan = ?, latitude = ?, longitude = ?,
                      external_health_mode_override = ?, coverage_scope = ?, viewport_zoom_override = ?, show_on_grid_default = ?, grid_default_camera_limit = ?,
-                     internal_ingest_policy_default = ?, internal_on_demand_close_after_seconds = ?
+                     internal_ingest_policy_default = ?, internal_on_demand_close_after_seconds = ?, internal_rtsp_transport_default = ?
                  WHERE id = ?`,
                 [
                     name || area.name,
@@ -438,12 +454,28 @@ class AreaService {
                     internal_on_demand_close_after_seconds !== undefined
                         ? normalizeOnDemandCloseAfterSeconds(internal_on_demand_close_after_seconds, null)
                         : normalizeOnDemandCloseAfterSeconds(area.internal_on_demand_close_after_seconds, null),
+                    internal_rtsp_transport_default !== undefined
+                        ? normalizeInternalRtspTransport(internal_rtsp_transport_default)
+                        : normalizeInternalRtspTransport(area.internal_rtsp_transport_default),
                     id
                 ]
             );
 
             const updatedArea = queryOne('SELECT * FROM areas WHERE id = ?', [id]);
             this.invalidateAreaCache();
+            const nextInternalPolicy = {
+                ingest: normalizeInternalIngestPolicyDefault(updatedArea.internal_ingest_policy_default),
+                closeAfter: normalizeOnDemandCloseAfterSeconds(updatedArea.internal_on_demand_close_after_seconds, null),
+                transport: normalizeInternalRtspTransport(updatedArea.internal_rtsp_transport_default),
+            };
+            const internalPolicyChanged = previousInternalPolicy.ingest !== nextInternalPolicy.ingest
+                || previousInternalPolicy.closeAfter !== nextInternalPolicy.closeAfter
+                || previousInternalPolicy.transport !== nextInternalPolicy.transport;
+            if (internalPolicyChanged) {
+                mediaMtxService.syncAreaCameras(id).catch((error) => {
+                    console.error(`[Area] Failed to sync MediaMTX area ${id}:`, error.message);
+                });
+            }
             return updatedArea;
         } catch (error) {
             if (error.message.includes('UNIQUE constraint failed')) {

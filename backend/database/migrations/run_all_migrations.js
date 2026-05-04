@@ -53,6 +53,7 @@ const MIGRATIONS = [
     'add_area_grid_default_visibility.js',
     'add_area_grid_default_limit.js',
     'add_internal_ingest_policy.js',
+    'add_internal_rtsp_transport_policy.js',
     'add_public_playback_controls.js',
     'add_playback_viewer_sessions.js',
     'create_camera_discovery_table.js',
