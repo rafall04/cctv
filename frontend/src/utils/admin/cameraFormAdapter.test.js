@@ -157,6 +157,7 @@ describe('cameraFormAdapter delivery type support', () => {
             internal_ingest_policy_override: 'on_demand',
             internal_on_demand_close_after_seconds_override: '15',
             internal_rtsp_transport_override: 'udp',
+            thumbnail_strategy: 'hls_only',
             source_profile: 'remote_private_rtsp',
         });
 
@@ -167,6 +168,7 @@ describe('cameraFormAdapter delivery type support', () => {
             internal_ingest_policy_override: 'on_demand',
             internal_on_demand_close_after_seconds_override: 15,
             internal_rtsp_transport_override: 'udp',
+            thumbnail_strategy: 'hls_only',
             source_profile: 'remote_private_rtsp',
         });
     });
@@ -180,6 +182,7 @@ describe('cameraFormAdapter delivery type support', () => {
             internal_ingest_policy_override: 'on_demand',
             internal_on_demand_close_after_seconds_override: '15',
             internal_rtsp_transport_override: 'udp',
+            thumbnail_strategy: 'hls_only',
             source_profile: 'remote_private_rtsp',
         });
 
@@ -189,6 +192,7 @@ describe('cameraFormAdapter delivery type support', () => {
             internal_ingest_policy_override: 'default',
             internal_on_demand_close_after_seconds_override: null,
             internal_rtsp_transport_override: 'default',
+            thumbnail_strategy: 'default',
             source_profile: null,
         });
     });

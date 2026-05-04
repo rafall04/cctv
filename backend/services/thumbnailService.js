@@ -17,6 +17,7 @@ import { config } from '../config/config.js';
 import { getEffectiveDeliveryType, getPrimaryExternalStreamUrl } from '../utils/cameraDelivery.js';
 import { resolveInternalIngestPolicy } from '../utils/internalIngestPolicy.js';
 import { buildFfmpegRtspInputArgs, resolveInternalRtspTransport } from '../utils/internalRtspTransportPolicy.js';
+import { normalizeThumbnailStrategy } from '../utils/thumbnailStrategyPolicy.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -113,6 +114,10 @@ class ThumbnailService {
         return next;
     }
 
+    sanitizeErrorMessage(message = '') {
+        return String(message).replace(/\b(rtsp|https?):\/\/([^:\s/@]+):([^@\s/]+)@/gi, '$1://****:****@');
+    }
+
     buildFfmpegInputArgs(sourceUrl, externalTlsMode = 'strict', rtspTransport = 'tcp') {
         const args = [];
         const normalizedTlsMode = this.normalizeExternalTlsMode(externalTlsMode);
@@ -140,7 +145,19 @@ class ThumbnailService {
         return args;
     }
 
-    resolveCameraThumbnailStrategy(camera) {
+    buildInternalHlsThumbnailStrategy(camera, externalTlsMode) {
+        if (!camera.stream_key) {
+            return { type: 'unavailable', reason: 'missing_internal_stream_key' };
+        }
+
+        return {
+            type: 'internal_hls',
+            sourceUrl: `${INTERNAL_HLS_BASE_URL}/${camera.stream_key}/index.m3u8`,
+            externalTlsMode,
+        };
+    }
+
+    resolveCameraThumbnailStrategies(camera) {
         const deliveryType = getEffectiveDeliveryType(camera);
         const externalStreamUrl = (getPrimaryExternalStreamUrl(camera) || '').trim();
         const externalSnapshotUrl = (camera.external_snapshot_url || '').trim();
@@ -148,8 +165,15 @@ class ThumbnailService {
         const privateRtspUrl = typeof camera.private_rtsp_url === 'string' ? camera.private_rtsp_url.trim() : '';
 
         if (deliveryType === 'internal_hls') {
+            const thumbnailStrategy = normalizeThumbnailStrategy(camera.thumbnail_strategy);
+            const hlsStrategy = this.buildInternalHlsThumbnailStrategy(camera, externalTlsMode);
+
+            if (thumbnailStrategy === 'hls_only') {
+                return [hlsStrategy];
+            }
+
             if (privateRtspUrl.startsWith('rtsp://')) {
-                return {
+                const rtspStrategy = {
                     type: 'internal_rtsp',
                     sourceUrl: privateRtspUrl,
                     externalTlsMode,
@@ -157,48 +181,50 @@ class ThumbnailService {
                         internal_rtsp_transport_default: camera?.area_internal_rtsp_transport_default,
                     }),
                 };
+
+                if (thumbnailStrategy === 'hls_fallback' && hlsStrategy.type !== 'unavailable') {
+                    return [rtspStrategy, hlsStrategy];
+                }
+
+                return [rtspStrategy];
             }
 
-            if (!camera.stream_key) {
-                return { type: 'unavailable', reason: 'missing_internal_stream_key' };
-            }
-
-            return {
-                type: 'internal_hls',
-                sourceUrl: `${INTERNAL_HLS_BASE_URL}/${camera.stream_key}/index.m3u8`,
-                externalTlsMode,
-            };
+            return [hlsStrategy];
         }
 
         if (deliveryType === 'external_hls') {
             if (externalStreamUrl.startsWith('http://') || externalStreamUrl.startsWith('https://')) {
-                return { type: 'external_hls', sourceUrl: externalStreamUrl, externalTlsMode };
+                return [{ type: 'external_hls', sourceUrl: externalStreamUrl, externalTlsMode }];
             }
 
-            return { type: 'unavailable', reason: 'missing_external_hls_url' };
+            return [{ type: 'unavailable', reason: 'missing_external_hls_url' }];
         }
 
         if (deliveryType === 'external_mjpeg') {
             if (externalSnapshotUrl) {
-                return { type: 'external_snapshot', sourceUrl: externalSnapshotUrl, externalTlsMode };
+                return [{ type: 'external_snapshot', sourceUrl: externalSnapshotUrl, externalTlsMode }];
             }
 
             if (externalStreamUrl.startsWith('http://') || externalStreamUrl.startsWith('https://')) {
-                return { type: 'external_mjpeg', sourceUrl: externalStreamUrl, externalTlsMode };
+                return [{ type: 'external_mjpeg', sourceUrl: externalStreamUrl, externalTlsMode }];
             }
 
-            return { type: 'placeholder', reason: 'missing_mjpeg_thumbnail_source' };
+            return [{ type: 'placeholder', reason: 'missing_mjpeg_thumbnail_source' }];
         }
 
         if (deliveryType === 'external_embed' || deliveryType === 'external_jsmpeg' || deliveryType === 'external_custom_ws') {
             if (externalSnapshotUrl) {
-                return { type: 'external_snapshot', sourceUrl: externalSnapshotUrl, externalTlsMode };
+                return [{ type: 'external_snapshot', sourceUrl: externalSnapshotUrl, externalTlsMode }];
             }
 
-            return { type: 'placeholder', reason: 'missing_external_snapshot_source' };
+            return [{ type: 'placeholder', reason: 'missing_external_snapshot_source' }];
         }
 
-        return { type: 'unavailable', reason: 'unsupported_delivery_type' };
+        return [{ type: 'unavailable', reason: 'unsupported_delivery_type' }];
+    }
+
+    resolveCameraThumbnailStrategy(camera) {
+        return this.resolveCameraThumbnailStrategies(camera)[0];
     }
 
     shouldSkipCamera(camera) {
@@ -235,29 +261,44 @@ class ThumbnailService {
             return { skipped: true, reason: 'already_in_progress' };
         }
 
-        const strategy = this.resolveCameraThumbnailStrategy(camera);
+        const strategies = this.resolveCameraThumbnailStrategies(camera);
 
         this.inFlightCameraIds.add(camera.id);
+        let lastError = null;
         try {
-            if (strategy.type === 'unavailable') {
-                throw new Error(strategy.reason || 'No valid source URL for thumbnail generation');
+            for (let index = 0; index < strategies.length; index += 1) {
+                const strategy = strategies[index];
+
+                try {
+                    if (strategy.type === 'unavailable') {
+                        throw new Error(strategy.reason || 'No valid source URL for thumbnail generation');
+                    }
+
+                    if (strategy.type === 'placeholder') {
+                        await this.generatePlaceholderThumbnail(camera.id);
+                    } else {
+                        await this.generateThumbnail(camera.id, strategy);
+                    }
+
+                    this.setThumbnailState(camera.id, {
+                        thumbnail_source_type: strategy.type,
+                        thumbnail_last_success_at: new Date().toISOString(),
+                        thumbnail_last_error_reason: null,
+                    });
+                    return { skipped: false };
+                } catch (error) {
+                    lastError = error;
+                    if (index < strategies.length - 1) {
+                        console.warn(`[Thumbnail] Camera ${camera.id} failed with ${strategy.type}, trying fallback: ${this.sanitizeErrorMessage(error.message)}`);
+                        continue;
+                    }
+                }
             }
 
-            if (strategy.type === 'placeholder') {
-                await this.generatePlaceholderThumbnail(camera.id);
-            } else {
-                await this.generateThumbnail(camera.id, strategy);
-            }
-
-            this.setThumbnailState(camera.id, {
-                thumbnail_source_type: strategy.type,
-                thumbnail_last_success_at: new Date().toISOString(),
-                thumbnail_last_error_reason: null,
-            });
-            return { skipped: false };
+            throw lastError || new Error('No valid source URL for thumbnail generation');
         } catch (error) {
             this.setThumbnailState(camera.id, {
-                thumbnail_last_error_reason: error.message,
+                thumbnail_last_error_reason: this.sanitizeErrorMessage(error.message),
             });
             throw error;
         } finally {
@@ -279,6 +320,11 @@ class ThumbnailService {
                 SELECT c.id, c.name, c.description, c.enabled, c.status, c.is_online, c.enable_recording, c.stream_key, c.stream_source, c.delivery_type,
                        c.internal_ingest_policy_override, c.internal_on_demand_close_after_seconds_override, c.source_profile,
                        c.internal_rtsp_transport_override,
+                       CASE
+                            WHEN c.thumbnail_strategy IN ('default', 'direct_rtsp', 'hls_fallback', 'hls_only')
+                                THEN c.thumbnail_strategy
+                            ELSE 'default'
+                       END as thumbnail_strategy,
                        c.private_rtsp_url,
                        external_hls_url, external_stream_url, external_snapshot_url,
                        external_embed_url, external_tls_mode, thumbnail_path,
@@ -330,7 +376,7 @@ class ThumbnailService {
                         }
                     } catch (error) {
                         failed += 1;
-                        console.error(`[Thumbnail] Camera ${camera.id} (${camera.name}) failed:`, error.message);
+                        console.error(`[Thumbnail] Camera ${camera.id} (${camera.name}) failed:`, this.sanitizeErrorMessage(error.message));
                     }
                 }
             };
@@ -476,8 +522,8 @@ class ThumbnailService {
             await this.generateThumbnail(cameraId, strategy);
             return { success: true, source: strategy.type };
         } catch (error) {
-            console.error(`[Thumbnail] On-demand generation failed for ${cameraId}:`, error.message);
-            return { success: false, error: error.message };
+            console.error(`[Thumbnail] On-demand generation failed for ${cameraId}:`, this.sanitizeErrorMessage(error.message));
+            return { success: false, error: this.sanitizeErrorMessage(error.message) };
         }
     }
 
@@ -486,6 +532,11 @@ class ThumbnailService {
             `SELECT c.id, c.name, c.description, c.enabled, c.status, c.is_online, c.enable_recording, c.stream_key, c.stream_source, c.delivery_type,
                     c.internal_ingest_policy_override, c.internal_on_demand_close_after_seconds_override, c.source_profile,
                     c.internal_rtsp_transport_override,
+                    CASE
+                        WHEN c.thumbnail_strategy IN ('default', 'direct_rtsp', 'hls_fallback', 'hls_only')
+                            THEN c.thumbnail_strategy
+                        ELSE 'default'
+                    END as thumbnail_strategy,
                     c.private_rtsp_url, c.external_hls_url, c.external_stream_url, c.external_snapshot_url,
                     c.external_embed_url, c.external_tls_mode, c.thumbnail_path,
                     crs.is_online as runtime_is_online,

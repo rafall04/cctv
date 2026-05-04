@@ -37,6 +37,7 @@ import {
     normalizeOnDemandCloseAfterSeconds,
 } from '../utils/internalIngestPolicy.js';
 import { normalizeInternalRtspTransport } from '../utils/internalRtspTransportPolicy.js';
+import { normalizeThumbnailStrategy } from '../utils/thumbnailStrategyPolicy.js';
 
 const BULK_AREA_TARGET_FILTERS = [
     'all',
@@ -220,6 +221,10 @@ const ADMIN_CAMERA_LIST_PROJECTION = `
         WHEN c.internal_rtsp_transport_override IN ('default', 'tcp', 'udp', 'auto') THEN c.internal_rtsp_transport_override
         ELSE 'default'
     END as internal_rtsp_transport_override,
+    CASE
+        WHEN c.thumbnail_strategy IN ('default', 'direct_rtsp', 'hls_fallback', 'hls_only') THEN c.thumbnail_strategy
+        ELSE 'default'
+    END as thumbnail_strategy,
     c.source_profile,
     c.recording_duration_hours,
     c.recording_status,
@@ -1348,6 +1353,7 @@ class CameraService {
             internal_ingest_policy_override,
             internal_on_demand_close_after_seconds_override,
             internal_rtsp_transport_override,
+            thumbnail_strategy,
             source_profile,
         } = data;
         const externalUseProxy = external_use_proxy === false || external_use_proxy === 0 ? 0 : 1;
@@ -1361,6 +1367,7 @@ class CameraService {
             null
         );
         const internalRtspTransportOverride = normalizeInternalRtspTransport(internal_rtsp_transport_override);
+        const thumbnailStrategy = normalizeThumbnailStrategy(thumbnail_strategy);
 
         if (!name) {
             const err = new Error('Camera name is required');
@@ -1438,7 +1445,7 @@ class CameraService {
         const cameraStatus = status || 'active';
 
         const result = execute(
-            'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, recording_duration_hours, video_codec, stream_source, delivery_type, external_hls_url, external_stream_url, external_embed_url, external_snapshot_url, external_origin_mode, external_use_proxy, external_tls_mode, external_health_mode, public_playback_mode, public_playback_preview_minutes, internal_ingest_policy_override, internal_on_demand_close_after_seconds_override, internal_rtsp_transport_override, source_profile) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO cameras (name, private_rtsp_url, description, location, group_name, area_id, enabled, is_tunnel, latitude, longitude, status, stream_key, enable_recording, recording_duration_hours, video_codec, stream_source, delivery_type, external_hls_url, external_stream_url, external_embed_url, external_snapshot_url, external_origin_mode, external_use_proxy, external_tls_mode, external_health_mode, public_playback_mode, public_playback_preview_minutes, internal_ingest_policy_override, internal_on_demand_close_after_seconds_override, internal_rtsp_transport_override, thumbnail_strategy, source_profile) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 name,
                 deliveryConfig.deliveryType === 'internal_hls' ? private_rtsp_url : '',
@@ -1470,6 +1477,7 @@ class CameraService {
                 internalIngestPolicyOverride,
                 internalOnDemandCloseAfterSecondsOverride,
                 internalRtspTransportOverride,
+                thumbnailStrategy,
                 source_profile || null,
             ]
         );
@@ -1556,6 +1564,7 @@ class CameraService {
             internal_ingest_policy_override,
             internal_on_demand_close_after_seconds_override,
             internal_rtsp_transport_override,
+            thumbnail_strategy,
             source_profile,
         } = data;
 
@@ -1590,6 +1599,10 @@ class CameraService {
                         WHEN internal_rtsp_transport_override IN ('default', 'tcp', 'udp', 'auto') THEN internal_rtsp_transport_override
                         ELSE 'default'
                     END as internal_rtsp_transport_override,
+                    CASE
+                        WHEN thumbnail_strategy IN ('default', 'direct_rtsp', 'hls_fallback', 'hls_only') THEN thumbnail_strategy
+                        ELSE 'default'
+                    END as thumbnail_strategy,
                     source_profile
              FROM cameras WHERE id = ?`,
             [id]
@@ -1629,6 +1642,11 @@ class CameraService {
         }
         if (internal_rtsp_transport_override !== undefined && !['default', 'tcp', 'udp', 'auto'].includes(internal_rtsp_transport_override)) {
             const err = new Error('Invalid internal RTSP transport override');
+            err.statusCode = 400;
+            throw err;
+        }
+        if (thumbnail_strategy !== undefined && !['default', 'direct_rtsp', 'hls_fallback', 'hls_only'].includes(thumbnail_strategy)) {
+            const err = new Error('Invalid thumbnail strategy');
             err.statusCode = 400;
             throw err;
         }
@@ -1771,6 +1789,10 @@ class CameraService {
         if (internal_rtsp_transport_override !== undefined) {
             updates.push('internal_rtsp_transport_override = ?');
             values.push(normalizeInternalRtspTransport(internal_rtsp_transport_override));
+        }
+        if (thumbnail_strategy !== undefined) {
+            updates.push('thumbnail_strategy = ?');
+            values.push(normalizeThumbnailStrategy(thumbnail_strategy));
         }
         if (source_profile !== undefined) {
             updates.push('source_profile = ?');

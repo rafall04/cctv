@@ -353,4 +353,85 @@ describe('thumbnailService external thumbnails', () => {
         expect(args).toContain('rtsp://user:pass@36.66.208.112:554/Streaming/Channels/402');
         expect(args).toContain('-rtsp_transport');
     });
+
+    it('uses internal MediaMTX HLS directly for hls_only thumbnail strategy', async () => {
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        queryMock.mockImplementation((sql, params) => {
+            if (params?.[0] === 35) {
+                return [{
+                    id: 35,
+                    name: 'V380 Yoosee',
+                    enabled: 1,
+                    status: 'active',
+                    is_online: 1,
+                    runtime_is_online: 1,
+                    stream_key: 'stream-v380',
+                    stream_source: 'internal',
+                    delivery_type: 'internal_hls',
+                    private_rtsp_url: 'rtsp://user:pass@192.168.12.4:554/onvif1',
+                    thumbnail_strategy: 'hls_only',
+                    external_hls_url: null,
+                    external_stream_url: null,
+                    external_snapshot_url: null,
+                    external_embed_url: null,
+                    external_tls_mode: 'strict',
+                    thumbnail_path: null,
+                }];
+            }
+
+            return [];
+        });
+
+        const result = await thumbnailService.refreshCameraThumbnail(35);
+
+        expect(result).toEqual({ success: true });
+        const [, args] = execFileMock.mock.calls[0];
+        expect(args).toContain('http://localhost:8888/stream-v380/index.m3u8');
+        expect(args).not.toContain('rtsp://user:pass@192.168.12.4:554/onvif1');
+    });
+
+    it('falls back to internal MediaMTX HLS when direct RTSP thumbnail fails and strategy allows fallback', async () => {
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        execFileMock
+            .mockImplementationOnce((file, args, options, callback) => {
+                callback?.(new Error('method SETUP failed: 500 Internal Server Error'), '', '');
+            })
+            .mockImplementationOnce((file, args, options, callback) => {
+                callback?.(null, '', '');
+            });
+        queryMock.mockImplementation((sql, params) => {
+            if (params?.[0] === 36) {
+                return [{
+                    id: 36,
+                    name: 'V380 Yoosee Fallback',
+                    enabled: 1,
+                    status: 'active',
+                    is_online: 1,
+                    runtime_is_online: 1,
+                    stream_key: 'stream-v380-fallback',
+                    stream_source: 'internal',
+                    delivery_type: 'internal_hls',
+                    private_rtsp_url: 'rtsp://user:pass@192.168.12.4:554/onvif1',
+                    thumbnail_strategy: 'hls_fallback',
+                    external_hls_url: null,
+                    external_stream_url: null,
+                    external_snapshot_url: null,
+                    external_embed_url: null,
+                    external_tls_mode: 'strict',
+                    thumbnail_path: null,
+                }];
+            }
+
+            return [];
+        });
+
+        const result = await thumbnailService.refreshCameraThumbnail(36);
+
+        expect(result).toEqual({ success: true });
+        expect(execFileMock).toHaveBeenCalledTimes(2);
+        expect(execFileMock.mock.calls[0][1]).toContain('rtsp://user:pass@192.168.12.4:554/onvif1');
+        expect(execFileMock.mock.calls[1][1]).toContain('http://localhost:8888/stream-v380-fallback/index.m3u8');
+    });
 });

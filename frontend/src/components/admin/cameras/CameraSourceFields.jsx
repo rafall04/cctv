@@ -59,6 +59,13 @@ const INTERNAL_RTSP_TRANSPORT_OPTIONS = [
     { value: 'auto', label: 'Auto', description: 'Biarkan MediaMTX/FFmpeg negosiasi transport sendiri.' },
 ];
 
+const THUMBNAIL_STRATEGY_OPTIONS = [
+    { value: 'default', label: 'Default', description: 'Pakai perilaku sistem saat ini: internal RTSP langsung jika tersedia.' },
+    { value: 'direct_rtsp', label: 'Direct RTSP', description: 'Paksa thumbnail langsung dari RTSP kamera.' },
+    { value: 'hls_fallback', label: 'HLS Fallback', description: 'Coba RTSP dulu, lalu MediaMTX HLS jika RTSP gagal.' },
+    { value: 'hls_only', label: 'HLS Only', description: 'Langsung ambil thumbnail dari MediaMTX HLS. Cocok untuk V380/Yoosee.' },
+];
+
 export default function CameraSourceFields({
     formData,
     isSubmitting,
@@ -227,6 +234,27 @@ export default function CameraSourceFields({
                             </select>
                             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                                 {INTERNAL_RTSP_TRANSPORT_OPTIONS.find((option) => option.value === (formData.internal_rtsp_transport_override || 'default'))?.description}
+                            </p>
+                        </div>
+
+                        <div>
+                            <label htmlFor="camera-thumbnail-strategy" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Thumbnail Strategy
+                            </label>
+                            <select
+                                id="camera-thumbnail-strategy"
+                                name="thumbnail_strategy"
+                                value={formData.thumbnail_strategy || 'default'}
+                                onChange={onChange}
+                                disabled={isSubmitting}
+                                className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border rounded-xl text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 border-gray-200 dark:border-gray-700/50"
+                            >
+                                {THUMBNAIL_STRATEGY_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                ))}
+                            </select>
+                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                {THUMBNAIL_STRATEGY_OPTIONS.find((option) => option.value === (formData.thumbnail_strategy || 'default'))?.description}
                             </p>
                         </div>
 

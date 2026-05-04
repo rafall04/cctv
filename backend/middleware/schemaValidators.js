@@ -1,11 +1,10 @@
-/**
- * JSON Schema Validators for API Endpoints
- * 
- * Defines validation schemas for all API endpoints to ensure
- * proper input validation and return 400 for invalid input.
- * 
- * Requirements: 7.1, 7.4
- */
+/*
+Purpose: Define JSON schemas for API endpoint request validation.
+Caller: Fastify route registration and schema validation middleware.
+Deps: security audit logger.
+MainFuncs: createCameraSchema, updateCameraSchema, area/user/auth/settings schema exports.
+SideEffects: Logs validation-related security events through validationErrorHandler().
+*/
 
 import { logSecurityEvent, SECURITY_EVENTS } from '../services/securityAuditLogger.js';
 
@@ -166,6 +165,10 @@ export const createCameraSchema = {
                 type: 'string',
                 enum: ['default', 'tcp', 'udp', 'auto']
             },
+            thumbnail_strategy: {
+                type: 'string',
+                enum: ['default', 'direct_rtsp', 'hls_fallback', 'hls_only']
+            },
             source_profile: {
                 anyOf: [{ type: 'string', maxLength: 120 }, { type: 'null' }]
             }
@@ -287,6 +290,10 @@ export const updateCameraSchema = {
             internal_rtsp_transport_override: {
                 type: 'string',
                 enum: ['default', 'tcp', 'udp', 'auto']
+            },
+            thumbnail_strategy: {
+                type: 'string',
+                enum: ['default', 'direct_rtsp', 'hls_fallback', 'hls_only']
             },
             source_profile: {
                 anyOf: [{ type: 'string', maxLength: 120 }, { type: 'null' }]
