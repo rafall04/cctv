@@ -353,6 +353,29 @@ describe('VideoPopup non-live states', () => {
             expect(body.style.aspectRatio).toBe(String(4 / 3));
         });
     });
+
+    it('menampilkan statistik penonton di header popup kamera', async () => {
+        startSessionMock.mockResolvedValue('viewer-session');
+        stopSessionMock.mockResolvedValue(undefined);
+
+        render(
+            <VideoPopup
+                camera={{
+                    ...baseCamera,
+                    id: 25,
+                    viewer_stats: {
+                        live_viewers: 4,
+                        total_views: 21500,
+                    },
+                }}
+                onClose={vi.fn()}
+            />
+        );
+
+        expect(screen.getByText('4 live')).toBeTruthy();
+        expect(screen.getByText('21.5k views')).toBeTruthy();
+    });
+
     it('menormalkan rasio body live grid yang padded dekat 16:9', async () => {
         render(
             <VideoPopup

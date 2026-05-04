@@ -1,8 +1,17 @@
+/*
+ * Purpose: Render the single-camera public live popup with stream playback, controls, ads, and viewer stats.
+ * Caller: Landing grid and map camera interactions.
+ * Deps: React, HLS/FLV utilities, viewerService, popup state/layout utilities, CameraViewerStatsBadges.
+ * MainFuncs: VideoPopup.
+ * SideEffects: Starts/stops viewer sessions, reports runtime signals, controls media playback/fullscreen, and may take snapshots.
+ */
+
 import { useRef, useState, useEffect, useCallback, useLayoutEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import flvjs from 'flv.js';
 import { Icons } from '../ui/Icons.jsx';
 import CodecBadge from '../CodecBadge.jsx';
+import CameraViewerStatsBadges from '../common/CameraViewerStatsBadges.jsx';
 import ZoomableVideo from './ZoomableVideo';
 import ZoomableMediaFrame from './ZoomableMediaFrame.jsx';
 import { detectDeviceTier } from '../../utils/deviceDetector';
@@ -313,7 +322,7 @@ function VideoPopup({
 
             if (!isActive) {
                 if (nextSessionId) {
-                    viewerService.stopSession(nextSessionId).catch(() => { });
+                    Promise.resolve(viewerService.stopSession(nextSessionId)).catch(() => { });
                 }
                 return;
             }
@@ -327,7 +336,7 @@ function VideoPopup({
         return () => {
             isActive = false;
             if (sessionId) {
-                viewerService.stopSession(sessionId).catch(err => {
+                Promise.resolve(viewerService.stopSession(sessionId)).catch(err => {
                     console.error('[VideoPopup] Failed to stop viewer session:', err);
                 });
             }
@@ -1064,6 +1073,7 @@ function VideoPopup({
                                 )}
                             </div>
                         )}
+                        <CameraViewerStatsBadges camera={camera} className="mt-2" />
                     </div>
                 )}
 
@@ -1179,6 +1189,7 @@ function VideoPopup({
                                             <span className={`w-1.5 h-1.5 rounded-full ${statusDisplay.dotColor}`} />
                                             {statusDisplay.label}
                                         </span>
+                                        <CameraViewerStatsBadges camera={camera} tone="overlay" />
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <button
