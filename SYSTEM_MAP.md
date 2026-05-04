@@ -48,7 +48,7 @@ SideEffects: None; documentation only.
 - Live tracking: HLS proxy/viewer routes use `/api/viewer/*`; keep live tracking separate from playback tracking.
 - Camera admin: `CameraManagement.jsx` -> camera admin components/hook -> `cameraService` frontend -> camera routes/controllers -> `backend/services/cameraService.js`; recording can be enabled for recordable HLS delivery types (`internal_hls`, `external_hls`), internal RTSP transport can be overridden per camera, and thumbnail capture strategy can be set per internal camera.
 - Area admin bulk policy: `AreaManagement.jsx` -> area service -> `backend/services/areaService.js` and `cameraService.bulkUpdateArea`; internal ingest and RTSP transport defaults can be set per area.
-- Health monitoring: `cameraHealthService` evaluates runtime/probe status, writes runtime state, and coordinates recording/thumbnail transitions; `thumbnailService` can use direct RTSP, internal MediaMTX HLS, or explicit HLS fallback per camera.
+- Health monitoring: `cameraHealthService` evaluates runtime/probe status, writes runtime state, and coordinates recording/thumbnail transitions; `thumbnailService` background work refreshes only missing/stale thumbnails in a capped queue with failure backoff, and can use direct RTSP, internal MediaMTX HLS, or explicit HLS fallback per camera.
 - Recording lifecycle: `recordingService` orchestrates FFmpeg, runtime state, segment discovery/remux/cleanup, and `recordingProcessManager`; internal RTSP FFmpeg input transport resolves from camera override -> area default -> TCP.
 - Streaming proxy: `hlsProxyRoutes.js` handles internal/external HLS proxying, viewer identity/session caching, external host policy, and stream response behavior.
 

@@ -434,4 +434,147 @@ describe('thumbnailService external thumbnails', () => {
         expect(execFileMock.mock.calls[0][1]).toContain('rtsp://user:pass@192.168.12.4:554/onvif1');
         expect(execFileMock.mock.calls[1][1]).toContain('http://localhost:8888/stream-v380-fallback/index.m3u8');
     });
+
+    it('background refresh only processes missing or stale thumbnails up to the per-run limit', async () => {
+        vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-05-05T00:00:00.000Z').getTime());
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+        const staleCameras = Array.from({ length: 32 }, (_, index) => ({
+            id: 100 + index,
+            name: `Stale ${index}`,
+            enabled: 1,
+            status: 'active',
+            is_online: 1,
+            runtime_is_online: 1,
+            stream_key: `stale-${index}`,
+            stream_source: 'internal',
+            delivery_type: 'internal_hls',
+            private_rtsp_url: null,
+            external_hls_url: null,
+            external_stream_url: null,
+            external_snapshot_url: null,
+            external_embed_url: null,
+            external_tls_mode: 'strict',
+            thumbnail_path: `/api/thumbnails/${100 + index}.jpg`,
+            thumbnail_updated_at: '2026-05-04T22:00:00.000Z',
+        }));
+
+        queryMock.mockReturnValue([
+            {
+                id: 99,
+                name: 'Fresh Thumbnail',
+                enabled: 1,
+                status: 'active',
+                is_online: 1,
+                runtime_is_online: 1,
+                stream_key: 'fresh-camera',
+                stream_source: 'internal',
+                delivery_type: 'internal_hls',
+                private_rtsp_url: null,
+                external_hls_url: null,
+                external_stream_url: null,
+                external_snapshot_url: null,
+                external_embed_url: null,
+                external_tls_mode: 'strict',
+                thumbnail_path: '/api/thumbnails/99.jpg',
+                thumbnail_updated_at: '2026-05-04T23:55:00.000Z',
+            },
+            ...staleCameras,
+        ]);
+
+        await thumbnailService.generateAllThumbnails();
+
+        expect(execFileMock).toHaveBeenCalledTimes(30);
+        const sourceArgs = execFileMock.mock.calls.map((call) => call[1].join(' ')).join('\n');
+        expect(sourceArgs).not.toContain('fresh-camera');
+        expect(sourceArgs).toContain('stale-0');
+        expect(sourceArgs).toContain('stale-29');
+        expect(sourceArgs).not.toContain('stale-30');
+    });
+
+    it('background refresh backs off failed cameras instead of retrying every interval', async () => {
+        vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-05-05T00:00:00.000Z').getTime());
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+        execFileMock.mockImplementation((file, args, options, callback) => {
+            callback?.(new Error('Camera refused thumbnail capture'), '', '');
+        });
+        queryMock.mockReturnValue([{
+            id: 140,
+            name: 'Failing Thumbnail',
+            enabled: 1,
+            status: 'active',
+            is_online: 1,
+            runtime_is_online: 1,
+            stream_key: 'failing-camera',
+            stream_source: 'internal',
+            delivery_type: 'internal_hls',
+            private_rtsp_url: null,
+            external_hls_url: null,
+            external_stream_url: null,
+            external_snapshot_url: null,
+            external_embed_url: null,
+            external_tls_mode: 'strict',
+            thumbnail_path: '/api/thumbnails/140.jpg',
+            thumbnail_updated_at: '2026-05-04T22:00:00.000Z',
+        }]);
+
+        await thumbnailService.generateAllThumbnails();
+        await thumbnailService.generateAllThumbnails();
+
+        expect(execFileMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('background refresh does not let strict on-demand cameras consume stale queue slots', async () => {
+        vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-05-05T00:00:00.000Z').getTime());
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+        const strictOnDemandCameras = Array.from({ length: 30 }, (_, index) => ({
+            id: 200 + index,
+            name: `Surabaya ${index}`,
+            description: 'source_tag: surabaya_private_rtsp',
+            enabled: 1,
+            status: 'active',
+            is_online: 1,
+            runtime_is_online: 1,
+            stream_key: `surabaya-${index}`,
+            stream_source: 'internal',
+            delivery_type: 'internal_hls',
+            private_rtsp_url: `rtsp://user:pass@36.66.208.${index + 1}:554/Streaming/Channels/402`,
+            internal_ingest_policy_override: 'on_demand',
+            internal_on_demand_close_after_seconds_override: 15,
+            external_hls_url: null,
+            external_stream_url: null,
+            external_snapshot_url: null,
+            external_embed_url: null,
+            external_tls_mode: 'strict',
+            thumbnail_path: null,
+            thumbnail_updated_at: null,
+        }));
+
+        queryMock.mockReturnValue([
+            ...strictOnDemandCameras,
+            {
+                id: 250,
+                name: 'Local Stale',
+                enabled: 1,
+                status: 'active',
+                is_online: 1,
+                runtime_is_online: 1,
+                stream_key: 'local-stale',
+                stream_source: 'internal',
+                delivery_type: 'internal_hls',
+                private_rtsp_url: null,
+                external_hls_url: null,
+                external_stream_url: null,
+                external_snapshot_url: null,
+                external_embed_url: null,
+                external_tls_mode: 'strict',
+                thumbnail_path: null,
+                thumbnail_updated_at: null,
+            },
+        ]);
+
+        await thumbnailService.generateAllThumbnails();
+
+        expect(execFileMock).toHaveBeenCalledTimes(1);
+        expect(execFileMock.mock.calls[0][1]).toContain('http://localhost:8888/local-stale/index.m3u8');
+    });
 });

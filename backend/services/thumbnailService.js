@@ -28,6 +28,10 @@ const THUMBNAIL_DIR = join(__dirname, '..', 'data', 'thumbnails');
 const INTERNAL_HLS_BASE_URL = (config.mediamtx?.hlsUrlInternal || 'http://localhost:8888').replace(/\/$/, '');
 const THUMBNAIL_INTERVAL_MS = 5 * 60 * 1000;
 const THUMBNAIL_CONCURRENCY = 3;
+const THUMBNAIL_MAX_PER_RUN = 30;
+const THUMBNAIL_STALE_MS = 60 * 60 * 1000;
+const THUMBNAIL_FAILURE_BACKOFF_BASE_MS = 30 * 60 * 1000;
+const THUMBNAIL_FAILURE_BACKOFF_MAX_MS = 6 * 60 * 60 * 1000;
 const FFMPEG_TIMEOUT_MS = 15000;
 const DEFAULT_PLACEHOLDER_COLOR = '0x111827';
 
@@ -43,6 +47,7 @@ class ThumbnailService {
         this.ffmpegAvailable = null;
         this.inFlightCameraIds = new Set();
         this.thumbnailState = new Map();
+        this.failureBackoff = new Map();
     }
 
     async checkFFmpeg() {
@@ -116,6 +121,61 @@ class ThumbnailService {
 
     sanitizeErrorMessage(message = '') {
         return String(message).replace(/\b(rtsp|https?):\/\/([^:\s/@]+):([^@\s/]+)@/gi, '$1://****:****@');
+    }
+
+    getThumbnailAgeMs(camera) {
+        if (!camera?.thumbnail_path || !camera?.thumbnail_updated_at) {
+            return Number.POSITIVE_INFINITY;
+        }
+
+        const updatedAt = new Date(camera.thumbnail_updated_at).getTime();
+        if (!Number.isFinite(updatedAt)) {
+            return Number.POSITIVE_INFINITY;
+        }
+
+        return Math.max(0, Date.now() - updatedAt);
+    }
+
+    isThumbnailStale(camera) {
+        return this.getThumbnailAgeMs(camera) >= THUMBNAIL_STALE_MS;
+    }
+
+    isInFailureBackoff(cameraId) {
+        const state = this.failureBackoff.get(cameraId);
+        return Boolean(state && Date.now() < state.nextRetryAt);
+    }
+
+    registerThumbnailFailure(cameraId) {
+        const previous = this.failureBackoff.get(cameraId) || { failures: 0, nextRetryAt: 0 };
+        const failures = previous.failures + 1;
+        const backoffMs = Math.min(
+            THUMBNAIL_FAILURE_BACKOFF_MAX_MS,
+            THUMBNAIL_FAILURE_BACKOFF_BASE_MS * (2 ** (failures - 1))
+        );
+        this.failureBackoff.set(cameraId, {
+            failures,
+            nextRetryAt: Date.now() + backoffMs,
+        });
+    }
+
+    clearThumbnailFailure(cameraId) {
+        this.failureBackoff.delete(cameraId);
+    }
+
+    isBackgroundThumbnailAllowed(camera) {
+        return !this.shouldSkipCamera({
+            ...camera,
+            _skipStrictOnDemandIdleThumbnail: true,
+        }).skipped;
+    }
+
+    selectBackgroundThumbnailCandidates(cameras) {
+        return cameras
+            .filter((camera) => this.isBackgroundThumbnailAllowed(camera))
+            .filter((camera) => this.isThumbnailStale(camera))
+            .filter((camera) => !this.isInFailureBackoff(camera.id))
+            .sort((a, b) => this.getThumbnailAgeMs(b) - this.getThumbnailAgeMs(a))
+            .slice(0, THUMBNAIL_MAX_PER_RUN);
     }
 
     buildFfmpegInputArgs(sourceUrl, externalTlsMode = 'strict', rtspTransport = 'tcp') {
@@ -327,7 +387,7 @@ class ThumbnailService {
                        END as thumbnail_strategy,
                        c.private_rtsp_url,
                        external_hls_url, external_stream_url, external_snapshot_url,
-                       external_embed_url, external_tls_mode, thumbnail_path,
+                       external_embed_url, external_tls_mode, thumbnail_path, thumbnail_updated_at,
                        crs.is_online as runtime_is_online,
                        CASE
                             WHEN a.internal_ingest_policy_default IN ('default', 'always_on', 'on_demand')
@@ -351,31 +411,34 @@ class ThumbnailService {
                 return;
             }
 
-            console.log(`[Thumbnail] Generating for ${cameras.length} cameras...`);
+            const candidates = this.selectBackgroundThumbnailCandidates(cameras);
+            console.log(`[Thumbnail] Generating for ${candidates.length} of ${cameras.length} eligible cameras...`);
 
             let success = 0;
             let failed = 0;
             let cursor = 0;
 
-            const workerCount = Math.min(THUMBNAIL_CONCURRENCY, cameras.length);
+            const workerCount = Math.min(THUMBNAIL_CONCURRENCY, candidates.length);
             const worker = async () => {
                 while (true) {
                     const currentIndex = cursor;
                     cursor += 1;
 
-                    if (currentIndex >= cameras.length) {
+                    if (currentIndex >= candidates.length) {
                         break;
                     }
 
-                const camera = cameras[currentIndex];
-                try {
-                    camera._skipStrictOnDemandIdleThumbnail = true;
-                    const result = await this.processCamera(camera);
+                    const camera = candidates[currentIndex];
+                    try {
+                        camera._skipStrictOnDemandIdleThumbnail = true;
+                        const result = await this.processCamera(camera);
                         if (!result?.skipped) {
                             success += 1;
+                            this.clearThumbnailFailure(camera.id);
                         }
                     } catch (error) {
                         failed += 1;
+                        this.registerThumbnailFailure(camera.id);
                         console.error(`[Thumbnail] Camera ${camera.id} (${camera.name}) failed:`, this.sanitizeErrorMessage(error.message));
                     }
                 }
