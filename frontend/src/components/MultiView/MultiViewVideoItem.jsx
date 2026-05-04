@@ -141,7 +141,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
 
                 if (!isActive) {
                     if (nextSessionId) {
-                        viewerService.stopSession(nextSessionId).catch(() => { });
+                        Promise.resolve(viewerService.stopSession(nextSessionId)).catch(() => { });
                     }
                     return;
                 }
@@ -158,7 +158,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         return () => {
             isActive = false;
             if (sessionId) {
-                viewerService.stopSession(sessionId).catch(err => {
+                Promise.resolve(viewerService.stopSession(sessionId)).catch(err => {
                     console.error('[MultiViewVideoItem] Failed to stop viewer session:', err);
                 });
             }
