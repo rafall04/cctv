@@ -1,3 +1,11 @@
+/*
+Purpose: Render Camera Management stream source, delivery type, and internal ingest policy controls.
+Caller: CameraFormModal inside admin Camera Management.
+Deps: validators and camera form state callbacks.
+MainFuncs: CameraSourceFields.
+SideEffects: Emits form change/blur callbacks only.
+*/
+
 import { getRtspFormatHint } from '../../../utils/validators';
 
 const DELIVERY_OPTIONS = [
@@ -39,9 +47,9 @@ const EXTERNAL_HEALTH_MODE_OPTIONS = [
 ];
 
 const INTERNAL_INGEST_POLICY_OPTIONS = [
-    { value: 'default', label: 'Ikuti Area', description: 'Gunakan default policy internal dari area kamera ini.' },
+    { value: 'default', label: 'Use Area Default', description: 'Gunakan default policy internal dari area kamera ini.' },
     { value: 'always_on', label: 'Always On', description: 'MediaMTX menjaga source tetap tersambung walau tidak ada viewer.' },
-    { value: 'on_demand', label: 'On-Demand', description: 'Source hanya dibuka saat ada viewer lalu ditutup lagi saat idle.' },
+    { value: 'on_demand', label: 'On Demand', description: 'Source hanya dibuka saat ada viewer lalu ditutup lagi saat idle.' },
 ];
 
 export default function CameraSourceFields({

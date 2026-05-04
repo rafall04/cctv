@@ -146,4 +146,46 @@ describe('cameraFormAdapter delivery type support', () => {
         expect(rules.external_stream_url.custom('https://example.com/live')).toBe('URL must start with ws:// or wss://');
         expect(rules.external_stream_url.custom('wss://example.com/live')).toBeUndefined();
     });
+
+    it('builds internal camera payload with ingest policy override fields', () => {
+        const payload = buildCameraPayload({
+            ...defaultCameraFormValues,
+            name: 'Internal On Demand Cam',
+            delivery_type: 'internal_hls',
+            stream_source: 'internal',
+            private_rtsp_url: 'rtsp://example.local/stream',
+            internal_ingest_policy_override: 'on_demand',
+            internal_on_demand_close_after_seconds_override: '15',
+            source_profile: 'remote_private_rtsp',
+        });
+
+        expect(payload).toMatchObject({
+            delivery_type: 'internal_hls',
+            stream_source: 'internal',
+            private_rtsp_url: 'rtsp://example.local/stream',
+            internal_ingest_policy_override: 'on_demand',
+            internal_on_demand_close_after_seconds_override: 15,
+            source_profile: 'remote_private_rtsp',
+        });
+    });
+
+    it('clears internal ingest fields for external cameras', () => {
+        const payload = buildCameraPayload({
+            ...defaultCameraFormValues,
+            delivery_type: 'external_hls',
+            stream_source: 'external',
+            external_stream_url: 'https://example.com/live.m3u8',
+            internal_ingest_policy_override: 'on_demand',
+            internal_on_demand_close_after_seconds_override: '15',
+            source_profile: 'remote_private_rtsp',
+        });
+
+        expect(payload).toMatchObject({
+            delivery_type: 'external_hls',
+            stream_source: 'external',
+            internal_ingest_policy_override: 'default',
+            internal_on_demand_close_after_seconds_override: null,
+            source_profile: null,
+        });
+    });
 });
