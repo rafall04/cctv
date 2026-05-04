@@ -8,11 +8,11 @@ SideEffects: Queues async init work and may abort pending operations.
 
 /**
  * StreamInitQueue Module
- * Manages stream initialization queue for low-end devices
+ * Manages stream initialization queue for multi-view/video startup
  * 
- * On low-end devices, only 1 stream can initialize at a time to prevent
- * CPU overload and improve reliability. Additional streams are queued
- * and initialized sequentially.
+ * Low-end devices initialize one stream at a time. Medium/high devices
+ * still use the queue with limited concurrency to avoid burst-loading HLS
+ * sources when multi-view starts several cameras together.
  * 
  * **Validates: Requirements 5.4**
  */
@@ -43,13 +43,13 @@ export const getMaxConcurrentInits = (options = {}) => {
 };
 
 /**
- * Check if device should use queued initialization
+ * Check if device should use queued initialization.
  * @param {Object} options - Optional overrides for testing
  * @returns {boolean} True if queued initialization should be used
  */
 export const shouldUseQueuedInit = (options = {}) => {
     const tier = options.tier ?? detectDeviceTier();
-    return tier === 'low';
+    return ['low', 'medium', 'high'].includes(tier);
 };
 
 /**

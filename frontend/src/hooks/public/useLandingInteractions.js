@@ -1,7 +1,16 @@
+/*
+Purpose: Own public landing click, popup, URL, and multi-view selection interactions.
+Caller: LandingPage content shell.
+Deps: React hooks, slug helpers, camera delivery/availability helpers, deviceDetector stream limits.
+MainFuncs: useLandingInteractions.
+SideEffects: Updates URL search params, emits toasts, stores popup/multi-view UI state.
+*/
+
 import { useCallback, useEffect, useState } from 'react';
 import { createCameraSlug, parseCameraIdFromSlug } from '../../utils/slugify';
 import { isMultiViewSupported } from '../../utils/cameraDelivery.js';
 import { isCameraPlayable } from '../../utils/cameraAvailability.js';
+import { getMaxConcurrentStreams } from '../../utils/deviceDetector.js';
 
 export function useLandingInteractions({
     cameras,
@@ -18,7 +27,7 @@ export function useLandingInteractions({
     const [showMulti, setShowMulti] = useState(false);
     const [maxReached, setMaxReached] = useState(false);
 
-    const maxStreams = deviceTier === 'low' ? 2 : deviceTier === 'mid' ? 4 : 6;
+    const maxStreams = getMaxConcurrentStreams(deviceTier);
 
     useEffect(() => {
         if (viewMode === 'playback') {

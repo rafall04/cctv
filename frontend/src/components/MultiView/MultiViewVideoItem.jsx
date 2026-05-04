@@ -33,6 +33,10 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
     const hlsRef = useRef(null);
     const fallbackHandlerRef = useRef(null);
     const abortControllerRef = useRef(null);
+    const loadingStageRef = useRef(LoadingStage.CONNECTING);
+    const autoRetryCountRef = useRef(0);
+    const internalWarmupRetryCountRef = useRef(0);
+    const internalWarmupRetryTimeoutRef = useRef(null);
 
     // Handle close with fullscreen exit
     const handleClose = async () => {
@@ -78,6 +82,14 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
     const { targetUrl: resolvedUrl, proxyFallbackUrl, isDirectStream } = resolveStreamUrl(camera, { forceProxy: forceProxyFallback });
     const effectiveUrl = resolvedUrl || url;
 
+    useEffect(() => {
+        loadingStageRef.current = loadingStage;
+    }, [loadingStage]);
+
+    useEffect(() => {
+        autoRetryCountRef.current = autoRetryCount;
+    }, [autoRetryCount]);
+
     // Track fullscreen state to disable animations and unlock orientation on exit
     useEffect(() => {
         const handleFullscreenChange = () => {
@@ -112,6 +124,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         // Don't track if camera is offline or in maintenance
         if (isMaintenance || isOffline) return;
 
+        let isActive = true;
         let sessionId = null;
 
         // Start viewer session with delay (staggered init)
@@ -121,8 +134,19 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 await new Promise(resolve => setTimeout(resolve, initDelay));
             }
 
+            if (!isActive) return;
+
             try {
-                sessionId = await viewerService.startSession(camera.id);
+                const nextSessionId = await viewerService.startSession(camera.id);
+
+                if (!isActive) {
+                    if (nextSessionId) {
+                        viewerService.stopSession(nextSessionId).catch(() => { });
+                    }
+                    return;
+                }
+
+                sessionId = nextSessionId;
             } catch (error) {
                 console.error('[MultiViewVideoItem] Failed to start viewer session:', error);
             }
@@ -132,6 +156,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
 
         // Cleanup: stop session when component unmounts
         return () => {
+            isActive = false;
             if (sessionId) {
                 viewerService.stopSession(sessionId).catch(err => {
                     console.error('[MultiViewVideoItem] Failed to stop viewer session:', err);
@@ -144,6 +169,18 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
     useEffect(() => {
         onStatusChange?.(camera.id, status);
     }, [status, camera.id, onStatusChange]);
+
+    const clearInternalWarmupRetry = useCallback(() => {
+        if (internalWarmupRetryTimeoutRef.current) {
+            clearTimeout(internalWarmupRetryTimeoutRef.current);
+            internalWarmupRetryTimeoutRef.current = null;
+        }
+    }, []);
+
+    useEffect(() => {
+        internalWarmupRetryCountRef.current = 0;
+        clearInternalWarmupRetry();
+    }, [camera.id, effectiveUrl, clearInternalWarmupRetry]);
 
     // Stream Timeout Hook - **Validates: Requirements 1.1, 1.2, 1.3**
     const {
@@ -212,7 +249,8 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         if (fallbackHandlerRef.current) {
             fallbackHandlerRef.current.clearPendingRetry();
         }
-    }, [clearStreamTimeout]);
+        clearInternalWarmupRetry();
+    }, [clearInternalWarmupRetry, clearStreamTimeout]);
 
     useEffect(() => {
         // Skip HLS loading if camera is in maintenance or offline
@@ -348,6 +386,31 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                     // For non-fatal errors, just continue
                     if (!d.fatal) return;
 
+                    const isInternalManifestWarmup404 =
+                        camera.stream_source !== 'external' &&
+                        d.type === Hls.ErrorTypes.NETWORK_ERROR &&
+                        d.response?.code === 404 &&
+                        (
+                            d.details === 'manifestLoadError' ||
+                            d.details === 'levelLoadError'
+                        );
+
+                    if (isInternalManifestWarmup404 && internalWarmupRetryCountRef.current < 3) {
+                        internalWarmupRetryCountRef.current += 1;
+                        setStatus('connecting');
+                        setErrorType(null);
+                        setLoadingStage(LoadingStage.CONNECTING);
+                        updateStreamStage(LoadingStage.CONNECTING);
+                        clearInternalWarmupRetry();
+                        internalWarmupRetryTimeoutRef.current = setTimeout(() => {
+                            internalWarmupRetryTimeoutRef.current = null;
+                            if (!cancelled) {
+                                setRetryKey((current) => current + 1);
+                            }
+                        }, 1200);
+                        return;
+                    }
+
                     // Clear loading timeout
                     clearStreamTimeout();
 
@@ -399,9 +462,9 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                         const streamError = createStreamError({
                             type: errorType,
                             message: d.details || 'Stream error',
-                            stage: loadingStage,
+                            stage: loadingStageRef.current,
                             deviceTier,
-                            retryCount: autoRetryCount,
+                            retryCount: autoRetryCountRef.current,
                         });
 
                         const result = fallbackHandlerRef.current.handleError(streamError, () => {
@@ -478,11 +541,11 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             }
         };
     }, [
-        autoRetryCount,
         availabilityState,
         camera.id,
         camera.stream_source,
         cleanupResources,
+        clearInternalWarmupRetry,
         clearStreamTimeout,
         deviceTier,
         effectiveUrl,
@@ -491,7 +554,6 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         isDirectStream,
         isMaintenance,
         isOffline,
-        loadingStage,
         onError,
         proxyFallbackUrl,
         retryKey,
