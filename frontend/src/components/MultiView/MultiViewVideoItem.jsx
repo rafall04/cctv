@@ -117,7 +117,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 }
             }
         };
-    }, [clearStreamTimeout]);
+    }, []);
 
     // Viewer session tracking - track when user starts/stops watching this camera
     useEffect(() => {

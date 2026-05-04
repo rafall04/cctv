@@ -30,6 +30,13 @@ describe('MultiViewVideoItem HLS stability', () => {
         expect(dependencies).not.toContain('autoRetryCount');
     });
 
+    it('does not read stream timeout callbacks before their hook declaration', () => {
+        const firstClearTimeoutDependency = source.indexOf('[clearStreamTimeout]');
+        const streamTimeoutDeclaration = source.indexOf('clearTimeout: clearStreamTimeout');
+
+        expect(firstClearTimeoutDependency).toBeGreaterThan(streamTimeoutDeclaration);
+    });
+
     it('guards delayed viewer session startup so unmounted tiles do not leak sessions', () => {
         expect(source).toContain('let isActive = true;');
         expect(source).toContain('if (!isActive)');
