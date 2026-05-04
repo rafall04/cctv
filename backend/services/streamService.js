@@ -1,13 +1,26 @@
+/**
+ * Purpose: Build public stream responses with delivery metadata, availability, thumbnails, and lightweight viewer stats.
+ * Caller: streamController public stream endpoints and stream service tests.
+ * Deps: connectionPool, config, jsonwebtoken, thumbnailPathService, cameraHealthService, cameraViewStatsService, camera delivery/projection utils.
+ * MainFuncs: buildCameraResponse, buildStreamUrls, getStreamUrls, getAllActiveStreams, generateStreamToken.
+ * SideEffects: Reads camera rows and active viewer aggregates; no writes.
+ */
+
 import { query, queryOne } from '../database/connectionPool.js';
 import { config } from '../config/config.js';
 import jwt from 'jsonwebtoken';
 import { sanitizeCameraThumbnailList } from './thumbnailPathService.js';
 import cameraHealthService from './cameraHealthService.js';
+import cameraViewStatsService from './cameraViewStatsService.js';
 import {
     getEffectiveDeliveryType,
     getStreamCapabilities,
 } from '../utils/cameraDelivery.js';
 import { SHARED_CAMERA_STREAM_PROJECTION, SHARED_CAMERA_STREAM_WITH_AREA_PROJECTION } from '../utils/cameraProjection.js';
+
+function resolveViewerStats(statsByCamera, cameraId) {
+    return statsByCamera[cameraId] || cameraViewStatsService.emptyStats;
+}
 
 class StreamService {
     buildCameraResponse(camera) {
@@ -136,10 +149,12 @@ class StreamService {
              WHERE c.enabled = 1 
              ORDER BY c.is_tunnel ASC, c.id ASC`
         );
+        const statsByCamera = cameraViewStatsService.getPublicStatsByCamera();
 
         const camerasWithStreams = cameras.map((camera) => this.buildCameraResponse({
             ...camera,
             _requestHost: requestHost,
+            viewer_stats: resolveViewerStats(statsByCamera, camera.id),
         }));
 
         return sanitizeCameraThumbnailList(camerasWithStreams);

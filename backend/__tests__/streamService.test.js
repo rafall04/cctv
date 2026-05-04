@@ -1,7 +1,50 @@
-import { describe, expect, it } from 'vitest';
+/**
+ * Purpose: Verify stream response delivery routing and public viewer stats enrichment.
+ * Caller: Backend focused test gate for streamService.
+ * Deps: vitest, streamService, connectionPool and cameraViewStatsService mocks.
+ * MainFuncs: streamService camera response tests.
+ * SideEffects: Mocks database/stat service calls only.
+ */
+
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import streamService from '../services/streamService.js';
 
+const { queryMock, viewStatsMock } = vi.hoisted(() => ({
+    queryMock: vi.fn(),
+    viewStatsMock: vi.fn(),
+}));
+
+vi.mock('../database/connectionPool.js', () => ({
+    query: (...args) => queryMock(...args),
+    queryOne: vi.fn(),
+    execute: vi.fn(),
+}));
+
+vi.mock('../services/cameraViewStatsService.js', () => ({
+    default: {
+        getPublicStatsByCamera: viewStatsMock,
+        emptyStats: {
+            live_viewers: 0,
+            total_views: 0,
+            total_watch_seconds: 0,
+            last_viewed_at: null,
+        },
+    },
+}));
+
+vi.mock('../services/cameraHealthService.js', () => ({
+    default: {
+        enrichCameraAvailability: (camera) => camera,
+    },
+}));
+
 describe('streamService camera response routing', () => {
+    beforeEach(() => {
+        queryMock.mockReset();
+        viewStatsMock.mockReset();
+        viewStatsMock.mockReturnValue({});
+    });
+
     it('keeps dirty legacy external URLs on the external_hls path', () => {
         const response = streamService.buildCameraResponse({
             id: 11,
@@ -27,5 +70,49 @@ describe('streamService camera response routing', () => {
 
         expect(response.delivery_type).toBe('external_mjpeg');
         expect(response.streams).toEqual({});
+    });
+
+    it('adds live and lifetime viewer stats to active stream cards without per-camera queries', () => {
+        queryMock.mockReturnValue([
+            {
+                id: 1,
+                name: 'Cam 1',
+                stream_key: 'camera1',
+                stream_source: 'internal',
+                delivery_type: 'internal_hls',
+            },
+            {
+                id: 2,
+                name: 'Cam 2',
+                stream_key: 'camera2',
+                stream_source: 'internal',
+                delivery_type: 'internal_hls',
+            },
+        ]);
+        viewStatsMock.mockReturnValue({
+            1: {
+                live_viewers: 3,
+                total_views: 12,
+                total_watch_seconds: 90,
+                last_viewed_at: '2026-05-05 12:30:00',
+            },
+        });
+
+        const streams = streamService.getAllActiveStreams('cctv.raf.my.id');
+
+        expect(queryMock).toHaveBeenCalledTimes(1);
+        expect(viewStatsMock).toHaveBeenCalledTimes(1);
+        expect(streams[0].viewer_stats).toEqual({
+            live_viewers: 3,
+            total_views: 12,
+            total_watch_seconds: 90,
+            last_viewed_at: '2026-05-05 12:30:00',
+        });
+        expect(streams[1].viewer_stats).toEqual({
+            live_viewers: 0,
+            total_views: 0,
+            total_watch_seconds: 0,
+            last_viewed_at: null,
+        });
     });
 });

@@ -1,6 +1,9 @@
 /**
- * Viewer Session Service
- * Manages real-time viewer tracking for CCTV streams
+ * Purpose: Manage real-time live viewer sessions and historical live-view analytics for CCTV streams.
+ * Caller: viewer routes, HLS proxy/session cleanup, backend startup cleanup timer.
+ * Deps: connectionPool, uuid, timezoneService, viewerAnalyticsService, cacheService, cameraViewStatsService.
+ * MainFuncs: startSession, heartbeat, endSession, cleanupStaleSessions, getViewerStats, getSessionHistory.
+ * SideEffects: Writes viewer session/history rows, updates camera lifetime view counters, and runs cleanup timers.
  * 
  * Features:
  * - Track active viewers per camera
@@ -22,6 +25,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getTimezone } from './timezoneService.js';
 import viewerAnalyticsService from './viewerAnalyticsService.js';
 import { cacheGetOrSetSync, cacheKey, CacheNamespace, CacheTTL } from './cacheService.js';
+import cameraViewStatsService from './cameraViewStatsService.js';
 
 /**
  * Get current timestamp in configured timezone format for SQLite
@@ -259,6 +263,12 @@ class ViewerSessionService {
                 timestamp,
                 durationSeconds
             ]);
+
+            cameraViewStatsService.recordCompletedLiveView({
+                cameraId: session.camera_id,
+                durationSeconds,
+                viewedAt: timestamp,
+            });
 
             console.log(`[ViewerSession] Ended: ${sessionId} (duration: ${durationSeconds}s)`);
             return true;

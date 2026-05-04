@@ -1,8 +1,8 @@
 /*
- * Purpose: Render a public landing camera card with thumbnail, status badges, and quick actions.
+ * Purpose: Render a public landing camera card with thumbnail, status badges, viewer stats, and quick actions.
  * Caller: Landing camera grids and public camera list views.
  * Deps: Icons, CodecBadge, CameraThumbnail, animation and availability utilities.
- * MainFuncs: CameraCard.
+ * MainFuncs: formatCompactCount, getViewerStats, CameraCard.
  * SideEffects: Invokes caller-provided click, multiview, and favorite callbacks.
  */
 
@@ -13,6 +13,34 @@ import CameraThumbnail from '../CameraThumbnail';
 import { shouldDisableAnimations } from '../../utils/animationControl';
 import { isCameraHardOffline, isCameraDegraded } from '../../utils/cameraAvailability.js';
 
+function formatCompactCount(value) {
+    const count = Number.parseInt(value, 10);
+    if (!Number.isFinite(count) || count <= 0) {
+        return '0';
+    }
+    if (count < 1000) {
+        return String(count);
+    }
+
+    const suffixes = [
+        { value: 1000000, suffix: 'm' },
+        { value: 1000, suffix: 'k' },
+    ];
+    const scale = suffixes.find((item) => count >= item.value);
+    const scaled = count / scale.value;
+    const rounded = Math.round(scaled * 10) / 10;
+    const formatted = scaled >= 100 ? Math.round(scaled).toString() : rounded.toFixed(1);
+    return `${formatted.replace(/\.0$/, '')}${scale.suffix}`;
+}
+
+function getViewerStats(camera) {
+    const stats = camera.viewer_stats || {};
+    return {
+        liveViewers: Number.parseInt(stats.live_viewers, 10) || 0,
+        totalViews: Number.parseInt(stats.total_views, 10) || 0,
+    };
+}
+
 const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMulti, isFavorite, onToggleFavorite }) {
     const isMaintenance = camera.status === 'maintenance';
     const isOffline = isCameraHardOffline(camera);
@@ -20,6 +48,7 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
     const isTunnel = camera.is_tunnel === 1;
     const disableAnimations = shouldDisableAnimations();
     const isFav = isFavorite?.(camera.id);
+    const { liveViewers, totalViews } = getViewerStats(camera);
 
     const cardStyle = isMaintenance
         ? 'ring-red-500/50 hover:ring-red-500'
@@ -172,6 +201,16 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
                         <span className="truncate">{camera.location}</span>
                     </p>
                 )}
+
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-gray-600 dark:text-gray-300">
+                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2 py-1 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                        <span className={`h-1.5 w-1.5 rounded-full ${liveViewers > 0 ? 'bg-emerald-500' : 'bg-gray-400'}`}></span>
+                        {formatCompactCount(liveViewers)} live
+                    </span>
+                    <span className="inline-flex items-center rounded-lg bg-gray-100 px-2 py-1 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                        {formatCompactCount(totalViews)} views
+                    </span>
+                </div>
             </div>
         </div>
     );
