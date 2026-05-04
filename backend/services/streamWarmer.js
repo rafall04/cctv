@@ -1,16 +1,14 @@
 /**
- * Stream Warmer Service
- * Keeps camera streams pre-loaded in MediaMTX for instant playback
- * by triggering RTSP connections without creating viewer sessions
- * 
- * Strategy:
- * 1. Use MediaMTX API to check path status (doesn't create reader)
- * 2. If path not ready, trigger via HEAD request to HLS (minimal footprint)
- * 3. This keeps RTSP connections alive without inflating viewer count
+ * Purpose: Keep always-on internal CCTV streams prewarmed in MediaMTX without creating viewer sessions.
+ * Caller: Backend startup and health/runtime maintenance flows that need low-latency local camera playback.
+ * Deps: axios MediaMTX/HLS clients, backend config, internal ingest policy resolver.
+ * MainFuncs: warmStream(), warmAllCameras(), stopWarming(), stopAll().
+ * SideEffects: Sends MediaMTX/HLS trigger requests and owns stream warmup intervals.
  */
 
 import axios from 'axios';
 import { config } from '../config/config.js';
+import { resolveInternalIngestPolicy } from '../utils/internalIngestPolicy.js';
 
 class StreamWarmer {
     constructor() {
@@ -118,20 +116,37 @@ class StreamWarmer {
      * @param {Array} cameras - Array of camera objects with id and stream_key
      */
     async warmAllCameras(cameras) {
-        console.log(`[StreamWarmer] Pre-warming ${cameras.length} camera streams...`);
+        let warmed = 0;
+        let skipped = 0;
+
+        console.log(`[StreamWarmer] Evaluating ${cameras.length} camera streams for pre-warm...`);
         
         for (const camera of cameras) {
-            // Use stream_key if available, fallback to legacy camera{id} format
+            const resolvedPolicy = resolveInternalIngestPolicy(camera, camera._areaPolicy || null);
             const pathName = camera.stream_key || `camera${camera.id}`;
+
+            if (resolvedPolicy.mode !== 'always_on') {
+                skipped++;
+                this.stopWarming(pathName);
+                continue;
+            }
             
-            // Start warming without waiting for result
             this.warmStream(pathName);
+            warmed++;
             
-            // Stagger by 5 seconds to avoid overwhelming cameras and CPU
-            await new Promise(resolve => setTimeout(resolve, 5000));
+            await this.waitBetweenWarmStarts();
         }
         
-        console.log(`[StreamWarmer] All streams warming started`);
+        console.log(`[StreamWarmer] Pre-warm active for ${warmed} stream(s), skipped ${skipped} on-demand stream(s)`);
+        return {
+            total: cameras.length,
+            warmed,
+            skipped,
+        };
+    }
+
+    async waitBetweenWarmStarts(delayMs = 5000) {
+        await new Promise(resolve => setTimeout(resolve, delayMs));
     }
 
     /**
