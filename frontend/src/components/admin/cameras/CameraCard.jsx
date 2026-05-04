@@ -1,3 +1,11 @@
+/*
+Purpose: Render an admin camera card with stream, monitoring, ingest policy, and status controls.
+Caller: CameraGrid inside Camera Management page.
+Deps: CameraStatusActions and camera read-model fields.
+MainFuncs: CameraCard, CameraBadge, getResolvedIngestPolicy, getIngestBadge.
+SideEffects: Emits edit/delete/toggle callbacks only.
+*/
+
 import CameraStatusActions from './CameraStatusActions';
 
 function CameraBadge({ condition, className, title, children }) {
@@ -10,6 +18,38 @@ function CameraBadge({ condition, className, title, children }) {
             {children}
         </span>
     );
+}
+
+function getResolvedIngestPolicy(camera) {
+    const cameraOverride = camera.internal_ingest_policy_override;
+    const areaDefault = camera.area_internal_ingest_policy_default;
+    const strictProfile = camera.source_profile === 'surabaya_private_rtsp';
+
+    if (cameraOverride === 'always_on' || cameraOverride === 'on_demand') {
+        return cameraOverride;
+    }
+
+    if (areaDefault === 'always_on' || areaDefault === 'on_demand') {
+        return areaDefault;
+    }
+
+    return strictProfile ? 'on_demand' : 'always_on';
+}
+
+function getIngestBadge(camera) {
+    const deliveryType = camera.delivery_type || 'internal_hls';
+    if (camera.stream_source !== 'internal' && deliveryType !== 'internal_hls') {
+        return null;
+    }
+
+    const policy = getResolvedIngestPolicy(camera);
+    return {
+        label: policy === 'always_on' ? 'Ingest: Always On' : 'Ingest: On Demand',
+        className: policy === 'always_on'
+            ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-200'
+            : 'bg-sky-500/15 text-sky-700 dark:text-sky-200',
+        title: 'Resolved internal RTSP ingest policy',
+    };
 }
 
 export default function CameraCard({
@@ -30,16 +70,9 @@ export default function CameraCard({
                 ? 'bg-slate-600/90 text-white'
                 : 'bg-red-500/90 text-white'));
 
+    const resolvedIngestBadge = getIngestBadge(camera);
     const secondaryBadges = [
-        camera.stream_source === 'internal' && {
-            label: camera.internal_ingest_policy_override && camera.internal_ingest_policy_override !== 'default'
-                ? camera.internal_ingest_policy_override === 'always_on' ? 'Always On' : 'On-Demand'
-                : 'Area Default',
-            className: camera.internal_ingest_policy_override === 'always_on'
-                ? 'bg-amber-500/90 text-white'
-                : 'bg-emerald-600/90 text-white',
-            title: 'Policy ingest internal RTSP',
-        },
+        resolvedIngestBadge,
         camera.stream_source === 'internal' && camera.internal_on_demand_close_after_seconds_override && {
             label: `${camera.internal_on_demand_close_after_seconds_override}s`,
             className: 'bg-slate-700/90 text-white',

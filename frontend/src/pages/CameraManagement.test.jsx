@@ -147,6 +147,32 @@ describe('CameraManagement', () => {
         expect(screen.queryByText('Camera health diagnostics')).toBeNull();
     });
 
+    it('menampilkan resolved ingest policy untuk kamera internal', async () => {
+        getAllCameras.mockResolvedValue({
+            success: true,
+            data: [{
+                id: 1035,
+                name: 'Surabaya Remote',
+                enabled: 1,
+                status: 'active',
+                availability_state: 'online',
+                area_name: 'SURABAYA',
+                location: 'A. YANI',
+                stream_source: 'internal',
+                delivery_type: 'internal_hls',
+                internal_ingest_policy_override: 'default',
+                area_internal_ingest_policy_default: 'on_demand',
+                source_profile: null,
+                is_tunnel: 0,
+            }],
+        });
+
+        render(<CameraManagement />);
+
+        expect(await screen.findByText('Surabaya Remote')).toBeTruthy();
+        expect(await screen.findByText('Ingest: On Demand')).toBeTruthy();
+    });
+
     it('mengambil detail penuh saat edit agar RTSP internal tetap muncul di form', async () => {
         getAllCameras.mockResolvedValue({
             success: true,
