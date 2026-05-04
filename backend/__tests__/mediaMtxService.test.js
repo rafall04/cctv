@@ -63,7 +63,14 @@ describe('mediaMtxService on-demand path sync', () => {
             },
         });
 
-        const result = await mediaMtxService.updateCameraPath('stream-1', 'rtsp://admin:pass@36.66.208.98:554/live');
+        const result = await mediaMtxService.updateCameraPath(
+            'stream-1',
+            'rtsp://admin:pass@36.66.208.98:554/live',
+            {
+                internal_ingest_policy_override: 'on_demand',
+                internal_on_demand_close_after_seconds_override: 30,
+            }
+        );
 
         expect(result).toEqual({ success: true, action: 'updated' });
         expect(patchMock).toHaveBeenCalledWith('/config/paths/patch/stream-1', expect.objectContaining({
@@ -102,6 +109,56 @@ describe('mediaMtxService on-demand path sync', () => {
         expect(cameras[0]._areaPolicy).toEqual({
             internal_ingest_policy_default: 'on_demand',
             internal_on_demand_close_after_seconds: 45,
+        });
+    });
+
+    it('builds always-on MediaMTX path config for local cameras', async () => {
+        const { default: mediaMtxService } = await import('../services/mediaMtxService.js');
+
+        const pathConfig = mediaMtxService.buildInternalPathConfig({
+            rtsp_url: 'rtsp://local-camera/stream',
+            internal_ingest_policy_override: 'default',
+            internal_on_demand_close_after_seconds_override: null,
+            source_profile: null,
+            description: '',
+            enable_recording: 1,
+            _areaPolicy: {
+                internal_ingest_policy_default: 'default',
+                internal_on_demand_close_after_seconds: null,
+            },
+        });
+
+        expect(pathConfig).toMatchObject({
+            source: 'rtsp://local-camera/stream',
+            sourceProtocol: 'tcp',
+            sourceOnDemand: false,
+            sourceOnDemandStartTimeout: '10s',
+            sourceOnDemandCloseAfter: '30s',
+        });
+    });
+
+    it('builds on-demand MediaMTX path config from area policy', async () => {
+        const { default: mediaMtxService } = await import('../services/mediaMtxService.js');
+
+        const pathConfig = mediaMtxService.buildInternalPathConfig({
+            rtsp_url: 'rtsp://remote-camera/stream',
+            internal_ingest_policy_override: 'default',
+            internal_on_demand_close_after_seconds_override: null,
+            source_profile: null,
+            description: '',
+            enable_recording: 0,
+            _areaPolicy: {
+                internal_ingest_policy_default: 'on_demand',
+                internal_on_demand_close_after_seconds: 45,
+            },
+        });
+
+        expect(pathConfig).toMatchObject({
+            source: 'rtsp://remote-camera/stream',
+            sourceProtocol: 'tcp',
+            sourceOnDemand: true,
+            sourceOnDemandStartTimeout: '10s',
+            sourceOnDemandCloseAfter: '45s',
         });
     });
 });
