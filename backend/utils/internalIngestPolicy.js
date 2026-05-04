@@ -45,7 +45,7 @@ export function resolveInternalIngestPolicy(camera = {}, area = null) {
 
     let mode = cameraMode !== 'default'
         ? cameraMode
-        : (areaMode !== 'default' ? areaMode : 'on_demand');
+        : (areaMode !== 'default' ? areaMode : 'always_on');
 
     if (strictProfile && cameraMode === 'default' && areaMode === 'default') {
         mode = 'on_demand';
