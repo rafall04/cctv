@@ -30,6 +30,7 @@ const THUMBNAIL_INTERVAL_MS = 5 * 60 * 1000;
 const THUMBNAIL_CONCURRENCY = 3;
 const THUMBNAIL_MAX_PER_RUN = 30;
 const THUMBNAIL_STALE_MS = 60 * 60 * 1000;
+const STRICT_ON_DEMAND_THUMBNAIL_STALE_MS = 3 * 60 * 60 * 1000;
 const THUMBNAIL_FAILURE_BACKOFF_BASE_MS = 30 * 60 * 1000;
 const THUMBNAIL_FAILURE_BACKOFF_MAX_MS = 6 * 60 * 60 * 1000;
 const FFMPEG_TIMEOUT_MS = 15000;
@@ -137,7 +138,10 @@ class ThumbnailService {
     }
 
     isThumbnailStale(camera) {
-        return this.getThumbnailAgeMs(camera) >= THUMBNAIL_STALE_MS;
+        const staleMs = this.isStrictOnDemandRtspCamera(camera)
+            ? STRICT_ON_DEMAND_THUMBNAIL_STALE_MS
+            : THUMBNAIL_STALE_MS;
+        return this.getThumbnailAgeMs(camera) >= staleMs;
     }
 
     isInFailureBackoff(cameraId) {
@@ -165,7 +169,7 @@ class ThumbnailService {
     isBackgroundThumbnailAllowed(camera) {
         return !this.shouldSkipCamera({
             ...camera,
-            _skipStrictOnDemandIdleThumbnail: true,
+            _skipStrictOnDemandIdleThumbnail: false,
         }).skipped;
     }
 
@@ -430,7 +434,7 @@ class ThumbnailService {
 
                     const camera = candidates[currentIndex];
                     try {
-                        camera._skipStrictOnDemandIdleThumbnail = true;
+                        camera._skipStrictOnDemandIdleThumbnail = false;
                         const result = await this.processCamera(camera);
                         if (!result?.skipped) {
                             success += 1;

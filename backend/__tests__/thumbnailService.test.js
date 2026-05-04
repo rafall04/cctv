@@ -207,7 +207,8 @@ describe('thumbnailService external thumbnails', () => {
         expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('WHERE c.enabled = 1'));
     });
 
-    it('skips strict on-demand Surabaya RTSP cameras during background generation', async () => {
+    it('skips strict on-demand Surabaya RTSP cameras until their long thumbnail window expires', async () => {
+        vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-05-05T00:00:00.000Z').getTime());
         const { default: thumbnailService } = await import('../services/thumbnailService.js');
 
         queryMock.mockReturnValue([
@@ -229,13 +230,50 @@ describe('thumbnailService external thumbnails', () => {
                 external_snapshot_url: null,
                 external_embed_url: null,
                 external_tls_mode: 'strict',
-                thumbnail_path: null,
+                thumbnail_path: '/api/thumbnails/22.jpg',
+                thumbnail_updated_at: '2026-05-04T22:00:00.000Z',
             },
         ]);
 
         await thumbnailService.generateAllThumbnails();
 
         expect(execFileMock).not.toHaveBeenCalled();
+    });
+
+    it('refreshes strict on-demand Surabaya thumbnails after three hours', async () => {
+        vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-05-05T00:00:00.000Z').getTime());
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        queryMock.mockReturnValue([
+            {
+                id: 23,
+                name: 'Surabaya Old Thumbnail',
+                description: 'source_tag: surabaya_private_rtsp',
+                enabled: 1,
+                status: 'active',
+                is_online: 1,
+                runtime_is_online: 1,
+                enable_recording: 0,
+                stream_key: 'camera23',
+                stream_source: 'internal',
+                delivery_type: 'internal_hls',
+                private_rtsp_url: 'rtsp://user:pass@36.66.208.112:554/Streaming/Channels/402',
+                internal_ingest_policy_override: 'on_demand',
+                internal_on_demand_close_after_seconds_override: 15,
+                external_hls_url: null,
+                external_stream_url: null,
+                external_snapshot_url: null,
+                external_embed_url: null,
+                external_tls_mode: 'strict',
+                thumbnail_path: '/api/thumbnails/23.jpg',
+                thumbnail_updated_at: '2026-05-04T20:59:00.000Z',
+            },
+        ]);
+
+        await thumbnailService.generateAllThumbnails();
+
+        expect(execFileMock).toHaveBeenCalledTimes(1);
+        expect(execFileMock.mock.calls[0][1]).toContain('rtsp://user:pass@36.66.208.112:554/Streaming/Channels/402');
     });
 
     it('refreshes a single camera only when it is eligible and online', async () => {
@@ -523,7 +561,7 @@ describe('thumbnailService external thumbnails', () => {
         expect(execFileMock).toHaveBeenCalledTimes(1);
     });
 
-    it('background refresh does not let strict on-demand cameras consume stale queue slots', async () => {
+    it('background refresh lets strict on-demand cameras wait for the long stale window before consuming slots', async () => {
         vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-05-05T00:00:00.000Z').getTime());
         const { default: thumbnailService } = await import('../services/thumbnailService.js');
         const strictOnDemandCameras = Array.from({ length: 30 }, (_, index) => ({
@@ -545,8 +583,8 @@ describe('thumbnailService external thumbnails', () => {
             external_snapshot_url: null,
             external_embed_url: null,
             external_tls_mode: 'strict',
-            thumbnail_path: null,
-            thumbnail_updated_at: null,
+            thumbnail_path: `/api/thumbnails/${200 + index}.jpg`,
+            thumbnail_updated_at: '2026-05-04T22:00:00.000Z',
         }));
 
         queryMock.mockReturnValue([
