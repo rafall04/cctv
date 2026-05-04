@@ -1,6 +1,9 @@
 /**
- * HLS Proxy Routes
- * Proxies HLS stream requests to MediaMTX while tracking viewer sessions.
+ * Purpose: Proxy HLS stream requests to MediaMTX/external HLS while owning proxied HLS viewer sessions.
+ * Caller: backend/server.js route registration for `/hls/*` and `/api/hls/*`.
+ * Deps: axios, http/https agents, jwt, config, viewerSessionService, cameraHealthService, connectionPool.
+ * MainFuncs: HlsSessionStore, createHlsProxyState, hlsProxyRoutes.
+ * SideEffects: Proxies upstream streams, starts/heartbeats/ends viewer sessions, records passive runtime health signals.
  */
 
 import axios from 'axios';
@@ -219,7 +222,7 @@ export class HlsSessionStore {
         this.entriesByCamera = new Map();
         this.inflight = new Map();
         this.cameraIdCache = new Map();
-        this.pendingSessionCloses = new Set();
+        this.pendingSessionCloses = new Map();
         this.sessionCreateLimiter = new FixedWindowLimiter(
             this.options.maxSessionCreatesPerWindow,
             this.options.controlWindowMs,
@@ -338,7 +341,7 @@ export class HlsSessionStore {
             }
         }
 
-        this.queueSessionClose(oldestEntry.sessionId);
+        this.queueSessionClose(oldestEntry.sessionId, oldestEntry.lastTouchedAt);
 
         return oldestEntry;
     }
@@ -365,7 +368,7 @@ export class HlsSessionStore {
 
         for (const entry of expiredEntries) {
             this.removeSessionEntry(entry.identity, entry.cameraId);
-            this.queueSessionClose(entry.sessionId);
+            this.queueSessionClose(entry.sessionId, entry.lastTouchedAt);
         }
 
         for (const [key, value] of this.cameraIdCache.entries()) {
@@ -384,7 +387,7 @@ export class HlsSessionStore {
         const allEntries = Array.from(this.entries.values());
         for (const entry of allEntries) {
             this.removeSessionEntry(entry.identity, entry.cameraId);
-            this.queueSessionClose(entry.sessionId);
+            this.queueSessionClose(entry.sessionId, entry.lastTouchedAt);
         }
         this.cameraIdCache.clear();
         this.sessionCreateLimiter.clear();
@@ -466,9 +469,9 @@ export class HlsSessionStore {
         return this.cameraLookupMissLimiter.isAllowed(`${identity}:${streamPath}`, now);
     }
 
-    queueSessionClose(sessionId) {
+    queueSessionClose(sessionId, endedAtMs = Date.now()) {
         if (sessionId) {
-            this.pendingSessionCloses.add(sessionId);
+            this.pendingSessionCloses.set(sessionId, { endedAtMs });
         }
     }
 
@@ -478,15 +481,15 @@ export class HlsSessionStore {
         }
 
         const batchSize = options.batchSize || this.options.sessionCloseBatchSize || this.pendingSessionCloses.size;
-        const sessionIds = Array.from(this.pendingSessionCloses).slice(0, batchSize);
-        for (const sessionId of sessionIds) {
+        const sessionCloseEntries = Array.from(this.pendingSessionCloses.entries()).slice(0, batchSize);
+        for (const [sessionId] of sessionCloseEntries) {
             this.pendingSessionCloses.delete(sessionId);
         }
 
-        for (const sessionId of sessionIds) {
-            await endSession(sessionId);
+        for (const [sessionId, closeOptions] of sessionCloseEntries) {
+            await endSession(sessionId, closeOptions);
         }
-        return sessionIds.length;
+        return sessionCloseEntries.length;
     }
 
     clear() {
@@ -880,6 +883,7 @@ function applyHlsCorsHeaders(request, reply) {
 async function endSessionWithTimeout(sessionId, options = {}) {
     const timeoutMs = options.timeoutMs || DEFAULT_HLS_CONFIG.sessionCloseTimeoutMs;
     const endSession = options.endSession;
+    const closeOptions = options.closeOptions || {};
 
     if (typeof endSession !== 'function') {
         return false;
@@ -887,7 +891,7 @@ async function endSessionWithTimeout(sessionId, options = {}) {
 
     try {
         await Promise.race([
-            Promise.resolve(endSession(sessionId)),
+            Promise.resolve(endSession(sessionId, closeOptions)),
             new Promise((_, reject) => {
                 setTimeout(() => reject(new Error(`Timed out ending session ${sessionId}`)), timeoutMs);
             }),
@@ -960,9 +964,10 @@ export function createHlsRouteState(options = {}) {
         return sessionCleanupQueue;
     };
 
-    const endSession = (sessionId) => endSessionWithTimeout(sessionId, {
+    const endSession = (sessionId, closeOptions = {}) => endSessionWithTimeout(sessionId, {
         timeoutMs: hlsOptions.sessionCloseTimeoutMs,
-        endSession: (activeSessionId) => viewerSessionService.endSession(activeSessionId),
+        endSession: (activeSessionId, activeCloseOptions) => viewerSessionService.endSession(activeSessionId, activeCloseOptions),
+        closeOptions,
     });
 
     const state = {

@@ -176,6 +176,7 @@ function VideoPopup({
         ? (resolvedUrl || url)
         : (deliveryType === 'external_flv' ? flvUrl : (popupEmbedUrl || fallbackExternalUrl));
     const passiveSignalUrl = (deliveryType === 'external_flv' ? flvUrl : null) || officialSourceUrl || effectiveUrl || null;
+    const shouldTrackManualViewerSession = streamCapabilities.popup && (!isHlsCamera || isDirectStream);
 
     const reportRuntimeSuccess = useCallback((signalType) => {
         if (camera.stream_source !== 'external') {
@@ -310,8 +311,8 @@ function VideoPopup({
 
     // Viewer session tracking - track when user starts/stops watching
     useEffect(() => {
-        // Don't track if camera is offline, in maintenance, or not popup-capable
-        if (isMaintenance || isOffline || !streamCapabilities.popup) return;
+        // Proxied HLS is tracked by the HLS proxy; direct/external streams still need frontend-owned sessions.
+        if (isMaintenance || isOffline || !shouldTrackManualViewerSession) return;
 
         let isActive = true;
         let sessionId = null;
@@ -341,7 +342,7 @@ function VideoPopup({
                 });
             }
         };
-    }, [camera.id, isMaintenance, isOffline, streamCapabilities.popup]);
+    }, [camera.id, isMaintenance, isOffline, shouldTrackManualViewerSession]);
 
     useEffect(() => {
         const onKey = (e) => e.key === 'Escape' && onClose();

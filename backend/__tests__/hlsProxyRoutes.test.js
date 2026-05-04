@@ -1,3 +1,11 @@
+/**
+ * Purpose: Verify HLS proxy helpers, session cache behavior, and proxied HLS viewer-session closure precision.
+ * Caller: Backend Vitest suite for routes/hlsProxyRoutes.js.
+ * Deps: vitest, events, hlsProxyRoutes exports.
+ * MainFuncs: HlsSessionStore tests, proxy helper tests.
+ * SideEffects: None; uses mocks and in-memory stores only.
+ */
+
 import { EventEmitter } from 'events';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -143,9 +151,25 @@ describe('HlsSessionStore', () => {
         const cleaned = await store.cleanupExpired(endSession, 1500);
 
         expect(cleaned).toBe(1);
-        expect(endSession).toHaveBeenCalledWith('session-10');
+        expect(endSession).toHaveBeenCalledWith('session-10', expect.objectContaining({
+            endedAtMs: expect.any(Number),
+        }));
         expect(store.getSessionEntry('viewer-4', 10)).toBe(null);
         expect(store.getCameraId('abc-stream')).toBe(null);
+    });
+
+    it('passes the last touched time when closing an expired HLS session', async () => {
+        const store = new HlsSessionStore({ sessionCacheTtlMs: 1000, cameraIdCacheTtlMs: 1000 });
+        const endSession = vi.fn(async () => true);
+
+        store.setSessionEntry('viewer-precision', 30, 'session-precision', 1000);
+        store.touchSession('viewer-precision', 30, 'segment', 2200);
+
+        await store.cleanupExpired(endSession, 4000);
+
+        expect(endSession).toHaveBeenCalledWith('session-precision', expect.objectContaining({
+            endedAtMs: 2200,
+        }));
     });
 
     it('drains pending session closes in batches', async () => {
@@ -181,7 +205,9 @@ describe('HlsSessionStore', () => {
         expect(store.pendingSessionCloses.has('session-a')).toBe(true);
 
         await store.drainPendingSessionCloses(endSession);
-        expect(endSession).toHaveBeenCalledWith('session-a');
+        expect(endSession).toHaveBeenCalledWith('session-a', expect.objectContaining({
+            endedAtMs: 10,
+        }));
     });
 
     it('coalesces concurrent playlist creation into one inflight session', async () => {

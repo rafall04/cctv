@@ -1,5 +1,13 @@
 // @vitest-environment jsdom
 
+/**
+ * Purpose: Verify VideoPopup stream states, layout behavior, and live viewer-session ownership.
+ * Caller: Frontend Vitest suite for components/MultiView/VideoPopup.jsx.
+ * Deps: React Testing Library, Vitest, mocked HLS/flv/viewer services.
+ * MainFuncs: VideoPopup rendering and session-tracking tests.
+ * SideEffects: Mocks browser media APIs and viewer service calls.
+ */
+
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import VideoPopup from './VideoPopup.jsx';
@@ -374,6 +382,21 @@ describe('VideoPopup non-live states', () => {
 
         expect(screen.getByText('4 live')).toBeTruthy();
         expect(screen.getByText('21.5k views')).toBeTruthy();
+    });
+
+    it('tidak membuat session manual untuk internal HLS karena sudah dilacak HLS proxy', async () => {
+        render(
+            <VideoPopup
+                camera={{ ...baseCamera, id: 26, delivery_type: 'internal_hls' }}
+                onClose={vi.fn()}
+            />
+        );
+
+        await waitFor(() => {
+            expect(hlsInstances).toHaveLength(1);
+        });
+
+        expect(startSessionMock).not.toHaveBeenCalled();
     });
 
     it('menormalkan rasio body live grid yang padded dekat 16:9', async () => {

@@ -31,9 +31,9 @@ import cameraViewStatsService from './cameraViewStatsService.js';
  * Get current timestamp in configured timezone format for SQLite
  * Format: YYYY-MM-DD HH:MM:SS
  */
-function getTimestamp() {
+function getTimestamp(date = new Date()) {
     const timezone = getTimezone();
-    return new Date().toLocaleString('sv-SE', {
+    return date.toLocaleString('sv-SE', {
         timeZone: timezone,
         year: 'numeric',
         month: '2-digit',
@@ -43,6 +43,25 @@ function getTimestamp() {
         second: '2-digit',
         hour12: false
     }).replace(' ', ' ');
+}
+
+function getSessionEndDate(options = {}) {
+    if (Number.isFinite(options.endedAtMs)) {
+        return new Date(options.endedAtMs);
+    }
+
+    if (options.endedAt instanceof Date && !Number.isNaN(options.endedAt.getTime())) {
+        return options.endedAt;
+    }
+
+    if (typeof options.endedAt === 'string') {
+        const parsedDate = new Date(options.endedAt);
+        if (!Number.isNaN(parsedDate.getTime())) {
+            return parsedDate;
+        }
+    }
+
+    return new Date();
 }
 
 /**
@@ -228,7 +247,7 @@ class ViewerSessionService {
         }
     }
 
-    endSession(sessionId) {
+    endSession(sessionId, options = {}) {
         try {
             const session = queryOne(`
                 SELECT * FROM viewer_sessions WHERE session_id = ? AND is_active = 1
@@ -237,9 +256,9 @@ class ViewerSessionService {
             if (!session) return false;
 
             const startedAt = new Date(session.started_at);
-            const endedAt = new Date();
-            const durationSeconds = Math.floor((endedAt - startedAt) / 1000);
-            const timestamp = getTimestamp();
+            const endedAt = getSessionEndDate(options);
+            const durationSeconds = Math.max(0, Math.floor((endedAt - startedAt) / 1000));
+            const timestamp = getTimestamp(endedAt);
 
             execute(`
                 UPDATE viewer_sessions 
@@ -282,13 +301,13 @@ class ViewerSessionService {
         try {
             const timestamp = getTimestamp();
             const staleSessions = query(`
-                SELECT session_id FROM viewer_sessions 
+                SELECT session_id, last_heartbeat FROM viewer_sessions 
                 WHERE is_active = 1 
                 AND datetime(last_heartbeat) < datetime(?, '-${SESSION_TIMEOUT} seconds')
             `, [timestamp]);
 
             for (const session of staleSessions) {
-                this.endSession(session.session_id);
+                this.endSession(session.session_id, { endedAt: session.last_heartbeat });
             }
 
             if (staleSessions.length > 0) {
