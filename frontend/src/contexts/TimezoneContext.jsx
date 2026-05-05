@@ -1,7 +1,7 @@
 /*
  * Purpose: Provide configured timezone formatting helpers across public and admin routes.
  * Caller: App provider tree and pages/components that display backend timestamps.
- * Deps: React context/hooks and admin settings API.
+ * Deps: React context/hooks and public settings API.
  * MainFuncs: TimezoneProvider, useTimezone, parseBackendDateInput, getLocalDateInputValue, TIMESTAMP_STORAGE.
  * SideEffects: Loads timezone setting from backend and formats display-only timestamps.
  */
@@ -98,7 +98,10 @@ export function TimezoneProvider({ children }) {
 
     const loadTimezone = async () => {
         try {
-            const { data } = await adminAPI.get('/api/admin/settings/timezone');
+            const { data } = await adminAPI.get('/api/settings/timezone', {
+                skipGlobalErrorNotification: true,
+                skipAuthRefresh: true,
+            });
             setTimezone(data.data.timezone);
         } catch (error) {
             console.error('Failed to load timezone:', error);

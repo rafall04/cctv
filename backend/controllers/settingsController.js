@@ -1,4 +1,25 @@
+/**
+ * Purpose: Handle public and authenticated settings API responses.
+ * Caller: backend/routes/settingsRoutes.js.
+ * Deps: settingsService and timezoneService.
+ * MainFuncs: getAllSettings, getSetting, updateSetting, getPublicTimezone.
+ * SideEffects: Reads and writes system settings through service boundaries.
+ */
+
 import settingsService from '../services/settingsService.js';
+import { getTimezone, TIMEZONE_MAP } from '../services/timezoneService.js';
+
+function getTimezonePayload() {
+    const timezone = getTimezone();
+    const shortName = Object.keys(TIMEZONE_MAP).find(
+        key => TIMEZONE_MAP[key] === timezone
+    ) || 'WIB';
+
+    return {
+        timezone,
+        shortName,
+    };
+}
 
 export async function getAllSettings(request, reply) {
     try {
@@ -103,6 +124,21 @@ export async function getPublicAdsSettings(request, reply) {
         });
     } catch (error) {
         console.error('Get public ads settings error:', error);
+        return reply.code(500).send({
+            success: false,
+            message: 'Internal server error',
+        });
+    }
+}
+
+export async function getPublicTimezone(request, reply) {
+    try {
+        return reply.send({
+            success: true,
+            data: getTimezonePayload(),
+        });
+    } catch (error) {
+        console.error('Get public timezone error:', error);
         return reply.code(500).send({
             success: false,
             message: 'Internal server error',

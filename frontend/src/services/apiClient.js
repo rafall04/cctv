@@ -1,3 +1,11 @@
+/*
+ * Purpose: Provide the shared Axios client with CSRF, retry, auth refresh, and global error handling.
+ * Caller: Frontend services, hooks, and context providers.
+ * Deps: axios, runtime config, API error helpers.
+ * MainFuncs: apiClient, apiRequest, fetchCsrfToken, getCsrfToken, setNotificationCallback.
+ * SideEffects: Registers Axios interceptors, keeps CSRF token in module state, dispatches session-expired events.
+ */
+
 import axios from 'axios';
 import { getApiUrl, getApiKey } from '../config/config.js';
 import {
@@ -55,6 +63,10 @@ function showErrorNotification(title, message) {
 
 function shouldSuppressGlobalErrorNotification(config) {
     return config?.skipGlobalErrorNotification === true;
+}
+
+function shouldBypassAuthRefresh(config) {
+    return config?.skipAuthRefresh === true || config?.authRequired === false;
 }
 
 /**
@@ -214,6 +226,11 @@ apiClient.interceptors.response.use(
         // Requirements: 10.4
         // Skip redirect for login endpoint - it handles its own 401 errors (invalid credentials)
         if (error.response?.status === 401 && !originalRequest.url?.includes('/api/auth/login')) {
+            if (shouldBypassAuthRefresh(originalRequest)) {
+                error.parsedError = parsedError;
+                return Promise.reject(error);
+            }
+
             // Check if this is a token refresh failure
             if (originalRequest.url?.includes('/api/auth/refresh')) {
                 // Refresh failed, clear auth and redirect
