@@ -3,11 +3,31 @@
  * Caller: Playback page.
  * Deps: React hooks and playbackTokenService.
  * MainFuncs: usePlaybackTokenAccess.
- * SideEffects: Activates HttpOnly playback token cookie and rewrites URL token parameter.
+ * SideEffects: Activates HttpOnly playback token/session cookies, sends session heartbeat, and rewrites URL token parameter.
  */
 
 import { useCallback, useEffect, useState } from 'react';
 import playbackTokenService from '../../services/playbackTokenService.js';
+
+const PLAYBACK_CLIENT_ID_KEY = 'raf_playback_client_id';
+const HEARTBEAT_INTERVAL_MS = 30_000;
+
+function getOrCreateClientId() {
+    if (typeof window === 'undefined') {
+        return '';
+    }
+
+    const existing = window.localStorage.getItem(PLAYBACK_CLIENT_ID_KEY);
+    if (existing) {
+        return existing;
+    }
+
+    const generated = window.crypto?.randomUUID
+        ? window.crypto.randomUUID()
+        : `client_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    window.localStorage.setItem(PLAYBACK_CLIENT_ID_KEY, generated);
+    return generated;
+}
 
 export function usePlaybackTokenAccess({
     enabled,
@@ -32,8 +52,8 @@ export function usePlaybackTokenAccess({
         setTokenMessage(silent ? '' : 'Mengaktifkan token...');
         try {
             const response = mode === 'share'
-                ? await playbackTokenService.activateShareKey(token, cameraId)
-                : await playbackTokenService.activateToken(token, cameraId);
+                ? await playbackTokenService.activateShareKey(token, cameraId, getOrCreateClientId())
+                : await playbackTokenService.activateToken(token, cameraId, getOrCreateClientId());
             if (!response?.success) {
                 setTokenMessage(response?.message || 'Token tidak valid');
                 return false;
@@ -91,6 +111,33 @@ export function usePlaybackTokenAccess({
             }, { replace: true });
         });
     }, [activateToken, enabled, searchParams, setSearchParams]);
+
+    useEffect(() => {
+        if (!enabled || !tokenStatus) {
+            return undefined;
+        }
+
+        let isActive = true;
+        const heartbeat = async () => {
+            try {
+                await playbackTokenService.heartbeatToken(cameraId);
+            } catch (error) {
+                if (!isActive) {
+                    return;
+                }
+
+                setTokenStatus(null);
+                setTokenMessage(error?.response?.data?.message || 'Session token playback berakhir');
+                onCleared?.();
+            }
+        };
+
+        const intervalId = window.setInterval(heartbeat, HEARTBEAT_INTERVAL_MS);
+        return () => {
+            isActive = false;
+            window.clearInterval(intervalId);
+        };
+    }, [cameraId, enabled, onCleared, tokenStatus]);
 
     return {
         tokenInput,

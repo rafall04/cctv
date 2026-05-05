@@ -2,11 +2,14 @@
  * Purpose: HTTP handlers for admin playback token management and public token activation.
  * Caller: playbackTokenRoutes and adminRoutes.
  * Deps: playbackTokenService and auth cookie option helper.
- * MainFuncs: listPlaybackTokens, listPlaybackTokenAuditLogs, createPlaybackToken, sharePlaybackToken, revokePlaybackToken, activatePlaybackToken, clearPlaybackToken.
- * SideEffects: Creates/revokes tokens and sets/clears HttpOnly playback token cookies.
+ * MainFuncs: listPlaybackTokens, listPlaybackTokenAuditLogs, createPlaybackToken, sharePlaybackToken, revokePlaybackToken, activatePlaybackToken, heartbeatPlaybackToken, clearPlaybackToken, clearPlaybackTokenSessions.
+ * SideEffects: Creates/revokes tokens and sets/clears HttpOnly playback token/session cookies.
  */
 
-import playbackTokenService, { PLAYBACK_TOKEN_COOKIE } from '../services/playbackTokenService.js';
+import playbackTokenService, {
+    PLAYBACK_TOKEN_COOKIE,
+    PLAYBACK_TOKEN_SESSION_COOKIE,
+} from '../services/playbackTokenService.js';
 import { isHttpsRequest } from '../utils/authCookieOptions.js';
 
 function getPlaybackTokenCookieOptions(request, maxAge = 30 * 24 * 60 * 60) {
@@ -111,6 +114,12 @@ export async function activatePlaybackToken(request, reply) {
             touch: true,
             eventType: request.body?.share_key ? 'activated_share' : 'activated_token',
             request,
+            requireSession: false,
+        });
+        const session = playbackTokenService.createPlaybackSession({
+            token: data,
+            clientId: request.body?.client_id || '',
+            request,
         });
 
         reply.setCookie(
@@ -118,8 +127,13 @@ export async function activatePlaybackToken(request, reply) {
             token,
             getPlaybackTokenCookieOptions(request, resolveCookieMaxAge(data))
         );
+        reply.setCookie(
+            PLAYBACK_TOKEN_SESSION_COOKIE,
+            session.session_id,
+            getPlaybackTokenCookieOptions(request, session.timeout_seconds)
+        );
 
-        return reply.send({ success: true, message: 'Token playback aktif', data });
+        return reply.send({ success: true, message: 'Token playback aktif', data, session });
     } catch (error) {
         console.error('Activate playback token error:', error);
         return reply.code(error.statusCode || 500).send({
@@ -129,7 +143,53 @@ export async function activatePlaybackToken(request, reply) {
     }
 }
 
+export async function heartbeatPlaybackToken(request, reply) {
+    try {
+        const cameraId = request.body?.camera_id || request.query?.cameraId || 0;
+        const data = playbackTokenService.validateRequestForCamera(request, cameraId || 0, {
+            touch: false,
+            requireSession: false,
+        });
+        if (!data) {
+            return reply.code(401).send({ success: false, message: 'Token playback tidak aktif' });
+        }
+
+        const session = playbackTokenService.assertPlaybackSession({ request, token: data, touch: true });
+        const sessionCookie = request.cookies?.[PLAYBACK_TOKEN_SESSION_COOKIE];
+        if (sessionCookie) {
+            reply.setCookie(
+                PLAYBACK_TOKEN_SESSION_COOKIE,
+                sessionCookie,
+                getPlaybackTokenCookieOptions(request, data.session_timeout_seconds)
+            );
+        }
+
+        return reply.send({ success: true, data, session });
+    } catch (error) {
+        console.error('Heartbeat playback token error:', error);
+        return reply.code(error.statusCode || 500).send({
+            success: false,
+            message: error.statusCode ? error.message : 'Internal server error',
+        });
+    }
+}
+
 export async function clearPlaybackToken(request, reply) {
+    playbackTokenService.stopPlaybackSession(request, 'stopped');
     reply.clearCookie(PLAYBACK_TOKEN_COOKIE, { path: '/' });
+    reply.clearCookie(PLAYBACK_TOKEN_SESSION_COOKIE, { path: '/' });
     return reply.send({ success: true, message: 'Token playback dibersihkan' });
+}
+
+export async function clearPlaybackTokenSessions(request, reply) {
+    try {
+        const cleared = playbackTokenService.clearTokenSessions(request.params.id, request);
+        return reply.send({ success: true, message: 'Session token dibersihkan', data: { cleared } });
+    } catch (error) {
+        console.error('Clear playback token sessions error:', error);
+        return reply.code(error.statusCode || 500).send({
+            success: false,
+            message: error.statusCode ? error.message : 'Internal server error',
+        });
+    }
 }

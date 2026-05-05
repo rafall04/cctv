@@ -51,6 +51,55 @@ describe('playbackTokenService', () => {
         expect(connectionPool.execute.mock.calls[0][1][1]).not.toBe(result.token);
     });
 
+    it('stores per-token session policy overrides at creation', async () => {
+        vi.spyOn(connectionPool, 'execute').mockReturnValue({ lastInsertRowid: 31, changes: 1 });
+        vi.spyOn(connectionPool, 'queryOne')
+            .mockReturnValueOnce(null)
+            .mockReturnValueOnce({
+                id: 31,
+                label: 'Trial Limit',
+                token_prefix: 'rafpb_limit',
+                share_key_prefix: 'ABC12345',
+                preset: 'trial_3d',
+                scope_type: 'all',
+                camera_ids_json: '[]',
+                playback_window_hours: 72,
+                expires_at: '2026-05-08 12:00:00',
+                revoked_at: null,
+                last_used_at: null,
+                use_count: 0,
+                max_active_sessions: 2,
+                session_limit_mode: 'strict',
+                session_timeout_seconds: 90,
+                client_note: 'Client test',
+                active_session_count: 0,
+                share_template: null,
+                created_by: 1,
+                created_at: '2026-05-05 12:00:00',
+                updated_at: '2026-05-05 12:00:00',
+            });
+        const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
+
+        const result = playbackTokenService.createToken(
+            {
+                label: 'Trial Limit',
+                preset: 'trial_3d',
+                scope_type: 'all',
+                max_active_sessions: 2,
+                session_limit_mode: 'strict',
+                session_timeout_seconds: 90,
+                client_note: 'Client test',
+            },
+            { user: { id: 1 }, headers: { origin: 'https://cctv.raf.my.id' } }
+        );
+
+        expect(result.data.max_active_sessions).toBe(2);
+        expect(result.data.session_limit_mode).toBe('strict');
+        expect(result.data.session_timeout_seconds).toBe(90);
+        expect(connectionPool.execute.mock.calls[0][0]).toContain('max_active_sessions');
+        expect(connectionPool.execute.mock.calls[0][1]).toEqual(expect.arrayContaining([2, 'strict', 90, 'Client test']));
+    });
+
     it('creates a token with custom short access code for sharing', async () => {
         vi.spyOn(connectionPool, 'execute').mockReturnValue({ lastInsertRowid: 8, changes: 1 });
         vi.spyOn(connectionPool, 'queryOne')
@@ -251,6 +300,72 @@ describe('playbackTokenService', () => {
             expect.stringContaining('INSERT INTO playback_token_audit_logs'),
             expect.arrayContaining([21, 'access_segments', 1168])
         );
+    });
+
+    it('rejects a new strict session when token active session limit is full', async () => {
+        vi.spyOn(connectionPool, 'execute').mockReturnValue({ changes: 1 });
+        vi.spyOn(connectionPool, 'query')
+            .mockReturnValueOnce([
+                { id: 1, last_seen_at: '2026-05-05 12:00:00' },
+            ]);
+        const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
+
+        expect(() => playbackTokenService.createPlaybackSession({
+            token: {
+                id: 41,
+                max_active_sessions: 1,
+                session_limit_mode: 'strict',
+                session_timeout_seconds: 60,
+            },
+            clientId: 'client-a',
+            request: { headers: { 'user-agent': 'vitest' }, ip: '127.0.0.1' },
+        })).toThrow('Batas perangkat aktif untuk token ini sudah penuh');
+    });
+
+    it('replaces oldest active session when token uses replace_oldest mode', async () => {
+        vi.spyOn(connectionPool, 'execute').mockReturnValue({ lastInsertRowid: 2, changes: 1 });
+        vi.spyOn(connectionPool, 'query')
+            .mockReturnValueOnce([
+                { id: 1, last_seen_at: '2026-05-05 11:59:00' },
+            ]);
+        const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
+
+        const session = playbackTokenService.createPlaybackSession({
+            token: {
+                id: 42,
+                max_active_sessions: 1,
+                session_limit_mode: 'replace_oldest',
+                session_timeout_seconds: 60,
+            },
+            clientId: 'client-b',
+            request: { headers: { 'user-agent': 'vitest' }, ip: '127.0.0.1' },
+        });
+
+        expect(session.session_id).toMatch(/^rafpsess_/);
+        expect(connectionPool.execute).toHaveBeenCalledWith(
+            expect.stringContaining('end_reason = ?'),
+            ['replaced', 1]
+        );
+        expect(connectionPool.execute).toHaveBeenCalledWith(
+            expect.stringContaining('INSERT INTO playback_token_sessions'),
+            expect.any(Array)
+        );
+    });
+
+    it('requires an active playback session for limited token stream requests', async () => {
+        vi.spyOn(connectionPool, 'execute').mockReturnValue({ changes: 1 });
+        vi.spyOn(connectionPool, 'queryOne').mockReturnValueOnce(null);
+        const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
+
+        expect(() => playbackTokenService.assertPlaybackSession({
+            request: { cookies: {}, headers: {} },
+            token: {
+                id: 43,
+                max_active_sessions: 1,
+                session_timeout_seconds: 60,
+            },
+            touch: true,
+        })).toThrow('Session playback tidak aktif');
     });
 
     it('lists recent audit logs with one bounded joined query', async () => {

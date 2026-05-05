@@ -2,14 +2,15 @@
  * Purpose: Create, share, validate, audit, and revoke scoped public playback access tokens.
  * Caller: playback token controllers and recordingPlaybackService.
  * Deps: crypto, SQLite connection helpers.
- * MainFuncs: createToken, listTokens, listAuditLogs, revokeToken, buildRepeatShareText, validateRequestForCamera, buildShareText.
- * SideEffects: Writes playback token rows, audit rows, share keys, and lightweight token usage touches.
+ * MainFuncs: createToken, listTokens, listAuditLogs, createPlaybackSession, assertPlaybackSession, clearTokenSessions, revokeToken, buildRepeatShareText, validateRequestForCamera, buildShareText.
+ * SideEffects: Writes playback token rows, session rows, audit rows, share keys, and lightweight token usage touches.
  */
 
 import crypto from 'crypto';
 import { execute, query, queryOne } from '../database/connectionPool.js';
 
 export const PLAYBACK_TOKEN_COOKIE = 'raf_playback_token';
+export const PLAYBACK_TOKEN_SESSION_COOKIE = 'raf_playback_session';
 
 const DEFAULT_SHARE_TEMPLATE = `Halo, berikut token akses playback CCTV RAF NET.
 
@@ -50,6 +51,10 @@ const ACCESS_CODE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 const DEFAULT_ACCESS_CODE_LENGTH = 8;
 const MIN_ACCESS_CODE_LENGTH = 6;
 const MAX_ACCESS_CODE_LENGTH = 32;
+const SESSION_LIMIT_MODES = new Set(['strict', 'replace_oldest', 'unlimited']);
+const DEFAULT_SESSION_TIMEOUT_SECONDS = 60;
+const MIN_SESSION_TIMEOUT_SECONDS = 30;
+const MAX_SESSION_TIMEOUT_SECONDS = 3600;
 
 function toSqlDate(date) {
     if (!date) {
@@ -71,6 +76,29 @@ function parseDate(value) {
 function normalizePositiveInteger(value) {
     const parsed = Number.parseInt(value, 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function normalizeNonNegativeInteger(value) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function normalizeSessionLimitMode(value) {
+    return SESSION_LIMIT_MODES.has(value) ? value : 'unlimited';
+}
+
+function resolveEffectiveSessionLimitMode(token) {
+    const mode = normalizeSessionLimitMode(token?.session_limit_mode);
+    return mode === 'unlimited' && token?.max_active_sessions ? 'strict' : mode;
+}
+
+function normalizeSessionTimeoutSeconds(value) {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed)) {
+        return DEFAULT_SESSION_TIMEOUT_SECONDS;
+    }
+
+    return Math.min(Math.max(parsed, MIN_SESSION_TIMEOUT_SECONDS), MAX_SESSION_TIMEOUT_SECONDS);
 }
 
 function normalizeAccessCodeLength(value) {
@@ -102,6 +130,10 @@ function hashToken(token) {
 
 function generateToken() {
     return `rafpb_${crypto.randomBytes(24).toString('base64url')}`;
+}
+
+function generateSessionId() {
+    return `rafpsess_${crypto.randomBytes(24).toString('base64url')}`;
 }
 
 function generateAccessCode(length = DEFAULT_ACCESS_CODE_LENGTH) {
@@ -146,6 +178,18 @@ function isMissingAuditSchemaError(error) {
         );
 }
 
+function isMissingSessionSchemaError(error) {
+    const message = String(error?.message || '');
+    return (message.includes('playback_token_sessions')
+        || message.includes('max_active_sessions')
+        || message.includes('session_limit_mode')
+        || message.includes('session_timeout_seconds'))
+        && (
+            message.includes('no such table')
+            || message.includes('no such column')
+        );
+}
+
 function parseCameraIdsJson(value) {
     try {
         const parsed = JSON.parse(value || '[]');
@@ -174,6 +218,14 @@ function sanitizeTokenRow(row) {
         revoked_at: row.revoked_at,
         last_used_at: row.last_used_at,
         use_count: row.use_count,
+        max_active_sessions: row.max_active_sessions ?? null,
+        session_limit_mode: row.session_limit_mode || 'unlimited',
+        session_timeout_seconds: row.session_timeout_seconds || DEFAULT_SESSION_TIMEOUT_SECONDS,
+        client_note: row.client_note || '',
+        active_session_count: row.active_session_count || 0,
+        latest_session_ip: row.latest_session_ip || null,
+        latest_session_user_agent: row.latest_session_user_agent || null,
+        latest_session_seen_at: row.latest_session_seen_at || null,
         share_template: row.share_template,
         created_by: row.created_by,
         created_at: row.created_at,
@@ -287,6 +339,34 @@ class PlaybackTokenService {
         throw err;
     }
 
+    resolveSessionPolicy(payload = {}, presetKey = 'custom') {
+        const presetDefaults = {
+            trial_1d: { maxActiveSessions: 1, mode: 'strict', timeoutSeconds: 60 },
+            trial_3d: { maxActiveSessions: 1, mode: 'strict', timeoutSeconds: 60 },
+            client_30d: { maxActiveSessions: 3, mode: 'strict', timeoutSeconds: 60 },
+            lifetime: { maxActiveSessions: null, mode: 'unlimited', timeoutSeconds: 60 },
+            custom: { maxActiveSessions: null, mode: 'unlimited', timeoutSeconds: 60 },
+        }[presetKey] || { maxActiveSessions: null, mode: 'unlimited', timeoutSeconds: 60 };
+
+        const requestedMode = payload.session_limit_mode
+            ? normalizeSessionLimitMode(payload.session_limit_mode)
+            : presetDefaults.mode;
+        const requestedMax = Object.prototype.hasOwnProperty.call(payload, 'max_active_sessions')
+            ? normalizeNonNegativeInteger(payload.max_active_sessions)
+            : presetDefaults.maxActiveSessions;
+        const mode = requestedMode === 'unlimited' || requestedMax === 0 ? 'unlimited' : requestedMode;
+        const maxActiveSessions = mode === 'unlimited' ? null : (requestedMax || presetDefaults.maxActiveSessions || 1);
+
+        return {
+            maxActiveSessions,
+            sessionLimitMode: mode,
+            sessionTimeoutSeconds: normalizeSessionTimeoutSeconds(
+                payload.session_timeout_seconds || presetDefaults.timeoutSeconds
+            ),
+            clientNote: typeof payload.client_note === 'string' ? payload.client_note.trim() : '',
+        };
+    }
+
     buildShareText({ token, shareKey, tokenRow, request }) {
         const row = sanitizeTokenRow(tokenRow) || tokenRow;
         const template = row?.share_template?.trim() || DEFAULT_SHARE_TEMPLATE;
@@ -333,6 +413,7 @@ class PlaybackTokenService {
         const playbackWindowHours = presetKey === 'custom'
             ? normalizePositiveInteger(payload.playback_window_hours)
             : preset.playbackWindowHours;
+        const sessionPolicy = this.resolveSessionPolicy(payload, presetKey);
         const label = String(payload.label || preset.label).trim() || preset.label;
         const shareTemplate = typeof payload.share_template === 'string' && payload.share_template.trim()
             ? payload.share_template.trim()
@@ -340,8 +421,8 @@ class PlaybackTokenService {
 
         const result = execute(
             `INSERT INTO playback_tokens
-            (label, token_hash, token_prefix, share_key_hash, share_key_prefix, preset, scope_type, camera_ids_json, playback_window_hours, expires_at, share_template, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (label, token_hash, token_prefix, share_key_hash, share_key_prefix, preset, scope_type, camera_ids_json, playback_window_hours, expires_at, max_active_sessions, session_limit_mode, session_timeout_seconds, client_note, share_template, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 label,
                 tokenHash,
@@ -353,6 +434,10 @@ class PlaybackTokenService {
                 JSON.stringify(cameraIds),
                 playbackWindowHours,
                 toSqlDate(expiresAt),
+                sessionPolicy.maxActiveSessions,
+                sessionPolicy.sessionLimitMode,
+                sessionPolicy.sessionTimeoutSeconds,
+                sessionPolicy.clientNote,
                 shareTemplate,
                 request?.user?.id || null,
             ]
@@ -376,11 +461,206 @@ class PlaybackTokenService {
     }
 
     listTokens() {
-        return query(
-            `SELECT * FROM playback_tokens
-            ORDER BY created_at DESC, id DESC
-            LIMIT 200`
-        ).map(sanitizeTokenRow);
+        try {
+            return query(
+                `SELECT
+                    pt.*,
+                    COALESCE(active_sessions.active_session_count, 0) as active_session_count,
+                    latest_session.ip_address as latest_session_ip,
+                    latest_session.user_agent as latest_session_user_agent,
+                    latest_session.last_seen_at as latest_session_seen_at
+                FROM playback_tokens pt
+                LEFT JOIN (
+                    SELECT token_id, COUNT(*) as active_session_count, MAX(id) as latest_session_id
+                    FROM playback_token_sessions
+                    WHERE ended_at IS NULL AND expires_at > CURRENT_TIMESTAMP
+                    GROUP BY token_id
+                ) active_sessions ON active_sessions.token_id = pt.id
+                LEFT JOIN playback_token_sessions latest_session ON latest_session.id = active_sessions.latest_session_id
+                ORDER BY pt.created_at DESC, pt.id DESC
+                LIMIT 200`
+            ).map(sanitizeTokenRow);
+        } catch (error) {
+            if (isMissingSessionSchemaError(error)) {
+                return query(
+                    `SELECT * FROM playback_tokens
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT 200`
+                ).map(sanitizeTokenRow);
+            }
+
+            throw error;
+        }
+    }
+
+    cleanupExpiredSessions(tokenId) {
+        try {
+            execute(
+                `UPDATE playback_token_sessions
+                SET ended_at = CURRENT_TIMESTAMP, end_reason = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE token_id = ?
+                  AND ended_at IS NULL
+                  AND expires_at <= CURRENT_TIMESTAMP`,
+                ['expired', tokenId]
+            );
+        } catch (error) {
+            if (!isMissingSessionSchemaError(error)) {
+                throw error;
+            }
+        }
+    }
+
+    getActiveSessions(tokenId) {
+        try {
+            return query(
+                `SELECT *
+                FROM playback_token_sessions
+                WHERE token_id = ?
+                  AND ended_at IS NULL
+                  AND expires_at > CURRENT_TIMESTAMP
+                ORDER BY last_seen_at ASC, id ASC`,
+                [tokenId]
+            );
+        } catch (error) {
+            if (isMissingSessionSchemaError(error)) {
+                return [];
+            }
+
+            throw error;
+        }
+    }
+
+    createPlaybackSession({ token, clientId = '', request = {} }) {
+        if (!token?.id) {
+            const err = new Error('Token playback tidak valid');
+            err.statusCode = 401;
+            throw err;
+        }
+
+        const mode = resolveEffectiveSessionLimitMode(token);
+        const maxActiveSessions = token.max_active_sessions ?? null;
+        const timeoutSeconds = normalizeSessionTimeoutSeconds(token.session_timeout_seconds);
+
+        this.cleanupExpiredSessions(token.id);
+        const activeSessions = this.getActiveSessions(token.id);
+
+        if (mode !== 'unlimited' && maxActiveSessions && activeSessions.length >= maxActiveSessions) {
+            if (mode === 'replace_oldest') {
+                execute(
+                    `UPDATE playback_token_sessions
+                    SET ended_at = CURRENT_TIMESTAMP, end_reason = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?`,
+                    ['replaced', activeSessions[0].id]
+                );
+            } else {
+                const err = new Error('Batas perangkat aktif untuk token ini sudah penuh');
+                err.statusCode = 429;
+                throw err;
+            }
+        }
+
+        const sessionId = generateSessionId();
+        const now = new Date();
+        const expiresAt = new Date(now.getTime() + timeoutSeconds * 1000);
+        execute(
+            `INSERT INTO playback_token_sessions
+            (token_id, session_id_hash, client_id_hash, ip_address, user_agent, last_seen_at, expires_at)
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)`,
+            [
+                token.id,
+                hashToken(sessionId),
+                clientId ? hashToken(clientId) : null,
+                this.getClientIp(request),
+                request?.headers?.['user-agent'] || null,
+                toSqlDate(expiresAt),
+            ]
+        );
+
+        this.recordAudit({
+            tokenId: token.id,
+            eventType: 'session_started',
+            request,
+            detail: {
+                mode,
+                max_active_sessions: maxActiveSessions,
+                timeout_seconds: timeoutSeconds,
+            },
+        });
+
+        return {
+            session_id: sessionId,
+            timeout_seconds: timeoutSeconds,
+            active_session_count: mode === 'replace_oldest' && activeSessions.length >= (maxActiveSessions || 0)
+                ? activeSessions.length
+                : activeSessions.length + 1,
+        };
+    }
+
+    assertPlaybackSession({ request = {}, token, touch = false } = {}) {
+        if (!token?.id || resolveEffectiveSessionLimitMode(token) === 'unlimited') {
+            return null;
+        }
+
+        const sessionId = request.cookies?.[PLAYBACK_TOKEN_SESSION_COOKIE];
+        if (!sessionId) {
+            const err = new Error('Session playback tidak aktif');
+            err.statusCode = 401;
+            throw err;
+        }
+
+        const row = queryOne(
+            `SELECT *
+            FROM playback_token_sessions
+            WHERE token_id = ?
+              AND session_id_hash = ?
+              AND ended_at IS NULL
+              AND expires_at > CURRENT_TIMESTAMP`,
+            [token.id, hashToken(sessionId)]
+        );
+
+        if (!row) {
+            const err = new Error('Session playback tidak aktif');
+            err.statusCode = 401;
+            throw err;
+        }
+
+        if (touch) {
+            const timeoutSeconds = normalizeSessionTimeoutSeconds(token.session_timeout_seconds);
+            const expiresAt = new Date(Date.now() + timeoutSeconds * 1000);
+            execute(
+                `UPDATE playback_token_sessions
+                SET last_seen_at = CURRENT_TIMESTAMP, expires_at = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?`,
+                [toSqlDate(expiresAt), row.id]
+            );
+        }
+
+        return row;
+    }
+
+    stopPlaybackSession(request = {}, reason = 'stopped') {
+        const sessionId = request.cookies?.[PLAYBACK_TOKEN_SESSION_COOKIE];
+        if (!sessionId) {
+            return null;
+        }
+
+        return execute(
+            `UPDATE playback_token_sessions
+            SET ended_at = CURRENT_TIMESTAMP, end_reason = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE session_id_hash = ? AND ended_at IS NULL`,
+            [reason, hashToken(sessionId)]
+        );
+    }
+
+    clearTokenSessions(tokenId, request = {}) {
+        const result = execute(
+            `UPDATE playback_token_sessions
+            SET ended_at = CURRENT_TIMESTAMP, end_reason = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE token_id = ? AND ended_at IS NULL`,
+            ['admin_cleared', tokenId]
+        );
+        this.recordAudit({ tokenId, eventType: 'sessions_cleared', request, detail: { cleared: result.changes } });
+        return result.changes;
     }
 
     listAuditLogs({ tokenId = null, limit = 100 } = {}) {
@@ -559,6 +839,10 @@ class PlaybackTokenService {
             const err = new Error('Token playback tidak mencakup kamera ini');
             err.statusCode = 403;
             throw err;
+        }
+
+        if (options.requireSession !== false) {
+            this.assertPlaybackSession({ request: options.request || {}, token, touch });
         }
 
         if (touch) {

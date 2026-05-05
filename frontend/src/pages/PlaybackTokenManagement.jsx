@@ -26,6 +26,13 @@ const PRESETS = [
     { value: 'custom', label: 'Custom' },
 ];
 
+const SESSION_LIMIT_MODES = [
+    { value: '', label: 'Ikuti preset' },
+    { value: 'strict', label: 'Tolak device baru' },
+    { value: 'replace_oldest', label: 'Ganti device terlama' },
+    { value: 'unlimited', label: 'Unlimited' },
+];
+
 function normalizeCameraRows(response) {
     const rows = response?.data?.cameras || response?.data || [];
     return Array.isArray(rows) ? rows : [];
@@ -43,6 +50,17 @@ function formatDate(value) {
         hour: '2-digit',
         minute: '2-digit',
     });
+}
+
+function formatSessionPolicy(token) {
+    const modeLabels = {
+        strict: 'Strict',
+        replace_oldest: 'Replace oldest',
+        unlimited: 'Unlimited',
+    };
+    const mode = token.session_limit_mode || 'unlimited';
+    const limit = token.max_active_sessions ? `${token.active_session_count || 0}/${token.max_active_sessions}` : `${token.active_session_count || 0}`;
+    return `${limit} aktif - ${modeLabels[mode] || mode}`;
 }
 
 export default function PlaybackTokenManagement() {
@@ -64,6 +82,10 @@ export default function PlaybackTokenManagement() {
         access_code_mode: 'auto',
         access_code_length: 8,
         custom_access_code: '',
+        max_active_sessions: '',
+        session_limit_mode: '',
+        session_timeout_seconds: '',
+        client_note: '',
         share_template: DEFAULT_TEMPLATE,
     });
 
@@ -161,6 +183,16 @@ export default function PlaybackTokenManagement() {
             showError('Gagal membuat share ulang', error?.response?.data?.message || error.message);
         } finally {
             setSharingTokenId(null);
+        }
+    };
+
+    const handleClearSessions = async (tokenId) => {
+        try {
+            const response = await playbackTokenService.clearSessions(tokenId);
+            showSuccess('Session dibersihkan', `${response?.data?.cleared || 0} session aktif dihentikan.`);
+            await loadData();
+        } catch (error) {
+            showError('Gagal membersihkan session', error?.response?.data?.message || error.message);
         }
     };
 
@@ -290,6 +322,58 @@ export default function PlaybackTokenManagement() {
                     )}
                 </div>
 
+                <div className="mt-4 grid gap-4 md:grid-cols-4">
+                    <label className="block">
+                        <span className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Limit Device</span>
+                        <input
+                            type="number"
+                            min="0"
+                            value={form.max_active_sessions}
+                            onChange={(event) => updateForm('max_active_sessions', event.target.value)}
+                            placeholder="Preset"
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                        />
+                        <span className="mt-1 block text-xs text-gray-500">0 = unlimited, kosong = ikut preset.</span>
+                    </label>
+
+                    <label className="block">
+                        <span className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Mode Limit</span>
+                        <select
+                            value={form.session_limit_mode}
+                            onChange={(event) => updateForm('session_limit_mode', event.target.value)}
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                        >
+                            {SESSION_LIMIT_MODES.map((mode) => (
+                                <option key={mode.value || 'preset'} value={mode.value}>{mode.label}</option>
+                            ))}
+                        </select>
+                    </label>
+
+                    <label className="block">
+                        <span className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">TTL Session</span>
+                        <input
+                            type="number"
+                            min="30"
+                            max="3600"
+                            value={form.session_timeout_seconds}
+                            onChange={(event) => updateForm('session_timeout_seconds', event.target.value)}
+                            placeholder="60"
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                        />
+                        <span className="mt-1 block text-xs text-gray-500">Heartbeat memperpanjang otomatis.</span>
+                    </label>
+
+                    <label className="block">
+                        <span className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Catatan Client</span>
+                        <input
+                            value={form.client_note}
+                            onChange={(event) => updateForm('client_note', event.target.value)}
+                            placeholder="Opsional"
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                        />
+                    </label>
+                </div>
+
                 {form.scope_type === 'selected' && (
                     <div className="mt-4 rounded-lg border border-gray-200 p-3 dark:border-gray-800">
                         <div className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Pilih Kamera</div>
@@ -370,6 +454,7 @@ export default function PlaybackTokenManagement() {
                                 <tr>
                                     <th className="px-3 py-2">Nama</th>
                                     <th className="px-3 py-2">Scope</th>
+                                    <th className="px-3 py-2">Session</th>
                                     <th className="px-3 py-2">Expired</th>
                                     <th className="px-3 py-2">Dipakai</th>
                                     <th className="px-3 py-2">Status</th>
@@ -384,6 +469,17 @@ export default function PlaybackTokenManagement() {
                                             <div className="text-xs text-gray-500">{token.token_prefix}...</div>
                                         </td>
                                         <td className="px-3 py-3">{token.scope_type === 'selected' ? `${token.camera_ids.length} kamera` : 'Semua'}</td>
+                                        <td className="px-3 py-3">
+                                            <div>{formatSessionPolicy(token)}</div>
+                                            <div className="text-xs text-gray-500">TTL {token.session_timeout_seconds || 60}s</div>
+                                            {token.latest_session_ip && <div className="text-xs text-gray-500">{token.latest_session_ip}</div>}
+                                            {token.latest_session_user_agent && (
+                                                <div className="max-w-48 truncate text-xs text-gray-500" title={token.latest_session_user_agent}>
+                                                    {token.latest_session_user_agent}
+                                                </div>
+                                            )}
+                                            {token.client_note && <div className="text-xs text-gray-500">{token.client_note}</div>}
+                                        </td>
                                         <td className="px-3 py-3">{formatDate(token.expires_at)}</td>
                                         <td className="px-3 py-3">{token.use_count || 0}x</td>
                                         <td className="px-3 py-3">
@@ -393,7 +489,7 @@ export default function PlaybackTokenManagement() {
                                         </td>
                                         <td className="px-3 py-3 text-right">
                                             {token.is_active && (
-                                                <div className="flex justify-end gap-2">
+                                                <div className="flex flex-wrap justify-end gap-2">
                                                     <button
                                                         onClick={() => handleRepeatShare(token.id)}
                                                         disabled={sharingTokenId === token.id}
@@ -401,6 +497,11 @@ export default function PlaybackTokenManagement() {
                                                     >
                                                         {sharingTokenId === token.id ? 'Membuat...' : 'Share'}
                                                     </button>
+                                                    {(token.active_session_count || 0) > 0 && (
+                                                        <button onClick={() => handleClearSessions(token.id)} className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100">
+                                                            Clear Session
+                                                        </button>
+                                                    )}
                                                     <button onClick={() => handleRevoke(token.id)} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100">
                                                         Cabut
                                                     </button>

@@ -2,24 +2,33 @@
  * Purpose: Frontend API client for activating and managing playback access tokens.
  * Caller: public playback token UI and admin playback token management page.
  * Deps: apiClient.
- * MainFuncs: activateToken, clearToken, listTokens, listAuditLogs, createToken, shareToken, revokeToken.
+ * MainFuncs: activateToken, heartbeatToken, clearToken, listTokens, listAuditLogs, createToken, shareToken, clearSessions, revokeToken.
  * SideEffects: Sends token activation and admin token management requests to backend.
  */
 
 import apiClient from './apiClient';
 
 export const playbackTokenService = {
-    async activateToken(token, cameraId = null) {
+    async activateToken(token, cameraId = null, clientId = '') {
         const response = await apiClient.post('/api/playback-token/activate', {
             token,
             camera_id: cameraId,
+            client_id: clientId,
         });
         return response.data;
     },
 
-    async activateShareKey(shareKey, cameraId = null) {
+    async activateShareKey(shareKey, cameraId = null, clientId = '') {
         const response = await apiClient.post('/api/playback-token/activate', {
             share_key: shareKey,
+            camera_id: cameraId,
+            client_id: clientId,
+        });
+        return response.data;
+    },
+
+    async heartbeatToken(cameraId = null) {
+        const response = await apiClient.post('/api/playback-token/heartbeat', {
             camera_id: cameraId,
         });
         return response.data;
@@ -47,6 +56,11 @@ export const playbackTokenService = {
 
     async shareToken(id) {
         const response = await apiClient.post(`/api/admin/playback-tokens/${id}/share`);
+        return response.data;
+    },
+
+    async clearSessions(id) {
+        const response = await apiClient.post(`/api/admin/playback-tokens/${id}/sessions/clear`);
         return response.data;
     },
 
