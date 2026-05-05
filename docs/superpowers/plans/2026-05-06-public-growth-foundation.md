@@ -366,7 +366,7 @@ git push
 - Test: `backend/__tests__/publicGrowthService.test.js`
 - Test: `backend/__tests__/publicGrowthRoutes.test.js`
 
-- [ ] **Step 1: Write service tests**
+- [x] **Step 1: Write service tests**
 
 Create `backend/__tests__/publicGrowthService.test.js`:
 
@@ -466,7 +466,7 @@ describe('publicGrowthService', () => {
 });
 ```
 
-- [ ] **Step 2: Implement service**
+- [x] **Step 2: Implement service**
 
 Replace `backend/services/publicGrowthService.js` with:
 
@@ -615,7 +615,7 @@ export function getTrendingCameras({ areaSlug = '', limit = 10 } = {}) {
 }
 ```
 
-- [ ] **Step 3: Harden controller errors**
+- [x] **Step 3: Harden controller errors**
 
 Update `backend/controllers/publicGrowthController.js` handlers to catch service errors:
 
@@ -631,7 +631,7 @@ function sendError(reply, error, fallbackMessage) {
 
 Each handler should wrap service calls in `try/catch` and call `sendError(reply, error, 'Internal server error')`.
 
-- [ ] **Step 4: Write route tests**
+- [x] **Step 4: Write route tests**
 
 Create `backend/__tests__/publicGrowthRoutes.test.js`:
 
@@ -695,7 +695,7 @@ describe('publicGrowthRoutes', () => {
 });
 ```
 
-- [ ] **Step 5: Run backend focused tests**
+- [x] **Step 5: Run backend focused tests**
 
 ```bash
 cd backend
@@ -704,7 +704,7 @@ npm test -- publicGrowthService.test.js publicGrowthRoutes.test.js
 
 Expected: all tests PASS.
 
-- [ ] **Step 6: Commit backend data layer**
+- [x] **Step 6: Commit backend data layer**
 
 ```bash
 git add backend/services/publicGrowthService.js backend/controllers/publicGrowthController.js backend/routes/publicGrowthRoutes.js backend/__tests__/publicGrowthService.test.js backend/__tests__/publicGrowthRoutes.test.js
