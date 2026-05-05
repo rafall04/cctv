@@ -30,6 +30,15 @@ vi.mock('../services/cameraService', () => ({
     },
 }));
 
+vi.mock('../contexts/TimezoneContext', () => ({
+    useTimezone: () => ({
+        timezone: 'Asia/Jakarta',
+        formatDateTime: (value) => `fmt:${value}`,
+        formatDate: (value) => `date:${value}`,
+        formatTime: (value) => `time:${value}`,
+    }),
+}));
+
 vi.mock('../hooks/admin/useAdminReconnectRefresh', () => ({
     useAdminReconnectRefresh: () => {},
 }));
@@ -111,14 +120,14 @@ describe('PlaybackAnalytics', () => {
             },
         });
 
-        getPlaybackViewerHistoryMock.mockResolvedValue({
+        getPlaybackViewerHistoryMock.mockImplementation((query = {}) => Promise.resolve({
             success: true,
             data: {
                 items: [
                     {
-                        id: 1,
-                        camera_name: 'Lobby',
-                        segment_filename: 'seg-1.mp4',
+                        id: query.page === 2 ? 2 : 1,
+                        camera_name: query.page === 2 ? 'Playback Page Two' : 'Lobby',
+                        segment_filename: query.page === 2 ? 'seg-2.mp4' : 'seg-1.mp4',
                         playback_access_mode: 'admin_full',
                         ip_address: '127.0.0.1',
                         admin_username: 'admin',
@@ -127,10 +136,10 @@ describe('PlaybackAnalytics', () => {
                         started_at: '2026-03-29T10:00:00.000Z',
                     },
                 ],
-                pagination: { page: 1, pageSize: 25, totalItems: 1, totalPages: 1 },
-                summary: { totalItems: 1, uniqueViewers: 1, totalWatchTime: 120 },
+                pagination: { page: query.page || 1, pageSize: query.pageSize || 25, totalItems: 60, totalPages: 3 },
+                summary: { totalItems: 60, uniqueViewers: 1, totalWatchTime: 120 },
             },
-        });
+        }));
 
         getAllCamerasMock.mockResolvedValue({
             success: true,
@@ -176,5 +185,22 @@ describe('PlaybackAnalytics', () => {
             period: '7days',
         }), 'blocking');
         expect(screen.getByText('seg-1.mp4')).toBeTruthy();
+    });
+
+    it('tetap menampilkan playback history page 2 setelah pagination diklik', async () => {
+        render(<PlaybackAnalytics />);
+
+        await screen.findByText('Playback Analytics');
+        fireEvent.click(screen.getByRole('button', { name: 'History' }));
+
+        await screen.findByText('Riwayat Playback');
+        fireEvent.click(screen.getByRole('button', { name: '2' }));
+
+        await waitFor(() => {
+            expect(getPlaybackViewerHistoryMock).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 }), 'blocking');
+        });
+        await waitFor(() => {
+            expect(screen.getByText('seg-2.mp4')).toBeTruthy();
+        });
     });
 });

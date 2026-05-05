@@ -368,6 +368,7 @@ export default function UserManagement() {
 
     const formatDate = (dateString) => {
         return formatDateTime(dateString, {
+            storage: 'utc_sql',
             year: 'numeric',
             month: 'short',
             day: 'numeric',

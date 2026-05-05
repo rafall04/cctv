@@ -59,6 +59,7 @@ export default function FeedbackManagement() {
     };
 
     const formatDate = (dateStr) => formatDateTime(dateStr, {
+        storage: 'utc_sql',
         day: 'numeric',
         month: 'short',
         year: 'numeric',

@@ -30,6 +30,15 @@ vi.mock('../services/cameraService', () => ({
     },
 }));
 
+vi.mock('../contexts/TimezoneContext', () => ({
+    useTimezone: () => ({
+        timezone: 'Asia/Jakarta',
+        formatDateTime: (value) => `fmt:${value}`,
+        formatDate: (value) => `date:${value}`,
+        formatTime: (value) => `time:${value}`,
+    }),
+}));
+
 vi.mock('../components/RealtimeChart', () => ({
     RealtimeActivityChart: () => <div>realtime-chart</div>,
 }));
@@ -119,14 +128,14 @@ describe('ViewerAnalytics', () => {
                 ],
             },
         });
-        getViewerHistory.mockResolvedValue({
+        getViewerHistory.mockImplementation((query = {}) => Promise.resolve({
             success: true,
             data: {
                 items: [
                     {
-                        id: 11,
+                        id: query.page === 2 ? 22 : 11,
                         camera_id: 2,
-                        camera_name: 'Gate',
+                        camera_name: query.page === 2 ? 'Page Two Camera' : 'Gate',
                         ip_address: '10.0.0.11',
                         device_type: 'desktop',
                         started_at: '2026-03-06T10:01:00.000Z',
@@ -135,10 +144,10 @@ describe('ViewerAnalytics', () => {
                         user_agent: 'test-agent',
                     },
                 ],
-                pagination: { page: 1, pageSize: 25, totalItems: 1, totalPages: 1 },
-                summary: { totalItems: 1, uniqueViewers: 1, totalWatchTime: 300 },
+                pagination: { page: query.page || 1, pageSize: query.pageSize || 25, totalItems: 60, totalPages: 3 },
+                summary: { totalItems: 60, uniqueViewers: 1, totalWatchTime: 300 },
             },
-        });
+        }));
         getAllCameras.mockResolvedValue({
             success: true,
             data: [
@@ -191,6 +200,23 @@ describe('ViewerAnalytics', () => {
         });
 
         expect(screen.getByText('127.0.0.1')).toBeTruthy();
+    });
+
+    it('tetap menampilkan history page 2 setelah pagination diklik', async () => {
+        render(<ViewerAnalytics />);
+
+        await screen.findByText('Statistik Penonton');
+        fireEvent.click(screen.getByRole('button', { name: 'History' }));
+
+        await screen.findByText('Riwayat Sesi Live');
+        fireEvent.click(screen.getByRole('button', { name: '2' }));
+
+        await waitFor(() => {
+            expect(getViewerHistory).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 }), 'blocking');
+        });
+        await waitFor(() => {
+            expect(screen.getByText('Page Two Camera')).toBeTruthy();
+        });
     });
 });
 

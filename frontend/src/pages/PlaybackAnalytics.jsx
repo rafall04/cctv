@@ -98,7 +98,7 @@ function renderPlaybackHistoryCell(session, column, formatDateTime) {
         case 'device_type':
             return renderDeviceBadge(session.device_type);
         case 'started_at':
-            return formatDateTime(session.started_at);
+            return formatDateTime(session.started_at, { storage: 'local_sql' });
         case 'duration_seconds':
             return renderDurationText(session.duration_seconds);
         default:
@@ -174,8 +174,8 @@ export default function PlaybackAnalytics() {
     }, [accessMode, cameraId, period]);
 
     const loadHistory = useCallback(async ({
-        page = history.pagination.page,
-        pageSize = history.pagination.pageSize,
+        page = 1,
+        pageSize = 25,
     } = {}) => {
         const requestId = ++historyRequestIdRef.current;
         setHistoryLoading(true);
@@ -214,7 +214,7 @@ export default function PlaybackAnalytics() {
                 setHistoryLoading(false);
             }
         }
-    }, [accessMode, cameraId, history.pagination.page, history.pagination.pageSize, historyDeviceType, historySearch, historySort, period]);
+    }, [accessMode, cameraId, historyDeviceType, historySearch, historySort, period]);
 
     useEffect(() => {
         let isMounted = true;
@@ -298,8 +298,8 @@ export default function PlaybackAnalytics() {
                     { label: 'Viewer / IP', key: 'ip_address' },
                     { label: 'Admin', key: 'admin_username' },
                     { label: 'Device', key: 'device_type' },
-                    { label: 'Mulai', render: (session) => formatDateTime(session.started_at) },
-                    { label: 'Selesai', render: (session) => session.ended_at ? formatDateTime(session.ended_at) : '-' },
+                    { label: 'Mulai', render: (session) => formatDateTime(session.started_at, { storage: 'local_sql' }) },
+                    { label: 'Selesai', render: (session) => session.ended_at ? formatDateTime(session.ended_at, { storage: 'local_sql' }) : '-' },
                     { label: 'Durasi', render: (session) => formatWatchTime(session.duration_seconds || 0) },
                     { label: 'User Agent', key: 'user_agent' },
                 ]}
@@ -387,7 +387,7 @@ export default function PlaybackAnalytics() {
                                         </span>
                                     </div>
                                     <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                        {session.ip_address} • {formatDateTime(session.started_at)} • {formatWatchTime(session.duration_seconds)}
+                                        {session.ip_address} • {formatDateTime(session.started_at, { storage: 'local_sql' })} • {formatWatchTime(session.duration_seconds)}
                                     </div>
                                 </button>
                             ))}

@@ -128,6 +128,7 @@ export default function PlaybackTokenManagement() {
         }
 
         return formatDateTime(value, {
+            storage: 'utc_sql',
             day: '2-digit',
             month: 'short',
             year: 'numeric',

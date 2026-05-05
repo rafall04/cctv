@@ -11,15 +11,25 @@ import { adminAPI } from '../services/api';
 
 const TimezoneContext = createContext();
 
-const SQLITE_UTC_DATETIME_PATTERN = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/;
+const SQLITE_BARE_DATETIME_PATTERN = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/;
+const TIMESTAMP_STORAGE = {
+    AUTO: 'auto',
+    UTC_SQL: 'utc_sql',
+    LOCAL_SQL: 'local_sql',
+};
 
-export function parseBackendDateInput(date) {
+function splitDateFormatOptions(options = {}) {
+    const { storage = TIMESTAMP_STORAGE.AUTO, ...formatOptions } = options;
+    return { storage, formatOptions };
+}
+
+export function parseBackendDateInput(date, { storage = TIMESTAMP_STORAGE.AUTO } = {}) {
     if (typeof date !== 'string') {
         return date;
     }
 
     const value = date.trim();
-    if (SQLITE_UTC_DATETIME_PATTERN.test(value)) {
+    if (storage === TIMESTAMP_STORAGE.UTC_SQL && SQLITE_BARE_DATETIME_PATTERN.test(value)) {
         return new Date(`${value.replace(' ', 'T')}Z`);
     }
 
@@ -47,7 +57,8 @@ export function TimezoneProvider({ children }) {
     };
 
     const formatDateTime = (date, options = {}) => {
-        const dateObj = parseBackendDateInput(date);
+        const { storage, formatOptions } = splitDateFormatOptions(options);
+        const dateObj = parseBackendDateInput(date, { storage });
         return new Intl.DateTimeFormat('id-ID', {
             timeZone: timezone,
             year: 'numeric',
@@ -57,30 +68,32 @@ export function TimezoneProvider({ children }) {
             minute: '2-digit',
             second: '2-digit',
             hour12: false,
-            ...options
+            ...formatOptions
         }).format(dateObj);
     };
 
     const formatDate = (date, options = {}) => {
-        const dateObj = parseBackendDateInput(date);
+        const { storage, formatOptions } = splitDateFormatOptions(options);
+        const dateObj = parseBackendDateInput(date, { storage });
         return new Intl.DateTimeFormat('id-ID', {
             timeZone: timezone,
             year: 'numeric',
             month: '2-digit',
             day: '2-digit',
-            ...options
+            ...formatOptions
         }).format(dateObj);
     };
 
     const formatTime = (date, options = {}) => {
-        const dateObj = parseBackendDateInput(date);
+        const { storage, formatOptions } = splitDateFormatOptions(options);
+        const dateObj = parseBackendDateInput(date, { storage });
         return new Intl.DateTimeFormat('id-ID', {
             timeZone: timezone,
             hour: '2-digit',
             minute: '2-digit',
             second: '2-digit',
             hour12: false,
-            ...options
+            ...formatOptions
         }).format(dateObj);
     };
 

@@ -63,9 +63,9 @@ function renderLiveHistoryCell(session, column, formatDateTime) {
         case 'device_type':
             return renderDeviceBadge(session.device_type);
         case 'started_at':
-            return formatDateTime(session.started_at);
+            return formatDateTime(session.started_at, { storage: 'local_sql' });
         case 'ended_at':
-            return session.ended_at ? formatDateTime(session.ended_at) : '-';
+            return session.ended_at ? formatDateTime(session.ended_at, { storage: 'local_sql' }) : '-';
         case 'duration_seconds':
             return renderDurationText(session.duration_seconds);
         default:
@@ -140,8 +140,8 @@ export default function ViewerAnalytics() {
     }, []);
 
     const loadHistory = useCallback(async ({
-        page = history.pagination.page,
-        pageSize = history.pagination.pageSize,
+        page = 1,
+        pageSize = 25,
     } = {}) => {
         const requestId = ++historyRequestIdRef.current;
         setHistoryLoading(true);
@@ -179,7 +179,7 @@ export default function ViewerAnalytics() {
                 setHistoryLoading(false);
             }
         }
-    }, [customDate, history.pagination.page, history.pagination.pageSize, historyDeviceType, historySearch, historySort, period, selectedCamera]);
+    }, [customDate, historyDeviceType, historySearch, historySort, period, selectedCamera]);
 
     useEffect(() => {
         loadHistory({ page: 1, pageSize: history.pagination.pageSize });
@@ -254,8 +254,8 @@ export default function ViewerAnalytics() {
                     { label: 'Kamera', key: 'camera_name' },
                     { label: 'IP Address', key: 'ip_address' },
                     { label: 'Device', key: 'device_type' },
-                    { label: 'Mulai', render: (session) => formatDateTime(session.started_at) },
-                    { label: 'Selesai', render: (session) => session.ended_at ? formatDateTime(session.ended_at) : '-' },
+                    { label: 'Mulai', render: (session) => formatDateTime(session.started_at, { storage: 'local_sql' }) },
+                    { label: 'Selesai', render: (session) => session.ended_at ? formatDateTime(session.ended_at, { storage: 'local_sql' }) : '-' },
                     { label: 'Durasi', render: (session) => formatWatchTime(session.duration_seconds || 0) },
                     { label: 'User Agent', key: 'user_agent' },
                 ]}
@@ -335,7 +335,7 @@ export default function ViewerAnalytics() {
                                         </div>
                                         <div className="mt-1 font-mono text-xs text-gray-500 dark:text-gray-400">{session.ip_address}</div>
                                         <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                            {formatDateTime(session.started_at)} • {formatWatchTime(session.duration_seconds)}
+                                            {formatDateTime(session.started_at, { storage: 'local_sql' })} • {formatWatchTime(session.duration_seconds)}
                                         </div>
                                     </button>
                                 ))}
