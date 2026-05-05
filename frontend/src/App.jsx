@@ -18,6 +18,7 @@ import { ApiClientInitializer } from './components/ApiClientInitializer';
 import ErrorBoundary from './components/ui/ErrorBoundary';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
+import Playback from './pages/Playback';
 import ProtectedRoute from './components/ProtectedRoute';
 import lazyWithRetry from './utils/lazyWithRetry';
 
@@ -37,7 +38,6 @@ const UnifiedSettings = lazyWithRetry(() => import('./pages/UnifiedSettings'), '
 const Dashboard = lazyWithRetry(() => import('./pages/Dashboard'), 'dashboard');
 const SponsorManagement = lazyWithRetry(() => import('./pages/SponsorManagement'), 'sponsor-management');
 const RecordingDashboard = lazyWithRetry(() => import('./pages/RecordingDashboard'), 'recording-dashboard');
-const Playback = lazyWithRetry(() => import('./pages/Playback'), 'playback');
 
 function AdminPageRoute({ children }) {
     return (

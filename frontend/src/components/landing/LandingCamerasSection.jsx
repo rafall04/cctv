@@ -10,9 +10,9 @@ import LandingConnectionTabs from './LandingConnectionTabs';
 import LandingResultsGrid from './LandingResultsGrid';
 import LandingMapPanel from './LandingMapPanel';
 import LandingPlaybackPanel from './LandingPlaybackPanel';
+import Playback from '../../pages/Playback';
 
 const MapView = lazy(() => import('../MapView'));
-const Playback = lazy(() => import('../../pages/Playback'));
 
 function renderSearchDropdown({
     cameras,

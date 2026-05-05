@@ -26,6 +26,10 @@ vi.mock('./pages/LoginPage', () => ({
     default: () => <div>login-page</div>,
 }));
 
+vi.mock('./pages/Playback', () => ({
+    default: ({ accessScope }) => <div data-testid="public-playback-page">playback:{accessScope}</div>,
+}));
+
 vi.mock('./layouts/AdminLayout', () => ({
     default: ({ children }) => <div data-testid="admin-layout">{children}</div>,
 }));
@@ -48,6 +52,17 @@ describe('App public routing', () => {
         render(<App />);
 
         expect(screen.getByTestId('public-landing-page')).toBeTruthy();
+        await waitFor(() => {
+            expect(screen.queryByTestId('admin-layout')).toBeNull();
+        });
+    });
+
+    it('merender public playback sebagai route kritikal tanpa lazy chunk playback', async () => {
+        window.history.pushState({}, '', '/playback');
+
+        render(<App />);
+
+        expect(screen.getByTestId('public-playback-page').textContent).toBe('playback:public_preview');
         await waitFor(() => {
             expect(screen.queryByTestId('admin-layout')).toBeNull();
         });
