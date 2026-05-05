@@ -1,13 +1,14 @@
 /**
  * Purpose: Create, share, validate, audit, and revoke scoped public playback access tokens.
  * Caller: playback token controllers and recordingPlaybackService.
- * Deps: crypto, SQLite connection helpers.
+ * Deps: crypto, SQLite connection helpers, timeService.
  * MainFuncs: createToken, updateTokenSettings, listTokens, listAuditLogs, createPlaybackSession, assertPlaybackSession, clearTokenSessions, revokeToken, buildRepeatShareText, validateRequestForCamera, buildShareText.
  * SideEffects: Writes playback token rows, session rows, audit rows, share keys, and lightweight token usage touches.
  */
 
 import crypto from 'crypto';
 import { execute, query, queryOne } from '../database/connectionPool.js';
+import { parseUtcSql, toUtcSql } from './timeService.js';
 
 export const PLAYBACK_TOKEN_COOKIE = 'raf_playback_token';
 export const PLAYBACK_TOKEN_SESSION_COOKIE = 'raf_playback_session';
@@ -57,11 +58,7 @@ const MIN_SESSION_TIMEOUT_SECONDS = 30;
 const MAX_SESSION_TIMEOUT_SECONDS = 3600;
 
 function toSqlDate(date) {
-    if (!date) {
-        return null;
-    }
-
-    return date.toISOString().slice(0, 19).replace('T', ' ');
+    return toUtcSql(date);
 }
 
 function parseDate(value) {
@@ -230,7 +227,7 @@ function sanitizeTokenRow(row) {
         created_by: row.created_by,
         created_at: row.created_at,
         updated_at: row.updated_at,
-        is_active: !row.revoked_at && (!row.expires_at || new Date(row.expires_at).getTime() > Date.now()),
+        is_active: !row.revoked_at && (!row.expires_at || (parseUtcSql(row.expires_at)?.getTime() ?? 0) > Date.now()),
     };
 }
 
@@ -902,7 +899,7 @@ class PlaybackTokenService {
             throw err;
         }
 
-        if (token.expires_at && new Date(token.expires_at).getTime() <= Date.now()) {
+        if (token.expires_at && (parseUtcSql(token.expires_at)?.getTime() ?? 0) <= Date.now()) {
             const err = new Error('Token playback sudah kedaluwarsa');
             err.statusCode = 401;
             throw err;

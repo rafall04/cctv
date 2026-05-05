@@ -1,7 +1,7 @@
 /**
  * Purpose: Manage real-time live viewer sessions and historical live-view analytics for CCTV streams.
  * Caller: viewer routes, HLS proxy/session cleanup, backend startup cleanup timer.
- * Deps: connectionPool, uuid, timezoneService, viewerAnalyticsService, cacheService, cameraViewStatsService.
+ * Deps: connectionPool, uuid, timeService, viewerAnalyticsService, cacheService, cameraViewStatsService.
  * MainFuncs: startSession, heartbeat, endSession, cleanupStaleSessions, getViewerStats, getSessionHistory.
  * SideEffects: Writes viewer session/history rows, updates camera lifetime view counters, and runs cleanup timers.
  * 
@@ -22,57 +22,17 @@
 
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import { v4 as uuidv4 } from 'uuid';
-import { getTimezone } from './timezoneService.js';
 import viewerAnalyticsService from './viewerAnalyticsService.js';
 import { cacheGetOrSetSync, cacheKey, CacheNamespace, CacheTTL } from './cacheService.js';
 import cameraViewStatsService from './cameraViewStatsService.js';
-
-/**
- * Get current timestamp in configured timezone format for SQLite
- * Format: YYYY-MM-DD HH:MM:SS
- */
-function getTimestamp(date = new Date()) {
-    const timezone = getTimezone();
-    return date.toLocaleString('sv-SE', {
-        timeZone: timezone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-    }).replace(' ', ' ');
-}
-
-function getSessionEndDate(options = {}) {
-    if (Number.isFinite(options.endedAtMs)) {
-        return new Date(options.endedAtMs);
-    }
-
-    if (options.endedAt instanceof Date && !Number.isNaN(options.endedAt.getTime())) {
-        return options.endedAt;
-    }
-
-    if (typeof options.endedAt === 'string') {
-        const parsedDate = new Date(options.endedAt);
-        if (!Number.isNaN(parsedDate.getTime())) {
-            return parsedDate;
-        }
-    }
-
-    return new Date();
-}
+import { diffLocalSqlSeconds, getLocalDate, getLocalDateWithOffset, nowLocalSql, resolveLocalSqlTimestamp } from './timeService.js';
 
 /**
  * Get current date in configured timezone for date comparisons
  * Format: YYYY-MM-DD
  */
 function getDate() {
-    const timezone = getTimezone();
-    return new Date().toLocaleDateString('sv-SE', {
-        timeZone: timezone
-    });
+    return getLocalDate();
 }
 
 /**
@@ -80,12 +40,7 @@ function getDate() {
  * Format: YYYY-MM-DD
  */
 function getDateWithOffset(days) {
-    const timezone = getTimezone();
-    const date = new Date();
-    date.setDate(date.getDate() + days);
-    return date.toLocaleDateString('sv-SE', {
-        timeZone: timezone
-    });
+    return getLocalDateWithOffset(days);
 }
 
 function buildHistoryDateFilter(period) {
@@ -216,7 +171,7 @@ class ViewerSessionService {
         const ipAddress = this.getRealIP(request);
         const userAgent = request.headers['user-agent'] || '';
         const deviceType = this.getDeviceType(userAgent);
-        const timestamp = getTimestamp();
+        const timestamp = nowLocalSql();
 
         try {
             execute(`
@@ -234,7 +189,7 @@ class ViewerSessionService {
 
     heartbeat(sessionId) {
         try {
-            const timestamp = getTimestamp();
+            const timestamp = nowLocalSql();
             const result = execute(`
                 UPDATE viewer_sessions 
                 SET last_heartbeat = ?
@@ -255,10 +210,9 @@ class ViewerSessionService {
 
             if (!session) return false;
 
-            const startedAt = new Date(session.started_at);
-            const endedAt = getSessionEndDate(options);
-            const durationSeconds = Math.max(0, Math.floor((endedAt - startedAt) / 1000));
-            const timestamp = getTimestamp(endedAt);
+            const rawEndTimestamp = options.endedAtMs ?? options.endedAt ?? new Date();
+            const timestamp = resolveLocalSqlTimestamp(rawEndTimestamp);
+            const durationSeconds = diffLocalSqlSeconds(session.started_at, timestamp);
 
             execute(`
                 UPDATE viewer_sessions 
@@ -299,7 +253,7 @@ class ViewerSessionService {
 
     cleanupStaleSessions() {
         try {
-            const timestamp = getTimestamp();
+            const timestamp = nowLocalSql();
             const staleSessions = query(`
                 SELECT session_id, last_heartbeat FROM viewer_sessions 
                 WHERE is_active = 1 
@@ -380,7 +334,7 @@ class ViewerSessionService {
 
     getActiveSessions() {
         try {
-            const timestamp = getTimestamp();
+            const timestamp = nowLocalSql();
             return query(`
                 SELECT 
                     vs.session_id,
@@ -404,7 +358,7 @@ class ViewerSessionService {
 
     getActiveSessionsByCamera(cameraId) {
         try {
-            const timestamp = getTimestamp();
+            const timestamp = nowLocalSql();
             return query(`
                 SELECT 
                     session_id,
@@ -613,7 +567,7 @@ class ViewerSessionService {
             const activeViewers = this.getTotalActiveViewers();
             const activeSessions = this.getActiveSessions();
             const viewersByCamera = this.getViewerCountByCamera();
-            const timestamp = getTimestamp();
+            const timestamp = nowLocalSql();
 
             // Get last 5 minutes activity (using configured timezone)
             const recentActivity = query(`
@@ -653,7 +607,7 @@ class ViewerSessionService {
                 activeSessions: [],
                 viewersByCamera: [],
                 recentActivity: [],
-                timestamp: getTimestamp(),
+                timestamp: nowLocalSql(),
             };
         }
     }

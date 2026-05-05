@@ -13,7 +13,7 @@ import FeedbackStatsGrid from '../components/admin/feedback/FeedbackStatsGrid';
 import FeedbackFilterBar from '../components/admin/feedback/FeedbackFilterBar';
 import FeedbackListPanel from '../components/admin/feedback/FeedbackListPanel';
 import FeedbackDetailPanel from '../components/admin/feedback/FeedbackDetailPanel';
-import { useTimezone } from '../contexts/TimezoneContext';
+import { TIMESTAMP_STORAGE, useTimezone } from '../contexts/TimezoneContext';
 
 export default function FeedbackManagement() {
     const { formatDateTime } = useTimezone();
@@ -59,7 +59,7 @@ export default function FeedbackManagement() {
     };
 
     const formatDate = (dateStr) => formatDateTime(dateStr, {
-        storage: 'utc_sql',
+        storage: TIMESTAMP_STORAGE.UTC_SQL,
         day: 'numeric',
         month: 'short',
         year: 'numeric',

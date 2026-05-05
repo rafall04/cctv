@@ -13,7 +13,7 @@ import { useNotification } from '../contexts/NotificationContext';
 import { TableSkeleton } from '../components/ui/Skeleton';
 import { NoUsersEmptyState } from '../components/ui/EmptyState';
 import { Alert } from '../components/ui/Alert';
-import { useTimezone } from '../contexts/TimezoneContext';
+import { TIMESTAMP_STORAGE, useTimezone } from '../contexts/TimezoneContext';
 
 /**
  * Password validation requirements
@@ -368,7 +368,7 @@ export default function UserManagement() {
 
     const formatDate = (dateString) => {
         return formatDateTime(dateString, {
-            storage: 'utc_sql',
+            storage: TIMESTAMP_STORAGE.UTC_SQL,
             year: 'numeric',
             month: 'short',
             day: 'numeric',

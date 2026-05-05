@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { cameraService } from '../services/cameraService';
 import playbackTokenService from '../services/playbackTokenService.js';
 import { useNotification } from '../contexts/NotificationContext';
-import { useTimezone } from '../contexts/TimezoneContext';
+import { TIMESTAMP_STORAGE, useTimezone } from '../contexts/TimezoneContext';
 
 const DEFAULT_TEMPLATE = `Halo, berikut token akses playback CCTV RAF NET.
 
@@ -128,7 +128,7 @@ export default function PlaybackTokenManagement() {
         }
 
         return formatDateTime(value, {
-            storage: 'utc_sql',
+            storage: TIMESTAMP_STORAGE.UTC_SQL,
             day: '2-digit',
             month: 'short',
             year: 'numeric',

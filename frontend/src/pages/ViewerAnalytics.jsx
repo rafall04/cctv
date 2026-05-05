@@ -25,7 +25,7 @@ import { useViewerAnalyticsFilters } from '../hooks/admin/useViewerAnalyticsFilt
 import { adminService } from '../services/adminService';
 import { cameraService } from '../services/cameraService';
 import { REQUEST_POLICY } from '../services/requestPolicy';
-import { useTimezone } from '../contexts/TimezoneContext';
+import { TIMESTAMP_STORAGE, useTimezone } from '../contexts/TimezoneContext';
 import { exportToCSV, formatWatchTime, mapPeriodToApi } from '../utils/admin/viewerAnalyticsAdapter';
 
 export { default as DailyDetailModal } from '../components/admin/analytics/DailyDetailModal';
@@ -63,9 +63,9 @@ function renderLiveHistoryCell(session, column, formatDateTime) {
         case 'device_type':
             return renderDeviceBadge(session.device_type);
         case 'started_at':
-            return formatDateTime(session.started_at, { storage: 'local_sql' });
+            return formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL });
         case 'ended_at':
-            return session.ended_at ? formatDateTime(session.ended_at, { storage: 'local_sql' }) : '-';
+            return session.ended_at ? formatDateTime(session.ended_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL }) : '-';
         case 'duration_seconds':
             return renderDurationText(session.duration_seconds);
         default:
@@ -254,8 +254,8 @@ export default function ViewerAnalytics() {
                     { label: 'Kamera', key: 'camera_name' },
                     { label: 'IP Address', key: 'ip_address' },
                     { label: 'Device', key: 'device_type' },
-                    { label: 'Mulai', render: (session) => formatDateTime(session.started_at, { storage: 'local_sql' }) },
-                    { label: 'Selesai', render: (session) => session.ended_at ? formatDateTime(session.ended_at, { storage: 'local_sql' }) : '-' },
+                    { label: 'Mulai', render: (session) => formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL }) },
+                    { label: 'Selesai', render: (session) => session.ended_at ? formatDateTime(session.ended_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL }) : '-' },
                     { label: 'Durasi', render: (session) => formatWatchTime(session.duration_seconds || 0) },
                     { label: 'User Agent', key: 'user_agent' },
                 ]}
@@ -335,7 +335,7 @@ export default function ViewerAnalytics() {
                                         </div>
                                         <div className="mt-1 font-mono text-xs text-gray-500 dark:text-gray-400">{session.ip_address}</div>
                                         <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                            {formatDateTime(session.started_at, { storage: 'local_sql' })} • {formatWatchTime(session.duration_seconds)}
+                                            {formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL })} • {formatWatchTime(session.duration_seconds)}
                                         </div>
                                     </button>
                                 ))}

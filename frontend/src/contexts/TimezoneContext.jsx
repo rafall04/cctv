@@ -2,7 +2,7 @@
  * Purpose: Provide configured timezone formatting helpers across public and admin routes.
  * Caller: App provider tree and pages/components that display backend timestamps.
  * Deps: React context/hooks and admin settings API.
- * MainFuncs: TimezoneProvider, useTimezone, parseBackendDateInput.
+ * MainFuncs: TimezoneProvider, useTimezone, parseBackendDateInput, TIMESTAMP_STORAGE.
  * SideEffects: Loads timezone setting from backend and formats display-only timestamps.
  */
 
@@ -12,7 +12,7 @@ import { adminAPI } from '../services/api';
 const TimezoneContext = createContext();
 
 const SQLITE_BARE_DATETIME_PATTERN = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/;
-const TIMESTAMP_STORAGE = {
+export const TIMESTAMP_STORAGE = {
     AUTO: 'auto',
     UTC_SQL: 'utc_sql',
     LOCAL_SQL: 'local_sql',
@@ -31,6 +31,10 @@ export function parseBackendDateInput(date, { storage = TIMESTAMP_STORAGE.AUTO }
     const value = date.trim();
     if (storage === TIMESTAMP_STORAGE.UTC_SQL && SQLITE_BARE_DATETIME_PATTERN.test(value)) {
         return new Date(`${value.replace(' ', 'T')}Z`);
+    }
+
+    if (SQLITE_BARE_DATETIME_PATTERN.test(value)) {
+        return new Date(value.replace(' ', 'T'));
     }
 
     return new Date(value);

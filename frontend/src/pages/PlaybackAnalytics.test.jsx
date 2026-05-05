@@ -31,6 +31,11 @@ vi.mock('../services/cameraService', () => ({
 }));
 
 vi.mock('../contexts/TimezoneContext', () => ({
+    TIMESTAMP_STORAGE: {
+        LOCAL_SQL: 'local_sql',
+        UTC_SQL: 'utc_sql',
+        AUTO: 'auto',
+    },
     useTimezone: () => ({
         timezone: 'Asia/Jakarta',
         formatDateTime: (value) => `fmt:${value}`,

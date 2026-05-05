@@ -57,6 +57,7 @@ SideEffects: None; documentation only.
 - Main DB path: `backend/data/cctv.db`; local DB files are ignored.
 - Use `query()`, `queryOne()`, `execute()`, and `transaction()` from `backend/database/connectionPool.js`.
 - Use parameterized SQL only.
+- Timestamp standard: new persistence should prefer UTC SQL/ISO values; live/playback viewer session history currently stores configured local SQL values and must use `backend/services/timeService.js` plus explicit frontend `TIMESTAMP_STORAGE` display modes.
 - Before DB-heavy feature work, check indexes/cardinality for target tables and avoid N+1 loops.
 - High-traffic tables include `cameras`, `camera_runtime_state`, `viewer_sessions`, `viewer_session_history`, `playback_viewer_sessions`, `playback_viewer_session_history`, `recording_segments`, and audit/security logs.
 

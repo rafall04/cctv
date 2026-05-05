@@ -1,7 +1,15 @@
+/**
+ * Purpose: Manage playback viewer sessions and history analytics separately from live viewer tracking.
+ * Caller: playback viewer routes and backend startup cleanup timer.
+ * Deps: connectionPool, uuid, timeService, cacheService.
+ * MainFuncs: startSession, heartbeat, endSession, cleanupStaleSessions, getActiveSessions, getSessionHistory, getAnalytics.
+ * SideEffects: Writes playback viewer session/history rows and runs cleanup/retention timers.
+ */
+
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import { v4 as uuidv4 } from 'uuid';
-import { getTimezone } from './timezoneService.js';
 import { cacheGetOrSetSync, cacheKey, CacheNamespace, CacheTTL } from './cacheService.js';
+import { diffLocalSqlSeconds, getLocalDate, getLocalDateWithOffset, nowLocalSql, resolveLocalSqlTimestamp } from './timeService.js';
 
 const SESSION_TIMEOUT = 15;
 const CLEANUP_INTERVAL = 60000;
@@ -9,30 +17,12 @@ const HISTORY_RETENTION_DAYS = 90;
 const RETENTION_RUN_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const PLAYBACK_ACCESS_MODES = new Set(['public_preview', 'admin_full']);
 
-function getTimestamp() {
-    const timezone = getTimezone();
-    return new Date().toLocaleString('sv-SE', {
-        timeZone: timezone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false,
-    }).replace(' ', ' ');
-}
-
 function getDate() {
-    const timezone = getTimezone();
-    return new Date().toLocaleDateString('sv-SE', { timeZone: timezone });
+    return getLocalDate();
 }
 
 function getDateWithOffset(days) {
-    const timezone = getTimezone();
-    const date = new Date();
-    date.setDate(date.getDate() + days);
-    return date.toLocaleDateString('sv-SE', { timeZone: timezone });
+    return getLocalDateWithOffset(days);
 }
 
 function normalizeAccessMode(value) {
@@ -187,7 +177,7 @@ class PlaybackViewerSessionService {
 
     startSession(payload, request) {
         const sessionId = uuidv4();
-        const timestamp = getTimestamp();
+        const timestamp = nowLocalSql();
         const ipAddress = this.getRealIP(request);
         const userAgent = request.headers['user-agent'] || '';
         const deviceType = this.getDeviceType(userAgent);
@@ -229,7 +219,7 @@ class PlaybackViewerSessionService {
     }
 
     heartbeat(sessionId) {
-        const timestamp = getTimestamp();
+        const timestamp = nowLocalSql();
         const result = execute(`
             UPDATE playback_viewer_sessions
             SET last_heartbeat = ?
@@ -238,7 +228,7 @@ class PlaybackViewerSessionService {
         return result.changes > 0;
     }
 
-    endSession(sessionId) {
+    endSession(sessionId, options = {}) {
         const session = queryOne(`
             SELECT *
             FROM playback_viewer_sessions
@@ -249,10 +239,9 @@ class PlaybackViewerSessionService {
             return false;
         }
 
-        const startedAt = new Date(session.started_at);
-        const endedAt = new Date();
-        const durationSeconds = Math.max(0, Math.floor((endedAt - startedAt) / 1000));
-        const timestamp = getTimestamp();
+        const rawEndTimestamp = options.endedAtMs ?? options.endedAt ?? new Date();
+        const timestamp = resolveLocalSqlTimestamp(rawEndTimestamp);
+        const durationSeconds = diffLocalSqlSeconds(session.started_at, timestamp);
 
         execute(`
             UPDATE playback_viewer_sessions
@@ -296,16 +285,16 @@ class PlaybackViewerSessionService {
     }
 
     cleanupStaleSessions() {
-        const timestamp = getTimestamp();
+        const timestamp = nowLocalSql();
         const staleSessions = query(`
-            SELECT session_id
+            SELECT session_id, last_heartbeat
             FROM playback_viewer_sessions
             WHERE is_active = 1
             AND datetime(last_heartbeat) < datetime(?, '-${SESSION_TIMEOUT} seconds')
         `, [timestamp]);
 
         for (const session of staleSessions) {
-            this.endSession(session.session_id);
+            this.endSession(session.session_id, { endedAt: session.last_heartbeat });
         }
 
         this.runRetentionIfDue();
@@ -381,7 +370,7 @@ class PlaybackViewerSessionService {
 
     getActiveSessions(filters = {}) {
         const { clause, params } = buildSessionFilters(filters);
-        const timestamp = getTimestamp();
+        const timestamp = nowLocalSql();
 
         return query(`
             SELECT
