@@ -61,6 +61,9 @@ export default function PlaybackTokenManagement() {
         camera_ids: [],
         playback_window_hours: '',
         expires_at: '',
+        access_code_mode: 'auto',
+        access_code_length: 8,
+        custom_access_code: '',
         share_template: DEFAULT_TEMPLATE,
     });
 
@@ -121,7 +124,7 @@ export default function PlaybackTokenManagement() {
                 shareText: response.share_text,
             });
             showSuccess('Token playback dibuat', 'Teks share memakai kode akses sekali pakai yang bisa dibuat ulang.');
-            setForm((current) => ({ ...current, label: '', camera_ids: [] }));
+            setForm((current) => ({ ...current, label: '', camera_ids: [], custom_access_code: '' }));
             await loadData();
         } catch (error) {
             showError('Gagal membuat token', error?.response?.data?.message || error.message);
@@ -247,6 +250,46 @@ export default function PlaybackTokenManagement() {
                     )}
                 </div>
 
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <label className="block">
+                        <span className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Kode Akses</span>
+                        <select
+                            value={form.access_code_mode}
+                            onChange={(event) => updateForm('access_code_mode', event.target.value)}
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                        >
+                            <option value="auto">Otomatis</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </label>
+
+                    {form.access_code_mode === 'auto' ? (
+                        <label className="block">
+                            <span className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Panjang Kode</span>
+                            <input
+                                type="number"
+                                min="6"
+                                max="32"
+                                value={form.access_code_length}
+                                onChange={(event) => updateForm('access_code_length', event.target.value)}
+                                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                            />
+                            <span className="mt-1 block text-xs text-gray-500">Kode otomatis memakai huruf kapital dan angka.</span>
+                        </label>
+                    ) : (
+                        <label className="block">
+                            <span className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Kode Custom</span>
+                            <input
+                                value={form.custom_access_code}
+                                onChange={(event) => updateForm('custom_access_code', event.target.value.toUpperCase())}
+                                placeholder="Contoh: RAFNET88"
+                                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm uppercase dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                            />
+                            <span className="mt-1 block text-xs text-gray-500">6-32 karakter: huruf, angka, underscore, atau strip.</span>
+                        </label>
+                    )}
+                </div>
+
                 {form.scope_type === 'selected' && (
                     <div className="mt-4 rounded-lg border border-gray-200 p-3 dark:border-gray-800">
                         <div className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Pilih Kamera</div>
@@ -281,7 +324,11 @@ export default function PlaybackTokenManagement() {
                 <div className="mt-4 flex justify-end">
                     <button
                         type="submit"
-                        disabled={saving || (form.scope_type === 'selected' && form.camera_ids.length === 0)}
+                        disabled={
+                            saving
+                            || (form.scope_type === 'selected' && form.camera_ids.length === 0)
+                            || (form.access_code_mode === 'custom' && form.custom_access_code.trim().length < 6)
+                        }
                         className="rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-white hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         {saving ? 'Membuat...' : 'Buat Token'}

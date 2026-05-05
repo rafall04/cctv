@@ -16,23 +16,25 @@ describe('playbackTokenService', () => {
 
     it('creates a trial token with share text and hashed storage only', async () => {
         vi.spyOn(connectionPool, 'execute').mockReturnValue({ lastInsertRowid: 7, changes: 1 });
-        vi.spyOn(connectionPool, 'queryOne').mockReturnValue({
-            id: 7,
-            label: 'Trial Client',
-            token_prefix: 'rafpb_abc123',
-            preset: 'trial_3d',
-            scope_type: 'all',
-            camera_ids_json: '[]',
-            playback_window_hours: 72,
-            expires_at: '2026-05-08 12:00:00',
-            revoked_at: null,
-            last_used_at: null,
-            use_count: 0,
-            share_template: 'Token: {{token}}\nLink: {{playback_url}}\nAkses: {{camera_scope}}',
-            created_by: 1,
-            created_at: '2026-05-05 12:00:00',
-            updated_at: '2026-05-05 12:00:00',
-        });
+        vi.spyOn(connectionPool, 'queryOne')
+            .mockReturnValueOnce(null)
+            .mockReturnValueOnce({
+                id: 7,
+                label: 'Trial Client',
+                token_prefix: 'rafpb_abc123',
+                preset: 'trial_3d',
+                scope_type: 'all',
+                camera_ids_json: '[]',
+                playback_window_hours: 72,
+                expires_at: '2026-05-08 12:00:00',
+                revoked_at: null,
+                last_used_at: null,
+                use_count: 0,
+                share_template: 'Token: {{token}}\nLink: {{playback_url}}\nAkses: {{camera_scope}}',
+                created_by: 1,
+                created_at: '2026-05-05 12:00:00',
+                updated_at: '2026-05-05 12:00:00',
+            });
         const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
 
         const result = playbackTokenService.createToken(
@@ -41,12 +43,94 @@ describe('playbackTokenService', () => {
         );
 
         expect(result.token).toMatch(/^rafpb_/);
-        expect(result.share_key).toMatch(/^rafps_/);
+        expect(result.share_key).toMatch(/^[A-Z0-9]{8}$/);
         expect(result.share_text).toContain(result.share_key);
         expect(result.share_text).not.toContain(result.token);
         expect(result.share_text).toContain('https://cctv.raf.my.id/playback?share=');
         expect(connectionPool.execute.mock.calls[0][0]).toContain('INSERT INTO playback_tokens');
         expect(connectionPool.execute.mock.calls[0][1][1]).not.toBe(result.token);
+    });
+
+    it('creates a token with custom short access code for sharing', async () => {
+        vi.spyOn(connectionPool, 'execute').mockReturnValue({ lastInsertRowid: 8, changes: 1 });
+        vi.spyOn(connectionPool, 'queryOne')
+            .mockReturnValueOnce(null)
+            .mockReturnValueOnce({
+                id: 8,
+                label: 'Kode Custom',
+                token_prefix: 'rafpb_custom',
+                share_key_prefix: 'RAFNET88',
+                preset: 'trial_1d',
+                scope_type: 'all',
+                camera_ids_json: '[]',
+                playback_window_hours: 24,
+                expires_at: '2026-05-06 12:00:00',
+                revoked_at: null,
+                last_used_at: null,
+                use_count: 0,
+                share_template: 'Kode: {{token}}\nLink: {{playback_url}}',
+                created_by: 1,
+                created_at: '2026-05-05 12:00:00',
+                updated_at: '2026-05-05 12:00:00',
+            });
+        const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
+
+        const result = playbackTokenService.createToken(
+            {
+                label: 'Kode Custom',
+                preset: 'trial_1d',
+                scope_type: 'all',
+                access_code_mode: 'custom',
+                custom_access_code: 'RAFNET88',
+            },
+            { user: { id: 1 }, headers: { origin: 'https://cctv.raf.my.id' } }
+        );
+
+        expect(result.share_key).toBe('RAFNET88');
+        expect(result.share_text).toContain('Kode: RAFNET88');
+        expect(result.share_text).toContain('/playback?share=RAFNET88');
+        expect(connectionPool.queryOne.mock.calls[0][0]).toContain('share_key_hash = ?');
+        expect(connectionPool.execute.mock.calls[0][1][4]).toBe('RAFNET88');
+    });
+
+    it('creates an automatic short access code using requested length', async () => {
+        vi.spyOn(connectionPool, 'execute').mockReturnValue({ lastInsertRowid: 10, changes: 1 });
+        vi.spyOn(connectionPool, 'queryOne')
+            .mockReturnValueOnce(null)
+            .mockReturnValueOnce({
+                id: 10,
+                label: 'Kode Auto',
+                token_prefix: 'rafpb_auto',
+                share_key_prefix: 'ABCDEFGH',
+                preset: 'trial_1d',
+                scope_type: 'all',
+                camera_ids_json: '[]',
+                playback_window_hours: 24,
+                expires_at: '2026-05-06 12:00:00',
+                revoked_at: null,
+                last_used_at: null,
+                use_count: 0,
+                share_template: 'Kode: {{token}}',
+                created_by: 1,
+                created_at: '2026-05-05 12:00:00',
+                updated_at: '2026-05-05 12:00:00',
+            });
+        const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
+
+        const result = playbackTokenService.createToken(
+            {
+                label: 'Kode Auto',
+                preset: 'trial_1d',
+                scope_type: 'all',
+                access_code_mode: 'auto',
+                access_code_length: 8,
+            },
+            { user: { id: 1 }, headers: { origin: 'https://cctv.raf.my.id' } }
+        );
+
+        expect(result.share_key).toMatch(/^[A-Z0-9]{8}$/);
+        expect(result.share_key).toHaveLength(8);
+        expect(result.share_text).toContain(result.share_key);
     });
 
     it('allows only cameras included in selected scope', async () => {
@@ -97,6 +181,7 @@ describe('playbackTokenService', () => {
                 created_at: '2026-05-05 12:00:00',
                 updated_at: '2026-05-05 12:00:00',
             })
+            .mockReturnValueOnce(null)
             .mockReturnValueOnce({
                 id: 17,
                 label: 'Client Lama',
@@ -122,7 +207,7 @@ describe('playbackTokenService', () => {
             headers: { origin: 'https://cctv.raf.my.id' },
         });
 
-        expect(result.share_text).toContain('rafps_');
+        expect(result.share_text).toMatch(/Kode: [A-Z0-9]{8}/);
         expect(result.share_text).toContain('/playback?share=');
         expect(result.share_text).not.toContain('rafpb_secret');
         expect(connectionPool.execute.mock.calls[0][0]).toContain('share_key_hash');

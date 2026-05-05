@@ -46,6 +46,11 @@ const TOKEN_PRESETS = {
     },
 };
 
+const ACCESS_CODE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+const DEFAULT_ACCESS_CODE_LENGTH = 8;
+const MIN_ACCESS_CODE_LENGTH = 6;
+const MAX_ACCESS_CODE_LENGTH = 32;
+
 function toSqlDate(date) {
     if (!date) {
         return null;
@@ -66,6 +71,15 @@ function parseDate(value) {
 function normalizePositiveInteger(value) {
     const parsed = Number.parseInt(value, 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function normalizeAccessCodeLength(value) {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed)) {
+        return DEFAULT_ACCESS_CODE_LENGTH;
+    }
+
+    return Math.min(Math.max(parsed, MIN_ACCESS_CODE_LENGTH), MAX_ACCESS_CODE_LENGTH);
 }
 
 function normalizeScopeType(value) {
@@ -90,8 +104,37 @@ function generateToken() {
     return `rafpb_${crypto.randomBytes(24).toString('base64url')}`;
 }
 
-function generateShareKey() {
-    return `rafps_${crypto.randomBytes(24).toString('base64url')}`;
+function generateAccessCode(length = DEFAULT_ACCESS_CODE_LENGTH) {
+    const normalizedLength = normalizeAccessCodeLength(length);
+    let code = '';
+    for (let index = 0; index < normalizedLength; index += 1) {
+        const randomIndex = crypto.randomInt(0, ACCESS_CODE_CHARS.length);
+        code += ACCESS_CODE_CHARS[randomIndex];
+    }
+    return code;
+}
+
+function normalizeCustomAccessCode(value) {
+    const code = String(value || '').trim().toUpperCase();
+    if (!code) {
+        const err = new Error('Kode akses custom wajib diisi');
+        err.statusCode = 400;
+        throw err;
+    }
+
+    if (code.length < MIN_ACCESS_CODE_LENGTH || code.length > MAX_ACCESS_CODE_LENGTH) {
+        const err = new Error(`Kode akses harus ${MIN_ACCESS_CODE_LENGTH}-${MAX_ACCESS_CODE_LENGTH} karakter`);
+        err.statusCode = 400;
+        throw err;
+    }
+
+    if (!/^[A-Z0-9_-]+$/.test(code)) {
+        const err = new Error('Kode akses hanya boleh huruf, angka, underscore, atau strip');
+        err.statusCode = 400;
+        throw err;
+    }
+
+    return code;
 }
 
 function parseCameraIdsJson(value) {
@@ -189,6 +232,43 @@ class PlaybackTokenService {
         return `${origin}/playback?${queryName}=${queryValue}`;
     }
 
+    ensureShareKeyAvailable(shareKey) {
+        const existing = queryOne(
+            'SELECT id FROM playback_tokens WHERE share_key_hash = ?',
+            [hashToken(shareKey)]
+        );
+
+        if (existing) {
+            const err = new Error('Kode akses sudah digunakan, pilih kode lain');
+            err.statusCode = 409;
+            throw err;
+        }
+    }
+
+    createShareKey(payload = {}) {
+        if (payload.access_code_mode === 'custom') {
+            const customCode = normalizeCustomAccessCode(payload.custom_access_code);
+            this.ensureShareKeyAvailable(customCode);
+            return customCode;
+        }
+
+        const length = normalizeAccessCodeLength(payload.access_code_length);
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+            const code = generateAccessCode(length);
+            const existing = queryOne(
+                'SELECT id FROM playback_tokens WHERE share_key_hash = ?',
+                [hashToken(code)]
+            );
+            if (!existing) {
+                return code;
+            }
+        }
+
+        const err = new Error('Gagal membuat kode akses unik, coba lagi');
+        err.statusCode = 409;
+        throw err;
+    }
+
     buildShareText({ token, shareKey, tokenRow, request }) {
         const row = sanitizeTokenRow(tokenRow) || tokenRow;
         const template = row?.share_template?.trim() || DEFAULT_SHARE_TEMPLATE;
@@ -215,7 +295,7 @@ class PlaybackTokenService {
         const presetKey = TOKEN_PRESETS[payload.preset] ? payload.preset : 'custom';
         const preset = TOKEN_PRESETS[presetKey];
         const token = generateToken();
-        const shareKey = generateShareKey();
+        const shareKey = this.createShareKey(payload);
         const tokenHash = hashToken(token);
         const shareKeyHash = hashToken(shareKey);
         const scopeType = normalizeScopeType(payload.scope_type);
@@ -358,7 +438,7 @@ class PlaybackTokenService {
             throw err;
         }
 
-        const shareKey = generateShareKey();
+        const shareKey = this.createShareKey({ access_code_length: DEFAULT_ACCESS_CODE_LENGTH });
         execute(
             `UPDATE playback_tokens
             SET share_key_hash = ?, share_key_prefix = ?, updated_at = CURRENT_TIMESTAMP
