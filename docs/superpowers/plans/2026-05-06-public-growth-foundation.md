@@ -720,7 +720,7 @@ git push
 - Test: `frontend/src/services/publicGrowthService.test.js`
 - Test: `frontend/src/utils/publicGrowthShare.test.js`
 
-- [ ] **Step 1: Write share helper tests**
+- [x] **Step 1: Write share helper tests**
 
 Create `frontend/src/utils/publicGrowthShare.test.js`:
 
@@ -755,7 +755,7 @@ describe('publicGrowthShare', () => {
 });
 ```
 
-- [ ] **Step 2: Write API wrapper tests**
+- [x] **Step 2: Write API wrapper tests**
 
 Create `frontend/src/services/publicGrowthService.test.js`:
 
@@ -801,7 +801,7 @@ describe('publicGrowthService', () => {
 });
 ```
 
-- [ ] **Step 3: Run focused frontend utility tests**
+- [x] **Step 3: Run focused frontend utility tests**
 
 ```bash
 cd frontend
@@ -810,7 +810,7 @@ npm test -- publicGrowthShare.test.js publicGrowthService.test.js
 
 Expected: all tests PASS.
 
-- [ ] **Step 4: Commit helper layer**
+- [x] **Step 4: Commit helper layer**
 
 ```bash
 git add frontend/src/services/publicGrowthService.js frontend/src/services/publicGrowthService.test.js frontend/src/utils/publicGrowthShare.js frontend/src/utils/publicGrowthShare.test.js
