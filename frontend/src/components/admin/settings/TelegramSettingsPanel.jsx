@@ -29,6 +29,12 @@ function FeatureItem({ title, description, enabled }) {
     );
 }
 
+function formatTargetOptionLabel(target = {}) {
+    const name = target.name || target.id || 'Target Telegram';
+    const chatId = target.chatId ? ` (${target.chatId})` : '';
+    return `${name}${chatId}`;
+}
+
 export default function TelegramSettingsPanel() {
     const [telegramStatus, setTelegramStatus] = useState(null);
     const [areas, setAreas] = useState([]);
@@ -352,9 +358,9 @@ export default function TelegramSettingsPanel() {
                                                     onChange={(event) => updateRule(index, { targetId: event.target.value })}
                                                     className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white"
                                                 >
-                                                    {formData.monitoringChatId && <option value="legacy-monitoring">Monitoring Utama</option>}
+                                                    {formData.monitoringChatId && <option value="legacy-monitoring">Monitoring Utama (Chat ID Monitoring Kamera)</option>}
                                                     {(formData.notificationTargets || []).map((target) => (
-                                                        <option key={target.id} value={target.id}>{target.name || target.id}</option>
+                                                        <option key={target.id} value={target.id}>{formatTargetOptionLabel(target)}</option>
                                                     ))}
                                                 </select>
                                             </div>
