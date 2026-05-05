@@ -368,6 +368,86 @@ describe('playbackTokenService', () => {
         })).toThrow('Session playback tidak aktif');
     });
 
+    it('updates only safe editable token metadata without changing expiry or access scope', async () => {
+        vi.spyOn(connectionPool, 'execute').mockReturnValue({ changes: 1 });
+        vi.spyOn(connectionPool, 'queryOne')
+            .mockReturnValueOnce({
+                id: 51,
+                label: 'Nama Lama',
+                token_prefix: 'rafpb_safe',
+                share_key_prefix: 'SAFE1234',
+                preset: 'trial_3d',
+                scope_type: 'selected',
+                camera_ids_json: '[1,2]',
+                playback_window_hours: 72,
+                expires_at: '2026-05-08 12:00:00',
+                revoked_at: null,
+                last_used_at: null,
+                use_count: 8,
+                max_active_sessions: 1,
+                session_limit_mode: 'strict',
+                session_timeout_seconds: 60,
+                client_note: '',
+                share_template: null,
+                created_by: 1,
+                created_at: '2026-05-05 12:00:00',
+                updated_at: '2026-05-05 12:00:00',
+            })
+            .mockReturnValueOnce({
+                id: 51,
+                label: 'Nama Baru',
+                token_prefix: 'rafpb_safe',
+                share_key_prefix: 'SAFE1234',
+                preset: 'trial_3d',
+                scope_type: 'selected',
+                camera_ids_json: '[1,2]',
+                playback_window_hours: 72,
+                expires_at: '2026-05-08 12:00:00',
+                revoked_at: null,
+                last_used_at: null,
+                use_count: 8,
+                max_active_sessions: 2,
+                session_limit_mode: 'replace_oldest',
+                session_timeout_seconds: 120,
+                client_note: 'NOC utama',
+                share_template: 'Kode {{token}}',
+                created_by: 1,
+                created_at: '2026-05-05 12:00:00',
+                updated_at: '2026-05-05 12:05:00',
+            });
+        const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
+
+        const updated = playbackTokenService.updateTokenSettings(51, {
+            label: 'Nama Baru',
+            max_active_sessions: 2,
+            session_limit_mode: 'replace_oldest',
+            session_timeout_seconds: 120,
+            client_note: 'NOC utama',
+            share_template: 'Kode {{token}}',
+            expires_at: '2099-01-01 00:00:00',
+            scope_type: 'all',
+        }, { user: { id: 3 }, headers: {} });
+
+        expect(updated).toMatchObject({
+            label: 'Nama Baru',
+            expires_at: '2026-05-08 12:00:00',
+            scope_type: 'selected',
+            camera_ids: [1, 2],
+            use_count: 8,
+            max_active_sessions: 2,
+            session_limit_mode: 'replace_oldest',
+            session_timeout_seconds: 120,
+        });
+        expect(connectionPool.execute.mock.calls[0][0]).toContain('UPDATE playback_tokens');
+        expect(connectionPool.execute.mock.calls[0][0]).not.toContain('expires_at');
+        expect(connectionPool.execute.mock.calls[0][0]).not.toContain('scope_type');
+        expect(connectionPool.execute.mock.calls[0][0]).not.toContain('token_hash');
+        expect(connectionPool.execute).toHaveBeenCalledWith(
+            expect.stringContaining('INSERT INTO playback_token_audit_logs'),
+            expect.arrayContaining([51, 'updated'])
+        );
+    });
+
     it('lists recent audit logs with one bounded joined query', async () => {
         vi.spyOn(connectionPool, 'query').mockReturnValue([
             {

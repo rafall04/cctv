@@ -2,7 +2,7 @@
  * Purpose: Create, share, validate, audit, and revoke scoped public playback access tokens.
  * Caller: playback token controllers and recordingPlaybackService.
  * Deps: crypto, SQLite connection helpers.
- * MainFuncs: createToken, listTokens, listAuditLogs, createPlaybackSession, assertPlaybackSession, clearTokenSessions, revokeToken, buildRepeatShareText, validateRequestForCamera, buildShareText.
+ * MainFuncs: createToken, updateTokenSettings, listTokens, listAuditLogs, createPlaybackSession, assertPlaybackSession, clearTokenSessions, revokeToken, buildRepeatShareText, validateRequestForCamera, buildShareText.
  * SideEffects: Writes playback token rows, session rows, audit rows, share keys, and lightweight token usage touches.
  */
 
@@ -491,6 +491,80 @@ class PlaybackTokenService {
 
             throw error;
         }
+    }
+
+    updateTokenSettings(tokenId, payload = {}, request = {}) {
+        const normalizedTokenId = Number.parseInt(tokenId, 10);
+        if (!Number.isInteger(normalizedTokenId) || normalizedTokenId <= 0) {
+            const err = new Error('Token playback tidak valid');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const existing = sanitizeTokenRow(queryOne('SELECT * FROM playback_tokens WHERE id = ?', [normalizedTokenId]));
+        if (!existing) {
+            const err = new Error('Token playback tidak ditemukan');
+            err.statusCode = 404;
+            throw err;
+        }
+
+        const label = String(payload.label || existing.label || '').trim();
+        if (!label) {
+            const err = new Error('Nama token wajib diisi');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const sessionPolicy = this.resolveSessionPolicy({
+            max_active_sessions: Object.prototype.hasOwnProperty.call(payload, 'max_active_sessions')
+                ? payload.max_active_sessions
+                : existing.max_active_sessions,
+            session_limit_mode: payload.session_limit_mode || existing.session_limit_mode,
+            session_timeout_seconds: payload.session_timeout_seconds || existing.session_timeout_seconds,
+            client_note: typeof payload.client_note === 'string' ? payload.client_note : existing.client_note,
+        }, existing.preset || 'custom');
+        const shareTemplate = typeof payload.share_template === 'string' && payload.share_template.trim()
+            ? payload.share_template.trim()
+            : DEFAULT_SHARE_TEMPLATE;
+
+        execute(
+            `UPDATE playback_tokens
+            SET label = ?,
+                max_active_sessions = ?,
+                session_limit_mode = ?,
+                session_timeout_seconds = ?,
+                client_note = ?,
+                share_template = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?`,
+            [
+                label,
+                sessionPolicy.maxActiveSessions,
+                sessionPolicy.sessionLimitMode,
+                sessionPolicy.sessionTimeoutSeconds,
+                sessionPolicy.clientNote,
+                shareTemplate,
+                normalizedTokenId,
+            ]
+        );
+
+        const updated = sanitizeTokenRow(queryOne('SELECT * FROM playback_tokens WHERE id = ?', [normalizedTokenId]));
+        this.recordAudit({
+            tokenId: normalizedTokenId,
+            eventType: 'updated',
+            request,
+            detail: {
+                fields: [
+                    'label',
+                    'max_active_sessions',
+                    'session_limit_mode',
+                    'session_timeout_seconds',
+                    'client_note',
+                    'share_template',
+                ],
+            },
+        });
+        return updated;
     }
 
     cleanupExpiredSessions(tokenId) {

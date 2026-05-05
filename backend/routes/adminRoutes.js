@@ -8,7 +8,7 @@
 
 import { getDashboardStats, getTodayStats, testTelegramNotification, getTelegramConfig, updateTelegramConfig, getViewerAnalytics, getViewerHistoryPage, getRealTimeViewers, getCameraHealthDebug, getCacheStats, clearCache, getTimezoneConfig, updateTimezoneConfig, exportDatabaseBackup, importDatabaseBackup, getBackupPreview } from '../controllers/adminController.js';
 import { generateApiKey, listApiKeys, deleteApiKey } from '../controllers/apiKeyController.js';
-import { clearPlaybackTokenSessions, createPlaybackToken, listPlaybackTokenAuditLogs, listPlaybackTokens, revokePlaybackToken, sharePlaybackToken } from '../controllers/playbackTokenController.js';
+import { clearPlaybackTokenSessions, createPlaybackToken, listPlaybackTokenAuditLogs, listPlaybackTokens, revokePlaybackToken, sharePlaybackToken, updatePlaybackToken } from '../controllers/playbackTokenController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 import { createApiKeySchema, apiKeyIdParamSchema } from '../middleware/schemaValidators.js';
 import mediaMtxService from '../services/mediaMtxService.js';
@@ -76,6 +76,11 @@ export default async function adminRoutes(fastify, options) {
     fastify.post('/playback-tokens', {
         onRequest: [authMiddleware],
         handler: createPlaybackToken,
+    });
+
+    fastify.put('/playback-tokens/:id', {
+        onRequest: [authMiddleware],
+        handler: updatePlaybackToken,
     });
 
     fastify.post('/playback-tokens/:id/share', {

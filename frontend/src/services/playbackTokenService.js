@@ -2,7 +2,7 @@
  * Purpose: Frontend API client for activating and managing playback access tokens.
  * Caller: public playback token UI and admin playback token management page.
  * Deps: apiClient.
- * MainFuncs: activateToken, heartbeatToken, clearToken, listTokens, listAuditLogs, createToken, shareToken, clearSessions, revokeToken.
+ * MainFuncs: activateToken, heartbeatToken, clearToken, listTokens, listAuditLogs, createToken, updateToken, shareToken, clearSessions, revokeToken.
  * SideEffects: Sends token activation and admin token management requests to backend.
  */
 
@@ -51,6 +51,11 @@ export const playbackTokenService = {
 
     async createToken(payload) {
         const response = await apiClient.post('/api/admin/playback-tokens', payload);
+        return response.data;
+    },
+
+    async updateToken(id, payload) {
+        const response = await apiClient.put(`/api/admin/playback-tokens/${id}`, payload);
         return response.data;
     },
 

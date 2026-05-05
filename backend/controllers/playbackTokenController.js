@@ -2,7 +2,7 @@
  * Purpose: HTTP handlers for admin playback token management and public token activation.
  * Caller: playbackTokenRoutes and adminRoutes.
  * Deps: playbackTokenService and auth cookie option helper.
- * MainFuncs: listPlaybackTokens, listPlaybackTokenAuditLogs, createPlaybackToken, sharePlaybackToken, revokePlaybackToken, activatePlaybackToken, heartbeatPlaybackToken, clearPlaybackToken, clearPlaybackTokenSessions.
+ * MainFuncs: listPlaybackTokens, listPlaybackTokenAuditLogs, createPlaybackToken, updatePlaybackToken, sharePlaybackToken, revokePlaybackToken, activatePlaybackToken, heartbeatPlaybackToken, clearPlaybackToken, clearPlaybackTokenSessions.
  * SideEffects: Creates/revokes tokens and sets/clears HttpOnly playback token/session cookies.
  */
 
@@ -64,6 +64,19 @@ export async function createPlaybackToken(request, reply) {
         });
     } catch (error) {
         console.error('Create playback token error:', error);
+        return reply.code(error.statusCode || 500).send({
+            success: false,
+            message: error.statusCode ? error.message : 'Internal server error',
+        });
+    }
+}
+
+export async function updatePlaybackToken(request, reply) {
+    try {
+        const data = playbackTokenService.updateTokenSettings(request.params.id, request.body || {}, request);
+        return reply.send({ success: true, message: 'Token playback diperbarui', data });
+    } catch (error) {
+        console.error('Update playback token error:', error);
         return reply.code(error.statusCode || 500).send({
             success: false,
             message: error.statusCode ? error.message : 'Internal server error',
