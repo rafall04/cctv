@@ -1,11 +1,14 @@
 /**
- * Telegram Notification Service
- * Sends alerts for camera status changes, feedback, and system events
- * Configuration stored in database (settings table)
+ * Purpose: Send Telegram alerts for camera status, feedback, and system events with multi-target routing.
+ * Caller: cameraHealthService, feedback flows, admin Telegram config/test endpoints.
+ * Deps: database settings table, timezoneService, Telegram Bot API, internal ingest policy resolver.
+ * MainFuncs: sendCameraStatusNotifications, sendMonitoringMessage, sendFeedbackMessage, getTelegramStatus.
+ * SideEffects: Reads/writes settings, sends outbound Telegram HTTP requests, maintains in-memory cooldown cache.
  */
 
 import { queryOne, execute } from '../database/database.js';
 import { formatDateTime } from './timezoneService.js';
+import { resolveInternalIngestPolicy } from '../utils/internalIngestPolicy.js';
 
 // Cooldown tracking to prevent spam
 const notificationCooldowns = new Map();
@@ -15,6 +18,169 @@ const COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
 let settingsCache = null;
 let settingsCacheTime = 0;
 const CACHE_TTL = 60000; // 60 seconds
+const LEGACY_MONITORING_TARGET_ID = 'legacy-monitoring';
+const VALID_EVENTS = new Set(['offline', 'online']);
+
+function normalizeTelegramTarget(target = {}) {
+    const id = String(target.id || target.name || target.chatId || '').trim();
+    const chatId = String(target.chatId || '').trim();
+    if (!id || !chatId) {
+        return null;
+    }
+
+    return {
+        id,
+        name: String(target.name || id).trim(),
+        chatId,
+        enabled: target.enabled !== false,
+    };
+}
+
+function normalizeTelegramRule(rule = {}) {
+    const targetId = String(rule.targetId || '').trim();
+    if (!targetId) {
+        return null;
+    }
+
+    const events = Array.isArray(rule.events)
+        ? rule.events.filter((event) => VALID_EVENTS.has(event))
+        : ['offline', 'online'];
+    const ingestModes = Array.isArray(rule.ingestModes) && rule.ingestModes.length > 0
+        ? rule.ingestModes
+        : ['always_on'];
+
+    return {
+        id: String(rule.id || `${targetId}-${rule.scope || 'global'}`).trim(),
+        enabled: rule.enabled !== false,
+        targetId,
+        scope: ['global', 'area', 'camera'].includes(rule.scope) ? rule.scope : 'global',
+        areaId: Number.parseInt(rule.areaId, 10),
+        cameraId: Number.parseInt(rule.cameraId, 10),
+        events,
+        ingestModes,
+    };
+}
+
+function normalizeTelegramSettings(settings = {}) {
+    const targets = [];
+    if (settings.monitoringChatId) {
+        targets.push({
+            id: LEGACY_MONITORING_TARGET_ID,
+            name: 'Monitoring Utama',
+            chatId: String(settings.monitoringChatId).trim(),
+            enabled: true,
+        });
+    }
+
+    if (Array.isArray(settings.notificationTargets)) {
+        for (const target of settings.notificationTargets) {
+            const normalized = normalizeTelegramTarget(target);
+            if (normalized) {
+                targets.push(normalized);
+            }
+        }
+    }
+
+    const targetByChatId = new Map();
+    for (const target of targets) {
+        if (target.enabled) {
+            targetByChatId.set(target.chatId, target);
+        }
+    }
+
+    const rules = Array.isArray(settings.notificationRules)
+        ? settings.notificationRules.map(normalizeTelegramRule).filter(Boolean)
+        : [];
+
+    if (rules.length === 0 && settings.monitoringChatId) {
+        rules.push({
+            id: 'default-always-on',
+            enabled: true,
+            targetId: LEGACY_MONITORING_TARGET_ID,
+            scope: 'global',
+            events: ['offline', 'online'],
+            ingestModes: ['always_on'],
+        });
+    }
+
+    return {
+        ...settings,
+        notificationTargets: Array.from(targetByChatId.values()),
+        notificationRules: rules,
+    };
+}
+
+function getCameraArea(camera = {}) {
+    return {
+        internal_ingest_policy_default: camera.area_internal_ingest_policy_default,
+        internal_on_demand_close_after_seconds: camera.area_internal_on_demand_close_after_seconds,
+    };
+}
+
+function getCameraIngestMode(camera = {}) {
+    if (camera.delivery_type !== 'internal_hls') {
+        return 'external';
+    }
+
+    return resolveInternalIngestPolicy(camera, getCameraArea(camera)).mode;
+}
+
+function ruleMatchesCamera(rule, camera, eventType) {
+    if (!rule.enabled || !rule.events.includes(eventType)) {
+        return false;
+    }
+
+    const ingestMode = getCameraIngestMode(camera);
+    if (!rule.ingestModes.includes('any') && !rule.ingestModes.includes(ingestMode)) {
+        return false;
+    }
+
+    if (rule.scope === 'area') {
+        return Number.parseInt(camera.area_id, 10) === rule.areaId;
+    }
+
+    if (rule.scope === 'camera') {
+        return Number.parseInt(camera.id, 10) === rule.cameraId;
+    }
+
+    return true;
+}
+
+function groupCamerasByArea(cameras = []) {
+    const groups = new Map();
+    for (const camera of cameras) {
+        const areaName = camera.area_name || camera.areaName || camera.location || 'Tanpa Area';
+        if (!groups.has(areaName)) {
+            groups.set(areaName, []);
+        }
+        groups.get(areaName).push(camera);
+    }
+    return groups;
+}
+
+function buildCameraStatusMessage(eventType, cameras = [], targetName = '') {
+    const title = eventType === 'offline' ? 'CCTV DOWN' : 'CCTV RECOVERED';
+    const groups = groupCamerasByArea(cameras);
+    const lines = [
+        `<b>${title}${targetName ? ` - ${targetName}` : ''}</b>`,
+        `Total: ${cameras.length} kamera`,
+        '',
+    ];
+
+    for (const [areaName, areaCameras] of groups.entries()) {
+        lines.push(`<b>${areaName}</b>`);
+        areaCameras.slice(0, 20).forEach((camera, index) => {
+            lines.push(`${index + 1}. ${camera.name}`);
+        });
+        if (areaCameras.length > 20) {
+            lines.push(`...dan ${areaCameras.length - 20} kamera lainnya`);
+        }
+        lines.push('');
+    }
+
+    lines.push(formatDateTime(new Date()));
+    return lines.join('\n').trim();
+}
 
 /**
  * Get Telegram settings from database with caching
@@ -28,14 +194,14 @@ function getTelegramSettings() {
     try {
         const setting = queryOne('SELECT value FROM settings WHERE key = ?', ['telegram_config']);
         if (setting) {
-            settingsCache = JSON.parse(setting.value);
+            settingsCache = normalizeTelegramSettings(JSON.parse(setting.value));
         } else {
-            settingsCache = {
+            settingsCache = normalizeTelegramSettings({
                 botToken: '',
                 monitoringChatId: '',
                 feedbackChatId: '',
                 enabled: false
-            };
+            });
         }
         settingsCacheTime = now;
         return settingsCache;
@@ -63,7 +229,7 @@ export function clearSettingsCache() {
  */
 export function saveTelegramSettings(settings) {
     try {
-        const valueStr = JSON.stringify(settings);
+        const valueStr = JSON.stringify(normalizeTelegramSettings(settings));
         const existing = queryOne('SELECT * FROM settings WHERE key = ?', ['telegram_config']);
         
         if (existing) {
@@ -133,6 +299,65 @@ async function sendToTelegram(message, chatId) {
         console.error('[Telegram] Error:', error.message);
         return false;
     }
+}
+
+export async function sendCameraStatusNotifications(eventType, cameras = []) {
+    if (!VALID_EVENTS.has(eventType) || cameras.length === 0) {
+        return false;
+    }
+
+    const settings = getTelegramSettings();
+    if (!settings.botToken) {
+        console.log('[Telegram] Bot not configured');
+        return false;
+    }
+
+    const targetsById = new Map(settings.notificationTargets.map((target) => [target.id, target]));
+    const camerasByChatId = new Map();
+
+    for (const camera of cameras) {
+        for (const rule of settings.notificationRules) {
+            if (!ruleMatchesCamera(rule, camera, eventType)) {
+                continue;
+            }
+
+            const target = targetsById.get(rule.targetId);
+            if (!target?.chatId) {
+                continue;
+            }
+
+            if (!camerasByChatId.has(target.chatId)) {
+                camerasByChatId.set(target.chatId, {
+                    target,
+                    camerasById: new Map(),
+                });
+            }
+            camerasByChatId.get(target.chatId).camerasById.set(camera.id, camera);
+        }
+    }
+
+    let sentCount = 0;
+    for (const { target, camerasById } of camerasByChatId.values()) {
+        const targetCameras = Array.from(camerasById.values());
+        if (targetCameras.length === 0) {
+            continue;
+        }
+
+        const cooldownKey = `camera_status_${eventType}_${target.chatId}_${targetCameras.map((camera) => camera.id).sort().join('_')}`;
+        if (isInCooldown(cooldownKey)) {
+            console.log(`[Telegram] Skipping ${eventType} group notification for ${target.name} (cooldown)`);
+            continue;
+        }
+
+        const message = buildCameraStatusMessage(eventType, targetCameras, target.name);
+        const sent = await sendToTelegram(message, target.chatId);
+        if (sent) {
+            setCooldown(cooldownKey);
+            sentCount += 1;
+        }
+    }
+
+    return sentCount > 0;
 }
 
 export async function sendMonitoringMessage(message) {
@@ -206,6 +431,8 @@ ${camera.location ? `📍 ${camera.location}` : ''}
 
 export async function sendMultipleCamerasOfflineNotification(cameras) {
     if (cameras.length === 0) return false;
+    const routed = await sendCameraStatusNotifications('offline', cameras);
+    if (routed) return true;
     if (cameras.length === 1) return sendCameraOfflineNotification(cameras[0]);
 
     const cameraList = cameras.map(c => `• ${c.name}`).join('\n');
@@ -224,6 +451,8 @@ ${cameraList}
 
 export async function sendMultipleCamerasOnlineNotification(cameras) {
     if (cameras.length === 0) return false;
+    const routed = await sendCameraStatusNotifications('online', cameras);
+    if (routed) return true;
     if (cameras.length === 1) return sendCameraOnlineNotification(cameras[0]);
 
     const cameraList = cameras.map(c => `• ${c.name}`).join('\n');
@@ -275,7 +504,7 @@ Tipe: ${type === 'monitoring' ? 'Monitoring Kamera' : 'Kritik & Saran'}
 
 export function isTelegramConfigured() {
     const settings = getTelegramSettings();
-    return !!(settings.botToken && settings.monitoringChatId);
+    return !!(settings.botToken && (settings.monitoringChatId || settings.notificationTargets.length > 0));
 }
 
 export function isFeedbackConfigured() {
@@ -292,6 +521,8 @@ export function getTelegramStatus() {
         botToken: settings.botToken ? `${settings.botToken.substring(0, 10)}...` : '',
         monitoringChatId: settings.monitoringChatId || '',
         feedbackChatId: settings.feedbackChatId || '',
+        notificationTargets: settings.notificationTargets || [],
+        notificationRules: settings.notificationRules || [],
     };
 }
 
@@ -300,6 +531,7 @@ export default {
     sendFeedbackMessage,
     sendCameraOfflineNotification,
     sendCameraOnlineNotification,
+    sendCameraStatusNotifications,
     sendMultipleCamerasOfflineNotification,
     sendMultipleCamerasOnlineNotification,
     sendFeedbackNotification,

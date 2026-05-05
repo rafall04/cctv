@@ -1,3 +1,11 @@
+/**
+ * Purpose: Handle admin dashboard, Telegram, analytics, timezone, cache, and backup API responses.
+ * Caller: backend/routes/adminRoutes.js.
+ * Deps: admin services, Telegram service, cache, timezone, backup, camera health services.
+ * MainFuncs: getDashboardStats, testTelegramNotification, getTelegramConfig, updateTelegramConfig.
+ * SideEffects: Reads metrics/settings, writes Telegram/timezone config, sends Telegram test messages.
+ */
+
 import os from 'os';
 import { query, queryOne } from '../database/database.js';
 import adminDashboardService from '../services/adminDashboardService.js';
@@ -118,13 +126,21 @@ export async function getTelegramConfig(request, reply) {
  */
 export async function updateTelegramConfig(request, reply) {
     try {
-        const { botToken, monitoringChatId, feedbackChatId } = request.body;
+        const {
+            botToken,
+            monitoringChatId,
+            feedbackChatId,
+            notificationTargets = [],
+            notificationRules = [],
+        } = request.body;
 
         const settings = {
             botToken: botToken || '',
             monitoringChatId: monitoringChatId || '',
             feedbackChatId: feedbackChatId || '',
-            enabled: !!(botToken && (monitoringChatId || feedbackChatId))
+            notificationTargets: Array.isArray(notificationTargets) ? notificationTargets : [],
+            notificationRules: Array.isArray(notificationRules) ? notificationRules : [],
+            enabled: !!(botToken && (monitoringChatId || feedbackChatId || notificationTargets.length > 0))
         };
 
         const saved = saveTelegramSettings(settings);

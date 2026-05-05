@@ -54,6 +54,7 @@ vi.mock('../services/mediaMtxService.js', () => ({
 vi.mock('../services/telegramService.js', () => ({
     sendCameraOfflineNotification: vi.fn(),
     sendCameraOnlineNotification: vi.fn(),
+    sendCameraStatusNotifications: vi.fn(),
     isTelegramConfigured: vi.fn(() => false),
 }));
 

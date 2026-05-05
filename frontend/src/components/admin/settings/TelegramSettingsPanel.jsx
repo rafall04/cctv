@@ -1,5 +1,14 @@
+/**
+ * Purpose: Admin panel for Telegram bot settings, multi-target notification groups, and routing rules.
+ * Caller: UnifiedSettings Telegram section.
+ * Deps: adminService, areaService, UI Skeleton/Alert components.
+ * MainFuncs: TelegramSettingsPanel, FeatureItem.
+ * SideEffects: Loads/saves Telegram settings and sends test notification requests.
+ */
+
 import { useState, useEffect, useCallback } from 'react';
 import { adminService } from '../../../services/adminService';
+import { areaService } from '../../../services/areaService';
 import { Skeleton } from '../../ui/Skeleton';
 import { Alert } from '../../ui/Alert';
 
@@ -22,6 +31,7 @@ function FeatureItem({ title, description, enabled }) {
 
 export default function TelegramSettingsPanel() {
     const [telegramStatus, setTelegramStatus] = useState(null);
+    const [areas, setAreas] = useState([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [testLoading, setTestLoading] = useState({ monitoring: false, feedback: false });
@@ -33,22 +43,32 @@ export default function TelegramSettingsPanel() {
         botToken: '',
         monitoringChatId: '',
         feedbackChatId: '',
+        notificationTargets: [],
+        notificationRules: [],
     });
 
     const loadTelegramStatus = useCallback(async () => {
         try {
             setLoading(true);
-            const response = await adminService.getTelegramStatus();
+            const [response, areaResponse] = await Promise.all([
+                adminService.getTelegramStatus(),
+                areaService.getAllAreas(),
+            ]);
             if (!response.success) {
                 setError(response.message || 'Gagal memuat status Telegram');
                 return;
             }
 
+            if (areaResponse?.success) {
+                setAreas(areaResponse.data || []);
+            }
             setTelegramStatus(response.data);
             setFormData({
                 botToken: response.data.botToken || '',
                 monitoringChatId: response.data.monitoringChatId || '',
                 feedbackChatId: response.data.feedbackChatId || '',
+                notificationTargets: response.data.notificationTargets || [],
+                notificationRules: response.data.notificationRules || [],
             });
             setError(null);
         } catch (requestError) {
@@ -106,9 +126,78 @@ export default function TelegramSettingsPanel() {
             botToken: telegramStatus?.botToken || '',
             monitoringChatId: telegramStatus?.monitoringChatId || '',
             feedbackChatId: telegramStatus?.feedbackChatId || '',
+            notificationTargets: telegramStatus?.notificationTargets || [],
+            notificationRules: telegramStatus?.notificationRules || [],
         });
         setError(null);
         setIsEditing(false);
+    };
+
+    const addTarget = () => {
+        const id = `target-${Date.now()}`;
+        setFormData((prev) => ({
+            ...prev,
+            notificationTargets: [
+                ...(prev.notificationTargets || []),
+                { id, name: 'Grup Baru', chatId: '', enabled: true },
+            ],
+        }));
+    };
+
+    const updateTarget = (index, patch) => {
+        setFormData((prev) => ({
+            ...prev,
+            notificationTargets: (prev.notificationTargets || []).map((target, targetIndex) => (
+                targetIndex === index ? { ...target, ...patch } : target
+            )),
+        }));
+    };
+
+    const removeTarget = (index) => {
+        setFormData((prev) => {
+            const target = prev.notificationTargets?.[index];
+            return {
+                ...prev,
+                notificationTargets: (prev.notificationTargets || []).filter((_, targetIndex) => targetIndex !== index),
+                notificationRules: (prev.notificationRules || []).filter((rule) => rule.targetId !== target?.id),
+            };
+        });
+    };
+
+    const addRule = () => {
+        const firstTarget = formData.notificationTargets?.[0];
+        setFormData((prev) => ({
+            ...prev,
+            notificationRules: [
+                ...(prev.notificationRules || []),
+                {
+                    id: `rule-${Date.now()}`,
+                    enabled: true,
+                    targetId: firstTarget?.id || 'legacy-monitoring',
+                    scope: 'global',
+                    areaId: '',
+                    cameraId: '',
+                    events: ['offline', 'online'],
+                    ingestModes: ['always_on'],
+                },
+            ],
+        }));
+    };
+
+    const updateRule = (index, patch) => {
+        setFormData((prev) => ({
+            ...prev,
+            notificationRules: (prev.notificationRules || []).map((rule, ruleIndex) => (
+                ruleIndex === index ? { ...rule, ...patch } : rule
+            )),
+        }));
+    };
+
+    const removeRule = (index) => {
+        setFormData((prev) => ({
+            ...prev,
+            notificationRules: (prev.notificationRules || []).filter((_, ruleIndex) => ruleIndex !== index),
+        }));
     };
 
     if (loading) {
@@ -198,6 +287,135 @@ export default function TelegramSettingsPanel() {
                                 />
                             </div>
 
+                            <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-4">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div>
+                                        <h3 className="font-semibold text-gray-900 dark:text-white">Target Grup Monitoring</h3>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400">Tambahkan grup Telegram untuk NOC, area, atau teknisi.</p>
+                                    </div>
+                                    <button type="button" onClick={addTarget} className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium">
+                                        Tambah Grup
+                                    </button>
+                                </div>
+
+                                <div className="space-y-3">
+                                    {(formData.notificationTargets || []).map((target, index) => (
+                                        <div key={target.id || index} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Nama Grup</label>
+                                                <input
+                                                    type="text"
+                                                    value={target.name || ''}
+                                                    onChange={(event) => updateTarget(index, { name: event.target.value, id: target.id || `target-${Date.now()}` })}
+                                                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Chat ID</label>
+                                                <input
+                                                    type="text"
+                                                    value={target.chatId || ''}
+                                                    onChange={(event) => updateTarget(index, { chatId: event.target.value })}
+                                                    placeholder="-1001234567890"
+                                                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white"
+                                                />
+                                            </div>
+                                            <button type="button" onClick={() => removeTarget(index)} className="px-3 py-2 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-lg text-sm font-medium">
+                                                Hapus
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {(formData.notificationTargets || []).length === 0 && (
+                                        <p className="text-sm text-gray-500 dark:text-gray-400">Belum ada grup tambahan. Chat ID monitoring utama tetap menjadi fallback.</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-4">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div>
+                                        <h3 className="font-semibold text-gray-900 dark:text-white">Routing Notifikasi CCTV</h3>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400">Default rule memakai internal always-on agar on-demand tidak membuat spam.</p>
+                                    </div>
+                                    <button type="button" onClick={addRule} className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium">
+                                        Tambah Rule
+                                    </button>
+                                </div>
+
+                                <div className="space-y-3">
+                                    {(formData.notificationRules || []).map((rule, index) => (
+                                        <div key={rule.id || index} className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] gap-3 items-end p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Kirim Ke</label>
+                                                <select
+                                                    value={rule.targetId || 'legacy-monitoring'}
+                                                    onChange={(event) => updateRule(index, { targetId: event.target.value })}
+                                                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white"
+                                                >
+                                                    {formData.monitoringChatId && <option value="legacy-monitoring">Monitoring Utama</option>}
+                                                    {(formData.notificationTargets || []).map((target) => (
+                                                        <option key={target.id} value={target.id}>{target.name || target.id}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Scope</label>
+                                                <select
+                                                    value={rule.scope || 'global'}
+                                                    onChange={(event) => updateRule(index, { scope: event.target.value })}
+                                                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white"
+                                                >
+                                                    <option value="global">Global</option>
+                                                    <option value="area">Per Area</option>
+                                                    <option value="camera">Per Kamera</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">{rule.scope === 'camera' ? 'Camera ID' : 'Area'}</label>
+                                                {rule.scope === 'area' ? (
+                                                    <select
+                                                        value={rule.areaId || ''}
+                                                        onChange={(event) => updateRule(index, { areaId: event.target.value })}
+                                                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white"
+                                                    >
+                                                        <option value="">Pilih Area</option>
+                                                        {areas.map((area) => (
+                                                            <option key={area.id} value={area.id}>{area.name}</option>
+                                                        ))}
+                                                    </select>
+                                                ) : (
+                                                    <input
+                                                        type="number"
+                                                        value={rule.scope === 'camera' ? (rule.cameraId || '') : ''}
+                                                        disabled={rule.scope !== 'camera'}
+                                                        onChange={(event) => updateRule(index, { cameraId: event.target.value })}
+                                                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white disabled:opacity-50"
+                                                    />
+                                                )}
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Ingest</label>
+                                                <select
+                                                    value={rule.ingestModes?.[0] || 'always_on'}
+                                                    onChange={(event) => updateRule(index, { ingestModes: [event.target.value] })}
+                                                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white"
+                                                >
+                                                    <option value="always_on">Always On</option>
+                                                    <option value="on_demand">On Demand</option>
+                                                    <option value="any">Semua</option>
+                                                </select>
+                                            </div>
+                                            <button type="button" onClick={() => removeRule(index)} className="px-3 py-2 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-lg text-sm font-medium">
+                                                Hapus
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {(formData.notificationRules || []).length === 0 && (
+                                        <p className="text-sm text-gray-500 dark:text-gray-400">Jika kosong, sistem memakai fallback: Monitoring Utama untuk internal always-on saja.</p>
+                                    )}
+                                </div>
+                            </div>
+
                             <div className="flex items-center gap-3 pt-4">
                                 <button onClick={handleSave} disabled={saving} className="px-6 py-2.5 bg-primary hover:bg-primary-600 disabled:bg-blue-400 text-white font-medium rounded-xl transition-colors">
                                     {saving ? 'Menyimpan...' : 'Simpan'}
@@ -208,7 +426,8 @@ export default function TelegramSettingsPanel() {
                             </div>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {[
                                 {
                                     key: 'monitoring',
@@ -250,7 +469,20 @@ export default function TelegramSettingsPanel() {
                                     )}
                                 </div>
                             ))}
-                        </div>
+                            </div>
+                            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <FeatureItem
+                                    title="Multi Grup Monitoring"
+                                    description={`${telegramStatus?.notificationTargets?.length || 0} grup tambahan terdaftar.`}
+                                    enabled={(telegramStatus?.notificationTargets?.length || 0) > 0}
+                                />
+                                <FeatureItem
+                                    title="Routing Policy"
+                                    description={`${telegramStatus?.notificationRules?.length || 0} rule aktif untuk area/kamera.`}
+                                    enabled={(telegramStatus?.notificationRules?.length || 0) > 0 || telegramStatus?.monitoringConfigured}
+                                />
+                            </div>
+                        </>
                     )}
 
                     <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl p-4">

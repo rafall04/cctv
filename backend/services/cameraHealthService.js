@@ -13,9 +13,8 @@ import net from 'net';
 import { config } from '../config/config.js';
 import { query, queryOne, execute, transaction } from '../database/connectionPool.js';
 import {
-    sendCameraOfflineNotification,
-    sendCameraOnlineNotification,
-    isTelegramConfigured
+    isTelegramConfigured,
+    sendCameraStatusNotifications
 } from './telegramService.js';
 import { getTimezone } from './timezoneService.js';
 import { recordingService } from './recordingService.js';
@@ -2562,7 +2561,7 @@ class CameraHealthService {
             }
 
             if (isTelegramConfigured() && (wentOffline.length > 0 || wentOnline.length > 0)) {
-                import('./telegramService.js').then(async (telegram) => {
+                try {
                     const flipFlopIds = new Set(
                         wentOffline.filter(c => wentOnline.some(o => o.id === c.id)).map(c => c.id)
                     );
@@ -2571,17 +2570,15 @@ class CameraHealthService {
                     
                     if (realOffline.length > 0) {
                         for (const cam of realOffline) this.offlineSince.set(cam.id, Date.now());
-                        telegram.sendMultipleCamerasOfflineNotification(realOffline).catch(e => console.error(e));
+                        sendCameraStatusNotifications('offline', realOffline).catch(e => console.error(e));
                     }
                     if (realOnline.length > 0) {
                         for (const cam of realOnline) this.offlineSince.delete(cam.id);
-                        if (realOnline.length === 1) {
-                            telegram.sendCameraOnlineNotification(realOnline[0]).catch(e => console.error(e));
-                        } else if (telegram.sendMultipleCamerasOnlineNotification) {
-                            telegram.sendMultipleCamerasOnlineNotification(realOnline).catch(e => console.error(e));
-                        }
+                        sendCameraStatusNotifications('online', realOnline).catch(e => console.error(e));
                     }
-                }).catch(err => console.error('[CameraHealth] Error loading telegramService', err));
+                } catch (err) {
+                    console.error('[CameraHealth] Error routing telegram notification', err);
+                }
             }
 
             for (const cameraId of this.healthState.keys()) {
