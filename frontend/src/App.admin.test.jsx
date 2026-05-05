@@ -12,6 +12,12 @@ vi.mock('./components/ui/ToastContainer', () => ({
     ToastContainer: () => null,
 }));
 
+vi.mock('./services/api', () => ({
+    adminAPI: {
+        get: vi.fn().mockResolvedValue({ data: { data: { timezone: 'Asia/Jakarta' } } }),
+    },
+}));
+
 vi.mock('./layouts/AdminLayout', () => ({
     default: ({ children }) => <div data-testid="admin-layout">{children}</div>,
 }));
@@ -59,6 +65,18 @@ vi.mock('./pages/ViewerAnalytics', () => ({
 vi.mock('./pages/PlaybackAnalytics', () => ({
     default: () => <div>playback-analytics-page</div>,
 }));
+
+vi.mock('./pages/PlaybackTokenManagement', async () => {
+    const { useTimezone } = await vi.importActual('./contexts/TimezoneContext');
+    function PlaybackTokenManagementMock() {
+        const { timezone } = useTimezone();
+        return <div>playback-token-page:{timezone}</div>;
+    }
+
+    return {
+        default: PlaybackTokenManagementMock,
+    };
+});
 
 vi.mock('./pages/UnifiedSettings', () => ({
     default: () => <div>settings-page</div>,
@@ -141,6 +159,20 @@ describe('App admin routing', () => {
 
         await waitFor(() => {
             expect(screen.getByText('playback-analytics-page')).toBeTruthy();
+        });
+    });
+
+    it('menyediakan timezone provider untuk route playback token admin', async () => {
+        window.history.pushState({}, '', '/admin/playback-tokens');
+
+        render(<App />);
+
+        await waitFor(() => {
+            expect(screen.getByTestId('admin-layout')).toBeTruthy();
+        });
+
+        await waitFor(() => {
+            expect(screen.getByText('playback-token-page:Asia/Jakarta')).toBeTruthy();
         });
     });
 });

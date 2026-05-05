@@ -12,6 +12,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { SecurityProvider } from './contexts/SecurityContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { BrandingProvider } from './contexts/BrandingContext';
+import { TimezoneProvider } from './contexts/TimezoneContext';
 import { ToastContainer } from './components/ui/ToastContainer';
 import { ApiClientInitializer } from './components/ApiClientInitializer';
 import ErrorBoundary from './components/ui/ErrorBoundary';
@@ -59,6 +60,7 @@ function App() {
         <BrandingProvider>
         <SecurityProvider>
         <NotificationProvider>
+        <TimezoneProvider>
         <ApiClientInitializer>
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <ToastContainer />
@@ -202,6 +204,7 @@ function App() {
             </Routes>
         </BrowserRouter>
         </ApiClientInitializer>
+        </TimezoneProvider>
         </NotificationProvider>
         </SecurityProvider>
         </BrandingProvider>

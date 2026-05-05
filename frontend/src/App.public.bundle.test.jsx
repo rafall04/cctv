@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 
@@ -10,6 +10,12 @@ vi.mock('./components/ApiClientInitializer', () => ({
 
 vi.mock('./components/ui/ToastContainer', () => ({
     ToastContainer: () => null,
+}));
+
+vi.mock('./services/api', () => ({
+    adminAPI: {
+        get: vi.fn().mockResolvedValue({ data: { data: { timezone: 'Asia/Jakarta' } } }),
+    },
 }));
 
 vi.mock('./pages/LandingPage', () => ({
@@ -42,6 +48,8 @@ describe('App public routing', () => {
         render(<App />);
 
         expect(screen.getByTestId('public-landing-page')).toBeTruthy();
-        expect(screen.queryByTestId('admin-layout')).toBeNull();
+        await waitFor(() => {
+            expect(screen.queryByTestId('admin-layout')).toBeNull();
+        });
     });
 });
