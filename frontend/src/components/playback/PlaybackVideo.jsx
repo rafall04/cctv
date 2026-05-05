@@ -29,6 +29,7 @@ export default function PlaybackVideo({
     onSeekWarningClose,
     snapshotNotification,
     formatTimestamp,
+    crossOriginMode = 'anonymous',
 }) {
     const getErrorInfo = () => {
         const errors = {
@@ -162,7 +163,7 @@ export default function PlaybackVideo({
                     controls
                     playsInline
                     preload="auto"
-                    crossOrigin="anonymous"
+                    crossOrigin={crossOriginMode}
                     muted
                 />
                 

@@ -1,8 +1,17 @@
+/**
+ * Purpose: Coordinate recording controls, public/admin playback policy, token access, and MP4 segment delivery.
+ * Caller: recordingController playback and recording handlers.
+ * Deps: database connection helpers, recording services, segment repository, settings, playback tokens, fs.
+ * MainFuncs: startRecording, stopRecording, getSegments, getStreamSegment, generatePlaylist, updateRecordingSettings.
+ * SideEffects: Starts/stops recordings, writes camera settings, logs admin actions, reads segment files.
+ */
+
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import { recordingService } from './recordingService.js';
 import recordingSegmentRepository from './recordingSegmentRepository.js';
 import { logAdminAction } from './securityAuditLogger.js';
 import settingsService from './settingsService.js';
+import playbackTokenService from './playbackTokenService.js';
 import { existsSync, statSync } from 'fs';
 
 const PUBLIC_PLAYBACK_MODES = new Set(['inherit', 'disabled', 'preview_only', 'admin_only']);
@@ -201,6 +210,21 @@ class RecordingPlaybackService {
             };
         }
 
+        const shouldTouchToken = request?.url?.includes('/segments') || request?.url?.includes('/playlist.m3u8');
+        const tokenAccess = playbackTokenService.validateRequestForCamera(request, camera.id, { touch: shouldTouchToken });
+        if (tokenAccess) {
+            return {
+                accessMode: 'token_full',
+                isPublicPreview: false,
+                previewMinutes: null,
+                playbackWindowHours: tokenAccess.playback_window_hours,
+                tokenId: tokenAccess.id,
+                notice: null,
+                contact: null,
+                deniedReason: null,
+            };
+        }
+
         const globalSettings = settingsService.getPublicPlaybackSettings();
         const cameraMode = normalizePublicPlaybackMode(camera.public_playback_mode);
 
@@ -306,8 +330,13 @@ class RecordingPlaybackService {
         const previewLimit = getPreviewSegmentLimit(access.previewMinutes);
         const queryOptions = access.accessMode === 'admin_full'
             ? { cameraId, order: 'oldest', limit: 1000, returnAscending: true }
-            : { cameraId, order: 'latest', limit: previewLimit, returnAscending: true };
-        const segmentsAscending = recordingSegmentRepository.findPlaybackSegments(queryOptions);
+            : access.accessMode === 'token_full'
+                ? { cameraId, order: 'oldest', limit: 1000, returnAscending: true }
+                : { cameraId, order: 'latest', limit: previewLimit, returnAscending: true };
+        const segmentsAscending = this.applyPlaybackWindow(
+            recordingSegmentRepository.findPlaybackSegments(queryOptions),
+            access
+        );
 
         if (segmentsAscending.length === 0) {
             const err = new Error('No segments found');
@@ -333,9 +362,20 @@ class RecordingPlaybackService {
             notice: access.notice,
             contact: access.contact,
             deniedReason: access.deniedReason,
+            playbackWindowHours: access.playbackWindowHours || null,
+            tokenId: access.tokenId || null,
             publicPlaybackMode: camera.public_playback_mode,
             segmentCount: segmentsAscending.length,
         };
+    }
+
+    applyPlaybackWindow(segments, access) {
+        if (!access?.playbackWindowHours) {
+            return segments;
+        }
+
+        const cutoffMs = Date.now() - access.playbackWindowHours * 60 * 60 * 1000;
+        return segments.filter((segment) => new Date(segment.start_time).getTime() >= cutoffMs);
     }
 
     getSegments(cameraId, request) {
@@ -361,12 +401,19 @@ class RecordingPlaybackService {
         }
 
         if (access.accessMode !== 'admin_full') {
-            const previewSegments = recordingSegmentRepository.findPlaybackSegments({
-                cameraId,
-                order: 'latest',
-                limit: getPreviewSegmentLimit(access.previewMinutes),
-                returnAscending: true,
-            });
+            const previewSegments = access.accessMode === 'token_full'
+                ? this.applyPlaybackWindow(recordingSegmentRepository.findPlaybackSegments({
+                    cameraId,
+                    order: 'oldest',
+                    limit: 1000,
+                    returnAscending: true,
+                }), access)
+                : recordingSegmentRepository.findPlaybackSegments({
+                    cameraId,
+                    order: 'latest',
+                    limit: getPreviewSegmentLimit(access.previewMinutes),
+                    returnAscending: true,
+                });
 
             if (!previewSegments.some((item) => item.filename === filename)) {
                 const err = new Error('Segment not available for this playback scope');

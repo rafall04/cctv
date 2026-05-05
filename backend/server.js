@@ -47,6 +47,7 @@ import hlsProxyRoutes from './routes/hlsProxyRoutes.js';
 import sponsorRoutes from './routes/sponsorRoutes.js';
 import saweriaRoutes from './routes/saweriaRoutes.js';
 import recordingRoutes from './routes/recordingRoutes.js';
+import playbackTokenRoutes from './routes/playbackTokenRoutes.js';
 import brandingRoutes from './routes/brandingRoutes.js';
 // thumbnailRoutes removed - @fastify/static handles thumbnails
 import mediaMtxService from './services/mediaMtxService.js';
@@ -268,6 +269,7 @@ await fastify.register(hlsProxyRoutes, { prefix: '/hls' });
 await fastify.register(sponsorRoutes, { prefix: '/api/sponsors' });
 await fastify.register(saweriaRoutes, { prefix: '/api/saweria' });
 await fastify.register(recordingRoutes, { prefix: '/api' });
+await fastify.register(playbackTokenRoutes, { prefix: '/api' });
 await fastify.register(brandingRoutes, { prefix: '/api/branding' });
 // thumbnailRoutes removed - @fastify/static handles /api/thumbnails/* automatically
 

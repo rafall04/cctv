@@ -1,5 +1,14 @@
+/**
+ * Purpose: Register protected admin endpoints for dashboard, analytics, settings, cache, and operational tooling.
+ * Caller: backend/server.js under the /api/admin prefix.
+ * Deps: admin controllers, API key controller, playback token controller, auth middleware, MediaMTX service.
+ * MainFuncs: adminRoutes.
+ * SideEffects: Adds authenticated admin routes to Fastify.
+ */
+
 import { getDashboardStats, getTodayStats, testTelegramNotification, getTelegramConfig, updateTelegramConfig, getViewerAnalytics, getViewerHistoryPage, getRealTimeViewers, getCameraHealthDebug, getCacheStats, clearCache, getTimezoneConfig, updateTimezoneConfig, exportDatabaseBackup, importDatabaseBackup, getBackupPreview } from '../controllers/adminController.js';
 import { generateApiKey, listApiKeys, deleteApiKey } from '../controllers/apiKeyController.js';
+import { createPlaybackToken, listPlaybackTokens, revokePlaybackToken } from '../controllers/playbackTokenController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 import { createApiKeySchema, apiKeyIdParamSchema } from '../middleware/schemaValidators.js';
 import mediaMtxService from '../services/mediaMtxService.js';
@@ -52,6 +61,21 @@ export default async function adminRoutes(fastify, options) {
     fastify.put('/telegram/config', {
         onRequest: [authMiddleware],
         handler: updateTelegramConfig,
+    });
+
+    fastify.get('/playback-tokens', {
+        onRequest: [authMiddleware],
+        handler: listPlaybackTokens,
+    });
+
+    fastify.post('/playback-tokens', {
+        onRequest: [authMiddleware],
+        handler: createPlaybackToken,
+    });
+
+    fastify.post('/playback-tokens/:id/revoke', {
+        onRequest: [authMiddleware],
+        handler: revokePlaybackToken,
     });
 
     // Debug endpoint - raw MediaMTX data (for troubleshooting viewer count)

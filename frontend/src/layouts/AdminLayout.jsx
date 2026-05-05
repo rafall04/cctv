@@ -1,3 +1,11 @@
+/*
+ * Purpose: Render authenticated admin shell, navigation, theme toggle, and account controls.
+ * Caller: App.jsx AdminPageRoute.
+ * Deps: React Router, authService, theme/notification/branding contexts, NetworkStatusBanner.
+ * MainFuncs: AdminLayout.
+ * SideEffects: Reads current user, listens for session/network changes, performs logout navigation.
+ */
+
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
@@ -73,6 +81,7 @@ export default function AdminLayout({ children }) {
         { label: 'Recordings', path: '/admin/recordings', icon: <Icons.Camera /> },
         { label: 'Playback', path: '/admin/playback', icon: <Icons.Playback /> },
         { label: 'Playback Analytics', path: '/admin/playback-analytics', icon: <Icons.Analytics /> },
+        { label: 'Playback Tokens', path: '/admin/playback-tokens', icon: <Icons.Playback /> },
         { label: 'Areas', path: '/admin/areas', icon: <Icons.MapPin /> },
         { label: 'Sponsors', path: '/admin/sponsors', icon: <Icons.Feedback /> },
         { label: 'Users', path: '/admin/users', icon: <Icons.Users /> },

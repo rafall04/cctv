@@ -28,11 +28,13 @@ import PlaybackVideo from '../components/playback/PlaybackVideo';
 import PlaybackTimeline from '../components/playback/PlaybackTimeline';
 import PlaybackSegmentList from '../components/playback/PlaybackSegmentList';
 import PlaybackUsageGuide from '../components/playback/PlaybackUsageGuide';
+import PlaybackTokenAccess from '../components/playback/PlaybackTokenAccess.jsx';
 import { useAdminReconnectRefresh } from '../hooks/admin/useAdminReconnectRefresh';
 import { usePlaybackMediaSource } from '../hooks/playback/usePlaybackMediaSource.js';
 import { usePlaybackSelectionActions } from '../hooks/playback/usePlaybackSelectionActions.js';
 import { usePlaybackSegments } from '../hooks/playback/usePlaybackSegments.js';
 import { usePlaybackShareAndSnapshot } from '../hooks/playback/usePlaybackShareAndSnapshot.js';
+import { usePlaybackTokenAccess } from '../hooks/playback/usePlaybackTokenAccess.js';
 import { usePlaybackViewerTracking } from '../hooks/playback/usePlaybackViewerTracking.js';
 
 const MAX_SEEK_DISTANCE = 180;
@@ -101,6 +103,22 @@ function Playback({
         cameraId: selectedCameraId,
         timestampParam: timestampFromUrl,
         accessScope,
+    });
+    const {
+        tokenInput,
+        setTokenInput,
+        tokenStatus,
+        tokenMessage,
+        isTokenBusy,
+        activateToken,
+        clearToken,
+    } = usePlaybackTokenAccess({
+        enabled: !isAdminPlayback,
+        searchParams,
+        setSearchParams,
+        cameraId: selectedCameraId,
+        onActivated: () => reloadSegments(selectedCameraId, { mode: 'initial' }),
+        onCleared: () => reloadSegments(selectedCameraId, { mode: 'initial' }),
     });
     const loading = camerasLoading;
     const videoRef = useRef(null);
@@ -183,6 +201,22 @@ function Playback({
 
         setSelectedCameraId(playbackCameras[0]?.id ?? null);
     }, [playbackCameras, selectedCameraId]);
+
+    useEffect(() => {
+        if (isAdminPlayback || tokenStatus?.scope_type !== 'selected' || !Array.isArray(tokenStatus.camera_ids)) {
+            return;
+        }
+
+        const allowedIds = new Set(tokenStatus.camera_ids);
+        if (allowedIds.has(selectedCameraId)) {
+            return;
+        }
+
+        const firstAllowedCamera = playbackCameras.find((camera) => allowedIds.has(camera.id));
+        if (firstAllowedCamera) {
+            setSelectedCameraId(firstAllowedCamera.id);
+        }
+    }, [isAdminPlayback, playbackCameras, selectedCameraId, tokenStatus]);
 
     useEffect(() => {
         if (!showPlaybackPopunder) {
@@ -914,6 +948,17 @@ function Playback({
                             Hubungi Admin
                         </a>
                     )}
+                    <div className="mt-5">
+                        <PlaybackTokenAccess
+                            tokenInput={tokenInput}
+                            onTokenInputChange={setTokenInput}
+                            onActivate={activateToken}
+                            onClear={clearToken}
+                            isBusy={isTokenBusy}
+                            tokenStatus={tokenStatus}
+                            message={tokenMessage}
+                        />
+                    </div>
                 </div>
             </div>
         );
@@ -941,6 +986,19 @@ function Playback({
                     showPublicNotice={!isAdminPlayback}
                 />
 
+                {!isAdminPlayback && (
+                    <PlaybackTokenAccess
+                        tokenInput={tokenInput}
+                        onTokenInputChange={setTokenInput}
+                        onActivate={activateToken}
+                        onClear={clearToken}
+                        isBusy={isTokenBusy}
+                        tokenStatus={tokenStatus}
+                        message={tokenMessage}
+                        compact
+                    />
+                )}
+
                 <PlaybackVideo
                     videoRef={videoRef}
                     containerRef={containerRef}
@@ -964,6 +1022,7 @@ function Playback({
                     snapshotNotification={snapshotNotification}
                     onSnapshotNotificationClose={clearSnapshotNotification}
                     formatTimestamp={formatTimestamp}
+                    crossOriginMode={!isAdminPlayback ? 'use-credentials' : 'anonymous'}
                 />
 
                 {showPlaybackNative && (
