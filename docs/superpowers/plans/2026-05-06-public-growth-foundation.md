@@ -1058,7 +1058,7 @@ git push
 - Modify: `frontend/src/.module_map.md`
 - Modify: any touched tests/components from prior tasks if verification exposes bugs.
 
-- [ ] **Step 1: Sync module maps**
+- [x] **Step 1: Sync module maps**
 
 Update `backend/.module_map.md` Domain Ownership:
 
@@ -1072,7 +1072,7 @@ Update `frontend/src/.module_map.md` Route Ownership:
 - Public area pages: `pages/AreaPublicPage.jsx`, `services/publicGrowthService.js`, `utils/publicGrowthShare.js`, and `components/landing/LandingTrendingCameras.jsx`.
 ```
 
-- [ ] **Step 2: Run focused backend tests**
+- [x] **Step 2: Run focused backend tests**
 
 ```bash
 cd backend
@@ -1081,7 +1081,7 @@ npm test -- publicGrowthService.test.js publicGrowthRoutes.test.js
 
 Expected: PASS.
 
-- [ ] **Step 3: Run focused frontend tests**
+- [x] **Step 3: Run focused frontend tests**
 
 ```bash
 cd frontend
@@ -1090,7 +1090,7 @@ npm test -- publicGrowthShare.test.js publicGrowthService.test.js LandingTrendin
 
 Expected: PASS.
 
-- [ ] **Step 4: Run frontend build and lint**
+- [x] **Step 4: Run frontend build and lint**
 
 ```bash
 cd frontend
@@ -1100,7 +1100,7 @@ npm run lint
 
 Expected: PASS.
 
-- [ ] **Step 5: Optional backend full gate if time allows**
+- [x] **Step 5: Optional backend full gate if time allows**
 
 ```bash
 cd backend
@@ -1109,7 +1109,7 @@ npm test
 
 Expected: PASS or document unrelated failures with exact test names.
 
-- [ ] **Step 6: Commit docs/polish**
+- [x] **Step 6: Commit docs/polish**
 
 ```bash
 git add SYSTEM_MAP.md backend/.module_map.md frontend/src/.module_map.md
