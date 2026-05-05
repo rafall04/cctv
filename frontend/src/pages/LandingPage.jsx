@@ -15,10 +15,12 @@ import LandingHero from '../components/landing/LandingHero';
 import LandingFooter from '../components/landing/LandingFooter';
 import LandingCamerasSection from '../components/landing/LandingCamerasSection';
 import LandingPublicTopStack from '../components/landing/LandingPublicTopStack';
+import LandingTrendingCameras from '../components/landing/LandingTrendingCameras';
 import MultiViewButton from '../components/MultiView/MultiViewButton';
 import InlineAdSlot from '../components/ads/InlineAdSlot';
 import GlobalAdScript from '../components/ads/GlobalAdScript';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../components/ads/adsConfig';
+import publicGrowthService from '../services/publicGrowthService';
 import lazyWithRetry from '../utils/lazyWithRetry';
 
 const LandingPageSimple = lazyWithRetry(() => import('../components/landing/LandingPageSimple'), 'landing-page-simple');
@@ -43,6 +45,8 @@ function LandingPageContent() {
     const { addToast } = useToast();
     const [searchParams, setSearchParams] = useSearchParams();
     const [activePopupSource, setActivePopupSource] = useState('grid');
+    const [trendingCameras, setTrendingCameras] = useState([]);
+    const [trendingLoading, setTrendingLoading] = useState(true);
     const { favorites, toggleFavorite, isFavorite, addRecentCamera } = useCameraHistory();
 
     const {
@@ -103,6 +107,31 @@ function LandingPageContent() {
             updateMetaTags(branding);
         }
     }, [branding]);
+
+    useEffect(() => {
+        let mounted = true;
+
+        publicGrowthService.getTrendingCameras({ limit: 4 })
+            .then((response) => {
+                if (mounted) {
+                    setTrendingCameras(response.data || []);
+                }
+            })
+            .catch(() => {
+                if (mounted) {
+                    setTrendingCameras([]);
+                }
+            })
+            .finally(() => {
+                if (mounted) {
+                    setTrendingLoading(false);
+                }
+            });
+
+        return () => {
+            mounted = false;
+        };
+    }, []);
 
     useEffect(() => {
         if (!popup && activePopupSource !== 'grid') {
@@ -201,6 +230,12 @@ function LandingPageContent() {
                     landingSettings={landingSettings}
                     disableHeavyEffects={disableHeavyEffects}
                     onCameraClick={setPopup}
+                />
+
+                <LandingTrendingCameras
+                    cameras={trendingCameras}
+                    loading={trendingLoading}
+                    onCameraClick={handleGridPopupOpen}
                 />
 
                 <LandingCamerasSection

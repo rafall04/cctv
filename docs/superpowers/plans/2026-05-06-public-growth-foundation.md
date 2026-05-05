@@ -825,7 +825,7 @@ git push
 - Modify: `frontend/src/pages/LandingPage.jsx`
 - Test: `frontend/src/components/landing/LandingTrendingCameras.test.jsx`
 
-- [ ] **Step 1: Write component test**
+- [x] **Step 1: Write component test**
 
 Create `frontend/src/components/landing/LandingTrendingCameras.test.jsx`:
 
@@ -865,7 +865,7 @@ describe('LandingTrendingCameras', () => {
 });
 ```
 
-- [ ] **Step 2: Integrate landing trending load**
+- [x] **Step 2: Integrate landing trending load**
 
 In `frontend/src/pages/LandingPage.jsx`, import:
 
@@ -922,7 +922,7 @@ Render before `LandingCamerasSection` in full mode:
 
 For simple mode, pass `trendingCameras` and `LandingTrendingCameras` only if `LandingPageSimple` supports extension props. If it does not, leave simple mode unchanged in this batch.
 
-- [ ] **Step 3: Run component test and build**
+- [x] **Step 3: Run component test and build**
 
 ```bash
 cd frontend
@@ -932,7 +932,7 @@ npm run build
 
 Expected: both PASS.
 
-- [ ] **Step 4: Commit landing trending**
+- [x] **Step 4: Commit landing trending**
 
 ```bash
 git add frontend/src/components/landing/LandingTrendingCameras.jsx frontend/src/components/landing/LandingTrendingCameras.test.jsx frontend/src/pages/LandingPage.jsx
