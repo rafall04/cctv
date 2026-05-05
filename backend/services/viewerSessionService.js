@@ -25,7 +25,7 @@ import { v4 as uuidv4 } from 'uuid';
 import viewerAnalyticsService from './viewerAnalyticsService.js';
 import { cacheGetOrSetSync, cacheKey, CacheNamespace, CacheTTL } from './cacheService.js';
 import cameraViewStatsService from './cameraViewStatsService.js';
-import { diffLocalSqlSeconds, getLocalDate, getLocalDateWithOffset, nowLocalSql, resolveLocalSqlTimestamp } from './timeService.js';
+import { diffLocalSqlSeconds, getLocalDate, getLocalDateWithOffset, getLocalSqlWithOffsetDays, nowLocalSql, resolveLocalSqlTimestamp } from './timeService.js';
 
 /**
  * Get current date in configured timezone for date comparisons
@@ -286,6 +286,8 @@ class ViewerSessionService {
 
     archiveOldHistory(retentionDays = HISTORY_RETENTION_DAYS) {
         try {
+            const cutoff = getLocalSqlWithOffsetDays(-retentionDays);
+
             execute(`
                 INSERT INTO viewer_session_history_archive (
                     id,
@@ -313,18 +315,18 @@ class ViewerSessionService {
                     created_at,
                     CURRENT_TIMESTAMP
                 FROM viewer_session_history
-                WHERE datetime(started_at) < datetime('now', ?)
+                WHERE datetime(started_at) < datetime(?)
                 AND NOT EXISTS (
                     SELECT 1
                     FROM viewer_session_history_archive archive
                     WHERE archive.id = viewer_session_history.id
                 )
-            `, [`-${retentionDays} days`]);
+            `, [cutoff]);
 
             execute(`
                 DELETE FROM viewer_session_history
-                WHERE datetime(started_at) < datetime('now', ?)
-            `, [`-${retentionDays} days`]);
+                WHERE datetime(started_at) < datetime(?)
+            `, [cutoff]);
         } catch (error) {
             if (!String(error?.message || '').includes('no such table')) {
                 console.error('[ViewerSession] Error archiving history:', error);

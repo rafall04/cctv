@@ -240,6 +240,42 @@ describe('thumbnailService external thumbnails', () => {
         expect(execFileMock).not.toHaveBeenCalled();
     });
 
+    it('treats bare SQLite thumbnail timestamps as UTC when checking stale age', async () => {
+        vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-05-05T01:30:00.000Z').getTime());
+        const { default: thumbnailService } = await import('../services/thumbnailService.js');
+
+        queryMock.mockReturnValue([
+            {
+                id: 122,
+                name: 'Surabaya UTC Bare',
+                description: 'source_tag: surabaya_private_rtsp',
+                enabled: 1,
+                status: 'active',
+                is_online: 1,
+                runtime_is_online: 1,
+                delivery_type: 'internal_hls',
+                private_rtsp_url: 'rtsp://user:pass@192.168.12.4:554/onvif1',
+                internal_ingest_policy_override: 'on_demand',
+                internal_on_demand_close_after_seconds_override: 30,
+                stream_key: 'utc-bare',
+                internal_rtsp_transport: 'tcp',
+                thumbnail_strategy: 'strict',
+                stream_source: 'internal',
+                external_hls_url: null,
+                external_mjpeg_url: null,
+                external_snapshot_url: null,
+                external_embed_url: null,
+                external_tls_mode: 'strict',
+                thumbnail_path: '/api/thumbnails/122.jpg',
+                thumbnail_updated_at: '2026-05-04 23:00:00',
+            },
+        ]);
+
+        await thumbnailService.generateAllThumbnails();
+
+        expect(execFileMock).not.toHaveBeenCalled();
+    });
+
     it('refreshes strict on-demand Surabaya thumbnails after three hours', async () => {
         vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-05-05T00:00:00.000Z').getTime());
         const { default: thumbnailService } = await import('../services/thumbnailService.js');

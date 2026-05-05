@@ -1,3 +1,11 @@
+/*
+ * Purpose: Verify admin viewer analytics tab behavior, pagination, and local-SQL daily detail filtering.
+ * Caller: Frontend Vitest suite for pages/ViewerAnalytics.jsx.
+ * Deps: Testing Library, Vitest, mocked admin/camera services, mocked TimezoneContext.
+ * MainFuncs: ViewerAnalytics and DailyDetailModal behavior tests.
+ * SideEffects: None.
+ */
+
 // @vitest-environment jsdom
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -36,6 +44,7 @@ vi.mock('../contexts/TimezoneContext', () => ({
         UTC_SQL: 'utc_sql',
         AUTO: 'auto',
     },
+    getLocalDateInputValue: () => '2026-05-05',
     useTimezone: () => ({
         timezone: 'Asia/Jakarta',
         formatDateTime: (value) => `fmt:${value}`,
@@ -250,6 +259,24 @@ describe('DailyDetailModal', () => {
         rerender(<DailyDetailModal date="2026-03-05" sessions={sessions} onClose={() => {}} />);
 
         expect(screen.getByText(/Detail Tanggal/i)).toBeTruthy();
+        expect(screen.getByText(/1 sesi/i)).toBeTruthy();
+    });
+
+    it('filters local SQL sessions by their stored local day without UTC shifting', () => {
+        const sessions = [
+            {
+                id: 1,
+                started_at: '2026-05-05 00:30:00',
+                ip_address: '127.0.0.1',
+                duration_seconds: 120,
+                camera_name: 'Local Midnight Camera',
+                device_type: 'desktop',
+            },
+        ];
+
+        render(<DailyDetailModal date="2026-05-05" sessions={sessions} onClose={() => {}} />);
+
+        expect(screen.getByText('Local Midnight Camera')).toBeTruthy();
         expect(screen.getByText(/1 sesi/i)).toBeTruthy();
     });
 });

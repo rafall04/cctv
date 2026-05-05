@@ -2,7 +2,7 @@
  * Purpose: Centralize backend timestamp formatting/parsing rules for UTC SQL and configured local SQL values.
  * Caller: Viewer/playback session services, token services, and future backend flows that write or compare timestamps.
  * Deps: timezoneService and Intl date formatting.
- * MainFuncs: nowLocalSql, resolveLocalSqlTimestamp, diffLocalSqlSeconds, getLocalDate, getLocalDateWithOffset, toUtcSql.
+ * MainFuncs: nowLocalSql, resolveLocalSqlTimestamp, diffLocalSqlSeconds, getLocalDate, getLocalDateWithOffset, getLocalSqlWithOffsetDays, toUtcSql.
  * SideEffects: Reads configured timezone through timezoneService.
  */
 
@@ -55,6 +55,17 @@ function parseLocalSqlParts(value) {
 
 function formatLocalSqlParts(parts) {
     return `${parts.year}-${pad(parts.month)}-${pad(parts.day)} ${pad(parts.hour)}:${pad(parts.minute)}:${pad(parts.second)}`;
+}
+
+function utcDateToLocalSqlParts(date) {
+    return {
+        year: date.getUTCFullYear(),
+        month: date.getUTCMonth() + 1,
+        day: date.getUTCDate(),
+        hour: date.getUTCHours(),
+        minute: date.getUTCMinutes(),
+        second: date.getUTCSeconds(),
+    };
 }
 
 function localSqlToComparableMs(value) {
@@ -115,6 +126,24 @@ export function getLocalDateWithOffset(days, date = new Date(), timezone = getTi
     const [year, month, day] = getLocalDate(date, timezone).split('-').map((part) => Number.parseInt(part, 10));
     const shifted = new Date(Date.UTC(year, month - 1, day + days, 12, 0, 0));
     return `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())}`;
+}
+
+export function getLocalSqlWithOffsetDays(days, date = new Date(), timezone = getTimezone()) {
+    const currentLocalSql = resolveLocalSqlTimestamp(date, timezone);
+    const parts = parseLocalSqlParts(currentLocalSql);
+    if (!parts) {
+        return currentLocalSql;
+    }
+
+    const shifted = new Date(Date.UTC(
+        parts.year,
+        parts.month - 1,
+        parts.day + days,
+        parts.hour,
+        parts.minute,
+        parts.second
+    ));
+    return formatLocalSqlParts(utcDateToLocalSqlParts(shifted));
 }
 
 export function toUtcSql(date = new Date()) {

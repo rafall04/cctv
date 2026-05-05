@@ -1,7 +1,7 @@
 /*
 Purpose: Generate and maintain camera thumbnail images from internal RTSP/HLS and external stream sources.
 Caller: Backend startup thumbnail scheduler, camera recovery hooks, and thumbnail refresh actions.
-Deps: ffmpeg, filesystem thumbnail storage, database camera rows, delivery and internal RTSP policy utilities.
+Deps: ffmpeg, filesystem thumbnail storage, database camera rows, timeService, delivery and internal RTSP policy utilities.
 MainFuncs: ThumbnailService, buildFfmpegInputArgs(), generateAllThumbnails(), generateSingle(), generateThumbnail().
 SideEffects: Executes ffmpeg, writes thumbnail files, updates camera thumbnail metadata in SQLite.
 */
@@ -18,6 +18,7 @@ import { getEffectiveDeliveryType, getPrimaryExternalStreamUrl } from '../utils/
 import { resolveInternalIngestPolicy } from '../utils/internalIngestPolicy.js';
 import { buildFfmpegRtspInputArgs, resolveInternalRtspTransport } from '../utils/internalRtspTransportPolicy.js';
 import { normalizeThumbnailStrategy } from '../utils/thumbnailStrategyPolicy.js';
+import { parseUtcSql } from './timeService.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -129,7 +130,7 @@ class ThumbnailService {
             return Number.POSITIVE_INFINITY;
         }
 
-        const updatedAt = new Date(camera.thumbnail_updated_at).getTime();
+        const updatedAt = parseUtcSql(camera.thumbnail_updated_at)?.getTime();
         if (!Number.isFinite(updatedAt)) {
             return Number.POSITIVE_INFINITY;
         }

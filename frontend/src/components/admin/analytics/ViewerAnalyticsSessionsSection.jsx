@@ -1,5 +1,14 @@
+/*
+ * Purpose: Render recent live viewer analytics sessions with configured timezone-aware timestamps.
+ * Caller: ViewerAnalytics overview tab.
+ * Deps: TimezoneContext, EmptyState, and analytics primitives.
+ * MainFuncs: ViewerAnalyticsSessionsSection.
+ * SideEffects: None; delegates export and pagination callbacks.
+ */
+
 import { EmptyState } from '../../ui/EmptyState';
 import { CameraFilter, DeviceIcon, Pagination, formatDuration } from './AnalyticsPrimitives';
+import { TIMESTAMP_STORAGE, useTimezone } from '../../../contexts/TimezoneContext';
 
 export default function ViewerAnalyticsSessionsSection({
     topCameras,
@@ -12,6 +21,8 @@ export default function ViewerAnalyticsSessionsSection({
     onPageChange,
     onExportSessions,
 }) {
+    const { formatDateTime } = useTimezone();
+
     return (
         <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
@@ -74,11 +85,13 @@ export default function ViewerAnalyticsSessionsSection({
                                             </span>
                                         </td>
                                         <td className="py-3 pr-4 text-gray-600 dark:text-gray-400">
-                                            {new Date(session.started_at).toLocaleString('id-ID', {
+                                            {formatDateTime(session.started_at, {
+                                                storage: TIMESTAMP_STORAGE.LOCAL_SQL,
                                                 day: '2-digit',
                                                 month: 'short',
                                                 hour: '2-digit',
                                                 minute: '2-digit',
+                                                second: undefined,
                                             })}
                                         </td>
                                         <td className="py-3 text-right font-semibold text-gray-900 dark:text-white">{formatDuration(session.duration_seconds)}</td>

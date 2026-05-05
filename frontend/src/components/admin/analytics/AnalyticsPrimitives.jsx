@@ -1,6 +1,15 @@
+/*
+ * Purpose: Provide reusable admin viewer analytics controls, cards, badges, charts, and pagination primitives.
+ * Caller: ViewerAnalytics and related admin analytics presentation sections.
+ * Deps: React state, TimezoneContext, TrendIndicator, viewer analytics adapter.
+ * MainFuncs: PeriodSelector, CameraFilter, ActiveViewerCard, chart components, Pagination, formatting re-exports.
+ * SideEffects: None.
+ */
+
 import { useState } from 'react';
 import { TrendBadge } from '../../TrendIndicator';
 import { formatDuration, formatWatchTime } from '../../../utils/admin/viewerAnalyticsAdapter';
+import { getLocalDateInputValue, useTimezone } from '../../../contexts/TimezoneContext';
 
 export function DeviceIcon({ type, className = 'w-4 h-4' }) {
     if (type === 'mobile') {
@@ -54,6 +63,7 @@ export function StatsCard({ icon, label, value, subValue, color = 'sky', trend }
 
 export function PeriodSelector({ value, onChange, customDate, onCustomDateChange }) {
     const [showDatePicker, setShowDatePicker] = useState(false);
+    const { timezone } = useTimezone();
     const periods = [
         { value: 'today', label: 'Hari Ini' },
         { value: 'yesterday', label: 'Kemarin' },
@@ -90,7 +100,7 @@ export function PeriodSelector({ value, onChange, customDate, onCustomDateChange
                         onCustomDateChange(event.target.value);
                         onChange('custom');
                     }}
-                    max={new Date().toISOString().split('T')[0]}
+                    max={getLocalDateInputValue(new Date(), timezone)}
                     className="px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
             )}

@@ -2,12 +2,12 @@
  * Purpose: Verify backend timestamp storage modes are parsed consistently before timezone display.
  * Caller: Frontend focused timezone test gate.
  * Deps: vitest, TimezoneContext date parser.
- * MainFuncs: parseBackendDateInput behavior tests.
+ * MainFuncs: parseBackendDateInput and getLocalDateInputValue behavior tests.
  * SideEffects: None.
  */
 
 import { describe, expect, it } from 'vitest';
-import { TIMESTAMP_STORAGE, parseBackendDateInput } from './TimezoneContext.jsx';
+import { TIMESTAMP_STORAGE, getLocalDateInputValue, parseBackendDateInput } from './TimezoneContext.jsx';
 
 describe('TimezoneContext date parsing', () => {
     it('treats SQLite CURRENT_TIMESTAMP strings as UTC instead of browser local time', () => {
@@ -20,5 +20,9 @@ describe('TimezoneContext date parsing', () => {
 
     it('parses local SQL strings explicitly instead of relying on browser-specific space parsing', () => {
         expect(Number.isNaN(parseBackendDateInput('2026-05-05 07:25:00', { storage: TIMESTAMP_STORAGE.LOCAL_SQL }).getTime())).toBe(false);
+    });
+
+    it('builds date input values from the configured timezone day', () => {
+        expect(getLocalDateInputValue(new Date('2026-05-05T17:30:00.000Z'), 'Asia/Jakarta')).toBe('2026-05-06');
     });
 });

@@ -1,7 +1,7 @@
 /**
  * Purpose: HTTP handlers for admin playback token management and public token activation.
  * Caller: playbackTokenRoutes and adminRoutes.
- * Deps: playbackTokenService and auth cookie option helper.
+ * Deps: playbackTokenService, timeService, and auth cookie option helper.
  * MainFuncs: listPlaybackTokens, listPlaybackTokenAuditLogs, createPlaybackToken, updatePlaybackToken, sharePlaybackToken, revokePlaybackToken, activatePlaybackToken, heartbeatPlaybackToken, clearPlaybackToken, clearPlaybackTokenSessions.
  * SideEffects: Creates/revokes tokens and sets/clears HttpOnly playback token/session cookies.
  */
@@ -10,6 +10,7 @@ import playbackTokenService, {
     PLAYBACK_TOKEN_COOKIE,
     PLAYBACK_TOKEN_SESSION_COOKIE,
 } from '../services/playbackTokenService.js';
+import { parseUtcSql } from '../services/timeService.js';
 import { isHttpsRequest } from '../utils/authCookieOptions.js';
 
 function getPlaybackTokenCookieOptions(request, maxAge = 30 * 24 * 60 * 60) {
@@ -28,7 +29,10 @@ function resolveCookieMaxAge(tokenData) {
         return 30 * 24 * 60 * 60;
     }
 
-    const remainingSeconds = Math.floor((new Date(tokenData.expires_at).getTime() - Date.now()) / 1000);
+    const expiresAt = parseUtcSql(tokenData.expires_at);
+    const remainingSeconds = expiresAt
+        ? Math.floor((expiresAt.getTime() - Date.now()) / 1000)
+        : 60;
     return Math.max(60, Math.min(remainingSeconds, 30 * 24 * 60 * 60));
 }
 

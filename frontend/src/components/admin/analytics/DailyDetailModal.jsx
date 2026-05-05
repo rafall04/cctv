@@ -1,14 +1,33 @@
+/*
+ * Purpose: Show per-day live viewer sessions using local-SQL history dates without browser UTC shifts.
+ * Caller: ViewerAnalytics daily chart detail modal.
+ * Deps: React, TimezoneContext, analytics primitives, EmptyState, viewer analytics adapter.
+ * MainFuncs: DailyDetailModal.
+ * SideEffects: None; invokes onClose from user interaction.
+ */
+
 import { useMemo } from 'react';
 import { EmptyState } from '../../ui/EmptyState';
 import { DeviceIcon, formatDuration, formatWatchTime } from './AnalyticsPrimitives';
 import { formatDate } from '../../../utils/admin/viewerAnalyticsAdapter';
+import { TIMESTAMP_STORAGE, useTimezone } from '../../../contexts/TimezoneContext';
+
+function getSessionLocalDate(startedAt) {
+    if (typeof startedAt === 'string' && /^\d{4}-\d{2}-\d{2}[ T]/.test(startedAt)) {
+        return startedAt.slice(0, 10);
+    }
+
+    const parsed = new Date(startedAt);
+    return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString().split('T')[0];
+}
 
 export default function DailyDetailModal({ date, sessions, onClose }) {
+    const { formatTime } = useTimezone();
+
     const filteredSessions = useMemo(() => {
         return sessions.filter((session) => {
             if (!date) return false;
-            const sessionDate = new Date(session.started_at).toISOString().split('T')[0];
-            return sessionDate === date;
+            return getSessionLocalDate(session.started_at) === date;
         });
     }, [date, sessions]);
 
@@ -60,7 +79,12 @@ export default function DailyDetailModal({ date, sessions, onClose }) {
                                 {filteredSessions.map((session, index) => (
                                     <tr key={session.id || index} className="text-sm">
                                         <td className="py-3 pr-4 text-gray-600 dark:text-gray-400">
-                                            {new Date(session.started_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                                            {formatTime(session.started_at, {
+                                                storage: TIMESTAMP_STORAGE.LOCAL_SQL,
+                                                hour: '2-digit',
+                                                minute: '2-digit',
+                                                second: undefined,
+                                            })}
                                         </td>
                                         <td className="py-3 pr-4 font-semibold text-gray-900 dark:text-white">{session.camera_name}</td>
                                         <td className="py-3 pr-4 font-mono text-gray-600 dark:text-gray-400">{session.ip_address}</td>

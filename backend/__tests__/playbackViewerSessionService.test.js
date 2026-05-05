@@ -2,7 +2,7 @@
  * Purpose: Verify playback viewer session timing uses configured local SQL semantics.
  * Caller: Backend Vitest suite for services/playbackViewerSessionService.js.
  * Deps: Vitest, mocked connectionPool, mocked timezone/cache services.
- * MainFuncs: endSession.
+ * MainFuncs: endSession, archiveOldHistory.
  * SideEffects: None; database writes are mocked.
  */
 
@@ -72,5 +72,21 @@ describe('playbackViewerSessionService', () => {
             30,
             'playback-session-1',
         ]);
+    });
+
+    it('archives playback history using a configured local SQL cutoff instead of SQLite UTC now', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-05-05T17:30:00.000Z'));
+
+        playbackViewerSessionService.archiveOldHistory(90);
+
+        expect(executeMock).toHaveBeenNthCalledWith(1, expect.stringContaining('INSERT INTO playback_viewer_session_history_archive'), [
+            '2026-02-05 00:30:00',
+        ]);
+        expect(executeMock).toHaveBeenNthCalledWith(2, expect.stringContaining('DELETE FROM playback_viewer_session_history'), [
+            '2026-02-05 00:30:00',
+        ]);
+
+        vi.useRealTimers();
     });
 });

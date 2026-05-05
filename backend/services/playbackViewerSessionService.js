@@ -9,7 +9,7 @@
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import { v4 as uuidv4 } from 'uuid';
 import { cacheGetOrSetSync, cacheKey, CacheNamespace, CacheTTL } from './cacheService.js';
-import { diffLocalSqlSeconds, getLocalDate, getLocalDateWithOffset, nowLocalSql, resolveLocalSqlTimestamp } from './timeService.js';
+import { diffLocalSqlSeconds, getLocalDate, getLocalDateWithOffset, getLocalSqlWithOffsetDays, nowLocalSql, resolveLocalSqlTimestamp } from './timeService.js';
 
 const SESSION_TIMEOUT = 15;
 const CLEANUP_INTERVAL = 60000;
@@ -312,6 +312,8 @@ class PlaybackViewerSessionService {
 
     archiveOldHistory(retentionDays = HISTORY_RETENTION_DAYS) {
         try {
+            const cutoff = getLocalSqlWithOffsetDays(-retentionDays);
+
             execute(`
                 INSERT INTO playback_viewer_session_history_archive (
                     id,
@@ -349,18 +351,18 @@ class PlaybackViewerSessionService {
                     created_at,
                     CURRENT_TIMESTAMP
                 FROM playback_viewer_session_history
-                WHERE datetime(started_at) < datetime('now', ?)
+                WHERE datetime(started_at) < datetime(?)
                 AND NOT EXISTS (
                     SELECT 1
                     FROM playback_viewer_session_history_archive archive
                     WHERE archive.id = playback_viewer_session_history.id
                 )
-            `, [`-${retentionDays} days`]);
+            `, [cutoff]);
 
             execute(`
                 DELETE FROM playback_viewer_session_history
-                WHERE datetime(started_at) < datetime('now', ?)
-            `, [`-${retentionDays} days`]);
+                WHERE datetime(started_at) < datetime(?)
+            `, [cutoff]);
         } catch (error) {
             if (!String(error?.message || '').includes('no such table')) {
                 console.error('[PlaybackViewerSession] Error archiving history:', error);

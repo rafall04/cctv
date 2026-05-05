@@ -2,7 +2,7 @@
  * Purpose: Verify live viewer session closure precision and analytics writes.
  * Caller: Backend Vitest suite for services/viewerSessionService.js.
  * Deps: Vitest, mocked connectionPool, mocked timezone/cache/analytics services.
- * MainFuncs: endSession, cleanupStaleSessions.
+ * MainFuncs: endSession, cleanupStaleSessions, archiveOldHistory.
  * SideEffects: None; database and stats writes are mocked.
  */
 
@@ -120,5 +120,21 @@ describe('viewerSessionService', () => {
             durationSeconds: 20,
             viewedAt: '2026-05-05 00:00:20',
         }));
+    });
+
+    it('archives live history using a configured local SQL cutoff instead of SQLite UTC now', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-05-05T17:30:00.000Z'));
+
+        viewerSessionService.archiveOldHistory(90);
+
+        expect(executeMock).toHaveBeenNthCalledWith(1, expect.stringContaining('INSERT INTO viewer_session_history_archive'), [
+            '2026-02-05 00:30:00',
+        ]);
+        expect(executeMock).toHaveBeenNthCalledWith(2, expect.stringContaining('DELETE FROM viewer_session_history'), [
+            '2026-02-05 00:30:00',
+        ]);
+
+        vi.useRealTimers();
     });
 });
