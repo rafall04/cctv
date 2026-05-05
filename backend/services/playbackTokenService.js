@@ -137,6 +137,15 @@ function normalizeCustomAccessCode(value) {
     return code;
 }
 
+function isMissingAuditSchemaError(error) {
+    const message = String(error?.message || '');
+    return message.includes('playback_token_audit_logs')
+        && (
+            message.includes('no such table')
+            || message.includes('no such column')
+        );
+}
+
 function parseCameraIdsJson(value) {
     try {
         const parsed = JSON.parse(value || '[]');
@@ -209,20 +218,29 @@ class PlaybackTokenService {
         request = {},
         detail = {},
     }) {
-        execute(
-            `INSERT INTO playback_token_audit_logs
-            (token_id, event_type, camera_id, actor_user_id, ip_address, user_agent, detail_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [
-                tokenId || null,
-                eventType,
-                cameraId || null,
-                request?.user?.id || null,
-                this.getClientIp(request),
-                request?.headers?.['user-agent'] || null,
-                JSON.stringify(detail || {}),
-            ]
-        );
+        try {
+            execute(
+                `INSERT INTO playback_token_audit_logs
+                (token_id, event_type, camera_id, actor_user_id, ip_address, user_agent, detail_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    tokenId || null,
+                    eventType,
+                    cameraId || null,
+                    request?.user?.id || null,
+                    this.getClientIp(request),
+                    request?.headers?.['user-agent'] || null,
+                    JSON.stringify(detail || {}),
+                ]
+            );
+        } catch (error) {
+            if (isMissingAuditSchemaError(error)) {
+                console.warn('[PlaybackToken] Audit table missing; run npm run migrate to enable audit logs');
+                return;
+            }
+
+            throw error;
+        }
     }
 
     buildPlaybackUrl({ token, shareKey, request }) {
@@ -378,30 +396,41 @@ class PlaybackTokenService {
 
         params.push(normalizedLimit);
 
-        return query(
-            `SELECT
-                al.id,
-                al.token_id,
-                pt.label as token_label,
-                pt.token_prefix,
-                al.event_type,
-                al.camera_id,
-                c.name as camera_name,
-                al.actor_user_id,
-                u.username as actor_username,
-                al.ip_address,
-                al.user_agent,
-                al.detail_json,
-                al.created_at
-            FROM playback_token_audit_logs al
-            LEFT JOIN playback_tokens pt ON pt.id = al.token_id
-            LEFT JOIN cameras c ON c.id = al.camera_id
-            LEFT JOIN users u ON u.id = al.actor_user_id
-            ${whereClause}
-            ORDER BY al.created_at DESC, al.id DESC
-            LIMIT ?`,
-            params
-        ).map((row) => {
+        let rows = [];
+        try {
+            rows = query(
+                `SELECT
+                    al.id,
+                    al.token_id,
+                    pt.label as token_label,
+                    pt.token_prefix,
+                    al.event_type,
+                    al.camera_id,
+                    c.name as camera_name,
+                    al.actor_user_id,
+                    u.username as actor_username,
+                    al.ip_address,
+                    al.user_agent,
+                    al.detail_json,
+                    al.created_at
+                FROM playback_token_audit_logs al
+                LEFT JOIN playback_tokens pt ON pt.id = al.token_id
+                LEFT JOIN cameras c ON c.id = al.camera_id
+                LEFT JOIN users u ON u.id = al.actor_user_id
+                ${whereClause}
+                ORDER BY al.created_at DESC, al.id DESC
+                LIMIT ?`,
+                params
+            );
+        } catch (error) {
+            if (isMissingAuditSchemaError(error)) {
+                return [];
+            }
+
+            throw error;
+        }
+
+        return rows.map((row) => {
             let detail = {};
             try {
                 detail = JSON.parse(row.detail_json || '{}');

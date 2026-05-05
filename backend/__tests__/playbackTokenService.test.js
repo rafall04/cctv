@@ -285,4 +285,31 @@ describe('playbackTokenService', () => {
             detail: { scope_type: 'all' },
         });
     });
+
+    it('returns empty audit logs when audit migration has not run yet', async () => {
+        vi.spyOn(connectionPool, 'query').mockImplementation(() => {
+            throw new Error('SQLITE_ERROR: no such table: playback_token_audit_logs');
+        });
+        const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
+
+        const logs = playbackTokenService.listAuditLogs({ limit: 50 });
+
+        expect(logs).toEqual([]);
+    });
+
+    it('does not break token flow when audit table is missing', async () => {
+        vi.spyOn(connectionPool, 'execute').mockImplementation((sql) => {
+            if (sql.includes('playback_token_audit_logs')) {
+                throw new Error('SQLITE_ERROR: no such table: playback_token_audit_logs');
+            }
+            return { changes: 1 };
+        });
+        const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
+
+        expect(() => playbackTokenService.recordAudit({
+            tokenId: 1,
+            eventType: 'created',
+            request: { headers: {} },
+        })).not.toThrow();
+    });
 });
