@@ -25,6 +25,7 @@ import { useViewerAnalyticsFilters } from '../hooks/admin/useViewerAnalyticsFilt
 import { adminService } from '../services/adminService';
 import { cameraService } from '../services/cameraService';
 import { REQUEST_POLICY } from '../services/requestPolicy';
+import { useTimezone } from '../contexts/TimezoneContext';
 import { exportToCSV, formatWatchTime, mapPeriodToApi } from '../utils/admin/viewerAnalyticsAdapter';
 
 export { default as DailyDetailModal } from '../components/admin/analytics/DailyDetailModal';
@@ -53,7 +54,7 @@ function TopMetricCard({ title, children }) {
     );
 }
 
-function renderLiveHistoryCell(session, column) {
+function renderLiveHistoryCell(session, column, formatDateTime) {
     switch (column.key) {
         case 'camera_name':
             return <span className="font-semibold text-gray-900 dark:text-white">{session.camera_name}</span>;
@@ -62,9 +63,9 @@ function renderLiveHistoryCell(session, column) {
         case 'device_type':
             return renderDeviceBadge(session.device_type);
         case 'started_at':
-            return new Date(session.started_at).toLocaleString('id-ID');
+            return formatDateTime(session.started_at);
         case 'ended_at':
-            return session.ended_at ? new Date(session.ended_at).toLocaleString('id-ID') : '-';
+            return session.ended_at ? formatDateTime(session.ended_at) : '-';
         case 'duration_seconds':
             return renderDurationText(session.duration_seconds);
         default:
@@ -73,6 +74,7 @@ function renderLiveHistoryCell(session, column) {
 }
 
 export default function ViewerAnalytics() {
+    const { formatDateTime } = useTimezone();
     const {
         period,
         customDate,
@@ -252,8 +254,8 @@ export default function ViewerAnalytics() {
                     { label: 'Kamera', key: 'camera_name' },
                     { label: 'IP Address', key: 'ip_address' },
                     { label: 'Device', key: 'device_type' },
-                    { label: 'Mulai', render: (session) => new Date(session.started_at).toLocaleString('id-ID') },
-                    { label: 'Selesai', render: (session) => session.ended_at ? new Date(session.ended_at).toLocaleString('id-ID') : '-' },
+                    { label: 'Mulai', render: (session) => formatDateTime(session.started_at) },
+                    { label: 'Selesai', render: (session) => session.ended_at ? formatDateTime(session.ended_at) : '-' },
                     { label: 'Durasi', render: (session) => formatWatchTime(session.duration_seconds || 0) },
                     { label: 'User Agent', key: 'user_agent' },
                 ]}
@@ -333,7 +335,7 @@ export default function ViewerAnalytics() {
                                         </div>
                                         <div className="mt-1 font-mono text-xs text-gray-500 dark:text-gray-400">{session.ip_address}</div>
                                         <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                            {new Date(session.started_at).toLocaleString('id-ID')} • {formatWatchTime(session.duration_seconds)}
+                                            {formatDateTime(session.started_at)} • {formatWatchTime(session.duration_seconds)}
                                         </div>
                                     </button>
                                 ))}
@@ -422,7 +424,7 @@ export default function ViewerAnalytics() {
                             { key: 'duration_seconds', label: 'Durasi' },
                         ]}
                         rowKey={(item) => item.id}
-                        renderCell={renderLiveHistoryCell}
+                        renderCell={(session, column) => renderLiveHistoryCell(session, column, formatDateTime)}
                         pagination={history.pagination}
                         onPageChange={(page) => loadHistory({ page, pageSize: history.pagination.pageSize })}
                         onPageSizeChange={(pageSize) => loadHistory({ page: 1, pageSize })}

@@ -1,7 +1,30 @@
+/*
+ * Purpose: Provide configured timezone formatting helpers across public and admin routes.
+ * Caller: App provider tree and pages/components that display backend timestamps.
+ * Deps: React context/hooks and admin settings API.
+ * MainFuncs: TimezoneProvider, useTimezone, parseBackendDateInput.
+ * SideEffects: Loads timezone setting from backend and formats display-only timestamps.
+ */
+
 import { createContext, useContext, useState, useEffect } from 'react';
 import { adminAPI } from '../services/api';
 
 const TimezoneContext = createContext();
+
+const SQLITE_UTC_DATETIME_PATTERN = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/;
+
+export function parseBackendDateInput(date) {
+    if (typeof date !== 'string') {
+        return date;
+    }
+
+    const value = date.trim();
+    if (SQLITE_UTC_DATETIME_PATTERN.test(value)) {
+        return new Date(`${value.replace(' ', 'T')}Z`);
+    }
+
+    return new Date(value);
+}
 
 export function TimezoneProvider({ children }) {
     const [timezone, setTimezone] = useState('Asia/Jakarta'); // Default
@@ -24,7 +47,7 @@ export function TimezoneProvider({ children }) {
     };
 
     const formatDateTime = (date, options = {}) => {
-        const dateObj = typeof date === 'string' ? new Date(date) : date;
+        const dateObj = parseBackendDateInput(date);
         return new Intl.DateTimeFormat('id-ID', {
             timeZone: timezone,
             year: 'numeric',
@@ -39,7 +62,7 @@ export function TimezoneProvider({ children }) {
     };
 
     const formatDate = (date, options = {}) => {
-        const dateObj = typeof date === 'string' ? new Date(date) : date;
+        const dateObj = parseBackendDateInput(date);
         return new Intl.DateTimeFormat('id-ID', {
             timeZone: timezone,
             year: 'numeric',
@@ -50,7 +73,7 @@ export function TimezoneProvider({ children }) {
     };
 
     const formatTime = (date, options = {}) => {
-        const dateObj = typeof date === 'string' ? new Date(date) : date;
+        const dateObj = parseBackendDateInput(date);
         return new Intl.DateTimeFormat('id-ID', {
             timeZone: timezone,
             hour: '2-digit',

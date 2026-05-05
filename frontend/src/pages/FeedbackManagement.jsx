@@ -1,3 +1,11 @@
+/*
+ * Purpose: Admin feedback management page with filters, list, detail, and status actions.
+ * Caller: Protected admin feedback route.
+ * Deps: Feedback services/components, feedback data hook, TimezoneContext.
+ * MainFuncs: FeedbackManagement.
+ * SideEffects: Fetches feedback data and updates/deletes feedback rows through API calls.
+ */
+
 import { feedbackService } from '../services/feedbackService';
 import { FeedbackIcons } from '../components/admin/feedback/feedbackConstants.jsx';
 import { useFeedbackManagementData } from '../hooks/admin/useFeedbackManagementData';
@@ -5,8 +13,10 @@ import FeedbackStatsGrid from '../components/admin/feedback/FeedbackStatsGrid';
 import FeedbackFilterBar from '../components/admin/feedback/FeedbackFilterBar';
 import FeedbackListPanel from '../components/admin/feedback/FeedbackListPanel';
 import FeedbackDetailPanel from '../components/admin/feedback/FeedbackDetailPanel';
+import { useTimezone } from '../contexts/TimezoneContext';
 
 export default function FeedbackManagement() {
+    const { formatDateTime } = useTimezone();
     const {
         feedbacks,
         stats,
@@ -48,7 +58,7 @@ export default function FeedbackManagement() {
         }
     };
 
-    const formatDate = (dateStr) => new Date(dateStr).toLocaleString('id-ID', {
+    const formatDate = (dateStr) => formatDateTime(dateStr, {
         day: 'numeric',
         month: 'short',
         year: 'numeric',

@@ -11,6 +11,7 @@ import { useSearchParams } from 'react-router-dom';
 import { cameraService } from '../services/cameraService';
 import recordingService from '../services/recordingService';
 import { useBranding } from '../contexts/BrandingContext';
+import { useTimezone } from '../contexts/TimezoneContext';
 import { createCameraSlug, parseCameraIdFromSlug } from '../utils/slugify';
 import {
     buildPlaybackSearchParams,
@@ -60,6 +61,7 @@ function Playback({
     const [searchParams, setSearchParams] = useSearchParams();
     const { cameraParam: cameraIdFromUrl, timestampParam: timestampFromUrl } = getPlaybackUrlState(searchParams);
     const { branding } = useBranding();
+    const { formatTime } = useTimezone();
     const isAdminPlayback = isAdminPlaybackScope(accessScope);
 
     const [cameras, setCameras] = useState(propCameras || []);
@@ -821,7 +823,7 @@ function Playback({
     };
 
     const formatTimestamp = (timestamp) => {
-        return new Date(timestamp).toLocaleString('id-ID', {
+        return formatTime(timestamp, {
             hour: '2-digit',
             minute: '2-digit',
             second: '2-digit'

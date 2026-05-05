@@ -1,3 +1,11 @@
+/*
+ * Purpose: Admin user management page for creating, editing, deleting, and password-updating users.
+ * Caller: Protected admin users route.
+ * Deps: React hooks, user/auth services, notification context, TimezoneContext, UI primitives.
+ * MainFuncs: UserManagement, validatePassword, isSelfDeletion.
+ * SideEffects: Fetches and mutates user records through API calls.
+ */
+
 import { useEffect, useState } from 'react';
 import { userService } from '../services/userService';
 import { authService } from '../services/authService';
@@ -5,6 +13,7 @@ import { useNotification } from '../contexts/NotificationContext';
 import { TableSkeleton } from '../components/ui/Skeleton';
 import { NoUsersEmptyState } from '../components/ui/EmptyState';
 import { Alert } from '../components/ui/Alert';
+import { useTimezone } from '../contexts/TimezoneContext';
 
 /**
  * Password validation requirements
@@ -140,6 +149,7 @@ function PasswordRequirementsDisplay({ password }) {
 }
 
 export default function UserManagement() {
+    const { formatDateTime } = useTimezone();
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState(null);
@@ -357,13 +367,13 @@ export default function UserManagement() {
     };
 
     const formatDate = (dateString) => {
-        return new Intl.DateTimeFormat('id-ID', {
+        return formatDateTime(dateString, {
             year: 'numeric',
             month: 'short',
             day: 'numeric',
             hour: '2-digit',
             minute: '2-digit',
-        }).format(new Date(dateString + ' UTC'));
+        });
     };
 
     return (

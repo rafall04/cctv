@@ -1,3 +1,11 @@
+/*
+ * Purpose: Admin playback analytics workspace with overview, active playback viewers, and history.
+ * Caller: Protected admin playback analytics route.
+ * Deps: Analytics UI components, admin/camera services, reconnect hook, TimezoneContext.
+ * MainFuncs: PlaybackAnalytics.
+ * SideEffects: Fetches playback analytics/history data and exports CSV files.
+ */
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AnalyticsHistoryTable, { AnalyticsHistoryDrawer, renderDeviceBadge, renderDurationText } from '../components/admin/analytics/AnalyticsHistoryTable';
 import { AnalyticsTabNav, AnalyticsWorkspaceHeader } from '../components/admin/analytics/AnalyticsWorkspace';
@@ -7,6 +15,7 @@ import { cameraService } from '../services/cameraService';
 import { REQUEST_POLICY } from '../services/requestPolicy';
 import { exportToCSV, mapPeriodToApi } from '../utils/admin/viewerAnalyticsAdapter';
 import { useAdminReconnectRefresh } from '../hooks/admin/useAdminReconnectRefresh';
+import { useTimezone } from '../contexts/TimezoneContext';
 
 const TABS = [
     { id: 'overview', label: 'Overview' },
@@ -62,7 +71,7 @@ function SectionCard({ title, children }) {
     );
 }
 
-function renderPlaybackHistoryCell(session, column) {
+function renderPlaybackHistoryCell(session, column, formatDateTime) {
     switch (column.key) {
         case 'camera_name':
             return (
@@ -89,7 +98,7 @@ function renderPlaybackHistoryCell(session, column) {
         case 'device_type':
             return renderDeviceBadge(session.device_type);
         case 'started_at':
-            return new Date(session.started_at).toLocaleString('id-ID');
+            return formatDateTime(session.started_at);
         case 'duration_seconds':
             return renderDurationText(session.duration_seconds);
         default:
@@ -98,6 +107,7 @@ function renderPlaybackHistoryCell(session, column) {
 }
 
 export default function PlaybackAnalytics() {
+    const { formatDateTime } = useTimezone();
     const [activeTab, setActiveTab] = useState('overview');
     const [period, setPeriod] = useState('7days');
     const [cameraId, setCameraId] = useState('');
@@ -288,8 +298,8 @@ export default function PlaybackAnalytics() {
                     { label: 'Viewer / IP', key: 'ip_address' },
                     { label: 'Admin', key: 'admin_username' },
                     { label: 'Device', key: 'device_type' },
-                    { label: 'Mulai', render: (session) => new Date(session.started_at).toLocaleString('id-ID') },
-                    { label: 'Selesai', render: (session) => session.ended_at ? new Date(session.ended_at).toLocaleString('id-ID') : '-' },
+                    { label: 'Mulai', render: (session) => formatDateTime(session.started_at) },
+                    { label: 'Selesai', render: (session) => session.ended_at ? formatDateTime(session.ended_at) : '-' },
                     { label: 'Durasi', render: (session) => formatWatchTime(session.duration_seconds || 0) },
                     { label: 'User Agent', key: 'user_agent' },
                 ]}
@@ -377,7 +387,7 @@ export default function PlaybackAnalytics() {
                                         </span>
                                     </div>
                                     <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                        {session.ip_address} • {new Date(session.started_at).toLocaleString('id-ID')} • {formatWatchTime(session.duration_seconds)}
+                                        {session.ip_address} • {formatDateTime(session.started_at)} • {formatWatchTime(session.duration_seconds)}
                                     </div>
                                 </button>
                             ))}
@@ -448,7 +458,7 @@ export default function PlaybackAnalytics() {
                             { key: 'duration_seconds', label: 'Durasi' },
                         ]}
                         rowKey={(item) => item.id}
-                        renderCell={renderPlaybackHistoryCell}
+                        renderCell={(session, column) => renderPlaybackHistoryCell(session, column, formatDateTime)}
                         pagination={history.pagination}
                         onPageChange={(page) => loadHistory({ page, pageSize: history.pagination.pageSize })}
                         onPageSizeChange={(pageSize) => loadHistory({ page: 1, pageSize })}
