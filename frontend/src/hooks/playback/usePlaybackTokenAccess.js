@@ -1,5 +1,5 @@
 /*
- * Purpose: Coordinate public playback token activation from URL/manual input and cleanup.
+ * Purpose: Coordinate public playback token/share-key activation from URL/manual input and cleanup.
  * Caller: Playback page.
  * Deps: React hooks and playbackTokenService.
  * MainFuncs: usePlaybackTokenAccess.
@@ -22,7 +22,7 @@ export function usePlaybackTokenAccess({
     const [tokenMessage, setTokenMessage] = useState('');
     const [isTokenBusy, setIsTokenBusy] = useState(false);
 
-    const activateToken = useCallback(async (rawToken, { silent = false } = {}) => {
+    const activateToken = useCallback(async (rawToken, { silent = false, mode = 'token' } = {}) => {
         const token = String(rawToken || '').trim();
         if (!enabled || !token) {
             return false;
@@ -31,7 +31,9 @@ export function usePlaybackTokenAccess({
         setIsTokenBusy(true);
         setTokenMessage(silent ? '' : 'Mengaktifkan token...');
         try {
-            const response = await playbackTokenService.activateToken(token, cameraId);
+            const response = mode === 'share'
+                ? await playbackTokenService.activateShareKey(token, cameraId)
+                : await playbackTokenService.activateToken(token, cameraId);
             if (!response?.success) {
                 setTokenMessage(response?.message || 'Token tidak valid');
                 return false;
@@ -74,14 +76,17 @@ export function usePlaybackTokenAccess({
         }
 
         const urlToken = searchParams.get('token');
-        if (!urlToken) {
+        const urlShareKey = searchParams.get('share');
+        const accessValue = urlShareKey || urlToken;
+        if (!accessValue) {
             return;
         }
 
-        activateToken(urlToken, { silent: true }).then(() => {
+        activateToken(accessValue, { silent: true, mode: urlShareKey ? 'share' : 'token' }).then(() => {
             setSearchParams((current) => {
                 const next = new URLSearchParams(current);
                 next.delete('token');
+                next.delete('share');
                 return next;
             }, { replace: true });
         });

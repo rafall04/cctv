@@ -13,7 +13,7 @@ import { useNotification } from '../contexts/NotificationContext';
 
 const DEFAULT_TEMPLATE = `Halo, berikut token akses playback CCTV RAF NET.
 
-Token: {{token}}
+Kode Akses: {{token}}
 Link: {{playback_url}}
 Berlaku: {{expires_at}}
 Akses: {{camera_scope}}`;
@@ -48,9 +48,11 @@ function formatDate(value) {
 export default function PlaybackTokenManagement() {
     const { success: showSuccess, error: showError } = useNotification();
     const [tokens, setTokens] = useState([]);
+    const [auditLogs, setAuditLogs] = useState([]);
     const [cameras, setCameras] = useState([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [sharingTokenId, setSharingTokenId] = useState(null);
     const [createdShare, setCreatedShare] = useState(null);
     const [form, setForm] = useState({
         label: '',
@@ -70,11 +72,13 @@ export default function PlaybackTokenManagement() {
     const loadData = useCallback(async () => {
         setLoading(true);
         try {
-            const [tokenResponse, cameraResponse] = await Promise.all([
+            const [tokenResponse, auditResponse, cameraResponse] = await Promise.all([
                 playbackTokenService.listTokens(),
+                playbackTokenService.listAuditLogs(50),
                 cameraService.getAllCameras(),
             ]);
             setTokens(Array.isArray(tokenResponse?.data) ? tokenResponse.data : []);
+            setAuditLogs(Array.isArray(auditResponse?.data) ? auditResponse.data : []);
             setCameras(normalizeCameraRows(cameraResponse));
         } catch (error) {
             showError('Gagal memuat token playback', error?.response?.data?.message || error.message);
@@ -114,10 +118,9 @@ export default function PlaybackTokenManagement() {
             };
             const response = await playbackTokenService.createToken(payload);
             setCreatedShare({
-                token: response.token,
                 shareText: response.share_text,
             });
-            showSuccess('Token playback dibuat', 'Token hanya ditampilkan satu kali.');
+            showSuccess('Token playback dibuat', 'Teks share memakai kode akses sekali pakai yang bisa dibuat ulang.');
             setForm((current) => ({ ...current, label: '', camera_ids: [] }));
             await loadData();
         } catch (error) {
@@ -143,6 +146,19 @@ export default function PlaybackTokenManagement() {
         }
 
         await handleCopy(createdShare.shareText);
+    };
+
+    const handleRepeatShare = async (tokenId) => {
+        setSharingTokenId(tokenId);
+        try {
+            const response = await playbackTokenService.shareToken(tokenId);
+            setCreatedShare({ shareText: response.share_text });
+            showSuccess('Teks share dibuat', 'Kode akses lama diganti dengan kode share baru.');
+        } catch (error) {
+            showError('Gagal membuat share ulang', error?.response?.data?.message || error.message);
+        } finally {
+            setSharingTokenId(null);
+        }
     };
 
     const handleRevoke = async (tokenId) => {
@@ -330,9 +346,18 @@ export default function PlaybackTokenManagement() {
                                         </td>
                                         <td className="px-3 py-3 text-right">
                                             {token.is_active && (
-                                                <button onClick={() => handleRevoke(token.id)} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100">
-                                                    Cabut
-                                                </button>
+                                                <div className="flex justify-end gap-2">
+                                                    <button
+                                                        onClick={() => handleRepeatShare(token.id)}
+                                                        disabled={sharingTokenId === token.id}
+                                                        className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-60"
+                                                    >
+                                                        {sharingTokenId === token.id ? 'Membuat...' : 'Share'}
+                                                    </button>
+                                                    <button onClick={() => handleRevoke(token.id)} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100">
+                                                        Cabut
+                                                    </button>
+                                                </div>
                                             )}
                                         </td>
                                     </tr>
@@ -341,6 +366,49 @@ export default function PlaybackTokenManagement() {
                         </table>
                     </div>
                 )}
+            </div>
+
+            <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                <div className="mb-4">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Log Token Terbaru</h2>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
+                        <thead className="text-left text-xs uppercase tracking-wide text-gray-500">
+                            <tr>
+                                <th className="px-3 py-2">Waktu</th>
+                                <th className="px-3 py-2">Event</th>
+                                <th className="px-3 py-2">Token</th>
+                                <th className="px-3 py-2">Kamera</th>
+                                <th className="px-3 py-2">Actor/IP</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                            {auditLogs.map((log) => (
+                                <tr key={log.id} className="text-gray-800 dark:text-gray-200">
+                                    <td className="px-3 py-3 whitespace-nowrap">{formatDate(log.created_at)}</td>
+                                    <td className="px-3 py-3">{log.event_type}</td>
+                                    <td className="px-3 py-3">
+                                        <div>{log.token_label || '-'}</div>
+                                        <div className="text-xs text-gray-500">{log.token_prefix || ''}</div>
+                                    </td>
+                                    <td className="px-3 py-3">{log.camera_name || (log.camera_id ? `ID ${log.camera_id}` : '-')}</td>
+                                    <td className="px-3 py-3">
+                                        <div>{log.actor_username || '-'}</div>
+                                        <div className="text-xs text-gray-500">{log.ip_address || '-'}</div>
+                                    </td>
+                                </tr>
+                            ))}
+                            {auditLogs.length === 0 && (
+                                <tr>
+                                    <td className="px-3 py-6 text-center text-gray-500" colSpan={5}>
+                                        Belum ada log token.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );

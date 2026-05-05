@@ -210,8 +210,12 @@ class RecordingPlaybackService {
             };
         }
 
-        const shouldTouchToken = request?.url?.includes('/segments') || request?.url?.includes('/playlist.m3u8');
-        const tokenAccess = playbackTokenService.validateRequestForCamera(request, camera.id, { touch: shouldTouchToken });
+        const isPlaylistRequest = request?.url?.includes('/playlist.m3u8');
+        const shouldTouchToken = request?.url?.includes('/segments') || isPlaylistRequest;
+        const tokenAccess = playbackTokenService.validateRequestForCamera(request, camera.id, {
+            touch: shouldTouchToken,
+            eventType: isPlaylistRequest ? 'access_playlist' : 'access_segments',
+        });
         if (tokenAccess) {
             return {
                 accessMode: 'token_full',

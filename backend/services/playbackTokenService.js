@@ -1,9 +1,9 @@
 /**
- * Purpose: Create, share, validate, and revoke scoped public playback access tokens.
+ * Purpose: Create, share, validate, audit, and revoke scoped public playback access tokens.
  * Caller: playback token controllers and recordingPlaybackService.
  * Deps: crypto, SQLite connection helpers.
- * MainFuncs: createToken, listTokens, revokeToken, validateRequestForCamera, buildShareText.
- * SideEffects: Writes playback token rows and lightweight token usage touches.
+ * MainFuncs: createToken, listTokens, listAuditLogs, revokeToken, buildRepeatShareText, validateRequestForCamera, buildShareText.
+ * SideEffects: Writes playback token rows, audit rows, share keys, and lightweight token usage touches.
  */
 
 import crypto from 'crypto';
@@ -13,7 +13,7 @@ export const PLAYBACK_TOKEN_COOKIE = 'raf_playback_token';
 
 const DEFAULT_SHARE_TEMPLATE = `Halo, berikut token akses playback CCTV RAF NET.
 
-Token: {{token}}
+Kode Akses: {{token}}
 Link: {{playback_url}}
 Berlaku: {{expires_at}}
 Akses: {{camera_scope}}`;
@@ -90,6 +90,10 @@ function generateToken() {
     return `rafpb_${crypto.randomBytes(24).toString('base64url')}`;
 }
 
+function generateShareKey() {
+    return `rafps_${crypto.randomBytes(24).toString('base64url')}`;
+}
+
 function parseCameraIdsJson(value) {
     try {
         const parsed = JSON.parse(value || '[]');
@@ -109,6 +113,7 @@ function sanitizeTokenRow(row) {
         id: row.id,
         label: row.label,
         token_prefix: row.token_prefix,
+        share_key_prefix: row.share_key_prefix || null,
         preset: row.preset,
         scope_type: row.scope_type,
         camera_ids: cameraIds,
@@ -145,16 +150,50 @@ class PlaybackTokenService {
         return DEFAULT_SHARE_TEMPLATE;
     }
 
-    buildPlaybackUrl({ token, request }) {
-        const origin = getRequestOrigin(request);
-        const queryToken = encodeURIComponent(token);
-        return `${origin}/playback?token=${queryToken}`;
+    getClientIp(request = {}) {
+        const forwardedFor = request.headers?.['x-forwarded-for'];
+        if (typeof forwardedFor === 'string' && forwardedFor.trim()) {
+            return forwardedFor.split(',')[0].trim();
+        }
+
+        return request.ip || request.socket?.remoteAddress || null;
     }
 
-    buildShareText({ token, tokenRow, request }) {
+    recordAudit({
+        tokenId,
+        eventType,
+        cameraId = null,
+        request = {},
+        detail = {},
+    }) {
+        execute(
+            `INSERT INTO playback_token_audit_logs
+            (token_id, event_type, camera_id, actor_user_id, ip_address, user_agent, detail_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [
+                tokenId || null,
+                eventType,
+                cameraId || null,
+                request?.user?.id || null,
+                this.getClientIp(request),
+                request?.headers?.['user-agent'] || null,
+                JSON.stringify(detail || {}),
+            ]
+        );
+    }
+
+    buildPlaybackUrl({ token, shareKey, request }) {
+        const origin = getRequestOrigin(request);
+        const queryName = shareKey ? 'share' : 'token';
+        const queryValue = encodeURIComponent(shareKey || token);
+        return `${origin}/playback?${queryName}=${queryValue}`;
+    }
+
+    buildShareText({ token, shareKey, tokenRow, request }) {
         const row = sanitizeTokenRow(tokenRow) || tokenRow;
         const template = row?.share_template?.trim() || DEFAULT_SHARE_TEMPLATE;
-        const playbackUrl = this.buildPlaybackUrl({ token, request });
+        const accessCode = shareKey || token;
+        const playbackUrl = this.buildPlaybackUrl({ token, shareKey, request });
         const cameraScope = row?.scope_type === 'selected'
             ? `${row.camera_ids?.length || 0} kamera terpilih`
             : 'Semua kamera playback';
@@ -164,7 +203,7 @@ class PlaybackTokenService {
             : 'Full sesuai rekaman tersedia';
 
         return template
-            .replaceAll('{{token}}', token)
+            .replaceAll('{{token}}', accessCode)
             .replaceAll('{{playback_url}}', playbackUrl)
             .replaceAll('{{expires_at}}', expiresAt)
             .replaceAll('{{label}}', row?.label || '')
@@ -176,7 +215,9 @@ class PlaybackTokenService {
         const presetKey = TOKEN_PRESETS[payload.preset] ? payload.preset : 'custom';
         const preset = TOKEN_PRESETS[presetKey];
         const token = generateToken();
+        const shareKey = generateShareKey();
         const tokenHash = hashToken(token);
+        const shareKeyHash = hashToken(shareKey);
         const scopeType = normalizeScopeType(payload.scope_type);
         const cameraIds = scopeType === 'selected' ? normalizeCameraIds(payload.camera_ids) : [];
 
@@ -201,12 +242,14 @@ class PlaybackTokenService {
 
         const result = execute(
             `INSERT INTO playback_tokens
-            (label, token_hash, token_prefix, preset, scope_type, camera_ids_json, playback_window_hours, expires_at, share_template, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (label, token_hash, token_prefix, share_key_hash, share_key_prefix, preset, scope_type, camera_ids_json, playback_window_hours, expires_at, share_template, created_by)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 label,
                 tokenHash,
                 token.slice(0, 12),
+                shareKeyHash,
+                shareKey.slice(0, 12),
                 presetKey,
                 scopeType,
                 JSON.stringify(cameraIds),
@@ -219,11 +262,18 @@ class PlaybackTokenService {
 
         const row = queryOne('SELECT * FROM playback_tokens WHERE id = ?', [result.lastInsertRowid]);
         const data = sanitizeTokenRow(row);
+        this.recordAudit({
+            tokenId: data.id,
+            eventType: 'created',
+            request,
+            detail: { preset: presetKey, scope_type: scopeType, camera_count: cameraIds.length },
+        });
 
         return {
             token,
             data,
-            share_text: this.buildShareText({ token, tokenRow: data, request }),
+            share_key: shareKey,
+            share_text: this.buildShareText({ shareKey, tokenRow: data, request }),
         };
     }
 
@@ -235,7 +285,103 @@ class PlaybackTokenService {
         ).map(sanitizeTokenRow);
     }
 
-    revokeToken(id) {
+    listAuditLogs({ tokenId = null, limit = 100 } = {}) {
+        const normalizedTokenId = Number.parseInt(tokenId, 10);
+        const normalizedLimit = Math.min(Math.max(Number.parseInt(limit, 10) || 100, 1), 200);
+        const params = [];
+        let whereClause = '';
+
+        if (Number.isInteger(normalizedTokenId) && normalizedTokenId > 0) {
+            whereClause = 'WHERE al.token_id = ?';
+            params.push(normalizedTokenId);
+        }
+
+        params.push(normalizedLimit);
+
+        return query(
+            `SELECT
+                al.id,
+                al.token_id,
+                pt.label as token_label,
+                pt.token_prefix,
+                al.event_type,
+                al.camera_id,
+                c.name as camera_name,
+                al.actor_user_id,
+                u.username as actor_username,
+                al.ip_address,
+                al.user_agent,
+                al.detail_json,
+                al.created_at
+            FROM playback_token_audit_logs al
+            LEFT JOIN playback_tokens pt ON pt.id = al.token_id
+            LEFT JOIN cameras c ON c.id = al.camera_id
+            LEFT JOIN users u ON u.id = al.actor_user_id
+            ${whereClause}
+            ORDER BY al.created_at DESC, al.id DESC
+            LIMIT ?`,
+            params
+        ).map((row) => {
+            let detail = {};
+            try {
+                detail = JSON.parse(row.detail_json || '{}');
+            } catch {
+                detail = {};
+            }
+
+            return {
+                ...row,
+                detail,
+            };
+        });
+    }
+
+    buildRepeatShareText(id, request = {}) {
+        const tokenId = Number.parseInt(id, 10);
+        if (!Number.isInteger(tokenId) || tokenId <= 0) {
+            const err = new Error('Invalid token id');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const row = queryOne('SELECT * FROM playback_tokens WHERE id = ?', [tokenId]);
+        const token = sanitizeTokenRow(row);
+        if (!token) {
+            const err = new Error('Token tidak ditemukan');
+            err.statusCode = 404;
+            throw err;
+        }
+
+        if (!token.is_active) {
+            const err = new Error('Token tidak aktif dan tidak bisa dibagikan ulang');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const shareKey = generateShareKey();
+        execute(
+            `UPDATE playback_tokens
+            SET share_key_hash = ?, share_key_prefix = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?`,
+            [hashToken(shareKey), shareKey.slice(0, 12), tokenId]
+        );
+
+        const updated = sanitizeTokenRow(queryOne('SELECT * FROM playback_tokens WHERE id = ?', [tokenId]));
+        const shareText = this.buildShareText({ shareKey, tokenRow: updated, request });
+        this.recordAudit({
+            tokenId,
+            eventType: 'shared',
+            request,
+            detail: { share_key_prefix: shareKey.slice(0, 12) },
+        });
+
+        return {
+            data: updated,
+            share_text: shareText,
+        };
+    }
+
+    revokeToken(id, request = {}) {
         const tokenId = Number.parseInt(id, 10);
         if (!Number.isInteger(tokenId) || tokenId <= 0) {
             const err = new Error('Invalid token id');
@@ -256,7 +402,9 @@ class PlaybackTokenService {
             throw err;
         }
 
-        return sanitizeTokenRow(queryOne('SELECT * FROM playback_tokens WHERE id = ?', [tokenId]));
+        const token = sanitizeTokenRow(queryOne('SELECT * FROM playback_tokens WHERE id = ?', [tokenId]));
+        this.recordAudit({ tokenId, eventType: 'revoked', request });
+        return token;
     }
 
     getTokenFromRequest(request = {}) {
@@ -266,12 +414,18 @@ class PlaybackTokenService {
         return bearer || request.cookies?.[PLAYBACK_TOKEN_COOKIE] || '';
     }
 
-    validateRawTokenForCamera(rawToken, cameraId, { touch = false } = {}) {
+    validateRawTokenForCamera(rawToken, cameraId, options = {}) {
+        const { touch = false } = options;
         if (!rawToken) {
             return null;
         }
 
-        const row = queryOne('SELECT * FROM playback_tokens WHERE token_hash = ?', [hashToken(rawToken)]);
+        const credentialHash = hashToken(rawToken);
+        const row = queryOne(
+            `SELECT * FROM playback_tokens
+            WHERE token_hash = ? OR share_key_hash = ?`,
+            [credentialHash, credentialHash]
+        );
         const token = sanitizeTokenRow(row);
         if (!token) {
             const err = new Error('Token playback tidak valid');
@@ -305,13 +459,23 @@ class PlaybackTokenService {
                 WHERE id = ?`,
                 [token.id]
             );
+            this.recordAudit({
+                tokenId: token.id,
+                eventType: options.eventType || 'access',
+                cameraId: normalizedCameraId > 0 ? normalizedCameraId : null,
+                request: options.request || {},
+                detail: { scope_type: token.scope_type },
+            });
         }
 
         return token;
     }
 
     validateRequestForCamera(request, cameraId, options = {}) {
-        return this.validateRawTokenForCamera(this.getTokenFromRequest(request), cameraId, options);
+        return this.validateRawTokenForCamera(this.getTokenFromRequest(request), cameraId, {
+            ...options,
+            request,
+        });
     }
 }
 
