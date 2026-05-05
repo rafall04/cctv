@@ -38,6 +38,7 @@ const UnifiedSettings = lazyWithRetry(() => import('./pages/UnifiedSettings'), '
 const Dashboard = lazyWithRetry(() => import('./pages/Dashboard'), 'dashboard');
 const SponsorManagement = lazyWithRetry(() => import('./pages/SponsorManagement'), 'sponsor-management');
 const RecordingDashboard = lazyWithRetry(() => import('./pages/RecordingDashboard'), 'recording-dashboard');
+const AreaPublicPage = lazyWithRetry(() => import('./pages/AreaPublicPage'), 'area-public-page');
 
 function AdminPageRoute({ children }) {
     return (
@@ -67,6 +68,11 @@ function App() {
             <Routes>
                 {/* Public routes */}
                 <Route path="/" element={<LandingPage />} />
+                <Route path="/area/:areaSlug" element={
+                    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading...</div>}>
+                        <AreaPublicPage />
+                    </Suspense>
+                } />
                 <Route path="/playback" element={
                     <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
                         <Playback accessScope="public_preview" />

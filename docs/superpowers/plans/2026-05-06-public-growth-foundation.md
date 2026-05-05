@@ -52,7 +52,7 @@ SideEffects: Documentation only.
 - Modify: `backend/server.js`
 - Modify: `frontend/src/App.jsx`
 
-- [ ] **Step 1: Add backend skeleton files**
+- [x] **Step 1: Add backend skeleton files**
 
 Create `backend/services/publicGrowthService.js` with this skeleton:
 
@@ -150,7 +150,7 @@ export default async function publicGrowthRoutes(fastify) {
 }
 ```
 
-- [ ] **Step 2: Register backend route**
+- [x] **Step 2: Register backend route**
 
 In `backend/server.js`, add import near other routes:
 
@@ -164,7 +164,7 @@ Register after settings/config public routes and before viewer routes:
 await fastify.register(publicGrowthRoutes, { prefix: '/api/public' });
 ```
 
-- [ ] **Step 3: Add frontend skeleton files**
+- [x] **Step 3: Add frontend skeleton files**
 
 Create `frontend/src/services/publicGrowthService.js`:
 
@@ -312,7 +312,7 @@ export default function AreaPublicPage() {
 }
 ```
 
-- [ ] **Step 4: Register frontend route**
+- [x] **Step 4: Register frontend route**
 
 In `frontend/src/App.jsx`, add lazy import:
 
@@ -330,7 +330,7 @@ Add public route after `/`:
 } />
 ```
 
-- [ ] **Step 5: Run skeleton build checks**
+- [x] **Step 5: Run skeleton build checks**
 
 Run:
 
@@ -350,7 +350,7 @@ npm run build
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit skeleton**
+- [x] **Step 6: Commit skeleton**
 
 ```bash
 git add backend/services/publicGrowthService.js backend/controllers/publicGrowthController.js backend/routes/publicGrowthRoutes.js backend/server.js frontend/src/services/publicGrowthService.js frontend/src/utils/publicGrowthShare.js frontend/src/components/landing/LandingTrendingCameras.jsx frontend/src/pages/AreaPublicPage.jsx frontend/src/App.jsx

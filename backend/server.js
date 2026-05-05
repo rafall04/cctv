@@ -49,6 +49,7 @@ import saweriaRoutes from './routes/saweriaRoutes.js';
 import recordingRoutes from './routes/recordingRoutes.js';
 import playbackTokenRoutes from './routes/playbackTokenRoutes.js';
 import brandingRoutes from './routes/brandingRoutes.js';
+import publicGrowthRoutes from './routes/publicGrowthRoutes.js';
 // thumbnailRoutes removed - @fastify/static handles thumbnails
 import mediaMtxService from './services/mediaMtxService.js';
 import streamWarmer from './services/streamWarmer.js';
@@ -263,6 +264,7 @@ await fastify.register(userRoutes, { prefix: '/api/users' });
 await fastify.register(feedbackRoutes, { prefix: '/api/feedback' });
 await fastify.register(configRoutes);
 await fastify.register(settingsRoutes);
+await fastify.register(publicGrowthRoutes, { prefix: '/api/public' });
 await fastify.register(viewerRoutes, { prefix: '/api/viewer' });
 await fastify.register(playbackViewerRoutes, { prefix: '/api/playback-viewer' });
 await fastify.register(hlsProxyRoutes, { prefix: '/hls' });
