@@ -946,7 +946,7 @@ git push
 - Modify: `frontend/src/pages/AreaPublicPage.jsx`
 - Test: `frontend/src/pages/AreaPublicPage.test.jsx`
 
-- [ ] **Step 1: Write page test**
+- [x] **Step 1: Write page test**
 
 Create `frontend/src/pages/AreaPublicPage.test.jsx`:
 
@@ -1018,7 +1018,7 @@ describe('AreaPublicPage', () => {
 });
 ```
 
-- [ ] **Step 2: Implement area page**
+- [x] **Step 2: Implement area page**
 
 Replace skeleton in `frontend/src/pages/AreaPublicPage.jsx` with a page that:
 
@@ -1032,7 +1032,7 @@ Replace skeleton in `frontend/src/pages/AreaPublicPage.jsx` with a page that:
 
 The minimal populated grid can use buttons first; reuse `LandingCameraCard` only if props align without extra refactor.
 
-- [ ] **Step 3: Run area page tests and build**
+- [x] **Step 3: Run area page tests and build**
 
 ```bash
 cd frontend
@@ -1042,7 +1042,7 @@ npm run build
 
 Expected: both PASS.
 
-- [ ] **Step 4: Commit area page**
+- [x] **Step 4: Commit area page**
 
 ```bash
 git add frontend/src/pages/AreaPublicPage.jsx frontend/src/pages/AreaPublicPage.test.jsx frontend/src/App.jsx
