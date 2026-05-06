@@ -269,7 +269,11 @@ export default function AreaPublicPage() {
     const handleCameraOpen = useCallback(async (camera) => {
         const requestId = streamResolveRequestRef.current + 1;
         streamResolveRequestRef.current = requestId;
-        setSelectedCamera(camera);
+        const pendingCamera = {
+            ...camera,
+            _stream_resolution_pending: true,
+        };
+        setSelectedCamera(pendingCamera);
 
         try {
             const resolvedCamera = await resolvePublicPopupCamera(camera);
@@ -277,10 +281,16 @@ export default function AreaPublicPage() {
                 return;
             }
 
-            setSelectedCamera(resolvedCamera || camera);
+            setSelectedCamera({
+                ...(resolvedCamera || camera),
+                _stream_resolution_pending: false,
+            });
         } catch {
             if (streamResolveRequestRef.current === requestId) {
-                setSelectedCamera(camera);
+                setSelectedCamera({
+                    ...camera,
+                    _stream_resolution_pending: false,
+                });
             }
         }
     }, []);

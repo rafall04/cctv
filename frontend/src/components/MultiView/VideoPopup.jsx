@@ -141,6 +141,7 @@ function VideoPopup({
     const availabilityState = getCameraAvailabilityState(camera);
     const isOffline = isCameraHardOffline(camera);
     const isMobileAdsViewport = isAdsMobileViewport();
+    const isStreamResolving = camera._stream_resolution_pending === true;
 
     const [status, setStatus] = useState(() => getPublicPopupInitialStatus(camera));
     const [loadingStage, setLoadingStage] = useState(LoadingStage.CONNECTING);
@@ -183,7 +184,7 @@ function VideoPopup({
         ? (resolvedUrl || url)
         : (deliveryType === 'external_flv' ? flvUrl : (popupEmbedUrl || fallbackExternalUrl));
     const passiveSignalUrl = (deliveryType === 'external_flv' ? flvUrl : null) || officialSourceUrl || effectiveUrl || null;
-    const shouldTrackManualViewerSession = streamCapabilities.popup && (!isHlsCamera || isDirectStream);
+    const shouldTrackManualViewerSession = !isStreamResolving && streamCapabilities.popup && (!isHlsCamera || isDirectStream);
 
     const reportRuntimeSuccess = useCallback((signalType) => {
         if (camera.stream_source !== 'external') {
@@ -252,7 +253,7 @@ function VideoPopup({
     }, [camera.id, effectiveUrl, clearInternalWarmupRetry]);
 
     useEffect(() => {
-        if (isMaintenance || isOffline) {
+        if (isMaintenance || isOffline || isStreamResolving) {
             return;
         }
 
@@ -261,7 +262,7 @@ function VideoPopup({
             setLoadingStage(LoadingStage.BUFFERING);
             setErrorType(effectiveUrl ? null : 'unknown');
         }
-    }, [availabilityState, deliveryType, effectiveUrl, isHlsCamera, isMaintenance, isOffline, streamCapabilities.popup]);
+    }, [availabilityState, deliveryType, effectiveUrl, isHlsCamera, isMaintenance, isOffline, isStreamResolving, streamCapabilities.popup]);
 
     useEffect(() => {
         setFlvPlaybackSupported(typeof window !== 'undefined' ? flvjs.isSupported() : false);
@@ -460,7 +461,7 @@ function VideoPopup({
 
     useEffect(() => {
         // Skip HLS loading if camera is in maintenance or offline
-        if (isMaintenance || isOffline || !isHlsCamera) return;
+        if (isMaintenance || isOffline || isStreamResolving || !isHlsCamera) return;
         if (!effectiveUrl || !videoRef.current) return;
         const video = videoRef.current;
         let hls = null;
@@ -780,10 +781,10 @@ function VideoPopup({
             cleanupResources();
             if (hls) { hls.destroy(); hlsRef.current = null; }
         };
-    }, [camera.id, camera.stream_source, cleanupResources, clearInternalWarmupRetry, clearStreamTimeout, deviceTier, isExternal, isHlsCamera, isMaintenance, isOffline, requestVideoPlay, resetFailures, retryKey, startTimeout, syncVideoAspectRatio, updateStreamStage, effectiveUrl, forceProxyFallback, isDirectStream, proxyFallbackUrl, reportRuntimeFailure, reportRuntimeSuccess]);
+    }, [camera.id, camera.stream_source, cleanupResources, clearInternalWarmupRetry, clearStreamTimeout, deviceTier, isExternal, isHlsCamera, isMaintenance, isOffline, isStreamResolving, requestVideoPlay, resetFailures, retryKey, startTimeout, syncVideoAspectRatio, updateStreamStage, effectiveUrl, forceProxyFallback, isDirectStream, proxyFallbackUrl, reportRuntimeFailure, reportRuntimeSuccess]);
 
     useEffect(() => {
-        if (isMaintenance || isOffline || deliveryType !== 'external_flv') return;
+        if (isMaintenance || isOffline || isStreamResolving || deliveryType !== 'external_flv') return;
         if (!videoRef.current) return;
 
         if (!flvjs.isSupported()) {
@@ -866,7 +867,7 @@ function VideoPopup({
                 flvRef.current = null;
             }
         };
-    }, [deliveryType, effectiveUrl, isMaintenance, isOffline, popupEmbedUrl, reportRuntimeFailure, reportRuntimeSuccess, requestVideoPlay, syncVideoAspectRatio]);
+    }, [deliveryType, effectiveUrl, isMaintenance, isOffline, isStreamResolving, popupEmbedUrl, reportRuntimeFailure, reportRuntimeSuccess, requestVideoPlay, syncVideoAspectRatio]);
 
     const handleRetry = useCallback(() => {
         cleanupResources();
@@ -974,9 +975,10 @@ function VideoPopup({
 
     // Get status display info - **Validates: Requirements 4.1, 4.2, 4.3, 4.4**
     const isRenderingNewCamera = renderedCameraIdRef.current !== camera.id;
-    const renderStatus = isRenderingNewCamera ? getPublicPopupInitialStatus(camera) : status;
-    const renderLoadingStage = isRenderingNewCamera ? LoadingStage.CONNECTING : loadingStage;
-    const renderErrorType = isRenderingNewCamera ? null : errorType;
+    const shouldMaskTransientError = isRenderingNewCamera || isStreamResolving;
+    const renderStatus = shouldMaskTransientError ? getPublicPopupInitialStatus(camera) : status;
+    const renderLoadingStage = shouldMaskTransientError ? LoadingStage.CONNECTING : loadingStage;
+    const renderErrorType = shouldMaskTransientError ? null : errorType;
     const statusDisplay = getPublicPopupStatusDisplay({
         status: renderStatus,
         loadingStage: renderLoadingStage,

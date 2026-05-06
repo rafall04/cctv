@@ -191,8 +191,12 @@ function LandingPageContent() {
     const handleGridPopupOpen = useCallback(async (camera) => {
         const requestId = streamResolveRequestRef.current + 1;
         streamResolveRequestRef.current = requestId;
+        const pendingCamera = {
+            ...camera,
+            _stream_resolution_pending: true,
+        };
         setActivePopupSource('grid');
-        handleCameraClick(camera);
+        handleCameraClick(pendingCamera);
 
         try {
             const resolvedCamera = await resolvePublicPopupCamera(camera, cameras);
@@ -201,11 +205,22 @@ function LandingPageContent() {
             }
 
             if (resolvedCamera && resolvedCamera !== camera) {
-                handleCameraClick(resolvedCamera);
+                handleCameraClick({
+                    ...resolvedCamera,
+                    _stream_resolution_pending: false,
+                });
+            } else {
+                handleCameraClick({
+                    ...camera,
+                    _stream_resolution_pending: false,
+                });
             }
         } catch {
             if (streamResolveRequestRef.current === requestId) {
-                handleCameraClick(camera);
+                handleCameraClick({
+                    ...camera,
+                    _stream_resolution_pending: false,
+                });
             }
         }
     }, [cameras, handleCameraClick]);

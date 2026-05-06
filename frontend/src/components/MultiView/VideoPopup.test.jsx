@@ -341,6 +341,28 @@ describe('VideoPopup non-live states', () => {
         expect(screen.getByText('CCTV Baru')).toBeTruthy();
     });
 
+    it('menahan error unknown saat payload kamera baru masih menunggu resolver stream', async () => {
+        render(
+            <VideoPopup
+                camera={{
+                    ...baseCamera,
+                    id: 33,
+                    name: 'CCTV FLV Pending',
+                    delivery_type: 'external_flv',
+                    stream_source: 'external',
+                    streams: {},
+                    external_stream_url: '',
+                    _stream_resolution_pending: true,
+                }}
+                onClose={vi.fn()}
+            />
+        );
+
+        expect(screen.queryByText('CCTV Tidak Terkoneksi')).toBeNull();
+        expect(screen.queryByText('ERROR')).toBeNull();
+        expect(screen.getByText('Menghubungkan...')).toBeTruthy();
+    });
+
     it('memperlakukan 404 manifest internal sebagai warmup sementara sebelum retry ulang', async () => {
         render(
             <VideoPopup

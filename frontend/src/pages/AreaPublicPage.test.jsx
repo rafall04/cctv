@@ -220,6 +220,7 @@ describe('AreaPublicPage', () => {
             camera: expect.objectContaining({
                 id: 9,
                 name: 'CCTV Pending Stream',
+                _stream_resolution_pending: true,
             }),
         }));
 
@@ -236,5 +237,11 @@ describe('AreaPublicPage', () => {
         await waitFor(() => {
             expect(screen.getByTestId('area-popup-modal').textContent).toContain('/hls/camera-9/index.m3u8');
         });
+        expect(videoPopupSpy).toHaveBeenLastCalledWith(expect.objectContaining({
+            camera: expect.objectContaining({
+                id: 9,
+                _stream_resolution_pending: false,
+            }),
+        }));
     });
 });
