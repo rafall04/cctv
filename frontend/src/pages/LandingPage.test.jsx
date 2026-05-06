@@ -12,7 +12,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { renderWithRouter } from '../test/renderWithRouter';
 import LandingPage from './LandingPage';
 
-const { getPublicSaweriaConfig, testBackendReachability, updateMetaTags, getPublicLandingPageSettings, getPublicAdsSettings, getDiscovery, preloadLandingMapView, videoPopupPropsSpy, landingPageSimplePropsSpy, cameraProviderPropsSpy, cameraContextState } = vi.hoisted(() => ({
+const { getPublicSaweriaConfig, testBackendReachability, updateMetaTags, getPublicLandingPageSettings, getPublicAdsSettings, getDiscovery, preloadLandingMapView, resolvePublicPopupCamera, videoPopupPropsSpy, landingPageSimplePropsSpy, cameraProviderPropsSpy, cameraContextState } = vi.hoisted(() => ({
     getPublicSaweriaConfig: vi.fn(),
     testBackendReachability: vi.fn(),
     updateMetaTags: vi.fn(),
@@ -20,6 +20,7 @@ const { getPublicSaweriaConfig, testBackendReachability, updateMetaTags, getPubl
     getPublicAdsSettings: vi.fn(),
     getDiscovery: vi.fn(),
     preloadLandingMapView: vi.fn(),
+    resolvePublicPopupCamera: vi.fn(),
     videoPopupPropsSpy: vi.fn(),
     landingPageSimplePropsSpy: vi.fn(),
     cameraProviderPropsSpy: vi.fn(),
@@ -65,6 +66,10 @@ vi.mock('../services/publicGrowthService', () => ({
         getDiscovery,
         getTrendingCameras: vi.fn().mockResolvedValue({ success: true, data: [] }),
     },
+}));
+
+vi.mock('../services/publicCameraResolver', () => ({
+    resolvePublicPopupCamera,
 }));
 
 vi.mock('../utils/preloadLandingMapView', () => ({
@@ -126,7 +131,6 @@ vi.mock('../components/landing/LandingCamerasSection', () => ({
                 onClick={() => onMapCameraOpen?.({
                     id: 99,
                     name: 'Map Camera',
-                    streams: { hls: 'https://example.com/map.m3u8' },
                     status: 'active',
                     is_online: 1,
                 })}
@@ -201,6 +205,7 @@ describe('LandingPage connectivity recovery', () => {
         getPublicAdsSettings.mockReset();
         getDiscovery.mockReset();
         preloadLandingMapView.mockReset();
+        resolvePublicPopupCamera.mockReset();
         videoPopupPropsSpy.mockReset();
         landingPageSimplePropsSpy.mockReset();
         cameraProviderPropsSpy.mockReset();
@@ -209,6 +214,14 @@ describe('LandingPage connectivity recovery', () => {
         getDiscovery.mockResolvedValue({
             success: true,
             data: { live_now: [], top_cameras: [], new_cameras: [], popular_areas: [] },
+        });
+        resolvePublicPopupCamera.mockResolvedValue({
+            id: 99,
+            name: 'Map Camera',
+            streams: { hls: 'https://example.com/map.m3u8' },
+            status: 'active',
+            is_online: 1,
+            _stream_resolution_pending: false,
         });
 
         getPublicSaweriaConfig.mockResolvedValue({
@@ -344,7 +357,7 @@ describe('LandingPage connectivity recovery', () => {
         ).toBeTruthy();
     });
 
-    it('merender popup map dari host halaman dengan test id map saat map membuka kamera', async () => {
+    it('merender popup map dari host halaman lewat resolusi stream saat map membuka kamera', async () => {
         renderWithRouter(<LandingPage />);
 
         await waitFor(() => {
@@ -359,10 +372,22 @@ describe('LandingPage connectivity recovery', () => {
             expect(screen.getByTestId('map-popup-modal')).toBeTruthy();
         });
 
+        await waitFor(() => {
+            expect(resolvePublicPopupCamera).toHaveBeenCalledWith(
+                expect.objectContaining({ id: 99, name: 'Map Camera' }),
+                []
+            );
+        });
+
         expect(videoPopupPropsSpy).toHaveBeenLastCalledWith(expect.objectContaining({
             modalTestId: 'map-popup-modal',
             bodyTestId: 'map-video-body',
-            camera: expect.objectContaining({ id: 99, name: 'Map Camera' }),
+            camera: expect.objectContaining({
+                id: 99,
+                name: 'Map Camera',
+                _stream_resolution_pending: false,
+                streams: { hls: 'https://example.com/map.m3u8' },
+            }),
         }));
         expect(cameraProviderPropsSpy).toHaveBeenLastCalledWith(expect.objectContaining({
             autoRefresh: false,

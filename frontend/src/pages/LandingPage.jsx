@@ -230,10 +230,44 @@ function LandingPageContent({ onRefreshPauseChange }) {
         }
     }, [cameras, handleCameraClick]);
 
-    const handleMapPopupOpen = useCallback((camera) => {
+    const handleMapPopupOpen = useCallback(async (camera, options = {}) => {
+        const { replaceHistory = false } = options;
+        const requestId = streamResolveRequestRef.current + 1;
+        streamResolveRequestRef.current = requestId;
+        const pendingCamera = {
+            ...camera,
+            _stream_resolution_pending: true,
+        };
+
         setActivePopupSource('map');
-        handleCameraClick(camera);
-    }, [handleCameraClick]);
+        handleCameraClick(pendingCamera, { replaceHistory });
+
+        try {
+            const resolvedCamera = await resolvePublicPopupCamera(camera, cameras);
+            if (streamResolveRequestRef.current !== requestId) {
+                return;
+            }
+
+            if (resolvedCamera && resolvedCamera !== camera) {
+                handleCameraClick({
+                    ...resolvedCamera,
+                    _stream_resolution_pending: false,
+                }, { replaceHistory: true });
+            } else {
+                handleCameraClick({
+                    ...camera,
+                    _stream_resolution_pending: false,
+                }, { replaceHistory: true });
+            }
+        } catch {
+            if (streamResolveRequestRef.current === requestId) {
+                handleCameraClick({
+                    ...camera,
+                    _stream_resolution_pending: false,
+                }, { replaceHistory: true });
+            }
+        }
+    }, [cameras, handleCameraClick]);
 
     const handleUnifiedPopupClose = useCallback(() => {
         streamResolveRequestRef.current += 1;
