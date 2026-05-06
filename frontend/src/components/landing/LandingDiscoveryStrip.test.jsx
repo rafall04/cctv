@@ -54,4 +54,22 @@ describe('LandingDiscoveryStrip', () => {
         const areaLink = within(areaList).getByRole('link', { name: /KAB SURABAYA/i });
         expect(areaLink.getAttribute('href')).toBe('/area/kab-surabaya');
     });
+
+    it('keeps the horizontal mobile carousel inside the viewport container', () => {
+        render(
+            <MemoryRouter>
+                <LandingDiscoveryStrip discovery={discovery} />
+            </MemoryRouter>
+        );
+
+        const shell = screen.getByTestId('landing-discovery-strip');
+        const list = screen.getByTestId('landing-discovery-strip-list');
+        const firstCamera = screen.getByRole('button', { name: /CCTV Live/i });
+
+        expect(shell.className).toContain('max-w-full');
+        expect(shell.className).toContain('overflow-hidden');
+        expect(list.className).toContain('min-w-0');
+        expect(list.className).toContain('max-w-full');
+        expect(firstCamera.className).toContain('w-[min(18rem,calc(100vw-4rem))]');
+    });
 });
