@@ -109,4 +109,36 @@ describe('useLandingInteractions multi-view limits', () => {
 
         expect(setSearchParams).toHaveBeenCalledWith(expect.any(Function), { replace: true });
     });
+
+    it('tidak menghidupkan ulang popup lama ketika URL lama belum sinkron setelah switch related', () => {
+        const hook = renderInteractionsWithSearch(new URLSearchParams('camera=1-camera-1'));
+
+        act(() => {
+            hook.result.current.handleCameraClick(createCamera(2), { replaceHistory: true });
+        });
+
+        expect(hook.result.current.popup?.id).toBe(2);
+
+        hook.rerender({ params: new URLSearchParams('camera=1-camera-1') });
+
+        expect(hook.result.current.popup?.id).toBe(2);
+    });
+
+    it('tidak membuka ulang popup ketika close menunggu URL menghapus camera param', () => {
+        const hook = renderInteractionsWithSearch(new URLSearchParams('camera=1-camera-1'));
+
+        act(() => {
+            hook.result.current.handleCameraClick(createCamera(1));
+        });
+
+        expect(hook.result.current.popup?.id).toBe(1);
+
+        act(() => {
+            hook.result.current.handlePopupClose();
+        });
+
+        hook.rerender({ params: new URLSearchParams('camera=1-camera-1') });
+
+        expect(hook.result.current.popup).toBeNull();
+    });
 });

@@ -6,7 +6,7 @@ MainFuncs: useLandingInteractions.
 SideEffects: Updates URL search params, emits toasts, stores popup/multi-view UI state.
 */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createCameraSlug, parseCameraIdFromSlug } from '../../utils/slugify';
 import { isMultiViewSupported } from '../../utils/cameraDelivery.js';
 import { isCameraPlayable } from '../../utils/cameraAvailability.js';
@@ -26,6 +26,7 @@ export function useLandingInteractions({
     const [multiCameras, setMultiCameras] = useState([]);
     const [showMulti, setShowMulti] = useState(false);
     const [maxReached, setMaxReached] = useState(false);
+    const pendingUrlCameraIdRef = useRef(undefined);
 
     const maxStreams = getMaxConcurrentStreams(deviceTier);
 
@@ -35,8 +36,16 @@ export function useLandingInteractions({
         }
 
         const cameraIdFromUrl = searchParams.get('camera');
-        if (cameraIdFromUrl && cameras.length > 0) {
-            const cameraId = parseCameraIdFromSlug(cameraIdFromUrl);
+        const cameraId = cameraIdFromUrl ? parseCameraIdFromSlug(cameraIdFromUrl) : null;
+
+        if (pendingUrlCameraIdRef.current !== undefined) {
+            if (cameraId !== pendingUrlCameraIdRef.current) {
+                return;
+            }
+            pendingUrlCameraIdRef.current = undefined;
+        }
+
+        if (cameraId && cameras.length > 0) {
             if (popup?.id === cameraId) {
                 return;
             }
@@ -94,6 +103,7 @@ export function useLandingInteractions({
 
     const handleCameraClick = useCallback((camera, options = {}) => {
         const { replaceHistory = false } = options;
+        pendingUrlCameraIdRef.current = camera.id;
         setPopup(camera);
         addRecentCamera(camera);
         setSearchParams((previous) => {
@@ -110,6 +120,7 @@ export function useLandingInteractions({
     }, [addRecentCamera, layoutMode, setSearchParams, viewMode]);
 
     const handlePopupClose = useCallback(() => {
+        pendingUrlCameraIdRef.current = null;
         setPopup(null);
         setSearchParams((previous) => {
             const next = new URLSearchParams(previous);
