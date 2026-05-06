@@ -1,5 +1,5 @@
 /**
- * Purpose: Renders the lightweight public landing mode with status, compact discovery, camera list, and footer.
+ * Purpose: Renders the lightweight public landing mode with status, compact discovery, compact smart feed, camera list, and footer.
  * Caller: LandingPage when layoutMode is simple.
  * Deps: Camera, branding, theme, landing config, discovery/quick access strips, ads, feedback, and support components.
  * MainFuncs: LandingPageSimple, SimpleHeader, SimpleStatusOverview, SimpleFooter.
@@ -224,6 +224,7 @@ export default function LandingPageSimple({
             <LandingSmartFeed
                 cameras={smartFeedCameras}
                 onCameraClick={onQuickCameraOpen || onCameraClick}
+                variant="simple"
             />
 
             <LandingQuickAccessStrip

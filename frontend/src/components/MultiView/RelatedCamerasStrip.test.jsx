@@ -19,13 +19,16 @@ describe('RelatedCamerasStrip', () => {
                 cameras={[
                     { id: 2, name: 'CCTV Selatan', area_name: 'KAB BOJONEGORO', live_viewers: 3, total_views: 44 },
                     { id: 3, name: 'CCTV Utara', area_name: 'KAB BOJONEGORO', live_viewers: 0, total_views: 12 },
+                    { id: 4, name: 'CCTV Barat', area_name: 'KAB BOJONEGORO', live_viewers: 1, total_views: 10 },
+                    { id: 5, name: 'CCTV Timur', area_name: 'KAB BOJONEGORO', live_viewers: 2, total_views: 9 },
                 ]}
                 onCameraClick={onCameraClick}
             />
         );
 
         expect(screen.getByTestId('related-cameras-strip')).toBeTruthy();
-        expect(screen.getByText('CCTV Terkait')).toBeTruthy();
+        expect(screen.getByText('Terkait')).toBeTruthy();
+        expect(screen.queryByText('CCTV Timur')).toBeNull();
 
         fireEvent.click(screen.getByRole('button', { name: /CCTV Selatan/i }));
 

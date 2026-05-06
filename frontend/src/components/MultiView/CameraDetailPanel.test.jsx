@@ -39,6 +39,7 @@ describe('CameraDetailPanel', () => {
         expect(screen.getByText('8 live')).toBeTruthy();
         expect(screen.getByText('120 views')).toBeTruthy();
         expect(screen.getByText('Playback tersedia')).toBeTruthy();
+        expect(screen.queryByText('Pantau area publik')).toBeNull();
         expect(screen.getByRole('link', { name: /Buka area/i }).getAttribute('href')).toBe('/area/KAB%20BOJONEGORO');
 
         fireEvent.click(screen.getByRole('button', { name: /Bagikan/i }));

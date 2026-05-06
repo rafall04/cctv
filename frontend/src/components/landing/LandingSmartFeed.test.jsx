@@ -38,4 +38,27 @@ describe('LandingSmartFeed', () => {
         const { container } = render(<LandingSmartFeed cameras={[]} />);
         expect(container.textContent).toBe('');
     });
+
+    it('uses a tighter simple mode with only three compact sections and three cameras each', () => {
+        render(
+            <LandingSmartFeed
+                variant="simple"
+                cameras={[
+                    { id: 1, name: 'Busy 1', area_name: 'A', is_online: 1, live_viewers: 9, total_views: 90 },
+                    { id: 2, name: 'Busy 2', area_name: 'A', is_online: 1, live_viewers: 8, total_views: 80 },
+                    { id: 3, name: 'Busy 3', area_name: 'A', is_online: 1, live_viewers: 7, total_views: 70 },
+                    { id: 4, name: 'Busy 4', area_name: 'A', is_online: 1, live_viewers: 6, total_views: 60 },
+                    { id: 5, name: 'Top 1', area_name: 'B', is_online: 1, live_viewers: 0, total_views: 50 },
+                ]}
+            />
+        );
+
+        expect(screen.getByTestId('landing-smart-feed').dataset.variant).toBe('simple');
+        expect(screen.getByText('Sedang Ramai')).toBeTruthy();
+        expect(screen.getByText('Paling Banyak Ditonton')).toBeTruthy();
+        expect(screen.getByText('Rekomendasi Hari Ini')).toBeTruthy();
+        expect(screen.queryByText('Kamera Terbaru')).toBeNull();
+        const firstSection = screen.getByText('Sedang Ramai').closest('.min-w-0');
+        expect(firstSection.textContent).not.toContain('Busy 4');
+    });
 });
