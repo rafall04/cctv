@@ -1,5 +1,5 @@
 /*
- * Purpose: Render public area-specific CCTV pages with standardized popup stream resolution, back navigation, trending, grid, and share entry points.
+ * Purpose: Render public area-specific CCTV pages with standardized popup stream resolution, back navigation, trending, grid, and resilient share entry points.
  * Caller: App route /area/:areaSlug.
  * Deps: React Router, publicGrowthService, publicGrowthShare, landing components.
  * MainFuncs: AreaPublicPage.
@@ -12,7 +12,7 @@ import CameraThumbnail from '../components/CameraThumbnail';
 import LandingTrendingCameras from '../components/landing/LandingTrendingCameras';
 import { resolvePublicPopupCamera } from '../services/publicCameraResolver';
 import publicGrowthService from '../services/publicGrowthService';
-import { buildAreaShareText } from '../utils/publicGrowthShare';
+import { buildAreaShareText, sharePublicText } from '../utils/publicGrowthShare';
 
 const VideoPopup = lazy(() => import('../components/MultiView/VideoPopup'));
 
@@ -97,6 +97,7 @@ export default function AreaPublicPage() {
     const [selectedCamera, setSelectedCamera] = useState(null);
     const [loading, setLoading] = useState(true);
     const [notFound, setNotFound] = useState(false);
+    const [shareMessage, setShareMessage] = useState('');
 
     useEffect(() => {
         let mounted = true;
@@ -174,13 +175,34 @@ export default function AreaPublicPage() {
             return;
         }
 
-        if (navigator.share) {
-            await navigator.share({ text: shareText });
-            return;
+        try {
+            const result = await sharePublicText({
+                text: shareText,
+                title: `CCTV Online ${area?.name || 'Area'} - RAF NET`,
+            });
+
+            if (result.status === 'native') {
+                setShareMessage('Link area berhasil dibagikan.');
+            } else if (result.status === 'clipboard') {
+                setShareMessage('Teks share area disalin.');
+            } else if (result.status === 'aborted') {
+                setShareMessage('Share dibatalkan.');
+            } else {
+                setShareMessage('Browser tidak mendukung share otomatis.');
+            }
+        } catch {
+            setShareMessage('Gagal membagikan area.');
+        }
+    }, [area, shareText]);
+
+    useEffect(() => {
+        if (!shareMessage) {
+            return undefined;
         }
 
-        await navigator.clipboard?.writeText(shareText);
-    }, [shareText]);
+        const timeoutId = window.setTimeout(() => setShareMessage(''), 3000);
+        return () => window.clearTimeout(timeoutId);
+    }, [shareMessage]);
 
     if (loading) {
         return (
@@ -224,13 +246,20 @@ export default function AreaPublicPage() {
                         >
                             Kembali ke CCTV Publik
                         </Link>
-                        <button
-                            type="button"
-                            onClick={handleShare}
-                            className="inline-flex w-fit rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary/90"
-                        >
-                            Share Area
-                        </button>
+                        <div className="flex flex-col items-start gap-1 sm:items-end">
+                            <button
+                                type="button"
+                                onClick={handleShare}
+                                className="inline-flex w-fit rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary/90"
+                            >
+                                Share Area
+                            </button>
+                            {shareMessage && (
+                                <span role="status" className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                                    {shareMessage}
+                                </span>
+                            )}
+                        </div>
                     </div>
                     <div className="flex flex-col gap-2">
                         <div className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">

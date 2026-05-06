@@ -90,6 +90,36 @@ describe('AreaPublicPage', () => {
         expect(document.title).toBe('CCTV Online KAB SURABAYA - RAF NET');
     });
 
+    it('falls back to clipboard when native area sharing fails', async () => {
+        const nativeShare = vi.fn().mockRejectedValue(new Error('Share unavailable'));
+        const writeText = vi.fn().mockResolvedValue(undefined);
+        Object.defineProperty(window.navigator, 'share', {
+            configurable: true,
+            value: nativeShare,
+        });
+        Object.defineProperty(window.navigator, 'clipboard', {
+            configurable: true,
+            value: { writeText },
+        });
+        getAreaMock.mockResolvedValue({
+            success: true,
+            data: { name: 'KAB SURABAYA', slug: 'kab-surabaya', camera_count: 1, online_count: 1, total_views: 9 },
+        });
+        getAreaCamerasMock.mockResolvedValue({ success: true, data: [] });
+        getTrendingCamerasMock.mockResolvedValue({ success: true, data: [] });
+
+        renderPage();
+
+        await waitFor(() => expect(screen.getByRole('button', { name: /Share Area/i })).toBeTruthy());
+        fireEvent.click(screen.getByRole('button', { name: /Share Area/i }));
+
+        await waitFor(() => {
+            expect(nativeShare).toHaveBeenCalledTimes(1);
+            expect(writeText).toHaveBeenCalledWith(expect.stringContaining('/area/kab-surabaya'));
+        });
+        expect(screen.getByRole('status').textContent).toContain('disalin');
+    });
+
     it('renders public not found state', async () => {
         getAreaMock.mockRejectedValue({ response: { status: 404 } });
         getAreaCamerasMock.mockResolvedValue({ success: true, data: [] });
