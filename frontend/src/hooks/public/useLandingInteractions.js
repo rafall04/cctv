@@ -36,7 +36,12 @@ export function useLandingInteractions({
 
         const cameraIdFromUrl = searchParams.get('camera');
         if (cameraIdFromUrl && cameras.length > 0) {
-            const camera = cameras.find((item) => item.id === parseCameraIdFromSlug(cameraIdFromUrl));
+            const cameraId = parseCameraIdFromSlug(cameraIdFromUrl);
+            if (popup?.id === cameraId) {
+                return;
+            }
+
+            const camera = cameras.find((item) => item.id === cameraId);
             if (camera) {
                 const isAvailable = isCameraPlayable(camera);
                 if (isAvailable) {
@@ -44,7 +49,7 @@ export function useLandingInteractions({
                 }
             }
         }
-    }, [cameras, searchParams, viewMode]);
+    }, [cameras, popup?.id, searchParams, viewMode]);
 
     const handleAddMulti = useCallback((camera) => {
         if (!isMultiViewSupported(camera)) {

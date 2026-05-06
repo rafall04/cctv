@@ -21,13 +21,15 @@ function createCamera(id) {
     };
 }
 
+const stableCameras = [1, 2, 3, 4].map(createCamera);
+
 function renderInteractions(deviceTier = 'high') {
     const addToast = vi.fn();
     const setSearchParams = vi.fn();
     const addRecentCamera = vi.fn();
 
     const result = renderHook(() => useLandingInteractions({
-        cameras: [1, 2, 3, 4].map(createCamera),
+        cameras: stableCameras,
         layoutMode: 'simple',
         viewMode: 'grid',
         deviceTier,
@@ -41,6 +43,23 @@ function renderInteractions(deviceTier = 'high') {
         ...result,
         addToast,
     };
+}
+
+function renderInteractionsWithSearch(searchParams) {
+    const setSearchParams = vi.fn();
+    return renderHook(
+        ({ params }) => useLandingInteractions({
+            cameras: stableCameras,
+            layoutMode: 'simple',
+            viewMode: 'grid',
+            deviceTier: 'high',
+            searchParams: params,
+            setSearchParams,
+            addToast: vi.fn(),
+            addRecentCamera: vi.fn(),
+        }),
+        { initialProps: { params: searchParams } }
+    );
 }
 
 describe('useLandingInteractions multi-view limits', () => {
@@ -59,5 +78,24 @@ describe('useLandingInteractions multi-view limits', () => {
             'Maximum 3 cameras allowed in Multi-View mode (high-end device)',
             'warning'
         );
+    });
+
+    it('tidak menimpa popup pending dengan kamera mentah dari URL sync untuk id yang sama', () => {
+        const hook = renderInteractionsWithSearch(new URLSearchParams());
+
+        act(() => {
+            hook.result.current.handleCameraClick({
+                ...createCamera(2),
+                streams: {},
+                _stream_resolution_pending: true,
+            });
+        });
+
+        expect(hook.result.current.popup?._stream_resolution_pending).toBe(true);
+
+        hook.rerender({ params: new URLSearchParams('camera=2-camera-2') });
+
+        expect(hook.result.current.popup?._stream_resolution_pending).toBe(true);
+        expect(hook.result.current.popup?.streams).toEqual({});
     });
 });
