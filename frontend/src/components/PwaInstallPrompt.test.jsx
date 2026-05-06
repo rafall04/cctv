@@ -1,5 +1,5 @@
 /*
- * Purpose: Verify public PWA install prompt behaves like a dismissible toast and respects install capability.
+ * Purpose: Verify public/admin PWA install prompt behaves like a dismissible toast and respects install capability.
  * Caller: Frontend focused PWA prompt test gate.
  * Deps: React Testing Library, React Router, Vitest, PwaInstallPrompt.
  * MainFuncs: PWA install prompt tests.
@@ -63,11 +63,41 @@ describe('PwaInstallPrompt', () => {
         expect(localStorage.getItem('rafnet_pwa_prompt_dismissed')).toBe('true');
     });
 
-    it('does not show on admin routes or after dismissal', async () => {
+    it('uses admin copy and dismissal key on admin routes', async () => {
+        render(
+            <MemoryRouter initialEntries={['/admin/dashboard']}>
+                <PwaInstallPrompt delayMs={100} />
+            </MemoryRouter>
+        );
+
+        let event;
+        await act(async () => {
+            event = dispatchInstallPromptEvent();
+            await Promise.resolve();
+        });
+
+        await act(async () => {
+            vi.advanceTimersByTime(100);
+        });
+
+        expect(screen.getByTestId('pwa-install-prompt').className).toContain('bottom-24');
+        expect(screen.getByText('Install RAF NET Admin')).toBeTruthy();
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: /Install/i }));
+            await Promise.resolve();
+        });
+
+        expect(event.prompt).toHaveBeenCalledTimes(1);
+        expect(localStorage.getItem('rafnet_admin_pwa_prompt_dismissed')).toBe('true');
+        expect(localStorage.getItem('rafnet_pwa_prompt_dismissed')).toBeNull();
+    });
+
+    it('does not show after route-specific dismissal', async () => {
         localStorage.setItem('rafnet_pwa_prompt_dismissed', 'true');
 
         render(
-            <MemoryRouter initialEntries={['/admin/dashboard']}>
+            <MemoryRouter initialEntries={['/']}>
                 <PwaInstallPrompt delayMs={100} />
             </MemoryRouter>
         );

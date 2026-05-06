@@ -1,15 +1,16 @@
 /*
- * Purpose: Render a delayed dismissible public PWA install toast when the browser exposes install capability.
- * Caller: App public route shell inside BrowserRouter.
+ * Purpose: Render a delayed dismissible public/admin PWA install toast when the browser exposes install capability.
+ * Caller: App route shell inside BrowserRouter.
  * Deps: React hooks, React Router location, beforeinstallprompt event, localStorage.
- * MainFuncs: PwaInstallPrompt.
+ * MainFuncs: PwaInstallPrompt, getPromptConfig.
  * SideEffects: Captures install prompt event, calls prompt(), and stores dismissal state.
  */
 
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 
-const DISMISS_KEY = 'rafnet_pwa_prompt_dismissed';
+const PUBLIC_DISMISS_KEY = 'rafnet_pwa_prompt_dismissed';
+const ADMIN_DISMISS_KEY = 'rafnet_admin_pwa_prompt_dismissed';
 const DEFAULT_DELAY_MS = 11000;
 
 function isStandaloneDisplay() {
@@ -21,6 +22,19 @@ export default function PwaInstallPrompt({ delayMs = DEFAULT_DELAY_MS }) {
     const [installEvent, setInstallEvent] = useState(null);
     const [visible, setVisible] = useState(false);
     const isAdminRoute = location.pathname.startsWith('/admin');
+    const config = isAdminRoute
+        ? {
+            dismissKey: ADMIN_DISMISS_KEY,
+            title: 'Install RAF NET Admin',
+            body: 'Buka admin lebih cepat untuk cek kamera, health, analytics, dan token playback.',
+            className: 'bottom-24 sm:bottom-6',
+        }
+        : {
+            dismissKey: PUBLIC_DISMISS_KEY,
+            title: 'Install RAF NET CCTV',
+            body: 'Buka lebih cepat dari layar utama tanpa mencari browser lagi.',
+            className: 'top-20',
+        };
 
     useEffect(() => {
         if (typeof window === 'undefined') {
@@ -37,17 +51,17 @@ export default function PwaInstallPrompt({ delayMs = DEFAULT_DELAY_MS }) {
     }, []);
 
     useEffect(() => {
-        if (isAdminRoute || !installEvent || isStandaloneDisplay() || localStorage.getItem(DISMISS_KEY) === 'true') {
+        if (!installEvent || isStandaloneDisplay() || localStorage.getItem(config.dismissKey) === 'true') {
             setVisible(false);
             return undefined;
         }
 
         const timer = window.setTimeout(() => setVisible(true), delayMs);
         return () => window.clearTimeout(timer);
-    }, [delayMs, installEvent, isAdminRoute]);
+    }, [delayMs, installEvent, config.dismissKey]);
 
     const dismiss = () => {
-        localStorage.setItem(DISMISS_KEY, 'true');
+        localStorage.setItem(config.dismissKey, 'true');
         setVisible(false);
     };
 
@@ -69,16 +83,16 @@ export default function PwaInstallPrompt({ delayMs = DEFAULT_DELAY_MS }) {
     return (
         <div
             data-testid="pwa-install-prompt"
-            className="fixed left-4 right-4 top-20 z-[99997] rounded-2xl border border-sky-200 bg-white p-4 shadow-2xl dark:border-sky-500/20 dark:bg-gray-900 sm:left-auto sm:right-6 sm:max-w-sm"
+            className={`fixed left-4 right-4 z-[99997] rounded-2xl border border-sky-200 bg-white p-4 shadow-2xl dark:border-sky-500/20 dark:bg-gray-900 sm:left-auto sm:right-6 sm:max-w-sm ${config.className}`}
         >
             <div className="flex items-start gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-300">
                     <span className="text-lg font-black">+</span>
                 </div>
                 <div className="min-w-0 flex-1">
-                    <h2 className="text-sm font-bold text-gray-900 dark:text-white">Install RAF NET CCTV</h2>
+                    <h2 className="text-sm font-bold text-gray-900 dark:text-white">{config.title}</h2>
                     <p className="mt-1 text-xs leading-5 text-gray-600 dark:text-gray-400">
-                        Buka lebih cepat dari layar utama tanpa mencari browser lagi.
+                        {config.body}
                     </p>
                     <div className="mt-3 flex items-center gap-2">
                         <button
