@@ -84,6 +84,7 @@ describe('AreaPublicPage', () => {
         renderPage();
 
         await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: /KAB SURABAYA/i })).toBeTruthy());
+        expect(screen.getByRole('link', { name: /Kembali ke CCTV Publik/i }).getAttribute('href')).toBe('/');
         expect(screen.getAllByText(/1 kamera/i).length).toBeGreaterThan(0);
         expect(screen.getAllByText(/CCTV A/i).length).toBeGreaterThan(0);
         expect(document.title).toBe('CCTV Online KAB SURABAYA - RAF NET');

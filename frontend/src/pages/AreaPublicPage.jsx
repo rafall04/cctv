@@ -1,5 +1,5 @@
 /*
- * Purpose: Render public area-specific CCTV pages with standardized popup stream resolution, trending, grid, and share entry points.
+ * Purpose: Render public area-specific CCTV pages with standardized popup stream resolution, back navigation, trending, grid, and share entry points.
  * Caller: App route /area/:areaSlug.
  * Deps: React Router, publicGrowthService, publicGrowthShare, landing components.
  * MainFuncs: AreaPublicPage.
@@ -216,15 +216,14 @@ export default function AreaPublicPage() {
     return (
         <main className="min-h-screen bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-white">
             <section className="border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-                <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-                    <Link to="/" className="text-sm font-semibold text-primary">RAF NET CCTV</Link>
-                    <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                        <div>
-                            <h1 className="text-2xl font-bold sm:text-3xl">{area?.name || 'Area CCTV'}</h1>
-                            <p className="mt-2 max-w-2xl text-sm text-gray-600 dark:text-gray-300">
-                                {area?.description || 'Pantau CCTV publik area ini secara online melalui RAF NET.'}
-                            </p>
-                        </div>
+                <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+                    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <Link
+                            to="/"
+                            className="inline-flex w-fit items-center rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary/60 hover:text-primary dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:text-primary-300"
+                        >
+                            Kembali ke CCTV Publik
+                        </Link>
                         <button
                             type="button"
                             onClick={handleShare}
@@ -233,7 +232,18 @@ export default function AreaPublicPage() {
                             Share Area
                         </button>
                     </div>
-                    <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                    <div className="flex flex-col gap-2">
+                        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                            Area CCTV
+                        </div>
+                        <div>
+                            <h1 className="text-2xl font-bold sm:text-3xl">{area?.name || 'Area CCTV'}</h1>
+                            <p className="mt-2 max-w-2xl text-sm text-gray-600 dark:text-gray-300">
+                                {area?.description || 'Pantau CCTV publik area ini secara online melalui RAF NET.'}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="mt-5 grid gap-3 sm:grid-cols-3">
                         <AreaStat label="Kamera Publik" value={area?.camera_count} />
                         <AreaStat label="Online" value={area?.online_count} />
                         <AreaStat label="Total Ditonton" value={area?.total_views} />
