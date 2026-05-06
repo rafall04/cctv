@@ -92,7 +92,8 @@ export function useLandingInteractions({
         });
     }, [addToast]);
 
-    const handleCameraClick = useCallback((camera) => {
+    const handleCameraClick = useCallback((camera, options = {}) => {
+        const { replaceHistory = false } = options;
         setPopup(camera);
         addRecentCamera(camera);
         setSearchParams((previous) => {
@@ -105,7 +106,7 @@ export function useLandingInteractions({
                 next.set('view', viewMode);
             }
             return next;
-        }, { replace: false });
+        }, { replace: replaceHistory });
     }, [addRecentCamera, layoutMode, setSearchParams, viewMode]);
 
     const handlePopupClose = useCallback(() => {
@@ -117,7 +118,7 @@ export function useLandingInteractions({
                 next.set('mode', layoutMode);
             }
             return next;
-        }, { replace: false });
+        }, { replace: true });
     }, [layoutMode, setSearchParams]);
 
     return {

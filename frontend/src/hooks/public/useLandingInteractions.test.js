@@ -42,6 +42,7 @@ function renderInteractions(deviceTier = 'high') {
     return {
         ...result,
         addToast,
+        setSearchParams,
     };
 }
 
@@ -97,5 +98,15 @@ describe('useLandingInteractions multi-view limits', () => {
 
         expect(hook.result.current.popup?._stream_resolution_pending).toBe(true);
         expect(hook.result.current.popup?.streams).toEqual({});
+    });
+
+    it('bisa mengganti popup tanpa menambah history entry baru', () => {
+        const { result, setSearchParams } = renderInteractions('high');
+
+        act(() => {
+            result.current.handleCameraClick(createCamera(2), { replaceHistory: true });
+        });
+
+        expect(setSearchParams).toHaveBeenCalledWith(expect.any(Function), { replace: true });
     });
 });

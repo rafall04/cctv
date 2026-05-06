@@ -188,7 +188,8 @@ function LandingPageContent() {
         }
     }, [activePopupSource, popup]);
 
-    const handleGridPopupOpen = useCallback(async (camera) => {
+    const handleGridPopupOpen = useCallback(async (camera, options = {}) => {
+        const { replaceHistory = false } = options;
         const requestId = streamResolveRequestRef.current + 1;
         streamResolveRequestRef.current = requestId;
         const pendingCamera = {
@@ -196,7 +197,7 @@ function LandingPageContent() {
             _stream_resolution_pending: true,
         };
         setActivePopupSource('grid');
-        handleCameraClick(pendingCamera);
+        handleCameraClick(pendingCamera, { replaceHistory });
 
         try {
             const resolvedCamera = await resolvePublicPopupCamera(camera, cameras);
@@ -208,19 +209,19 @@ function LandingPageContent() {
                 handleCameraClick({
                     ...resolvedCamera,
                     _stream_resolution_pending: false,
-                });
+                }, { replaceHistory: true });
             } else {
                 handleCameraClick({
                     ...camera,
                     _stream_resolution_pending: false,
-                });
+                }, { replaceHistory: true });
             }
         } catch {
             if (streamResolveRequestRef.current === requestId) {
                 handleCameraClick({
                     ...camera,
                     _stream_resolution_pending: false,
-                });
+                }, { replaceHistory: true });
             }
         }
     }, [cameras, handleCameraClick]);
@@ -347,7 +348,7 @@ function LandingPageContent() {
                             modalTestId={activePopupSource === 'map' ? 'map-popup-modal' : 'grid-popup-modal'}
                             bodyTestId={activePopupSource === 'map' ? 'map-video-body' : 'grid-video-body'}
                             relatedCameras={relatedPopupCameras}
-                            onRelatedCameraClick={handleGridPopupOpen}
+                            onRelatedCameraClick={(camera) => handleGridPopupOpen(camera, { replaceHistory: true })}
                             isFavorite={isFavorite}
                             onToggleFavorite={toggleFavorite}
                         />
@@ -478,7 +479,7 @@ function LandingPageContent() {
                             modalTestId={activePopupSource === 'map' ? 'map-popup-modal' : 'grid-popup-modal'}
                             bodyTestId={activePopupSource === 'map' ? 'map-video-body' : 'grid-video-body'}
                             relatedCameras={relatedPopupCameras}
-                            onRelatedCameraClick={handleGridPopupOpen}
+                            onRelatedCameraClick={(camera) => handleGridPopupOpen(camera, { replaceHistory: true })}
                             isFavorite={isFavorite}
                             onToggleFavorite={toggleFavorite}
                         />
