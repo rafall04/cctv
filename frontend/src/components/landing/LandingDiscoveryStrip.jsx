@@ -133,7 +133,7 @@ export default function LandingDiscoveryStrip({
     }
 
     return (
-        <section data-testid="landing-discovery-strip" className={`mx-auto w-full max-w-full overflow-hidden px-3 py-3 sm:max-w-7xl sm:px-6 lg:px-8 ${className}`}>
+        <section id="public-discovery" data-testid="landing-discovery-strip" className={`mx-auto w-full max-w-full overflow-hidden px-3 py-3 sm:max-w-7xl sm:px-6 lg:px-8 ${className}`}>
             <div className="min-w-0 max-w-full overflow-hidden rounded-2xl border border-gray-200 bg-white/85 p-2 shadow-sm dark:border-gray-800 dark:bg-gray-900/85 sm:p-3">
                 <div className="flex min-w-0 max-w-full items-center gap-2 overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch]" role="tablist" aria-label="Discovery CCTV publik">
                     {sections.map((section) => {

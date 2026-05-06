@@ -1,3 +1,11 @@
+/*
+ * Purpose: Render the public floating multi-view launcher without colliding with mobile navigation.
+ * Caller: LandingPage public full/simple modes.
+ * Deps: Icons and animation control utility.
+ * MainFuncs: MultiViewButton.
+ * SideEffects: Invokes caller-provided open handler.
+ */
+
 import { Icons } from '../../components/ui/Icons';
 import { shouldDisableAnimations } from '../../utils/animationControl';
 
@@ -14,7 +22,7 @@ function MultiViewButton({ count, onClick, maxReached, maxStreams = 3 }) {
     if (count === 0) return null;
 
     return (
-        <div className="fixed bottom-6 left-6 z-40 flex flex-col items-start gap-2">
+        <div className="fixed bottom-24 left-4 z-40 flex flex-col items-start gap-2 sm:bottom-6 sm:left-6">
             {/* Info tooltip when max reached */}
             {maxReached && (
                 <div className={`bg-amber-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg shadow-lg ${disableAnimations ? '' : 'animate-bounce'}`}>

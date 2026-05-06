@@ -1,7 +1,7 @@
 /**
  * Purpose: Renders the lightweight public landing mode with status, compact discovery, camera list, and footer.
  * Caller: LandingPage when layoutMode is simple.
- * Deps: Camera, branding, theme, landing config, discovery strip, ads, feedback, and support components.
+ * Deps: Camera, branding, theme, landing config, discovery/quick access strips, ads, feedback, and support components.
  * MainFuncs: LandingPageSimple, SimpleHeader, SimpleStatusOverview, SimpleFooter.
  * SideEffects: Lazy-loads optional floating widgets and ad slots.
  */
@@ -16,6 +16,7 @@ import lazyWithRetry from '../../utils/lazyWithRetry';
 import LayoutModeToggle from './LayoutModeToggle';
 import LandingPublicTopStack from './LandingPublicTopStack';
 import LandingDiscoveryStrip from './LandingDiscoveryStrip';
+import LandingQuickAccessStrip from './LandingQuickAccessStrip';
 
 const FeedbackWidget = lazyWithRetry(() => import('../FeedbackWidget'), 'feedback-widget-inline');
 const SaweriaSupport = lazyWithRetry(() => import('../SaweriaSupport'), 'saweria-support-inline');
@@ -187,6 +188,9 @@ export default function LandingPageSimple({
     publicConfigLoading = false,
     publicDiscovery = null,
     discoveryLoading = false,
+    recentCameras = [],
+    favoriteCameras = [],
+    onQuickCameraOpen,
 }) {
     const { branding } = useBranding();
     const showFooterBanner = shouldRenderAdSlot(adsConfig, 'footerBanner', isAdsMobileViewport());
@@ -213,6 +217,12 @@ export default function LandingPageSimple({
                 loading={discoveryLoading}
                 onCameraClick={onCameraClick}
                 className="pt-2"
+            />
+
+            <LandingQuickAccessStrip
+                recentCameras={recentCameras}
+                favoriteCameras={favoriteCameras}
+                onCameraClick={onQuickCameraOpen || onCameraClick}
             />
 
             <main className="flex-1 min-h-0 pb-4 sm:pb-6">

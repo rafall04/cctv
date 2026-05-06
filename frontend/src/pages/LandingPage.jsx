@@ -1,12 +1,12 @@
 /*
- * Purpose: Compose the public CCTV landing experience across full/simple modes, compact discovery, standardized popup streams, map/grid views, and popups.
+ * Purpose: Compose the public CCTV landing experience across full/simple modes, compact discovery, mobile quick access, standardized popup streams, map/grid views, and popups.
  * Caller: App public root route.
  * Deps: React, Router search params, branding/camera/toast contexts, landing hooks, landing components, publicGrowthService.
  * MainFuncs: LandingPage, LandingPageContent, DeferredSurfaceFallback.
  * SideEffects: Fetches public config/discovery data, updates metadata, opens video popups, manages multiview state.
  */
 
-import { Suspense, useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useBranding } from '../contexts/BrandingContext';
 import { updateMetaTags } from '../utils/metaUpdater';
@@ -24,6 +24,8 @@ import LandingFooter from '../components/landing/LandingFooter';
 import LandingCamerasSection from '../components/landing/LandingCamerasSection';
 import LandingPublicTopStack from '../components/landing/LandingPublicTopStack';
 import LandingDiscoveryStrip from '../components/landing/LandingDiscoveryStrip';
+import LandingQuickAccessStrip from '../components/landing/LandingQuickAccessStrip';
+import LandingMobileDock from '../components/landing/LandingMobileDock';
 import MultiViewButton from '../components/MultiView/MultiViewButton';
 import InlineAdSlot from '../components/ads/InlineAdSlot';
 import GlobalAdScript from '../components/ads/GlobalAdScript';
@@ -56,7 +58,7 @@ function LandingPageContent() {
     const [activePopupSource, setActivePopupSource] = useState('grid');
     const [publicDiscovery, setPublicDiscovery] = useState(null);
     const [discoveryLoading, setDiscoveryLoading] = useState(true);
-    const { favorites, toggleFavorite, isFavorite, addRecentCamera } = useCameraHistory();
+    const { favorites, recentCameras, toggleFavorite, isFavorite, addRecentCamera } = useCameraHistory();
 
     const {
         layoutMode,
@@ -110,6 +112,15 @@ function LandingPageContent() {
     const showSocialBar = !shouldSuspendSocialBar && shouldRenderAdSlot(adsConfig, 'socialBar', isMobileAdsViewport);
     const showFooterBanner = shouldRenderAdSlot(adsConfig, 'footerBanner', isMobileAdsViewport);
     const showAfterCamerasNative = shouldRenderAdSlot(adsConfig, 'afterCamerasNative', isMobileAdsViewport);
+    const favoriteCameras = useMemo(() => (
+        cameras.filter((camera) => favorites.includes(camera.id)).slice(0, 5)
+    ), [cameras, favorites]);
+    const recentCameraItems = useMemo(() => (
+        recentCameras
+            .map((recentCamera) => cameras.find((camera) => camera.id === recentCamera.id) || recentCamera)
+            .slice(0, 5)
+    ), [cameras, recentCameras]);
+    const quickAccessCount = favoriteCameras.length + recentCameraItems.length;
 
     useEffect(() => {
         if (branding) {
@@ -164,6 +175,23 @@ function LandingPageContent() {
         setActivePopupSource('grid');
     }, [handlePopupClose]);
 
+    const scrollToElement = useCallback((elementId) => {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }, []);
+
+    const handleMobileHomeClick = useCallback(() => {
+        if (typeof window.scrollTo === 'function') {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    }, []);
+
+    const handleMobileQuickAccessClick = useCallback(() => {
+        scrollToElement(quickAccessCount > 0 ? 'public-quick-access' : 'public-discovery');
+    }, [quickAccessCount, scrollToElement]);
+
     if (layoutMode === 'simple') {
         return (
             <div key="simple-mode">
@@ -191,6 +219,9 @@ function LandingPageContent() {
                         publicConfigLoading={publicConfigLoading || brandingLoading}
                         publicDiscovery={publicDiscovery}
                         discoveryLoading={discoveryLoading}
+                        recentCameras={recentCameraItems}
+                        favoriteCameras={favoriteCameras}
+                        onQuickCameraOpen={handleGridPopupOpen}
                     />
                 </Suspense>
 
@@ -200,6 +231,15 @@ function LandingPageContent() {
                     maxReached={maxReached}
                     maxStreams={maxStreams}
                 />
+                {!popup && (
+                    <LandingMobileDock
+                        viewMode={viewMode}
+                        onViewModeChange={setViewMode}
+                        onHomeClick={handleMobileHomeClick}
+                        onQuickAccessClick={handleMobileQuickAccessClick}
+                        quickAccessCount={quickAccessCount}
+                    />
+                )}
 
                 {popup && (
                     <Suspense fallback={null}>
@@ -247,6 +287,12 @@ function LandingPageContent() {
                 <LandingDiscoveryStrip
                     discovery={publicDiscovery}
                     loading={discoveryLoading}
+                    onCameraClick={handleGridPopupOpen}
+                />
+
+                <LandingQuickAccessStrip
+                    recentCameras={recentCameraItems}
+                    favoriteCameras={favoriteCameras}
                     onCameraClick={handleGridPopupOpen}
                 />
 
@@ -305,6 +351,15 @@ function LandingPageContent() {
                     maxReached={maxReached}
                     maxStreams={maxStreams}
                 />
+                {!popup && (
+                    <LandingMobileDock
+                        viewMode={viewMode}
+                        onViewModeChange={setViewMode}
+                        onHomeClick={handleMobileHomeClick}
+                        onQuickAccessClick={handleMobileQuickAccessClick}
+                        quickAccessCount={quickAccessCount}
+                    />
+                )}
 
                 {popup && (
                     <Suspense fallback={null}>
