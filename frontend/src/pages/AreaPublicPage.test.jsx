@@ -114,6 +114,58 @@ describe('AreaPublicPage', () => {
         expect(document.title).toBe('CCTV Online KAB SURABAYA - RAF NET');
     });
 
+    it('merender daftar semua CCTV area secara bertahap untuk area besar', async () => {
+        const areaCameras = Array.from({ length: 26 }, (_, index) => ({
+            id: index + 100,
+            name: `CCTV Area ${index + 1}`,
+            area_name: 'KAB SURABAYA',
+            total_views: index,
+            live_viewers: 0,
+        }));
+
+        getAreaMock.mockResolvedValue({
+            success: true,
+            data: { name: 'KAB SURABAYA', slug: 'kab-surabaya', camera_count: 26, online_count: 20, total_views: 200 },
+        });
+        getAreaCamerasMock.mockResolvedValue({ success: true, data: areaCameras });
+        getTrendingCamerasMock.mockResolvedValue({ success: true, data: [] });
+
+        renderPage();
+
+        await waitFor(() => expect(screen.getByRole('heading', { level: 2, name: /Semua CCTV Area/i })).toBeTruthy());
+
+        const allCamerasSection = screen.getByRole('heading', { level: 2, name: /Semua CCTV Area/i }).closest('section');
+        expect(within(allCamerasSection).getByText('CCTV Area 12')).toBeTruthy();
+        expect(within(allCamerasSection).queryByText('CCTV Area 13')).toBeNull();
+        expect(within(allCamerasSection).getByText(/Menampilkan 12 dari 26 kamera/i)).toBeTruthy();
+
+        fireEvent.click(within(allCamerasSection).getByRole('button', { name: /Tampilkan 12 kamera lagi/i }));
+
+        expect(within(allCamerasSection).getByText('CCTV Area 24')).toBeTruthy();
+        expect(within(allCamerasSection).queryByText('CCTV Area 25')).toBeNull();
+    });
+
+    it('memprioritaskan thumbnail pertama di daftar semua CCTV area', async () => {
+        getAreaMock.mockResolvedValue({
+            success: true,
+            data: { name: 'KAB SURABAYA', slug: 'kab-surabaya', camera_count: 2, online_count: 2, total_views: 20 },
+        });
+        getAreaCamerasMock.mockResolvedValue({
+            success: true,
+            data: [
+                { id: 31, name: 'CCTV Priority A', area_name: 'KAB SURABAYA', thumbnail_path: '/api/thumbnails/31.jpg' },
+                { id: 32, name: 'CCTV Priority B', area_name: 'KAB SURABAYA', thumbnail_path: '/api/thumbnails/32.jpg' },
+            ],
+        });
+        getTrendingCamerasMock.mockResolvedValue({ success: true, data: [] });
+
+        renderPage();
+
+        await waitFor(() => expect(screen.getByAltText('CCTV Priority A preview')).toBeTruthy());
+        expect(screen.getByAltText('CCTV Priority A preview').getAttribute('loading')).toBe('eager');
+        expect(screen.getByAltText('CCTV Priority B preview').getAttribute('loading')).toBe('eager');
+    });
+
     it('falls back to clipboard when native area sharing fails', async () => {
         const nativeShare = vi.fn().mockRejectedValue(new Error('Share unavailable'));
         const writeText = vi.fn().mockResolvedValue(undefined);

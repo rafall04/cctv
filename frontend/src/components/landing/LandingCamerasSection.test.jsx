@@ -10,7 +10,7 @@
 
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import LandingCamerasSection from './LandingCamerasSection';
+import LandingCamerasSection, { renderSearchDropdown } from './LandingCamerasSection';
 
 vi.mock('../../contexts/CameraContext', () => ({
     useCameras: () => ({
@@ -112,5 +112,25 @@ describe('LandingCamerasSection controls', () => {
 
         fireEvent.click(screen.getByRole('button', { name: /Terbaru/i }));
         expect(screen.getByText('results-grid:Market,Square,Gate,Lobby')).toBeTruthy();
+    });
+
+    it('membatasi hasil dropdown search agar tidak merender semua kamera sekaligus', () => {
+        render(
+            renderSearchDropdown({
+                cameras: Array.from({ length: 35 }, (_, index) => ({
+                    id: index + 10,
+                    name: `Bulk Camera ${index + 1}`,
+                    area_name: 'Area Bulk',
+                })),
+                viewMode: 'grid',
+                onSelect: vi.fn(),
+                searchQuery: 'bulk',
+                maxResults: 20,
+            })
+        );
+
+        expect(screen.getByText('Bulk Camera 20')).toBeTruthy();
+        expect(screen.queryByText('Bulk Camera 21')).toBeNull();
+        expect(screen.getByText(/20 dari 35 hasil pencarian/i)).toBeTruthy();
     });
 });

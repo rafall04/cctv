@@ -1,5 +1,5 @@
 /*
- * Purpose: Render public area-specific CCTV portal pages with area status, discovery sections, standardized popup stream resolution, related popup cameras, and resilient share entry points.
+ * Purpose: Render public area-specific CCTV portal pages with area status, discovery sections, progressive camera lists, standardized popup stream resolution, related popup cameras, and resilient share entry points.
  * Caller: App route /area/:areaSlug.
  * Deps: React Router, CameraThumbnail, VideoPopup, publicGrowthService, publicGrowthShare.
  * MainFuncs: AreaPublicPage.
@@ -14,6 +14,9 @@ import publicGrowthService from '../services/publicGrowthService';
 import { buildAreaShareText, sharePublicText } from '../utils/publicGrowthShare';
 
 const VideoPopup = lazy(() => import('../components/MultiView/VideoPopup'));
+const AREA_INITIAL_VISIBLE_CAMERAS = 12;
+const AREA_LOAD_MORE_CAMERAS = 12;
+const AREA_PRIORITY_THUMBNAILS = 4;
 
 function setMetaContent(selector, content) {
     const element = document.querySelector(selector);
@@ -133,7 +136,7 @@ function AreaCameraSection({ title, description, cameras, metricLabel, metricVal
     );
 }
 
-function AreaCameraCard({ camera, onClick }) {
+function AreaCameraCard({ camera, onClick, thumbnailPriority = false }) {
     return (
         <button
             type="button"
@@ -147,6 +150,7 @@ function AreaCameraCard({ camera, onClick }) {
                     cameraName={camera.name}
                     isMaintenance={camera.status === 'maintenance'}
                     isOffline={camera.availability_state === 'offline'}
+                    priority={thumbnailPriority}
                 />
                 <span className="absolute left-3 top-3 rounded-lg bg-red-500/90 px-2 py-1 text-[10px] font-bold text-white">
                     LIVE
@@ -180,6 +184,7 @@ export default function AreaPublicPage() {
     const [loading, setLoading] = useState(true);
     const [notFound, setNotFound] = useState(false);
     const [shareMessage, setShareMessage] = useState('');
+    const [visibleAreaCameraCount, setVisibleAreaCameraCount] = useState(AREA_INITIAL_VISIBLE_CAMERAS);
     const streamResolveRequestRef = useRef(0);
 
     useEffect(() => {
@@ -188,6 +193,7 @@ export default function AreaPublicPage() {
         setLoading(true);
         setNotFound(false);
         setSelectedCamera(null);
+        setVisibleAreaCameraCount(AREA_INITIAL_VISIBLE_CAMERAS);
 
         Promise.all([
             publicGrowthService.getArea(areaSlug),
@@ -265,6 +271,11 @@ export default function AreaPublicPage() {
             })
             .slice(0, 5);
     }, [cameras, selectedCamera]);
+    const visibleAreaCameras = useMemo(() => (
+        cameras.slice(0, visibleAreaCameraCount)
+    ), [cameras, visibleAreaCameraCount]);
+    const hiddenAreaCameraCount = Math.max(cameras.length - visibleAreaCameras.length, 0);
+    const nextAreaLoadCount = Math.min(AREA_LOAD_MORE_CAMERAS, hiddenAreaCameraCount);
 
     const handleCameraOpen = useCallback(async (camera) => {
         const requestId = streamResolveRequestRef.current + 1;
@@ -460,15 +471,32 @@ export default function AreaPublicPage() {
                         </p>
                     </div>
                 ) : (
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {cameras.map((camera) => (
-                            <AreaCameraCard
-                                key={camera.id}
-                                camera={camera}
-                                onClick={handleCameraOpen}
-                            />
-                        ))}
-                    </div>
+                    <>
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                            {visibleAreaCameras.map((camera, index) => (
+                                <AreaCameraCard
+                                    key={camera.id}
+                                    camera={camera}
+                                    onClick={handleCameraOpen}
+                                    thumbnailPriority={index < AREA_PRIORITY_THUMBNAILS}
+                                />
+                            ))}
+                        </div>
+                        {hiddenAreaCameraCount > 0 && (
+                            <div className="mt-6 flex flex-col items-center gap-3 text-center">
+                                <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                                    Menampilkan {visibleAreaCameras.length} dari {cameras.length} kamera
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => setVisibleAreaCameraCount((current) => Math.min(current + AREA_LOAD_MORE_CAMERAS, cameras.length))}
+                                    className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 shadow-sm transition hover:border-primary/50 hover:text-primary dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-primary/50 dark:hover:text-primary"
+                                >
+                                    Tampilkan {nextAreaLoadCount} kamera lagi
+                                </button>
+                            </div>
+                        )}
+                    </>
                 )}
             </section>
 

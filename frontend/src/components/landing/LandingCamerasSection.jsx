@@ -1,5 +1,5 @@
 /*
- * Purpose: Render public landing camera workspace with search, area filters, ranking tabs, grid/map/playback modes, and empty states.
+ * Purpose: Render public landing camera workspace with capped search, area filters, ranking tabs, grid/map/playback modes, and empty states.
  * Caller: LandingPage and LandingPageSimple.
  * Deps: Camera context, public filter hook, map preloader, landing toolbar/filter/grid/map/playback components.
  * MainFuncs: CamerasSection, renderSearchDropdown.
@@ -23,11 +23,12 @@ import { preloadLandingMapView } from '../../utils/preloadLandingMapView';
 
 const MapView = lazy(() => preloadLandingMapView());
 
-function renderSearchDropdown({
+export function renderSearchDropdown({
     cameras,
     viewMode,
     onSelect,
     searchQuery,
+    maxResults = 20,
 }) {
     if (searchQuery.trim() && cameras.length === 0) {
         return (
@@ -46,14 +47,17 @@ function renderSearchDropdown({
         return null;
     }
 
+    const visibleCameras = cameras.slice(0, maxResults);
+    const hasHiddenResults = visibleCameras.length < cameras.length;
+
     return (
         <div className="absolute left-0 right-0 top-full z-[1100] mt-2 max-h-[300px] overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-800 sm:max-h-[400px]">
             <div className="sticky top-0 border-b border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-700 dark:bg-gray-900/50">
                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {cameras.length} hasil pencarian
+                    {hasHiddenResults ? `${visibleCameras.length} dari ${cameras.length}` : cameras.length} hasil pencarian
                 </span>
             </div>
-            {cameras.map((camera, index) => {
+            {visibleCameras.map((camera, index) => {
                 const isMaintenance = camera.status === 'maintenance';
                 const isTunnel = camera.is_tunnel === 1;
                 const hasCoords = camera.latitude && camera.longitude;
