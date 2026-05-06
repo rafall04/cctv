@@ -6,6 +6,7 @@
  * SideEffects: Renders sanitized HTML from configured area coverage.
  */
 import LandingStatsBar from './LandingStatsBar';
+import { sanitizePublicHtml } from '../../utils/sanitizePublicHtml';
 
 export default function Hero({ branding, landingSettings, disableHeavyEffects, onCameraClick }) {
     const heroTitle = branding.hero_title === 'Pantau CCTV Secara Real-Time'
@@ -72,10 +73,10 @@ export default function Hero({ branding, landingSettings, disableHeavyEffects, o
                         <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
                         <circle cx="12" cy="11" r="3" />
                     </svg>
-                    <span
-                        className="text-sm text-amber-700 dark:text-amber-400"
-                        dangerouslySetInnerHTML={{ __html: landingSettings.area_coverage }}
-                    />
+                <span
+                    className="text-sm text-amber-700 dark:text-amber-400"
+                    dangerouslySetInnerHTML={{ __html: sanitizePublicHtml(landingSettings.area_coverage) }}
+                />
                 </div>
 
                 <LandingStatsBar onCameraClick={onCameraClick} />

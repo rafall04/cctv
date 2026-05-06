@@ -6,6 +6,8 @@
  * SideEffects: Invokes caller-provided camera click handler.
  */
 
+import { sliceLandingQuickAccessCameras } from '../../utils/publicLandingSections';
+
 function QuickCameraButton({ camera, label, onCameraClick }) {
     return (
         <button
@@ -65,7 +67,9 @@ export default function LandingQuickAccessStrip({
     onCameraClick,
     forceVisible = false,
 }) {
-    if (!forceVisible && !recentCameras.length && !favoriteCameras.length) {
+    const capped = sliceLandingQuickAccessCameras({ favoriteCameras, recentCameras });
+
+    if (!forceVisible && !capped.recentCameras.length && !capped.favoriteCameras.length) {
         return null;
     }
 
@@ -75,14 +79,14 @@ export default function LandingQuickAccessStrip({
                 <QuickGroup
                     title="Favorit"
                     label="FAV"
-                    cameras={favoriteCameras}
+                    cameras={capped.favoriteCameras}
                     onCameraClick={onCameraClick}
                 />
-                {forceVisible && favoriteCameras.length === 0 && <EmptyFavoriteTarget />}
+                {forceVisible && capped.favoriteCameras.length === 0 && <EmptyFavoriteTarget />}
                 <QuickGroup
                     title="Terakhir Dilihat"
                     label="REC"
-                    cameras={recentCameras}
+                    cameras={capped.recentCameras}
                     onCameraClick={onCameraClick}
                 />
             </div>

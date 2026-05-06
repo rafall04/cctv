@@ -8,51 +8,7 @@
 
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-
-function formatCount(value) {
-    return Number(value || 0).toLocaleString('id-ID');
-}
-
-function getItems(discovery, key) {
-    return Array.isArray(discovery?.[key]) ? discovery[key] : [];
-}
-
-function buildSections(discovery) {
-    return [
-        {
-            key: 'live_now',
-            label: 'Sedang Ramai',
-            metricLabel: 'penonton',
-            items: getItems(discovery, 'live_now'),
-            type: 'camera',
-            metric: (camera) => camera.live_viewers,
-        },
-        {
-            key: 'top_cameras',
-            label: 'Paling Ditonton',
-            metricLabel: 'views',
-            items: getItems(discovery, 'top_cameras'),
-            type: 'camera',
-            metric: (camera) => camera.total_views,
-        },
-        {
-            key: 'popular_areas',
-            label: 'Area Populer',
-            metricLabel: 'views',
-            items: getItems(discovery, 'popular_areas'),
-            type: 'area',
-            metric: (area) => area.total_views,
-        },
-        {
-            key: 'new_cameras',
-            label: 'Kamera Terbaru',
-            metricLabel: 'views',
-            items: getItems(discovery, 'new_cameras'),
-            type: 'camera',
-            metric: (camera) => camera.total_views,
-        },
-    ].filter((section) => section.items.length > 0);
-}
+import { buildLandingDiscoverySections, formatLandingDiscoveryCount, LANDING_DISCOVERY_LIMIT } from '../../utils/publicLandingSections';
 
 function DiscoverySkeleton() {
     return (
@@ -76,7 +32,7 @@ function DiscoveryCameraButton({ camera, metricLabel, metricValue, onCameraClick
                 <div className="truncate text-sm font-semibold text-gray-900 dark:text-white">{camera.name}</div>
                 <div className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">{camera.area_name || camera.location || 'Area publik'}</div>
                 <div className="mt-1 text-xs font-semibold text-primary">
-                    {formatCount(metricValue)} {metricLabel}
+                    {formatLandingDiscoveryCount(metricValue)} {metricLabel}
                 </div>
             </div>
         </button>
@@ -94,9 +50,9 @@ function DiscoveryAreaLink({ area }) {
             </div>
             <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-semibold text-gray-900 dark:text-white">{area.name}</div>
-                <div className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">{formatCount(area.camera_count)} kamera publik</div>
+                <div className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">{formatLandingDiscoveryCount(area.camera_count)} kamera publik</div>
                 <div className="mt-1 text-xs font-semibold text-primary">
-                    {formatCount(area.total_views)}x ditonton
+                    {formatLandingDiscoveryCount(area.total_views)}x ditonton
                 </div>
             </div>
         </Link>
@@ -108,9 +64,9 @@ export default function LandingDiscoveryStrip({
     loading = false,
     onCameraClick,
     className = '',
-    maxItemsPerSection = 8,
+    maxItemsPerSection = LANDING_DISCOVERY_LIMIT,
 }) {
-    const sections = useMemo(() => buildSections(discovery), [discovery]);
+    const sections = useMemo(() => buildLandingDiscoverySections(discovery), [discovery]);
     const [activeKey, setActiveKey] = useState('');
     const activeSection = sections.find((section) => section.key === activeKey) || sections[0];
     const activeItems = activeSection?.items.slice(0, maxItemsPerSection) || [];
@@ -145,7 +101,7 @@ export default function LandingDiscoveryStrip({
                             >
                                 {section.label}
                                 <span className={`ml-2 rounded-lg px-1.5 py-0.5 text-[10px] ${active ? 'bg-white/20 text-white' : 'bg-white text-gray-500 dark:bg-gray-900 dark:text-gray-400'}`}>
-                                    {section.items.length}
+                                    {formatLandingDiscoveryCount(section.items.length)}
                                 </span>
                             </button>
                         );
@@ -154,7 +110,7 @@ export default function LandingDiscoveryStrip({
 
                 {hiddenItemCount > 0 && (
                     <div className="px-1 pb-1 text-[11px] font-medium text-gray-500 dark:text-gray-400">
-                        Menampilkan {activeItems.length} dari {activeSection.items.length}
+                        Menampilkan {formatLandingDiscoveryCount(activeItems.length)} dari {formatLandingDiscoveryCount(activeSection.items.length)}
                     </div>
                 )}
 

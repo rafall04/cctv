@@ -12,6 +12,11 @@ import CameraThumbnail from '../components/CameraThumbnail';
 import { resolvePublicPopupCamera } from '../services/publicCameraResolver';
 import publicGrowthService from '../services/publicGrowthService';
 import { buildAreaShareText, sharePublicText } from '../utils/publicGrowthShare';
+import {
+    buildAreaPublicRankingLists,
+    getAreaCameraLiveViewers,
+    getAreaCameraTotalViews,
+} from '../utils/areaPublicRanking';
 
 const VideoPopup = lazy(() => import('../components/MultiView/VideoPopup'));
 const AREA_INITIAL_VISIBLE_CAMERAS = 12;
@@ -42,14 +47,6 @@ function updateAreaMetadata(area) {
 
 function formatCount(value) {
     return Number(value || 0).toLocaleString('id-ID');
-}
-
-function getCameraLiveViewers(camera) {
-    return Number(camera?.live_viewers || camera?.viewer_stats?.live_viewers || 0);
-}
-
-function getCameraTotalViews(camera) {
-    return Number(camera?.total_views || camera?.viewer_stats?.total_views || 0);
 }
 
 function AreaStat({ label, value }) {
@@ -161,14 +158,14 @@ function AreaCameraCard({ camera, onClick, thumbnailPriority = false }) {
                 <div className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
                     {camera.location || camera.area_name || 'Lokasi publik'}
                 </div>
-                <div className="mt-3 flex gap-2 text-[11px] font-semibold">
-                    <span className="rounded-lg bg-emerald-50 px-2 py-1 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
-                        {formatCount(getCameraLiveViewers(camera))} live
-                    </span>
-                    <span className="rounded-lg bg-gray-100 px-2 py-1 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-                        {formatCount(getCameraTotalViews(camera))} views
-                    </span>
-                </div>
+                    <div className="mt-3 flex gap-2 text-[11px] font-semibold">
+                        <span className="rounded-lg bg-emerald-50 px-2 py-1 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                            {formatCount(getAreaCameraLiveViewers(camera))} live
+                        </span>
+                        <span className="rounded-lg bg-gray-100 px-2 py-1 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                            {formatCount(getAreaCameraTotalViews(camera))} views
+                        </span>
+                    </div>
             </div>
         </button>
     );
@@ -235,47 +232,23 @@ export default function AreaPublicPage() {
 
     const shareText = useMemo(() => (area ? buildAreaShareText(area) : ''), [area]);
     const liveViewerCount = useMemo(() => (
-        cameras.reduce((total, camera) => total + getCameraLiveViewers(camera), 0)
+        cameras.reduce((total, camera) => total + getAreaCameraLiveViewers(camera), 0)
     ), [cameras]);
-    const liveCameras = useMemo(() => (
-        [...cameras]
-            .filter((camera) => getCameraLiveViewers(camera) > 0)
-            .sort((left, right) => getCameraLiveViewers(right) - getCameraLiveViewers(left))
-            .slice(0, 4)
-    ), [cameras]);
-    const topCameras = useMemo(() => {
-        const source = trendingCameras.length ? trendingCameras : cameras;
-        return [...source]
-            .sort((left, right) => getCameraTotalViews(right) - getCameraTotalViews(left))
-            .slice(0, 4);
-    }, [cameras, trendingCameras]);
-    const newestCameras = useMemo(() => (
-        [...cameras]
-            .filter((camera) => camera.created_at)
-            .sort((left, right) => String(right.created_at).localeCompare(String(left.created_at)))
-            .slice(0, 4)
-    ), [cameras]);
-    const relatedPopupCameras = useMemo(() => {
-        if (!selectedCamera) {
-            return [];
-        }
-
-        return [...cameras]
-            .filter((camera) => camera.id !== selectedCamera.id)
-            .sort((left, right) => {
-                const liveDelta = getCameraLiveViewers(right) - getCameraLiveViewers(left);
-                if (liveDelta !== 0) {
-                    return liveDelta;
-                }
-                return getCameraTotalViews(right) - getCameraTotalViews(left);
-            })
-            .slice(0, 5);
-    }, [cameras, selectedCamera]);
+    const {
+        liveCameras,
+        topCameras,
+        newestCameras,
+        relatedPopupCameras,
+    } = useMemo(() => buildAreaPublicRankingLists(cameras, trendingCameras, selectedCamera), [cameras, selectedCamera, trendingCameras]);
     const visibleAreaCameras = useMemo(() => (
         cameras.slice(0, visibleAreaCameraCount)
     ), [cameras, visibleAreaCameraCount]);
     const hiddenAreaCameraCount = Math.max(cameras.length - visibleAreaCameras.length, 0);
     const nextAreaLoadCount = Math.min(AREA_LOAD_MORE_CAMERAS, hiddenAreaCameraCount);
+    const cameraIdFromUrl = useMemo(() => {
+        const cameraId = Number.parseInt(searchParams.get('camera'), 10);
+        return Number.isFinite(cameraId) && cameraId > 0 ? cameraId : null;
+    }, [searchParams]);
 
     const handleCameraOpen = useCallback(async (camera) => {
         const requestId = streamResolveRequestRef.current + 1;
@@ -307,16 +280,15 @@ export default function AreaPublicPage() {
     }, []);
 
     useEffect(() => {
-        const cameraId = Number.parseInt(searchParams.get('camera'), 10);
-        if (!cameraId || !cameras.length) {
+        if (!cameraIdFromUrl || !cameras.length) {
             return;
         }
 
-        const cameraFromUrl = cameras.find((camera) => camera.id === cameraId);
+        const cameraFromUrl = cameras.find((camera) => camera.id === cameraIdFromUrl);
         if (cameraFromUrl) {
             handleCameraOpen(cameraFromUrl);
         }
-    }, [cameras, handleCameraOpen, searchParams]);
+    }, [cameraIdFromUrl, cameras, handleCameraOpen]);
 
     const handleShare = useCallback(async () => {
         if (!shareText) {
@@ -435,7 +407,7 @@ export default function AreaPublicPage() {
                 title={`Sedang Ramai di ${area?.name || ''}`.trim()}
                 description="Kamera dengan penonton aktif terbanyak saat ini."
                 metricLabel="live"
-                metricValue={getCameraLiveViewers}
+                metricValue={getAreaCameraLiveViewers}
                 onCameraClick={handleCameraOpen}
             />
 
@@ -444,7 +416,7 @@ export default function AreaPublicPage() {
                 title={`Top CCTV ${area?.name || ''}`.trim()}
                 description="Kamera yang paling banyak dibuka oleh pengunjung."
                 metricLabel="views"
-                metricValue={getCameraTotalViews}
+                metricValue={getAreaCameraTotalViews}
                 onCameraClick={handleCameraOpen}
             />
 
@@ -453,7 +425,7 @@ export default function AreaPublicPage() {
                 title={`Kamera Baru ${area?.name || ''}`.trim()}
                 description="Kamera publik terbaru yang sudah tersedia di area ini."
                 metricLabel="views"
-                metricValue={getCameraTotalViews}
+                metricValue={getAreaCameraTotalViews}
                 onCameraClick={handleCameraOpen}
             />
 

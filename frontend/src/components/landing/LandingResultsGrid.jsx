@@ -8,26 +8,9 @@
 
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import CameraCard from './LandingCameraCard';
-import { getDeviceCapabilities } from '../../utils/deviceDetector';
+import { getAdaptiveGridWindow } from '../../utils/publicLandingSections';
 
-const DEFAULT_GRID_WINDOW = {
-    initialVisibleCount: 24,
-    loadMoreCount: 24,
-    priorityThumbnailCount: 6,
-};
-
-const COMPACT_GRID_WINDOW = {
-    initialVisibleCount: 12,
-    loadMoreCount: 12,
-    priorityThumbnailCount: 4,
-};
-
-export function getAdaptiveGridWindow(capabilities = getDeviceCapabilities()) {
-    if (capabilities?.isMobile || capabilities?.tier === 'low') {
-        return COMPACT_GRID_WINDOW;
-    }
-    return DEFAULT_GRID_WINDOW;
-}
+export { getAdaptiveGridWindow } from '../../utils/publicLandingSections';
 
 const LandingGridCameraCard = memo(function LandingGridCameraCard({
     camera,

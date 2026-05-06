@@ -6,6 +6,7 @@
  * SideEffects: Lazy-loads optional floating widgets and ad slots.
  */
 import { Suspense } from 'react';
+import { Link } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useBranding } from '../../contexts/BrandingContext';
 import { useCameras } from '../../contexts/CameraContext';
@@ -40,11 +41,11 @@ function SimpleHeader({ branding, layoutMode, onLayoutToggle }) {
         <header className={`sticky top-0 z-[1001] bg-white/90 dark:bg-gray-900/90 ${disableAnimations ? '' : 'backdrop-blur-xl'} border-b border-emerald-200/30 dark:border-emerald-700/30`}>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-14">
-                    <a href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity" title={branding.company_name}>
+                    <Link to="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity" title={branding.company_name}>
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center text-white shadow-lg shadow-primary/30">
                             <span className="text-sm font-bold">{branding.logo_text}</span>
                         </div>
-                    </a>
+                    </Link>
 
                     <div className="flex items-center gap-2">
                         <LayoutModeToggle

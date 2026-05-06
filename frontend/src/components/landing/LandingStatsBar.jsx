@@ -1,10 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useCameras } from '../../contexts/CameraContext';
 import { getCameraAvailabilityState } from '../../utils/cameraAvailability.js';
 import { Icons } from '../ui/Icons';
 import { shouldDisableAnimations } from '../../utils/animationControl';
 
-function ListModal({ title, items, type, onClose }) {
+function ListModal({ title, items, type, onClose, onCameraClick }) {
     const getHeaderColor = () => {
         switch (type) {
             case 'online': return 'from-emerald-500 to-emerald-600';
@@ -42,10 +42,30 @@ function ListModal({ title, items, type, onClose }) {
 
     const disableAnimations = shouldDisableAnimations();
 
+    useEffect(() => {
+        const originalOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape') {
+                onClose();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            document.body.style.overflow = originalOverflow;
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [onClose]);
+
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 dark:bg-black/80" onClick={onClose}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 dark:bg-black/80" onClick={onClose}>
             <div
-                className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md max-h-[70vh] overflow-hidden"
+                role="dialog"
+                aria-modal="true"
+                className="max-h-[70vh] w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-900"
                 onClick={e => e.stopPropagation()}
             >
                 <div className={`bg-gradient-to-r ${getHeaderColor()} px-4 sm:px-5 py-3 sm:py-4 flex items-center justify-between`}>
@@ -84,7 +104,7 @@ function ListModal({ title, items, type, onClose }) {
                                 return (
                                     <button
                                         key={camera.id}
-                                        onClick={() => onClose(camera)}
+                                        onClick={() => onCameraClick?.(camera)}
                                         className={`w-full px-4 py-3 text-left flex items-center gap-3 ${disableAnimations
                                             ? 'hover:bg-gray-100 dark:hover:bg-gray-800'
                                             : 'hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors'
@@ -239,7 +259,8 @@ export default function StatsBar({ onCameraClick }) {
                     title="Kamera Online"
                     items={stats.onlineList}
                     type="online"
-                    onClose={handleCameraItemClick}
+                    onClose={() => setActiveModal(null)}
+                    onCameraClick={handleCameraItemClick}
                 />
             )}
             {activeModal === 'offline' && (

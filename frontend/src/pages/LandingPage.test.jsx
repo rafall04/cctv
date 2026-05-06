@@ -134,8 +134,20 @@ vi.mock('../components/landing/LandingCamerasSection', () => ({
                     status: 'active',
                     is_online: 1,
                 })}
+                >
+                    cameras-section
+                </button>
+            <button
+                type="button"
+                data-testid="open-map-popup-alt"
+                onClick={() => onMapCameraOpen?.({
+                    id: 100,
+                    name: 'Map Camera Alt',
+                    status: 'active',
+                    is_online: 1,
+                })}
             >
-                cameras-section
+                cameras-section-alt
             </button>
         </section>
     ),
@@ -391,6 +403,60 @@ describe('LandingPage connectivity recovery', () => {
         }));
         expect(cameraProviderPropsSpy).toHaveBeenLastCalledWith(expect.objectContaining({
             autoRefresh: false,
+        }));
+    });
+
+    it('mengabaikan hasil resolusi popup yang terlambat saat popup baru dibuka', async () => {
+        let resolveFirstPopup;
+        const firstPopupPromise = new Promise((resolve) => {
+            resolveFirstPopup = resolve;
+        });
+
+        resolvePublicPopupCamera.mockImplementation((camera) => {
+            if (camera.id === 99) {
+                return firstPopupPromise;
+            }
+
+            return Promise.resolve({
+                ...camera,
+                streams: { hls: `https://example.com/${camera.id}.m3u8` },
+                _stream_resolution_pending: false,
+            });
+        });
+
+        renderWithRouter(<LandingPage />);
+
+        await waitFor(() => {
+            expect(screen.getByTestId('open-map-popup')).toBeTruthy();
+        });
+
+        await act(async () => {
+            screen.getByTestId('open-map-popup').click();
+            screen.getByTestId('open-map-popup-alt').click();
+        });
+
+        await act(async () => {
+            resolveFirstPopup({
+                id: 99,
+                name: 'Map Camera',
+                streams: { hls: 'https://example.com/late.m3u8' },
+                status: 'active',
+                is_online: 1,
+                _stream_resolution_pending: false,
+            });
+        });
+
+        await waitFor(() => {
+            expect(screen.getByTestId('map-popup-modal')).toBeTruthy();
+        });
+
+        expect(videoPopupPropsSpy).toHaveBeenLastCalledWith(expect.objectContaining({
+            camera: expect.objectContaining({
+                id: 100,
+                name: 'Map Camera Alt',
+                streams: { hls: 'https://example.com/100.m3u8' },
+                _stream_resolution_pending: false,
+            }),
         }));
     });
 

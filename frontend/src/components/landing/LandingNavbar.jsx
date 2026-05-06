@@ -1,4 +1,5 @@
 import { useEffect, useRef, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useCameras } from '../../contexts/CameraContext';
 import { Icons } from '../ui/Icons';
@@ -57,7 +58,7 @@ export default function Navbar({ branding, layoutMode, onLayoutToggle }) {
         <nav className={`sticky top-0 z-[1001] bg-white/90 dark:bg-gray-900/90 ${disableAnimations ? '' : 'backdrop-blur-xl'} border-b border-gray-200/50 dark:border-gray-800/50`}>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16">
-                    <a href="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity" title={`${branding.company_tagline} - ${branding.company_name}`}>
+                    <Link to="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity" title={`${branding.company_tagline} - ${branding.company_name}`}>
                         <div className="relative">
                             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary-600 flex items-center justify-center text-white shadow-lg shadow-primary/30">
                                 <span className="text-lg font-bold">{branding.logo_text}</span>
@@ -70,7 +71,7 @@ export default function Navbar({ branding, layoutMode, onLayoutToggle }) {
                             <span className="text-lg font-bold text-gray-900 dark:text-white">{branding.company_name}</span>
                             <p className="text-[10px] text-gray-500 dark:text-gray-400 -mt-0.5">{branding.company_tagline}</p>
                         </div>
-                    </a>
+                    </Link>
 
                     <div className="hidden md:flex items-center gap-3 px-4 py-2 rounded-xl bg-gray-100/80 dark:bg-gray-800/80">
                         <div className="flex items-center gap-2">
