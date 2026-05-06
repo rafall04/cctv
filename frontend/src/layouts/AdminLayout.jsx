@@ -3,7 +3,7 @@
  * Caller: App.jsx AdminPageRoute.
  * Deps: React Router, authService, theme/notification/branding contexts, NetworkStatusBanner.
  * MainFuncs: AdminLayout, AdminPwaQuickActions.
- * SideEffects: Reads current user, listens for session/network changes, performs logout navigation.
+ * SideEffects: Reads current user, listens for session/network changes, hides mobile dock while sidebar is open, performs logout navigation.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -148,12 +148,14 @@ export default function AdminLayout({ children }) {
                     <div className="flex items-center gap-2">
                         <button
                             onClick={toggleTheme}
+                            aria-label={isDark ? 'Aktifkan light mode' : 'Aktifkan dark mode'}
                             className="p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                         >
                             {isDark ? <Icons.Sun /> : <Icons.Moon />}
                         </button>
                         <button
                             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                            aria-label={isMobileMenuOpen ? 'Tutup menu admin' : 'Buka menu admin'}
                             className="p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                         >
                             {isMobileMenuOpen ? <Icons.X /> : <Icons.Menu />}
@@ -225,6 +227,7 @@ export default function AdminLayout({ children }) {
                 <div className="p-4 border-t border-gray-200 dark:border-gray-800 space-y-3">
                     <button
                         onClick={toggleTheme}
+                        aria-label={isDark ? 'Aktifkan light mode' : 'Aktifkan dark mode'}
                         className="hidden lg:flex w-full items-center gap-3 px-4 py-3 rounded-xl font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/80 transition-all"
                     >
                         <div className="text-gray-500 dark:text-gray-400">
@@ -247,6 +250,7 @@ export default function AdminLayout({ children }) {
 
                     <button
                         onClick={handleLogout}
+                        aria-label="Logout"
                         className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
                     >
                         <Icons.Logout />
@@ -269,7 +273,7 @@ export default function AdminLayout({ children }) {
                     </div>
                 </div>
             </main>
-            <AdminPwaQuickActions activePath={location.pathname} />
+            {!isMobileMenuOpen && <AdminPwaQuickActions activePath={location.pathname} />}
         </div>
     );
 }

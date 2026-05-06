@@ -8,7 +8,7 @@
  * SideEffects: Renders jsdom UI with mocked providers only.
  */
 
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AdminLayout from './AdminLayout';
 import { TestRouter } from '../test/renderWithRouter';
@@ -113,5 +113,22 @@ describe('AdminLayout dark mode readability', () => {
         expect(quickActions.getByRole('link', { name: /Health/i }).getAttribute('href')).toBe('/admin/health-debug');
         expect(quickActions.getByRole('link', { name: /Token/i }).getAttribute('href')).toBe('/admin/playback-tokens');
         expect(quickActions.getByRole('link', { name: /Publik/i }).getAttribute('href')).toBe('/');
+    });
+
+    it('menyembunyikan quick action mobile saat menu admin terbuka agar logout tetap bisa diklik', () => {
+        render(
+            <TestRouter initialEntries={['/admin/dashboard']}>
+                <AdminLayout>
+                    <div>Content</div>
+                </AdminLayout>
+            </TestRouter>
+        );
+
+        expect(screen.getByTestId('admin-pwa-quick-actions')).toBeTruthy();
+
+        fireEvent.click(screen.getByRole('button', { name: /buka menu admin/i }));
+
+        expect(screen.queryByTestId('admin-pwa-quick-actions')).toBeNull();
+        expect(screen.getByRole('button', { name: /logout/i })).toBeTruthy();
     });
 });
