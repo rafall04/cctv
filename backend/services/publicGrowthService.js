@@ -33,7 +33,7 @@ const PUBLIC_CAMERA_COLUMNS = `
     c.external_embed_url,
     c.external_snapshot_url,
     a.name AS area_name,
-    LOWER(REPLACE(a.name, ' ', '-')) AS area_slug,
+    COALESCE(a.slug, LOWER(REPLACE(a.name, ' ', '-'))) AS area_slug,
     COALESCE(cvs.total_live_views, 0) AS total_views,
     COALESCE(active.viewer_count, 0) AS live_viewers
 `;
@@ -120,7 +120,7 @@ export function getPublicAreaBySlug(areaSlug) {
         SELECT
             a.id,
             a.name,
-            LOWER(REPLACE(a.name, ' ', '-')) AS slug,
+            COALESCE(a.slug, LOWER(REPLACE(a.name, ' ', '-'))) AS slug,
             COUNT(c.id) AS camera_count,
             SUM(CASE WHEN c.status != 'maintenance' THEN 1 ELSE 0 END) AS online_count,
             COALESCE(SUM(cvs.total_live_views), 0) AS total_views,
@@ -128,9 +128,10 @@ export function getPublicAreaBySlug(areaSlug) {
         FROM areas a
         LEFT JOIN cameras c ON c.area_id = a.id AND c.enabled = 1
         LEFT JOIN camera_view_stats cvs ON cvs.camera_id = c.id
-        WHERE LOWER(REPLACE(a.name, ' ', '-')) = ?
+        WHERE a.slug = ?
+           OR (a.slug IS NULL AND LOWER(REPLACE(a.name, ' ', '-')) = ?)
         GROUP BY a.id
-    `, [normalizedAreaSlug]);
+    `, [normalizedAreaSlug, normalizedAreaSlug]);
 
     assertArea(row, normalizedAreaSlug);
 
@@ -149,10 +150,11 @@ export function getPublicAreaBySlug(areaSlug) {
 export function getPublicAreaCameras(areaSlug) {
     const normalizedAreaSlug = toAreaSlug(areaSlug);
     const area = queryOne(`
-        SELECT id, name, LOWER(REPLACE(name, ' ', '-')) AS slug
+        SELECT id, name, COALESCE(slug, LOWER(REPLACE(name, ' ', '-'))) AS slug
         FROM areas
-        WHERE LOWER(REPLACE(name, ' ', '-')) = ?
-    `, [normalizedAreaSlug]);
+        WHERE slug = ?
+           OR (slug IS NULL AND LOWER(REPLACE(name, ' ', '-')) = ?)
+    `, [normalizedAreaSlug, normalizedAreaSlug]);
     assertArea(area, normalizedAreaSlug);
 
     return query(`
@@ -162,16 +164,16 @@ export function getPublicAreaCameras(areaSlug) {
         LEFT JOIN camera_view_stats cvs ON cvs.camera_id = c.id
         ${getActiveViewerJoin()}
         WHERE c.enabled = 1
-          AND LOWER(REPLACE(a.name, ' ', '-')) = ?
+          AND (a.slug = ? OR (a.slug IS NULL AND LOWER(REPLACE(a.name, ' ', '-')) = ?))
         ORDER BY c.is_tunnel ASC, c.id ASC
-    `, [normalizedAreaSlug]).map(sanitizeCamera);
+    `, [normalizedAreaSlug, normalizedAreaSlug]).map(sanitizeCamera);
 }
 
 export function getTrendingCameras({ areaSlug = '', limit = 10 } = {}) {
     const normalizedLimit = normalizeLimit(limit);
     const normalizedAreaSlug = areaSlug ? toAreaSlug(areaSlug) : '';
-    const params = normalizedAreaSlug ? [normalizedAreaSlug, normalizedLimit] : [normalizedLimit];
-    const areaFilter = normalizedAreaSlug ? "AND LOWER(REPLACE(a.name, ' ', '-')) = ?" : '';
+    const params = normalizedAreaSlug ? [normalizedAreaSlug, normalizedAreaSlug, normalizedLimit] : [normalizedLimit];
+    const areaFilter = normalizedAreaSlug ? "AND (a.slug = ? OR (a.slug IS NULL AND LOWER(REPLACE(a.name, ' ', '-')) = ?))" : '';
 
     return query(`
         SELECT ${PUBLIC_CAMERA_COLUMNS}
@@ -226,7 +228,7 @@ export function getPublicDiscovery({ limit = 6 } = {}) {
         SELECT
             a.id,
             a.name,
-            LOWER(REPLACE(a.name, ' ', '-')) AS slug,
+            COALESCE(a.slug, LOWER(REPLACE(a.name, ' ', '-'))) AS slug,
             COUNT(c.id) AS camera_count,
             SUM(CASE WHEN c.status != 'maintenance' THEN 1 ELSE 0 END) AS online_count,
             COALESCE(SUM(cvs.total_live_views), 0) AS total_views,

@@ -1,13 +1,11 @@
 #!/usr/bin/env node
 
 /**
- * Run All Migrations Script
- * 
- * Safely runs all database migrations in order.
- * Safe to run multiple times - migrations check if changes already exist.
- * 
- * Usage:
- *   node backend/database/migrations/run_all_migrations.js
+ * Purpose: Run all forward-only SQLite migrations in a stable order.
+ * Caller: npm run migrate, backend migration gate, and deployment scripts.
+ * Deps: better-sqlite3, Node fs/path/url helpers, migration files in this directory.
+ * MainFuncs: MIGRATIONS runner loop.
+ * SideEffects: Applies schema, index, and data backfill changes to backend/data/cctv.db.
  */
 
 import Database from 'better-sqlite3';
@@ -59,7 +57,8 @@ const MIGRATIONS = [
     'create_camera_discovery_table.js',
     'add_camera_delivery_types.js',
     'backfill_camera_delivery_types.js',
-    'add_runtime_state_and_history_retention.js'
+    'add_runtime_state_and_history_retention.js',
+    'zz_20260507_add_area_slug_indexes.js'
 ];
 
 console.log('🚀 Starting migration process...\n');

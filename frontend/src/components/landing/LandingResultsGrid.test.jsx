@@ -11,7 +11,7 @@
 import { memo } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import LandingResultsGrid from './LandingResultsGrid';
+import LandingResultsGrid, { getAdaptiveGridWindow } from './LandingResultsGrid';
 
 const { cameraCardRenderSpy } = vi.hoisted(() => ({
     cameraCardRenderSpy: vi.fn(),
@@ -36,6 +36,24 @@ function makeCameras(count) {
 }
 
 describe('LandingResultsGrid optimization', () => {
+    it('uses a smaller default render window for low-end or mobile devices', () => {
+        expect(getAdaptiveGridWindow({ isMobile: true, tier: 'medium' })).toEqual({
+            initialVisibleCount: 12,
+            loadMoreCount: 12,
+            priorityThumbnailCount: 4,
+        });
+        expect(getAdaptiveGridWindow({ isMobile: false, tier: 'low' })).toEqual({
+            initialVisibleCount: 12,
+            loadMoreCount: 12,
+            priorityThumbnailCount: 4,
+        });
+        expect(getAdaptiveGridWindow({ isMobile: false, tier: 'high' })).toEqual({
+            initialVisibleCount: 24,
+            loadMoreCount: 24,
+            priorityThumbnailCount: 6,
+        });
+    });
+
     it('renders public camera cards progressively instead of mounting every card at once', () => {
         render(
             <LandingResultsGrid

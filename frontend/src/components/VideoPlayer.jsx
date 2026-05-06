@@ -13,6 +13,7 @@ import { createErrorRecoveryHandler } from '../utils/errorRecovery';
 import { createVisibilityObserver } from '../utils/visibilityObserver';
 import { createOrientationObserver } from '../utils/orientationObserver';
 import { preloadHls } from '../utils/preloadManager';
+import { cleanupMediaResources } from '../utils/mediaResourceCleanup';
 import { useStreamTimeout } from '../hooks/useStreamTimeout';
 import { LoadingStage, getStageMessage, createStreamError } from '../utils/streamLoaderTypes';
 import { createFallbackHandler } from '../utils/fallbackHandler';
@@ -200,24 +201,11 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
      * **Property 8: Resource Cleanup on Timeout**
      */
     const cleanupResources = useCallback(() => {
-        // Cancel pending network requests
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
-            abortControllerRef.current = null;
-        }
-
-        // Destroy HLS instance - **Validates: Requirements 7.1**
-        if (hlsRef.current) {
-            hlsRef.current.destroy();
-            hlsRef.current = null;
-        }
-
-        // Clear video element source - **Validates: Requirements 7.2**
-        if (videoRef.current) {
-            videoRef.current.pause();
-            videoRef.current.src = '';
-            videoRef.current.load();
-        }
+        cleanupMediaResources({
+            abortControllerRef,
+            hlsRef,
+            videoElement: videoRef.current,
+        });
 
         // Clear loading timeout
         clearStreamTimeout();

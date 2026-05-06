@@ -19,6 +19,7 @@ import { shouldDisableAnimations } from '../../utils/animationControl';
 import { LoadingStage, createStreamError } from '../../utils/streamLoaderTypes';
 import { createFallbackHandler } from '../../utils/fallbackHandler';
 import { getHLSConfig } from '../../utils/hlsConfig';
+import { cleanupMediaResources } from '../../utils/mediaResourceCleanup';
 import { preloadHls } from '../../utils/preloadManager';
 import { resolveStreamUrl } from '../../utils/directStreamHelper';
 import { useStreamTimeout } from '../../hooks/useStreamTimeout';
@@ -409,24 +410,14 @@ function VideoPopup({
 
     // Cleanup resources function - **Validates: Requirements 7.1, 7.2, 7.3**
     const cleanupResources = useCallback(({ videoElement = videoRef.current, resetVideo = true } = {}) => {
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
-            abortControllerRef.current = null;
-        }
         clearInternalWarmupRetry();
-        if (hlsRef.current) {
-            hlsRef.current.destroy();
-            hlsRef.current = null;
-        }
-        if (flvRef.current) {
-            flvRef.current.destroy();
-            flvRef.current = null;
-        }
-        if (resetVideo && videoElement) {
-            videoElement.pause();
-            videoElement.src = '';
-            videoElement.load();
-        }
+        cleanupMediaResources({
+            abortControllerRef,
+            hlsRef,
+            flvRef,
+            videoElement,
+            resetVideo,
+        });
         clearStreamTimeout();
         if (fallbackHandlerRef.current) {
             fallbackHandlerRef.current.clearPendingRetry();

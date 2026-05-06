@@ -2,11 +2,30 @@
  * Purpose: Manage public landing camera search, area selection, ranking tabs, and grid/map filtering.
  * Caller: LandingCamerasSection.
  * Deps: React hooks.
- * MainFuncs: useLandingCameraFilters.
+ * MainFuncs: normalizeSearchText, buildLandingCameraSearchIndex, useLandingCameraFilters.
  * SideEffects: Tracks local UI filter state and focused map camera state.
  */
 
 import { useCallback, useMemo, useRef, useState } from 'react';
+
+export function normalizeSearchText(value = '') {
+    return String(value)
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+}
+
+export function buildLandingCameraSearchIndex(cameras = []) {
+    return cameras.map((camera) => ({
+        camera,
+        searchText: [
+            camera?.name,
+            camera?.location,
+            camera?.area_name,
+        ].map(normalizeSearchText).filter(Boolean).join(' '),
+    }));
+}
 
 function getCameraMetric(camera, key) {
     return Number(camera?.[key] ?? camera?.viewer_stats?.[key] ?? 0);
@@ -70,22 +89,18 @@ export function useLandingCameraFilters(cameras, areas, favorites, viewMode, onC
         return Array.from(names).sort((left, right) => left.localeCompare(right));
     }, [areas, cameras]);
 
+    const cameraSearchIndex = useMemo(() => buildLandingCameraSearchIndex(cameras), [cameras]);
+
     const searchFilteredCameras = useMemo(() => {
         if (!searchQuery.trim()) {
             return cameras;
         }
 
-        const query = searchQuery.toLowerCase().trim();
-        return cameras.filter((camera) => {
-            const name = (camera.name || '').toLowerCase();
-            const location = (camera.location || '').toLowerCase();
-            const areaName = (camera.area_name || '').toLowerCase();
-
-            return name.includes(query)
-                || location.includes(query)
-                || areaName.includes(query);
-        });
-    }, [cameras, searchQuery]);
+        const query = normalizeSearchText(searchQuery);
+        return cameraSearchIndex
+            .filter(({ searchText }) => searchText.includes(query))
+            .map(({ camera }) => camera);
+    }, [cameraSearchIndex, cameras, searchQuery]);
 
     const areaFilteredCameras = useMemo(() => {
         if (selectedArea === 'all') {

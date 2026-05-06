@@ -1,13 +1,33 @@
 /*
  * Purpose: Render public landing camera result cards progressively for the active grid filter.
  * Caller: LandingCamerasSection.
- * Deps: React memo/callback hooks, LandingCameraCard, and caller-provided camera action callbacks.
- * MainFuncs: LandingResultsGrid, LandingGridCameraCard.
+ * Deps: React memo/callback hooks, LandingCameraCard, device detector, and caller-provided camera action callbacks.
+ * MainFuncs: getAdaptiveGridWindow, LandingResultsGrid, LandingGridCameraCard.
  * SideEffects: Invokes camera open, favorite, and multiview callbacks through child cards.
  */
 
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import CameraCard from './LandingCameraCard';
+import { getDeviceCapabilities } from '../../utils/deviceDetector';
+
+const DEFAULT_GRID_WINDOW = {
+    initialVisibleCount: 24,
+    loadMoreCount: 24,
+    priorityThumbnailCount: 6,
+};
+
+const COMPACT_GRID_WINDOW = {
+    initialVisibleCount: 12,
+    loadMoreCount: 12,
+    priorityThumbnailCount: 4,
+};
+
+export function getAdaptiveGridWindow(capabilities = getDeviceCapabilities()) {
+    if (capabilities?.isMobile || capabilities?.tier === 'low') {
+        return COMPACT_GRID_WINDOW;
+    }
+    return DEFAULT_GRID_WINDOW;
+}
 
 const LandingGridCameraCard = memo(function LandingGridCameraCard({
     camera,
@@ -46,19 +66,23 @@ export default function LandingResultsGrid({
     multiCameras,
     isFavorite,
     onToggleFavorite,
-    initialVisibleCount = 24,
-    loadMoreCount = 24,
-    priorityThumbnailCount = 6,
+    initialVisibleCount,
+    loadMoreCount,
+    priorityThumbnailCount,
 }) {
-    const [visibleCount, setVisibleCount] = useState(initialVisibleCount);
+    const adaptiveGridWindow = useMemo(() => getAdaptiveGridWindow(), []);
+    const resolvedInitialVisibleCount = initialVisibleCount ?? adaptiveGridWindow.initialVisibleCount;
+    const resolvedLoadMoreCount = loadMoreCount ?? adaptiveGridWindow.loadMoreCount;
+    const resolvedPriorityThumbnailCount = priorityThumbnailCount ?? adaptiveGridWindow.priorityThumbnailCount;
+    const [visibleCount, setVisibleCount] = useState(resolvedInitialVisibleCount);
     const multiCameraIds = useMemo(() => new Set(multiCameras.map((camera) => camera.id)), [multiCameras]);
     const visibleCameras = useMemo(() => cameras.slice(0, visibleCount), [cameras, visibleCount]);
     const hiddenCount = Math.max(cameras.length - visibleCameras.length, 0);
-    const nextLoadCount = Math.min(loadMoreCount, hiddenCount);
+    const nextLoadCount = Math.min(resolvedLoadMoreCount, hiddenCount);
 
     useEffect(() => {
-        setVisibleCount(initialVisibleCount);
-    }, [cameras, initialVisibleCount]);
+        setVisibleCount(resolvedInitialVisibleCount);
+    }, [cameras, resolvedInitialVisibleCount]);
 
     return (
         <>
@@ -72,7 +96,7 @@ export default function LandingResultsGrid({
                         isInMulti={multiCameraIds.has(camera.id)}
                         isFavorite={isFavorite}
                         onToggleFavorite={onToggleFavorite}
-                        thumbnailPriority={index < priorityThumbnailCount}
+                        thumbnailPriority={index < resolvedPriorityThumbnailCount}
                     />
                 ))}
             </div>
@@ -84,7 +108,7 @@ export default function LandingResultsGrid({
                     </p>
                     <button
                         type="button"
-                        onClick={() => setVisibleCount((current) => Math.min(current + loadMoreCount, cameras.length))}
+                        onClick={() => setVisibleCount((current) => Math.min(current + resolvedLoadMoreCount, cameras.length))}
                         className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 shadow-sm transition hover:border-primary/50 hover:text-primary dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-primary/50 dark:hover:text-primary"
                     >
                         Tampilkan {nextLoadCount} kamera lagi

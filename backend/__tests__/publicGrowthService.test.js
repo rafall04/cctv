@@ -61,7 +61,8 @@ describe('publicGrowthService', () => {
         const service = await import('../services/publicGrowthService.js');
         service.getPublicAreaBySlug('KAB SURABAYA');
 
-        expect(queryOneMock.mock.calls[0][1]).toEqual(['kab-surabaya']);
+        expect(queryOneMock.mock.calls[0][1]).toEqual(['kab-surabaya', 'kab-surabaya']);
+        expect(queryOneMock.mock.calls[0][0]).toContain('a.slug');
     });
 
     it('does not expose private camera source fields', async () => {
@@ -111,7 +112,8 @@ describe('publicGrowthService', () => {
         expect(service.getTrendingCameras({ areaSlug: 'kab-surabaya', limit: 4 })).toEqual([
             expect.objectContaining({ id: 1, name: 'CCTV A', total_views: 30 }),
         ]);
-        expect(queryMock.mock.calls[0][1]).toEqual(['kab-surabaya', 4]);
+        expect(queryMock.mock.calls[0][1]).toEqual(['kab-surabaya', 'kab-surabaya', 4]);
+        expect(queryMock.mock.calls[0][0]).toContain('a.slug');
     });
 
     it('throws 404 for unknown area slug', async () => {
