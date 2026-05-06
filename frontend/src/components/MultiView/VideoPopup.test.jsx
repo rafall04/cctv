@@ -8,7 +8,7 @@
  * SideEffects: Mocks browser media APIs and viewer service calls.
  */
 
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import VideoPopup from './VideoPopup.jsx';
 
@@ -195,6 +195,7 @@ describe('VideoPopup non-live states', () => {
     });
 
     afterEach(() => {
+        cleanup();
         vi.restoreAllMocks();
     });
 
@@ -339,6 +340,53 @@ describe('VideoPopup non-live states', () => {
         expect(screen.queryByText('CCTV Tidak Terkoneksi')).toBeNull();
         expect(screen.getByText('Memuat stream...')).toBeTruthy();
         expect(screen.getByText('CCTV Baru')).toBeTruthy();
+    });
+
+    it('mengabaikan error stream lama yang datang terlambat setelah popup switch kamera', async () => {
+        const { rerender } = render(
+            <VideoPopup
+                camera={{ ...baseCamera, id: 34, name: 'CCTV A' }}
+                onClose={vi.fn()}
+            />
+        );
+
+        await waitFor(() => {
+            expect(hlsInstances).toHaveLength(1);
+        });
+
+        const oldHls = hlsInstances[0];
+        HTMLMediaElement.prototype.load.mockImplementation(function dispatchOldVideoError() {
+            const target = this;
+            setTimeout(() => {
+                target.dispatchEvent(new Event('error'));
+            }, 0);
+        });
+
+        rerender(
+            <VideoPopup
+                camera={{
+                    ...baseCamera,
+                    id: 35,
+                    name: 'CCTV B',
+                    streams: { hls: 'https://example.com/cctv-b.m3u8' },
+                }}
+                onClose={vi.fn()}
+            />
+        );
+
+        await act(async () => {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            oldHls.emit('error', {}, {
+                fatal: true,
+                type: 'networkError',
+                details: 'levelLoadError',
+            });
+        });
+
+        expect(screen.getByText('CCTV B')).toBeTruthy();
+        expect(screen.queryByText('Koneksi Gagal')).toBeNull();
+        expect(screen.queryByText('CCTV Tidak Terkoneksi')).toBeNull();
+        expect(screen.queryByText('ERROR')).toBeNull();
     });
 
     it('menahan error unknown saat payload kamera baru masih menunggu resolver stream', async () => {

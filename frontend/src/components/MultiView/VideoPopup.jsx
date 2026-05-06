@@ -85,6 +85,7 @@ function VideoPopup({
     const internalWarmupRetryCountRef = useRef(0);
     const internalWarmupRetryTimeoutRef = useRef(null);
     const renderedCameraIdRef = useRef(camera.id);
+    const streamRunIdRef = useRef(0);
     const { branding } = useBranding(); // ← FIX: Add branding context
 
     // Handle close with fullscreen exit
@@ -407,7 +408,7 @@ function VideoPopup({
     }, []);
 
     // Cleanup resources function - **Validates: Requirements 7.1, 7.2, 7.3**
-    const cleanupResources = useCallback(() => {
+    const cleanupResources = useCallback(({ videoElement = videoRef.current, resetVideo = true } = {}) => {
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
             abortControllerRef.current = null;
@@ -421,10 +422,10 @@ function VideoPopup({
             flvRef.current.destroy();
             flvRef.current = null;
         }
-        if (videoRef.current) {
-            videoRef.current.pause();
-            videoRef.current.src = '';
-            videoRef.current.load();
+        if (resetVideo && videoElement) {
+            videoElement.pause();
+            videoElement.src = '';
+            videoElement.load();
         }
         clearStreamTimeout();
         if (fallbackHandlerRef.current) {
@@ -437,8 +438,9 @@ function VideoPopup({
             return;
         }
 
+        streamRunIdRef.current += 1;
         renderedCameraIdRef.current = camera.id;
-        cleanupResources();
+        cleanupResources({ resetVideo: false });
         setStatus(getPublicPopupInitialStatus(camera));
         setLoadingStage(LoadingStage.CONNECTING);
         setErrorType(null);
@@ -469,6 +471,8 @@ function VideoPopup({
         let cancelled = false;
         let playbackCheckInterval = null;
         let isLive = false; // Flag to prevent setState after live
+        const streamRunId = streamRunIdRef.current;
+        const isStaleStreamRun = () => cancelled || streamRunId !== streamRunIdRef.current;
 
         abortControllerRef.current = new AbortController();
         setStatus('connecting');
@@ -480,7 +484,7 @@ function VideoPopup({
 
         // Only change to 'live' once video starts playing - don't revert on buffering
         const handlePlaying = () => {
-            if (cancelled || isLive) return; // Skip if already live
+            if (isStaleStreamRun() || isLive) return; // Skip if already live
             isLive = true; // Set flag to prevent future setState
             clearInterval(playbackCheckInterval);
             playbackCheckInterval = null;
@@ -504,7 +508,7 @@ function VideoPopup({
         // Some browsers don't fire 'playing' event reliably
         const startPlaybackCheck = () => {
             playbackCheckInterval = setInterval(() => {
-                if (cancelled || isLive) {
+                if (isStaleStreamRun() || isLive) {
                     clearInterval(playbackCheckInterval);
                     playbackCheckInterval = null;
                     return;
@@ -523,7 +527,7 @@ function VideoPopup({
         };
 
         const handleError = () => {
-            if (cancelled || isLive) return; // Don't show error if already playing
+            if (isStaleStreamRun() || isLive) return; // Don't show error if already playing
             clearInterval(playbackCheckInterval);
             playbackCheckInterval = null;
             setStatus('error');
@@ -532,7 +536,7 @@ function VideoPopup({
         };
 
         const handleLoadedMetadata = () => {
-            if (cancelled) return;
+            if (isStaleStreamRun()) return;
             syncVideoAspectRatio();
         };
 
@@ -542,7 +546,7 @@ function VideoPopup({
 
         // Live Edge Synchronization Fix
         const handlePlaySync = () => {
-            if (cancelled || !hls || !isExternal) return;
+            if (isStaleStreamRun() || !hls || !isExternal) return;
             if (hls.liveSyncPosition) {
                 const latency = hls.liveSyncPosition - video.currentTime;
                 // If we are more than 10 seconds behind live edge, sync it
@@ -555,7 +559,7 @@ function VideoPopup({
         video.addEventListener('play', handlePlaySync);
 
         // Direct HLS.js usage - no lazy loading needed
-        if (cancelled) return;
+        if (isStaleStreamRun()) return;
 
         // Update loading stage - **Validates: Requirements 4.2**
         setLoadingStage(LoadingStage.LOADING);
@@ -568,7 +572,7 @@ function VideoPopup({
 
         const initHls = async () => {
             HlsClass = await preloadHls();
-            if (cancelled || !HlsClass) return;
+            if (isStaleStreamRun() || !HlsClass) return;
 
             const deviceTier = detectDeviceTier();
             const hlsConfig = getHLSConfig(deviceTier, {
@@ -582,7 +586,7 @@ function VideoPopup({
             // This helps prevent media errors on some browsers
             hls.loadSource(effectiveUrl);
             setTimeout(() => {
-                if (!cancelled && hlsRef.current) {
+                if (!isStaleStreamRun() && hlsRef.current) {
                     hls.attachMedia(video);
                     startPlaybackCheck();
                 }
@@ -592,7 +596,7 @@ function VideoPopup({
             startPlaybackCheck();
 
             hls.on(HlsClass.Events.MANIFEST_PARSED, () => {
-                if (cancelled || isLive) return; // Skip if already live
+                if (isStaleStreamRun() || isLive) return; // Skip if already live
                 // Update to buffering stage
                 setLoadingStage(LoadingStage.BUFFERING);
                 updateStreamStage(LoadingStage.BUFFERING);
@@ -601,7 +605,7 @@ function VideoPopup({
 
             // FRAG_LOADED fires when first fragment is loaded - more reliable than MANIFEST_PARSED
             hls.on(HlsClass.Events.FRAG_LOADED, () => {
-                if (cancelled || isLive) return; // Skip if already live
+                if (isStaleStreamRun() || isLive) return; // Skip if already live
                 // If still in LOADING stage, move to BUFFERING
                 setLoadingStage(prev => {
                     if (prev === LoadingStage.LOADING || prev === LoadingStage.CONNECTING) {
@@ -617,13 +621,13 @@ function VideoPopup({
             });
 
             hls.on(HlsClass.Events.FRAG_BUFFERED, () => {
-                if (cancelled || isLive) return; // Skip if already live
+                if (isStaleStreamRun() || isLive) return; // Skip if already live
                 // Langsung set PLAYING dan status live setelah buffered
                 handlePlaying(); // Use handlePlaying to set isLive flag
             });
 
             hls.on(HlsClass.Events.ERROR, (_, d) => {
-                if (cancelled || isLive) return; // Don't handle errors if already playing
+                if (isStaleStreamRun() || isLive) return; // Don't handle errors if already playing
 
                 // For non-fatal errors, just continue
                 if (!d.fatal) return;
@@ -660,7 +664,7 @@ function VideoPopup({
                     clearInternalWarmupRetry();
                     internalWarmupRetryTimeoutRef.current = setTimeout(() => {
                         internalWarmupRetryTimeoutRef.current = null;
-                        if (!cancelled) {
+                        if (!isStaleStreamRun()) {
                             setRetryKey((current) => current + 1);
                         }
                     }, 1200);
@@ -714,7 +718,7 @@ function VideoPopup({
                     });
 
                     const result = fallbackHandlerRef.current.handleError(streamError, () => {
-                        if (!cancelled && hls) {
+                        if (!isStaleStreamRun() && hls) {
                             setLoadingStage(LoadingStage.CONNECTING);
                             hls.destroy();
                             const newHlsConfig = getHLSConfig(deviceTier, {
@@ -727,13 +731,13 @@ function VideoPopup({
                             newHls.attachMedia(video);
 
                             newHls.on(HlsClass.Events.MANIFEST_PARSED, () => {
-                                if (cancelled) return;
+                                if (isStaleStreamRun()) return;
                                 setLoadingStage(LoadingStage.BUFFERING);
                                 requestVideoPlay(video);
                             });
 
                             newHls.on(HlsClass.Events.ERROR, (_, d2) => {
-                                if (cancelled) return;
+                                if (isStaleStreamRun()) return;
                                 if (d2.fatal) {
                                     setStatus('error');
                                     setErrorType(detectedErrorType);
@@ -759,7 +763,7 @@ function VideoPopup({
         // Standard priority for internal streams and external streams alike
         const initializePlayback = async () => {
             const loadedHls = await preloadHls();
-            if (cancelled) return;
+            if (isStaleStreamRun()) return;
             HlsClass = loadedHls;
 
             if (HlsClass?.isSupported()) {
@@ -778,7 +782,7 @@ function VideoPopup({
             video.removeEventListener('loadedmetadata', handleLoadedMetadata);
             video.removeEventListener('error', handleError);
             video.removeEventListener('play', handlePlaySync);
-            cleanupResources();
+            cleanupResources({ videoElement: video });
             if (hls) { hls.destroy(); hlsRef.current = null; }
         };
     }, [camera.id, camera.stream_source, cleanupResources, clearInternalWarmupRetry, clearStreamTimeout, deviceTier, isExternal, isHlsCamera, isMaintenance, isOffline, isStreamResolving, requestVideoPlay, resetFailures, retryKey, startTimeout, syncVideoAspectRatio, updateStreamStage, effectiveUrl, forceProxyFallback, isDirectStream, proxyFallbackUrl, reportRuntimeFailure, reportRuntimeSuccess]);
@@ -805,6 +809,8 @@ function VideoPopup({
         setFlvPlaybackSupported(true);
         const video = videoRef.current;
         let cancelled = false;
+        const streamRunId = streamRunIdRef.current;
+        const isStaleStreamRun = () => cancelled || streamRunId !== streamRunIdRef.current;
         const player = flvjs.createPlayer({
             type: 'flv',
             isLive: true,
@@ -822,7 +828,7 @@ function VideoPopup({
         setVideoAspectRatio(null);
 
         const handlePlaying = () => {
-            if (cancelled) return;
+            if (isStaleStreamRun()) return;
             setStatus('live');
             setLoadingStage(LoadingStage.PLAYING);
             syncVideoAspectRatio();
@@ -830,14 +836,14 @@ function VideoPopup({
         };
 
         const handleLoadedMetadata = () => {
-            if (cancelled) return;
+            if (isStaleStreamRun()) return;
             syncVideoAspectRatio();
             setLoadingStage(LoadingStage.BUFFERING);
             requestVideoPlay(video);
         };
 
         const handleFatalError = () => {
-            if (cancelled) return;
+            if (isStaleStreamRun()) return;
             setStatus(popupEmbedUrl ? 'playing' : 'error');
             setLoadingStage(popupEmbedUrl ? LoadingStage.BUFFERING : LoadingStage.ERROR);
             setErrorType(popupEmbedUrl ? null : 'media');
@@ -870,7 +876,8 @@ function VideoPopup({
     }, [deliveryType, effectiveUrl, isMaintenance, isOffline, isStreamResolving, popupEmbedUrl, reportRuntimeFailure, reportRuntimeSuccess, requestVideoPlay, syncVideoAspectRatio]);
 
     const handleRetry = useCallback(() => {
-        cleanupResources();
+        streamRunIdRef.current += 1;
+        cleanupResources({ resetVideo: false });
         setStatus('connecting');
         setErrorType(null);
         setLoadingStage(LoadingStage.CONNECTING);
@@ -1140,10 +1147,11 @@ function VideoPopup({
                     onDoubleClick={toggleFS}
                 >
                     {isHlsCamera || (deliveryType === 'external_flv' && flvPlaybackSupported) ? (
-                        <ZoomableVideo videoRef={videoRef} maxZoom={4} onZoomChange={setZoom} isFullscreen={isFullscreen} />
+                        <ZoomableVideo key={`video-${camera.id}`} videoRef={videoRef} maxZoom={4} onZoomChange={setZoom} isFullscreen={isFullscreen} />
                     ) : deliveryType === 'external_mjpeg' && effectiveUrl ? (
                         <ZoomableMediaFrame maxZoom={4} onZoomChange={setZoom}>
                             <img
+                                key={`mjpeg-${camera.id}`}
                                 src={effectiveUrl}
                                 alt={camera.name}
                                 data-testid="external-mjpeg-body"
@@ -1163,6 +1171,7 @@ function VideoPopup({
                     ) : popupEmbedUrl ? (
                         <ZoomableMediaFrame maxZoom={3} onZoomChange={setZoom}>
                             <iframe
+                                key={`embed-${camera.id}`}
                                 src={popupEmbedUrl}
                                 title={camera.name}
                                 data-testid="external-embed-body"
