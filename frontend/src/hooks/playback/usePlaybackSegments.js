@@ -49,6 +49,28 @@ function selectLatestSegment(segments) {
     return [...segments].sort((a, b) => new Date(b.start_time) - new Date(a.start_time))[0];
 }
 
+function isNoSegmentsMessage(message) {
+    return typeof message === 'string' && message.toLowerCase().includes('no segments found');
+}
+
+function applyEmptySegmentsState({
+    requestCameraId,
+    accessScope,
+    setPlaybackPolicy,
+    setPlaybackDeniedMessage,
+    setSegments,
+    setSegmentsCameraId,
+    setSelectedSegment,
+    setSeekTargetSeconds,
+}) {
+    setPlaybackPolicy(getDefaultPlaybackPolicy(accessScope));
+    setPlaybackDeniedMessage('');
+    setSegments([]);
+    setSegmentsCameraId(requestCameraId);
+    setSelectedSegment(null);
+    setSeekTargetSeconds(null);
+}
+
 function selectInitialSegment(segments, timestampParam) {
     if (!segments.length) {
         return {
@@ -153,6 +175,20 @@ export function usePlaybackSegments({
             }
 
             if (!response?.success || !response.data) {
+                if (response?.status === 404 || isNoSegmentsMessage(response?.message)) {
+                    applyEmptySegmentsState({
+                        requestCameraId,
+                        accessScope,
+                        setPlaybackPolicy,
+                        setPlaybackDeniedMessage,
+                        setSegments,
+                        setSegmentsCameraId,
+                        setSelectedSegment,
+                        setSeekTargetSeconds,
+                    });
+                    return;
+                }
+
                 if (!isBackgroundMode) {
                     setPlaybackDeniedMessage(response?.message || '');
                 }
@@ -182,7 +218,22 @@ export function usePlaybackSegments({
             }
 
             if (!isBackgroundMode) {
-                setPlaybackDeniedMessage(error?.response?.data?.message || '');
+                const errorMessage = error?.response?.data?.message || '';
+                if (error?.response?.status === 404 || isNoSegmentsMessage(errorMessage)) {
+                    applyEmptySegmentsState({
+                        requestCameraId,
+                        accessScope,
+                        setPlaybackPolicy,
+                        setPlaybackDeniedMessage,
+                        setSegments,
+                        setSegmentsCameraId,
+                        setSelectedSegment,
+                        setSeekTargetSeconds,
+                    });
+                    return;
+                }
+
+                setPlaybackDeniedMessage(errorMessage);
                 setSegments([]);
                 setSegmentsCameraId(null);
                 setSelectedSegment(null);

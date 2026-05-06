@@ -430,6 +430,49 @@ describe('Playback', () => {
         expect(screen.getByTestId('location-search').textContent).toContain('t=');
     });
 
+    it('tetap menampilkan pemilih CCTV saat kamera publik tidak punya rekaman', async () => {
+        getSegments
+            .mockRejectedValueOnce({
+                response: {
+                    status: 404,
+                    data: { message: 'No segments found' },
+                },
+            })
+            .mockResolvedValueOnce({
+                success: true,
+                data: {
+                    segments: buildSegments('gate'),
+                },
+            });
+
+        render(
+            <TestRouter initialEntries={['/playback?mode=full&view=playback&cam=1']}>
+                <LocationProbe />
+                <Playback
+                    cameras={[
+                        { id: 1, name: 'Lobby Mati', enable_recording: 1, location: 'Area A' },
+                        { id: 2, name: 'Gate Aktif', enable_recording: 1, location: 'Area B' },
+                    ]}
+                />
+            </TestRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText('playback-header')).toBeTruthy();
+            expect(screen.getByTestId('video-segment').textContent).toBe('none');
+        });
+
+        expect(screen.queryByText('Playback Publik Tidak Tersedia')).toBeNull();
+
+        fireEvent.click(screen.getByText('ganti-kamera'));
+
+        await waitFor(() => {
+            expect(screen.getByTestId('video-segment').textContent).toBe('gate-2');
+        });
+
+        expect(screen.getByTestId('location-search').textContent).toContain('cam=2-gate-aktif');
+    });
+
     it('share playback mempertahankan simple mode pada link publik', async () => {
         render(
             <TestRouter initialEntries={['/playback?mode=simple&view=playback&cam=1']}>
