@@ -13,16 +13,19 @@ const {
     getPublicAreaBySlugMock,
     getPublicAreaCamerasMock,
     getTrendingCamerasMock,
+    getPublicDiscoveryMock,
 } = vi.hoisted(() => ({
     getPublicAreaBySlugMock: vi.fn(),
     getPublicAreaCamerasMock: vi.fn(),
     getTrendingCamerasMock: vi.fn(),
+    getPublicDiscoveryMock: vi.fn(),
 }));
 
 vi.mock('../services/publicGrowthService.js', () => ({
     getPublicAreaBySlug: getPublicAreaBySlugMock,
     getPublicAreaCameras: getPublicAreaCamerasMock,
     getTrendingCameras: getTrendingCamerasMock,
+    getPublicDiscovery: getPublicDiscoveryMock,
 }));
 
 describe('publicGrowthRoutes', () => {
@@ -31,6 +34,7 @@ describe('publicGrowthRoutes', () => {
         getPublicAreaBySlugMock.mockReset();
         getPublicAreaCamerasMock.mockReset();
         getTrendingCamerasMock.mockReset();
+        getPublicDiscoveryMock.mockReset();
     });
 
     it('serves public area data without auth', async () => {
@@ -74,6 +78,28 @@ describe('publicGrowthRoutes', () => {
 
         expect(response.statusCode).toBe(200);
         expect(getTrendingCamerasMock).toHaveBeenCalledWith({ areaSlug: 'kab-surabaya', limit: '4' });
+        await fastify.close();
+    });
+
+    it('serves public discovery payload for landing page sections', async () => {
+        getPublicDiscoveryMock.mockReturnValue({
+            live_now: [],
+            top_cameras: [],
+            new_cameras: [],
+            popular_areas: [],
+        });
+        const { default: publicGrowthRoutes } = await import('../routes/publicGrowthRoutes.js');
+        const fastify = Fastify();
+        await fastify.register(publicGrowthRoutes, { prefix: '/api/public' });
+
+        const response = await fastify.inject({
+            method: 'GET',
+            url: '/api/public/discovery?limit=6',
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(getPublicDiscoveryMock).toHaveBeenCalledWith({ limit: '6' });
+        expect(response.json()).toMatchObject({ success: true, data: { live_now: [], popular_areas: [] } });
         await fastify.close();
     });
 });

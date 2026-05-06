@@ -58,6 +58,10 @@ vi.mock('../services/settingsService', () => ({
 
 vi.mock('../services/publicGrowthService', () => ({
     default: {
+        getDiscovery: vi.fn().mockResolvedValue({
+            success: true,
+            data: { live_now: [], top_cameras: [], new_cameras: [], popular_areas: [] },
+        }),
         getTrendingCameras: vi.fn().mockResolvedValue({ success: true, data: [] }),
     },
 }));

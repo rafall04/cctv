@@ -26,6 +26,29 @@
     }
   ],
   "categories": ["security", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Peta CCTV",
+      "short_name": "Peta",
+      "description": "Buka peta CCTV publik",
+      "url": "/?view=map",
+      "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Grid CCTV",
+      "short_name": "Grid",
+      "description": "Buka grid CCTV publik",
+      "url": "/?view=grid",
+      "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Playback",
+      "short_name": "Playback",
+      "description": "Buka halaman playback publik",
+      "url": "/playback",
+      "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ],
   "lang": "id",
   "dir": "ltr"
 }

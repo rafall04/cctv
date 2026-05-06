@@ -9,17 +9,18 @@ SideEffects: Loads runtime config, mounts React into #root, logs bootstrap failu
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { loadRuntimeConfig } from './config/runtimeConfig.js';
+import { registerServiceWorker } from './utils/registerServiceWorker.js';
 import './index.css';
 
 async function bootstrap() {
     await loadRuntimeConfig();
     const { default: App } = await import('./App.jsx');
-
     ReactDOM.createRoot(document.getElementById('root')).render(
         <React.StrictMode>
             <App />
         </React.StrictMode>
     );
+    registerServiceWorker();
 }
 
 bootstrap().catch((error) => {

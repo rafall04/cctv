@@ -154,6 +154,12 @@ export default function AreaPublicPage() {
     }, [cameras, searchParams]);
 
     const shareText = useMemo(() => (area ? buildAreaShareText(area) : ''), [area]);
+    const newestCameras = useMemo(() => (
+        [...cameras]
+            .filter((camera) => camera.created_at)
+            .sort((left, right) => String(right.created_at).localeCompare(String(left.created_at)))
+            .slice(0, 4)
+    ), [cameras]);
 
     const handleShare = useCallback(async () => {
         if (!shareText) {
@@ -230,6 +236,12 @@ export default function AreaPublicPage() {
             <LandingTrendingCameras
                 cameras={trendingCameras}
                 title={`Top CCTV ${area?.name || ''}`.trim()}
+                onCameraClick={setSelectedCamera}
+            />
+
+            <LandingTrendingCameras
+                cameras={newestCameras}
+                title={`Kamera Terbaru ${area?.name || ''}`.trim()}
                 onCameraClick={setSelectedCamera}
             />
 

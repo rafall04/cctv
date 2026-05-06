@@ -2,7 +2,7 @@
  * Purpose: Verify public growth read models are sanitized and ordered correctly.
  * Caller: Backend focused public growth test gate.
  * Deps: vitest, mocked connectionPool, publicGrowthService.
- * MainFuncs: Public area, camera sanitization, and trending tests.
+ * MainFuncs: Public area, camera sanitization, trending, and discovery tests.
  * SideEffects: Mocks database reads.
  */
 
@@ -103,5 +103,41 @@ describe('publicGrowthService', () => {
         const service = await import('../services/publicGrowthService.js');
 
         expect(() => service.getPublicAreaBySlug('hilang')).toThrow('Area hilang tidak ditemukan');
+    });
+
+    it('builds public discovery sections with sanitized cameras and popular areas', async () => {
+        queryMock
+            .mockReturnValueOnce([{ id: 1, name: 'Live A', live_viewers: 3, total_views: 40 }])
+            .mockReturnValueOnce([{ id: 2, name: 'Top B', live_viewers: 1, total_views: 90 }])
+            .mockReturnValueOnce([{ id: 3, name: 'New C', created_at: '2026-05-06 08:00:00', total_views: 4 }])
+            .mockReturnValueOnce([{
+                id: 7,
+                name: 'KAB SURABAYA',
+                slug: 'kab-surabaya',
+                camera_count: 12,
+                online_count: 10,
+                live_viewers: 5,
+                total_views: 120,
+                latest_camera_at: '2026-05-06 08:00:00',
+            }]);
+
+        const service = await import('../services/publicGrowthService.js');
+        const discovery = service.getPublicDiscovery({ limit: 6 });
+
+        expect(discovery.live_now).toEqual([expect.objectContaining({ id: 1, name: 'Live A', live_viewers: 3 })]);
+        expect(discovery.top_cameras).toEqual([expect.objectContaining({ id: 2, name: 'Top B', total_views: 90 })]);
+        expect(discovery.new_cameras).toEqual([expect.objectContaining({ id: 3, name: 'New C', created_at: '2026-05-06 08:00:00' })]);
+        expect(discovery.popular_areas).toEqual([
+            expect.objectContaining({
+                id: 7,
+                name: 'KAB SURABAYA',
+                slug: 'kab-surabaya',
+                camera_count: 12,
+                online_count: 10,
+                live_viewers: 5,
+                total_views: 120,
+            }),
+        ]);
+        expect(queryMock).toHaveBeenCalledTimes(4);
     });
 });

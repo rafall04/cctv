@@ -1,3 +1,11 @@
+/*
+ * Purpose: Compose the public CCTV landing experience across full/simple modes, discovery sections, map/grid views, and popups.
+ * Caller: App public root route.
+ * Deps: React, Router search params, branding/camera/toast contexts, landing hooks, landing components, publicGrowthService.
+ * MainFuncs: LandingPage, LandingPageContent, DeferredSurfaceFallback.
+ * SideEffects: Fetches public config/discovery data, updates metadata, opens video popups, manages multiview state.
+ */
+
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useBranding } from '../contexts/BrandingContext';
@@ -15,7 +23,7 @@ import LandingHero from '../components/landing/LandingHero';
 import LandingFooter from '../components/landing/LandingFooter';
 import LandingCamerasSection from '../components/landing/LandingCamerasSection';
 import LandingPublicTopStack from '../components/landing/LandingPublicTopStack';
-import LandingTrendingCameras from '../components/landing/LandingTrendingCameras';
+import LandingPublicDiscovery from '../components/landing/LandingPublicDiscovery';
 import MultiViewButton from '../components/MultiView/MultiViewButton';
 import InlineAdSlot from '../components/ads/InlineAdSlot';
 import GlobalAdScript from '../components/ads/GlobalAdScript';
@@ -45,8 +53,8 @@ function LandingPageContent() {
     const { addToast } = useToast();
     const [searchParams, setSearchParams] = useSearchParams();
     const [activePopupSource, setActivePopupSource] = useState('grid');
-    const [trendingCameras, setTrendingCameras] = useState([]);
-    const [trendingLoading, setTrendingLoading] = useState(true);
+    const [publicDiscovery, setPublicDiscovery] = useState(null);
+    const [discoveryLoading, setDiscoveryLoading] = useState(true);
     const { favorites, toggleFavorite, isFavorite, addRecentCamera } = useCameraHistory();
 
     const {
@@ -111,20 +119,20 @@ function LandingPageContent() {
     useEffect(() => {
         let mounted = true;
 
-        publicGrowthService.getTrendingCameras({ limit: 4 })
+        publicGrowthService.getDiscovery({ limit: 6 })
             .then((response) => {
                 if (mounted) {
-                    setTrendingCameras(response.data || []);
+                    setPublicDiscovery(response.data || null);
                 }
             })
             .catch(() => {
                 if (mounted) {
-                    setTrendingCameras([]);
+                    setPublicDiscovery(null);
                 }
             })
             .finally(() => {
                 if (mounted) {
-                    setTrendingLoading(false);
+                    setDiscoveryLoading(false);
                 }
             });
 
@@ -232,9 +240,9 @@ function LandingPageContent() {
                     onCameraClick={setPopup}
                 />
 
-                <LandingTrendingCameras
-                    cameras={trendingCameras}
-                    loading={trendingLoading}
+                <LandingPublicDiscovery
+                    discovery={publicDiscovery}
+                    loading={discoveryLoading}
                     onCameraClick={handleGridPopupOpen}
                 />
 

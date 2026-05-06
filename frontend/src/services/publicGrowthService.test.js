@@ -38,4 +38,13 @@ describe('publicGrowthService', () => {
             params: { areaSlug: 'kab-surabaya', limit: 4 },
         }));
     });
+
+    it('loads public discovery sections with a bounded limit', async () => {
+        await publicGrowthService.getDiscovery({ limit: 6 });
+        expect(getMock).toHaveBeenCalledWith('/api/public/discovery', expect.objectContaining({
+            skipGlobalErrorNotification: true,
+            skipAuthRefresh: true,
+            params: { limit: 6 },
+        }));
+    });
 });
