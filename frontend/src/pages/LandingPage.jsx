@@ -6,7 +6,7 @@
  * SideEffects: Fetches public config/discovery data, updates metadata, opens video popups, computes popup-related cameras, manages multiview state.
  */
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useBranding } from '../contexts/BrandingContext';
 import { updateMetaTags } from '../utils/metaUpdater';
@@ -60,6 +60,7 @@ function LandingPageContent() {
     const [activePopupSource, setActivePopupSource] = useState('grid');
     const [publicDiscovery, setPublicDiscovery] = useState(null);
     const [discoveryLoading, setDiscoveryLoading] = useState(true);
+    const streamResolveRequestRef = useRef(0);
     const { favorites, recentCameras, toggleFavorite, isFavorite, addRecentCamera } = useCameraHistory();
 
     const {
@@ -188,9 +189,25 @@ function LandingPageContent() {
     }, [activePopupSource, popup]);
 
     const handleGridPopupOpen = useCallback(async (camera) => {
+        const requestId = streamResolveRequestRef.current + 1;
+        streamResolveRequestRef.current = requestId;
         setActivePopupSource('grid');
-        const resolvedCamera = await resolvePublicPopupCamera(camera, cameras);
-        handleCameraClick(resolvedCamera || camera);
+        handleCameraClick(camera);
+
+        try {
+            const resolvedCamera = await resolvePublicPopupCamera(camera, cameras);
+            if (streamResolveRequestRef.current !== requestId) {
+                return;
+            }
+
+            if (resolvedCamera && resolvedCamera !== camera) {
+                handleCameraClick(resolvedCamera);
+            }
+        } catch {
+            if (streamResolveRequestRef.current === requestId) {
+                handleCameraClick(camera);
+            }
+        }
     }, [cameras, handleCameraClick]);
 
     const handleMapPopupOpen = useCallback((camera) => {
@@ -199,6 +216,7 @@ function LandingPageContent() {
     }, [handleCameraClick]);
 
     const handleUnifiedPopupClose = useCallback(() => {
+        streamResolveRequestRef.current += 1;
         handlePopupClose();
         setActivePopupSource('grid');
     }, [handlePopupClose]);

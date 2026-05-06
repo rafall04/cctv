@@ -84,6 +84,7 @@ function VideoPopup({
     const autoRetryCountRef = useRef(0);
     const internalWarmupRetryCountRef = useRef(0);
     const internalWarmupRetryTimeoutRef = useRef(null);
+    const renderedCameraIdRef = useRef(camera.id);
     const { branding } = useBranding(); // ← FIX: Add branding context
 
     // Handle close with fullscreen exit
@@ -429,6 +430,33 @@ function VideoPopup({
             fallbackHandlerRef.current.clearPendingRetry();
         }
     }, [clearInternalWarmupRetry, clearStreamTimeout]);
+
+    useLayoutEffect(() => {
+        if (renderedCameraIdRef.current === camera.id) {
+            return;
+        }
+
+        renderedCameraIdRef.current = camera.id;
+        cleanupResources();
+        setStatus(getPublicPopupInitialStatus(camera));
+        setLoadingStage(LoadingStage.CONNECTING);
+        setErrorType(null);
+        setSnapshotNotification(null);
+        setZoom(1);
+        setRetryKey(0);
+        setAutoRetryCount(0);
+        setConsecutiveFailures(0);
+        setShowTroubleshooting(false);
+        setForceProxyFallback(false);
+        setVideoAspectRatio(null);
+        internalWarmupRetryCountRef.current = 0;
+        loadingStageRef.current = LoadingStage.CONNECTING;
+        autoRetryCountRef.current = 0;
+        resetFailures();
+        if (fallbackHandlerRef.current) {
+            fallbackHandlerRef.current.reset();
+        }
+    }, [camera, cleanupResources, resetFailures]);
 
     useEffect(() => {
         // Skip HLS loading if camera is in maintenance or offline
@@ -945,15 +973,23 @@ function VideoPopup({
     };
 
     // Get status display info - **Validates: Requirements 4.1, 4.2, 4.3, 4.4**
+    const isRenderingNewCamera = renderedCameraIdRef.current !== camera.id;
+    const renderStatus = isRenderingNewCamera ? getPublicPopupInitialStatus(camera) : status;
+    const renderLoadingStage = isRenderingNewCamera ? LoadingStage.CONNECTING : loadingStage;
+    const renderErrorType = isRenderingNewCamera ? null : errorType;
     const statusDisplay = getPublicPopupStatusDisplay({
-        status,
-        loadingStage,
-        errorType,
+        status: renderStatus,
+        loadingStage: renderLoadingStage,
+        errorType: renderErrorType,
         isTunnel: camera.is_tunnel === 1 || camera.is_tunnel === true,
     });
-    const overlayState = getPublicPopupOverlayState({ status, loadingStage, errorType });
-    const isPlaybackLocked = isPublicPopupPlaybackLocked(status);
-    const canRetry = shouldShowPublicPopupRetry({ status, errorType });
+    const overlayState = getPublicPopupOverlayState({
+        status: renderStatus,
+        loadingStage: renderLoadingStage,
+        errorType: renderErrorType,
+    });
+    const isPlaybackLocked = isPublicPopupPlaybackLocked(renderStatus);
+    const canRetry = shouldShowPublicPopupRetry({ status: renderStatus, errorType: renderErrorType });
     const popupAdsEnabled = adsConfig?.popup?.enabled !== false;
     const popupMaxHeight = isMobileAdsViewport
         ? (adsConfig?.popup?.maxHeight?.mobile || 220)
@@ -991,7 +1027,7 @@ function VideoPopup({
 
     // Check if animations should be disabled on low-end devices - **Validates: Requirements 5.2**
     const disableAnimations = shouldDisableAnimations();
-    const isVideoActive = status === 'live';
+    const isVideoActive = renderStatus === 'live';
 
     useLayoutEffect(() => {
         if (typeof window === 'undefined') return undefined;
@@ -1059,7 +1095,7 @@ function VideoPopup({
                                     </svg>
                                 </button>
                                 <span className={`inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold ${statusDisplay.color}`}>
-                                    <span className={`w-1.5 h-1.5 rounded-full ${statusDisplay.dotColor} ${status === 'live' && !disableAnimations ? 'animate-pulse' : ''}`} />
+                                    <span className={`w-1.5 h-1.5 rounded-full ${statusDisplay.dotColor} ${renderStatus === 'live' && !disableAnimations ? 'animate-pulse' : ''}`} />
                                     {statusDisplay.label}
                                 </span>
                             </div>
@@ -1217,7 +1253,7 @@ function VideoPopup({
                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                                             </svg>
                                         </button>
-                                        {status === 'live' && isHlsCamera && <button onClick={takeSnapshot} className="p-2 hover:bg-gray-700/50 dark:hover:bg-white/20 active:bg-gray-700/70 dark:active:bg-white/30 rounded-xl text-gray-900 dark:text-white bg-gray-200/80 dark:bg-white/10"><Icons.Image /></button>}
+                                        {renderStatus === 'live' && isHlsCamera && <button onClick={takeSnapshot} className="p-2 hover:bg-gray-700/50 dark:hover:bg-white/20 active:bg-gray-700/70 dark:active:bg-white/30 rounded-xl text-gray-900 dark:text-white bg-gray-200/80 dark:bg-white/10"><Icons.Image /></button>}
                                         <button onClick={toggleFS} className="p-2 hover:bg-gray-700/50 dark:hover:bg-white/20 active:bg-gray-700/70 dark:active:bg-white/30 rounded-xl text-gray-900 dark:text-white bg-gray-200/80 dark:bg-white/10">
                                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
@@ -1296,7 +1332,7 @@ function VideoPopup({
                                         )}
                                     </div>
 
-                                    {status === 'live' && isHlsCamera && (
+                                    {renderStatus === 'live' && isHlsCamera && (
                                         <button onClick={takeSnapshot} className="p-1.5 bg-gray-200/80 dark:bg-gray-800 hover:bg-gray-300/50 dark:hover:bg-gray-700 rounded-lg text-gray-900 dark:text-white transition-colors" title="Ambil Screenshot">
                                             <Icons.Image />
                                         </button>

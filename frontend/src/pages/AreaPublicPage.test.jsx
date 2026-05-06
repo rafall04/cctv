@@ -191,4 +191,50 @@ describe('AreaPublicPage', () => {
             }),
         }));
     });
+
+    it('shows the selected camera immediately while stream resolution is still pending', async () => {
+        let resolveStream;
+        const streamPromise = new Promise((resolve) => {
+            resolveStream = resolve;
+        });
+
+        getAreaMock.mockResolvedValue({
+            success: true,
+            data: { name: 'KAB SURABAYA', slug: 'kab-surabaya', camera_count: 1, online_count: 1, total_views: 9 },
+        });
+        getAreaCamerasMock.mockResolvedValue({
+            success: true,
+            data: [{ id: 9, name: 'CCTV Pending Stream', area_name: 'KAB SURABAYA', total_views: 9 }],
+        });
+        getTrendingCamerasMock.mockResolvedValue({ success: true, data: [] });
+        getStreamUrlsMock.mockReturnValue(streamPromise);
+
+        renderPage();
+
+        await waitFor(() => expect(screen.getByRole('heading', { level: 2, name: /Semua CCTV Area/i })).toBeTruthy());
+        const allCamerasSection = screen.getByRole('heading', { level: 2, name: /Semua CCTV Area/i }).closest('section');
+        fireEvent.click(within(allCamerasSection).getByRole('button', { name: /CCTV Pending Stream/i }));
+
+        expect(screen.getByTestId('area-popup-modal').textContent).toContain('no-stream');
+        expect(videoPopupSpy).toHaveBeenLastCalledWith(expect.objectContaining({
+            camera: expect.objectContaining({
+                id: 9,
+                name: 'CCTV Pending Stream',
+            }),
+        }));
+
+        resolveStream({
+            success: true,
+            data: {
+                camera: { id: 9, name: 'CCTV Pending Stream', area_name: 'KAB SURABAYA', delivery_type: 'internal_hls' },
+                streams: { hls: '/hls/camera-9/index.m3u8' },
+                stream_source: 'internal',
+                delivery_type: 'internal_hls',
+            },
+        });
+
+        await waitFor(() => {
+            expect(screen.getByTestId('area-popup-modal').textContent).toContain('/hls/camera-9/index.m3u8');
+        });
+    });
 });

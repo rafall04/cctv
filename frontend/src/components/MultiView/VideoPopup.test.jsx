@@ -299,6 +299,48 @@ describe('VideoPopup non-live states', () => {
         expect(screen.queryByTitle('Fullscreen')).toBeNull();
     });
 
+    it('langsung mereset overlay error lama ketika popup diganti ke kamera lain', async () => {
+        const { rerender } = render(
+            <VideoPopup
+                camera={{ ...baseCamera, id: 31, name: 'CCTV Lama' }}
+                onClose={vi.fn()}
+            />
+        );
+
+        await waitFor(() => {
+            expect(hlsInstances).toHaveLength(1);
+        });
+
+        await act(async () => {
+            hlsInstances[0].emit('error', {}, {
+                fatal: true,
+                type: 'networkError',
+                details: 'levelLoadError',
+            });
+        });
+
+        await waitFor(() => {
+            expect(screen.getByText('Koneksi Gagal')).toBeTruthy();
+        });
+
+        rerender(
+            <VideoPopup
+                camera={{
+                    ...baseCamera,
+                    id: 32,
+                    name: 'CCTV Baru',
+                    streams: { hls: 'https://example.com/new-live.m3u8' },
+                }}
+                onClose={vi.fn()}
+            />
+        );
+
+        expect(screen.queryByText('Koneksi Gagal')).toBeNull();
+        expect(screen.queryByText('CCTV Tidak Terkoneksi')).toBeNull();
+        expect(screen.getByText('Memuat stream...')).toBeTruthy();
+        expect(screen.getByText('CCTV Baru')).toBeTruthy();
+    });
+
     it('memperlakukan 404 manifest internal sebagai warmup sementara sebelum retry ulang', async () => {
         render(
             <VideoPopup

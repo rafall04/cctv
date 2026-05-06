@@ -6,7 +6,7 @@
  * SideEffects: Fetches public area/camera data and updates document metadata.
  */
 
-import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import CameraThumbnail from '../components/CameraThumbnail';
 import { resolvePublicPopupCamera } from '../services/publicCameraResolver';
@@ -180,9 +180,11 @@ export default function AreaPublicPage() {
     const [loading, setLoading] = useState(true);
     const [notFound, setNotFound] = useState(false);
     const [shareMessage, setShareMessage] = useState('');
+    const streamResolveRequestRef = useRef(0);
 
     useEffect(() => {
         let mounted = true;
+        streamResolveRequestRef.current += 1;
         setLoading(true);
         setNotFound(false);
         setSelectedCamera(null);
@@ -265,9 +267,21 @@ export default function AreaPublicPage() {
     }, [cameras, selectedCamera]);
 
     const handleCameraOpen = useCallback(async (camera) => {
-        const resolvedCamera = await resolvePublicPopupCamera(camera);
-        if (resolvedCamera) {
-            setSelectedCamera(resolvedCamera);
+        const requestId = streamResolveRequestRef.current + 1;
+        streamResolveRequestRef.current = requestId;
+        setSelectedCamera(camera);
+
+        try {
+            const resolvedCamera = await resolvePublicPopupCamera(camera);
+            if (streamResolveRequestRef.current !== requestId) {
+                return;
+            }
+
+            setSelectedCamera(resolvedCamera || camera);
+        } catch {
+            if (streamResolveRequestRef.current === requestId) {
+                setSelectedCamera(camera);
+            }
         }
     }, []);
 
@@ -452,7 +466,10 @@ export default function AreaPublicPage() {
                 <Suspense fallback={null}>
                     <VideoPopup
                         camera={selectedCamera}
-                        onClose={() => setSelectedCamera(null)}
+                        onClose={() => {
+                            streamResolveRequestRef.current += 1;
+                            setSelectedCamera(null);
+                        }}
                         modalTestId="area-popup-modal"
                         bodyTestId="area-video-body"
                         relatedCameras={relatedPopupCameras}
