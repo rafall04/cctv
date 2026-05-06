@@ -1,3 +1,11 @@
+/*
+ * Purpose: Render optional public Saweria support modal and floating banner without colliding with other mobile public actions.
+ * Caller: Public landing full/simple pages.
+ * Deps: React hooks, browser fetch/localStorage/window.open.
+ * MainFuncs: SaweriaSupport.
+ * SideEffects: Fetches Saweria config, stores banner preferences, opens Saweria external link, and registers temporary scroll/timer handlers.
+ */
+
 import { useState, useEffect, useMemo, memo } from 'react';
 
 const STORAGE_KEY = 'saweria_dont_show';
@@ -183,7 +191,10 @@ const SaweriaSupport = memo(function SaweriaSupport() {
 
             {/* Banner - Simplified */}
             {showBanner && (
-                <div className={`fixed bottom-24 right-6 z-[999998] ${bannerMinimized ? 'w-14' : 'w-64'}`}>
+                <div
+                    data-testid="saweria-floating-banner"
+                    className={`fixed bottom-24 left-4 right-auto z-[99998] sm:bottom-24 sm:left-auto sm:right-6 ${bannerMinimized ? 'w-14' : 'w-[calc(100vw-7rem)] max-w-52 sm:w-64 sm:max-w-none'}`}
+                >
                     {bannerMinimized ? (
                         <button
                             onClick={handleBannerMaximize}
