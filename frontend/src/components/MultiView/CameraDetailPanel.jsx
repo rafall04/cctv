@@ -1,20 +1,16 @@
 /*
  * Purpose: Render minimal public camera metadata and popup actions before or below live playback.
  * Caller: VideoPopup public single-camera modal.
- * Deps: landingCameraInsights utility and caller-provided share/favorite handlers.
+ * Deps: landingCameraInsights utility, publicGrowthShare utility, and caller-provided share/favorite handlers.
  * MainFuncs: CameraDetailPanel.
  * SideEffects: Invokes share and favorite callbacks.
  */
 
 import { getPublicCameraQuality } from '../../utils/landingCameraInsights';
+import { buildAreaPath } from '../../utils/publicGrowthShare';
 
 function metric(camera, key) {
     return Number(camera?.[key] ?? camera?.viewer_stats?.[key] ?? 0);
-}
-
-function getAreaHref(camera) {
-    const areaSlug = camera?.area_slug || camera?.areaSlug || camera?.area_name || camera?.areaName;
-    return areaSlug ? `/area/${encodeURIComponent(areaSlug)}` : '/';
 }
 
 export default function CameraDetailPanel({
@@ -72,7 +68,7 @@ export default function CameraDetailPanel({
                         </button>
                     )}
                     <a
-                        href={getAreaHref(camera)}
+                        href={buildAreaPath(camera)}
                         className="rounded-lg bg-gray-100 px-3 py-2 text-xs font-bold text-gray-700 transition hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                     >
                         Buka area

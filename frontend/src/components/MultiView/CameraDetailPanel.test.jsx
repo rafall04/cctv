@@ -40,12 +40,30 @@ describe('CameraDetailPanel', () => {
         expect(screen.getByText('120 views')).toBeTruthy();
         expect(screen.getByText('Playback tersedia')).toBeTruthy();
         expect(screen.queryByText('Pantau area publik')).toBeNull();
-        expect(screen.getByRole('link', { name: /Buka area/i }).getAttribute('href')).toBe('/area/KAB%20BOJONEGORO');
+        expect(screen.getByRole('link', { name: /Buka area/i }).getAttribute('href')).toBe('/area/kab-bojonegoro');
 
         fireEvent.click(screen.getByRole('button', { name: /Bagikan/i }));
         fireEvent.click(screen.getByRole('button', { name: /Tambah favorit/i }));
 
         expect(onShare).toHaveBeenCalledTimes(1);
         expect(onToggleFavorite).toHaveBeenCalledWith(12);
+    });
+
+    it('prefers canonical area slug for area navigation when available', () => {
+        render(
+            <CameraDetailPanel
+                camera={{
+                    id: 13,
+                    name: 'CCTV Surabaya',
+                    area_name: 'KAB SURABAYA',
+                    area_slug: 'kab-surabaya',
+                    total_views: 1,
+                    live_viewers: 0,
+                }}
+                onShare={vi.fn()}
+            />
+        );
+
+        expect(screen.getByRole('link', { name: /Buka area/i }).getAttribute('href')).toBe('/area/kab-surabaya');
     });
 });

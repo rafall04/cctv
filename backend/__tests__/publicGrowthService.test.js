@@ -48,6 +48,22 @@ describe('publicGrowthService', () => {
         });
     });
 
+    it('normalizes raw area names before querying public area data', async () => {
+        queryOneMock.mockReturnValue({
+            id: 7,
+            name: 'KAB SURABAYA',
+            slug: 'kab-surabaya',
+            camera_count: 2,
+            online_count: 1,
+            total_views: 12,
+        });
+
+        const service = await import('../services/publicGrowthService.js');
+        service.getPublicAreaBySlug('KAB SURABAYA');
+
+        expect(queryOneMock.mock.calls[0][1]).toEqual(['kab-surabaya']);
+    });
+
     it('does not expose private camera source fields', async () => {
         queryOneMock.mockReturnValue({ id: 7, name: 'KAB SURABAYA', slug: 'kab-surabaya' });
         queryMock.mockReturnValue([

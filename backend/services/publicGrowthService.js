@@ -47,7 +47,13 @@ function normalizeLimit(limit) {
 }
 
 function toAreaSlug(name = '') {
-    return String(name).trim().toLowerCase().replace(/\s+/g, '-');
+    let value = String(name).trim();
+    try {
+        value = decodeURIComponent(value);
+    } catch {
+        // Keep the original input if it is not URL encoded.
+    }
+    return value.toLowerCase().replace(/\s+/g, '-');
 }
 
 function assertArea(row, slug) {
@@ -109,6 +115,7 @@ function getActiveViewerJoin() {
 }
 
 export function getPublicAreaBySlug(areaSlug) {
+    const normalizedAreaSlug = toAreaSlug(areaSlug);
     const row = queryOne(`
         SELECT
             a.id,
@@ -123,9 +130,9 @@ export function getPublicAreaBySlug(areaSlug) {
         LEFT JOIN camera_view_stats cvs ON cvs.camera_id = c.id
         WHERE LOWER(REPLACE(a.name, ' ', '-')) = ?
         GROUP BY a.id
-    `, [areaSlug]);
+    `, [normalizedAreaSlug]);
 
-    assertArea(row, areaSlug);
+    assertArea(row, normalizedAreaSlug);
 
     return {
         id: row.id,
@@ -140,12 +147,13 @@ export function getPublicAreaBySlug(areaSlug) {
 }
 
 export function getPublicAreaCameras(areaSlug) {
+    const normalizedAreaSlug = toAreaSlug(areaSlug);
     const area = queryOne(`
         SELECT id, name, LOWER(REPLACE(name, ' ', '-')) AS slug
         FROM areas
         WHERE LOWER(REPLACE(name, ' ', '-')) = ?
-    `, [areaSlug]);
-    assertArea(area, areaSlug);
+    `, [normalizedAreaSlug]);
+    assertArea(area, normalizedAreaSlug);
 
     return query(`
         SELECT ${PUBLIC_CAMERA_COLUMNS}
@@ -156,13 +164,14 @@ export function getPublicAreaCameras(areaSlug) {
         WHERE c.enabled = 1
           AND LOWER(REPLACE(a.name, ' ', '-')) = ?
         ORDER BY c.is_tunnel ASC, c.id ASC
-    `, [areaSlug]).map(sanitizeCamera);
+    `, [normalizedAreaSlug]).map(sanitizeCamera);
 }
 
 export function getTrendingCameras({ areaSlug = '', limit = 10 } = {}) {
     const normalizedLimit = normalizeLimit(limit);
-    const params = areaSlug ? [areaSlug, normalizedLimit] : [normalizedLimit];
-    const areaFilter = areaSlug ? "AND LOWER(REPLACE(a.name, ' ', '-')) = ?" : '';
+    const normalizedAreaSlug = areaSlug ? toAreaSlug(areaSlug) : '';
+    const params = normalizedAreaSlug ? [normalizedAreaSlug, normalizedLimit] : [normalizedLimit];
+    const areaFilter = normalizedAreaSlug ? "AND LOWER(REPLACE(a.name, ' ', '-')) = ?" : '';
 
     return query(`
         SELECT ${PUBLIC_CAMERA_COLUMNS}

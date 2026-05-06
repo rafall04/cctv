@@ -2,17 +2,41 @@
  * Purpose: Build branded public CCTV share URLs and text for areas and cameras.
  * Caller: AreaPublicPage, LandingTrendingCameras, and public share buttons.
  * Deps: Browser URL APIs.
- * MainFuncs: buildAreaShareText, buildCameraShareText, buildAreaUrl, buildCameraUrl, sharePublicText.
+ * MainFuncs: getPublicAreaSlug, buildAreaPath, buildAreaShareText, buildCameraShareText, buildAreaUrl, buildCameraUrl, sharePublicText.
  * SideEffects: None.
  */
 
-export function buildAreaUrl(slug, origin = window.location.origin) {
-    return `${origin}/area/${encodeURIComponent(slug)}`;
+function normalizeSlug(value = '') {
+    return String(value).trim().toLowerCase().replace(/\s+/g, '-');
+}
+
+export function getPublicAreaSlug(areaInput = {}) {
+    if (typeof areaInput === 'string') {
+        return normalizeSlug(areaInput);
+    }
+
+    return normalizeSlug(
+        areaInput.area_slug
+        || areaInput.areaSlug
+        || areaInput.slug
+        || areaInput.area_name
+        || areaInput.areaName
+        || areaInput.name
+        || ''
+    );
+}
+
+export function buildAreaPath(areaInput) {
+    const slug = getPublicAreaSlug(areaInput);
+    return slug ? `/area/${encodeURIComponent(slug)}` : '/';
+}
+
+export function buildAreaUrl(areaInput, origin = window.location.origin) {
+    return `${origin}${buildAreaPath(areaInput)}`;
 }
 
 export function buildCameraUrl(camera, origin = window.location.origin) {
-    const areaSlug = camera.area_slug || camera.areaSlug || 'all';
-    const baseUrl = buildAreaUrl(areaSlug, origin);
+    const baseUrl = buildAreaUrl(getPublicAreaSlug(camera) || 'all', origin);
     return `${baseUrl}?camera=${encodeURIComponent(camera.id)}`;
 }
 

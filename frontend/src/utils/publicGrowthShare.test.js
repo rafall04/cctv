@@ -7,11 +7,23 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import { buildAreaShareText, buildAreaUrl, buildCameraShareText, buildCameraUrl, sharePublicText } from './publicGrowthShare';
+import {
+    buildAreaShareText,
+    buildAreaUrl,
+    buildCameraShareText,
+    buildCameraUrl,
+    getPublicAreaSlug,
+    sharePublicText,
+} from './publicGrowthShare';
 
 describe('publicGrowthShare', () => {
     it('builds stable area URLs', () => {
         expect(buildAreaUrl('kab-surabaya', 'https://cctv.raf.my.id')).toBe('https://cctv.raf.my.id/area/kab-surabaya');
+    });
+
+    it('normalizes public area names into route slugs', () => {
+        expect(getPublicAreaSlug({ area_name: 'KAB BOJONEGORO' })).toBe('kab-bojonegoro');
+        expect(getPublicAreaSlug({ area_slug: 'kab-surabaya', area_name: 'KAB SURABAYA' })).toBe('kab-surabaya');
     });
 
     it('builds branded area share text', () => {
