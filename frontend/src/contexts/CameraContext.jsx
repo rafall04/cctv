@@ -1,13 +1,13 @@
 /*
  * Purpose: Provide public camera and area data with resilient initial, background, and resume refresh behavior.
  * Caller: Public landing pages and camera-driven UI surfaces through CameraProvider/useCameras.
- * Deps: React context/hooks, streamService, areaService, request policy constants, device tier detector.
+ * Deps: React context/hooks, cameraService, areaService, request policy constants, device tier detector.
  * MainFuncs: CameraProvider, useCameras.
  * SideEffects: Fetches public camera/area data, schedules visible-tab refresh timers, listens for browser resume events.
  */
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { streamService } from '../services/streamService';
+import { cameraService } from '../services/cameraService';
 import { areaService } from '../services/areaService';
 import { REQUEST_POLICY } from '../services/requestPolicy';
 import { detectDeviceTier } from '../utils/deviceDetector';
@@ -51,7 +51,7 @@ export function CameraProvider({ children, autoRefresh = true }) {
 
         try {
             const [camsRes, areasRes] = await Promise.all([
-                streamService.getAllActiveStreams(
+                cameraService.getActiveCameras(
                     preserveExistingData ? REQUEST_POLICY.BACKGROUND : REQUEST_POLICY.BLOCKING,
                     requestConfig
                 ),
@@ -152,7 +152,7 @@ export function CameraProvider({ children, autoRefresh = true }) {
     useEffect(() => {
         if (!autoRefresh) return;
 
-        const refreshMs = deviceTier === 'low' ? 60000 : deviceTier === 'high' ? 15000 : 30000;
+        const refreshMs = deviceTier === 'low' ? 120000 : deviceTier === 'high' ? 30000 : 60000;
         const refreshInterval = setInterval(async () => {
             if (document.visibilityState === 'hidden') {
                 return;

@@ -7,6 +7,11 @@ SideEffects: Updates search params and localStorage layout preference.
 */
 
 import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
+import { detectDeviceTier, isMobileDevice } from '../../utils/deviceDetector';
+
+function shouldPreferLightPublicLanding() {
+    return isMobileDevice() || detectDeviceTier() === 'low';
+}
 
 function getInitialLayoutMode(searchParams) {
     const queryMode = searchParams.get('mode');
@@ -23,7 +28,7 @@ function getInitialLayoutMode(searchParams) {
         console.warn('Failed to read localStorage:', err);
     }
 
-    return 'full';
+    return shouldPreferLightPublicLanding() ? 'simple' : 'full';
 }
 
 function getInitialViewMode(searchParams) {
@@ -34,7 +39,11 @@ function getInitialViewMode(searchParams) {
         return queryMode;
     }
 
-    return ['map', 'grid', 'playback'].includes(queryView) ? queryView : 'map';
+    if (['map', 'grid', 'playback'].includes(queryView)) {
+        return queryView;
+    }
+
+    return shouldPreferLightPublicLanding() ? 'grid' : 'map';
 }
 
 export function useLandingModeState(searchParams, setSearchParams) {

@@ -115,4 +115,18 @@ describe('streamService camera response routing', () => {
             last_viewed_at: null,
         });
     });
+
+    it('does not expose private RTSP credentials in public stream responses', () => {
+        const response = streamService.buildCameraResponse({
+            id: 21,
+            name: 'Private Cam',
+            stream_key: 'camera21',
+            stream_source: 'internal',
+            delivery_type: 'internal_hls',
+            private_rtsp_url: 'rtsp://admin:secret@10.0.0.5/live',
+        });
+
+        expect(response).not.toHaveProperty('private_rtsp_url');
+        expect(JSON.stringify(response)).not.toContain('rtsp://admin:secret');
+    });
 });

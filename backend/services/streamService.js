@@ -29,9 +29,10 @@ class StreamService {
         const capabilities = getStreamCapabilities(deliveryType);
         const isExternalHls = deliveryType === 'external_hls';
         const availability = cameraHealthService.enrichCameraAvailability(camera);
+        const { private_rtsp_url, ...publicAvailability } = availability;
 
         return {
-            ...availability,
+            ...publicAvailability,
             delivery_type: deliveryType,
             stream_capabilities: capabilities,
             streams: isExternalHls

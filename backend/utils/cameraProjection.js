@@ -1,3 +1,11 @@
+/*
+ * Purpose: Define shared sanitized camera SELECT projections for public stream read models.
+ * Caller: Backend streamService public stream endpoints.
+ * Deps: cameras and areas table schemas.
+ * MainFuncs: SHARED_CAMERA_STREAM_PROJECTION, SHARED_CAMERA_STREAM_WITH_AREA_PROJECTION.
+ * SideEffects: None; SQL projection constants only.
+ */
+
 export const SHARED_CAMERA_STREAM_PROJECTION = `
     c.id,
     c.name,
@@ -20,7 +28,6 @@ export const SHARED_CAMERA_STREAM_PROJECTION = `
     c.internal_on_demand_close_after_seconds_override,
     c.source_profile,
     c.stream_key,
-    c.private_rtsp_url,
     c.video_codec,
     c.thumbnail_path,
     c.thumbnail_updated_at,

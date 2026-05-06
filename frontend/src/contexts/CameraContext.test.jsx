@@ -3,7 +3,7 @@
 /*
  * Purpose: Validate public camera context refresh behavior across resume and network recovery flows.
  * Caller: Frontend Vitest suite for public camera data regressions.
- * Deps: React Testing Library, CameraContext, mocked stream/area services, mocked device tier.
+ * Deps: React Testing Library, CameraContext, mocked camera/area services, mocked device tier.
  * MainFuncs: CameraProvider and useCameras integration tests.
  * SideEffects: Renders jsdom providers and dispatches browser focus/online events.
  */
@@ -12,17 +12,17 @@ import { render, screen, waitFor, act } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CameraProvider, useCameras } from './CameraContext';
 
-const { getAllActiveStreams } = vi.hoisted(() => ({
-    getAllActiveStreams: vi.fn(),
+const { getActiveCameras } = vi.hoisted(() => ({
+    getActiveCameras: vi.fn(),
 }));
 
 const { getPublicAreas } = vi.hoisted(() => ({
     getPublicAreas: vi.fn(),
 }));
 
-vi.mock('../services/streamService', () => ({
-    streamService: {
-        getAllActiveStreams,
+vi.mock('../services/cameraService', () => ({
+    cameraService: {
+        getActiveCameras,
     },
 }));
 
@@ -33,7 +33,7 @@ vi.mock('../services/areaService', () => ({
 }));
 
 vi.mock('../utils/deviceDetector', () => ({
-    detectDeviceTier: () => 'mid',
+    detectDeviceTier: () => 'medium',
 }));
 
 function CameraConsumer() {
@@ -55,7 +55,7 @@ function CameraConsumer() {
 describe('CameraContext', () => {
     beforeEach(() => {
         vi.useRealTimers();
-        getAllActiveStreams.mockReset();
+        getActiveCameras.mockReset();
         getPublicAreas.mockReset();
         getPublicAreas.mockResolvedValue({ success: true, data: [{ id: 1, name: 'Area 1' }] });
     });
@@ -70,7 +70,7 @@ describe('CameraContext', () => {
 
     it('mempertahankan data lama saat refresh resume gagal', async () => {
         const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-        getAllActiveStreams
+        getActiveCameras
             .mockResolvedValueOnce({ success: true, data: [{ id: 1, name: 'Cam 1' }] })
             .mockRejectedValue(new Error('network down'));
 
@@ -94,7 +94,7 @@ describe('CameraContext', () => {
             expect(screen.getByTestId('initial-error').textContent).toBe('no');
         }, { timeout: 4000 });
 
-        expect(getAllActiveStreams).toHaveBeenLastCalledWith(
+        expect(getActiveCameras).toHaveBeenLastCalledWith(
             'background',
             expect.objectContaining({ skipGlobalErrorNotification: true })
         );
@@ -110,7 +110,7 @@ describe('CameraContext', () => {
     });
 
     it('merefresh data saat browser kembali online', async () => {
-        getAllActiveStreams
+        getActiveCameras
             .mockResolvedValueOnce({ success: true, data: [{ id: 1, name: 'Cam 1' }] })
             .mockResolvedValue({ success: true, data: [{ id: 1, name: 'Cam 1' }, { id: 2, name: 'Cam 2' }] });
 
@@ -136,7 +136,7 @@ describe('CameraContext', () => {
 
     it('tidak menjalankan background refresh periodik saat tab publik sedang hidden', async () => {
         vi.useFakeTimers();
-        getAllActiveStreams.mockResolvedValue({ success: true, data: [{ id: 1, name: 'Cam 1' }] });
+        getActiveCameras.mockResolvedValue({ success: true, data: [{ id: 1, name: 'Cam 1' }] });
 
         render(
             <CameraProvider>
@@ -150,7 +150,7 @@ describe('CameraContext', () => {
         });
 
         expect(screen.getByTestId('camera-count').textContent).toBe('1');
-        expect(getAllActiveStreams).toHaveBeenCalledTimes(1);
+        expect(getActiveCameras).toHaveBeenCalledTimes(1);
 
         Object.defineProperty(document, 'visibilityState', {
             configurable: true,
@@ -158,11 +158,11 @@ describe('CameraContext', () => {
         });
 
         await act(async () => {
-            vi.advanceTimersByTime(30000);
+            vi.advanceTimersByTime(60000);
             await Promise.resolve();
         });
 
-        expect(getAllActiveStreams).toHaveBeenCalledTimes(1);
+        expect(getActiveCameras).toHaveBeenCalledTimes(1);
 
         Object.defineProperty(document, 'visibilityState', {
             configurable: true,
@@ -170,11 +170,11 @@ describe('CameraContext', () => {
         });
 
         await act(async () => {
-            vi.advanceTimersByTime(30000);
+            vi.advanceTimersByTime(60000);
             await Promise.resolve();
             await Promise.resolve();
         });
 
-        expect(getAllActiveStreams).toHaveBeenCalledTimes(2);
+        expect(getActiveCameras).toHaveBeenCalledTimes(2);
     });
 });

@@ -1,3 +1,11 @@
+/**
+ * Purpose: Register public and admin area routes for landing filters and area management.
+ * Caller: backend/server.js route bootstrap.
+ * Deps: areaController, authMiddleware, schema validators, cacheMiddleware.
+ * MainFuncs: areaRoutes.
+ * SideEffects: Adds Fastify routes and caches public area reads.
+ */
+
 import {
     getAllAreas,
     getAreaById,
@@ -14,10 +22,12 @@ import {
     updateAreaSchema,
     areaIdParamSchema,
 } from '../middleware/schemaValidators.js';
+import { cacheMiddleware } from '../middleware/cacheMiddleware.js';
 
 export default async function areaRoutes(fastify, options) {
     // Public endpoints - for landing page filter
     fastify.get('/public', {
+        preHandler: cacheMiddleware(30000),
         handler: getAllAreas,
     });
     

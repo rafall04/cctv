@@ -61,6 +61,32 @@ describe('cameraService read models', () => {
         });
     });
 
+    it('adds public viewer stats to landing read model without exposing private RTSP URLs', async () => {
+        const querySpy = vi.spyOn(connectionPool, 'query').mockReturnValue([
+            {
+                id: 2,
+                name: 'Cam B',
+                private_rtsp_url: 'rtsp://private',
+                live_viewers: 4,
+                total_views: 18,
+                total_watch_seconds: 240,
+                last_viewed_at: '2026-05-05 10:00:00',
+            },
+        ]);
+
+        const { default: cameraService } = await import('../services/cameraService.js');
+        const rows = cameraService.getPublicLandingCameraList();
+
+        expect(querySpy.mock.calls[0][0]).not.toContain('private_rtsp_url');
+        expect(rows[0]).not.toHaveProperty('private_rtsp_url');
+        expect(rows[0].viewer_stats).toEqual({
+            live_viewers: 4,
+            total_views: 18,
+            total_watch_seconds: 240,
+            last_viewed_at: '2026-05-05 10:00:00',
+        });
+    });
+
     it('loads camera detail with full config plus runtime state', async () => {
         const queryOneSpy = vi.spyOn(connectionPool, 'queryOne').mockReturnValue({
             id: 9,

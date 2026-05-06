@@ -196,6 +196,10 @@ const PUBLIC_LANDING_CAMERA_PROJECTION = `
             THEN a.external_health_mode_override
         ELSE 'default'
     END as area_external_health_mode_override,
+    COALESCE(active.viewer_count, 0) as live_viewers,
+    COALESCE(cvs.total_live_views, 0) as total_views,
+    COALESCE(cvs.total_watch_seconds, 0) as total_watch_seconds,
+    cvs.last_viewed_at,
     ${CAMERA_RUNTIME_STATE_PROJECTION}
 `;
 
@@ -333,6 +337,28 @@ function getNormalizedExternalStreamUrl(data = {}, deliveryType) {
     }
 
     return null;
+}
+
+function sanitizePublicLandingCamera(camera) {
+    const { private_rtsp_url, ...publicCamera } = camera;
+    const liveViewers = Number(publicCamera.live_viewers || 0);
+    const totalViews = Number(publicCamera.total_views || 0);
+    const totalWatchSeconds = Number(publicCamera.total_watch_seconds || 0);
+    const lastViewedAt = publicCamera.last_viewed_at || null;
+
+    return {
+        ...publicCamera,
+        live_viewers: liveViewers,
+        total_views: totalViews,
+        total_watch_seconds: totalWatchSeconds,
+        last_viewed_at: lastViewedAt,
+        viewer_stats: {
+            live_viewers: liveViewers,
+            total_views: totalViews,
+            total_watch_seconds: totalWatchSeconds,
+            last_viewed_at: lastViewedAt,
+        },
+    };
 }
 
 function validateDeliveryConfiguration({
@@ -1281,9 +1307,18 @@ class CameraService {
             FROM cameras c
             LEFT JOIN areas a ON c.area_id = a.id
             LEFT JOIN camera_runtime_state crs ON crs.camera_id = c.id
+            LEFT JOIN camera_view_stats cvs ON cvs.camera_id = c.id
+            LEFT JOIN (
+                SELECT camera_id, COUNT(*) AS viewer_count
+                FROM viewer_sessions
+                WHERE is_active = 1
+                GROUP BY camera_id
+            ) active ON active.camera_id = c.id
             WHERE c.enabled = 1
             ORDER BY c.is_tunnel ASC, c.id ASC
-        `)).map((camera) => cameraHealthService.enrichCameraAvailability(camera)), CAMERA_READ_MODEL_TTL_MS);
+        `))
+            .map(sanitizePublicLandingCamera)
+            .map((camera) => cameraHealthService.enrichCameraAvailability(camera)), CAMERA_READ_MODEL_TTL_MS);
     }
 
     getAdminCameraList() {
