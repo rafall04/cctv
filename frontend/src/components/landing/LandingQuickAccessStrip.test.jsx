@@ -36,4 +36,11 @@ describe('LandingQuickAccessStrip', () => {
         const { container } = render(<LandingQuickAccessStrip />);
         expect(container.textContent).toBe('');
     });
+
+    it('can render an empty favorite target for mobile dock users', () => {
+        render(<LandingQuickAccessStrip forceVisible favoriteCameras={[]} recentCameras={[]} />);
+
+        expect(screen.getByTestId('landing-quick-access')).toBeTruthy();
+        expect(screen.getByText(/Belum ada kamera favorit/i)).toBeTruthy();
+    });
 });

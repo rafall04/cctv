@@ -17,6 +17,7 @@ import LayoutModeToggle from './LayoutModeToggle';
 import LandingPublicTopStack from './LandingPublicTopStack';
 import LandingDiscoveryStrip from './LandingDiscoveryStrip';
 import LandingQuickAccessStrip from './LandingQuickAccessStrip';
+import LandingSmartFeed from './LandingSmartFeed';
 
 const FeedbackWidget = lazyWithRetry(() => import('../FeedbackWidget'), 'feedback-widget-inline');
 const SaweriaSupport = lazyWithRetry(() => import('../SaweriaSupport'), 'saweria-support-inline');
@@ -191,12 +192,13 @@ export default function LandingPageSimple({
     recentCameras = [],
     favoriteCameras = [],
     onQuickCameraOpen,
+    smartFeedCameras = [],
 }) {
     const { branding } = useBranding();
     const showFooterBanner = shouldRenderAdSlot(adsConfig, 'footerBanner', isAdsMobileViewport());
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
+        <div className="min-h-screen bg-gray-50 pb-24 dark:bg-gray-950 flex flex-col sm:pb-0">
             <SimpleHeader
                 branding={branding}
                 layoutMode={layoutMode}
@@ -219,10 +221,16 @@ export default function LandingPageSimple({
                 className="pt-2"
             />
 
+            <LandingSmartFeed
+                cameras={smartFeedCameras}
+                onCameraClick={onQuickCameraOpen || onCameraClick}
+            />
+
             <LandingQuickAccessStrip
                 recentCameras={recentCameras}
                 favoriteCameras={favoriteCameras}
                 onCameraClick={onQuickCameraOpen || onCameraClick}
+                forceVisible
             />
 
             <main className="flex-1 min-h-0 pb-4 sm:pb-6">

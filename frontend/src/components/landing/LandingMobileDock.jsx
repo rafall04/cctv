@@ -20,6 +20,7 @@ export default function LandingMobileDock({
     onHomeClick,
     onQuickAccessClick,
     quickAccessCount = 0,
+    favoriteCount = 0,
 }) {
     const handleClick = (key) => {
         if (key === 'home') {
@@ -38,7 +39,7 @@ export default function LandingMobileDock({
     return (
         <nav
             data-testid="landing-mobile-dock"
-            className="fixed inset-x-0 bottom-0 z-[1200] border-t border-gray-200 bg-white/95 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 shadow-[0_-12px_30px_rgba(15,23,42,0.14)] backdrop-blur-xl dark:border-gray-800 dark:bg-gray-950/95 sm:hidden"
+            className="fixed inset-x-3 bottom-3 z-[1200] rounded-2xl border border-gray-200 bg-white/95 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 shadow-[0_-12px_30px_rgba(15,23,42,0.16)] backdrop-blur-xl dark:border-gray-800 dark:bg-gray-950/95 sm:hidden"
             aria-label="Navigasi publik mobile"
         >
             <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
@@ -55,7 +56,12 @@ export default function LandingMobileDock({
                                     : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
                             }`}
                         >
-                            {item.label}
+                            <span>{item.label}</span>
+                            {item.key === 'quick' && favoriteCount > 0 && (
+                                <span className="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
+                                    {favoriteCount}
+                                </span>
+                            )}
                             {item.key === 'quick' && quickAccessCount > 0 && (
                                 <span className={`absolute right-1 top-1 h-1.5 w-1.5 rounded-full ${active ? 'bg-white' : 'bg-primary'}`} />
                             )}

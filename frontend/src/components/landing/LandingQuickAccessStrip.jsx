@@ -51,12 +51,21 @@ function QuickGroup({ title, label, cameras, onCameraClick }) {
     );
 }
 
+function EmptyFavoriteTarget() {
+    return (
+        <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+            Belum ada kamera favorit. Tekan tombol bintang pada kartu CCTV untuk menyimpan akses cepat.
+        </div>
+    );
+}
+
 export default function LandingQuickAccessStrip({
     recentCameras = [],
     favoriteCameras = [],
     onCameraClick,
+    forceVisible = false,
 }) {
-    if (!recentCameras.length && !favoriteCameras.length) {
+    if (!forceVisible && !recentCameras.length && !favoriteCameras.length) {
         return null;
     }
 
@@ -69,6 +78,7 @@ export default function LandingQuickAccessStrip({
                     cameras={favoriteCameras}
                     onCameraClick={onCameraClick}
                 />
+                {forceVisible && favoriteCameras.length === 0 && <EmptyFavoriteTarget />}
                 <QuickGroup
                     title="Terakhir Dilihat"
                     label="REC"

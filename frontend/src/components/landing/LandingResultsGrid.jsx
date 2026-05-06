@@ -1,3 +1,11 @@
+/*
+ * Purpose: Render public landing camera result cards for the active grid filter.
+ * Caller: LandingCamerasSection.
+ * Deps: LandingCameraCard and caller-provided camera action callbacks.
+ * MainFuncs: LandingResultsGrid.
+ * SideEffects: Invokes camera open, favorite, and multiview callbacks through child cards.
+ */
+
 import CameraCard from './LandingCameraCard';
 
 export default function LandingResultsGrid({

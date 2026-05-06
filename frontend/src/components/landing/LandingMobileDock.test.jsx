@@ -36,4 +36,20 @@ describe('LandingMobileDock', () => {
         expect(onQuickAccessClick).toHaveBeenCalledTimes(1);
         expect(onHomeClick).toHaveBeenCalledTimes(1);
     });
+
+    it('keeps the mobile dock above footer-safe content and exposes favorite count in the label', () => {
+        render(
+            <LandingMobileDock
+                viewMode="grid"
+                onViewModeChange={vi.fn()}
+                onHomeClick={vi.fn()}
+                onQuickAccessClick={vi.fn()}
+                quickAccessCount={3}
+                favoriteCount={2}
+            />
+        );
+
+        expect(screen.getByTestId('landing-mobile-dock').className).toContain('bottom-3');
+        expect(screen.getByRole('button', { name: /Favorit 2/i })).toBeTruthy();
+    });
 });

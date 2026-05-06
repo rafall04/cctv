@@ -1,3 +1,11 @@
+/*
+ * Purpose: Render public floating feedback form for visitors to submit criticism and suggestions.
+ * Caller: Public landing full/simple pages and other public support surfaces.
+ * Deps: React state and feedbackService API client.
+ * MainFuncs: FeedbackWidget.
+ * SideEffects: Submits feedback to backend and temporarily schedules success close timeout.
+ */
+
 import { useState } from 'react';
 import { feedbackService } from '../services/feedbackService';
 
@@ -73,7 +81,7 @@ export default function FeedbackWidget() {
             {/* Floating Button */}
             <button
                 onClick={() => setIsOpen(true)}
-                className={`fixed bottom-6 right-6 z-[99999] p-4 rounded-full shadow-2xl transition-all duration-300 ${
+                className={`fixed bottom-24 right-4 z-[99999] p-4 rounded-full shadow-2xl transition-all duration-300 sm:bottom-6 sm:right-6 ${
                     isOpen ? 'scale-0 opacity-0' : 'scale-100 opacity-100'
                 } bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white hover:scale-110`}
                 title="Kritik & Saran"
@@ -83,7 +91,7 @@ export default function FeedbackWidget() {
 
             {/* Widget Panel */}
             <div
-                className={`fixed bottom-6 right-6 z-[99999] w-80 sm:w-96 transition-all duration-300 ${
+                className={`fixed bottom-24 right-4 z-[99999] w-[calc(100vw-2rem)] max-w-80 transition-all duration-300 sm:bottom-6 sm:right-6 sm:w-96 sm:max-w-none ${
                     isOpen ? 'scale-100 opacity-100' : 'scale-0 opacity-0 pointer-events-none'
                 }`}
             >

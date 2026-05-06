@@ -13,6 +13,7 @@ import CameraThumbnail from '../CameraThumbnail';
 import CameraViewerStatsBadges from '../common/CameraViewerStatsBadges.jsx';
 import { shouldDisableAnimations } from '../../utils/animationControl';
 import { isCameraHardOffline, isCameraDegraded } from '../../utils/cameraAvailability.js';
+import { getPublicCameraQuality } from '../../utils/landingCameraInsights';
 
 const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMulti, isFavorite, onToggleFavorite }) {
     const isMaintenance = camera.status === 'maintenance';
@@ -21,6 +22,7 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
     const isTunnel = camera.is_tunnel === 1;
     const disableAnimations = shouldDisableAnimations();
     const isFav = isFavorite?.(camera.id);
+    const quality = getPublicCameraQuality(camera);
 
     const cardStyle = isMaintenance
         ? 'ring-red-500/50 hover:ring-red-500'
@@ -174,7 +176,12 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
                     </p>
                 )}
 
-                <CameraViewerStatsBadges camera={camera} className="mt-3" />
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className={`rounded-full border px-2 py-1 text-[10px] font-bold ${quality.className}`}>
+                        {quality.label}
+                    </span>
+                    <CameraViewerStatsBadges camera={camera} />
+                </div>
             </div>
         </div>
     );

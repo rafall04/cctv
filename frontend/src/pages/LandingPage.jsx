@@ -26,6 +26,7 @@ import LandingPublicTopStack from '../components/landing/LandingPublicTopStack';
 import LandingDiscoveryStrip from '../components/landing/LandingDiscoveryStrip';
 import LandingQuickAccessStrip from '../components/landing/LandingQuickAccessStrip';
 import LandingMobileDock from '../components/landing/LandingMobileDock';
+import LandingSmartFeed from '../components/landing/LandingSmartFeed';
 import MultiViewButton from '../components/MultiView/MultiViewButton';
 import InlineAdSlot from '../components/ads/InlineAdSlot';
 import GlobalAdScript from '../components/ads/GlobalAdScript';
@@ -121,6 +122,7 @@ function LandingPageContent() {
             .slice(0, 5)
     ), [cameras, recentCameras]);
     const quickAccessCount = favoriteCameras.length + recentCameraItems.length;
+    const favoriteCount = favoriteCameras.length;
 
     useEffect(() => {
         if (branding) {
@@ -189,8 +191,8 @@ function LandingPageContent() {
     }, []);
 
     const handleMobileQuickAccessClick = useCallback(() => {
-        scrollToElement(quickAccessCount > 0 ? 'public-quick-access' : 'public-discovery');
-    }, [quickAccessCount, scrollToElement]);
+        scrollToElement('public-quick-access');
+    }, [scrollToElement]);
 
     if (layoutMode === 'simple') {
         return (
@@ -222,6 +224,7 @@ function LandingPageContent() {
                         recentCameras={recentCameraItems}
                         favoriteCameras={favoriteCameras}
                         onQuickCameraOpen={handleGridPopupOpen}
+                        smartFeedCameras={cameras}
                     />
                 </Suspense>
 
@@ -238,6 +241,7 @@ function LandingPageContent() {
                         onHomeClick={handleMobileHomeClick}
                         onQuickAccessClick={handleMobileQuickAccessClick}
                         quickAccessCount={quickAccessCount}
+                        favoriteCount={favoriteCount}
                     />
                 )}
 
@@ -268,7 +272,7 @@ function LandingPageContent() {
     return (
         <div key="full-mode">
             {showSocialBar && <GlobalAdScript slotKey="social-bar" script={adsConfig.slots.socialBar.script} />}
-            <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
+            <div className="min-h-screen bg-gray-50 pb-24 dark:bg-gray-950 flex flex-col sm:pb-0">
                 <LandingNavbar branding={branding} layoutMode={layoutMode} onLayoutToggle={toggleLayoutMode} />
                 <LandingPublicTopStack
                     layoutMode="full"
@@ -290,10 +294,16 @@ function LandingPageContent() {
                     onCameraClick={handleGridPopupOpen}
                 />
 
+                <LandingSmartFeed
+                    cameras={cameras}
+                    onCameraClick={handleGridPopupOpen}
+                />
+
                 <LandingQuickAccessStrip
                     recentCameras={recentCameraItems}
                     favoriteCameras={favoriteCameras}
                     onCameraClick={handleGridPopupOpen}
+                    forceVisible
                 />
 
                 <LandingCamerasSection
@@ -358,6 +368,7 @@ function LandingPageContent() {
                         onHomeClick={handleMobileHomeClick}
                         onQuickAccessClick={handleMobileQuickAccessClick}
                         quickAccessCount={quickAccessCount}
+                        favoriteCount={favoriteCount}
                     />
                 )}
 
