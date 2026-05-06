@@ -9,6 +9,15 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import LandingSmartFeed from './LandingSmartFeed';
+import { buildPublicSmartFeedSections } from '../../utils/landingCameraInsights';
+
+vi.mock('../../utils/landingCameraInsights', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        buildPublicSmartFeedSections: vi.fn(actual.buildPublicSmartFeedSections),
+    };
+});
 
 describe('LandingSmartFeed', () => {
     it('renders smart camera sections and opens selected camera', () => {
@@ -60,5 +69,33 @@ describe('LandingSmartFeed', () => {
         expect(screen.queryByText('Kamera Terbaru')).toBeNull();
         const firstSection = screen.getByText('Sedang Ramai').closest('.min-w-0');
         expect(firstSection.textContent).not.toContain('Busy 4');
+    });
+
+    it('does not recompute smart sections when camera inputs are unchanged', () => {
+        buildPublicSmartFeedSections.mockClear();
+        const cameras = [
+            { id: 1, name: 'Stable 1', area_name: 'A', is_online: 1, live_viewers: 3, total_views: 30 },
+            { id: 2, name: 'Stable 2', area_name: 'B', is_online: 1, live_viewers: 0, total_views: 20 },
+        ];
+        const now = new Date('2026-05-06T12:00:00+07:00');
+        const { rerender } = render(
+            <LandingSmartFeed
+                cameras={cameras}
+                now={now}
+                onCameraClick={vi.fn()}
+            />
+        );
+
+        expect(buildPublicSmartFeedSections).toHaveBeenCalledTimes(1);
+
+        rerender(
+            <LandingSmartFeed
+                cameras={cameras}
+                now={now}
+                onCameraClick={vi.fn()}
+            />
+        );
+
+        expect(buildPublicSmartFeedSections).toHaveBeenCalledTimes(1);
     });
 });

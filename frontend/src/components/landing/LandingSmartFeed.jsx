@@ -1,14 +1,15 @@
 /*
  * Purpose: Render compact public discovery feed sections derived from live camera quality and viewer activity, with a tighter simple-mode variant.
  * Caller: LandingPage and LandingPageSimple public surfaces.
- * Deps: landingCameraInsights utility and caller-provided camera click handler.
+ * Deps: React memo hooks, landingCameraInsights utility, and caller-provided camera click handler.
  * MainFuncs: LandingSmartFeed.
  * SideEffects: Invokes caller-provided camera click handler.
  */
 
+import { memo, useMemo } from 'react';
 import { buildPublicSmartFeedSections, getPublicCameraQuality } from '../../utils/landingCameraInsights';
 
-function SmartFeedCameraButton({ camera, onCameraClick, now, variant = 'default' }) {
+const SmartFeedCameraButton = memo(function SmartFeedCameraButton({ camera, onCameraClick, now, variant = 'default' }) {
     const quality = getPublicCameraQuality(camera, now);
     const areaLabel = camera.area_name || camera.location || 'Area publik';
     const liveViewers = Number(camera.live_viewers || camera.viewer_stats?.live_viewers || 0);
@@ -38,7 +39,7 @@ function SmartFeedCameraButton({ camera, onCameraClick, now, variant = 'default'
             </div>
         </button>
     );
-}
+});
 
 export default function LandingSmartFeed({
     cameras = [],
@@ -47,25 +48,31 @@ export default function LandingSmartFeed({
     variant = 'default',
 }) {
     const isSimple = variant === 'simple';
-    const baseSections = buildPublicSmartFeedSections(cameras, now, isSimple ? 3 : 6);
-    const simpleSections = ['busy', 'top', 'recommended']
-        .map((key) => {
-            const existingSection = baseSections.find((section) => section.key === key);
-            if (existingSection) {
-                return existingSection;
-            }
+    const sections = useMemo(() => {
+        const baseSections = buildPublicSmartFeedSections(cameras, now, isSimple ? 3 : 6);
 
-            if (key === 'recommended') {
-                const fallbackSection = baseSections.find((section) => section.key === 'top' || section.key === 'busy');
-                return fallbackSection
-                    ? { key: 'recommended', title: 'Rekomendasi Hari Ini', cameras: fallbackSection.cameras.slice(0, 3) }
-                    : null;
-            }
+        if (!isSimple) {
+            return baseSections;
+        }
 
-            return null;
-        })
-        .filter(Boolean);
-    const sections = isSimple ? simpleSections : baseSections;
+        return ['busy', 'top', 'recommended']
+            .map((key) => {
+                const existingSection = baseSections.find((section) => section.key === key);
+                if (existingSection) {
+                    return existingSection;
+                }
+
+                if (key === 'recommended') {
+                    const fallbackSection = baseSections.find((section) => section.key === 'top' || section.key === 'busy');
+                    return fallbackSection
+                        ? { key: 'recommended', title: 'Rekomendasi Hari Ini', cameras: fallbackSection.cameras.slice(0, 3) }
+                        : null;
+                }
+
+                return null;
+            })
+            .filter(Boolean);
+    }, [cameras, isSimple, now]);
 
     if (sections.length === 0) {
         return null;

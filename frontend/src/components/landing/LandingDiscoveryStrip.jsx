@@ -1,12 +1,12 @@
 /*
  * Purpose: Render compact mobile-safe public discovery tabs with capped active lists shared by full and simple public landing modes.
  * Caller: LandingPage and LandingPageSimple.
- * Deps: React state/effects, React Router Link, sanitized public discovery payloads.
+ * Deps: React state/memo hooks, React Router Link, sanitized public discovery payloads.
  * MainFuncs: LandingDiscoveryStrip, DiscoveryCameraButton, DiscoveryAreaLink.
  * SideEffects: Invokes caller-provided camera click handlers.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 function formatCount(value) {
@@ -115,17 +115,6 @@ export default function LandingDiscoveryStrip({
     const activeSection = sections.find((section) => section.key === activeKey) || sections[0];
     const activeItems = activeSection?.items.slice(0, maxItemsPerSection) || [];
     const hiddenItemCount = Math.max((activeSection?.items.length || 0) - activeItems.length, 0);
-
-    useEffect(() => {
-        if (!sections.length) {
-            setActiveKey('');
-            return;
-        }
-
-        if (!sections.some((section) => section.key === activeKey)) {
-            setActiveKey(sections[0].key);
-        }
-    }, [activeKey, sections]);
 
     if (loading) {
         return <DiscoverySkeleton />;

@@ -1,13 +1,43 @@
 /*
  * Purpose: Render public landing camera result cards progressively for the active grid filter.
  * Caller: LandingCamerasSection.
- * Deps: React hooks, LandingCameraCard, and caller-provided camera action callbacks.
- * MainFuncs: LandingResultsGrid.
+ * Deps: React memo/callback hooks, LandingCameraCard, and caller-provided camera action callbacks.
+ * MainFuncs: LandingResultsGrid, LandingGridCameraCard.
  * SideEffects: Invokes camera open, favorite, and multiview callbacks through child cards.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import CameraCard from './LandingCameraCard';
+
+const LandingGridCameraCard = memo(function LandingGridCameraCard({
+    camera,
+    onCameraClick,
+    onAddMulti,
+    isInMulti,
+    isFavorite,
+    onToggleFavorite,
+    thumbnailPriority,
+}) {
+    const handleCameraClick = useCallback(() => {
+        onCameraClick(camera);
+    }, [camera, onCameraClick]);
+
+    const handleAddMulti = useCallback(() => {
+        onAddMulti(camera);
+    }, [camera, onAddMulti]);
+
+    return (
+        <CameraCard
+            camera={camera}
+            onClick={handleCameraClick}
+            onAddMulti={handleAddMulti}
+            inMulti={isInMulti}
+            isFavorite={isFavorite}
+            onToggleFavorite={onToggleFavorite}
+            thumbnailPriority={thumbnailPriority}
+        />
+    );
+});
 
 export default function LandingResultsGrid({
     cameras,
@@ -22,7 +52,7 @@ export default function LandingResultsGrid({
 }) {
     const [visibleCount, setVisibleCount] = useState(initialVisibleCount);
     const multiCameraIds = useMemo(() => new Set(multiCameras.map((camera) => camera.id)), [multiCameras]);
-    const visibleCameras = cameras.slice(0, visibleCount);
+    const visibleCameras = useMemo(() => cameras.slice(0, visibleCount), [cameras, visibleCount]);
     const hiddenCount = Math.max(cameras.length - visibleCameras.length, 0);
     const nextLoadCount = Math.min(loadMoreCount, hiddenCount);
 
@@ -34,12 +64,12 @@ export default function LandingResultsGrid({
         <>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
                 {visibleCameras.map((camera, index) => (
-                    <CameraCard
+                    <LandingGridCameraCard
                         key={camera.id ?? `grid-${index}`}
                         camera={camera}
-                        onClick={() => onCameraClick(camera)}
-                        onAddMulti={() => onAddMulti(camera)}
-                        inMulti={multiCameraIds.has(camera.id)}
+                        onCameraClick={onCameraClick}
+                        onAddMulti={onAddMulti}
+                        isInMulti={multiCameraIds.has(camera.id)}
                         isFavorite={isFavorite}
                         onToggleFavorite={onToggleFavorite}
                         thumbnailPriority={index < priorityThumbnailCount}

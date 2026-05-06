@@ -8,16 +8,24 @@
  * SideEffects: None.
  */
 
+import { memo } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import LandingResultsGrid from './LandingResultsGrid';
 
+const { cameraCardRenderSpy } = vi.hoisted(() => ({
+    cameraCardRenderSpy: vi.fn(),
+}));
+
 vi.mock('./LandingCameraCard', () => ({
-    default: ({ camera, thumbnailPriority }) => (
-        <div data-testid="camera-card" data-priority={thumbnailPriority ? 'true' : 'false'}>
-            {camera.name}
-        </div>
-    ),
+    default: memo(function MockLandingCameraCard({ camera, thumbnailPriority }) {
+        cameraCardRenderSpy(camera.id);
+        return (
+            <div data-testid="camera-card" data-priority={thumbnailPriority ? 'true' : 'false'}>
+                {camera.name}
+            </div>
+        );
+    }),
 }));
 
 function makeCameras(count) {
@@ -65,5 +73,35 @@ describe('LandingResultsGrid optimization', () => {
         const cards = screen.getAllByTestId('camera-card');
         expect(cards.slice(0, 3).every((card) => card.dataset.priority === 'true')).toBe(true);
         expect(cards.slice(3).every((card) => card.dataset.priority === 'false')).toBe(true);
+    });
+
+    it('keeps visible camera card props stable when parent rerenders with same camera data', () => {
+        cameraCardRenderSpy.mockClear();
+        const cameras = makeCameras(2);
+        const onCameraClick = vi.fn();
+        const onAddMulti = vi.fn();
+        const { rerender } = render(
+            <LandingResultsGrid
+                cameras={cameras}
+                initialVisibleCount={2}
+                onCameraClick={onCameraClick}
+                onAddMulti={onAddMulti}
+                multiCameras={[cameras[0]]}
+            />
+        );
+
+        expect(cameraCardRenderSpy).toHaveBeenCalledTimes(2);
+
+        rerender(
+            <LandingResultsGrid
+                cameras={cameras}
+                initialVisibleCount={2}
+                onCameraClick={onCameraClick}
+                onAddMulti={onAddMulti}
+                multiCameras={[cameras[0]]}
+            />
+        );
+
+        expect(cameraCardRenderSpy).toHaveBeenCalledTimes(2);
     });
 });
