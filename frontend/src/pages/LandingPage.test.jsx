@@ -1,3 +1,10 @@
+/*
+ * Purpose: Regression tests for public landing connectivity, settings, and popup recovery behavior.
+ * Caller: Frontend Vitest suites for landing page flows.
+ * Deps: React Testing Library, Vitest, LandingPage, mocked public services and UI components.
+ * MainFuncs: Verifies recovery UI, public settings hydration, and map popup props.
+ * SideEffects: Mocks runtime config, services, and child components during test execution.
+ */
 // @vitest-environment jsdom
 
 import { screen, waitFor, act } from '@testing-library/react';
@@ -39,12 +46,19 @@ vi.mock('../utils/connectionTester', () => ({
 
 vi.mock('../config/config.js', () => ({
     getApiUrl: () => 'https://api.example.com',
+    getApiKey: () => '',
 }));
 
 vi.mock('../services/settingsService', () => ({
     settingsService: {
         getPublicLandingPageSettings,
         getPublicAdsSettings,
+    },
+}));
+
+vi.mock('../services/publicGrowthService', () => ({
+    default: {
+        getTrendingCameras: vi.fn().mockResolvedValue({ success: true, data: [] }),
     },
 }));
 

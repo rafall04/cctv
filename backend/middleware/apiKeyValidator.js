@@ -1,11 +1,9 @@
 /**
- * API Key Validation Middleware
- * 
- * Validates X-API-Key header on incoming requests.
- * Rejects requests with missing or invalid keys with 403 Forbidden.
- * Logs validation failures for security monitoring.
- * 
- * Requirements: 1.1, 1.2, 1.3
+ * Purpose: API key validation middleware for private/admin-facing API requests.
+ * Caller: backend/server.js security middleware registration and focused middleware tests.
+ * Deps: apiKeyService.js, securityAuditLogger.js.
+ * MainFuncs: isPublicEndpoint, extractApiKey, apiKeyValidatorMiddleware, validateApiKeyMiddleware.
+ * SideEffects: Rejects protected requests without valid API keys and logs validation failures.
  */
 
 import { validateApiKey, API_KEY_CONFIG, hasActiveApiKeys } from '../services/apiKeyService.js';
@@ -29,6 +27,7 @@ export const API_KEY_VALIDATOR_CONFIG = {
     ],
     // Endpoint prefixes that don't require API key validation
     publicPrefixes: [
+        '/api/public/',
         '/api/stream/',
         '/hls/'                 // HLS proxy - public streaming endpoint
     ],

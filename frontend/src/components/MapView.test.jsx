@@ -304,6 +304,7 @@ describe('MapView area filter visibility', () => {
             is_online: 1,
             status: 'active',
             is_tunnel: 0,
+            streams: { hls: 'https://example.com/lobby.m3u8' },
         },
         {
             id: 2,
@@ -314,6 +315,7 @@ describe('MapView area filter visibility', () => {
             is_online: 1,
             status: 'active',
             is_tunnel: 0,
+            streams: { hls: 'https://example.com/kantor.m3u8' },
         },
     ];
 
@@ -486,7 +488,7 @@ describe('MapView area filter visibility', () => {
         fireEvent.click(screen.getByTestId('marker--7.1507-111.8815'));
 
         await waitFor(() => {
-            expect(startSessionMock).toHaveBeenCalledWith(1);
+            expect(screen.getByTestId('map-popup-modal')).toBeTruthy();
         });
 
         fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Baureno' } });
@@ -511,7 +513,7 @@ describe('MapView area filter visibility', () => {
         fireEvent.click(screen.getByTestId('marker--7.1507-111.8815'));
 
         await waitFor(() => {
-            expect(startSessionMock).toHaveBeenCalledWith(1);
+            expect(screen.getByTestId('map-popup-modal')).toBeTruthy();
         });
 
         rerender(<MapView cameras={areaCameras} areas={areas} showAreaFilter selectedArea="Baureno" />);
