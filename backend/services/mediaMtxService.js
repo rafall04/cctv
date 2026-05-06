@@ -2,7 +2,7 @@
 Purpose: Keep MediaMTX path configuration synchronized with enabled internal CCTV cameras.
 Caller: Backend startup, MediaMTX health timer, camera service path repair, and health checks.
 Deps: axios MediaMTX API client, connectionPool camera reads, config, internal ingest policy resolver.
-MainFuncs: MediaMtxService, healthCheck(), getDatabaseCameras(), updateCameraPath(), syncCameras(), syncAreaCameras().
+MainFuncs: MediaMtxService, healthCheck(), getDatabaseCameras(), buildInternalPathConfig(), updateCameraPath(), syncCameras(), syncAreaCameras().
 SideEffects: Reads camera/area DB rows and creates, patches, or deletes MediaMTX path configuration.
 */
 
@@ -74,11 +74,37 @@ class MediaMtxService {
         const resolvedTransport = resolveInternalRtspTransport(camera, camera._areaPolicy || null);
         return {
             source: camera.rtsp_url,
-            sourceProtocol: toMediaMtxSourceProtocol(resolvedTransport),
+            rtspTransport: toMediaMtxSourceProtocol(resolvedTransport),
             sourceOnDemand: resolvedPolicy.mode !== 'always_on',
             sourceOnDemandStartTimeout: '10s',
             sourceOnDemandCloseAfter: `${resolvedPolicy.closeAfterSeconds || 30}s`,
         };
+    }
+
+    buildLegacyInternalPathConfig(pathConfig) {
+        const { rtspTransport, ...legacyPathConfig } = pathConfig;
+        return {
+            ...legacyPathConfig,
+            sourceProtocol: rtspTransport,
+        };
+    }
+
+    async writePathConfig(method, pathName, pathConfig) {
+        const endpointAction = method === 'post' ? 'add' : 'patch';
+        const endpoint = `/config/paths/${endpointAction}/${pathName}`;
+        const request = method === 'post' ? mtxApi.post : mtxApi.patch;
+
+        try {
+            await request(endpoint, pathConfig);
+            return { usedLegacyPayload: false };
+        } catch (error) {
+            if (error?.response?.status !== 400 || !Object.prototype.hasOwnProperty.call(pathConfig, 'rtspTransport')) {
+                throw error;
+            }
+
+            await request(endpoint, this.buildLegacyInternalPathConfig(pathConfig));
+            return { usedLegacyPayload: true };
+        }
     }
 
     pathConfigNeedsUpdate(currentConfig, desiredConfig) {
@@ -86,8 +112,11 @@ class MediaMtxService {
             return true;
         }
 
+        const currentTransport = currentConfig.rtspTransport ?? currentConfig.sourceProtocol;
+        const desiredTransport = desiredConfig.rtspTransport ?? desiredConfig.sourceProtocol;
+
         return currentConfig.source !== desiredConfig.source
-            || currentConfig.sourceProtocol !== desiredConfig.sourceProtocol
+            || currentTransport !== desiredTransport
             || Boolean(currentConfig.sourceOnDemand) !== Boolean(desiredConfig.sourceOnDemand)
             || currentConfig.sourceOnDemandStartTimeout !== desiredConfig.sourceOnDemandStartTimeout
             || currentConfig.sourceOnDemandCloseAfter !== desiredConfig.sourceOnDemandCloseAfter;
@@ -310,11 +339,11 @@ class MediaMtxService {
 
             if (exists) {
                 // Path exists, update it
-                await mtxApi.patch(`/config/paths/patch/${pathName}`, pathConfig);
+                await this.writePathConfig('patch', pathName, pathConfig);
                 return { success: true, action: 'updated' };
             } else {
                 // Path doesn't exist, add it
-                await mtxApi.post(`/config/paths/add/${pathName}`, pathConfig);
+                await this.writePathConfig('post', pathName, pathConfig);
                 return { success: true, action: 'added' };
             }
         } catch (error) {
@@ -399,14 +428,14 @@ class MediaMtxService {
 
             try {
                 if (!configuredPathsSet.has(camera.path_name)) {
-                    await mtxApi.post(`/config/paths/add/${camera.path_name}`, pathConfig);
+                    await this.writePathConfig('post', camera.path_name, pathConfig);
                     console.log(`[MediaMTX] Added path: ${camera.path_name}`);
                     added++;
                 } else {
                     // Always check for config drift (e.g. timeout changes)
                     const currentConfig = await this.getPathConfig(camera.path_name);
                     if (this.pathConfigNeedsUpdate(currentConfig, pathConfig)) {
-                        await mtxApi.patch(`/config/paths/patch/${camera.path_name}`, pathConfig);
+                        await this.writePathConfig('patch', camera.path_name, pathConfig);
                         console.log(`[MediaMTX] Updated path: ${camera.path_name}`);
                         updated++;
                     }
@@ -499,11 +528,11 @@ class MediaMtxService {
                     return { success: true, action: 'unchanged' };
                 }
 
-                await mtxApi.patch(`/config/paths/patch/${pathName}`, pathConfig);
+                await this.writePathConfig('patch', pathName, pathConfig);
                 console.log(`[MediaMTX] Updated path: ${pathName}`);
                 return { success: true, action: 'updated' };
             } else {
-                await mtxApi.post(`/config/paths/add/${pathName}`, pathConfig);
+                await this.writePathConfig('post', pathName, pathConfig);
                 console.log(`[MediaMTX] Added path: ${pathName}`);
                 return { success: true, action: 'added' };
             }

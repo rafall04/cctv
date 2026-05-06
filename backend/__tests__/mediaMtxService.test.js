@@ -56,7 +56,7 @@ describe('mediaMtxService on-demand path sync', () => {
             data: {
                 name: 'stream-1',
                 source: 'rtsp://admin:pass@36.66.208.98:554/live',
-                sourceProtocol: 'tcp',
+                rtspTransport: 'tcp',
                 sourceOnDemand: false,
                 sourceOnDemandStartTimeout: '10s',
                 sourceOnDemandCloseAfter: '0s',
@@ -74,9 +74,11 @@ describe('mediaMtxService on-demand path sync', () => {
 
         expect(result).toEqual({ success: true, action: 'updated' });
         expect(patchMock).toHaveBeenCalledWith('/config/paths/patch/stream-1', expect.objectContaining({
+            rtspTransport: 'tcp',
             sourceOnDemand: true,
             sourceOnDemandCloseAfter: '30s',
         }));
+        expect(patchMock.mock.calls[0][1]).not.toHaveProperty('sourceProtocol');
     });
 
     it('qualifies joined camera columns when reading database cameras', async () => {
@@ -152,7 +154,7 @@ describe('mediaMtxService on-demand path sync', () => {
 
         expect(result).toEqual({ updated: 1 });
         expect(patchMock).toHaveBeenCalledWith('/config/paths/patch/camera2', expect.objectContaining({
-            sourceProtocol: 'udp',
+            rtspTransport: 'udp',
         }));
         expect(patchMock).toHaveBeenCalledTimes(1);
     });
@@ -175,11 +177,12 @@ describe('mediaMtxService on-demand path sync', () => {
 
         expect(pathConfig).toMatchObject({
             source: 'rtsp://local-camera/stream',
-            sourceProtocol: 'tcp',
+            rtspTransport: 'tcp',
             sourceOnDemand: false,
             sourceOnDemandStartTimeout: '10s',
             sourceOnDemandCloseAfter: '30s',
         });
+        expect(pathConfig).not.toHaveProperty('sourceProtocol');
     });
 
     it('builds on-demand MediaMTX path config from area policy', async () => {
@@ -200,7 +203,7 @@ describe('mediaMtxService on-demand path sync', () => {
 
         expect(pathConfig).toMatchObject({
             source: 'rtsp://remote-camera/stream',
-            sourceProtocol: 'tcp',
+            rtspTransport: 'tcp',
             sourceOnDemand: true,
             sourceOnDemandStartTimeout: '10s',
             sourceOnDemandCloseAfter: '45s',
@@ -227,7 +230,7 @@ describe('mediaMtxService on-demand path sync', () => {
 
         expect(pathConfig).toMatchObject({
             source: 'rtsp://udp-only-camera/stream',
-            sourceProtocol: 'udp',
+            rtspTransport: 'udp',
         });
     });
 
@@ -251,7 +254,63 @@ describe('mediaMtxService on-demand path sync', () => {
 
         expect(pathConfig).toMatchObject({
             source: 'rtsp://auto-camera/stream',
-            sourceProtocol: 'automatic',
+            rtspTransport: 'automatic',
         });
+    });
+
+    it('treats legacy sourceProtocol configs as equivalent when checking path drift', async () => {
+        const { default: mediaMtxService } = await import('../services/mediaMtxService.js');
+
+        expect(mediaMtxService.pathConfigNeedsUpdate(
+            {
+                source: 'rtsp://legacy-camera/stream',
+                sourceProtocol: 'tcp',
+                sourceOnDemand: true,
+                sourceOnDemandStartTimeout: '10s',
+                sourceOnDemandCloseAfter: '30s',
+            },
+            {
+                source: 'rtsp://legacy-camera/stream',
+                rtspTransport: 'tcp',
+                sourceOnDemand: true,
+                sourceOnDemandStartTimeout: '10s',
+                sourceOnDemandCloseAfter: '30s',
+            }
+        )).toBe(false);
+    });
+
+    it('falls back to legacy sourceProtocol payload only when MediaMTX rejects modern rtspTransport', async () => {
+        const { default: mediaMtxService } = await import('../services/mediaMtxService.js');
+        const badRequest = new Error('Request failed with status code 400');
+        badRequest.response = { status: 400 };
+
+        getMock.mockResolvedValueOnce({ data: { items: [{ name: 'stream-legacy' }] } });
+        getMock.mockResolvedValueOnce({
+            data: {
+                name: 'stream-legacy',
+                source: 'rtsp://admin:pass@10.0.0.10/live',
+                sourceProtocol: 'udp',
+                sourceOnDemand: false,
+                sourceOnDemandStartTimeout: '10s',
+                sourceOnDemandCloseAfter: '30s',
+            },
+        });
+        patchMock
+            .mockRejectedValueOnce(badRequest)
+            .mockResolvedValueOnce({});
+
+        const result = await mediaMtxService.updateCameraPath(
+            'stream-legacy',
+            'rtsp://admin:pass@10.0.0.10/live',
+            {
+                internal_rtsp_transport_override: 'tcp',
+            }
+        );
+
+        expect(result).toEqual({ success: true, action: 'updated' });
+        expect(patchMock.mock.calls[0][1]).toMatchObject({ rtspTransport: 'tcp' });
+        expect(patchMock.mock.calls[0][1]).not.toHaveProperty('sourceProtocol');
+        expect(patchMock.mock.calls[1][1]).toMatchObject({ sourceProtocol: 'tcp' });
+        expect(patchMock.mock.calls[1][1]).not.toHaveProperty('rtspTransport');
     });
 });
