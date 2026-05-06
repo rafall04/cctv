@@ -6,7 +6,7 @@
  * SideEffects: Mocks public growth API.
  */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -67,26 +67,50 @@ describe('AreaPublicPage', () => {
         document.title = 'RAF NET';
     });
 
-    it('renders area data and cameras', async () => {
+    it('renders area portal sections and cameras', async () => {
         getAreaMock.mockResolvedValue({
             success: true,
-            data: { name: 'KAB SURABAYA', slug: 'kab-surabaya', camera_count: 1, online_count: 1, total_views: 9 },
+            data: { name: 'KAB SURABAYA', slug: 'kab-surabaya', camera_count: 2, online_count: 1, total_views: 92 },
         });
         getAreaCamerasMock.mockResolvedValue({
             success: true,
-            data: [{ id: 1, name: 'CCTV A', area_name: 'KAB SURABAYA', total_views: 9 }],
+            data: [
+                {
+                    id: 1,
+                    name: 'CCTV A',
+                    area_name: 'KAB SURABAYA',
+                    total_views: 90,
+                    live_viewers: 5,
+                    created_at: '2026-05-06 08:00:00',
+                },
+                {
+                    id: 2,
+                    name: 'CCTV B',
+                    area_name: 'KAB SURABAYA',
+                    total_views: 2,
+                    live_viewers: 0,
+                    created_at: '2026-05-05 08:00:00',
+                },
+            ],
         });
         getTrendingCamerasMock.mockResolvedValue({
             success: true,
-            data: [{ id: 1, name: 'CCTV A', area_name: 'KAB SURABAYA', total_views: 9 }],
+            data: [{ id: 1, name: 'CCTV A', area_name: 'KAB SURABAYA', total_views: 90, live_viewers: 5 }],
         });
 
         renderPage();
 
         await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: /KAB SURABAYA/i })).toBeTruthy());
         expect(screen.getByRole('link', { name: /Kembali ke CCTV Publik/i }).getAttribute('href')).toBe('/');
-        expect(screen.getAllByText(/1 kamera/i).length).toBeGreaterThan(0);
+        expect(screen.getByRole('heading', { level: 2, name: /Status Area/i })).toBeTruthy();
+        expect(screen.getByRole('heading', { level: 2, name: /Sedang Ramai di KAB SURABAYA/i })).toBeTruthy();
+        expect(screen.getByRole('heading', { level: 2, name: /Top CCTV KAB SURABAYA/i })).toBeTruthy();
+        expect(screen.getByRole('heading', { level: 2, name: /Kamera Baru KAB SURABAYA/i })).toBeTruthy();
+        expect(screen.getByRole('heading', { level: 2, name: /Semua CCTV Area/i })).toBeTruthy();
+        expect(screen.getAllByText(/2 kamera/i).length).toBeGreaterThan(0);
+        expect(screen.getAllByText(/5 live/i).length).toBeGreaterThan(0);
         expect(screen.getAllByText(/CCTV A/i).length).toBeGreaterThan(0);
+        expect(screen.getAllByText(/CCTV B/i).length).toBeGreaterThan(0);
         expect(document.title).toBe('CCTV Online KAB SURABAYA - RAF NET');
     });
 
@@ -152,8 +176,9 @@ describe('AreaPublicPage', () => {
 
         renderPage();
 
-        await waitFor(() => expect(screen.getByRole('button', { name: /CCTV Area Raw/i })).toBeTruthy());
-        fireEvent.click(screen.getByRole('button', { name: /CCTV Area Raw/i }));
+        await waitFor(() => expect(screen.getByRole('heading', { level: 2, name: /Semua CCTV Area/i })).toBeTruthy());
+        const allCamerasSection = screen.getByRole('heading', { level: 2, name: /Semua CCTV Area/i }).closest('section');
+        fireEvent.click(within(allCamerasSection).getByRole('button', { name: /CCTV Area Raw/i }));
 
         await waitFor(() => {
             expect(getStreamUrlsMock).toHaveBeenCalledWith(8);

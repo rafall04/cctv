@@ -1,7 +1,7 @@
 /*
- * Purpose: Render public area-specific CCTV pages with standardized popup stream resolution, back navigation, trending, grid, and resilient share entry points.
+ * Purpose: Render public area-specific CCTV portal pages with area status, discovery sections, standardized popup stream resolution, and resilient share entry points.
  * Caller: App route /area/:areaSlug.
- * Deps: React Router, publicGrowthService, publicGrowthShare, landing components.
+ * Deps: React Router, CameraThumbnail, publicGrowthService, publicGrowthShare.
  * MainFuncs: AreaPublicPage.
  * SideEffects: Fetches public area/camera data and updates document metadata.
  */
@@ -9,7 +9,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import CameraThumbnail from '../components/CameraThumbnail';
-import LandingTrendingCameras from '../components/landing/LandingTrendingCameras';
 import { resolvePublicPopupCamera } from '../services/publicCameraResolver';
 import publicGrowthService from '../services/publicGrowthService';
 import { buildAreaShareText, sharePublicText } from '../utils/publicGrowthShare';
@@ -42,12 +41,95 @@ function formatCount(value) {
     return Number(value || 0).toLocaleString('id-ID');
 }
 
+function getCameraLiveViewers(camera) {
+    return Number(camera?.live_viewers || camera?.viewer_stats?.live_viewers || 0);
+}
+
+function getCameraTotalViews(camera) {
+    return Number(camera?.total_views || camera?.viewer_stats?.total_views || 0);
+}
+
 function AreaStat({ label, value }) {
     return (
         <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm dark:border-gray-800 dark:bg-gray-900">
             <div className="text-xl font-bold text-gray-900 dark:text-white">{formatCount(value)}</div>
             <div className="mt-1 text-xs font-medium text-gray-500 dark:text-gray-400">{label}</div>
         </div>
+    );
+}
+
+function AreaStatusPanel({ area, cameras, liveViewerCount }) {
+    const cameraCount = Number(area?.camera_count ?? cameras.length ?? 0);
+    const onlineCount = Number(area?.online_count ?? cameras.filter((camera) => camera.is_online === 1 || camera.is_online === true).length);
+    const onlinePercent = cameraCount > 0 ? Math.round((onlineCount / cameraCount) * 100) : 0;
+
+    return (
+        <section className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
+            <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Status Area</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Ringkasan kondisi kamera publik di area ini.
+                    </p>
+                </div>
+                <span className="text-xs font-semibold text-primary">{onlinePercent}% online</span>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <AreaStat label="Kamera Publik" value={cameraCount} />
+                <AreaStat label="Online" value={onlineCount} />
+                <AreaStat label="Live Sekarang" value={liveViewerCount} />
+                <AreaStat label="Total Ditonton" value={area?.total_views} />
+            </div>
+        </section>
+    );
+}
+
+function AreaCameraMiniCard({ camera, metricLabel, metricValue, onClick }) {
+    return (
+        <button
+            type="button"
+            onClick={() => onClick(camera)}
+            className="rounded-xl border border-gray-200 bg-white p-3 text-left shadow-sm transition hover:border-primary/60 hover:bg-primary/5 dark:border-gray-800 dark:bg-gray-900 dark:hover:bg-primary/10"
+        >
+            <div className="truncate text-sm font-semibold text-gray-900 dark:text-white">{camera.name}</div>
+            <div className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
+                {camera.location || camera.area_name || 'Lokasi publik'}
+            </div>
+            <div className="mt-2 text-xs font-semibold text-primary">
+                {formatCount(metricValue)} {metricLabel}
+            </div>
+        </button>
+    );
+}
+
+function AreaCameraSection({ title, description, cameras, metricLabel, metricValue, onCameraClick }) {
+    if (!cameras.length) {
+        return null;
+    }
+
+    return (
+        <section className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+            <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">{title}</h2>
+                    {description && (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">{description}</p>
+                    )}
+                </div>
+                <span className="text-xs text-gray-500 dark:text-gray-400">{cameras.length} kamera</span>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {cameras.map((camera) => (
+                    <AreaCameraMiniCard
+                        key={`${title}-${camera.id}`}
+                        camera={camera}
+                        metricLabel={metricLabel}
+                        metricValue={metricValue(camera)}
+                        onClick={onCameraClick}
+                    />
+                ))}
+            </div>
+        </section>
     );
 }
 
@@ -77,10 +159,10 @@ function AreaCameraCard({ camera, onClick }) {
                 </div>
                 <div className="mt-3 flex gap-2 text-[11px] font-semibold">
                     <span className="rounded-lg bg-emerald-50 px-2 py-1 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
-                        {formatCount(camera.live_viewers || camera.viewer_stats?.live_viewers)} live
+                        {formatCount(getCameraLiveViewers(camera))} live
                     </span>
                     <span className="rounded-lg bg-gray-100 px-2 py-1 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-                        {formatCount(camera.total_views || camera.viewer_stats?.total_views)} views
+                        {formatCount(getCameraTotalViews(camera))} views
                     </span>
                 </div>
             </div>
@@ -144,6 +226,21 @@ export default function AreaPublicPage() {
     }, [areaSlug]);
 
     const shareText = useMemo(() => (area ? buildAreaShareText(area) : ''), [area]);
+    const liveViewerCount = useMemo(() => (
+        cameras.reduce((total, camera) => total + getCameraLiveViewers(camera), 0)
+    ), [cameras]);
+    const liveCameras = useMemo(() => (
+        [...cameras]
+            .filter((camera) => getCameraLiveViewers(camera) > 0)
+            .sort((left, right) => getCameraLiveViewers(right) - getCameraLiveViewers(left))
+            .slice(0, 4)
+    ), [cameras]);
+    const topCameras = useMemo(() => {
+        const source = trendingCameras.length ? trendingCameras : cameras;
+        return [...source]
+            .sort((left, right) => getCameraTotalViews(right) - getCameraTotalViews(left))
+            .slice(0, 4);
+    }, [cameras, trendingCameras]);
     const newestCameras = useMemo(() => (
         [...cameras]
             .filter((camera) => camera.created_at)
@@ -275,26 +372,43 @@ export default function AreaPublicPage() {
                     <div className="mt-5 grid gap-3 sm:grid-cols-3">
                         <AreaStat label="Kamera Publik" value={area?.camera_count} />
                         <AreaStat label="Online" value={area?.online_count} />
-                        <AreaStat label="Total Ditonton" value={area?.total_views} />
+                        <AreaStat label="Live Sekarang" value={liveViewerCount} />
                     </div>
                 </div>
             </section>
 
-            <LandingTrendingCameras
-                cameras={trendingCameras}
-                title={`Top CCTV ${area?.name || ''}`.trim()}
+            <AreaStatusPanel area={area} cameras={cameras} liveViewerCount={liveViewerCount} />
+
+            <AreaCameraSection
+                cameras={liveCameras}
+                title={`Sedang Ramai di ${area?.name || ''}`.trim()}
+                description="Kamera dengan penonton aktif terbanyak saat ini."
+                metricLabel="live"
+                metricValue={getCameraLiveViewers}
                 onCameraClick={handleCameraOpen}
             />
 
-            <LandingTrendingCameras
+            <AreaCameraSection
+                cameras={topCameras}
+                title={`Top CCTV ${area?.name || ''}`.trim()}
+                description="Kamera yang paling banyak dibuka oleh pengunjung."
+                metricLabel="views"
+                metricValue={getCameraTotalViews}
+                onCameraClick={handleCameraOpen}
+            />
+
+            <AreaCameraSection
                 cameras={newestCameras}
-                title={`Kamera Terbaru ${area?.name || ''}`.trim()}
+                title={`Kamera Baru ${area?.name || ''}`.trim()}
+                description="Kamera publik terbaru yang sudah tersedia di area ini."
+                metricLabel="views"
+                metricValue={getCameraTotalViews}
                 onCameraClick={handleCameraOpen}
             />
 
             <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
                 <div className="mb-4 flex items-center justify-between gap-3">
-                    <h2 className="text-lg font-semibold">Daftar CCTV</h2>
+                    <h2 className="text-lg font-semibold">Semua CCTV Area</h2>
                     <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{cameras.length} kamera</span>
                 </div>
 
