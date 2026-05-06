@@ -1,5 +1,5 @@
 /*
- * Purpose: Render compact mobile-safe public discovery tabs shared by full and simple public landing modes.
+ * Purpose: Render compact mobile-safe public discovery tabs with capped active lists shared by full and simple public landing modes.
  * Caller: LandingPage and LandingPageSimple.
  * Deps: React state/effects, React Router Link, sanitized public discovery payloads.
  * MainFuncs: LandingDiscoveryStrip, DiscoveryCameraButton, DiscoveryAreaLink.
@@ -108,10 +108,13 @@ export default function LandingDiscoveryStrip({
     loading = false,
     onCameraClick,
     className = '',
+    maxItemsPerSection = 8,
 }) {
     const sections = useMemo(() => buildSections(discovery), [discovery]);
     const [activeKey, setActiveKey] = useState('');
     const activeSection = sections.find((section) => section.key === activeKey) || sections[0];
+    const activeItems = activeSection?.items.slice(0, maxItemsPerSection) || [];
+    const hiddenItemCount = Math.max((activeSection?.items.length || 0) - activeItems.length, 0);
 
     useEffect(() => {
         if (!sections.length) {
@@ -160,8 +163,14 @@ export default function LandingDiscoveryStrip({
                     })}
                 </div>
 
+                {hiddenItemCount > 0 && (
+                    <div className="px-1 pb-1 text-[11px] font-medium text-gray-500 dark:text-gray-400">
+                        Menampilkan {activeItems.length} dari {activeSection.items.length}
+                    </div>
+                )}
+
                 <div data-testid="landing-discovery-strip-list" className="flex min-w-0 max-w-full gap-2 overflow-x-auto pt-1 [-webkit-overflow-scrolling:touch]">
-                    {activeSection.items.map((item) => (
+                    {activeItems.map((item) => (
                         activeSection.type === 'area' ? (
                             <DiscoveryAreaLink key={`area-${item.id}`} area={item} />
                         ) : (

@@ -72,4 +72,26 @@ describe('LandingDiscoveryStrip', () => {
         expect(list.className).toContain('max-w-full');
         expect(firstCamera.className).toContain('w-[min(18rem,calc(100vw-4rem))]');
     });
+
+    it('limits active discovery items so the public landing stays light on mobile', () => {
+        const manyLiveItems = Array.from({ length: 12 }, (_, index) => ({
+            id: index + 10,
+            name: `CCTV Live ${index + 1}`,
+            area_name: 'Area A',
+            live_viewers: 12 - index,
+        }));
+
+        render(
+            <MemoryRouter>
+                <LandingDiscoveryStrip
+                    discovery={{ ...discovery, live_now: manyLiveItems }}
+                    maxItemsPerSection={6}
+                />
+            </MemoryRouter>
+        );
+
+        expect(screen.getByText('CCTV Live 6')).toBeTruthy();
+        expect(screen.queryByText('CCTV Live 7')).toBeNull();
+        expect(screen.getByText(/6 dari 12/i)).toBeTruthy();
+    });
 });

@@ -21,6 +21,22 @@ describe('CameraThumbnail', () => {
         expect(image.getAttribute('src')).toBe('/api/thumbnails/1.jpg');
     });
 
+    it('prioritizes above-the-fold public thumbnails when requested', () => {
+        render(
+            <CameraThumbnail
+                cameraId={1}
+                thumbnailPath="/api/thumbnails/1.jpg"
+                cameraName="Lobby"
+                priority={true}
+            />
+        );
+
+        const image = screen.getByAltText('Lobby preview');
+        expect(image.getAttribute('loading')).toBe('eager');
+        expect(image.getAttribute('fetchpriority')).toBe('high');
+        expect(image.getAttribute('decoding')).toBe('async');
+    });
+
     it('falls back to the offline icon when camera is offline even if a thumbnail path exists', () => {
         render(
             <CameraThumbnail

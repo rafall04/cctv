@@ -1,5 +1,5 @@
 /*
- * Purpose: Render a public landing camera card with thumbnail, status badges, viewer stats, and quick actions.
+ * Purpose: Render a public landing camera card with prioritized/lazy thumbnail, status badges, viewer stats, and quick actions.
  * Caller: Landing camera grids and public camera list views.
  * Deps: Icons, CodecBadge, CameraThumbnail, CameraViewerStatsBadges, animation and availability utilities.
  * MainFuncs: CameraCard.
@@ -15,7 +15,7 @@ import { shouldDisableAnimations } from '../../utils/animationControl';
 import { isCameraHardOffline, isCameraDegraded } from '../../utils/cameraAvailability.js';
 import { getPublicCameraQuality } from '../../utils/landingCameraInsights';
 
-const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMulti, isFavorite, onToggleFavorite }) {
+const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMulti, isFavorite, onToggleFavorite, thumbnailPriority = false }) {
     const isMaintenance = camera.status === 'maintenance';
     const isOffline = isCameraHardOffline(camera);
     const isDegraded = isCameraDegraded(camera);
@@ -79,6 +79,7 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
                     cameraName={camera.name}
                     isMaintenance={isMaintenance}
                     isOffline={isOffline}
+                    priority={thumbnailPriority}
                 />
 
                 {!isMaintenance && !isOffline && !disableAnimations && (

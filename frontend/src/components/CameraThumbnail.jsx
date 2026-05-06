@@ -1,21 +1,31 @@
 /*
-Purpose: Render a camera thumbnail or fallback camera status icon.
+Purpose: Render a camera thumbnail or fallback camera status icon with optional first-viewport priority loading.
 Caller: Public/admin camera cards and grids.
 Deps: React state and buildApiAssetUrl.
 MainFuncs: CameraThumbnail.
 SideEffects: Tracks thumbnail load failure in local component state.
 */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { buildApiAssetUrl } from '../config/config.js';
 
 export default function CameraThumbnail({ 
     thumbnailPath,
     cameraName,
     isMaintenance = false,
-    isOffline = false 
+    isOffline = false,
+    priority = false,
 }) {
     const [error, setError] = useState(false);
+    const imageRef = useRef(null);
+
+    useEffect(() => {
+        if (!imageRef.current) {
+            return;
+        }
+
+        imageRef.current.setAttribute('fetchpriority', priority ? 'high' : 'auto');
+    }, [priority]);
     
     // Fallback icon component
     const FallbackIcon = () => (
@@ -46,10 +56,12 @@ export default function CameraThumbnail({
     
     return (
         <img
+            ref={imageRef}
             src={thumbnailUrl}
             alt={`${cameraName} preview`}
             className="absolute inset-0 w-full h-full object-cover"
-            loading="lazy"
+            loading={priority ? 'eager' : 'lazy'}
+            decoding="async"
             onError={() => setError(true)}
         />
     );

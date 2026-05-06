@@ -37,7 +37,7 @@ vi.mock('./LandingPlaybackPanel', () => ({
 }));
 
 vi.mock('./LandingResultsGrid', () => ({
-    default: ({ cameras }) => <div>results-grid:{cameras.map((camera) => camera.name).join(',')}</div>,
+    default: ({ cameras, initialVisibleCount = cameras.length }) => <div>results-grid:{cameras.slice(0, initialVisibleCount).map((camera) => camera.name).join(',')}</div>,
 }));
 
 describe('LandingCamerasSection controls', () => {
