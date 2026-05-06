@@ -962,11 +962,12 @@ describe('Playback', () => {
             expect(screen.getByTestId('video-segment').textContent).toBe('seg-2');
         });
 
-        expect(screen.getByTestId('buffering-state').textContent).toBe('true');
-
         const video = screen.getByTestId('playback-video');
         await waitFor(() => {
             expect(video.getAttribute('src')).toBe('/stream/1/seg-2.mp4');
+        });
+        await waitFor(() => {
+            expect(screen.getByTestId('buffering-state').textContent).toBe('true');
         });
         await act(async () => {
             await Promise.resolve();

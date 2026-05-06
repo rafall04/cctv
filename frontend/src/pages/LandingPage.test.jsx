@@ -12,13 +12,14 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { renderWithRouter } from '../test/renderWithRouter';
 import LandingPage from './LandingPage';
 
-const { getPublicSaweriaConfig, testBackendReachability, updateMetaTags, getPublicLandingPageSettings, getPublicAdsSettings, getDiscovery, videoPopupPropsSpy, landingPageSimplePropsSpy } = vi.hoisted(() => ({
+const { getPublicSaweriaConfig, testBackendReachability, updateMetaTags, getPublicLandingPageSettings, getPublicAdsSettings, getDiscovery, preloadLandingMapView, videoPopupPropsSpy, landingPageSimplePropsSpy } = vi.hoisted(() => ({
     getPublicSaweriaConfig: vi.fn(),
     testBackendReachability: vi.fn(),
     updateMetaTags: vi.fn(),
     getPublicLandingPageSettings: vi.fn(),
     getPublicAdsSettings: vi.fn(),
     getDiscovery: vi.fn(),
+    preloadLandingMapView: vi.fn(),
     videoPopupPropsSpy: vi.fn(),
     landingPageSimplePropsSpy: vi.fn(),
 }));
@@ -62,6 +63,10 @@ vi.mock('../services/publicGrowthService', () => ({
         getDiscovery,
         getTrendingCameras: vi.fn().mockResolvedValue({ success: true, data: [] }),
     },
+}));
+
+vi.mock('../utils/preloadLandingMapView', () => ({
+    preloadLandingMapView,
 }));
 
 vi.mock('../contexts/CameraContext', () => ({
@@ -108,20 +113,22 @@ vi.mock('../components/landing/LandingHero', () => ({
 }));
 
 vi.mock('../components/landing/LandingCamerasSection', () => ({
-    default: ({ onMapCameraOpen }) => (
-        <button
-            type="button"
-            data-testid="open-map-popup"
-            onClick={() => onMapCameraOpen?.({
-                id: 99,
-                name: 'Map Camera',
-                streams: { hls: 'https://example.com/map.m3u8' },
-                status: 'active',
-                is_online: 1,
-            })}
-        >
-            cameras-section
-        </button>
+    default: ({ onMapCameraOpen, viewMode }) => (
+        <section id="camera-workspace" data-testid="camera-workspace" data-view-mode={viewMode}>
+            <button
+                type="button"
+                data-testid="open-map-popup"
+                onClick={() => onMapCameraOpen?.({
+                    id: 99,
+                    name: 'Map Camera',
+                    streams: { hls: 'https://example.com/map.m3u8' },
+                    status: 'active',
+                    is_online: 1,
+                })}
+            >
+                cameras-section
+            </button>
+        </section>
     ),
 }));
 
@@ -188,6 +195,7 @@ describe('LandingPage connectivity recovery', () => {
         getPublicLandingPageSettings.mockReset();
         getPublicAdsSettings.mockReset();
         getDiscovery.mockReset();
+        preloadLandingMapView.mockReset();
         videoPopupPropsSpy.mockReset();
         landingPageSimplePropsSpy.mockReset();
         testBackendReachability.mockResolvedValue({ reachable: true, latency: 80 });
@@ -255,6 +263,10 @@ describe('LandingPage connectivity recovery', () => {
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
             json: async () => ({ success: false }),
         }));
+        vi.stubGlobal('requestAnimationFrame', (callback) => {
+            callback();
+            return 1;
+        });
     });
 
     afterEach(() => {
@@ -429,6 +441,30 @@ describe('LandingPage connectivity recovery', () => {
                     }),
                 }),
             }),
+        }));
+    });
+
+    it('scrolls to the camera workspace and preloads map when mobile dock map is clicked', async () => {
+        const scrollTo = vi.fn();
+        vi.stubGlobal('scrollTo', scrollTo);
+
+        renderWithRouter(<LandingPage />, { initialEntries: ['/?mode=full&view=grid'] });
+
+        await waitFor(() => {
+            expect(screen.getByTestId('camera-workspace')).toBeTruthy();
+        });
+
+        await act(async () => {
+            screen.getByRole('button', { name: 'Map' }).click();
+        });
+
+        await waitFor(() => {
+            expect(screen.getByTestId('camera-workspace').dataset.viewMode).toBe('map');
+        });
+
+        expect(preloadLandingMapView).toHaveBeenCalled();
+        expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({
+            behavior: 'smooth',
         }));
     });
 

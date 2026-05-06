@@ -1,7 +1,7 @@
 /*
  * Purpose: Render public landing camera workspace with search, area filters, ranking tabs, grid/map/playback modes, and empty states.
  * Caller: LandingPage and LandingPageSimple.
- * Deps: Camera context, public filter hook, landing toolbar/filter/grid/map/playback components.
+ * Deps: Camera context, public filter hook, map preloader, landing toolbar/filter/grid/map/playback components.
  * MainFuncs: CamerasSection, renderSearchDropdown.
  * SideEffects: Invokes camera popup, map focus, multiview, favorite, and mode-change callbacks.
  */
@@ -19,8 +19,9 @@ import LandingResultsGrid from './LandingResultsGrid';
 import LandingMapPanel from './LandingMapPanel';
 import LandingPlaybackPanel from './LandingPlaybackPanel';
 import Playback from '../../pages/Playback';
+import { preloadLandingMapView } from '../../utils/preloadLandingMapView';
 
-const MapView = lazy(() => import('../MapView'));
+const MapView = lazy(() => preloadLandingMapView());
 
 function renderSearchDropdown({
     cameras,
@@ -192,7 +193,7 @@ export default function CamerasSection({
     );
 
     return (
-        <section id="playback-section" className="py-8 pb-16 sm:py-12 sm:pb-24">
+        <section id="camera-workspace" className="py-8 pb-16 sm:py-12 sm:pb-24">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <LandingCameraToolbar
                     title={landingSettings.section_title}

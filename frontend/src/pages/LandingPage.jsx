@@ -1,7 +1,7 @@
 /*
  * Purpose: Compose the public CCTV landing experience across full/simple modes, compact discovery, mobile quick access, standardized popup streams, map/grid views, rich popups, and related cameras.
  * Caller: App public root route.
- * Deps: React, Router search params, branding/camera/toast contexts, landing hooks, landing components, publicGrowthService.
+ * Deps: React, Router search params, branding/camera/toast contexts, landing hooks, landing components, map preloader, publicGrowthService.
  * MainFuncs: LandingPage, LandingPageContent, DeferredSurfaceFallback.
  * SideEffects: Fetches public config/discovery data, updates metadata, opens video popups, computes popup-related cameras, manages multiview state.
  */
@@ -33,6 +33,7 @@ import GlobalAdScript from '../components/ads/GlobalAdScript';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../components/ads/adsConfig';
 import { resolvePublicPopupCamera } from '../services/publicCameraResolver';
 import publicGrowthService from '../services/publicGrowthService';
+import { preloadLandingMapView } from '../utils/preloadLandingMapView';
 import lazyWithRetry from '../utils/lazyWithRetry';
 
 const LandingPageSimple = lazyWithRetry(() => import('../components/landing/LandingPageSimple'), 'landing-page-simple');
@@ -202,10 +203,11 @@ function LandingPageContent() {
         setActivePopupSource('grid');
     }, [handlePopupClose]);
 
-    const scrollToElement = useCallback((elementId) => {
+    const scrollToElement = useCallback((elementId, offset = 72) => {
         const element = document.getElementById(elementId);
         if (element) {
-            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            const top = element.getBoundingClientRect().top + window.scrollY - offset;
+            window.scrollTo({ top: Math.max(top, 0), behavior: 'smooth' });
         }
     }, []);
 
@@ -218,6 +220,39 @@ function LandingPageContent() {
     const handleMobileQuickAccessClick = useCallback(() => {
         scrollToElement('public-quick-access');
     }, [scrollToElement]);
+
+    const handleMobileViewModeChange = useCallback((nextMode) => {
+        if (nextMode === 'map') {
+            preloadLandingMapView();
+        }
+
+        setViewMode(nextMode);
+        const scheduleScroll = window.requestAnimationFrame || ((callback) => window.setTimeout(callback, 0));
+        scheduleScroll(() => {
+            scrollToElement('camera-workspace');
+        });
+    }, [scrollToElement, setViewMode]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || typeof IntersectionObserver === 'undefined') {
+            return undefined;
+        }
+
+        const workspace = document.getElementById('camera-workspace');
+        if (!workspace) {
+            return undefined;
+        }
+
+        const observer = new IntersectionObserver((entries) => {
+            if (entries.some((entry) => entry.isIntersecting || entry.intersectionRatio > 0)) {
+                preloadLandingMapView();
+                observer.disconnect();
+            }
+        }, { rootMargin: '360px 0px' });
+
+        observer.observe(workspace);
+        return () => observer.disconnect();
+    }, [layoutMode]);
 
     if (layoutMode === 'simple') {
         return (
@@ -262,7 +297,7 @@ function LandingPageContent() {
                 {!popup && (
                     <LandingMobileDock
                         viewMode={viewMode}
-                        onViewModeChange={setViewMode}
+                        onViewModeChange={handleMobileViewModeChange}
                         onHomeClick={handleMobileHomeClick}
                         onQuickAccessClick={handleMobileQuickAccessClick}
                         quickAccessCount={quickAccessCount}
@@ -393,7 +428,7 @@ function LandingPageContent() {
                 {!popup && (
                     <LandingMobileDock
                         viewMode={viewMode}
-                        onViewModeChange={setViewMode}
+                        onViewModeChange={handleMobileViewModeChange}
                         onHomeClick={handleMobileHomeClick}
                         onQuickAccessClick={handleMobileQuickAccessClick}
                         quickAccessCount={quickAccessCount}
