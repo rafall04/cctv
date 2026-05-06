@@ -32,6 +32,7 @@ export const SHARED_CAMERA_STREAM_PROJECTION = `
     c.thumbnail_path,
     c.thumbnail_updated_at,
     c.stream_source,
+    c.private_rtsp_url,
     c.external_hls_url,
     c.delivery_type,
     c.external_stream_url,

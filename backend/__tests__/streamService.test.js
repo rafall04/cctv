@@ -9,14 +9,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import streamService from '../services/streamService.js';
 
-const { queryMock, viewStatsMock } = vi.hoisted(() => ({
+const { queryMock, queryOneMock, viewStatsMock } = vi.hoisted(() => ({
     queryMock: vi.fn(),
+    queryOneMock: vi.fn(),
     viewStatsMock: vi.fn(),
 }));
 
 vi.mock('../database/connectionPool.js', () => ({
     query: (...args) => queryMock(...args),
-    queryOne: vi.fn(),
+    queryOne: (...args) => queryOneMock(...args),
     execute: vi.fn(),
 }));
 
@@ -41,6 +42,7 @@ vi.mock('../services/cameraHealthService.js', () => ({
 describe('streamService camera response routing', () => {
     beforeEach(() => {
         queryMock.mockReset();
+        queryOneMock.mockReset();
         viewStatsMock.mockReset();
         viewStatsMock.mockReturnValue({});
     });
@@ -128,5 +130,26 @@ describe('streamService camera response routing', () => {
 
         expect(response).not.toHaveProperty('private_rtsp_url');
         expect(JSON.stringify(response)).not.toContain('rtsp://admin:secret');
+    });
+
+    it('keeps internal RTSP available to backend stream health while sanitizing public getStreamUrls output', () => {
+        queryOneMock.mockImplementation((sql) => {
+            expect(sql).toContain('c.private_rtsp_url');
+            return {
+                id: 31,
+                name: 'Local Cam',
+                stream_key: 'camera31',
+                stream_source: 'internal',
+                delivery_type: 'internal_hls',
+                enabled: 1,
+                private_rtsp_url: 'rtsp://admin:secret@10.0.0.31/live',
+            };
+        });
+
+        const response = streamService.getStreamUrls(31, 'localhost:3001');
+
+        expect(response.streams.hls).toBe('/hls/camera31/index.m3u8');
+        expect(JSON.stringify(response)).not.toContain('rtsp://admin:secret');
+        expect(response.camera).not.toHaveProperty('private_rtsp_url');
     });
 });
