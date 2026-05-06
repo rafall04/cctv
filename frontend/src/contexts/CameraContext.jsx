@@ -1,3 +1,11 @@
+/*
+ * Purpose: Provide public camera and area data with resilient initial, background, and resume refresh behavior.
+ * Caller: Public landing pages and camera-driven UI surfaces through CameraProvider/useCameras.
+ * Deps: React context/hooks, streamService, areaService, request policy constants, device tier detector.
+ * MainFuncs: CameraProvider, useCameras.
+ * SideEffects: Fetches public camera/area data, schedules visible-tab refresh timers, listens for browser resume events.
+ */
+
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { streamService } from '../services/streamService';
 import { areaService } from '../services/areaService';
@@ -146,6 +154,10 @@ export function CameraProvider({ children, autoRefresh = true }) {
 
         const refreshMs = deviceTier === 'low' ? 60000 : deviceTier === 'high' ? 15000 : 30000;
         const refreshInterval = setInterval(async () => {
+            if (document.visibilityState === 'hidden') {
+                return;
+            }
+
             try {
                 await refreshData({ mode: 'background' });
             } catch (err) {

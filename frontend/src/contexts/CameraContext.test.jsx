@@ -9,7 +9,7 @@
  */
 
 import { render, screen, waitFor, act } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CameraProvider, useCameras } from './CameraContext';
 
 const { getAllActiveStreams } = vi.hoisted(() => ({
@@ -54,9 +54,18 @@ function CameraConsumer() {
 
 describe('CameraContext', () => {
     beforeEach(() => {
+        vi.useRealTimers();
         getAllActiveStreams.mockReset();
         getPublicAreas.mockReset();
         getPublicAreas.mockResolvedValue({ success: true, data: [{ id: 1, name: 'Area 1' }] });
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+        Object.defineProperty(document, 'visibilityState', {
+            configurable: true,
+            value: 'visible',
+        });
     });
 
     it('mempertahankan data lama saat refresh resume gagal', async () => {
@@ -123,5 +132,49 @@ describe('CameraContext', () => {
             expect(screen.getByTestId('camera-count').textContent).toBe('2');
             expect(screen.getByTestId('background-error').textContent).toBe('no');
         });
+    });
+
+    it('tidak menjalankan background refresh periodik saat tab publik sedang hidden', async () => {
+        vi.useFakeTimers();
+        getAllActiveStreams.mockResolvedValue({ success: true, data: [{ id: 1, name: 'Cam 1' }] });
+
+        render(
+            <CameraProvider>
+                <CameraConsumer />
+            </CameraProvider>
+        );
+
+        await act(async () => {
+            await Promise.resolve();
+            await Promise.resolve();
+        });
+
+        expect(screen.getByTestId('camera-count').textContent).toBe('1');
+        expect(getAllActiveStreams).toHaveBeenCalledTimes(1);
+
+        Object.defineProperty(document, 'visibilityState', {
+            configurable: true,
+            value: 'hidden',
+        });
+
+        await act(async () => {
+            vi.advanceTimersByTime(30000);
+            await Promise.resolve();
+        });
+
+        expect(getAllActiveStreams).toHaveBeenCalledTimes(1);
+
+        Object.defineProperty(document, 'visibilityState', {
+            configurable: true,
+            value: 'visible',
+        });
+
+        await act(async () => {
+            vi.advanceTimersByTime(30000);
+            await Promise.resolve();
+            await Promise.resolve();
+        });
+
+        expect(getAllActiveStreams).toHaveBeenCalledTimes(2);
     });
 });

@@ -1,12 +1,12 @@
 /*
  * Purpose: Render a public landing camera card with prioritized/lazy thumbnail, status badges, viewer stats, and quick actions.
  * Caller: Landing camera grids and public camera list views.
- * Deps: Icons, CodecBadge, CameraThumbnail, CameraViewerStatsBadges, animation and availability utilities.
+ * Deps: React memo/ref hooks, Icons, CodecBadge, CameraThumbnail, CameraViewerStatsBadges, animation and availability utilities, video popup preloader.
  * MainFuncs: CameraCard.
- * SideEffects: Invokes caller-provided click, multiview, and favorite callbacks.
+ * SideEffects: Invokes caller-provided click, multiview, favorite callbacks, and preloads the video popup chunk on first user intent.
  */
 
-import { memo } from 'react';
+import { memo, useRef } from 'react';
 import { Icons } from '../ui/Icons';
 import CodecBadge from '../CodecBadge';
 import CameraThumbnail from '../CameraThumbnail';
@@ -14,8 +14,10 @@ import CameraViewerStatsBadges from '../common/CameraViewerStatsBadges.jsx';
 import { shouldDisableAnimations } from '../../utils/animationControl';
 import { isCameraHardOffline, isCameraDegraded } from '../../utils/cameraAvailability.js';
 import { getPublicCameraQuality } from '../../utils/landingCameraInsights';
+import { preloadPublicVideoPopup } from '../../utils/preloadPublicVideoPopup';
 
 const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMulti, isFavorite, onToggleFavorite, thumbnailPriority = false }) {
+    const didPrewarmVideoPopupRef = useRef(false);
     const isMaintenance = camera.status === 'maintenance';
     const isOffline = isCameraHardOffline(camera);
     const isDegraded = isCameraDegraded(camera);
@@ -42,9 +44,21 @@ const CameraCard = memo(function CameraCard({ camera, onClick, onAddMulti, inMul
 
     const transitionClass = disableAnimations ? '' : 'transition-all duration-200';
     const hoverTransform = disableAnimations ? '' : 'hover:-translate-y-1';
+    const prewarmVideoPopup = () => {
+        if (didPrewarmVideoPopupRef.current) {
+            return;
+        }
+
+        didPrewarmVideoPopupRef.current = true;
+        preloadPublicVideoPopup();
+    };
 
     return (
-        <div className={`relative rounded-2xl overflow-hidden bg-white dark:bg-gray-900 shadow-lg ring-1 ${transitionClass} ${hoverTransform} group/card ${cardStyle}`}>
+        <div
+            className={`relative rounded-2xl overflow-hidden bg-white dark:bg-gray-900 shadow-lg ring-1 ${transitionClass} ${hoverTransform} group/card ${cardStyle}`}
+            onPointerEnter={prewarmVideoPopup}
+            onFocus={prewarmVideoPopup}
+        >
             <div className="absolute top-3 right-3 z-30 flex gap-2">
                 {onToggleFavorite && (
                     <button

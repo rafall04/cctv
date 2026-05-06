@@ -12,7 +12,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { renderWithRouter } from '../test/renderWithRouter';
 import LandingPage from './LandingPage';
 
-const { getPublicSaweriaConfig, testBackendReachability, updateMetaTags, getPublicLandingPageSettings, getPublicAdsSettings, getDiscovery, preloadLandingMapView, videoPopupPropsSpy, landingPageSimplePropsSpy } = vi.hoisted(() => ({
+const { getPublicSaweriaConfig, testBackendReachability, updateMetaTags, getPublicLandingPageSettings, getPublicAdsSettings, getDiscovery, preloadLandingMapView, videoPopupPropsSpy, landingPageSimplePropsSpy, cameraProviderPropsSpy, cameraContextState } = vi.hoisted(() => ({
     getPublicSaweriaConfig: vi.fn(),
     testBackendReachability: vi.fn(),
     updateMetaTags: vi.fn(),
@@ -22,6 +22,8 @@ const { getPublicSaweriaConfig, testBackendReachability, updateMetaTags, getPubl
     preloadLandingMapView: vi.fn(),
     videoPopupPropsSpy: vi.fn(),
     landingPageSimplePropsSpy: vi.fn(),
+    cameraProviderPropsSpy: vi.fn(),
+    cameraContextState: { deviceTier: 'mid' },
 }));
 
 vi.mock('../services/saweriaService', () => ({
@@ -70,10 +72,13 @@ vi.mock('../utils/preloadLandingMapView', () => ({
 }));
 
 vi.mock('../contexts/CameraContext', () => ({
-    CameraProvider: ({ children }) => <>{children}</>,
+    CameraProvider: ({ children, autoRefresh }) => {
+        cameraProviderPropsSpy({ autoRefresh });
+        return <>{children}</>;
+    },
     useCameras: () => ({
         cameras: [],
-        deviceTier: 'mid',
+        deviceTier: cameraContextState.deviceTier,
     }),
 }));
 
@@ -198,6 +203,8 @@ describe('LandingPage connectivity recovery', () => {
         preloadLandingMapView.mockReset();
         videoPopupPropsSpy.mockReset();
         landingPageSimplePropsSpy.mockReset();
+        cameraProviderPropsSpy.mockReset();
+        cameraContextState.deviceTier = 'mid';
         testBackendReachability.mockResolvedValue({ reachable: true, latency: 80 });
         getDiscovery.mockResolvedValue({
             success: true,
@@ -357,6 +364,9 @@ describe('LandingPage connectivity recovery', () => {
             bodyTestId: 'map-video-body',
             camera: expect.objectContaining({ id: 99, name: 'Map Camera' }),
         }));
+        expect(cameraProviderPropsSpy).toHaveBeenLastCalledWith(expect.objectContaining({
+            autoRefresh: false,
+        }));
     });
 
     it('merender footer banner di bawah halaman pada full mode', async () => {
@@ -466,6 +476,27 @@ describe('LandingPage connectivity recovery', () => {
         expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({
             behavior: 'smooth',
         }));
+    });
+
+    it('tidak auto-preload map dari intersection observer pada device low-end', async () => {
+        cameraContextState.deviceTier = 'low';
+        let observedCallback;
+        const observe = vi.fn();
+        const disconnect = vi.fn();
+        vi.stubGlobal('IntersectionObserver', vi.fn((callback) => {
+            observedCallback = callback;
+            return { observe, disconnect };
+        }));
+
+        renderWithRouter(<LandingPage />, { initialEntries: ['/?mode=full&view=grid'] });
+
+        expect(observe).not.toHaveBeenCalled();
+
+        if (observedCallback) {
+            observedCallback([{ isIntersecting: true, intersectionRatio: 1 }]);
+        }
+
+        expect(preloadLandingMapView).not.toHaveBeenCalled();
     });
 
     it('meneruskan discovery publik yang sama ke simple mode', async () => {

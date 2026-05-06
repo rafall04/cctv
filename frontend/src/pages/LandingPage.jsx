@@ -3,7 +3,7 @@
  * Caller: App public root route.
  * Deps: React, Router search params, branding/camera/toast contexts, landing hooks, landing components, map preloader, publicGrowthService.
  * MainFuncs: LandingPage, LandingPageContent, DeferredSurfaceFallback.
- * SideEffects: Fetches public config/discovery data, updates metadata, opens video popups, computes popup-related cameras, manages multiview state.
+ * SideEffects: Fetches public config/discovery data, updates metadata, opens video popups, computes popup-related cameras, manages multiview state, and pauses background refresh while public video surfaces are active.
  */
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -52,7 +52,7 @@ function DeferredSurfaceFallback({ className = '' }) {
     );
 }
 
-function LandingPageContent() {
+function LandingPageContent({ onRefreshPauseChange }) {
     const { branding, loading: brandingLoading } = useBranding();
     const { cameras, deviceTier } = useCameras();
     const { addToast } = useToast();
@@ -188,6 +188,10 @@ function LandingPageContent() {
         }
     }, [activePopupSource, popup]);
 
+    useEffect(() => {
+        onRefreshPauseChange?.(Boolean(popup || showMulti));
+    }, [onRefreshPauseChange, popup, showMulti]);
+
     const handleGridPopupOpen = useCallback(async (camera, options = {}) => {
         const { replaceHistory = false } = options;
         const requestId = streamResolveRequestRef.current + 1;
@@ -272,6 +276,10 @@ function LandingPageContent() {
             return undefined;
         }
 
+        if (deviceTier === 'low') {
+            return undefined;
+        }
+
         const workspace = document.getElementById('camera-workspace');
         if (!workspace) {
             return undefined;
@@ -286,7 +294,7 @@ function LandingPageContent() {
 
         observer.observe(workspace);
         return () => observer.disconnect();
-    }, [layoutMode]);
+    }, [deviceTier, layoutMode]);
 
     if (layoutMode === 'simple') {
         return (
@@ -510,12 +518,20 @@ function LandingPageContent() {
     );
 }
 
+function LandingPageShell() {
+    const [refreshPaused, setRefreshPaused] = useState(false);
+
+    return (
+        <CameraProvider autoRefresh={!refreshPaused}>
+            <LandingPageContent onRefreshPauseChange={setRefreshPaused} />
+        </CameraProvider>
+    );
+}
+
 export default function LandingPage() {
     return (
         <ToastProvider>
-            <CameraProvider>
-                <LandingPageContent />
-            </CameraProvider>
+            <LandingPageShell />
         </ToastProvider>
     );
 }

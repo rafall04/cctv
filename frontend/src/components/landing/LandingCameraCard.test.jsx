@@ -6,11 +6,14 @@
  * SideEffects: Renders component in jsdom only.
  */
 
-import { render } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import LandingCameraCard from './LandingCameraCard.jsx';
 
-const thumbnailSpy = vi.fn(() => <div data-testid="camera-thumbnail" />);
+const { thumbnailSpy, preloadPublicVideoPopup } = vi.hoisted(() => ({
+    thumbnailSpy: vi.fn(() => <div data-testid="camera-thumbnail" />),
+    preloadPublicVideoPopup: vi.fn(),
+}));
 
 vi.mock('../CameraThumbnail', () => ({
     default: (props) => thumbnailSpy(props),
@@ -31,6 +34,10 @@ vi.mock('../ui/Icons', () => ({
 
 vi.mock('../../utils/animationControl', () => ({
     shouldDisableAnimations: () => true,
+}));
+
+vi.mock('../../utils/preloadPublicVideoPopup', () => ({
+    preloadPublicVideoPopup,
 }));
 
 describe('LandingCameraCard', () => {
@@ -85,5 +92,29 @@ describe('LandingCameraCard', () => {
 
         expect(getByText('3 live')).toBeTruthy();
         expect(getByText('12.5k views')).toBeTruthy();
+    });
+
+    it('prewarms the video popup chunk on first card intent', () => {
+        preloadPublicVideoPopup.mockClear();
+        const { getByText } = render(
+            <LandingCameraCard
+                camera={{
+                    id: 11,
+                    name: 'Prewarm Camera',
+                    is_online: 1,
+                    status: 'active',
+                }}
+                onClick={vi.fn()}
+                onAddMulti={vi.fn()}
+                inMulti={false}
+                isFavorite={() => false}
+                onToggleFavorite={vi.fn()}
+            />
+        );
+
+        fireEvent.pointerEnter(getByText('Prewarm Camera').closest('.group\\/card'));
+        fireEvent.focus(getByText('Prewarm Camera').closest('.group\\/card'));
+
+        expect(preloadPublicVideoPopup).toHaveBeenCalledTimes(1);
     });
 });
