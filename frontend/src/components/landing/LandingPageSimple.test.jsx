@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /**
- * Purpose: Verifies the lightweight landing mode composition, status copy, and ad placement.
+ * Purpose: Verifies the lightweight landing mode composition, status copy, compact discovery, and ad placement.
  * Caller: Frontend Vitest suite.
  * Deps: mocked theme, branding, cameras, public config, ads, and floating widgets.
  * MainFuncs: LandingPageSimple render tests.
@@ -48,6 +48,10 @@ vi.mock('./LayoutModeToggle', () => ({
 
 vi.mock('./LandingPublicTopStack', () => ({
     default: () => <div>top-stack</div>,
+}));
+
+vi.mock('./LandingDiscoveryStrip', () => ({
+    default: ({ discovery }) => <div data-testid="landing-discovery-strip">{discovery?.live_now?.[0]?.name || 'no-discovery'}</div>,
 }));
 
 vi.mock('../ads/InlineAdSlot', () => ({
@@ -145,5 +149,36 @@ describe('LandingPageSimple', () => {
         expect(screen.getByText('2')).toBeTruthy();
         expect(screen.getByText('1')).toBeTruthy();
         expect(screen.getByText('3')).toBeTruthy();
+    });
+
+    it('menampilkan discovery compact yang sama di mode simpel', () => {
+        const CamerasSection = () => <div data-testid="cameras-section">cameras</div>;
+
+        render(
+            <LandingPageSimple
+                onCameraClick={vi.fn()}
+                onAddMulti={vi.fn()}
+                multiCameras={[]}
+                saweriaEnabled={false}
+                saweriaLink=""
+                CamerasSection={CamerasSection}
+                layoutMode="simple"
+                onLayoutToggle={vi.fn()}
+                favorites={[]}
+                onToggleFavorite={vi.fn()}
+                isFavorite={vi.fn(() => false)}
+                viewMode="grid"
+                setViewMode={vi.fn()}
+                adsConfig={null}
+                publicDiscovery={{
+                    live_now: [{ id: 9, name: 'CCTV Compact' }],
+                    top_cameras: [],
+                    new_cameras: [],
+                    popular_areas: [],
+                }}
+            />
+        );
+
+        expect(screen.getByTestId('landing-discovery-strip').textContent).toContain('CCTV Compact');
     });
 });

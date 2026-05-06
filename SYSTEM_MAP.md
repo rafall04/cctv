@@ -42,7 +42,7 @@ SideEffects: None; documentation only.
 ## Critical Runtime Flows
 
 - Live public viewing: `LandingPage` -> `CameraContext`/camera services -> `MapView` or landing grid -> `VideoPopup`/`VideoPlayer` -> `/api/hls/*` or external stream handling.
-- Public growth discovery: `/area/:areaSlug` and landing discovery sections use sanitized `/api/public/*` area/trending/discovery endpoints for live-now, top CCTV, popular areas, and newest cameras with existing public video popup behavior.
+- Public growth discovery: `/area/:areaSlug` and landing compact discovery strip use sanitized `/api/public/*` area/trending/discovery endpoints for live-now, top CCTV, popular areas, and newest cameras with existing public video popup behavior.
 - Public PWA shell: `main.jsx` registers `/sw.js`; `site.webmanifest` exposes public workflow shortcuts and the service worker caches only safe app-shell assets while avoiding `/api/*` and `/hls/*` stream caching.
 - Admin authentication: `LoginPage` -> `authService` frontend -> `/api/auth/login` -> `authController`/`authService` backend; HttpOnly cookie options are derived by `backend/utils/authCookieOptions.js` so same-origin domain and direct-IP access keep session cookies valid.
 - Playback public/admin: `/playback` uses `accessScope='public_preview'`; `/admin/playback` uses `accessScope='admin_full'`; `Playback.jsx` -> `recordingService` -> recording routes -> segment stream endpoint.

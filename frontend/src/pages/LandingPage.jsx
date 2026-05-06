@@ -1,5 +1,5 @@
 /*
- * Purpose: Compose the public CCTV landing experience across full/simple modes, discovery sections, map/grid views, and popups.
+ * Purpose: Compose the public CCTV landing experience across full/simple modes, compact discovery, map/grid views, and popups.
  * Caller: App public root route.
  * Deps: React, Router search params, branding/camera/toast contexts, landing hooks, landing components, publicGrowthService.
  * MainFuncs: LandingPage, LandingPageContent, DeferredSurfaceFallback.
@@ -23,7 +23,7 @@ import LandingHero from '../components/landing/LandingHero';
 import LandingFooter from '../components/landing/LandingFooter';
 import LandingCamerasSection from '../components/landing/LandingCamerasSection';
 import LandingPublicTopStack from '../components/landing/LandingPublicTopStack';
-import LandingPublicDiscovery from '../components/landing/LandingPublicDiscovery';
+import LandingDiscoveryStrip from '../components/landing/LandingDiscoveryStrip';
 import MultiViewButton from '../components/MultiView/MultiViewButton';
 import InlineAdSlot from '../components/ads/InlineAdSlot';
 import GlobalAdScript from '../components/ads/GlobalAdScript';
@@ -187,6 +187,8 @@ function LandingPageContent() {
                         announcement={landingSettings.announcement}
                         eventBanner={landingSettings.eventBanner}
                         publicConfigLoading={publicConfigLoading || brandingLoading}
+                        publicDiscovery={publicDiscovery}
+                        discoveryLoading={discoveryLoading}
                     />
                 </Suspense>
 
@@ -240,7 +242,7 @@ function LandingPageContent() {
                     onCameraClick={setPopup}
                 />
 
-                <LandingPublicDiscovery
+                <LandingDiscoveryStrip
                     discovery={publicDiscovery}
                     loading={discoveryLoading}
                     onCameraClick={handleGridPopupOpen}

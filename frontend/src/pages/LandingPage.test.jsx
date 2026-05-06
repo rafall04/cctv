@@ -12,12 +12,13 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { renderWithRouter } from '../test/renderWithRouter';
 import LandingPage from './LandingPage';
 
-const { getPublicSaweriaConfig, testBackendReachability, updateMetaTags, getPublicLandingPageSettings, getPublicAdsSettings, videoPopupPropsSpy, landingPageSimplePropsSpy } = vi.hoisted(() => ({
+const { getPublicSaweriaConfig, testBackendReachability, updateMetaTags, getPublicLandingPageSettings, getPublicAdsSettings, getDiscovery, videoPopupPropsSpy, landingPageSimplePropsSpy } = vi.hoisted(() => ({
     getPublicSaweriaConfig: vi.fn(),
     testBackendReachability: vi.fn(),
     updateMetaTags: vi.fn(),
     getPublicLandingPageSettings: vi.fn(),
     getPublicAdsSettings: vi.fn(),
+    getDiscovery: vi.fn(),
     videoPopupPropsSpy: vi.fn(),
     landingPageSimplePropsSpy: vi.fn(),
 }));
@@ -58,10 +59,7 @@ vi.mock('../services/settingsService', () => ({
 
 vi.mock('../services/publicGrowthService', () => ({
     default: {
-        getDiscovery: vi.fn().mockResolvedValue({
-            success: true,
-            data: { live_now: [], top_cameras: [], new_cameras: [], popular_areas: [] },
-        }),
+        getDiscovery,
         getTrendingCameras: vi.fn().mockResolvedValue({ success: true, data: [] }),
     },
 }));
@@ -189,9 +187,14 @@ describe('LandingPage connectivity recovery', () => {
         updateMetaTags.mockReset();
         getPublicLandingPageSettings.mockReset();
         getPublicAdsSettings.mockReset();
+        getDiscovery.mockReset();
         videoPopupPropsSpy.mockReset();
         landingPageSimplePropsSpy.mockReset();
         testBackendReachability.mockResolvedValue({ reachable: true, latency: 80 });
+        getDiscovery.mockResolvedValue({
+            success: true,
+            data: { live_now: [], top_cameras: [], new_cameras: [], popular_areas: [] },
+        });
 
         getPublicSaweriaConfig.mockResolvedValue({
             success: true,
@@ -427,5 +430,28 @@ describe('LandingPage connectivity recovery', () => {
                 }),
             }),
         }));
+    });
+
+    it('meneruskan discovery publik yang sama ke simple mode', async () => {
+        getDiscovery.mockResolvedValueOnce({
+            success: true,
+            data: {
+                live_now: [{ id: 4, name: 'CCTV Ramai', live_viewers: 8 }],
+                top_cameras: [],
+                new_cameras: [],
+                popular_areas: [],
+            },
+        });
+
+        renderWithRouter(<LandingPage />, { initialEntries: ['/?mode=simple'] });
+
+        await waitFor(() => {
+            expect(landingPageSimplePropsSpy).toHaveBeenCalledWith(expect.objectContaining({
+                publicDiscovery: expect.objectContaining({
+                    live_now: [expect.objectContaining({ id: 4, name: 'CCTV Ramai' })],
+                }),
+                discoveryLoading: false,
+            }));
+        });
     });
 });

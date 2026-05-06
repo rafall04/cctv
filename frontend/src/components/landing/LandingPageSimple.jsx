@@ -1,7 +1,7 @@
 /**
- * Purpose: Renders the lightweight public landing mode with status, camera list, and footer.
+ * Purpose: Renders the lightweight public landing mode with status, compact discovery, camera list, and footer.
  * Caller: LandingPage when layoutMode is simple.
- * Deps: Camera, branding, theme, landing config, ads, feedback, and support components.
+ * Deps: Camera, branding, theme, landing config, discovery strip, ads, feedback, and support components.
  * MainFuncs: LandingPageSimple, SimpleHeader, SimpleStatusOverview, SimpleFooter.
  * SideEffects: Lazy-loads optional floating widgets and ad slots.
  */
@@ -15,6 +15,7 @@ import { shouldDisableAnimations } from '../../utils/animationControl';
 import lazyWithRetry from '../../utils/lazyWithRetry';
 import LayoutModeToggle from './LayoutModeToggle';
 import LandingPublicTopStack from './LandingPublicTopStack';
+import LandingDiscoveryStrip from './LandingDiscoveryStrip';
 
 const FeedbackWidget = lazyWithRetry(() => import('../FeedbackWidget'), 'feedback-widget-inline');
 const SaweriaSupport = lazyWithRetry(() => import('../SaweriaSupport'), 'saweria-support-inline');
@@ -184,6 +185,8 @@ export default function LandingPageSimple({
     announcement,
     eventBanner,
     publicConfigLoading = false,
+    publicDiscovery = null,
+    discoveryLoading = false,
 }) {
     const { branding } = useBranding();
     const showFooterBanner = shouldRenderAdSlot(adsConfig, 'footerBanner', isAdsMobileViewport());
@@ -204,6 +207,13 @@ export default function LandingPageSimple({
             />
 
             <SimpleStatusOverview />
+
+            <LandingDiscoveryStrip
+                discovery={publicDiscovery}
+                loading={discoveryLoading}
+                onCameraClick={onCameraClick}
+                className="pt-2"
+            />
 
             <main className="flex-1 min-h-0 pb-4 sm:pb-6">
                 {CamerasSection && (
