@@ -380,8 +380,8 @@ describe('VideoPopup non-live states', () => {
             />
         );
 
-        expect(screen.getByText('4 live')).toBeTruthy();
-        expect(screen.getByText('21.5k views')).toBeTruthy();
+        expect(screen.getAllByText('4 live').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('21.5k views').length).toBeGreaterThan(0);
     });
 
     it('tidak membuat session manual untuk internal HLS karena sudah dilacak HLS proxy', async () => {

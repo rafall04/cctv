@@ -1,9 +1,9 @@
 /*
-Purpose: Define React provider tree, route table, protected admin shell, and public/admin playback scopes.
+Purpose: Define React provider tree, route table, protected admin shell, public/admin playback scopes, and public PWA install prompt.
 Caller: main.jsx after runtime config loads.
-Deps: React Router, context providers, ErrorBoundary, AdminLayout, page components, lazyWithRetry.
+Deps: React Router, context providers, ErrorBoundary, PwaInstallPrompt, AdminLayout, page components, lazyWithRetry.
 MainFuncs: App, AdminPageRoute.
-SideEffects: Registers client-side routes and renders global toast/provider structure.
+SideEffects: Registers client-side routes, renders global toast/provider structure, and surfaces public PWA install capability.
 */
 
 import { Suspense } from 'react';
@@ -16,6 +16,7 @@ import { TimezoneProvider } from './contexts/TimezoneContext';
 import { ToastContainer } from './components/ui/ToastContainer';
 import { ApiClientInitializer } from './components/ApiClientInitializer';
 import ErrorBoundary from './components/ui/ErrorBoundary';
+import PwaInstallPrompt from './components/PwaInstallPrompt';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import Playback from './pages/Playback';
@@ -65,6 +66,7 @@ function App() {
         <ApiClientInitializer>
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <ToastContainer />
+            <PwaInstallPrompt />
             <Routes>
                 {/* Public routes */}
                 <Route path="/" element={<LandingPage />} />

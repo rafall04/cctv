@@ -1,9 +1,9 @@
 /*
- * Purpose: Compose the public CCTV landing experience across full/simple modes, compact discovery, mobile quick access, standardized popup streams, map/grid views, and popups.
+ * Purpose: Compose the public CCTV landing experience across full/simple modes, compact discovery, mobile quick access, standardized popup streams, map/grid views, rich popups, and related cameras.
  * Caller: App public root route.
  * Deps: React, Router search params, branding/camera/toast contexts, landing hooks, landing components, publicGrowthService.
  * MainFuncs: LandingPage, LandingPageContent, DeferredSurfaceFallback.
- * SideEffects: Fetches public config/discovery data, updates metadata, opens video popups, manages multiview state.
+ * SideEffects: Fetches public config/discovery data, updates metadata, opens video popups, computes popup-related cameras, manages multiview state.
  */
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
@@ -123,6 +123,31 @@ function LandingPageContent() {
     ), [cameras, recentCameras]);
     const quickAccessCount = favoriteCameras.length + recentCameraItems.length;
     const favoriteCount = favoriteCameras.length;
+    const relatedPopupCameras = useMemo(() => {
+        if (!popup) {
+            return [];
+        }
+
+        return [...cameras]
+            .filter((camera) => camera.id !== popup.id)
+            .sort((left, right) => {
+                const leftSameArea = left.area_name && left.area_name === popup.area_name ? 1 : 0;
+                const rightSameArea = right.area_name && right.area_name === popup.area_name ? 1 : 0;
+                if (leftSameArea !== rightSameArea) {
+                    return rightSameArea - leftSameArea;
+                }
+
+                const liveDelta = Number(right.live_viewers || right.viewer_stats?.live_viewers || 0)
+                    - Number(left.live_viewers || left.viewer_stats?.live_viewers || 0);
+                if (liveDelta !== 0) {
+                    return liveDelta;
+                }
+
+                return Number(right.total_views || right.viewer_stats?.total_views || 0)
+                    - Number(left.total_views || left.viewer_stats?.total_views || 0);
+            })
+            .slice(0, 5);
+    }, [cameras, popup]);
 
     useEffect(() => {
         if (branding) {
@@ -253,6 +278,10 @@ function LandingPageContent() {
                             adsConfig={adsConfig}
                             modalTestId={activePopupSource === 'map' ? 'map-popup-modal' : 'grid-popup-modal'}
                             bodyTestId={activePopupSource === 'map' ? 'map-video-body' : 'grid-video-body'}
+                            relatedCameras={relatedPopupCameras}
+                            onRelatedCameraClick={handleGridPopupOpen}
+                            isFavorite={isFavorite}
+                            onToggleFavorite={toggleFavorite}
                         />
                     </Suspense>
                 )}
@@ -380,6 +409,10 @@ function LandingPageContent() {
                             adsConfig={adsConfig}
                             modalTestId={activePopupSource === 'map' ? 'map-popup-modal' : 'grid-popup-modal'}
                             bodyTestId={activePopupSource === 'map' ? 'map-video-body' : 'grid-video-body'}
+                            relatedCameras={relatedPopupCameras}
+                            onRelatedCameraClick={handleGridPopupOpen}
+                            isFavorite={isFavorite}
+                            onToggleFavorite={toggleFavorite}
                         />
                     </Suspense>
                 )}

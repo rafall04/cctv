@@ -1,7 +1,7 @@
 /*
- * Purpose: Render public area-specific CCTV portal pages with area status, discovery sections, standardized popup stream resolution, and resilient share entry points.
+ * Purpose: Render public area-specific CCTV portal pages with area status, discovery sections, standardized popup stream resolution, related popup cameras, and resilient share entry points.
  * Caller: App route /area/:areaSlug.
- * Deps: React Router, CameraThumbnail, publicGrowthService, publicGrowthShare.
+ * Deps: React Router, CameraThumbnail, VideoPopup, publicGrowthService, publicGrowthShare.
  * MainFuncs: AreaPublicPage.
  * SideEffects: Fetches public area/camera data and updates document metadata.
  */
@@ -247,6 +247,22 @@ export default function AreaPublicPage() {
             .sort((left, right) => String(right.created_at).localeCompare(String(left.created_at)))
             .slice(0, 4)
     ), [cameras]);
+    const relatedPopupCameras = useMemo(() => {
+        if (!selectedCamera) {
+            return [];
+        }
+
+        return [...cameras]
+            .filter((camera) => camera.id !== selectedCamera.id)
+            .sort((left, right) => {
+                const liveDelta = getCameraLiveViewers(right) - getCameraLiveViewers(left);
+                if (liveDelta !== 0) {
+                    return liveDelta;
+                }
+                return getCameraTotalViews(right) - getCameraTotalViews(left);
+            })
+            .slice(0, 5);
+    }, [cameras, selectedCamera]);
 
     const handleCameraOpen = useCallback(async (camera) => {
         const resolvedCamera = await resolvePublicPopupCamera(camera);
@@ -439,6 +455,8 @@ export default function AreaPublicPage() {
                         onClose={() => setSelectedCamera(null)}
                         modalTestId="area-popup-modal"
                         bodyTestId="area-video-body"
+                        relatedCameras={relatedPopupCameras}
+                        onRelatedCameraClick={handleCameraOpen}
                     />
                 </Suspense>
             )}

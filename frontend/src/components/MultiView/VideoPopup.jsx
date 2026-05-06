@@ -1,7 +1,7 @@
 /*
  * Purpose: Render the single-camera public live popup with stream playback, controls, ads, and viewer stats.
  * Caller: Landing grid and map camera interactions.
- * Deps: React, HLS/FLV utilities, viewerService, popup state/layout utilities, CameraViewerStatsBadges.
+ * Deps: React, HLS/FLV utilities, viewerService, popup state/layout utilities, camera detail/related panels, CameraViewerStatsBadges.
  * MainFuncs: VideoPopup.
  * SideEffects: Starts/stops viewer sessions, reports runtime signals, controls media playback/fullscreen, and may take snapshots.
  */
@@ -29,6 +29,8 @@ import { createCameraSlug } from '../../utils/slugify';
 import { buildPublicCameraShareUrl } from '../../utils/publicShareUrl';
 import PublicStreamStatusOverlay from '../PublicStreamStatusOverlay.jsx';
 import InlineAdSlot from '../ads/InlineAdSlot.jsx';
+import CameraDetailPanel from './CameraDetailPanel.jsx';
+import RelatedCamerasStrip from './RelatedCamerasStrip.jsx';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../ads/adsConfig.js';
 import {
     getPublicPopupBodyStyle,
@@ -62,6 +64,10 @@ function VideoPopup({
     adsConfig = null,
     modalTestId = 'grid-popup-modal',
     bodyTestId = 'grid-video-body',
+    relatedCameras = [],
+    onRelatedCameraClick,
+    isFavorite,
+    onToggleFavorite,
 }) {
     const [searchParams] = useSearchParams();
     const videoRef = useRef(null);
@@ -1078,6 +1084,15 @@ function VideoPopup({
                     </div>
                 )}
 
+                {!isFullscreen && (
+                    <CameraDetailPanel
+                        camera={camera}
+                        isFavorite={Boolean(isFavorite?.(camera.id))}
+                        onShare={handleShare}
+                        onToggleFavorite={onToggleFavorite}
+                    />
+                )}
+
                 {/* Video - expand to full screen in fullscreen mode */}
                 <div
                     ref={wrapperRef}
@@ -1247,6 +1262,11 @@ function VideoPopup({
 
                 {/* Controls Panel + Codec Description - hide in fullscreen */}
                 <div ref={footerRef} className={`shrink-0 border-t border-gray-200 dark:border-gray-800 ${isFullscreen ? 'hidden' : ''}`}>
+                    <RelatedCamerasStrip
+                        cameras={relatedCameras}
+                        onCameraClick={onRelatedCameraClick}
+                    />
+
                     {/* Controls */}
                     <div className="p-3 flex items-center justify-between">
                         {/* Camera Description - Kiri Bawah */}
