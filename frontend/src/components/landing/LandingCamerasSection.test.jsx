@@ -1,5 +1,13 @@
 // @vitest-environment jsdom
 
+/*
+ * Purpose: Verify public landing camera controls, area filter defaults, and ranking tab behavior.
+ * Caller: Frontend focused landing camera section test gate.
+ * Deps: React Testing Library, Vitest, LandingCamerasSection with mocked camera context and child panels.
+ * MainFuncs: LandingCamerasSection control behavior tests.
+ * SideEffects: None.
+ */
+
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import LandingCamerasSection from './LandingCamerasSection';
@@ -7,10 +15,10 @@ import LandingCamerasSection from './LandingCamerasSection';
 vi.mock('../../contexts/CameraContext', () => ({
     useCameras: () => ({
         cameras: [
-            { id: 1, name: 'Lobby', area_name: 'Dander', latitude: '-7.1', longitude: '111.8', is_tunnel: 0, status: 'active', enable_recording: 1 },
-            { id: 2, name: 'Gate', area_name: 'Dander', latitude: '-7.2', longitude: '111.9', is_tunnel: 1, status: 'active', enable_recording: 1 },
-            { id: 4, name: 'Market', area_name: 'Dander', latitude: '-7.15', longitude: '111.85', is_tunnel: 0, status: 'active', enable_recording: 1 },
-            { id: 3, name: 'Square', area_name: 'Baureno', latitude: '-7.3', longitude: '112.0', is_tunnel: 0, status: 'active', enable_recording: 1 },
+            { id: 1, name: 'Lobby', area_name: 'Dander', latitude: '-7.1', longitude: '111.8', is_tunnel: 0, status: 'active', enable_recording: 1, live_viewers: 2, total_views: 20, created_at: '2026-05-01 08:00:00' },
+            { id: 2, name: 'Gate', area_name: 'Dander', latitude: '-7.2', longitude: '111.9', is_tunnel: 1, status: 'active', enable_recording: 1, live_viewers: 9, total_views: 30, created_at: '2026-05-02 08:00:00' },
+            { id: 4, name: 'Market', area_name: 'Dander', latitude: '-7.15', longitude: '111.85', is_tunnel: 0, status: 'active', enable_recording: 1, live_viewers: 4, total_views: 80, created_at: '2026-05-04 08:00:00' },
+            { id: 3, name: 'Square', area_name: 'Baureno', latitude: '-7.3', longitude: '112.0', is_tunnel: 0, status: 'active', enable_recording: 1, live_viewers: 1, total_views: 10, created_at: '2026-05-03 08:00:00' },
         ],
         areas: [
             { id: 1, name: 'Dander', show_on_grid_default: 1, grid_default_camera_limit: 2 },
@@ -91,5 +99,18 @@ describe('LandingCamerasSection controls', () => {
         });
 
         expect(screen.getByText('results-grid:Square')).toBeTruthy();
+    });
+
+    it('menambahkan tab paling ramai dan terbaru pada filter grid area', () => {
+        render(<LandingCamerasSection {...commonProps} viewMode="grid" />);
+
+        expect(screen.getByRole('button', { name: /Paling Ramai/i })).toBeTruthy();
+        expect(screen.getByRole('button', { name: /Terbaru/i })).toBeTruthy();
+
+        fireEvent.click(screen.getByRole('button', { name: /Paling Ramai/i }));
+        expect(screen.getByText('results-grid:Gate,Market,Lobby,Square')).toBeTruthy();
+
+        fireEvent.click(screen.getByRole('button', { name: /Terbaru/i }));
+        expect(screen.getByText('results-grid:Market,Square,Gate,Lobby')).toBeTruthy();
     });
 });

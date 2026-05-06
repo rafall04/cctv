@@ -1,4 +1,50 @@
+/*
+ * Purpose: Manage public landing camera search, area selection, ranking tabs, and grid/map filtering.
+ * Caller: LandingCamerasSection.
+ * Deps: React hooks.
+ * MainFuncs: useLandingCameraFilters.
+ * SideEffects: Tracks local UI filter state and focused map camera state.
+ */
+
 import { useCallback, useMemo, useRef, useState } from 'react';
+
+function getCameraMetric(camera, key) {
+    return Number(camera?.[key] ?? camera?.viewer_stats?.[key] ?? 0);
+}
+
+function sortByNewest(left, right) {
+    const rightCreated = String(right?.created_at || '');
+    const leftCreated = String(left?.created_at || '');
+    const byCreated = rightCreated.localeCompare(leftCreated);
+    if (byCreated !== 0) {
+        return byCreated;
+    }
+    return Number(right?.id || 0) - Number(left?.id || 0);
+}
+
+function sortGridCameras(cameras, connectionTab) {
+    const nextCameras = [...cameras];
+
+    if (connectionTab === 'popular') {
+        return nextCameras.sort((left, right) => {
+            const byLive = getCameraMetric(right, 'live_viewers') - getCameraMetric(left, 'live_viewers');
+            if (byLive !== 0) {
+                return byLive;
+            }
+            const byViews = getCameraMetric(right, 'total_views') - getCameraMetric(left, 'total_views');
+            if (byViews !== 0) {
+                return byViews;
+            }
+            return (left?.name || '').localeCompare(right?.name || '');
+        });
+    }
+
+    if (connectionTab === 'newest') {
+        return nextCameras.sort(sortByNewest);
+    }
+
+    return cameras;
+}
 
 export function useLandingCameraFilters(cameras, areas, favorites, viewMode, onCameraClick) {
     const [connectionTab, setConnectionTab] = useState('all');
@@ -114,6 +160,9 @@ export function useLandingCameraFilters(cameras, areas, favorites, viewMode, onC
     }, [areaFilteredCameras, defaultGridAreaConfigs, selectedArea, viewMode]);
 
     const filteredForGrid = useMemo(() => {
+        if (connectionTab === 'popular' || connectionTab === 'newest') {
+            return sortGridCameras(areaFilteredCameras, connectionTab);
+        }
         if (connectionTab === 'stable') {
             return gridAreaScopedCameras.filter((camera) => camera.is_tunnel !== 1);
         }
@@ -124,7 +173,7 @@ export function useLandingCameraFilters(cameras, areas, favorites, viewMode, onC
             return gridAreaScopedCameras.filter((camera) => favorites.includes(camera.id));
         }
         return gridAreaScopedCameras;
-    }, [gridAreaScopedCameras, connectionTab, favorites]);
+    }, [areaFilteredCameras, gridAreaScopedCameras, connectionTab, favorites]);
 
     const favoritesInAreaCount = useMemo(() => (
         areaFilteredCameras.filter((camera) => favorites.includes(camera.id)).length

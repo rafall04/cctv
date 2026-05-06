@@ -1,3 +1,11 @@
+/*
+ * Purpose: Render public landing camera workspace with search, area filters, ranking tabs, grid/map/playback modes, and empty states.
+ * Caller: LandingPage and LandingPageSimple.
+ * Deps: Camera context, public filter hook, landing toolbar/filter/grid/map/playback components.
+ * MainFuncs: CamerasSection, renderSearchDropdown.
+ * SideEffects: Invokes camera popup, map focus, multiview, favorite, and mode-change callbacks.
+ */
+
 import { lazy } from 'react';
 import { useCameras } from '../../contexts/CameraContext';
 import { useLandingCameraFilters } from '../../hooks/public/useLandingCameraFilters';
@@ -215,7 +223,7 @@ export default function CamerasSection({
                         />
                     ) : connectionTab !== 'all' ? (
                         <NoDataWithFilterEmptyState
-                            filterName={connectionTab === 'tunnel' ? 'Koneksi Tunnel' : connectionTab === 'favorites' ? 'Kamera Favorit' : 'Koneksi Stabil'}
+                            filterName={connectionTab === 'tunnel' ? 'Koneksi Tunnel' : connectionTab === 'favorites' ? 'Kamera Favorit' : connectionTab === 'popular' ? 'Paling Ramai' : connectionTab === 'newest' ? 'Kamera Terbaru' : 'Koneksi Stabil'}
                             onClearFilter={() => setConnectionTab('all')}
                         />
                     ) : selectedArea !== 'all' ? (

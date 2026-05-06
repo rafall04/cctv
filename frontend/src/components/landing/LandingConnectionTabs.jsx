@@ -1,3 +1,11 @@
+/*
+ * Purpose: Render grid camera filter/ranking tabs for public landing area results.
+ * Caller: LandingCamerasSection contextual controls.
+ * Deps: Camera viewer stats and favorites arrays.
+ * MainFuncs: LandingConnectionTabs.
+ * SideEffects: Invokes caller-provided tab change handler.
+ */
+
 export default function LandingConnectionTabs({
     connectionTab,
     onChange,
@@ -7,6 +15,7 @@ export default function LandingConnectionTabs({
 }) {
     const stableCount = areaFilteredCameras.filter((camera) => camera.is_tunnel !== 1).length;
     const tunnelCount = areaFilteredCameras.filter((camera) => camera.is_tunnel === 1).length;
+    const newestCount = areaFilteredCameras.filter((camera) => camera.created_at).length || areaFilteredCameras.length;
 
     return (
         <div>
@@ -42,6 +51,28 @@ export default function LandingConnectionTabs({
                 >
                     <span className="w-2 h-2 rounded-full bg-orange-500"></span>
                     Tunnel ({tunnelCount})
+                </button>
+                <button
+                    onClick={() => onChange('popular')}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                        connectionTab === 'popular'
+                            ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                >
+                    <span className="w-2 h-2 rounded-full bg-sky-500"></span>
+                    Paling Ramai ({areaFilteredCameras.length})
+                </button>
+                <button
+                    onClick={() => onChange('newest')}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                        connectionTab === 'newest'
+                            ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                >
+                    <span className="w-2 h-2 rounded-full bg-violet-500"></span>
+                    Terbaru ({newestCount})
                 </button>
                 {favorites.length > 0 && (
                     <button

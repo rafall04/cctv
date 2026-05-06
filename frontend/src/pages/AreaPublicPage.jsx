@@ -1,5 +1,5 @@
 /*
- * Purpose: Render public area-specific CCTV pages with trending, grid, and share entry points.
+ * Purpose: Render public area-specific CCTV pages with standardized popup stream resolution, trending, grid, and share entry points.
  * Caller: App route /area/:areaSlug.
  * Deps: React Router, publicGrowthService, publicGrowthShare, landing components.
  * MainFuncs: AreaPublicPage.
@@ -10,6 +10,7 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import CameraThumbnail from '../components/CameraThumbnail';
 import LandingTrendingCameras from '../components/landing/LandingTrendingCameras';
+import { resolvePublicPopupCamera } from '../services/publicCameraResolver';
 import publicGrowthService from '../services/publicGrowthService';
 import { buildAreaShareText } from '../utils/publicGrowthShare';
 
@@ -141,6 +142,21 @@ export default function AreaPublicPage() {
         };
     }, [areaSlug]);
 
+    const shareText = useMemo(() => (area ? buildAreaShareText(area) : ''), [area]);
+    const newestCameras = useMemo(() => (
+        [...cameras]
+            .filter((camera) => camera.created_at)
+            .sort((left, right) => String(right.created_at).localeCompare(String(left.created_at)))
+            .slice(0, 4)
+    ), [cameras]);
+
+    const handleCameraOpen = useCallback(async (camera) => {
+        const resolvedCamera = await resolvePublicPopupCamera(camera);
+        if (resolvedCamera) {
+            setSelectedCamera(resolvedCamera);
+        }
+    }, []);
+
     useEffect(() => {
         const cameraId = Number.parseInt(searchParams.get('camera'), 10);
         if (!cameraId || !cameras.length) {
@@ -149,17 +165,9 @@ export default function AreaPublicPage() {
 
         const cameraFromUrl = cameras.find((camera) => camera.id === cameraId);
         if (cameraFromUrl) {
-            setSelectedCamera(cameraFromUrl);
+            handleCameraOpen(cameraFromUrl);
         }
-    }, [cameras, searchParams]);
-
-    const shareText = useMemo(() => (area ? buildAreaShareText(area) : ''), [area]);
-    const newestCameras = useMemo(() => (
-        [...cameras]
-            .filter((camera) => camera.created_at)
-            .sort((left, right) => String(right.created_at).localeCompare(String(left.created_at)))
-            .slice(0, 4)
-    ), [cameras]);
+    }, [cameras, handleCameraOpen, searchParams]);
 
     const handleShare = useCallback(async () => {
         if (!shareText) {
@@ -236,13 +244,13 @@ export default function AreaPublicPage() {
             <LandingTrendingCameras
                 cameras={trendingCameras}
                 title={`Top CCTV ${area?.name || ''}`.trim()}
-                onCameraClick={setSelectedCamera}
+                onCameraClick={handleCameraOpen}
             />
 
             <LandingTrendingCameras
                 cameras={newestCameras}
                 title={`Kamera Terbaru ${area?.name || ''}`.trim()}
-                onCameraClick={setSelectedCamera}
+                onCameraClick={handleCameraOpen}
             />
 
             <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
@@ -264,7 +272,7 @@ export default function AreaPublicPage() {
                             <AreaCameraCard
                                 key={camera.id}
                                 camera={camera}
-                                onClick={setSelectedCamera}
+                                onClick={handleCameraOpen}
                             />
                         ))}
                     </div>

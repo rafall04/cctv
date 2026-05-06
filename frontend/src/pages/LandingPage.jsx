@@ -1,5 +1,5 @@
 /*
- * Purpose: Compose the public CCTV landing experience across full/simple modes, compact discovery, map/grid views, and popups.
+ * Purpose: Compose the public CCTV landing experience across full/simple modes, compact discovery, standardized popup streams, map/grid views, and popups.
  * Caller: App public root route.
  * Deps: React, Router search params, branding/camera/toast contexts, landing hooks, landing components, publicGrowthService.
  * MainFuncs: LandingPage, LandingPageContent, DeferredSurfaceFallback.
@@ -28,6 +28,7 @@ import MultiViewButton from '../components/MultiView/MultiViewButton';
 import InlineAdSlot from '../components/ads/InlineAdSlot';
 import GlobalAdScript from '../components/ads/GlobalAdScript';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../components/ads/adsConfig';
+import { resolvePublicPopupCamera } from '../services/publicCameraResolver';
 import publicGrowthService from '../services/publicGrowthService';
 import lazyWithRetry from '../utils/lazyWithRetry';
 
@@ -147,10 +148,11 @@ function LandingPageContent() {
         }
     }, [activePopupSource, popup]);
 
-    const handleGridPopupOpen = useCallback((camera) => {
+    const handleGridPopupOpen = useCallback(async (camera) => {
         setActivePopupSource('grid');
-        handleCameraClick(camera);
-    }, [handleCameraClick]);
+        const resolvedCamera = await resolvePublicPopupCamera(camera, cameras);
+        handleCameraClick(resolvedCamera || camera);
+    }, [cameras, handleCameraClick]);
 
     const handleMapPopupOpen = useCallback((camera) => {
         setActivePopupSource('map');
