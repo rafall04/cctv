@@ -1,9 +1,9 @@
 /*
- * Purpose: Render authenticated admin shell, navigation, theme toggle, and account controls.
+ * Purpose: Render authenticated admin shell, navigation, admin PWA affordances, theme toggle, and account controls.
  * Caller: App.jsx AdminPageRoute.
- * Deps: React Router, authService, theme/notification/branding contexts, NetworkStatusBanner.
- * MainFuncs: AdminLayout.
- * SideEffects: Reads current user, listens for session/network changes, performs logout navigation.
+ * Deps: React Router, authService, theme/notification/branding contexts, NetworkStatusBanner, beforeinstallprompt.
+ * MainFuncs: AdminLayout, AdminPwaInstallBanner, AdminPwaQuickActions.
+ * SideEffects: Reads current user, listens for session/network/PWA install events, performs logout navigation.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -31,6 +31,108 @@ const Icons = {
     Home: () => <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>,
     ChevronRight: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>,
 };
+
+const ADMIN_PWA_DISMISS_KEY = 'rafnet_admin_pwa_prompt_dismissed';
+
+function isStandaloneDisplay() {
+    return window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator?.standalone === true;
+}
+
+function AdminPwaInstallBanner() {
+    const [installEvent, setInstallEvent] = useState(null);
+    const [dismissed, setDismissed] = useState(() => localStorage.getItem(ADMIN_PWA_DISMISS_KEY) === 'true');
+
+    useEffect(() => {
+        const handleBeforeInstallPrompt = (event) => {
+            event.preventDefault();
+            setInstallEvent(event);
+        };
+
+        window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+        return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    }, []);
+
+    const dismiss = () => {
+        localStorage.setItem(ADMIN_PWA_DISMISS_KEY, 'true');
+        setDismissed(true);
+    };
+
+    const install = async () => {
+        if (!installEvent) {
+            dismiss();
+            return;
+        }
+
+        await installEvent.prompt();
+        await installEvent.userChoice.catch(() => null);
+        dismiss();
+    };
+
+    if (dismissed || !installEvent || isStandaloneDisplay()) {
+        return null;
+    }
+
+    return (
+        <section
+            data-testid="admin-pwa-install-banner"
+            className="mb-4 rounded-xl border border-sky-200 bg-white px-4 py-3 shadow-sm dark:border-sky-500/20 dark:bg-gray-900"
+        >
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                    <p className="text-sm font-bold text-gray-900 dark:text-white">Admin App RAF NET</p>
+                    <p className="mt-1 text-xs leading-5 text-gray-600 dark:text-gray-400">
+                        Pasang shortcut admin untuk akses cepat ke kamera, health, analytics, dan token playback.
+                    </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={install}
+                        className="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white transition hover:bg-primary-600"
+                    >
+                        Install Admin App
+                    </button>
+                    <button
+                        type="button"
+                        onClick={dismiss}
+                        className="rounded-lg bg-gray-100 px-3 py-2 text-xs font-bold text-gray-700 transition hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                    >
+                        Nanti
+                    </button>
+                </div>
+            </div>
+        </section>
+    );
+}
+
+function AdminPwaQuickActions() {
+    const actions = [
+        { label: 'Dashboard', path: '/admin/dashboard', icon: <Icons.Dashboard /> },
+        { label: 'Kamera', path: '/admin/cameras', icon: <Icons.Camera /> },
+        { label: 'Health', path: '/admin/health-debug', icon: <Icons.Analytics /> },
+        { label: 'Token', path: '/admin/playback-tokens', icon: <Icons.Playback /> },
+        { label: 'Publik', path: '/', icon: <Icons.Home /> },
+    ];
+
+    return (
+        <nav
+            data-testid="admin-pwa-quick-actions"
+            className="mb-4 flex gap-2 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch] lg:hidden"
+            aria-label="Quick action admin"
+        >
+            {actions.map((action) => (
+                <Link
+                    key={action.path}
+                    to={action.path}
+                    className="flex min-w-[5.5rem] shrink-0 flex-col items-center gap-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 shadow-sm transition hover:border-primary/50 hover:text-primary dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:text-primary"
+                >
+                    {action.icon}
+                    <span>{action.label}</span>
+                </Link>
+            ))}
+        </nav>
+    );
+}
 
 export default function AdminLayout({ children }) {
     const location = useLocation();
@@ -227,6 +329,8 @@ export default function AdminLayout({ children }) {
             <main className="lg:ml-72 min-h-screen overflow-y-auto">
                 <div className={`pb-8 px-4 lg:px-8 transition-all ${isOffline ? 'pt-32 lg:pt-16' : 'pt-16 lg:pt-0'}`}>
                     <div className="max-w-7xl mx-auto">
+                        <AdminPwaInstallBanner />
+                        <AdminPwaQuickActions />
                         {children}
                     </div>
                 </div>

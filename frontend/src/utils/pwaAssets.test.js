@@ -1,5 +1,5 @@
 /*
- * Purpose: Verify public PWA manifest and service worker assets are installable and app-shell friendly.
+ * Purpose: Verify public/admin PWA manifest and service worker assets are installable and app-shell friendly.
  * Caller: Frontend focused PWA asset test gate.
  * Deps: fs, Vitest, frontend/public assets.
  * MainFuncs: PWA manifest and service worker checks.
@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 const publicAssetPath = (filename) => `public/${filename}`;
 
 describe('PWA public assets', () => {
-    it('defines app shortcuts for core public workflows', () => {
+    it('defines app shortcuts for core public and admin workflows', () => {
         const manifest = JSON.parse(fs.readFileSync(publicAssetPath('site.webmanifest'), 'utf8'));
 
         expect(manifest.display).toBe('standalone');
@@ -20,6 +20,9 @@ describe('PWA public assets', () => {
             expect.objectContaining({ name: 'Peta CCTV', url: '/?view=map' }),
             expect.objectContaining({ name: 'Grid CCTV', url: '/?view=grid' }),
             expect.objectContaining({ name: 'Playback', url: '/playback' }),
+            expect.objectContaining({ name: 'Admin Dashboard', url: '/admin/dashboard' }),
+            expect.objectContaining({ name: 'Kamera Admin', url: '/admin/cameras' }),
+            expect.objectContaining({ name: 'Health CCTV', url: '/admin/health-debug' }),
         ]));
     });
 

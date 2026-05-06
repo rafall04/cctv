@@ -47,6 +47,27 @@
       "description": "Buka halaman playback publik",
       "url": "/playback",
       "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Admin Dashboard",
+      "short_name": "Admin",
+      "description": "Buka dashboard admin RAF NET",
+      "url": "/admin/dashboard",
+      "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Kamera Admin",
+      "short_name": "Kamera",
+      "description": "Kelola kamera CCTV dari admin",
+      "url": "/admin/cameras",
+      "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Health CCTV",
+      "short_name": "Health",
+      "description": "Cek status health CCTV",
+      "url": "/admin/health-debug",
+      "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
     }
   ],
   "lang": "id",
