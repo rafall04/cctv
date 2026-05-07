@@ -6,8 +6,21 @@
  * SideEffects: None.
  */
 
+import { createCameraSlug } from './slugify';
+
 function normalizeSlug(value = '') {
     return String(value).trim().toLowerCase().replace(/\s+/g, '-');
+}
+
+function getCameraAreaSlug(camera = {}) {
+    return normalizeSlug(
+        camera.area_slug
+        || camera.areaSlug
+        || camera.slug
+        || camera.area_name
+        || camera.areaName
+        || ''
+    );
 }
 
 export function getPublicAreaSlug(areaInput = {}) {
@@ -36,8 +49,15 @@ export function buildAreaUrl(areaInput, origin = window.location.origin) {
 }
 
 export function buildCameraUrl(camera, origin = window.location.origin) {
-    const baseUrl = buildAreaUrl(getPublicAreaSlug(camera) || 'all', origin);
-    return `${baseUrl}?camera=${encodeURIComponent(camera.id)}`;
+    const cameraSlug = createCameraSlug(camera);
+    const areaSlug = getCameraAreaSlug(camera);
+    const cameraParam = cameraSlug ? `?camera=${encodeURIComponent(cameraSlug)}` : '';
+
+    if (!areaSlug) {
+        return `${origin}/${cameraParam}`;
+    }
+
+    return `${origin}${buildAreaPath(areaSlug)}${cameraParam}`;
 }
 
 export function buildAreaShareText(area, origin = window.location.origin) {
