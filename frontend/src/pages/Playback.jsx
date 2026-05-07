@@ -29,6 +29,7 @@ import PlaybackVideo from '../components/playback/PlaybackVideo';
 import PlaybackTimeline from '../components/playback/PlaybackTimeline';
 import PlaybackSegmentList from '../components/playback/PlaybackSegmentList';
 import PlaybackUsageGuide from '../components/playback/PlaybackUsageGuide';
+import PlaybackQuickActions from '../components/playback/PlaybackQuickActions';
 import PlaybackTokenAccess from '../components/playback/PlaybackTokenAccess.jsx';
 import { useAdminReconnectRefresh } from '../hooks/admin/useAdminReconnectRefresh';
 import { usePlaybackMediaSource } from '../hooks/playback/usePlaybackMediaSource.js';
@@ -1070,6 +1071,12 @@ function Playback({
                     onSegmentClick={handleSegmentClick}
                     formatTimestamp={formatTimestamp}
                 />
+
+                {!isAdminPlayback && (
+                    <PlaybackQuickActions
+                        selectedCamera={selectedCamera}
+                    />
+                )}
             </div>
             </div>
         </>

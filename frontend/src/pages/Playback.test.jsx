@@ -7,7 +7,7 @@
  * MainFuncs: Playback page behavior tests.
  * SideEffects: Mocks localStorage, media element methods, clipboard, and router location.
  */
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useLocation } from 'react-router-dom';
 import { TestRouter } from '../test/renderWithRouter';
@@ -531,6 +531,27 @@ describe('Playback', () => {
         expect(sharedUrl).toContain('cam=1-lobby');
         expect(sharedUrl).not.toContain('mode=full');
         expect(sharedUrl).not.toContain('view=playback');
+    });
+
+    it('menampilkan quick actions publik di bawah playback untuk pindah ke live dan area', async () => {
+        render(
+            <TestRouter initialEntries={['/playback?mode=full&view=playback&cam=1']}>
+                <Playback
+                    cameras={[
+                        { id: 1, name: 'Lobby', enable_recording: 1, area_slug: 'kab-surabaya', area_name: 'Kab Surabaya' },
+                    ]}
+                />
+            </TestRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('playback-quick-actions')).toBeTruthy();
+        });
+
+        const quickActions = within(screen.getByTestId('playback-quick-actions'));
+
+        expect(quickActions.getByRole('link', { name: /Buka CCTV Live/i }).getAttribute('href')).toBe('/area/kab-surabaya?camera=1-lobby');
+        expect(quickActions.getByRole('link', { name: /Buka Area/i }).getAttribute('href')).toBe('/area/kab-surabaya');
     });
 
     it('menampilkan native banner playback tepat di bawah video saat slot aktif', async () => {
