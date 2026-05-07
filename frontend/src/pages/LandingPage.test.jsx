@@ -24,7 +24,7 @@ const { getPublicSaweriaConfig, testBackendReachability, updateMetaTags, getPubl
     videoPopupPropsSpy: vi.fn(),
     landingPageSimplePropsSpy: vi.fn(),
     cameraProviderPropsSpy: vi.fn(),
-    cameraContextState: { deviceTier: 'mid' },
+    cameraContextState: { cameras: [], deviceTier: 'mid' },
 }));
 
 vi.mock('../services/saweriaService', () => ({
@@ -82,7 +82,7 @@ vi.mock('../contexts/CameraContext', () => ({
         return <>{children}</>;
     },
     useCameras: () => ({
-        cameras: [],
+        cameras: cameraContextState.cameras,
         deviceTier: cameraContextState.deviceTier,
     }),
 }));
@@ -221,6 +221,7 @@ describe('LandingPage connectivity recovery', () => {
         videoPopupPropsSpy.mockReset();
         landingPageSimplePropsSpy.mockReset();
         cameraProviderPropsSpy.mockReset();
+        cameraContextState.cameras = [];
         cameraContextState.deviceTier = 'mid';
         testBackendReachability.mockResolvedValue({ reachable: true, latency: 80 });
         getDiscovery.mockResolvedValue({
@@ -404,6 +405,37 @@ describe('LandingPage connectivity recovery', () => {
         expect(cameraProviderPropsSpy).toHaveBeenLastCalledWith(expect.objectContaining({
             autoRefresh: false,
         }));
+    });
+
+    it('merender popup direct URL kamera lewat resolusi stream sebelum playback', async () => {
+        cameraContextState.cameras = [{
+            id: 99,
+            name: 'Map Camera',
+            status: 'active',
+            is_online: 1,
+        }];
+
+        renderWithRouter(<LandingPage />, {
+            initialEntries: ['/?camera=99-map-camera'],
+        });
+
+        await waitFor(() => {
+            expect(resolvePublicPopupCamera).toHaveBeenCalledWith(
+                expect.objectContaining({ id: 99, name: 'Map Camera' }),
+                expect.arrayContaining([expect.objectContaining({ id: 99 })])
+            );
+        });
+
+        await waitFor(() => {
+            expect(videoPopupPropsSpy).toHaveBeenLastCalledWith(expect.objectContaining({
+                camera: expect.objectContaining({
+                    id: 99,
+                    name: 'Map Camera',
+                    _stream_resolution_pending: false,
+                    streams: { hls: 'https://example.com/map.m3u8' },
+                }),
+            }));
+        });
     });
 
     it('mengabaikan hasil resolusi popup yang terlambat saat popup baru dibuka', async () => {

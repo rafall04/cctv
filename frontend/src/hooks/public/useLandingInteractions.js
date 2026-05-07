@@ -21,12 +21,14 @@ export function useLandingInteractions({
     setSearchParams,
     addToast,
     addRecentCamera,
+    resolveUrlCamera,
 }) {
     const [popup, setPopup] = useState(null);
     const [multiCameras, setMultiCameras] = useState([]);
     const [showMulti, setShowMulti] = useState(false);
     const [maxReached, setMaxReached] = useState(false);
     const pendingUrlCameraIdRef = useRef(undefined);
+    const urlResolveRequestRef = useRef(0);
 
     const maxStreams = getMaxConcurrentStreams(deviceTier);
 
@@ -54,11 +56,42 @@ export function useLandingInteractions({
             if (camera) {
                 const isAvailable = isCameraPlayable(camera);
                 if (isAvailable) {
+                    if (typeof resolveUrlCamera === 'function') {
+                        const requestId = urlResolveRequestRef.current + 1;
+                        urlResolveRequestRef.current = requestId;
+                        setPopup({
+                            ...camera,
+                            _stream_resolution_pending: true,
+                        });
+                        addRecentCamera(camera);
+
+                        Promise.resolve(resolveUrlCamera(camera))
+                            .then((resolvedCamera) => {
+                                if (urlResolveRequestRef.current !== requestId) {
+                                    return;
+                                }
+
+                                setPopup({
+                                    ...(resolvedCamera || camera),
+                                    _stream_resolution_pending: false,
+                                });
+                            })
+                            .catch(() => {
+                                if (urlResolveRequestRef.current === requestId) {
+                                    setPopup({
+                                        ...camera,
+                                        _stream_resolution_pending: false,
+                                    });
+                                }
+                            });
+                        return;
+                    }
+
                     setPopup(camera);
                 }
             }
         }
-    }, [cameras, popup?.id, searchParams, viewMode]);
+    }, [addRecentCamera, cameras, popup?.id, resolveUrlCamera, searchParams, viewMode]);
 
     const handleAddMulti = useCallback((camera) => {
         if (!isMultiViewSupported(camera)) {
@@ -103,6 +136,7 @@ export function useLandingInteractions({
 
     const handleCameraClick = useCallback((camera, options = {}) => {
         const { replaceHistory = false } = options;
+        urlResolveRequestRef.current += 1;
         pendingUrlCameraIdRef.current = camera.id;
         setPopup(camera);
         addRecentCamera(camera);
@@ -120,6 +154,7 @@ export function useLandingInteractions({
     }, [addRecentCamera, layoutMode, setSearchParams, viewMode]);
 
     const handlePopupClose = useCallback(() => {
+        urlResolveRequestRef.current += 1;
         pendingUrlCameraIdRef.current = null;
         setPopup(null);
         setSearchParams((previous) => {

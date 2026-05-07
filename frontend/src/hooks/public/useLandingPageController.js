@@ -53,6 +53,7 @@ export function useLandingPageController({
         setSearchParams,
         addToast,
         addRecentCamera,
+        resolveUrlCamera: (camera) => resolvePublicPopupCamera(camera, cameras),
     });
 
     useLandingReachability();
