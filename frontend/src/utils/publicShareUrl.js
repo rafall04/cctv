@@ -37,29 +37,24 @@ export function getPublicLiveView(searchParams) {
 
 export function buildPublicCameraShareUrl({
     origin = typeof window !== 'undefined' ? window.location.origin : '',
-    searchParams,
     camera,
 }) {
-    const params = new URLSearchParams();
-    params.set('mode', getPublicLayoutMode(searchParams));
-    params.set('view', getPublicLiveView(searchParams));
-
-    if (camera) {
-        params.set('camera', camera);
+    if (!camera) {
+        return `${origin}/`;
     }
+
+    const params = new URLSearchParams();
+    params.set('camera', camera);
 
     return `${origin}/?${params.toString()}`;
 }
 
 export function buildPublicPlaybackShareUrl({
     origin = typeof window !== 'undefined' ? window.location.origin : '',
-    searchParams,
     camera,
     timestamp,
 }) {
     const params = new URLSearchParams();
-    params.set('mode', getPublicLayoutMode(searchParams));
-    params.set('view', 'playback');
 
     if (camera) {
         params.set('cam', camera);
@@ -69,5 +64,6 @@ export function buildPublicPlaybackShareUrl({
         params.set('t', String(timestamp));
     }
 
-    return `${origin}/?${params.toString()}`;
+    const queryString = params.toString();
+    return queryString ? `${origin}/playback?${queryString}` : `${origin}/playback`;
 }
