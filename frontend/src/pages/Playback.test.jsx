@@ -533,7 +533,7 @@ describe('Playback', () => {
         expect(sharedUrl).not.toContain('view=playback');
     });
 
-    it('menampilkan quick actions publik di bawah playback untuk pindah ke live dan area', async () => {
+    it('menampilkan mobile dock publik di bawah playback untuk pindah ke home map grid favorit playback', async () => {
         render(
             <TestRouter initialEntries={['/playback?mode=full&view=playback&cam=1']}>
                 <Playback
@@ -545,13 +545,18 @@ describe('Playback', () => {
         );
 
         await waitFor(() => {
-            expect(screen.getByTestId('playback-quick-actions')).toBeTruthy();
+            expect(screen.getByTestId('landing-mobile-dock')).toBeTruthy();
         });
 
-        const quickActions = within(screen.getByTestId('playback-quick-actions'));
+        const mobileDock = within(screen.getByTestId('landing-mobile-dock'));
 
-        expect(quickActions.getByRole('link', { name: /Buka CCTV Live/i }).getAttribute('href')).toBe('/area/kab-surabaya?camera=1-lobby');
-        expect(quickActions.getByRole('link', { name: /Buka Area/i }).getAttribute('href')).toBe('/area/kab-surabaya');
+        expect(screen.queryByTestId('playback-quick-actions')).toBeNull();
+        expect(mobileDock.getByRole('link', { name: 'Home' }).getAttribute('href')).toBe('/');
+        expect(mobileDock.getByRole('link', { name: 'Map' }).getAttribute('href')).toBe('/?view=map&mode=full');
+        expect(mobileDock.getByRole('link', { name: 'Grid' }).getAttribute('href')).toBe('/?view=grid&mode=full');
+        expect(mobileDock.getByRole('link', { name: 'Favorit' }).getAttribute('href')).toBe('/?view=grid&mode=full#public-quick-access');
+        expect(mobileDock.getByRole('link', { name: 'Playback' }).getAttribute('href')).toContain('/playback?');
+        expect(mobileDock.getByRole('link', { name: 'Playback' }).className).toContain('bg-primary');
     });
 
     it('menampilkan native banner playback tepat di bawah video saat slot aktif', async () => {

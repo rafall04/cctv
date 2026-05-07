@@ -1,9 +1,9 @@
 /*
- * Purpose: Render a mobile-only public landing bottom navigation dock for common camera workflows.
- * Caller: LandingPage and LandingPageSimple.
+ * Purpose: Render a mobile-only public bottom navigation dock for common camera workflows.
+ * Caller: LandingPage, LandingPageSimple, and public Playback.
  * Deps: React props and caller-provided view/scroll handlers.
  * MainFuncs: LandingMobileDock.
- * SideEffects: Invokes callbacks to change view mode or scroll public sections.
+ * SideEffects: Invokes callbacks to change view mode or scroll public sections, or navigates when hrefs are provided.
  */
 
 import { Icons } from '../ui/Icons';
@@ -84,6 +84,7 @@ export default function LandingMobileDock({
     onViewModeChange,
     onHomeClick,
     onQuickAccessClick,
+    itemHrefs = null,
     quickAccessCount = 0,
     favoriteCount = 0,
 }) {
@@ -110,18 +111,14 @@ export default function LandingMobileDock({
             <div className="mx-auto grid max-w-md grid-cols-5 gap-1 sm:max-w-none">
                 {NAV_ITEMS.map((item) => {
                     const active = item.key === viewMode;
-                    return (
-                        <button
-                            key={item.key}
-                            type="button"
-                            onClick={() => handleClick(item.key)}
-                            aria-label={item.key === 'quick' && favoriteCount > 0 ? `${item.label} ${favoriteCount}` : item.label}
-                            className={`relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[10px] font-semibold leading-none transition sm:text-[11px] ${
-                                active
-                                    ? 'bg-primary text-white'
-                                    : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
-                            }`}
-                        >
+                    const className = `relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[10px] font-semibold leading-none transition sm:text-[11px] ${
+                        active
+                            ? 'bg-primary text-white'
+                            : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
+                    }`;
+                    const ariaLabel = item.key === 'quick' && favoriteCount > 0 ? `${item.label} ${favoriteCount}` : item.label;
+                    const content = (
+                        <>
                             <span className="flex h-4 w-4 items-center justify-center">
                                 <DockIcon itemKey={item.key} />
                             </span>
@@ -134,6 +131,32 @@ export default function LandingMobileDock({
                             {item.key === 'quick' && quickAccessCount > 0 && (
                                 <span className={`absolute right-1 top-1 h-1.5 w-1.5 rounded-full ${active ? 'bg-white' : 'bg-primary'}`} />
                             )}
+                        </>
+                    );
+                    const href = itemHrefs?.[item.key];
+
+                    if (href) {
+                        return (
+                            <a
+                                key={item.key}
+                                href={href}
+                                aria-label={ariaLabel}
+                                className={className}
+                            >
+                                {content}
+                            </a>
+                        );
+                    }
+
+                    return (
+                        <button
+                            key={item.key}
+                            type="button"
+                            onClick={() => handleClick(item.key)}
+                            aria-label={ariaLabel}
+                            className={className}
+                        >
+                            {content}
                         </button>
                     );
                 })}

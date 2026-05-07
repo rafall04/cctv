@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { cameraService } from '../services/cameraService';
 import recordingService from '../services/recordingService';
 import { useBranding } from '../contexts/BrandingContext';
@@ -29,8 +29,8 @@ import PlaybackVideo from '../components/playback/PlaybackVideo';
 import PlaybackTimeline from '../components/playback/PlaybackTimeline';
 import PlaybackSegmentList from '../components/playback/PlaybackSegmentList';
 import PlaybackUsageGuide from '../components/playback/PlaybackUsageGuide';
-import PlaybackQuickActions from '../components/playback/PlaybackQuickActions';
 import PlaybackTokenAccess from '../components/playback/PlaybackTokenAccess.jsx';
+import LandingMobileDock from '../components/landing/LandingMobileDock.jsx';
 import { useAdminReconnectRefresh } from '../hooks/admin/useAdminReconnectRefresh';
 import { usePlaybackMediaSource } from '../hooks/playback/usePlaybackMediaSource.js';
 import { usePlaybackSelectionActions } from '../hooks/playback/usePlaybackSelectionActions.js';
@@ -60,6 +60,7 @@ function Playback({
     accessScope = PLAYBACK_ACCESS_SCOPES.PUBLIC_PREVIEW,
 }) {
     const [searchParams, setSearchParams] = useSearchParams();
+    const location = useLocation();
     const { cameraParam: cameraIdFromUrl, timestampParam: timestampFromUrl } = getPlaybackUrlState(searchParams);
     const { branding } = useBranding();
     const { formatTime } = useTimezone();
@@ -158,6 +159,17 @@ function Playback({
     const showPlaybackNative = shouldRenderAdSlot(adsConfig, 'playbackNative', isMobileAdsViewport);
     const showPlaybackPopunder = shouldRenderAdSlot(adsConfig, 'playbackPopunder', isMobileAdsViewport);
     const [playbackPopunderTriggerId, setPlaybackPopunderTriggerId] = useState(0);
+    const publicDockHrefs = useMemo(() => {
+        const currentPlaybackHref = `${location.pathname || '/playback'}${location.search || ''}`;
+
+        return {
+            home: '/',
+            map: '/?view=map&mode=full',
+            grid: '/?view=grid&mode=full',
+            quick: '/?view=grid&mode=full#public-quick-access',
+            playback: currentPlaybackHref || '/playback',
+        };
+    }, [location.pathname, location.search]);
     const {
         snapshotNotification,
         clearSnapshotNotification,
@@ -1073,8 +1085,9 @@ function Playback({
                 />
 
                 {!isAdminPlayback && (
-                    <PlaybackQuickActions
-                        selectedCamera={selectedCamera}
+                    <LandingMobileDock
+                        viewMode="playback"
+                        itemHrefs={publicDockHrefs}
                     />
                 )}
             </div>
