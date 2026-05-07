@@ -1,6 +1,9 @@
 /**
- * Viewer Controller
- * Handles viewer session tracking API endpoints
+ * Purpose: Handle live viewer session tracking endpoints and runtime signals.
+ * Caller: viewer routes.
+ * Deps: viewerSessionService, cameraService, cameraHealthService, cameraDelivery utils.
+ * MainFuncs: startViewerSession, viewerHeartbeat, stopViewerSession, reportViewerRuntimeSignal, getActiveViewers, getViewerStats.
+ * SideEffects: Validates viewer start requests, starts/stops live viewer sessions, and writes runtime signal events.
  */
 
 import viewerSessionService from '../services/viewerSessionService.js';
@@ -50,6 +53,12 @@ export async function startViewerSession(request, reply) {
         });
     } catch (error) {
         console.error('Start viewer session error:', error);
+        if (error.statusCode === 403) {
+            return reply.code(403).send({
+                success: false,
+                message: error.message
+            });
+        }
         if (error.statusCode === 404) {
             return reply.code(404).send({
                 success: false,

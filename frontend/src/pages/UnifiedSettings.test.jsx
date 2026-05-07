@@ -32,6 +32,10 @@ vi.mock('../components/admin/settings/PlaybackSettingsPanel', () => ({
     default: () => <div>playback-panel</div>,
 }));
 
+vi.mock('../components/admin/settings/NetworkAccessPolicyPanel', () => ({
+    default: () => <div>network-panel</div>,
+}));
+
 vi.mock('../components/admin/settings/TimezoneSettingsTab', () => ({
     default: () => <div>timezone-panel</div>,
 }));
@@ -61,6 +65,9 @@ describe('UnifiedSettings', () => {
 
         fireEvent.click(screen.getByText('Playback'));
         expect(screen.getByText('playback-panel')).toBeTruthy();
+
+        fireEvent.click(screen.getByText('ASN Access'));
+        expect(screen.getByText('network-panel')).toBeTruthy();
 
         fireEvent.click(screen.getByText('Branding'));
         expect(screen.getByText('branding-panel')).toBeTruthy();

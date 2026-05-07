@@ -60,6 +60,12 @@ function renderLiveHistoryCell(session, column, formatDateTime) {
             return <span className="font-semibold text-gray-900 dark:text-white">{session.camera_name}</span>;
         case 'ip_address':
             return <span className="font-mono text-xs">{session.ip_address}</span>;
+        case 'asn_number':
+            return <span className="font-mono text-xs">{session.asn_number ?? '-'}</span>;
+        case 'asn_org':
+            return <span className="text-xs text-gray-700 dark:text-gray-200">{session.asn_org || '-'}</span>;
+        case 'network_lookup_source':
+            return <span className="text-xs text-gray-500 dark:text-gray-400">{session.network_lookup_source || '-'}</span>;
         case 'device_type':
             return renderDeviceBadge(session.device_type);
         case 'started_at':
@@ -253,6 +259,10 @@ export default function ViewerAnalytics() {
                 fields={[
                     { label: 'Kamera', key: 'camera_name' },
                     { label: 'IP Address', key: 'ip_address' },
+                    { label: 'ASN Number', key: 'asn_number' },
+                    { label: 'ISP / Org', key: 'asn_org' },
+                    { label: 'Lookup Source', key: 'network_lookup_source' },
+                    { label: 'Lookup Version', key: 'network_lookup_version' },
                     { label: 'Device', key: 'device_type' },
                     { label: 'Mulai', render: (session) => formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL }) },
                     { label: 'Selesai', render: (session) => session.ended_at ? formatDateTime(session.ended_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL }) : '-' },
@@ -334,6 +344,9 @@ export default function ViewerAnalytics() {
                                             {renderDeviceBadge(session.device_type)}
                                         </div>
                                         <div className="mt-1 font-mono text-xs text-gray-500 dark:text-gray-400">{session.ip_address}</div>
+                                        <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                            ASN {session.asn_number || session.asnNumber || '-'} · {session.asn_org || session.asnOrg || '-'}
+                                        </div>
                                         <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                                             {formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL })} • {formatWatchTime(session.duration_seconds)}
                                         </div>
@@ -418,6 +431,8 @@ export default function ViewerAnalytics() {
                         columns={[
                             { key: 'camera_name', label: 'Kamera' },
                             { key: 'ip_address', label: 'IP Address' },
+                            { key: 'asn_number', label: 'ASN' },
+                            { key: 'asn_org', label: 'ISP / Org' },
                             { key: 'device_type', label: 'Perangkat' },
                             { key: 'started_at', label: 'Mulai' },
                             { key: 'ended_at', label: 'Selesai' },
@@ -466,7 +481,7 @@ export default function ViewerAnalytics() {
                                     <input
                                         value={historySearch}
                                         onChange={(event) => setHistorySearch(event.target.value)}
-                                        placeholder="IP, kamera, perangkat"
+                                        placeholder="IP, ASN, ISP, kamera"
                                         className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 dark:text-white"
                                     />
                                 </label>

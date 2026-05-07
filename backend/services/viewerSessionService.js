@@ -1,7 +1,7 @@
 /**
  * Purpose: Manage real-time live viewer sessions and historical live-view analytics for CCTV streams.
  * Caller: viewer routes, HLS proxy/session cleanup, backend startup cleanup timer.
- * Deps: connectionPool, uuid, timeService, viewerAnalyticsService, cacheService, cameraViewStatsService.
+ * Deps: connectionPool, uuid, timeService, viewerAnalyticsService, cacheService, cameraViewStatsService, network identity/policy services.
  * MainFuncs: startSession, heartbeat, endSession, cleanupStaleSessions, getViewerStats, getSessionHistory.
  * SideEffects: Writes viewer session/history rows, updates camera lifetime view counters, and runs cleanup timers.
  * 
@@ -25,7 +25,11 @@ import { v4 as uuidv4 } from 'uuid';
 import viewerAnalyticsService from './viewerAnalyticsService.js';
 import { cacheGetOrSetSync, cacheKey, CacheNamespace, CacheTTL } from './cacheService.js';
 import cameraViewStatsService from './cameraViewStatsService.js';
+import networkIdentityService from './networkIdentityService.js';
+import networkAccessPolicyService from './networkAccessPolicyService.js';
+import { logSecurityEvent, SECURITY_EVENTS } from './securityAuditLogger.js';
 import { diffLocalSqlSeconds, getLocalDate, getLocalDateWithOffset, getLocalSqlWithOffsetDays, nowLocalSql, resolveLocalSqlTimestamp } from './timeService.js';
+import { getTrustedViewerIdentity } from '../utils/trustedProxyIdentity.js';
 
 /**
  * Get current date in configured timezone for date comparisons
@@ -87,8 +91,8 @@ function buildHistoryFilters({ cameraId = null, deviceType = '', search = '' } =
 
     if (typeof search === 'string' && search.trim()) {
         const likeValue = `%${search.trim()}%`;
-        clauses.push('AND (camera_name LIKE ? OR ip_address LIKE ? OR device_type LIKE ?)');
-        params.push(likeValue, likeValue, likeValue);
+        clauses.push('AND (camera_name LIKE ? OR ip_address LIKE ? OR device_type LIKE ? OR asn_org LIKE ? OR CAST(asn_number AS TEXT) LIKE ? OR network_lookup_source LIKE ?)');
+        params.push(likeValue, likeValue, likeValue, likeValue, likeValue, likeValue);
     }
 
     return {
@@ -143,15 +147,7 @@ class ViewerSessionService {
     }
 
     getRealIP(request) {
-        const forwardedFor = request.headers['x-forwarded-for'];
-        if (forwardedFor) {
-            return forwardedFor.split(',')[0].trim();
-        }
-        const realIP = request.headers['x-real-ip'];
-        if (realIP) {
-            return realIP.trim();
-        }
-        return request.ip || request.socket?.remoteAddress || 'unknown';
+        return getTrustedViewerIdentity(request);
     }
 
     getDeviceType(userAgent) {
@@ -172,12 +168,78 @@ class ViewerSessionService {
         const userAgent = request.headers['user-agent'] || '';
         const deviceType = this.getDeviceType(userAgent);
         const timestamp = nowLocalSql();
+        const networkIdentity = networkIdentityService.resolveIpIdentity(ipAddress);
+        let accessDecision;
+        try {
+            accessDecision = networkAccessPolicyService.enforceAccess({
+                cameraId,
+                accessFlow: 'live',
+                identity: networkIdentity,
+            });
+        } catch (error) {
+            if (error.statusCode === 403) {
+                logSecurityEvent(SECURITY_EVENTS.NETWORK_ACCESS_DENIED, {
+                    flow: 'live',
+                    camera_id: cameraId,
+                    ip_address: ipAddress,
+                    asn_number: networkIdentity.asnNumber || null,
+                    asn_org: networkIdentity.asnOrg || 'unknown',
+                    network_lookup_source: networkIdentity.lookupSource || 'unavailable',
+                    network_lookup_version: networkIdentity.lookupVersion || 'unavailable',
+                    policy_mode: error.decision?.policy?.mode || 'observe_only',
+                    policy_scope: error.decision?.policy?.scope || 'global',
+                    policy_target_id: error.decision?.policy?.targetId ?? null,
+                    policy_access_flow: error.decision?.policy?.accessFlow || 'live',
+                    reason: error.decision?.reason || 'denied',
+                }, request);
+            }
+            throw error;
+        }
 
         try {
             execute(`
-                INSERT INTO viewer_sessions (session_id, camera_id, ip_address, user_agent, device_type, started_at, last_heartbeat)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            `, [sessionId, cameraId, ipAddress, userAgent, deviceType, timestamp, timestamp]);
+                INSERT INTO viewer_sessions (
+                    session_id,
+                    camera_id,
+                    ip_address,
+                    user_agent,
+                    device_type,
+                    asn_number,
+                    asn_org,
+                    network_lookup_source,
+                    network_lookup_version,
+                    started_at,
+                    last_heartbeat
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [
+                sessionId,
+                cameraId,
+                ipAddress,
+                userAgent,
+                deviceType,
+                networkIdentity.asnNumber || null,
+                networkIdentity.asnOrg || 'unknown',
+                networkIdentity.lookupSource || 'unavailable',
+                networkIdentity.lookupVersion || 'unavailable',
+                timestamp,
+                timestamp
+            ]);
+
+            logSecurityEvent(SECURITY_EVENTS.NETWORK_ACCESS_ALLOWED, {
+                flow: 'live',
+                camera_id: cameraId,
+                session_id: sessionId,
+                ip_address: ipAddress,
+                asn_number: networkIdentity.asnNumber || null,
+                asn_org: networkIdentity.asnOrg || 'unknown',
+                network_lookup_source: networkIdentity.lookupSource || 'unavailable',
+                network_lookup_version: networkIdentity.lookupVersion || 'unavailable',
+                policy_mode: accessDecision.policy?.mode || 'observe_only',
+                policy_scope: accessDecision.policy?.scope || 'global',
+                policy_target_id: accessDecision.policy?.targetId ?? null,
+                policy_access_flow: accessDecision.policy?.accessFlow || 'live',
+            }, request);
 
             console.log(`[ViewerSession] Started: ${sessionId} for camera ${cameraId} from ${ipAddress} at ${timestamp}`);
             return sessionId;
@@ -224,14 +286,18 @@ class ViewerSessionService {
 
             execute(`
                 INSERT INTO viewer_session_history 
-                (camera_id, camera_name, ip_address, user_agent, device_type, started_at, ended_at, duration_seconds)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (camera_id, camera_name, ip_address, user_agent, device_type, asn_number, asn_org, network_lookup_source, network_lookup_version, started_at, ended_at, duration_seconds)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, [
                 session.camera_id,
                 camera?.name || `Camera ${session.camera_id}`,
                 session.ip_address,
                 session.user_agent,
                 session.device_type,
+                session.asn_number ?? null,
+                session.asn_org || 'unknown',
+                session.network_lookup_source || 'unavailable',
+                session.network_lookup_version || 'unavailable',
                 session.started_at,
                 timestamp,
                 durationSeconds
@@ -296,6 +362,10 @@ class ViewerSessionService {
                     ip_address,
                     user_agent,
                     device_type,
+                    asn_number,
+                    asn_org,
+                    network_lookup_source,
+                    network_lookup_version,
                     started_at,
                     ended_at,
                     duration_seconds,
@@ -309,6 +379,10 @@ class ViewerSessionService {
                     ip_address,
                     user_agent,
                     device_type,
+                    asn_number,
+                    asn_org,
+                    network_lookup_source,
+                    network_lookup_version,
                     started_at,
                     ended_at,
                     duration_seconds,
@@ -344,6 +418,10 @@ class ViewerSessionService {
                     c.name as camera_name,
                     vs.ip_address,
                     vs.device_type,
+                    vs.asn_number,
+                    vs.asn_org,
+                    vs.network_lookup_source,
+                    vs.network_lookup_version,
                     vs.started_at,
                     vs.last_heartbeat,
                     CAST((julianday(?) - julianday(vs.started_at)) * 86400 AS INTEGER) as duration_seconds
@@ -366,6 +444,10 @@ class ViewerSessionService {
                     session_id,
                     ip_address,
                     device_type,
+                    asn_number,
+                    asn_org,
+                    network_lookup_source,
+                    network_lookup_version,
                     started_at,
                     last_heartbeat,
                     CAST((julianday(?) - julianday(started_at)) * 86400 AS INTEGER) as duration_seconds
@@ -464,6 +546,10 @@ class ViewerSessionService {
                     ip_address,
                     user_agent,
                     device_type,
+                    asn_number,
+                    asn_org,
+                    network_lookup_source,
+                    network_lookup_version,
                     started_at,
                     ended_at,
                     duration_seconds
@@ -577,6 +663,10 @@ class ViewerSessionService {
                     camera_name,
                     ip_address,
                     device_type,
+                    asn_number,
+                    asn_org,
+                    network_lookup_source,
+                    network_lookup_version,
                     started_at
                 FROM viewer_session_history
                 WHERE datetime(started_at) >= datetime(?, '-5 minutes')
@@ -592,6 +682,10 @@ class ViewerSessionService {
                     cameraName: s.camera_name,
                     ipAddress: s.ip_address,
                     deviceType: s.device_type,
+                    asnNumber: s.asn_number,
+                    asnOrg: s.asn_org,
+                    networkLookupSource: s.network_lookup_source,
+                    networkLookupVersion: s.network_lookup_version,
                     startedAt: s.started_at,
                     durationSeconds: s.duration_seconds
                 })),

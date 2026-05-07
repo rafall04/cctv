@@ -10,6 +10,7 @@
  * - Log CSRF token failures
  * - Log account lockout events
  * - Log admin actions
+ * - Log network access decisions for ASN policy enforcement
  * - Include fingerprint in all entries
  * - 90-day log retention with automatic cleanup
  * 
@@ -46,7 +47,9 @@ export const SECURITY_EVENTS = {
     USER_DELETED: 'USER_DELETED',
     CAMERA_CREATED: 'CAMERA_CREATED',
     CAMERA_UPDATED: 'CAMERA_UPDATED',
-    CAMERA_DELETED: 'CAMERA_DELETED'
+    CAMERA_DELETED: 'CAMERA_DELETED',
+    NETWORK_ACCESS_ALLOWED: 'NETWORK_ACCESS_ALLOWED',
+    NETWORK_ACCESS_DENIED: 'NETWORK_ACCESS_DENIED'
 };
 
 // Alias for backward compatibility

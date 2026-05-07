@@ -95,6 +95,12 @@ function renderPlaybackHistoryCell(session, column, formatDateTime) {
                     )}
                 </div>
             );
+        case 'asn_number':
+            return <span className="font-mono text-xs">{session.asn_number ?? '-'}</span>;
+        case 'asn_org':
+            return <span className="text-xs text-gray-700 dark:text-gray-200">{session.asn_org || '-'}</span>;
+        case 'network_lookup_source':
+            return <span className="text-xs text-gray-500 dark:text-gray-400">{session.network_lookup_source || '-'}</span>;
         case 'device_type':
             return renderDeviceBadge(session.device_type);
         case 'started_at':
@@ -296,6 +302,10 @@ export default function PlaybackAnalytics() {
                     { label: 'Segment', key: 'segment_filename' },
                     { label: 'Mode Akses', key: 'playback_access_mode' },
                     { label: 'Viewer / IP', key: 'ip_address' },
+                    { label: 'ASN Number', key: 'asn_number' },
+                    { label: 'ISP / Org', key: 'asn_org' },
+                    { label: 'Lookup Source', key: 'network_lookup_source' },
+                    { label: 'Lookup Version', key: 'network_lookup_version' },
                     { label: 'Admin', key: 'admin_username' },
                     { label: 'Device', key: 'device_type' },
                     { label: 'Mulai', render: (session) => formatDateTime(session.started_at, { storage: TIMESTAMP_STORAGE.LOCAL_SQL }) },
@@ -418,6 +428,8 @@ export default function PlaybackAnalytics() {
                                         </div>
                                         <div className="mt-3 grid gap-1 text-sm text-gray-600 dark:text-gray-300">
                                             <div>IP: {session.ip_address || session.ipAddress}</div>
+                                            <div>ASN: {session.asn_number || session.asnNumber || '-'}</div>
+                                            <div>ISP: {session.asn_org || session.asnOrg || '-'}</div>
                                             <div>Device: {session.device_type || session.deviceType}</div>
                                             <div>Durasi: {formatWatchTime(session.duration_seconds || session.durationSeconds || 0)}</div>
                                             {(session.admin_username || session.adminUsername) && (
@@ -453,6 +465,8 @@ export default function PlaybackAnalytics() {
                             { key: 'camera_name', label: 'Kamera / Segment' },
                             { key: 'playback_access_mode', label: 'Akses' },
                             { key: 'viewer', label: 'Viewer' },
+                            { key: 'asn_number', label: 'ASN' },
+                            { key: 'asn_org', label: 'ISP / Org' },
                             { key: 'device_type', label: 'Perangkat' },
                             { key: 'started_at', label: 'Mulai' },
                             { key: 'duration_seconds', label: 'Durasi' },
@@ -499,7 +513,7 @@ export default function PlaybackAnalytics() {
                                     <input
                                         value={historySearch}
                                         onChange={(event) => setHistorySearch(event.target.value)}
-                                        placeholder="IP, segment, admin"
+                                        placeholder="IP, ASN, ISP, segment, admin"
                                         className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-950 dark:text-white"
                                     />
                                 </label>

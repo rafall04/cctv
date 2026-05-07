@@ -50,6 +50,7 @@ import recordingRoutes from './routes/recordingRoutes.js';
 import playbackTokenRoutes from './routes/playbackTokenRoutes.js';
 import brandingRoutes from './routes/brandingRoutes.js';
 import publicGrowthRoutes from './routes/publicGrowthRoutes.js';
+import networkAccessPolicyRoutes from './routes/networkAccessPolicyRoutes.js';
 // thumbnailRoutes removed - @fastify/static handles thumbnails
 import mediaMtxService from './services/mediaMtxService.js';
 import streamWarmer from './services/streamWarmer.js';
@@ -273,6 +274,7 @@ await fastify.register(saweriaRoutes, { prefix: '/api/saweria' });
 await fastify.register(recordingRoutes, { prefix: '/api' });
 await fastify.register(playbackTokenRoutes, { prefix: '/api' });
 await fastify.register(brandingRoutes, { prefix: '/api/branding' });
+await fastify.register(networkAccessPolicyRoutes, { prefix: '/api/network-access-policies' });
 // thumbnailRoutes removed - @fastify/static handles /api/thumbnails/* automatically
 
 // ============================================

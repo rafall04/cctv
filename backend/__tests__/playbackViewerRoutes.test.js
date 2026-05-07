@@ -1,3 +1,11 @@
+/**
+ * Purpose: Verify playback viewer routes map service behavior to HTTP responses.
+ * Caller: Vitest backend suite.
+ * Deps: Fastify playback viewer routes, playback viewer session service, camera service, auth middleware.
+ * MainFuncs: playbackViewerRoutes test cases for start, validation, and analytics behavior.
+ * SideEffects: Exercises route handlers against mocked services.
+ */
+
 import Fastify from 'fastify';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -135,6 +143,32 @@ describe('playbackViewerRoutes', () => {
         expect(response.statusCode).toBe(400);
         expect(response.json().message).toBe('Camera is disabled');
         expect(startSessionMock).not.toHaveBeenCalled();
+        await fastify.close();
+    });
+
+    it('returns 403 when ASN policy denies playback access', async () => {
+        getCameraByIdMock.mockReturnValue({ id: 11, enabled: 1, name: 'Garage' });
+        startSessionMock.mockImplementationOnce(() => {
+            const error = new Error('ASN policy denied');
+            error.statusCode = 403;
+            throw error;
+        });
+        const { default: playbackViewerRoutes } = await import('../routes/playbackViewerRoutes.js');
+        const fastify = Fastify();
+        await fastify.register(playbackViewerRoutes, { prefix: '/api/playback-viewer' });
+
+        const response = await fastify.inject({
+            method: 'POST',
+            url: '/api/playback-viewer/start',
+            payload: {
+                cameraId: 11,
+                segmentFilename: 'seg-11.mp4',
+                accessMode: 'public_preview',
+            },
+        });
+
+        expect(response.statusCode).toBe(403);
+        expect(response.json().message).toBe('ASN policy denied');
         await fastify.close();
     });
 

@@ -3,11 +3,12 @@
 /**
  * Purpose: Verifies the lightweight landing mode composition, status copy, compact discovery, and ad placement.
  * Caller: Frontend Vitest suite.
- * Deps: mocked theme, branding, cameras, public config, ads, and floating widgets.
+ * Deps: react-router MemoryRouter, mocked theme, branding, cameras, public config, ads, and floating widgets.
  * MainFuncs: LandingPageSimple render tests.
  * SideEffects: Renders into jsdom only.
  */
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import LandingPageSimple from './LandingPageSimple';
 
@@ -66,26 +67,33 @@ vi.mock('../SaweriaSupport', () => ({
     default: () => <div>saweria-support</div>,
 }));
 
+function renderLandingPageSimple(props) {
+    return render(
+        <MemoryRouter>
+            <LandingPageSimple {...props} />
+        </MemoryRouter>
+    );
+}
+
 describe('LandingPageSimple', () => {
     it('merender footer banner di bawah cameras section dan sebelum footer', async () => {
         const CamerasSection = () => <div data-testid="cameras-section">cameras</div>;
 
-        render(
-            <LandingPageSimple
-                onCameraClick={vi.fn()}
-                onAddMulti={vi.fn()}
-                multiCameras={[]}
-                saweriaEnabled={false}
-                saweriaLink=""
-                CamerasSection={CamerasSection}
-                layoutMode="simple"
-                onLayoutToggle={vi.fn()}
-                favorites={[]}
-                onToggleFavorite={vi.fn()}
-                isFavorite={vi.fn(() => false)}
-                viewMode="grid"
-                setViewMode={vi.fn()}
-                adsConfig={{
+        renderLandingPageSimple({
+                onCameraClick: vi.fn(),
+                onAddMulti: vi.fn(),
+                multiCameras: [],
+                saweriaEnabled: false,
+                saweriaLink: '',
+                CamerasSection,
+                layoutMode: 'simple',
+                onLayoutToggle: vi.fn(),
+                favorites: [],
+                onToggleFavorite: vi.fn(),
+                isFavorite: vi.fn(() => false),
+                viewMode: 'grid',
+                setViewMode: vi.fn(),
+                adsConfig: {
                     enabled: true,
                     devices: { desktop: true, mobile: true },
                     slots: {
@@ -98,9 +106,8 @@ describe('LandingPageSimple', () => {
                             },
                         },
                     },
-                }}
-            />
-        );
+                },
+            });
 
         await screen.findByText('feedback-widget');
 
@@ -119,24 +126,22 @@ describe('LandingPageSimple', () => {
     it('menampilkan ringkasan online dan offline di bagian atas mode simpel', async () => {
         const CamerasSection = () => <div data-testid="cameras-section">cameras</div>;
 
-        render(
-            <LandingPageSimple
-                onCameraClick={vi.fn()}
-                onAddMulti={vi.fn()}
-                multiCameras={[]}
-                saweriaEnabled={false}
-                saweriaLink=""
-                CamerasSection={CamerasSection}
-                layoutMode="simple"
-                onLayoutToggle={vi.fn()}
-                favorites={[]}
-                onToggleFavorite={vi.fn()}
-                isFavorite={vi.fn(() => false)}
-                viewMode="grid"
-                setViewMode={vi.fn()}
-                adsConfig={null}
-            />
-        );
+        renderLandingPageSimple({
+                onCameraClick: vi.fn(),
+                onAddMulti: vi.fn(),
+                multiCameras: [],
+                saweriaEnabled: false,
+                saweriaLink: '',
+                CamerasSection,
+                layoutMode: 'simple',
+                onLayoutToggle: vi.fn(),
+                favorites: [],
+                onToggleFavorite: vi.fn(),
+                isFavorite: vi.fn(() => false),
+                viewMode: 'grid',
+                setViewMode: vi.fn(),
+                adsConfig: null,
+            });
 
         await screen.findByText('feedback-widget');
 
@@ -154,30 +159,28 @@ describe('LandingPageSimple', () => {
     it('menampilkan discovery compact yang sama di mode simpel', () => {
         const CamerasSection = () => <div data-testid="cameras-section">cameras</div>;
 
-        render(
-            <LandingPageSimple
-                onCameraClick={vi.fn()}
-                onAddMulti={vi.fn()}
-                multiCameras={[]}
-                saweriaEnabled={false}
-                saweriaLink=""
-                CamerasSection={CamerasSection}
-                layoutMode="simple"
-                onLayoutToggle={vi.fn()}
-                favorites={[]}
-                onToggleFavorite={vi.fn()}
-                isFavorite={vi.fn(() => false)}
-                viewMode="grid"
-                setViewMode={vi.fn()}
-                adsConfig={null}
-                publicDiscovery={{
+        renderLandingPageSimple({
+                onCameraClick: vi.fn(),
+                onAddMulti: vi.fn(),
+                multiCameras: [],
+                saweriaEnabled: false,
+                saweriaLink: '',
+                CamerasSection,
+                layoutMode: 'simple',
+                onLayoutToggle: vi.fn(),
+                favorites: [],
+                onToggleFavorite: vi.fn(),
+                isFavorite: vi.fn(() => false),
+                viewMode: 'grid',
+                setViewMode: vi.fn(),
+                adsConfig: null,
+                publicDiscovery: {
                     live_now: [{ id: 9, name: 'CCTV Compact' }],
                     top_cameras: [],
                     new_cameras: [],
                     popular_areas: [],
-                }}
-            />
-        );
+                },
+            });
 
         expect(screen.getByTestId('landing-discovery-strip').textContent).toContain('CCTV Compact');
     });

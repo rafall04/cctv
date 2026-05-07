@@ -1,11 +1,13 @@
+/**
+ * Purpose: Build live viewer analytics from session history and active viewer state.
+ * Caller: viewerSessionService and admin analytics routes/pages.
+ * Deps: connectionPool, timezoneService, viewer session history tables.
+ * MainFuncs: getAnalytics, overview helpers, retention helpers.
+ * SideEffects: Reads viewer_session_history and returns derived analytics payloads.
+ */
+
 import { query, queryOne } from '../database/connectionPool.js';
 import { getTimezone } from './timezoneService.js';
-// Removed circular dependency import
-
-/**
- * Viewer Analytics Service
- * Responsible for querying and standardizing analytics from viewer sessions.
- */
 
 function getDate() {
     const timezone = getTimezone();
@@ -218,7 +220,7 @@ class ViewerAnalyticsService {
             `);
 
             const recentSessions = query(`
-                SELECT id, camera_id, camera_name, ip_address, device_type, started_at, ended_at, duration_seconds
+                SELECT id, camera_id, camera_name, ip_address, device_type, asn_number, asn_org, network_lookup_source, network_lookup_version, started_at, ended_at, duration_seconds
                 FROM viewer_session_history
                 WHERE 1=1 ${dateFilter}
                 ORDER BY started_at DESC LIMIT 50
@@ -279,7 +281,9 @@ class ViewerAnalyticsService {
                 topCameras, deviceBreakdown, topVisitors, recentSessions, peakHours, cameraPerformance,
                 activeSessions: activeSessions.map(s => ({
                     sessionId: s.session_id, cameraId: s.camera_id, cameraName: s.camera_name,
-                    ipAddress: s.ip_address, deviceType: s.device_type, startedAt: s.started_at, durationSeconds: s.duration_seconds
+                    ipAddress: s.ip_address, deviceType: s.device_type, asnNumber: s.asn_number,
+                    asnOrg: s.asn_org, networkLookupSource: s.network_lookup_source,
+                    networkLookupVersion: s.network_lookup_version, startedAt: s.started_at, durationSeconds: s.duration_seconds
                 })),
             };
         } catch (error) {

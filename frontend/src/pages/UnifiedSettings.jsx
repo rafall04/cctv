@@ -1,3 +1,11 @@
+/*
+ * Purpose: Render the admin settings workspace and route tab state to each settings panel.
+ * Caller: Admin protected route for /admin/settings.
+ * Deps: React, admin settings panels.
+ * MainFuncs: UnifiedSettings.
+ * SideEffects: Switches local tab state only; child panels perform API side effects.
+ */
+
 import { useState } from 'react';
 import TelegramSettingsPanel from '../components/admin/settings/TelegramSettingsPanel';
 import SaweriaSettingsPanel from '../components/admin/settings/SaweriaSettingsPanel';
@@ -6,6 +14,7 @@ import GeneralSettingsPanel from '../components/admin/settings/GeneralSettingsPa
 import AdsSettingsPanel from '../components/admin/settings/AdsSettingsPanel';
 import StreamHealthSettingsPanel from '../components/admin/settings/StreamHealthSettingsPanel';
 import PlaybackSettingsPanel from '../components/admin/settings/PlaybackSettingsPanel';
+import NetworkAccessPolicyPanel from '../components/admin/settings/NetworkAccessPolicyPanel';
 import ApiKeySettings from '../components/admin/settings/ApiKeySettings';
 import TimezoneSettingsTab from '../components/admin/settings/TimezoneSettingsTab';
 import BackupSettingsTab from '../components/admin/settings/BackupSettingsTab';
@@ -48,6 +57,12 @@ const Icons = {
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
     ),
+    Network: () => (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 3l7 4v5c0 4.5-2.9 7.7-7 9-4.1-1.3-7-4.5-7-9V7l7-4z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9.5 12.5l1.8 1.8 3.7-4" />
+        </svg>
+    ),
     ApiKey: () => (
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
@@ -74,6 +89,7 @@ export default function UnifiedSettings() {
         { id: 'backup', label: 'Backup', icon: <Icons.Backup /> },
         { id: 'health', label: 'Health', icon: <Icons.Health /> },
         { id: 'playback', label: 'Playback', icon: <Icons.Playback /> },
+        { id: 'network', label: 'ASN Access', icon: <Icons.Network /> },
         { id: 'telegram', label: 'Telegram Bot', icon: <Icons.Telegram /> },
         { id: 'saweria', label: 'Saweria', icon: <Icons.Saweria /> },
         { id: 'ads', label: 'Ads', icon: <Icons.Ads /> },
@@ -122,6 +138,7 @@ export default function UnifiedSettings() {
                 {activeTab === 'backup' && <BackupSettingsTab />}
                 {activeTab === 'health' && <StreamHealthSettingsPanel />}
                 {activeTab === 'playback' && <PlaybackSettingsPanel />}
+                {activeTab === 'network' && <NetworkAccessPolicyPanel />}
                 {activeTab === 'telegram' && <TelegramSettingsPanel />}
                 {activeTab === 'saweria' && <SaweriaSettingsPanel />}
                 {activeTab === 'ads' && <AdsSettingsPanel />}

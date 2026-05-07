@@ -13,11 +13,17 @@ const {
     queryOneMock,
     executeMock,
     recordCompletedLiveViewMock,
+    resolveIpIdentityMock,
+    enforceAccessMock,
+    logSecurityEventMock,
 } = vi.hoisted(() => ({
     queryMock: vi.fn(),
     queryOneMock: vi.fn(),
     executeMock: vi.fn(),
     recordCompletedLiveViewMock: vi.fn(),
+    resolveIpIdentityMock: vi.fn(),
+    enforceAccessMock: vi.fn(),
+    logSecurityEventMock: vi.fn(),
 }));
 
 vi.mock('../database/connectionPool.js', () => ({
@@ -46,6 +52,26 @@ vi.mock('../services/cacheService.js', () => ({
 vi.mock('../services/cameraViewStatsService.js', () => ({
     default: {
         recordCompletedLiveView: recordCompletedLiveViewMock,
+    },
+}));
+
+vi.mock('../services/securityAuditLogger.js', () => ({
+    SECURITY_EVENTS: {
+        NETWORK_ACCESS_ALLOWED: 'NETWORK_ACCESS_ALLOWED',
+        NETWORK_ACCESS_DENIED: 'NETWORK_ACCESS_DENIED',
+    },
+    logSecurityEvent: logSecurityEventMock,
+}));
+
+vi.mock('../services/networkIdentityService.js', () => ({
+    default: {
+        resolveIpIdentity: resolveIpIdentityMock,
+    },
+}));
+
+vi.mock('../services/networkAccessPolicyService.js', () => ({
+    default: {
+        enforceAccess: enforceAccessMock,
     },
 }));
 
@@ -80,7 +106,87 @@ describe('viewerSessionService', () => {
         executeMock.mockReset();
         executeMock.mockReturnValue({ changes: 1 });
         recordCompletedLiveViewMock.mockReset();
+        resolveIpIdentityMock.mockReset();
+        resolveIpIdentityMock.mockReturnValue({
+            ipAddress: '127.0.0.1',
+            asnNumber: 7713,
+            asnOrg: 'PT Telekomunikasi Indonesia',
+            lookupSource: 'geolite2_asn',
+            lookupVersion: '2026-05-07',
+        });
+        enforceAccessMock.mockReset();
+        enforceAccessMock.mockReturnValue({ allowed: true, reason: 'observe_only' });
+        logSecurityEventMock.mockReset();
         viewerSessionService.lastRetentionRunAt = Date.now();
+    });
+
+    it('blocks live session creation when ASN policy denies access', () => {
+        const policyError = new Error('ASN policy denied');
+        policyError.statusCode = 403;
+        enforceAccessMock.mockImplementation(() => {
+            throw policyError;
+        });
+
+        expect(() => viewerSessionService.startSession(12, {
+            headers: { 'user-agent': 'vitest' },
+            ip: '127.0.0.1',
+        })).toThrow('ASN policy denied');
+
+        expect(resolveIpIdentityMock).toHaveBeenCalledWith('127.0.0.1');
+        expect(enforceAccessMock).toHaveBeenCalledWith({
+            cameraId: 12,
+            accessFlow: 'live',
+            identity: expect.objectContaining({ asnNumber: 7713 }),
+        });
+        expect(logSecurityEventMock).toHaveBeenCalledWith(
+            'NETWORK_ACCESS_DENIED',
+            expect.objectContaining({
+                flow: 'live',
+                camera_id: 12,
+                asn_number: 7713,
+            }),
+            expect.any(Object)
+        );
+        expect(executeMock).not.toHaveBeenCalled();
+    });
+
+    it('persists live ASN identity columns when a session starts', () => {
+        const sessionId = viewerSessionService.startSession(12, {
+            headers: { 'user-agent': 'vitest' },
+            ip: '127.0.0.1',
+        });
+
+        expect(sessionId).toEqual(expect.any(String));
+        const insertCall = executeMock.mock.calls.find(([sql]) => sql.includes('INSERT INTO viewer_sessions'));
+        expect(insertCall).toBeTruthy();
+        expect(insertCall[0].match(/\?/g)).toHaveLength(insertCall[1].length);
+        expect(insertCall[1]).toEqual(expect.arrayContaining([
+            7713,
+            'PT Telekomunikasi Indonesia',
+            'geolite2_asn',
+            '2026-05-07',
+        ]));
+        expect(logSecurityEventMock).toHaveBeenCalledWith(
+            'NETWORK_ACCESS_ALLOWED',
+            expect.objectContaining({
+                flow: 'live',
+                camera_id: 12,
+                asn_number: 7713,
+            }),
+            expect.any(Object)
+        );
+    });
+
+    it('does not trust spoofed forwarded IP headers from untrusted live viewer requests', () => {
+        viewerSessionService.startSession(12, {
+            headers: {
+                'user-agent': 'vitest',
+                'x-forwarded-for': '8.8.8.8',
+            },
+            ip: '203.0.113.10',
+        });
+
+        expect(resolveIpIdentityMock).toHaveBeenCalledWith('203.0.113.10');
     });
 
     it('uses the explicit end time for history duration and live view stats', () => {

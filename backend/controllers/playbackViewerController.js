@@ -1,3 +1,11 @@
+/**
+ * Purpose: Handle playback viewer session tracking endpoints.
+ * Caller: playback viewer routes.
+ * Deps: playbackViewerSessionService, cameraService.
+ * MainFuncs: startPlaybackViewerSession, playbackViewerHeartbeat, stopPlaybackViewerSession, getActivePlaybackViewers, getPlaybackViewerStats, getPlaybackViewerHistory, getPlaybackViewerAnalytics.
+ * SideEffects: Validates playback start requests and writes playback viewer session lifecycle responses.
+ */
+
 import playbackViewerSessionService from '../services/playbackViewerSessionService.js';
 import cameraService from '../services/cameraService.js';
 
@@ -46,6 +54,9 @@ export async function startPlaybackViewerSession(request, reply) {
         });
     } catch (error) {
         console.error('Start playback viewer session error:', error);
+        if (error.statusCode === 403) {
+            return reply.code(403).send({ success: false, message: error.message });
+        }
         if (error.statusCode === 404) {
             return reply.code(404).send({ success: false, message: error.message });
         }

@@ -138,6 +138,11 @@ export function ActiveViewerCard({ session }) {
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                     <span className="font-mono text-sm font-semibold text-gray-900 dark:text-white truncate">{session.ipAddress}</span>
+                    {(session.asnNumber || session.asnOrg || session.asn_number || session.asn_org) && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                            ASN {session.asnNumber || session.asn_number || '-'} · {session.asnOrg || session.asn_org || '-'}
+                        </p>
+                    )}
                     <span className="flex items-center gap-1">
                         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                         <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">LIVE</span>

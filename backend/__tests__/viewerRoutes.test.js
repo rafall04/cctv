@@ -1,3 +1,11 @@
+/**
+ * Purpose: Verify live viewer routes map validation and service errors to HTTP responses.
+ * Caller: Vitest backend suite.
+ * Deps: Fastify viewer routes, viewer session service, camera service, camera health service.
+ * MainFuncs: viewerRoutes test cases for start, validation, and runtime-signal behavior.
+ * SideEffects: Exercises route handlers against mocked services.
+ */
+
 import Fastify from 'fastify';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -116,6 +124,28 @@ describe('viewerRoutes', () => {
         expect(response.statusCode).toBe(400);
         expect(response.json().message).toContain('cameraId');
         expect(getCameraByIdMock).not.toHaveBeenCalled();
+        await fastify.close();
+    });
+
+    it('returns 403 when ASN policy denies live access', async () => {
+        getCameraByIdMock.mockReturnValue({ id: 10, enabled: 1, delivery_type: 'internal_hls' });
+        startSessionMock.mockImplementationOnce(() => {
+            const error = new Error('ASN policy denied');
+            error.statusCode = 403;
+            throw error;
+        });
+        const { default: viewerRoutes } = await import('../routes/viewerRoutes.js');
+        const fastify = Fastify();
+        await fastify.register(viewerRoutes, { prefix: '/api/viewer' });
+
+        const response = await fastify.inject({
+            method: 'POST',
+            url: '/api/viewer/start',
+            payload: { cameraId: 10 },
+        });
+
+        expect(response.statusCode).toBe(403);
+        expect(response.json().message).toBe('ASN policy denied');
         await fastify.close();
     });
 

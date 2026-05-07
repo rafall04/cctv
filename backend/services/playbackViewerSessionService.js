@@ -1,7 +1,7 @@
 /**
  * Purpose: Manage playback viewer sessions and history analytics separately from live viewer tracking.
  * Caller: playback viewer routes and backend startup cleanup timer.
- * Deps: connectionPool, uuid, timeService, cacheService.
+ * Deps: connectionPool, uuid, timeService, cacheService, network identity/policy services.
  * MainFuncs: startSession, heartbeat, endSession, cleanupStaleSessions, getActiveSessions, getSessionHistory, getAnalytics.
  * SideEffects: Writes playback viewer session/history rows and runs cleanup/retention timers.
  */
@@ -10,6 +10,10 @@ import { query, queryOne, execute } from '../database/connectionPool.js';
 import { v4 as uuidv4 } from 'uuid';
 import { cacheGetOrSetSync, cacheKey, CacheNamespace, CacheTTL } from './cacheService.js';
 import { diffLocalSqlSeconds, getLocalDate, getLocalDateWithOffset, getLocalSqlWithOffsetDays, nowLocalSql, resolveLocalSqlTimestamp } from './timeService.js';
+import networkIdentityService from './networkIdentityService.js';
+import networkAccessPolicyService from './networkAccessPolicyService.js';
+import { logSecurityEvent, SECURITY_EVENTS } from './securityAuditLogger.js';
+import { getTrustedViewerIdentity } from '../utils/trustedProxyIdentity.js';
 
 const SESSION_TIMEOUT = 15;
 const CLEANUP_INTERVAL = 60000;
@@ -95,8 +99,8 @@ function buildHistoryFilters({
 
     if (typeof search === 'string' && search.trim()) {
         const likeValue = `%${search.trim()}%`;
-        clauses.push('AND (camera_name LIKE ? OR segment_filename LIKE ? OR ip_address LIKE ? OR COALESCE(admin_username, \'\') LIKE ?)');
-        params.push(likeValue, likeValue, likeValue, likeValue);
+        clauses.push('AND (camera_name LIKE ? OR segment_filename LIKE ? OR ip_address LIKE ? OR COALESCE(admin_username, \'\') LIKE ? OR asn_org LIKE ? OR CAST(asn_number AS TEXT) LIKE ? OR network_lookup_source LIKE ?)');
+        params.push(likeValue, likeValue, likeValue, likeValue, likeValue, likeValue, likeValue);
     }
 
     return {
@@ -150,17 +154,7 @@ class PlaybackViewerSessionService {
     }
 
     getRealIP(request) {
-        const forwardedFor = request.headers['x-forwarded-for'];
-        if (forwardedFor) {
-            return forwardedFor.split(',')[0].trim();
-        }
-
-        const realIP = request.headers['x-real-ip'];
-        if (realIP) {
-            return realIP.trim();
-        }
-
-        return request.ip || request.socket?.remoteAddress || 'unknown';
+        return getTrustedViewerIdentity(request);
     }
 
     getDeviceType(userAgent) {
@@ -182,6 +176,37 @@ class PlaybackViewerSessionService {
         const userAgent = request.headers['user-agent'] || '';
         const deviceType = this.getDeviceType(userAgent);
         const playbackAccessMode = normalizeAccessMode(payload.accessMode);
+        const networkIdentity = networkIdentityService.resolveIpIdentity(ipAddress);
+        let accessDecision;
+        try {
+            accessDecision = networkAccessPolicyService.enforceAccess({
+                cameraId: payload.cameraId,
+                accessFlow: 'playback',
+                identity: networkIdentity,
+            });
+        } catch (error) {
+            if (error.statusCode === 403) {
+                logSecurityEvent(SECURITY_EVENTS.NETWORK_ACCESS_DENIED, {
+                    flow: 'playback',
+                    camera_id: payload.cameraId,
+                    segment_filename: payload.segmentFilename,
+                    playback_access_mode: playbackAccessMode,
+                    ip_address: ipAddress,
+                    asn_number: networkIdentity.asnNumber || null,
+                    asn_org: networkIdentity.asnOrg || 'unknown',
+                    network_lookup_source: networkIdentity.lookupSource || 'unavailable',
+                    network_lookup_version: networkIdentity.lookupVersion || 'unavailable',
+                    policy_mode: error.decision?.policy?.mode || 'observe_only',
+                    policy_scope: error.decision?.policy?.scope || 'global',
+                    policy_target_id: error.decision?.policy?.targetId ?? null,
+                    policy_access_flow: error.decision?.policy?.accessFlow || 'playback',
+                    reason: error.decision?.reason || 'denied',
+                    admin_user_id: payload.adminUserId || null,
+                    admin_username: payload.adminUsername || null,
+                }, request);
+            }
+            throw error;
+        }
 
         execute(`
             INSERT INTO playback_viewer_sessions (
@@ -194,11 +219,15 @@ class PlaybackViewerSessionService {
                 ip_address,
                 user_agent,
                 device_type,
+                asn_number,
+                asn_org,
+                network_lookup_source,
+                network_lookup_version,
                 admin_user_id,
                 admin_username,
                 started_at,
                 last_heartbeat
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
             sessionId,
             payload.cameraId,
@@ -209,11 +238,34 @@ class PlaybackViewerSessionService {
             ipAddress,
             userAgent,
             deviceType,
+            networkIdentity.asnNumber || null,
+            networkIdentity.asnOrg || 'unknown',
+            networkIdentity.lookupSource || 'unavailable',
+            networkIdentity.lookupVersion || 'unavailable',
             payload.adminUserId || null,
             payload.adminUsername || null,
             timestamp,
             timestamp,
         ]);
+
+        logSecurityEvent(SECURITY_EVENTS.NETWORK_ACCESS_ALLOWED, {
+            flow: 'playback',
+            camera_id: payload.cameraId,
+            session_id: sessionId,
+            segment_filename: payload.segmentFilename,
+            playback_access_mode: playbackAccessMode,
+            ip_address: ipAddress,
+            asn_number: networkIdentity.asnNumber || null,
+            asn_org: networkIdentity.asnOrg || 'unknown',
+            network_lookup_source: networkIdentity.lookupSource || 'unavailable',
+            network_lookup_version: networkIdentity.lookupVersion || 'unavailable',
+            policy_mode: accessDecision.policy?.mode || 'observe_only',
+            policy_scope: accessDecision.policy?.scope || 'global',
+            policy_target_id: accessDecision.policy?.targetId ?? null,
+            policy_access_flow: accessDecision.policy?.accessFlow || 'playback',
+            admin_user_id: payload.adminUserId || null,
+            admin_username: payload.adminUsername || null,
+        }, request);
 
         return sessionId;
     }
@@ -259,12 +311,16 @@ class PlaybackViewerSessionService {
                 ip_address,
                 user_agent,
                 device_type,
+                asn_number,
+                asn_org,
+                network_lookup_source,
+                network_lookup_version,
                 admin_user_id,
                 admin_username,
                 started_at,
                 ended_at,
                 duration_seconds
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
             session.camera_id,
             session.camera_name,
@@ -274,6 +330,10 @@ class PlaybackViewerSessionService {
             session.ip_address,
             session.user_agent,
             session.device_type,
+            session.asn_number ?? null,
+            session.asn_org || 'unknown',
+            session.network_lookup_source || 'unavailable',
+            session.network_lookup_version || 'unavailable',
             session.admin_user_id,
             session.admin_username,
             session.started_at,
@@ -325,6 +385,10 @@ class PlaybackViewerSessionService {
                     ip_address,
                     user_agent,
                     device_type,
+                    asn_number,
+                    asn_org,
+                    network_lookup_source,
+                    network_lookup_version,
                     admin_user_id,
                     admin_username,
                     started_at,
@@ -343,6 +407,10 @@ class PlaybackViewerSessionService {
                     ip_address,
                     user_agent,
                     device_type,
+                    asn_number,
+                    asn_org,
+                    network_lookup_source,
+                    network_lookup_version,
                     admin_user_id,
                     admin_username,
                     started_at,
@@ -384,6 +452,10 @@ class PlaybackViewerSessionService {
                 playback_access_mode,
                 ip_address,
                 device_type,
+                asn_number,
+                asn_org,
+                network_lookup_source,
+                network_lookup_version,
                 admin_user_id,
                 admin_username,
                 started_at,
@@ -408,6 +480,10 @@ class PlaybackViewerSessionService {
                 playback_access_mode,
                 ip_address,
                 device_type,
+                asn_number,
+                asn_org,
+                network_lookup_source,
+                network_lookup_version,
                 admin_user_id,
                 admin_username,
                 started_at,
@@ -469,6 +545,10 @@ class PlaybackViewerSessionService {
                 ip_address,
                 user_agent,
                 device_type,
+                asn_number,
+                asn_org,
+                network_lookup_source,
+                network_lookup_version,
                 admin_user_id,
                 admin_username,
                 started_at,
@@ -564,12 +644,16 @@ class PlaybackViewerSessionService {
             const sharedParams = [...dateFilter.params, ...historyFilters.params];
 
             const topCameras = query(`
-            SELECT
-                camera_id,
-                camera_name,
-                COUNT(*) as total_sessions,
-                COUNT(DISTINCT ip_address) as unique_viewers,
-                COALESCE(SUM(duration_seconds), 0) as total_watch_time
+                SELECT
+                    camera_id,
+                    camera_name,
+                    COUNT(*) as total_sessions,
+                    COUNT(DISTINCT ip_address) as unique_viewers,
+                    COALESCE(SUM(duration_seconds), 0) as total_watch_time,
+                    MAX(asn_number) as asn_number,
+                    MAX(asn_org) as asn_org,
+                    MAX(network_lookup_source) as network_lookup_source,
+                    MAX(network_lookup_version) as network_lookup_version
             FROM playback_viewer_session_history
             WHERE 1 = 1
             ${dateFilter.clause}
@@ -608,6 +692,10 @@ class PlaybackViewerSessionService {
                 playback_access_mode,
                 ip_address,
                 device_type,
+                asn_number,
+                asn_org,
+                network_lookup_source,
+                network_lookup_version,
                 admin_user_id,
                 admin_username,
                 started_at,
@@ -650,7 +738,11 @@ class PlaybackViewerSessionService {
                 COUNT(*) as total_sessions,
                 COUNT(DISTINCT camera_id) as cameras_watched,
                 COALESCE(SUM(duration_seconds), 0) as total_watch_time,
-                MAX(started_at) as last_visit
+                MAX(started_at) as last_visit,
+                MAX(asn_number) as asn_number,
+                MAX(asn_org) as asn_org,
+                MAX(network_lookup_source) as network_lookup_source,
+                MAX(network_lookup_version) as network_lookup_version
             FROM playback_viewer_session_history
             WHERE 1 = 1
             ${dateFilter.clause}
@@ -684,6 +776,10 @@ class PlaybackViewerSessionService {
                 playbackAccessMode: session.playback_access_mode,
                 ipAddress: session.ip_address,
                 deviceType: session.device_type,
+                asnNumber: session.asn_number,
+                asnOrg: session.asn_org,
+                networkLookupSource: session.network_lookup_source,
+                networkLookupVersion: session.network_lookup_version,
                 adminUserId: session.admin_user_id,
                 adminUsername: session.admin_username,
                 startedAt: session.started_at,
