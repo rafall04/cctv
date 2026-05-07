@@ -19,6 +19,36 @@ describe('playbackUrlState', () => {
         expect(state.timestampParam).toBe('1777716000000');
     });
 
+    it('reads canonical playback params from cam and t', () => {
+        const state = getPlaybackUrlState(new URLSearchParams('cam=1-lobby&t=1710000000000'));
+
+        expect(state).toEqual({
+            cameraParam: '1-lobby',
+            timestampParam: '1710000000000',
+            isLegacyRootPlayback: false,
+        });
+    });
+
+    it('detects legacy root playback URLs using view=playback', () => {
+        const state = getPlaybackUrlState(new URLSearchParams('mode=full&view=playback&cam=1-lobby&t=1710000000000'));
+
+        expect(state).toEqual({
+            cameraParam: '1-lobby',
+            timestampParam: '1710000000000',
+            isLegacyRootPlayback: true,
+        });
+    });
+
+    it('detects legacy root playback URLs using mode=playback', () => {
+        const state = getPlaybackUrlState(new URLSearchParams('mode=playback&cam=1-lobby&t=1710000000000'));
+
+        expect(state).toEqual({
+            cameraParam: '1-lobby',
+            timestampParam: '1710000000000',
+            isLegacyRootPlayback: true,
+        });
+    });
+
     it('builds playback params with cam and t only for playback selection', () => {
         const params = buildPlaybackSearchParams({
             currentParams: new URLSearchParams('utm_source=share&camera=99'),
@@ -53,5 +83,15 @@ describe('playbackUrlState', () => {
         expect(params.get('cam')).toBe('public-camera');
         expect(params.get('t')).toBe('1777716000000');
         expect(params.has('scope')).toBe(false);
+    });
+
+    it('removes live and legacy playback-only params when building playback params', () => {
+        const next = buildPlaybackSearchParams({
+            currentParams: new URLSearchParams('camera=2-live&mode=full&view=playback&scope=admin_full&accessScope=admin_full'),
+            camera: '1-lobby',
+            timestamp: 1710000000000,
+        });
+
+        expect(next.toString()).toBe('cam=1-lobby&t=1710000000000');
     });
 });
