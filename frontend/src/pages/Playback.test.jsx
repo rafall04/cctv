@@ -473,7 +473,7 @@ describe('Playback', () => {
         expect(screen.getByTestId('location-search').textContent).toContain('cam=2-gate-aktif');
     });
 
-    it('share playback mempertahankan simple mode pada link publik', async () => {
+    it('share playback memakai route canonical dari legacy simple mode', async () => {
         render(
             <TestRouter initialEntries={['/playback?mode=simple&view=playback&cam=1']}>
                 <Playback
@@ -498,12 +498,14 @@ describe('Playback', () => {
         });
 
         const sharedUrl = window.navigator.clipboard.writeText.mock.calls[0][0];
-        expect(sharedUrl).toContain('/?mode=simple&view=playback');
+        expect(sharedUrl).toContain('/playback?');
         expect(sharedUrl).toContain('cam=1-lobby');
         expect(sharedUrl).toContain('t=');
+        expect(sharedUrl).not.toContain('mode=simple');
+        expect(sharedUrl).not.toContain('view=playback');
     });
 
-    it('share playback mempertahankan full mode pada link publik', async () => {
+    it('share playback memakai route canonical dari legacy full mode', async () => {
         render(
             <TestRouter initialEntries={['/playback?mode=full&view=playback&cam=1']}>
                 <Playback
@@ -525,8 +527,10 @@ describe('Playback', () => {
         });
 
         const sharedUrl = window.navigator.clipboard.writeText.mock.calls[0][0];
-        expect(sharedUrl).toContain('/?mode=full&view=playback');
+        expect(sharedUrl).toContain('/playback?');
         expect(sharedUrl).toContain('cam=1-lobby');
+        expect(sharedUrl).not.toContain('mode=full');
+        expect(sharedUrl).not.toContain('view=playback');
     });
 
     it('menampilkan native banner playback tepat di bawah video saat slot aktif', async () => {
