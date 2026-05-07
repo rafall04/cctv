@@ -6,12 +6,16 @@
  * SideEffects: None; returns new URLSearchParams instances.
  */
 
-const PLAYBACK_ONLY_PARAMS = ['camera', 'scope', 'accessScope'];
+const PLAYBACK_ONLY_PARAMS = ['camera', 'mode', 'view', 'scope', 'accessScope'];
 
 export function getPlaybackUrlState(searchParams) {
+    const viewParam = searchParams.get('view');
+    const modeParam = searchParams.get('mode');
+
     return {
         cameraParam: searchParams.get('cam'),
         timestampParam: searchParams.get('t'),
+        isLegacyRootPlayback: viewParam === 'playback' || modeParam === 'playback',
     };
 }
 
