@@ -98,12 +98,38 @@ describe('usePlaybackShareAndSnapshot', () => {
         });
 
         expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-            'https://cctv.example.test/?mode=simple&view=playback&cam=7-lobby-camera&t=1777716012400'
+            'https://cctv.example.test/playback?cam=7-lobby-camera&t=1777716012400'
         );
         expect(result.current.snapshotNotification).toEqual({
             type: 'success',
             message: 'Tautan disalin ke clipboard!',
         });
+    });
+
+    it('copies canonical public playback share links', async () => {
+        const { result } = renderHook(() => usePlaybackShareAndSnapshot(buildHookProps({
+            videoRef: {
+                current: {
+                    currentTime: 2.4,
+                },
+            },
+            selectedCamera: {
+                id: 7,
+                name: 'Gerbang Utama',
+            },
+            selectedSegment: {
+                start_time: '2024-03-09T16:00:00.000Z',
+            },
+            searchParams: new URLSearchParams('mode=full&view=playback&cam=7-gerbang-utama'),
+        })));
+
+        await act(async () => {
+            await result.current.handleShare();
+        });
+
+        expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+            expect.stringMatching(/^https:\/\/cctv\.example\.test\/playback\?cam=7-gerbang-utama&t=\d+$/)
+        );
     });
 
     it('does not share admin playback links', async () => {
