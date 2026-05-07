@@ -87,4 +87,16 @@ describe('useLandingModeState', () => {
         expect(screen.getByTestId('current-query').textContent).toContain('view=grid');
         expect(screen.getByTestId('current-query').textContent).toContain('mode=simple');
     });
+
+    it('keeps camera-only URLs usable by adding default layout and view params', () => {
+        render(
+            <TestRouter initialEntries={['/?camera=1-gerbang-utama']}>
+                <LandingModeStateHarness />
+            </TestRouter>
+        );
+
+        expect(screen.getByTestId('current-query').textContent).toContain('camera=1-gerbang-utama');
+        expect(screen.getByTestId('current-query').textContent).toContain('mode=full');
+        expect(screen.getByTestId('current-query').textContent).toContain('view=map');
+    });
 });
