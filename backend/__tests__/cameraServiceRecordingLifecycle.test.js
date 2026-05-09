@@ -12,10 +12,12 @@ const queryOneMock = vi.fn();
 const queryMock = vi.fn();
 const executeMock = vi.fn();
 const updateCameraPathMock = vi.fn();
+const refreshCameraPathAfterSourceChangeMock = vi.fn();
 const removeCameraPathByKeyMock = vi.fn();
 const restartRecordingMock = vi.fn();
 const startRecordingMock = vi.fn();
 const stopRecordingMock = vi.fn();
+const clearCameraRuntimeStateMock = vi.fn();
 
 vi.mock('../database/connectionPool.js', () => ({
     query: queryMock,
@@ -27,6 +29,7 @@ vi.mock('../database/connectionPool.js', () => ({
 vi.mock('../services/mediaMtxService.js', () => ({
     default: {
         updateCameraPath: updateCameraPathMock,
+        refreshCameraPathAfterSourceChange: refreshCameraPathAfterSourceChangeMock,
         removeCameraPathByKey: removeCameraPathByKeyMock,
     },
 }));
@@ -69,6 +72,7 @@ vi.mock('../services/thumbnailPathService.js', () => ({
 vi.mock('../services/cameraHealthService.js', () => ({
     default: {
         checkCamera: vi.fn(),
+        clearCameraRuntimeState: clearCameraRuntimeStateMock,
     },
 }));
 
@@ -138,6 +142,7 @@ describe('cameraService.updateCamera recording lifecycle reconciliation', () => 
         queryMock.mockReturnValue([]);
         executeMock.mockReturnValue({ changes: 1, lastInsertRowid: 7 });
         updateCameraPathMock.mockResolvedValue({ success: true, action: 'updated' });
+        refreshCameraPathAfterSourceChangeMock.mockResolvedValue({ success: true, action: 'refreshed' });
         removeCameraPathByKeyMock.mockResolvedValue({ success: true });
         restartRecordingMock.mockResolvedValue({ success: true });
         startRecordingMock.mockResolvedValue({ success: true });
@@ -147,14 +152,31 @@ describe('cameraService.updateCamera recording lifecycle reconciliation', () => 
     it('restarts active recording after RTSP URL changes', async () => {
         await runUpdate({ private_rtsp_url: 'rtsp://user:pass@10.0.0.8/stream1' });
 
-        expect(updateCameraPathMock).toHaveBeenCalledWith(
+        expect(refreshCameraPathAfterSourceChangeMock).toHaveBeenCalledWith(
             'stream-key-7',
             'rtsp://user:pass@10.0.0.8/stream1',
             expect.objectContaining({ private_rtsp_url: 'rtsp://user:pass@10.0.0.8/stream1' })
         );
+        expect(updateCameraPathMock).not.toHaveBeenCalled();
+        expect(clearCameraRuntimeStateMock).toHaveBeenCalledWith(7, 'stream-key-7');
         expect(restartRecordingMock).toHaveBeenCalledWith(7, 'camera_source_updated');
         expect(startRecordingMock).not.toHaveBeenCalled();
         expect(stopRecordingMock).not.toHaveBeenCalled();
+    });
+
+    it('refreshes MediaMTX path after RTSP transport changes', async () => {
+        await runUpdate({ internal_rtsp_transport_override: 'udp' });
+
+        expect(refreshCameraPathAfterSourceChangeMock).toHaveBeenCalledWith(
+            'stream-key-7',
+            'rtsp://user:pass@10.0.0.7/stream1',
+            expect.objectContaining({
+                internal_rtsp_transport_override: 'udp',
+                private_rtsp_url: 'rtsp://user:pass@10.0.0.7/stream1',
+            })
+        );
+        expect(updateCameraPathMock).not.toHaveBeenCalled();
+        expect(clearCameraRuntimeStateMock).toHaveBeenCalledWith(7, 'stream-key-7');
     });
 
     it('restarts active recording after video codec changes', async () => {
@@ -195,6 +217,8 @@ describe('cameraService.updateCamera recording lifecycle reconciliation', () => 
         await runUpdate({ name: 'Gate Camera Updated', location: 'North Gate' });
 
         expect(updateCameraPathMock).not.toHaveBeenCalled();
+        expect(refreshCameraPathAfterSourceChangeMock).not.toHaveBeenCalled();
+        expect(clearCameraRuntimeStateMock).not.toHaveBeenCalled();
         expect(restartRecordingMock).not.toHaveBeenCalled();
         expect(startRecordingMock).not.toHaveBeenCalled();
         expect(stopRecordingMock).not.toHaveBeenCalled();

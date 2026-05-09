@@ -91,6 +91,26 @@ vi.mock('axios', () => ({
     }
 }));
 
+describe('CameraHealthService runtime reset', () => {
+    it('clears per-camera health runtime state after source refresh', () => {
+        const service = new CameraHealthService();
+
+        service.healthState.set(7, { state: 'healthy', lastReason: 'mediamtx_path_ready' });
+        service.offlineSince.set(7, Date.now());
+        service.probeCache.set('camera:7', { result: { online: true }, expiresAt: Date.now() + 1000 });
+        service.internalPathRepairBackoff.set('stream-key-7', Date.now() + 1000);
+        service.lastActivePathMap.set('stream-key-7', { ready: true });
+
+        service.clearCameraRuntimeState(7, 'stream-key-7');
+
+        expect(service.healthState.has(7)).toBe(false);
+        expect(service.offlineSince.has(7)).toBe(false);
+        expect(service.probeCache.has('camera:7')).toBe(false);
+        expect(service.internalPathRepairBackoff.has('stream-key-7')).toBe(false);
+        expect(service.lastActivePathMap.has('stream-key-7')).toBe(false);
+    });
+});
+
 function createReadableStream() {
     const stream = new PassThrough();
     stream.end('frame');

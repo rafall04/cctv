@@ -2,7 +2,7 @@
 Purpose: Monitor camera availability, update runtime health state, and trigger recording/thumbnail transitions.
 Caller: Backend server startup, camera health routes, and runtime stream signal handlers.
 Deps: connectionPool, cameraRuntimeStateService, mediaMtxService, recordingService, thumbnailService, cameraHealthPolicy.
-MainFuncs: CameraHealthService, checkAllCameras(), checkCamera(), evaluateCameraStatus(), recordRuntimeSignal().
+MainFuncs: CameraHealthService, checkAllCameras(), checkCamera(), evaluateCameraStatus(), clearCameraRuntimeState(), recordRuntimeSignal().
 SideEffects: Updates camera online state/runtime state, repairs MediaMTX paths, sends notifications, pauses/resumes recording.
 */
 
@@ -838,6 +838,24 @@ class CameraHealthService {
         this.probeCache = new Map();
         this.internalPathRepairBackoff = new Map();
         this.lastActivePathMap = new Map();
+    }
+
+    clearCameraRuntimeState(cameraId, pathName = null) {
+        const normalizedCameraId = Number(cameraId);
+        this.healthState.delete(normalizedCameraId);
+        this.offlineSince.delete(normalizedCameraId);
+
+        const cameraToken = `camera:${normalizedCameraId}`;
+        for (const key of this.probeCache.keys()) {
+            if (key === cameraToken || (pathName && key.includes(pathName))) {
+                this.probeCache.delete(key);
+            }
+        }
+
+        if (pathName) {
+            this.internalPathRepairBackoff.delete(pathName);
+            this.lastActivePathMap.delete(pathName);
+        }
     }
 
     async probeInternalRtspSource(rtspUrl, timeoutMs = 4000) {

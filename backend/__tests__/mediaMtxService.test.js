@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const getMock = vi.fn();
 const postMock = vi.fn();
 const patchMock = vi.fn();
+const deleteMock = vi.fn();
 const queryMock = vi.fn();
 const queryOneMock = vi.fn();
 
@@ -20,6 +21,7 @@ vi.mock('axios', () => ({
             get: getMock,
             post: postMock,
             patch: patchMock,
+            delete: deleteMock,
         }),
     },
 }));
@@ -44,6 +46,7 @@ describe('mediaMtxService on-demand path sync', () => {
         getMock.mockReset();
         postMock.mockReset();
         patchMock.mockReset();
+        deleteMock.mockReset();
         queryMock.mockReset();
         queryOneMock.mockReset();
     });
@@ -312,5 +315,114 @@ describe('mediaMtxService on-demand path sync', () => {
         expect(patchMock.mock.calls[0][1]).not.toHaveProperty('sourceProtocol');
         expect(patchMock.mock.calls[1][1]).toMatchObject({ sourceProtocol: 'tcp' });
         expect(patchMock.mock.calls[1][1]).not.toHaveProperty('rtspTransport');
+    });
+
+    it('refreshes an existing path after camera source changes', async () => {
+        const { default: mediaMtxService } = await import('../services/mediaMtxService.js');
+
+        getMock.mockResolvedValueOnce({
+            data: {
+                name: 'stream-refresh',
+                source: 'rtsp://admin:pass@10.0.0.10/live',
+                rtspTransport: 'tcp',
+                sourceOnDemand: true,
+                sourceOnDemandStartTimeout: '10s',
+                sourceOnDemandCloseAfter: '30s',
+            },
+        });
+        patchMock.mockResolvedValueOnce({});
+        deleteMock.mockResolvedValueOnce({});
+        postMock.mockResolvedValueOnce({});
+
+        const result = await mediaMtxService.refreshCameraPathAfterSourceChange(
+            'stream-refresh',
+            'rtsp://admin:pass@10.0.0.20/live',
+            {
+                internal_ingest_policy_override: 'on_demand',
+                internal_on_demand_close_after_seconds_override: 30,
+                internal_rtsp_transport_override: 'default',
+            }
+        );
+
+        expect(result).toEqual({
+            success: true,
+            action: 'refreshed',
+            pathName: 'stream-refresh',
+        });
+        expect(patchMock).toHaveBeenCalledWith('/config/paths/patch/stream-refresh', expect.objectContaining({
+            source: 'rtsp://admin:pass@10.0.0.20/live',
+            rtspTransport: 'tcp',
+        }));
+        expect(deleteMock).toHaveBeenCalledWith('/config/paths/delete/stream-refresh');
+        expect(postMock).toHaveBeenCalledWith('/config/paths/add/stream-refresh', expect.objectContaining({
+            source: 'rtsp://admin:pass@10.0.0.20/live',
+        }));
+    });
+
+    it('creates path when refreshing a camera source with no existing config', async () => {
+        const { default: mediaMtxService } = await import('../services/mediaMtxService.js');
+
+        getMock.mockRejectedValueOnce(Object.assign(new Error('not found'), {
+            response: { status: 404 },
+        }));
+        postMock.mockResolvedValueOnce({});
+
+        const result = await mediaMtxService.refreshCameraPathAfterSourceChange(
+            'stream-new',
+            'rtsp://admin:pass@10.0.0.30/live',
+            {
+                internal_ingest_policy_override: 'default',
+                internal_on_demand_close_after_seconds_override: null,
+                internal_rtsp_transport_override: 'udp',
+            }
+        );
+
+        expect(result).toEqual({
+            success: true,
+            action: 'created',
+            pathName: 'stream-new',
+        });
+        expect(postMock).toHaveBeenCalledWith('/config/paths/add/stream-new', expect.objectContaining({
+            source: 'rtsp://admin:pass@10.0.0.30/live',
+            rtspTransport: 'udp',
+        }));
+        expect(deleteMock).not.toHaveBeenCalled();
+    });
+
+    it('keeps patched config and skips add when path delete fails during refresh', async () => {
+        const { default: mediaMtxService } = await import('../services/mediaMtxService.js');
+
+        getMock.mockResolvedValueOnce({
+            data: {
+                name: 'stream-delete-fails',
+                source: 'rtsp://admin:pass@10.0.0.10/live',
+                rtspTransport: 'tcp',
+                sourceOnDemand: true,
+                sourceOnDemandStartTimeout: '10s',
+                sourceOnDemandCloseAfter: '30s',
+            },
+        });
+        patchMock.mockResolvedValueOnce({});
+        deleteMock.mockRejectedValueOnce(new Error('delete failed'));
+
+        const result = await mediaMtxService.refreshCameraPathAfterSourceChange(
+            'stream-delete-fails',
+            'rtsp://admin:pass@10.0.0.40/live',
+            {
+                internal_ingest_policy_override: 'on_demand',
+                internal_on_demand_close_after_seconds_override: 30,
+                internal_rtsp_transport_override: 'default',
+            }
+        );
+
+        expect(result).toEqual({
+            success: true,
+            action: 'patched_refresh_pending',
+            pathName: 'stream-delete-fails',
+            error: 'delete failed',
+        });
+        expect(patchMock).toHaveBeenCalledTimes(1);
+        expect(deleteMock).toHaveBeenCalledWith('/config/paths/delete/stream-delete-fails');
+        expect(postMock).not.toHaveBeenCalled();
     });
 });

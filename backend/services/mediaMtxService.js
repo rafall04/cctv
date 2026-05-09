@@ -2,8 +2,8 @@
 Purpose: Keep MediaMTX path configuration synchronized with enabled internal CCTV cameras.
 Caller: Backend startup, MediaMTX health timer, camera service path repair, and health checks.
 Deps: axios MediaMTX API client, connectionPool camera reads, config, internal ingest policy resolver.
-MainFuncs: MediaMtxService, healthCheck(), getDatabaseCameras(), buildInternalPathConfig(), updateCameraPath(), syncCameras(), syncAreaCameras().
-SideEffects: Reads camera/area DB rows and creates, patches, or deletes MediaMTX path configuration.
+MainFuncs: MediaMtxService, healthCheck(), getDatabaseCameras(), buildInternalPathConfig(), updateCameraPath(), refreshCameraPathAfterSourceChange(), syncCameras(), syncAreaCameras().
+SideEffects: Reads camera/area DB rows and creates, patches, refreshes, or deletes MediaMTX path configuration.
 */
 
 import axios from 'axios';
@@ -104,6 +104,74 @@ class MediaMtxService {
 
             await request(endpoint, this.buildLegacyInternalPathConfig(pathConfig));
             return { usedLegacyPayload: true };
+        }
+    }
+
+    buildCameraPathConfig(rtspUrl, policyCamera = null) {
+        const camera = policyCamera
+            ? {
+                ...policyCamera,
+                rtsp_url: rtspUrl,
+            }
+            : {
+                rtsp_url: rtspUrl,
+                internal_ingest_policy_override: 'default',
+                internal_on_demand_close_after_seconds_override: null,
+                internal_rtsp_transport_override: 'default',
+                source_profile: null,
+                description: null,
+                enable_recording: 1,
+                _areaPolicy: null,
+            };
+
+        return this.buildInternalPathConfig(camera);
+    }
+
+    async refreshCameraPathAfterSourceChange(streamKey, rtspUrl, policyCamera = null) {
+        const pathName = streamKey;
+
+        if (!streamKey) {
+            console.error('[MediaMTX] Missing stream key');
+            return { success: false, error: 'Missing stream key' };
+        }
+
+        if (!rtspUrl || !rtspUrl.startsWith('rtsp://')) {
+            console.error(`[MediaMTX] Invalid RTSP URL for ${pathName}: ${rtspUrl}`);
+            return { success: false, error: 'Invalid RTSP URL' };
+        }
+
+        const pathConfig = this.buildCameraPathConfig(rtspUrl, policyCamera);
+
+        try {
+            const currentConfig = await this.getPathConfig(pathName);
+
+            if (!currentConfig) {
+                await this.writePathConfig('post', pathName, pathConfig);
+                console.log(`[MediaMTX] Added refreshed path: ${pathName}`);
+                return { success: true, action: 'created', pathName };
+            }
+
+            await this.writePathConfig('patch', pathName, pathConfig);
+            const removeResult = await this.removePath(pathName);
+            if (!removeResult.success) {
+                return {
+                    success: true,
+                    action: 'patched_refresh_pending',
+                    pathName,
+                    error: removeResult.error,
+                };
+            }
+            await this.writePathConfig('post', pathName, pathConfig);
+            console.log(`[MediaMTX] Refreshed path lifecycle: ${pathName}`);
+            return { success: true, action: 'refreshed', pathName };
+        } catch (error) {
+            console.error(`[MediaMTX] Error refreshing path ${pathName}:`, error.message);
+            return {
+                success: false,
+                action: 'refresh_failed',
+                pathName,
+                error: error.message,
+            };
         }
     }
 
@@ -501,22 +569,7 @@ class MediaMtxService {
             return { success: false, error: 'Invalid RTSP URL' };
         }
 
-        const camera = policyCamera
-            ? {
-                ...policyCamera,
-                rtsp_url: rtspUrl,
-            }
-            : {
-                rtsp_url: rtspUrl,
-                internal_ingest_policy_override: 'default',
-                internal_on_demand_close_after_seconds_override: null,
-                internal_rtsp_transport_override: 'default',
-                source_profile: null,
-                description: null,
-                enable_recording: 1,
-                _areaPolicy: null,
-            };
-        const pathConfig = this.buildInternalPathConfig(camera);
+        const pathConfig = this.buildCameraPathConfig(rtspUrl, policyCamera);
 
         try {
             const exists = await this.pathConfigExists(pathName);
