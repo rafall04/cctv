@@ -1101,6 +1101,60 @@ function isRecordableDeliveryType(deliveryType) {
     return RECORDABLE_DELIVERY_TYPES.has(deliveryType);
 }
 
+function boolEnabled(value) {
+    return value === 1 || value === true;
+}
+
+function hasOwn(payload, key) {
+    return Object.prototype.hasOwnProperty.call(payload, key);
+}
+
+function resolveUpdatedCameraSnapshot(existingCamera, data, deliveryConfig) {
+    return {
+        ...existingCamera,
+        enabled: hasOwn(data, 'enabled') ? (boolEnabled(data.enabled) ? 1 : 0) : existingCamera.enabled,
+        enable_recording: hasOwn(data, 'enable_recording')
+            ? (isRecordableDeliveryType(deliveryConfig.deliveryType) && boolEnabled(data.enable_recording) ? 1 : 0)
+            : existingCamera.enable_recording,
+        private_rtsp_url: hasOwn(data, 'private_rtsp_url') ? (data.private_rtsp_url || '') : existingCamera.private_rtsp_url,
+        delivery_type: deliveryConfig.deliveryType,
+        stream_source: deliveryConfig.compatStreamSource,
+        external_hls_url: deliveryConfig.externalHlsUrl,
+        external_stream_url: deliveryConfig.externalStreamUrl,
+        external_embed_url: deliveryConfig.externalEmbedUrl,
+        external_snapshot_url: deliveryConfig.externalSnapshotUrl,
+        external_origin_mode: deliveryConfig.externalOriginMode,
+        video_codec: hasOwn(data, 'video_codec') ? data.video_codec : existingCamera.video_codec,
+        internal_rtsp_transport_override: hasOwn(data, 'internal_rtsp_transport_override')
+            ? normalizeInternalRtspTransport(data.internal_rtsp_transport_override)
+            : existingCamera.internal_rtsp_transport_override,
+    };
+}
+
+function didRecordingSourceChange(existingCamera, updatedCamera, data) {
+    const sourceKeys = [
+        'private_rtsp_url',
+        'delivery_type',
+        'stream_source',
+        'external_hls_url',
+        'external_stream_url',
+        'video_codec',
+        'internal_rtsp_transport_override',
+    ];
+
+    if (hasOwn(data, 'enabled') && boolEnabled(existingCamera.enabled) !== boolEnabled(updatedCamera.enabled)) {
+        return true;
+    }
+
+    return sourceKeys.some((key) => String(existingCamera[key] ?? '') !== String(updatedCamera[key] ?? ''));
+}
+
+function shouldRecordingBeActive(camera) {
+    return boolEnabled(camera.enabled)
+        && boolEnabled(camera.enable_recording)
+        && isRecordableDeliveryType(camera.delivery_type);
+}
+
 function isPublicStatusDisable(payload = {}) {
     return payload.enabled === 0 || payload.enabled === false;
 }
@@ -1604,7 +1658,7 @@ class CameraService {
         } = data;
 
         const existingCamera = queryOne(
-            `SELECT id, name, private_rtsp_url, area_id, enabled, stream_key, enable_recording, stream_source,
+            `SELECT id, name, private_rtsp_url, area_id, enabled, stream_key, enable_recording, video_codec, stream_source,
                     delivery_type, external_hls_url, external_stream_url, external_embed_url,
                     external_snapshot_url,
                     CASE
