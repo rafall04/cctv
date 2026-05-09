@@ -1917,14 +1917,16 @@ class CameraService {
 
         this.invalidateCameraCache();
 
+        const updatedCamera = resolveUpdatedCameraSnapshot(existingCamera, data, deliveryConfig);
         const currentDeliveryType = deliveryConfig.deliveryType;
-        const newEnabled = enabled !== undefined ? enabled : existingCamera.enabled;
-        const newRtspUrl = private_rtsp_url !== undefined ? private_rtsp_url : existingCamera.private_rtsp_url;
+        const newEnabled = updatedCamera.enabled;
+        const newRtspUrl = updatedCamera.private_rtsp_url;
         const newAreaId = area_id !== undefined ? area_id : existingCamera.area_id;
         const rtspChanged = private_rtsp_url !== undefined && private_rtsp_url !== existingCamera.private_rtsp_url;
-        const enabledChanged = enabled !== undefined && enabled !== existingCamera.enabled;
+        const enabledChanged = enabled !== undefined && boolEnabled(enabled) !== boolEnabled(existingCamera.enabled);
         const rtspTransportChanged = internal_rtsp_transport_override !== undefined
             && normalizeInternalRtspTransport(internal_rtsp_transport_override) !== existingCamera.internal_rtsp_transport_override;
+        const recordingSourceChanged = didRecordingSourceChange(existingCamera, updatedCamera, data);
 
         // If stream source changed to external, remove MediaMTX path
         if (currentDeliveryType !== 'internal_hls') {
@@ -1965,27 +1967,36 @@ class CameraService {
             }
         }
 
-        if (enable_recording !== undefined) {
-            const { recordingService } = await import('./recordingService.js');
-            const newRecordingEnabled = enable_recording === true || enable_recording === 1;
-            const oldRecordingEnabled = existingCamera.enable_recording === 1;
-            const cameraEnabled = (newEnabled === 1 || newEnabled === true);
+        const oldShouldRecord = shouldRecordingBeActive(existingCamera);
+        const nextShouldRecord = shouldRecordingBeActive(updatedCamera);
+        const shouldReconcileRecording = enable_recording !== undefined || recordingSourceChanged;
 
-            if (newRecordingEnabled !== oldRecordingEnabled) {
-                if (newRecordingEnabled && cameraEnabled && isRecordableDeliveryType(currentDeliveryType)) {
-                    console.log(`[Camera ${id}] Auto-starting recording (enable_recording changed to true)`);
+        if (shouldReconcileRecording) {
+            const { recordingService } = await import('./recordingService.js');
+            const cameraId = parseInt(id, 10);
+
+            if (!nextShouldRecord) {
+                if (oldShouldRecord || enable_recording !== undefined || recordingSourceChanged) {
+                    console.log(`[Camera ${id}] Stopping recording after camera update`);
                     try {
-                        await recordingService.startRecording(parseInt(id));
-                    } catch (err) {
-                        console.error(`[Camera ${id}] Failed to start recording:`, err.message);
-                    }
-                } else if (!newRecordingEnabled) {
-                    console.log(`[Camera ${id}] Auto-stopping recording (enable_recording changed to false)`);
-                    try {
-                        await recordingService.stopRecording(parseInt(id));
+                        await recordingService.stopRecording(cameraId, { reason: 'camera_source_updated' });
                     } catch (err) {
                         console.error(`[Camera ${id}] Failed to stop recording:`, err.message);
                     }
+                }
+            } else if (!oldShouldRecord) {
+                console.log(`[Camera ${id}] Starting recording after camera update`);
+                try {
+                    await recordingService.startRecording(cameraId);
+                } catch (err) {
+                    console.error(`[Camera ${id}] Failed to start recording:`, err.message);
+                }
+            } else if (recordingSourceChanged) {
+                console.log(`[Camera ${id}] Restarting recording after source update`);
+                try {
+                    await recordingService.restartRecording(cameraId, 'camera_source_updated');
+                } catch (err) {
+                    console.error(`[Camera ${id}] Failed to restart recording:`, err.message);
                 }
             }
         }
