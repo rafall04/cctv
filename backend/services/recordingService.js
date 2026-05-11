@@ -24,6 +24,7 @@ import {
     getFinalRecordingPath,
     getPendingRecordingDir,
     getPendingRecordingPattern,
+    isFinalSegmentFilename,
     isPartialSegmentFilename,
     toFinalSegmentFilename,
 } from './recordingSegmentFilePolicy.js';
@@ -952,70 +953,62 @@ class RecordingService {
                     if (!camera || !camera.enable_recording) continue;
 
                     try {
-                        // Get all MP4 files in directory (exclude temp files)
                         const allFiles = await fsPromises.readdir(cameraDir);
-                        const files = allFiles.filter(f => /^\d{8}_\d{6}\.mp4$/.test(f));
+                        const finalFiles = allFiles.filter(isFinalSegmentFilename);
+                        let partialFiles = [];
+                        const pendingDir = getPendingRecordingDir(RECORDINGS_BASE_PATH, cameraId);
+                        try {
+                            partialFiles = (await fsPromises.readdir(pendingDir)).filter(isPartialSegmentFilename);
+                        } catch {
+                            partialFiles = [];
+                        }
 
-                        // FIX N+1 Query: Hash existing files from DB to RAM `Set` once per camera
                         const existingFilesSet = new Set(
                             query('SELECT filename FROM recording_segments WHERE camera_id = ?', [cameraId])
                                 .map(row => row.filename)
                         );
 
-                        // Check each file
-                        for (const filename of files) {
-                            // CRITICAL: Delete files that have failed re-mux 3+ times
+                        for (const filename of partialFiles) {
+                            const finalFilename = toFinalSegmentFilename(filename);
+                            if (!finalFilename || existingFilesSet.has(finalFilename)) continue;
+                            const filePath = join(pendingDir, filename);
+                            const stats = await fsPromises.stat(filePath);
+                            const fileAge = Date.now() - stats.mtimeMs;
+                            const fileKey = `${cameraId}:${finalFilename}`;
+                            if (filesBeingProcessed.has(fileKey)) continue;
+                            if (fileAge > 30000) {
+                                console.log(`[Scanner] Found pending segment: ${filename} (age: ${Math.round(fileAge / 1000)}s)`);
+                                this.onSegmentCreated(cameraId, filename);
+                            }
+                        }
+
+                        for (const filename of finalFiles) {
                             if (isFileFailed(cameraId, filename)) {
                                 const failedPath = join(cameraDir, filename);
                                 try {
-                                    try {
-                                        await fsPromises.access(failedPath);
-                                        const quarantineResult = await quarantineFailedRemuxFileIfExpired(cameraId, filename, failedPath, 'scanner_remux_failed_3x');
-                                        if (!quarantineResult.retained) {
-                                            console.log(`[Scanner] Quarantined expired failed-remux file: ${filename}`);
-                                        }
-                                        continue;
-                                    } catch (e) { }
+                                    await fsPromises.access(failedPath);
+                                    const quarantineResult = await quarantineFailedRemuxFileIfExpired(cameraId, filename, failedPath, 'scanner_remux_failed_3x');
+                                    if (!quarantineResult.retained) {
+                                        console.log(`[Scanner] Quarantined expired failed-remux file: ${filename}`);
+                                    }
+                                } catch {
                                     removeFailedFile(cameraId, filename);
-                                } catch (delErr) {
-                                    console.error(`[Scanner] Failed to delete failed file ${filename}:`, delErr.message);
                                 }
                                 continue;
                             }
 
-                            // Check if already in database (using fast memory Set lookup O(1))
                             if (!existingFilesSet.has(filename)) {
                                 const filePath = join(cameraDir, filename);
-                                try {
-                                    const stats = await fsPromises.stat(filePath);
-
-                                    // BUG FIX #4: Check if file is being processed (prevent duplicate)
-                                    const fileKey = `${cameraId}:${filename}`;
-                                    if (filesBeingProcessed.has(fileKey)) {
-                                        continue; // Skip, already being processed
-                                    }
-
-                                    // FIX Crash Recovery: Prevent processing if another instance is currently remuxing this file
-                                    let isRemuxing = false;
-                                    try {
-                                        const rStat = await fsPromises.stat(filePath + '.remux.mp4');
-                                        if (Date.now() - rStat.mtimeMs < 5 * 60 * 1000) { isRemuxing = true; } // Active remux < 5min ago
-                                    } catch (e) { }
-                                    if (isRemuxing) continue;
-
-                                    // Only process files that are at least 30 seconds old (likely complete/frozen)
-                                    const fileAge = Date.now() - stats.mtimeMs;
-                                    if (fileAge > 30000) {
-                                        console.log(`[Scanner] Found unregistered segment: ${filename} (age: ${Math.round(fileAge / 1000)}s)`);
-                                        // Trigger segment processing
-                                        this.onSegmentCreated(cameraId, filename);
-                                    }
-                                } catch (statErr) {
-                                    // File may have been deleted
+                                const stats = await fsPromises.stat(filePath);
+                                const fileKey = `${cameraId}:${filename}`;
+                                if (filesBeingProcessed.has(fileKey)) continue;
+                                const fileAge = Date.now() - stats.mtimeMs;
+                                if (fileAge > 30000) {
+                                    console.log(`[Scanner] Found unregistered final segment: ${filename} (age: ${Math.round(fileAge / 1000)}s)`);
+                                    this.onSegmentCreated(cameraId, filename);
                                 }
                             }
-                        }
-                    } catch (error) {
+                        }                    } catch (error) {
                         console.error(`[Scanner] Error scanning camera ${cameraId}:`, error);
                     }
                 }

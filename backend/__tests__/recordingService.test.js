@@ -739,6 +739,69 @@ describe('recordingService external recording support', () => {
         expect(finalizerMock.finalizeSegment).toHaveBeenCalledTimes(1);
     });
 
+    it('scanner recovers pending partial files that are not registered', async () => {
+        finalizerMock.finalizeSegment.mockResolvedValue({ success: true });
+        const { recordingService } = await import('../services/recordingService.js');
+        queryOneMock.mockReturnValue({ id: 8, enable_recording: 1 });
+        queryMock.mockReturnValue([]);
+        fsPromisesMock.readdir.mockImplementation(async (targetPath) => {
+            if (targetPath.endsWith('recordings')) return ['camera8'];
+            if (targetPath.endsWith('camera8')) return ['pending'];
+            if (targetPath.endsWith('pending')) return ['20260511_211000.mp4.partial'];
+            return [];
+        });
+        fsPromisesMock.stat.mockImplementation(async (targetPath) => ({
+            isDirectory: () => targetPath.endsWith('camera8') || targetPath.endsWith('pending'),
+            size: 4096,
+            mtimeMs: Date.now() - 120000,
+        }));
+        const segmentSpy = vi.spyOn(recordingService, 'onSegmentCreated');
+
+        const runs = [];
+        let scheduled = false;
+        recordingService.startSegmentScanner((callback) => {
+            if (!scheduled) {
+                scheduled = true;
+                runs.push(callback());
+            }
+            return 1;
+        });
+        await Promise.all(runs);
+
+        expect(segmentSpy).toHaveBeenCalledWith(8, '20260511_211000.mp4.partial');
+    });
+
+    it('scanner reconciles valid final orphan MP4 files into DB through finalizer', async () => {
+        finalizerMock.finalizeSegment.mockResolvedValue({ success: true });
+        const { recordingService } = await import('../services/recordingService.js');
+        queryOneMock.mockReturnValue({ id: 8, enable_recording: 1 });
+        queryMock.mockReturnValue([]);
+        fsPromisesMock.readdir.mockImplementation(async (targetPath) => {
+            if (targetPath.endsWith('recordings')) return ['camera8'];
+            if (targetPath.endsWith('camera8')) return ['20260511_211000.mp4'];
+            return [];
+        });
+        fsPromisesMock.stat.mockImplementation(async (targetPath) => ({
+            isDirectory: () => targetPath.endsWith('camera8'),
+            size: 4096,
+            mtimeMs: Date.now() - 120000,
+        }));
+        const segmentSpy = vi.spyOn(recordingService, 'onSegmentCreated');
+
+        const runs = [];
+        let scheduled = false;
+        recordingService.startSegmentScanner((callback) => {
+            if (!scheduled) {
+                scheduled = true;
+                runs.push(callback());
+            }
+            return 1;
+        });
+        await Promise.all(runs);
+
+        expect(segmentSpy).toHaveBeenCalledWith(8, '20260511_211000.mp4');
+    });
+
     it('starts and stops the attached recording scheduler explicitly', async () => {
         const { recordingService } = await import('../services/recordingService.js');
         const scheduler = {
