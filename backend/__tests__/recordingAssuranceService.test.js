@@ -13,6 +13,7 @@ const queryMock = vi.fn();
 const getRecordingStatusMock = vi.fn();
 const existsSyncMock = vi.fn();
 const statSyncMock = vi.fn();
+const summarizeActiveMock = vi.fn();
 
 vi.mock('../database/connectionPool.js', () => ({
     query: queryMock,
@@ -21,6 +22,12 @@ vi.mock('../database/connectionPool.js', () => ({
 vi.mock('../services/recordingService.js', () => ({
     recordingService: {
         getRecordingStatus: getRecordingStatusMock,
+    },
+}));
+
+vi.mock('../services/recordingRecoveryDiagnosticsRepository.js', () => ({
+    default: {
+        summarizeActive: summarizeActiveMock,
     },
 }));
 
@@ -36,6 +43,7 @@ describe('recordingAssuranceService', () => {
         vi.clearAllMocks();
         existsSyncMock.mockReturnValue(true);
         statSyncMock.mockReturnValue({ size: 1048576 });
+        summarizeActiveMock.mockReturnValue({});
     });
 
     it('classifies enabled recording cameras from batched latest segment and gap queries', () => {
@@ -153,5 +161,18 @@ describe('recordingAssuranceService', () => {
 
         expect(source).toContain("../database/connectionPool.js");
         expect(source).not.toContain("../database/database.js");
+    });
+
+    it('includes recovery diagnostic summary in assurance snapshot', () => {
+        summarizeActiveMock.mockReturnValue({ pending: 2, retryable_failed: 1, unrecoverable: 1 });
+        queryMock.mockReturnValueOnce([]);
+
+        const snapshot = recordingAssuranceService.getSnapshot();
+
+        expect(snapshot.recoveryDiagnostics).toEqual({
+            pending: 2,
+            retryable_failed: 1,
+            unrecoverable: 1,
+        });
     });
 });
