@@ -1,7 +1,7 @@
 /*
 Purpose: Render admin workflow for Telegram camera notification routing preview, drill delivery, and recent diagnostic audit rows.
 Caller: App.jsx protected /admin/notification-diagnostics route.
-Deps: adminService, cameraService, React hooks, Tailwind admin UI classes.
+Deps: adminService, cameraService, React hooks, TimezoneContext, Tailwind admin UI classes.
 MainFuncs: NotificationDiagnostics.
 SideEffects: Fetches cameras/diagnostics and can trigger Telegram diagnostic drill sends.
 */
@@ -9,6 +9,7 @@ SideEffects: Fetches cameras/diagnostics and can trigger Telegram diagnostic dri
 import { useEffect, useMemo, useState } from 'react';
 import { adminService } from '../services/adminService';
 import { cameraService } from '../services/cameraService';
+import { TIMESTAMP_STORAGE, useTimezone } from '../contexts/TimezoneContext';
 
 const EVENT_OPTIONS = [
     { value: 'offline', label: 'Offline' },
@@ -20,6 +21,7 @@ function statusTone(success) {
 }
 
 export default function NotificationDiagnostics() {
+    const { formatDateTime, timezone } = useTimezone();
     const [cameras, setCameras] = useState([]);
     const [cameraId, setCameraId] = useState('');
     const [eventType, setEventType] = useState('offline');
@@ -54,6 +56,17 @@ export default function NotificationDiagnostics() {
     const selectedCameraId = useMemo(() => Number.parseInt(cameraId, 10), [cameraId]);
     const canPreview = Number.isInteger(selectedCameraId) && selectedCameraId > 0;
     const canDrill = Boolean(preview?.routing?.canSend && canPreview && !drilling);
+    const timezoneLabel = !timezone || timezone === 'Asia/Jakarta' ? 'WIB' : timezone;
+
+    function formatRuntimeTimestamp(value) {
+        if (!value) return '-';
+        return formatDateTime(value, { storage: TIMESTAMP_STORAGE.LOCAL_SQL });
+    }
+
+    function formatAuditTimestamp(value) {
+        if (!value) return '-';
+        return formatDateTime(value, { storage: TIMESTAMP_STORAGE.UTC_SQL });
+    }
 
     async function refreshRuns() {
         const response = await adminService.getNotificationDiagnosticsRuns({ cameraId: selectedCameraId || '', limit: 20 });
@@ -171,7 +184,7 @@ export default function NotificationDiagnostics() {
                             <div className="flex justify-between gap-3"><dt className="text-gray-500">Camera</dt><dd className="font-semibold text-gray-900 dark:text-white">{preview.camera.name}</dd></div>
                             <div className="flex justify-between gap-3"><dt className="text-gray-500">Area</dt><dd className="text-gray-900 dark:text-white">{preview.camera.areaName}</dd></div>
                             <div className="flex justify-between gap-3"><dt className="text-gray-500">Status</dt><dd className="text-gray-900 dark:text-white">{preview.health.status}</dd></div>
-                            <div className="flex justify-between gap-3"><dt className="text-gray-500">Last Check</dt><dd className="text-gray-900 dark:text-white">{preview.health.lastCheckedAt || '-'}</dd></div>
+                            <div className="flex justify-between gap-3"><dt className="text-gray-500">Last Check ({timezoneLabel})</dt><dd className="text-gray-900 dark:text-white">{formatRuntimeTimestamp(preview.health.lastCheckedAt)}</dd></div>
                         </dl>
                     </div>
 
@@ -211,7 +224,7 @@ export default function NotificationDiagnostics() {
                     <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
                         <thead>
                             <tr className="text-left text-xs uppercase text-gray-500">
-                                <th className="py-2 pr-4">Time</th>
+                                <th className="py-2 pr-4">Time ({timezoneLabel})</th>
                                 <th className="py-2 pr-4">Camera</th>
                                 <th className="py-2 pr-4">Event</th>
                                 <th className="py-2 pr-4">Targets</th>
@@ -221,7 +234,7 @@ export default function NotificationDiagnostics() {
                         <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                             {runs.map((run) => (
                                 <tr key={run.id}>
-                                    <td className="py-2 pr-4 text-gray-500">{run.createdAt}</td>
+                                    <td className="py-2 pr-4 text-gray-500">{formatAuditTimestamp(run.createdAt)}</td>
                                     <td className="py-2 pr-4 text-gray-900 dark:text-white">{run.cameraName}</td>
                                     <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">{run.eventType}</td>
                                     <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">{run.sentCount}/{run.targetCount}</td>

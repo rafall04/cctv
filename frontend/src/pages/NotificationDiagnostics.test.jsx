@@ -14,6 +14,18 @@ import NotificationDiagnostics from './NotificationDiagnostics';
 import { adminService } from '../services/adminService';
 import { cameraService } from '../services/cameraService';
 
+vi.mock('../contexts/TimezoneContext', () => ({
+    TIMESTAMP_STORAGE: {
+        LOCAL_SQL: 'local_sql',
+        UTC_SQL: 'utc_sql',
+        AUTO: 'auto',
+    },
+    useTimezone: () => ({
+        timezone: 'Asia/Jakarta',
+        formatDateTime: (value, options = {}) => `${options.storage}:${value}`,
+    }),
+}));
+
 vi.mock('../services/adminService', () => ({
     adminService: {
         previewNotificationDiagnostics: vi.fn(),
@@ -123,5 +135,44 @@ describe('NotificationDiagnostics', () => {
 
         await waitFor(() => expect(adminService.runNotificationDiagnosticsDrill).toHaveBeenCalledWith({ cameraId: 5, eventType: 'offline' }));
         expect(await screen.findByText('Sent')).toBeTruthy();
+    });
+
+    it('standardizes runtime and audit timestamps with explicit storage modes', async () => {
+        adminService.getNotificationDiagnosticsRuns.mockResolvedValue({
+            success: true,
+            data: [{
+                id: 1,
+                cameraName: 'Gate 1',
+                eventType: 'online',
+                success: true,
+                targetCount: 1,
+                sentCount: 1,
+                createdAt: '2026-05-11 14:28:53',
+            }],
+        });
+        adminService.previewNotificationDiagnostics.mockResolvedValue({
+            success: true,
+            data: {
+                camera: { id: 5, name: 'Gate 1', areaName: 'North' },
+                health: { status: 'online', lastCheckedAt: '2026-05-11 21:26:32' },
+                eventType: 'online',
+                routing: {
+                    canSend: true,
+                    matchedTargets: [{ id: 'north', name: 'North Group', chatIdMasked: '-10***001' }],
+                    matchedRules: [],
+                    unmatchedRules: [],
+                    ruleIssues: [],
+                },
+            },
+        });
+
+        render(<NotificationDiagnostics />);
+
+        fireEvent.change(await screen.findByLabelText(/CCTV/i), { target: { value: '5' } });
+        fireEvent.change(screen.getByLabelText(/Event/i), { target: { value: 'online' } });
+        fireEvent.click(screen.getByRole('button', { name: /Preview Routing/i }));
+
+        expect(await screen.findByText('local_sql:2026-05-11 21:26:32')).toBeTruthy();
+        expect(screen.getByText('utc_sql:2026-05-11 14:28:53')).toBeTruthy();
     });
 });
