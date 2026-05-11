@@ -25,6 +25,7 @@ export function useLandingInteractions({
 }) {
     const [popup, setPopup] = useState(null);
     const [multiCameras, setMultiCameras] = useState([]);
+    const [pendingMultiCameraIds, setPendingMultiCameraIds] = useState([]);
     const [showMulti, setShowMulti] = useState(false);
     const [maxReached, setMaxReached] = useState(false);
     const pendingUrlCameraIdRef = useRef(undefined);
@@ -93,31 +94,63 @@ export function useLandingInteractions({
         }
     }, [addRecentCamera, cameras, popup?.id, resolveUrlCamera, searchParams, viewMode]);
 
-    const handleAddMulti = useCallback((camera) => {
+    const handleAddMulti = useCallback(async (camera) => {
         if (!isMultiViewSupported(camera)) {
             addToast(`"${camera.name}" tidak mendukung Multi-View untuk format stream ini`, 'warning');
             return;
         }
 
-        setMultiCameras((previous) => {
-            const exists = previous.some((item) => item.id === camera.id);
-            if (exists) {
-                addToast(`"${camera.name}" removed from Multi-View`, 'info');
-                setMaxReached(false);
-                return previous.filter((item) => item.id !== camera.id);
+        const exists = multiCameras.some((item) => item.id === camera.id);
+        if (exists) {
+            addToast(`"${camera.name}" removed from Multi-View`, 'info');
+            setMaxReached(false);
+            setMultiCameras((previous) => previous.filter((item) => item.id !== camera.id));
+            return;
+        }
+
+        if (multiCameras.length >= maxStreams) {
+            addToast(`Maximum ${maxStreams} cameras allowed in Multi-View mode (${deviceTier}-end device)`, 'warning');
+            setMaxReached(true);
+            setTimeout(() => setMaxReached(false), 3000);
+            return;
+        }
+
+        setPendingMultiCameraIds((previous) => (
+            previous.includes(camera.id) ? previous : [...previous, camera.id]
+        ));
+
+        try {
+            const resolvedCamera = typeof resolveUrlCamera === 'function'
+                ? await resolveUrlCamera(camera)
+                : camera;
+            const nextCamera = resolvedCamera || camera;
+
+            if (!isMultiViewSupported(nextCamera)) {
+                addToast(`"${camera.name}" tidak mendukung Multi-View untuk format stream ini`, 'warning');
+                return;
             }
 
-            if (previous.length >= maxStreams) {
-                addToast(`Maximum ${maxStreams} cameras allowed in Multi-View mode (${deviceTier}-end device)`, 'warning');
-                setMaxReached(true);
-                setTimeout(() => setMaxReached(false), 3000);
-                return previous;
-            }
+            setMultiCameras((previous) => {
+                if (previous.some((item) => item.id === nextCamera.id)) {
+                    return previous;
+                }
 
-            addToast(`"${camera.name}" added to Multi-View (${previous.length + 1}/${maxStreams})`, 'success');
-            return [...previous, camera];
-        });
-    }, [addToast, deviceTier, maxStreams]);
+                if (previous.length >= maxStreams) {
+                    addToast(`Maximum ${maxStreams} cameras allowed in Multi-View mode (${deviceTier}-end device)`, 'warning');
+                    setMaxReached(true);
+                    setTimeout(() => setMaxReached(false), 3000);
+                    return previous;
+                }
+
+                addToast(`"${nextCamera.name}" added to Multi-View (${previous.length + 1}/${maxStreams})`, 'success');
+                return [...previous, nextCamera];
+            });
+        } catch {
+            addToast(`"${camera.name}" gagal disiapkan untuk Multi-View`, 'warning');
+        } finally {
+            setPendingMultiCameraIds((previous) => previous.filter((id) => id !== camera.id));
+        }
+    }, [addToast, deviceTier, maxStreams, multiCameras, resolveUrlCamera]);
 
     const handleRemoveMulti = useCallback((id) => {
         setMultiCameras((previous) => {
@@ -132,6 +165,7 @@ export function useLandingInteractions({
             setMaxReached(false);
             return next;
         });
+        setPendingMultiCameraIds((previous) => previous.filter((cameraId) => cameraId !== id));
     }, [addToast]);
 
     const handleCameraClick = useCallback((camera, options = {}) => {
@@ -170,6 +204,7 @@ export function useLandingInteractions({
     return {
         popup,
         multiCameras,
+        pendingMultiCameraIds,
         showMulti,
         maxReached,
         maxStreams,

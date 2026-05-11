@@ -23,7 +23,7 @@ function createCamera(id) {
 
 const stableCameras = [1, 2, 3, 4].map(createCamera);
 
-function renderInteractions(deviceTier = 'high') {
+function renderInteractions(deviceTier = 'high', overrides = {}) {
     const addToast = vi.fn();
     const setSearchParams = vi.fn();
     const addRecentCamera = vi.fn();
@@ -37,6 +37,7 @@ function renderInteractions(deviceTier = 'high') {
         setSearchParams,
         addToast,
         addRecentCamera,
+        resolveUrlCamera: overrides.resolveUrlCamera,
     }));
 
     return {
@@ -64,19 +65,57 @@ function renderInteractionsWithSearch(searchParams) {
 }
 
 describe('useLandingInteractions multi-view limits', () => {
-    it('caps high-end devices at three multi-view cameras', () => {
+    it('caps high-end devices at three multi-view cameras', async () => {
         const { result, addToast } = renderInteractions('high');
 
-        act(() => {
-            [1, 2, 3, 4].forEach((id) => {
-                result.current.handleAddMulti(createCamera(id));
-            });
+        await act(async () => {
+            for (const id of [1, 2, 3, 4]) {
+                await result.current.handleAddMulti(createCamera(id));
+            }
         });
 
         expect(result.current.maxStreams).toBe(3);
         expect(result.current.multiCameras.map((camera) => camera.id)).toEqual([1, 2, 3]);
         expect(addToast).toHaveBeenCalledWith(
             'Maximum 3 cameras allowed in Multi-View mode (high-end device)',
+            'warning'
+        );
+    });
+
+    it('resolves metadata-only cameras before adding them to multi-view', async () => {
+        const resolveUrlCamera = vi.fn().mockResolvedValue({
+            ...createCamera(7),
+            streams: { hls: 'https://example.com/resolved.m3u8' },
+        });
+        const hook = renderInteractions('high', { resolveUrlCamera });
+
+        await act(async () => {
+            await hook.result.current.handleAddMulti({
+                ...createCamera(7),
+                streams: {},
+            });
+        });
+
+        expect(resolveUrlCamera).toHaveBeenCalledWith(expect.objectContaining({ id: 7 }));
+        expect(hook.result.current.multiCameras).toEqual([
+            expect.objectContaining({
+                id: 7,
+                streams: { hls: 'https://example.com/resolved.m3u8' },
+            }),
+        ]);
+    });
+
+    it('keeps a deterministic warning when multi-view stream resolution fails', async () => {
+        const resolveUrlCamera = vi.fn().mockRejectedValue(new Error('network'));
+        const hook = renderInteractions('high', { resolveUrlCamera });
+
+        await act(async () => {
+            await hook.result.current.handleAddMulti(createCamera(8));
+        });
+
+        expect(hook.result.current.multiCameras).toEqual([]);
+        expect(hook.addToast).toHaveBeenCalledWith(
+            '"Camera 8" gagal disiapkan untuk Multi-View',
             'warning'
         );
     });

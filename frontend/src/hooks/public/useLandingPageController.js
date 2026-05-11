@@ -35,6 +35,7 @@ export function useLandingPageController({
     const {
         popup,
         multiCameras,
+        pendingMultiCameraIds,
         showMulti,
         maxReached,
         maxStreams,
@@ -184,6 +185,7 @@ export function useLandingPageController({
         discoveryLoading,
         popup,
         multiCameras,
+        pendingMultiCameraIds,
         showMulti,
         maxReached,
         maxStreams,
