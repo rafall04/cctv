@@ -106,6 +106,8 @@ describe('AdminLayout dark mode readability', () => {
         const dock = screen.getByTestId('admin-pwa-quick-actions');
         expect(dock.className).toContain('fixed');
         expect(dock.className).toContain('bottom-3');
+        expect(dock.className).toContain('z-30');
+        expect(dock.className).not.toContain('z-[1200]');
         expect(dock.querySelector('.grid-cols-5')).toBeTruthy();
 
         const quickActions = within(dock);

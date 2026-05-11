@@ -44,7 +44,7 @@ function AdminPwaQuickActions({ activePath }) {
     return (
         <nav
             data-testid="admin-pwa-quick-actions"
-            className="fixed inset-x-3 bottom-3 z-[1200] rounded-2xl border border-gray-200 bg-white/95 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 shadow-[0_-12px_30px_rgba(15,23,42,0.16)] backdrop-blur-xl dark:border-gray-800 dark:bg-gray-950/95 lg:hidden"
+            className="fixed inset-x-3 bottom-3 z-30 rounded-2xl border border-gray-200 bg-white/95 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 shadow-[0_-12px_30px_rgba(15,23,42,0.16)] backdrop-blur-xl dark:border-gray-800 dark:bg-gray-950/95 lg:hidden"
             aria-label="Quick action admin"
         >
             <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
