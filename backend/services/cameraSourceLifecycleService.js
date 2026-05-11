@@ -192,20 +192,30 @@ export class CameraSourceLifecycleService {
     }
 
     recordLifecycleEvent({ cameraId, eventType, reason, status, classification, result }) {
-        this.db.execute(
-            `INSERT INTO camera_source_lifecycle_events
-             (camera_id, event_type, reason, status, source_change_summary_json, result_json, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [
-                cameraId,
-                eventType,
-                reason,
-                status,
-                JSON.stringify(classification),
-                JSON.stringify(result),
-                new Date().toISOString(),
-            ]
-        );
+        try {
+            const cameraExists = this.db.queryOne?.('SELECT id FROM cameras WHERE id = ?', [cameraId]);
+            if (!cameraExists) {
+                console.warn(`[CameraSourceLifecycle] Skipped event for missing camera ${cameraId}`);
+                return;
+            }
+
+            this.db.execute(
+                `INSERT INTO camera_source_lifecycle_events
+                 (camera_id, event_type, reason, status, source_change_summary_json, result_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    cameraId,
+                    eventType,
+                    reason,
+                    status,
+                    JSON.stringify(classification),
+                    JSON.stringify(result),
+                    new Date().toISOString(),
+                ]
+            );
+        } catch (error) {
+            console.warn(`[CameraSourceLifecycle] Failed to write event for camera ${cameraId}: ${error.message}`);
+        }
     }
 
     getRecentEvents(cameraId, limit = 20) {

@@ -140,4 +140,49 @@ describe('CameraSourceLifecycleService refresh orchestration', () => {
         expect(calls.some((call) => call[0] === 'runtime' && call[2] === 'checking')).toBe(true);
         expect(calls.some((call) => call[0] === 'execute' && call[1].includes('camera_source_lifecycle_events'))).toBe(true);
     });
+
+    it('keeps source refresh successful when lifecycle event persistence fails', async () => {
+        const service = new CameraSourceLifecycleService({
+            mediaMtxService: {
+                refreshCameraPathAfterSourceChange: async (streamKey) => ({ success: true, action: 'refreshed', pathName: streamKey }),
+                getPathConfig: async () => ({ source: 'rtsp://admin:secret@10.0.0.2/live' }),
+            },
+            cameraHealthService: {
+                clearCameraRuntimeState: async () => {},
+            },
+            cameraRuntimeStateService: {
+                upsertRuntimeState: () => {},
+            },
+            db: {
+                queryOne: (sql) => (
+                    sql.includes('SELECT id FROM cameras')
+                        ? { id: 999 }
+                        : { stream_revision: 4, source_updated_at: '2026-05-11T05:00:00.000Z' }
+                ),
+                query: () => [],
+                execute: (sql) => {
+                    if (sql.includes('camera_source_lifecycle_events')) {
+                        throw new Error('FOREIGN KEY constraint failed');
+                    }
+                },
+            },
+        });
+
+        await expect(service.refreshCameraSource({
+            camera: {
+                id: 999,
+                stream_key: 'missing-camera',
+                stream_source: 'internal',
+                delivery_type: 'internal_hls',
+                enabled: 1,
+                private_rtsp_url: 'rtsp://admin:secret@10.0.0.2/live',
+            },
+            reason: 'camera_update',
+            classification: { sourceChanged: true, changedFields: ['enabled'], maskedChanges: {} },
+        })).resolves.toMatchObject({
+            sourceChanged: true,
+            status: 'refreshed',
+            streamRevision: 4,
+        });
+    });
 });
