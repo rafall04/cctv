@@ -68,7 +68,7 @@ function MultiViewLayout({ cameras, onRemove, onClose }) {
     const getInitDelay = (index) => index * DEFAULT_STAGGER_DELAY;
 
     return (
-        <div className="fixed inset-0 z-50 bg-gray-50 dark:bg-gray-950 flex flex-col">
+        <div className="fixed inset-0 z-[1300] bg-gray-50 dark:bg-gray-950 flex flex-col">
             <div className="shrink-0 flex items-center justify-between p-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-white/10">
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary-400"><Icons.Layout /></div>

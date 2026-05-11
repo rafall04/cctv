@@ -8,7 +8,7 @@ MainFuncs: MultiViewVideoItem runtime tests.
 SideEffects: Mounts component in jsdom and advances timers.
 */
 
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import MultiViewVideoItem from './MultiViewVideoItem.jsx';
 
@@ -255,12 +255,23 @@ describe('MultiViewVideoItem runtime stability', () => {
 
         const { unmount } = render(
             <MultiViewVideoItem
-                camera={baseCamera}
+                camera={{
+                    ...baseCamera,
+                    delivery_type: 'external_hls',
+                    external_use_proxy: false,
+                    _rawExternalHlsUrl: 'https://example.com/direct.m3u8',
+                }}
                 onRemove={vi.fn()}
                 onError={vi.fn()}
                 onStatusChange={vi.fn()}
             />
         );
+
+        await waitForInitialHls();
+
+        await act(async () => {
+            fireEvent.playing(screen.getByTestId('multi-view-video'));
+        });
 
         await waitFor(() => {
             expect(startSessionMock).toHaveBeenCalledWith(31);

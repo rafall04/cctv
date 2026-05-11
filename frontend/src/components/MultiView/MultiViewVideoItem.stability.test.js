@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const source = fs.readFileSync(path.join(dirname, 'MultiViewVideoItem.jsx'), 'utf8');
+const layoutSource = fs.readFileSync(path.join(dirname, 'MultiViewLayout.jsx'), 'utf8');
 
 function getHlsEffectDependencies() {
     const start = source.indexOf('        initStream();');
@@ -38,9 +39,10 @@ describe('MultiViewVideoItem HLS stability', () => {
     });
 
     it('guards delayed viewer session startup so unmounted tiles do not leak sessions', () => {
-        expect(source).toContain('let isActive = true;');
-        expect(source).toContain('if (!isActive)');
-        expect(source).toContain('isActive = false;');
+        expect(source).toContain('viewerSessionActiveRef.current = true;');
+        expect(source).toContain('!viewerSessionActiveRef.current');
+        expect(source).toContain('viewerSessionActiveRef.current = false;');
+        expect(source).toContain('viewerSessionRunRef.current');
     });
 
     it('retries internal HLS manifest warmup errors before surfacing tile failure', () => {
@@ -65,5 +67,24 @@ describe('MultiViewVideoItem HLS stability', () => {
     it('does not silently stay connecting when no stream URL exists', () => {
         expect(source).toContain('Stream URL belum tersedia untuk Multi-View');
         expect(source).toContain('Format stream tidak didukung');
+    });
+
+    it('renders the multi-view shell above public mobile dock overlays', () => {
+        expect(layoutSource).toContain('z-[1300]');
+    });
+
+    it('starts frontend viewer sessions only after playback is confirmed', () => {
+        const handlePlayingIndex = source.indexOf('const handlePlaying = () => {');
+        const handlePlayingEnd = source.indexOf('        };', handlePlayingIndex);
+        const handlePlayingBlock = source.slice(handlePlayingIndex, handlePlayingEnd);
+
+        expect(source).toContain('startViewerSessionAfterPlayback');
+        expect(handlePlayingBlock).toContain('startViewerSessionAfterPlayback();');
+    });
+
+    it('skips frontend viewer sessions for backend-proxied HLS streams', () => {
+        expect(source).toContain('shouldTrackFrontendViewerSession');
+        expect(source).toContain('return false;');
+        expect(source).toContain('isDirectStream');
     });
 });

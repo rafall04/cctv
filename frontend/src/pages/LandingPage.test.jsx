@@ -24,7 +24,7 @@ const { getPublicSaweriaConfig, testBackendReachability, updateMetaTags, getPubl
     videoPopupPropsSpy: vi.fn(),
     landingPageSimplePropsSpy: vi.fn(),
     cameraProviderPropsSpy: vi.fn(),
-    cameraContextState: { cameras: [], deviceTier: 'mid' },
+    cameraContextState: { cameras: [], deviceTier: 'medium' },
 }));
 
 vi.mock('../services/saweriaService', () => ({
@@ -123,7 +123,7 @@ vi.mock('../components/landing/LandingHero', () => ({
 }));
 
 vi.mock('../components/landing/LandingCamerasSection', () => ({
-    default: ({ onMapCameraOpen, viewMode }) => (
+    default: ({ onMapCameraOpen, onAddMulti, viewMode }) => (
         <section id="camera-workspace" data-testid="camera-workspace" data-view-mode={viewMode}>
             <button
                 type="button"
@@ -134,9 +134,9 @@ vi.mock('../components/landing/LandingCamerasSection', () => ({
                     status: 'active',
                     is_online: 1,
                 })}
-                >
-                    cameras-section
-                </button>
+            >
+                cameras-section
+            </button>
             <button
                 type="button"
                 data-testid="open-map-popup-alt"
@@ -148,6 +148,21 @@ vi.mock('../components/landing/LandingCamerasSection', () => ({
                 })}
             >
                 cameras-section-alt
+            </button>
+            <button
+                type="button"
+                data-testid="add-multiview-camera"
+                onClick={() => onAddMulti?.({
+                    id: 101,
+                    name: 'Multi Camera',
+                    status: 'active',
+                    is_online: 1,
+                    stream_source: 'external',
+                    delivery_type: 'external_hls',
+                    streams: { hls: 'https://example.com/multi.m3u8' },
+                })}
+            >
+                add-multiview-camera
             </button>
         </section>
     ),
@@ -182,11 +197,15 @@ vi.mock('../components/landing/LandingEventBanner', () => ({
 }));
 
 vi.mock('../components/MultiView/MultiViewButton', () => ({
-    default: () => <div>multi-button</div>,
+    default: ({ count, onClick }) => (
+        <button type="button" data-testid="multi-view-button" onClick={onClick}>
+            multi-button-{count}
+        </button>
+    ),
 }));
 
 vi.mock('../components/MultiView/MultiViewLayout', () => ({
-    default: () => <div>multi-layout</div>,
+    default: () => <div data-testid="multi-view-layout">multi-layout</div>,
 }));
 
 vi.mock('../components/MultiView/VideoPopup', () => ({
@@ -222,7 +241,7 @@ describe('LandingPage connectivity recovery', () => {
         landingPageSimplePropsSpy.mockReset();
         cameraProviderPropsSpy.mockReset();
         cameraContextState.cameras = [];
-        cameraContextState.deviceTier = 'mid';
+        cameraContextState.deviceTier = 'medium';
         testBackendReachability.mockResolvedValue({ reachable: true, latency: 80 });
         getDiscovery.mockResolvedValue({
             success: true,
@@ -436,6 +455,37 @@ describe('LandingPage connectivity recovery', () => {
                 }),
             }));
         });
+    });
+
+    it('hides mobile dock and launcher while multi-view is open', async () => {
+        resolvePublicPopupCamera.mockImplementation((camera) => Promise.resolve(camera));
+
+        renderWithRouter(<LandingPage />);
+
+        await waitFor(() => {
+            expect(screen.getByTestId('add-multiview-camera')).toBeTruthy();
+        });
+
+        await act(async () => {
+            screen.getByTestId('add-multiview-camera').click();
+        });
+
+        await waitFor(() => {
+            expect(screen.getByTestId('multi-view-button')).toBeTruthy();
+        });
+
+        expect(screen.getByTestId('landing-mobile-dock')).toBeTruthy();
+
+        await act(async () => {
+            screen.getByTestId('multi-view-button').click();
+        });
+
+        await waitFor(() => {
+            expect(screen.getByTestId('multi-view-layout')).toBeTruthy();
+        });
+
+        expect(screen.queryByTestId('landing-mobile-dock')).toBeNull();
+        expect(screen.queryByTestId('multi-view-button')).toBeNull();
     });
 
     it('mengabaikan hasil resolusi popup yang terlambat saat popup baru dibuka', async () => {

@@ -44,6 +44,10 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
     const autoRetryCountRef = useRef(0);
     const internalWarmupRetryCountRef = useRef(0);
     const internalWarmupRetryTimeoutRef = useRef(null);
+    const viewerSessionIdRef = useRef(null);
+    const viewerSessionPendingRef = useRef(false);
+    const viewerSessionActiveRef = useRef(true);
+    const viewerSessionRunRef = useRef(0);
 
     // Handle close with fullscreen exit
     const handleClose = async () => {
@@ -100,6 +104,17 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
     const externalFrameUrl = renderMode === 'embed' ? embedUrl : null;
     const hasRenderableExternalUrl = Boolean(flvUrl || mjpegUrl || externalFrameUrl);
     const canCaptureSnapshot = renderMode === 'hls' || renderMode === 'flv';
+    const shouldTrackFrontendViewerSession = useCallback(() => {
+        if (isMaintenance || isOffline) {
+            return false;
+        }
+
+        if (renderMode !== 'hls') {
+            return true;
+        }
+
+        return Boolean(isDirectStream);
+    }, [isDirectStream, isMaintenance, isOffline, renderMode]);
 
     useEffect(() => {
         loadingStageRef.current = loadingStage;
@@ -138,51 +153,24 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         };
     }, []);
 
-    // Viewer session tracking - track when user starts/stops watching this camera
     useEffect(() => {
-        // Don't track if camera is offline or in maintenance
-        if (isMaintenance || isOffline) return;
+        viewerSessionRunRef.current += 1;
+        viewerSessionActiveRef.current = true;
 
-        let isActive = true;
-        let sessionId = null;
-
-        // Start viewer session with delay (staggered init)
-        const startTracking = async () => {
-            // Wait for init delay before starting session
-            if (initDelay > 0) {
-                await new Promise(resolve => setTimeout(resolve, initDelay));
-            }
-
-            if (!isActive) return;
-
-            try {
-                const nextSessionId = await viewerService.startSession(camera.id);
-
-                if (!isActive) {
-                    if (nextSessionId) {
-                        Promise.resolve(viewerService.stopSession(nextSessionId)).catch(() => { });
-                    }
-                    return;
-                }
-
-                sessionId = nextSessionId;
-            } catch (error) {
-                console.error('[MultiViewVideoItem] Failed to start viewer session:', error);
-            }
-        };
-
-        startTracking();
-
-        // Cleanup: stop session when component unmounts
         return () => {
-            isActive = false;
+            viewerSessionActiveRef.current = false;
+            viewerSessionRunRef.current += 1;
+            const sessionId = viewerSessionIdRef.current;
+            viewerSessionIdRef.current = null;
+            viewerSessionPendingRef.current = false;
+
             if (sessionId) {
                 Promise.resolve(viewerService.stopSession(sessionId)).catch(err => {
                     console.error('[MultiViewVideoItem] Failed to stop viewer session:', err);
                 });
             }
         };
-    }, [camera.id, isMaintenance, isOffline, initDelay]);
+    }, [camera.id]);
 
     // Notify parent of status changes
     useEffect(() => {
@@ -275,6 +263,36 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         clearInternalWarmupRetry();
     }, [clearInternalWarmupRetry, clearStreamTimeout]);
 
+    const startViewerSessionAfterPlayback = useCallback(async () => {
+        if (!shouldTrackFrontendViewerSession()) {
+            return;
+        }
+
+        if (viewerSessionIdRef.current || viewerSessionPendingRef.current) {
+            return;
+        }
+
+        viewerSessionPendingRef.current = true;
+        const sessionRun = viewerSessionRunRef.current;
+
+        try {
+            const nextSessionId = await viewerService.startSession(camera.id);
+
+            if (!viewerSessionActiveRef.current || sessionRun !== viewerSessionRunRef.current) {
+                if (nextSessionId) {
+                    Promise.resolve(viewerService.stopSession(nextSessionId)).catch(() => { });
+                }
+                return;
+            }
+
+            viewerSessionIdRef.current = nextSessionId;
+        } catch (error) {
+            console.error('[MultiViewVideoItem] Failed to start viewer session:', error);
+        } finally {
+            viewerSessionPendingRef.current = false;
+        }
+    }, [camera.id, shouldTrackFrontendViewerSession]);
+
     useEffect(() => {
         // Skip HLS loading if camera is in maintenance or offline
         if (isMaintenance || isOffline) return;
@@ -311,6 +329,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 fallbackHandlerRef.current.reset();
             }
             setAutoRetryCount(0);
+            startViewerSessionAfterPlayback();
         };
 
         // Fallback: Check video state periodically
@@ -587,6 +606,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         proxyFallbackUrl,
         renderMode,
         retryKey,
+        startViewerSessionAfterPlayback,
         startTimeout,
         updateStreamStage,
     ]);
@@ -623,6 +643,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             setStatus('live');
             setLoadingStage(LoadingStage.PLAYING);
             clearStreamTimeout();
+            startViewerSessionAfterPlayback();
         };
         const markError = () => {
             setStatus('error');
@@ -645,7 +666,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 flvRef.current = null;
             }
         };
-    }, [camera.id, clearStreamTimeout, flvUrl, isMaintenance, isOffline, onError, renderMode]);
+    }, [camera.id, clearStreamTimeout, flvUrl, isMaintenance, isOffline, onError, renderMode, startViewerSessionAfterPlayback]);
 
     useEffect(() => {
         if (isMaintenance || isOffline) return;
@@ -782,7 +803,10 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                         alt={camera.name}
                         data-testid="multi-view-mjpeg"
                         className="h-full w-full object-contain bg-black"
-                        onLoad={() => setStatus('live')}
+                        onLoad={() => {
+                            setStatus('live');
+                            startViewerSessionAfterPlayback();
+                        }}
                         onError={() => {
                             setStatus('error');
                             setLoadingStage(LoadingStage.ERROR);
@@ -797,7 +821,10 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                         className="h-full w-full border-0 bg-black"
                         allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
                         referrerPolicy="no-referrer"
-                        onLoad={() => setStatus('live')}
+                        onLoad={() => {
+                            setStatus('live');
+                            startViewerSessionAfterPlayback();
+                        }}
                     />
                 ) : (
                     <ZoomableVideo videoRef={videoRef} status={status} maxZoom={3} onZoomChange={setZoom} isFullscreen={isFullscreen} />

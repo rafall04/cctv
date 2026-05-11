@@ -185,13 +185,15 @@ function LandingPageContent({ onRefreshPauseChange }) {
                     />
                 </Suspense>
 
-                <MultiViewButton
-                    count={multiCameras.length}
-                    onClick={() => setShowMulti(true)}
-                    maxReached={maxReached}
-                    maxStreams={maxStreams}
-                />
-                {!popup && (
+                {!showMulti && (
+                    <MultiViewButton
+                        count={multiCameras.length}
+                        onClick={() => setShowMulti(true)}
+                        maxReached={maxReached}
+                        maxStreams={maxStreams}
+                    />
+                )}
+                {!popup && !showMulti && (
                     <LandingMobileDock
                         viewMode={viewMode}
                         onViewModeChange={handleMobileViewModeChange}
@@ -316,13 +318,15 @@ function LandingPageContent({ onRefreshPauseChange }) {
                     branding={branding}
                 />
 
-                <MultiViewButton
-                    count={multiCameras.length}
-                    onClick={() => setShowMulti(true)}
-                    maxReached={maxReached}
-                    maxStreams={maxStreams}
-                />
-                {!popup && (
+                {!showMulti && (
+                    <MultiViewButton
+                        count={multiCameras.length}
+                        onClick={() => setShowMulti(true)}
+                        maxReached={maxReached}
+                        maxStreams={maxStreams}
+                    />
+                )}
+                {!popup && !showMulti && (
                     <LandingMobileDock
                         viewMode={viewMode}
                         onViewModeChange={handleMobileViewModeChange}
