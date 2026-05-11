@@ -174,6 +174,48 @@ function ruleMatchesCamera(rule, camera, eventType) {
     return true;
 }
 
+function buildNotificationRuleIssues(settings = {}) {
+    const targetsById = new Map((settings.notificationTargets || []).map((target) => [target.id, target]));
+    const issues = [];
+
+    for (const rule of settings.notificationRules || []) {
+        if (!targetsById.has(rule.targetId)) {
+            issues.push({
+                id: rule.id,
+                severity: 'error',
+                message: 'Rule mengarah ke target Telegram yang tidak tersedia.',
+            });
+            continue;
+        }
+
+        if (rule.scope === 'area' && Number.isNaN(rule.areaId)) {
+            issues.push({
+                id: rule.id,
+                severity: 'error',
+                message: 'Rule area membutuhkan areaId valid.',
+            });
+        }
+
+        if (rule.scope === 'camera' && Number.isNaN(rule.cameraId)) {
+            issues.push({
+                id: rule.id,
+                severity: 'error',
+                message: 'Rule kamera membutuhkan cameraId valid.',
+            });
+        }
+
+        if (!Array.isArray(rule.events) || rule.events.length === 0) {
+            issues.push({
+                id: rule.id,
+                severity: 'error',
+                message: 'Rule membutuhkan minimal satu event offline atau online.',
+            });
+        }
+    }
+
+    return issues;
+}
+
 function groupCamerasByArea(cameras = []) {
     const groups = new Map();
     for (const camera of cameras) {
@@ -573,6 +615,7 @@ export function isFeedbackConfigured() {
 
 export function getTelegramStatus() {
     const settings = getTelegramSettings();
+    const notificationRuleIssues = buildNotificationRuleIssues(settings);
     return {
         enabled: !!(settings.botToken && (hasCameraMonitoringTarget(settings) || settings.feedbackChatId)),
         monitoringConfigured: !!(settings.botToken && settings.monitoringChatId),
@@ -583,6 +626,7 @@ export function getTelegramStatus() {
         feedbackChatId: settings.feedbackChatId || '',
         notificationTargets: settings.notificationTargets || [],
         notificationRules: settings.notificationRules || [],
+        notificationRuleIssues,
     };
 }
 

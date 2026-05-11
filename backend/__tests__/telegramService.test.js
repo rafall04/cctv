@@ -212,4 +212,49 @@ describe('telegramService notification routing', () => {
         expect(sent).toBe(false);
         expect(global.fetch).not.toHaveBeenCalled();
     });
+
+    it('reports invalid routing rules without sending them as healthy policy', async () => {
+        const telegram = await loadTelegramService({
+            botToken: '123456789:test',
+            monitoringChatId: '',
+            feedbackChatId: '',
+            notificationTargets: [
+                { id: 'area-bojonegoro', name: 'Area Bojonegoro', chatId: '-100-area' },
+            ],
+            notificationRules: [
+                {
+                    id: 'missing-area',
+                    enabled: true,
+                    targetId: 'area-bojonegoro',
+                    scope: 'area',
+                    areaId: '',
+                    events: ['offline'],
+                    ingestModes: ['always_on'],
+                },
+                {
+                    id: 'missing-target',
+                    enabled: true,
+                    targetId: 'unknown-target',
+                    scope: 'global',
+                    events: ['online'],
+                    ingestModes: ['always_on'],
+                },
+            ],
+        });
+
+        const status = telegram.getTelegramStatus();
+
+        expect(status.notificationRuleIssues).toEqual([
+            {
+                id: 'missing-area',
+                severity: 'error',
+                message: 'Rule area membutuhkan areaId valid.',
+            },
+            {
+                id: 'missing-target',
+                severity: 'error',
+                message: 'Rule mengarah ke target Telegram yang tidak tersedia.',
+            },
+        ]);
+    });
 });
