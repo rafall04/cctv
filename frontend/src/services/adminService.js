@@ -210,9 +210,9 @@ export const adminService = {
         }
     },
 
-    async testTelegramNotification(type = 'monitoring') {
+    async testTelegramNotification(type = 'monitoring', options = {}) {
         try {
-            const response = await apiClient.post('/api/admin/telegram/test', { type });
+            const response = await apiClient.post('/api/admin/telegram/test', { type, ...options });
             return response.data;
         } catch (error) {
             console.error('Test Telegram notification error:', error);

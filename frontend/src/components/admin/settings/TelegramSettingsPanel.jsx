@@ -40,7 +40,7 @@ export default function TelegramSettingsPanel() {
     const [areas, setAreas] = useState([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [testLoading, setTestLoading] = useState({ monitoring: false, feedback: false });
+    const [testLoading, setTestLoading] = useState({});
     const [testResult, setTestResult] = useState(null);
     const [error, setError] = useState(null);
     const [successMsg, setSuccessMsg] = useState(null);
@@ -110,12 +110,13 @@ export default function TelegramSettingsPanel() {
         }
     };
 
-    const handleTestNotification = async (type) => {
-        setTestLoading((prev) => ({ ...prev, [type]: true }));
+    const handleTestNotification = async (type, options = {}) => {
+        const loadingKey = options.targetId ? `target:${options.targetId}` : type;
+        setTestLoading((prev) => ({ ...prev, [loadingKey]: true }));
         setTestResult(null);
 
         try {
-            const response = await adminService.testTelegramNotification(type);
+            const response = await adminService.testTelegramNotification(type, options);
             setTestResult({
                 type: response.success ? 'success' : 'error',
                 message: response.message || (response.success ? 'Notifikasi test berhasil dikirim.' : 'Gagal mengirim notifikasi test'),
@@ -123,7 +124,7 @@ export default function TelegramSettingsPanel() {
         } catch (requestError) {
             setTestResult({ type: 'error', message: 'Gagal terhubung ke server' });
         } finally {
-            setTestLoading((prev) => ({ ...prev, [type]: false }));
+            setTestLoading((prev) => ({ ...prev, [loadingKey]: false }));
         }
     };
 
@@ -236,6 +237,13 @@ export default function TelegramSettingsPanel() {
                     message={testResult.message}
                     dismissible
                     onDismiss={() => setTestResult(null)}
+                />
+            )}
+            {(telegramStatus?.notificationRuleIssues || []).length > 0 && (
+                <Alert
+                    type="warning"
+                    title="Routing Telegram perlu diperiksa"
+                    message={telegramStatus.notificationRuleIssues.map((issue) => issue.message).join(' ')}
                 />
             )}
 
@@ -488,6 +496,33 @@ export default function TelegramSettingsPanel() {
                                     enabled={(telegramStatus?.notificationRules?.length || 0) > 0 || telegramStatus?.monitoringConfigured}
                                 />
                             </div>
+                            {(telegramStatus?.notificationTargets || []).length > 0 && (
+                                <div className="mt-6 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+                                    <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Target Grup Aktif</h3>
+                                    <div className="space-y-2">
+                                        {(telegramStatus.notificationTargets || []).map((target) => {
+                                            const loadingKey = `target:${target.id}`;
+                                            return (
+                                                <div key={target.id} className="flex items-center justify-between gap-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 px-3 py-2">
+                                                    <div className="min-w-0">
+                                                        <p className="font-medium text-gray-900 dark:text-white truncate">{target.name}</p>
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{target.chatId}</p>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        aria-label={`Test ${target.name}`}
+                                                        onClick={() => handleTestNotification('target', { targetId: target.id })}
+                                                        disabled={testLoading[loadingKey]}
+                                                        className="shrink-0 text-xs px-2 py-1 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-lg hover:bg-emerald-200 dark:hover:bg-emerald-500/30 transition-colors disabled:opacity-60"
+                                                    >
+                                                        {testLoading[loadingKey] ? 'Mengirim...' : 'Test'}
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
                         </>
                     )}
 
@@ -506,8 +541,8 @@ export default function TelegramSettingsPanel() {
             <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl p-6">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Fitur Notifikasi</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FeatureItem title="Kamera Offline" description="Notifikasi otomatis saat kamera terputus." enabled={telegramStatus?.monitoringConfigured} />
-                    <FeatureItem title="Kamera Online" description="Notifikasi saat kamera kembali terhubung." enabled={telegramStatus?.monitoringConfigured} />
+                    <FeatureItem title="Kamera Offline" description="Notifikasi otomatis saat kamera terputus." enabled={telegramStatus?.cameraMonitoringConfigured} />
+                    <FeatureItem title="Kamera Online" description="Notifikasi saat kamera kembali terhubung." enabled={telegramStatus?.cameraMonitoringConfigured} />
                     <FeatureItem title="Kritik dan Saran" description="Notifikasi saat ada feedback baru." enabled={telegramStatus?.feedbackConfigured} />
                     <FeatureItem title="Cooldown 5 Menit" description="Mengurangi spam notifikasi berulang." enabled={telegramStatus?.enabled} />
                 </div>
