@@ -57,10 +57,12 @@ export default function CameraCard({
     deletingId,
     togglingId,
     togglingMaintenanceId,
+    refreshingStreamId,
     onEdit,
     onDelete,
     onToggleEnabled,
     onToggleMaintenance,
+    onRefreshStream,
 }) {
     const availabilityTone = camera.availability_state === 'online'
         ? 'bg-emerald-500/90 text-white'
@@ -107,6 +109,11 @@ export default function CameraCard({
             label: 'Tunnel',
             className: 'bg-amber-500/90 text-white',
             title: 'Koneksi Tunnel - Kurang Stabil',
+        },
+        camera.monitoring_state === 'reconnecting' && {
+            label: 'Reconnecting',
+            className: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-200',
+            title: 'Stream source sedang reconnect setelah update',
         },
     ].filter(Boolean);
 
@@ -206,8 +213,10 @@ export default function CameraCard({
                     camera={camera}
                     togglingId={togglingId}
                     togglingMaintenanceId={togglingMaintenanceId}
+                    refreshingStreamId={refreshingStreamId}
                     onToggleEnabled={onToggleEnabled}
                     onToggleMaintenance={onToggleMaintenance}
+                    onRefreshStream={onRefreshStream}
                 />
             </div>
         </div>

@@ -1,3 +1,11 @@
+/**
+ * Purpose: Owns Camera Management page data, filters, forms, mutations, and stream lifecycle recovery actions.
+ * Caller: frontend/src/pages/CameraManagement.jsx.
+ * Deps: cameraService, areaService, notification/form hooks, admin camera form adapter.
+ * MainFuncs: useCameraManagementPage.
+ * SideEffects: Loads camera/area data, performs camera mutations, and triggers stream refresh API calls.
+ */
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cameraService } from '../../services/cameraService';
 import { areaService } from '../../services/areaService';
@@ -41,11 +49,28 @@ export function useCameraManagementPage() {
     const [deletingId, setDeletingId] = useState(null);
     const [togglingId, setTogglingId] = useState(null);
     const [togglingMaintenanceId, setTogglingMaintenanceId] = useState(null);
+    const [refreshingStreamId, setRefreshingStreamId] = useState(null);
     const camerasRequestIdRef = useRef(0);
     const areasRequestIdRef = useRef(0);
     const mountedRef = useRef(true);
 
     const { success, error: showError } = useNotification();
+
+    const handleLifecycleResult = useCallback((lifecycle) => {
+        if (!lifecycle?.sourceChanged) {
+            return;
+        }
+
+        if (lifecycle.status === 'refreshed') {
+            success('Camera Stream Refreshed', 'Camera source lifecycle refreshed successfully.');
+            return;
+        }
+
+        showError(
+            'Camera Stream Reconnecting',
+            lifecycle.warnings?.[0] || 'Camera stream is reconnecting. Use Refresh Stream if it stays stuck.'
+        );
+    }, [showError, success]);
 
     const {
         values: formData,
@@ -213,6 +238,7 @@ export function useCameraManagementPage() {
                 : await cameraService.createCamera(payload);
 
             if (result.success) {
+                handleLifecycleResult(result.data?.sourceLifecycle);
                 closeModal();
                 await loadCameras({ mode: 'initial' });
 
@@ -253,6 +279,7 @@ export function useCameraManagementPage() {
         closeModal,
         editingCamera,
         formData,
+        handleLifecycleResult,
         loadCameras,
         setFieldError,
         setSubmitting,
@@ -298,6 +325,9 @@ export function useCameraManagementPage() {
                     item.id === camera.id ? { ...item, enabled: previousEnabled } : item
                 )));
                 showError('Update Failed', result.message || 'Failed to update camera status');
+            } else {
+                handleLifecycleResult(result.data?.sourceLifecycle);
+                await loadCameras({ mode: 'background' });
             }
         } catch (error) {
             setCameras((previous) => previous.map((item) => (
@@ -307,7 +337,24 @@ export function useCameraManagementPage() {
         } finally {
             setTogglingId(null);
         }
-    }, [showError]);
+    }, [handleLifecycleResult, loadCameras, showError]);
+
+    const refreshCameraStream = useCallback(async (cameraId) => {
+        setRefreshingStreamId(cameraId);
+        try {
+            const result = await cameraService.refreshCameraStream(cameraId);
+            if (result.success) {
+                handleLifecycleResult(result.data?.sourceLifecycle);
+                await loadCameras({ mode: 'background' });
+                return;
+            }
+            showError('Refresh Failed', result.message || 'Failed to refresh camera stream');
+        } catch (error) {
+            showError('Refresh Failed', error.response?.data?.message || 'Failed to refresh camera stream');
+        } finally {
+            setRefreshingStreamId(null);
+        }
+    }, [handleLifecycleResult, loadCameras, showError]);
 
     const toggleMaintenance = useCallback(async (camera) => {
         const previousStatus = camera.status;
@@ -395,6 +442,7 @@ export function useCameraManagementPage() {
         deletingId,
         togglingId,
         togglingMaintenanceId,
+        refreshingStreamId,
         modalError,
         formData,
         isSubmitting,
@@ -408,6 +456,7 @@ export function useCameraManagementPage() {
         deleteCamera,
         toggleEnabled,
         toggleMaintenance,
+        refreshCameraStream,
         setFieldValue,
         getFieldError,
         setModalError,

@@ -17,6 +17,7 @@ import { cleanupMediaResources } from '../utils/mediaResourceCleanup';
 import { useStreamTimeout } from '../hooks/useStreamTimeout';
 import { LoadingStage, getStageMessage, createStreamError } from '../utils/streamLoaderTypes';
 import { createFallbackHandler } from '../utils/fallbackHandler';
+import { appendStreamRevision } from '../utils/streamRevision';
 
 /**
  * Optimized VideoPlayer Component
@@ -98,6 +99,11 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
         && (camera?.external_use_proxy === 0 || camera?.external_use_proxy === false)
         && !forceProxyFallback
     ), [camera?.external_use_proxy, forceProxyFallback, isExternalStream]);
+    const streamRevision = camera?.stream_revision ?? camera?.source_updated_at ?? camera?.updated_at;
+    const rawHlsUrl = useMemo(() => (
+        useDirectStream && camera?.external_hls_url ? camera.external_hls_url : streams?.hls
+    ), [camera?.external_hls_url, streams?.hls, useDirectStream]);
+    const targetHlsUrl = useMemo(() => appendStreamRevision(rawHlsUrl, streamRevision), [rawHlsUrl, streamRevision]);
 
     // Detect device capabilities on mount
     useEffect(() => {
@@ -317,11 +323,9 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
     // Main HLS initialization effect - now using PreloadManager
     // **Validates: Requirements 2.1, 2.2, 2.3**
     useEffect(() => {
-        if (!streams || !videoRef.current || !deviceCapabilities) return;
+        if (!targetHlsUrl || !videoRef.current || !deviceCapabilities) return;
 
         const video = videoRef.current;
-        // Smart Routing Logic: Bypass proxy if configured, unless fallback tripped
-        const targetHlsUrl = useDirectStream && camera.external_hls_url ? camera.external_hls_url : streams.hls;
 
         let hls = null;
         let isDestroyed = false;
@@ -591,7 +595,6 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
         };
     }, [
         autoRetryCount,
-        camera?.external_hls_url,
         cleanupResources,
         clearStreamTimeout,
         deviceCapabilities,
@@ -600,7 +603,7 @@ const VideoPlayer = memo(({ camera, streams, onExpand, isExpanded, enableZoom = 
         loadingStage,
         resetFailures,
         startTimeout,
-        streams,
+        targetHlsUrl,
         updateStreamStage,
         useDirectStream,
     ]);

@@ -1,10 +1,24 @@
+/*
+Purpose: Render per-camera operational status toggles and manual stream recovery action.
+Caller: CameraCard inside Camera Management.
+Deps: lucide-react RefreshCw icon.
+MainFuncs: CameraStatusActions.
+SideEffects: Emits toggle and manual refresh callbacks only.
+*/
+
+import { RefreshCw } from 'lucide-react';
+
 export default function CameraStatusActions({
     camera,
     togglingId,
     togglingMaintenanceId,
+    refreshingStreamId,
     onToggleEnabled,
     onToggleMaintenance,
+    onRefreshStream,
 }) {
+    const isRefreshingStream = refreshingStreamId === camera.id;
+
     return (
         <>
             <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700/50">
@@ -19,6 +33,20 @@ export default function CameraStatusActions({
                         <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${camera.enabled ? 'left-5' : 'left-0.5'}`}></div>
                     </button>
                 </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-3 mt-3 border-t border-gray-200 dark:border-gray-700/50">
+                <span className="text-xs text-gray-500 dark:text-gray-400">Stream source</span>
+                <button
+                    type="button"
+                    onClick={() => onRefreshStream(camera.id)}
+                    disabled={isRefreshingStream}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-50 disabled:opacity-50 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-950"
+                    title="Refresh stream source tanpa disable/enable"
+                >
+                    <RefreshCw className={`h-3.5 w-3.5 ${isRefreshingStream ? 'animate-spin' : ''}`} />
+                    {isRefreshingStream ? 'Refreshing...' : 'Refresh Stream'}
+                </button>
             </div>
 
             <div className="flex items-center justify-between pt-3 mt-3 border-t border-gray-200 dark:border-gray-700/50">

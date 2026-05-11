@@ -1,3 +1,11 @@
+/**
+ * Purpose: Camera API client for public/admin camera CRUD, lifecycle recovery, import, restore, and bulk actions.
+ * Caller: Camera contexts, admin camera hooks/pages, and public camera views.
+ * Deps: apiClient, requestPolicy.
+ * MainFuncs: cameraService get/create/update/delete/refresh/import/restore methods.
+ * SideEffects: Performs HTTP requests through apiClient.
+ */
+
 import apiClient from './apiClient';
 import { getRequestPolicyConfig, REQUEST_POLICY } from './requestPolicy';
 
@@ -53,6 +61,26 @@ export const cameraService = {
             return response.data;
         } catch (error) {
             console.error('Update camera error:', error);
+            throw error;
+        }
+    },
+
+    async refreshCameraStream(id) {
+        try {
+            const response = await apiClient.post(`/api/cameras/${id}/stream/refresh`);
+            return response.data;
+        } catch (error) {
+            console.error('Refresh camera stream error:', error);
+            throw error;
+        }
+    },
+
+    async getCameraSourceLifecycleEvents(id) {
+        try {
+            const response = await apiClient.get(`/api/cameras/${id}/stream/events`);
+            return response.data;
+        } catch (error) {
+            console.error('Get camera source lifecycle events error:', error);
             throw error;
         }
     },

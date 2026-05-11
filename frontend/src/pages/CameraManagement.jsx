@@ -1,3 +1,11 @@
+/*
+Purpose: Camera Management route shell for admin camera CRUD, filters, forms, and stream recovery controls.
+Caller: App protected admin route.
+Deps: admin camera components and useCameraManagementPage hook.
+MainFuncs: CameraManagement.
+SideEffects: Delegates camera mutations and stream refresh actions through the page hook.
+*/
+
 import CameraFormModal from '../components/admin/cameras/CameraFormModal';
 import CameraGrid from '../components/admin/cameras/CameraGrid';
 import CameraManagementHeader from '../components/admin/cameras/CameraManagementHeader';
@@ -21,6 +29,7 @@ export default function CameraManagement() {
         deletingId,
         togglingId,
         togglingMaintenanceId,
+        refreshingStreamId,
         modalError,
         formData,
         isSubmitting,
@@ -34,6 +43,7 @@ export default function CameraManagement() {
         deleteCamera,
         toggleEnabled,
         toggleMaintenance,
+        refreshCameraStream,
         setFieldValue,
         getFieldError,
         setModalError,
@@ -135,10 +145,12 @@ export default function CameraManagement() {
                     deletingId={deletingId}
                     togglingId={togglingId}
                     togglingMaintenanceId={togglingMaintenanceId}
+                    refreshingStreamId={refreshingStreamId}
                     onEdit={openEditModal}
                     onDelete={deleteCamera}
                     onToggleEnabled={toggleEnabled}
                     onToggleMaintenance={toggleMaintenance}
+                    onRefreshStream={refreshCameraStream}
                 />
             )}
 

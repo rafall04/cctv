@@ -10,6 +10,7 @@ const {
     createCamera,
     updateCamera,
     deleteCamera,
+    refreshCameraStream,
     getAllAreas,
 } = vi.hoisted(() => ({
     getAllCameras: vi.fn(),
@@ -17,6 +18,7 @@ const {
     createCamera: vi.fn(),
     updateCamera: vi.fn(),
     deleteCamera: vi.fn(),
+    refreshCameraStream: vi.fn(),
     getAllAreas: vi.fn(),
 }));
 
@@ -27,6 +29,7 @@ vi.mock('../services/cameraService', () => ({
         createCamera,
         updateCamera,
         deleteCamera,
+        refreshCameraStream,
     },
 }));
 
@@ -58,6 +61,7 @@ describe('CameraManagement', () => {
         createCamera.mockReset();
         updateCamera.mockReset();
         deleteCamera.mockReset();
+        refreshCameraStream.mockReset();
         getAllAreas.mockReset();
 
         getAllCameras.mockResolvedValue({ success: true, data: [] });
@@ -65,6 +69,17 @@ describe('CameraManagement', () => {
         getAllAreas.mockResolvedValue({ success: true, data: [{ id: 1, name: 'Lobby' }] });
         createCamera.mockResolvedValue({ success: true });
         updateCamera.mockResolvedValue({ success: true });
+        refreshCameraStream.mockResolvedValue({
+            success: true,
+            data: {
+                cameraId: 1,
+                sourceLifecycle: {
+                    sourceChanged: true,
+                    reason: 'manual_refresh',
+                    status: 'refreshed',
+                },
+            },
+        });
     });
 
     it('mewajibkan RTSP untuk kamera internal', async () => {
@@ -171,6 +186,36 @@ describe('CameraManagement', () => {
 
         expect(await screen.findByText('Surabaya Remote')).toBeTruthy();
         expect(await screen.findByText('Ingest: On Demand')).toBeTruthy();
+    });
+
+    it('menyediakan refresh stream manual untuk recovery tanpa disable enable', async () => {
+        getAllCameras.mockResolvedValue({
+            success: true,
+            data: [{
+                id: 1,
+                name: 'Lobby Cam',
+                enabled: 1,
+                status: 'active',
+                availability_state: 'online',
+                monitoring_state: 'reconnecting',
+                area_name: 'Lobby',
+                location: 'Gate',
+                stream_source: 'internal',
+                delivery_type: 'internal_hls',
+                is_tunnel: 0,
+            }],
+        });
+
+        render(<CameraManagement />);
+
+        expect(await screen.findByText('Lobby Cam')).toBeTruthy();
+        expect(await screen.findByText('Reconnecting')).toBeTruthy();
+
+        fireEvent.click(screen.getByRole('button', { name: /Refresh Stream/i }));
+
+        await waitFor(() => {
+            expect(refreshCameraStream).toHaveBeenCalledWith(1);
+        });
     });
 
     it('mengambil detail penuh saat edit agar RTSP internal tetap muncul di form', async () => {
