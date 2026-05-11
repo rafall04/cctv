@@ -18,10 +18,14 @@ import recordingProcessManager from './recordingProcessManager.js';
 import { createRecordingCleanupService } from './recordingCleanupService.js';
 import { canDeleteRecordingFile, computeRetentionWindow, isSafeRecordingFilename } from './recordingRetentionPolicy.js';
 import recordingSegmentRepository from './recordingSegmentRepository.js';
+import recordingSegmentFinalizer from './recordingSegmentFinalizer.js';
 import {
-    getCameraRecordingDir,
+    getCameraRecordingDir as getPolicyCameraRecordingDir,
+    getFinalRecordingPath,
     getPendingRecordingDir,
     getPendingRecordingPattern,
+    isPartialSegmentFilename,
+    toFinalSegmentFilename,
 } from './recordingSegmentFilePolicy.js';
 const execPromise = promisify(exec);
 
@@ -538,7 +542,7 @@ class RecordingService {
             }
 
             // Create camera recording directory
-            const cameraDir = getCameraRecordingDir(RECORDINGS_BASE_PATH, cameraId);
+            const cameraDir = getPolicyCameraRecordingDir(RECORDINGS_BASE_PATH, cameraId);
             const pendingDir = getPendingRecordingDir(RECORDINGS_BASE_PATH, cameraId);
             mkdirSync(cameraDir, { recursive: true });
             mkdirSync(pendingDir, { recursive: true });
@@ -669,7 +673,7 @@ class RecordingService {
 
         // Detect segment completion only on "Closing" so remux never touches files still being written.
         if (output.includes('Closing') && output.includes('.mp4')) {
-            const match = output.match(/(\d{8}_\d{6}\.mp4)/);
+            const match = output.match(/(\d{8}_\d{6}\.mp4(?:\.partial)?)/);
             if (match) {
                 const filename = match[1];
                 console.log(`[FFmpeg] Detected segment completion (CLOSING): ${filename}`);
@@ -703,254 +707,44 @@ class RecordingService {
      * Handle segment creation
      */
     onSegmentCreated(cameraId, filename) {
-        // CRITICAL: Check if this file has failed re-mux before (prevent infinite loop)
-        if (isFileFailed(cameraId, filename)) {
-            // File has failed 3+ times; keep it in place until retention expiry.
-            const cameraDir = join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
-            const failedPath = join(cameraDir, filename);
+        const finalFilename = toFinalSegmentFilename(filename);
+        if (!finalFilename) {
+            console.warn(`[Segment] Invalid filename format: ${filename}`);
+            return;
+        }
+
+        if (isFileFailed(cameraId, finalFilename)) {
+            const failedPath = getFinalRecordingPath(RECORDINGS_BASE_PATH, cameraId, finalFilename);
             if (existsSync(failedPath)) {
-                quarantineFailedRemuxFileIfExpired(cameraId, filename, failedPath, 'remux_failed_3x').catch((err) => {
-                    console.error(`[Segment] Failed to process failed-remux file ${filename}:`, err.message);
+                quarantineFailedRemuxFileIfExpired(cameraId, finalFilename, failedPath, 'remux_failed_3x').catch((err) => {
+                    console.error(`[Segment] Failed to process failed-remux file ${finalFilename}:`, err.message);
                 });
             }
             return;
         }
 
-        const cameraDir = join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
-        const filePath = join(cameraDir, filename);
-
-        // CRITICAL: Mark file as being processed (prevent deletion + duplicate processing)
-        const fileKey = `${cameraId}:${filename}`;
-
-        // BUG FIX #2: Prevent duplicate processing
+        const fileKey = `${cameraId}:${finalFilename}`;
         if (filesBeingProcessed.has(fileKey)) {
-            console.log(`[Segment] Already processing: ${filename}, skipping duplicate`);
+            console.log(`[Segment] Already processing: ${finalFilename}, skipping duplicate`);
             return;
         }
 
         filesBeingProcessed.add(fileKey);
+        const sourceType = isPartialSegmentFilename(filename) ? 'partial' : 'final_orphan';
+        const sourcePath = sourceType === 'partial'
+            ? join(getPendingRecordingDir(RECORDINGS_BASE_PATH, cameraId), filename)
+            : getFinalRecordingPath(RECORDINGS_BASE_PATH, cameraId, finalFilename);
 
-        console.log(`[Segment] Detected new segment: camera${cameraId}/${filename}`);
-
-        // Immediate processing, no need to wait or loop check size
-        // Since we only trigger onSegmentCreated on "Closing" or after 30s frozen scanner
-        setTimeout(async () => {
-            try {
-                // BUG FIX #1: Ensure cleanup in ALL exit paths
-                const cleanup = () => {
-                    filesBeingProcessed.delete(fileKey);
-                };
-
-                try {
-                    await fsPromises.access(filePath);
-                } catch {
-                    console.warn(`[Segment] File not found: ${filePath}`);
-                    cleanup();
-                    return;
-                }
-
-                // RAM FIX: Wait if too many concurrent re-mux operations
-                while (activeRemuxCount >= MAX_CONCURRENT_REMUX) {
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                }
-                activeRemuxCount++;
-
-                try {
-
-                // CRITICAL FIX: Re-mux file to create proper MP4 index for seeking
-                console.log(`[Segment] Re-muxing file to fix MP4 index: ${filename}`);
-                const tempPath = filePath + '.remux.mp4';
-
-                // Clean up any existing temp files first
-                try {
-                    await fsPromises.unlink(tempPath);
-                    console.log(`[Segment] Cleaning up existing temp file: ${tempPath}`);
-                } catch (e) { }
-
-                // Quick ffprobe check asynchronously
-                // CRITICAL: Store actual duration for accurate database entry
-                let actualDuration = 600; // Default 10 minutes, will be updated by ffprobe
-
-                try {
-                    const { stdout } = await execPromise(
-                        `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`,
-                        { encoding: 'utf8', timeout: 3000 } // Async execution, Eventloop friendly
-                    );
-
-                    const ffprobeOutput = stdout.trim();
-                    const dur = parseFloat(ffprobeOutput);
-
-                    if (!ffprobeOutput || isNaN(dur) || dur < 1) { // Valid if at least 1 second file
-                        console.log(`[Segment] File corrupt or invalid duration (${ffprobeOutput}): ${filename}`);
-
-                        // Track failed attempt in database
-                        incrementFailCount(cameraId, filename);
-
-                        const camera = queryOne('SELECT recording_duration_hours FROM cameras WHERE id = ?', [cameraId]);
-                        const stats = await fsPromises.stat(filePath).catch(() => null);
-                        const nowMs = Date.now();
-                        const retentionWindow = computeRetentionWindow({
-                            retentionHours: camera?.recording_duration_hours,
-                            nowMs,
-                        });
-                        const deletePolicy = canDeleteRecordingFile({
-                            filename,
-                            fileMtimeMs: stats?.mtimeMs,
-                            retentionWindow,
-                            nowMs,
-                        });
-
-                        if (deletePolicy.allowed) {
-                            await quarantineRecordingFile(cameraId, filename, filePath, 'invalid_duration_retention_expired');
-                        } else {
-                            console.warn(`[Segment] Keeping invalid segment until retention expiry: camera${cameraId}/${filename}`);
-                        }
-
-                        cleanup();
-                        return;
-                    }
-
-                    // Store actual duration from ffprobe
-                    actualDuration = Math.round(dur);
-                    console.log(`[Segment] File is valid, duration: ${actualDuration}s`);
-                } catch (error) {
-                    console.log(`[Segment] ffprobe check failed, file not ready or corrupt: ${filename}`);
-
-                    // Track failed attempt in database
-                    incrementFailCount(cameraId, filename);
-
-                    cleanup();
-                    return;
-                }
-
-                // Perform re-mux with optimized settings for seeking
-                await new Promise((resolve, reject) => {
-                    const ffmpeg = spawn('ffmpeg', [
-                        '-i', filePath,
-                        '-c', 'copy',                    // Copy streams (no re-encode)
-                        '-movflags', '+faststart',       // Move moov atom to start (CRITICAL for seeking)
-                        '-fflags', '+genpts',            // Generate presentation timestamps
-                        '-avoid_negative_ts', 'make_zero', // Normalize timestamps
-                        '-y',                            // Overwrite
-                        tempPath
-                    ]);
-
-                    let ffmpegError = '';
-                    let errorLength = 0;
-                    ffmpeg.stderr.on('data', (data) => {
-                        // RAM FIX: Cap stderr buffer at 10KB to prevent unbounded growth
-                        if (errorLength < 10000) {
-                            ffmpegError += data.toString();
-                            errorLength += data.length;
-                        }
-                    });
-
-                    ffmpeg.on('close', (code) => {
-                        if (code === 0) {
-                            console.log(`[Segment] Re-mux successful: ${filename}`);
-                            resolve();
-                        } else {
-                            console.error(`[Segment] Re-mux failed (code ${code}):`, ffmpegError.slice(-500));
-                            // Clean up failed temp file
-                            if (existsSync(tempPath)) {
-                                unlinkSync(tempPath);
-                            }
-                            reject(new Error(`FFmpeg re-mux failed with code ${code}`));
-                        }
-                    });
-
-                    ffmpeg.on('error', (error) => {
-                        console.error(`[Segment] Re-mux spawn error:`, error);
-                        // Clean up on error
-                        if (existsSync(tempPath)) {
-                            unlinkSync(tempPath);
-                        }
-                        reject(error);
-                    });
-                });
-
-                // 🛡️ FIX 1: ATOMIC DATA SAFETY - Replace original with re-muxed file
-                // CRITICAL: Use atomic rename instead of delete+rename to prevent data loss
-                // On Linux/Unix, fs.promises.rename() overwrites target atomically (crash-safe)
-                if (existsSync(tempPath)) {
-                    try {
-                        const tempStats = await fsPromises.stat(tempPath);
-                        console.log(`[Segment] Re-muxed file size: ${(tempStats.size / 1024 / 1024).toFixed(2)} MB`);
-                    } catch (e) { }
-
-                    try {
-                        // Atomic rename: overwrites filePath in single operation (no gap)
-                        // If crash occurs during rename, either old or new file exists (never both missing)
-                        await fsPromises.rename(tempPath, filePath);
-                        console.log(`[Segment] ✓ File replaced with re-muxed version (atomic operation)`);
-                    } catch (error) {
-                        // Handle EXDEV error (cross-device rename not supported)
-                        if (error.code === 'EXDEV') {
-                            console.log(`[Segment] Cross-device detected, using copy+delete fallback`);
-                            await fsPromises.copyFile(tempPath, filePath);
-                            await fsPromises.unlink(tempPath);
-                            console.log(`[Segment] ✓ File replaced using copy+delete fallback`);
-                        } else {
-                            throw error;
-                        }
-                    }
-                } else {
-                    console.error(`[Segment] Re-muxed file not found: ${tempPath}`);
-                    cleanup();
-                    return;
-                }
-
-                // Parse filename untuk get timestamp
-                const match = filename.match(/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
-                if (!match) {
-                    console.warn(`[Segment] Invalid filename format: ${filename}`);
-                    cleanup();
-                    return;
-                }
-
-                const [, year, month, day, hour, minute, second] = match;
-                const startTime = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
-                // Use actual duration from ffprobe (not hardcoded 10 minutes)
-                const endTime = new Date(startTime.getTime() + actualDuration * 1000);
-
-                // Get final file size after re-mux
-                let finalSize = 0;
-                try {
-                    const finalStats = await fsPromises.stat(filePath);
-                    finalSize = finalStats.size;
-                } catch (e) { }
-
-                recordingSegmentRepository.upsertSegment({
-                    cameraId,
-                    filename,
-                    startTime: startTime.toISOString(),
-                    endTime: endTime.toISOString(),
-                    fileSize: finalSize,
-                    duration: actualDuration,
-                    filePath,
-                });
-
-                console.log(`✓ Segment saved: camera${cameraId}/${filename} (${(finalSize / 1024 / 1024).toFixed(2)} MB)`);
-
-                // CRITICAL: Remove from processing set (allow cleanup)
-                cleanup();
-
-                // NOTE: Cleanup is now handled by scheduled cleanup (every 30 minutes)
-                // No per-segment cleanup to prevent aggressive deletion
-
-                } finally {
-                    activeRemuxCount--;
-                }
-
-            } catch (error) {
-                console.error(`[Segment] Error handling segment creation:`, error);
-
-                // CRITICAL: Remove from processing set on error
-                filesBeingProcessed.delete(fileKey);
-            }
-        }, 3000); // Wait 3 seconds initial delay (optimized from 15s)
+        console.log(`[Segment] Enqueue finalization: camera${cameraId}/${filename}`);
+        recordingSegmentFinalizer.finalizeSegment({
+            cameraId,
+            sourcePath,
+            filename,
+            sourceType,
+        }).finally(() => {
+            filesBeingProcessed.delete(fileKey);
+        });
     }
-
     /**
      * Cleanup old segments - AGE-BASED (FINAL FIX)
      * CRITICAL: Delete based on FILE AGE, not segment count
