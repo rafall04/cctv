@@ -13,6 +13,19 @@ import {
 } from './telegramService.js';
 
 const VALID_EVENTS = new Set(['offline', 'online']);
+export const RUNTIME_STATE_DIAGNOSTICS_SELECT = `
+    SELECT
+        camera_id,
+        is_online,
+        monitoring_state,
+        monitoring_reason,
+        last_runtime_signal_at,
+        last_runtime_signal_type,
+        last_health_check_at,
+        updated_at
+    FROM camera_runtime_state
+    WHERE camera_id = ?
+`;
 
 function assertEventType(eventType) {
     if (!VALID_EVENTS.has(eventType)) {
@@ -51,11 +64,7 @@ function getCamera(cameraId) {
 }
 
 function getRuntimeState(cameraId) {
-    return queryOne(`
-        SELECT camera_id, health_status, last_checked_at, last_error, response_time_ms, consecutive_failures
-        FROM camera_runtime_state
-        WHERE camera_id = ?
-    `, [cameraId]);
+    return queryOne(RUNTIME_STATE_DIAGNOSTICS_SELECT, [cameraId]);
 }
 
 function formatCamera(camera) {
@@ -69,23 +78,34 @@ function formatCamera(camera) {
     };
 }
 
-function formatHealth(runtime) {
+export function formatRuntimeHealthForDiagnostics(runtime) {
     if (!runtime) {
         return {
             status: 'unknown',
+            isOnline: false,
+            reason: null,
             lastCheckedAt: null,
+            lastRuntimeSignalAt: null,
+            lastRuntimeSignalType: null,
+            updatedAt: null,
             lastError: null,
             responseTimeMs: null,
             consecutiveFailures: 0,
         };
     }
 
+    const reason = runtime.monitoring_reason || null;
     return {
-        status: runtime.health_status || 'unknown',
-        lastCheckedAt: runtime.last_checked_at || null,
-        lastError: runtime.last_error || null,
-        responseTimeMs: runtime.response_time_ms || null,
-        consecutiveFailures: runtime.consecutive_failures || 0,
+        status: runtime.monitoring_state || (runtime.is_online === 1 ? 'online' : 'unknown'),
+        isOnline: runtime.is_online === 1,
+        reason,
+        lastCheckedAt: runtime.last_health_check_at || null,
+        lastRuntimeSignalAt: runtime.last_runtime_signal_at || null,
+        lastRuntimeSignalType: runtime.last_runtime_signal_type || null,
+        updatedAt: runtime.updated_at || null,
+        lastError: reason,
+        responseTimeMs: null,
+        consecutiveFailures: 0,
     };
 }
 
@@ -123,7 +143,7 @@ function buildPreview(cameraId, eventType) {
 
     return {
         camera: formatCamera(camera),
-        health: formatHealth(runtime),
+        health: formatRuntimeHealthForDiagnostics(runtime),
         eventType,
         routing,
         generatedAt: new Date().toISOString(),

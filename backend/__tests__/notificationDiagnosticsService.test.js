@@ -55,9 +55,13 @@ describe('notificationDiagnosticsService', () => {
             })
             .mockReturnValueOnce({
                 camera_id: 5,
-                health_status: 'online',
-                last_checked_at: '2026-05-11 10:00:00',
-                last_error: null,
+                is_online: 1,
+                monitoring_state: 'online',
+                monitoring_reason: 'health_check_ok',
+                last_runtime_signal_at: '2026-05-11 09:59:30',
+                last_runtime_signal_type: 'hls_probe',
+                last_health_check_at: '2026-05-11 10:00:00',
+                updated_at: '2026-05-11 10:00:01',
             });
         mockInspectRouting.mockReturnValue({
             configured: true,
@@ -78,6 +82,52 @@ describe('notificationDiagnosticsService', () => {
         expect(mockExecute).not.toHaveBeenCalled();
     });
 
+    it('maps the real camera_runtime_state schema into diagnostics health fields', async () => {
+        const service = await import('../services/notificationDiagnosticsService.js');
+
+        const health = service.formatRuntimeHealthForDiagnostics({
+            camera_id: 5,
+            is_online: 0,
+            monitoring_state: 'offline',
+            monitoring_reason: 'probe_timeout',
+            last_runtime_signal_at: '2026-05-11 09:50:00',
+            last_runtime_signal_type: 'manifest',
+            last_health_check_at: '2026-05-11 10:00:00',
+            updated_at: '2026-05-11 10:00:01',
+        });
+
+        expect(health).toEqual({
+            status: 'offline',
+            isOnline: false,
+            reason: 'probe_timeout',
+            lastCheckedAt: '2026-05-11 10:00:00',
+            lastRuntimeSignalAt: '2026-05-11 09:50:00',
+            lastRuntimeSignalType: 'manifest',
+            updatedAt: '2026-05-11 10:00:01',
+            lastError: 'probe_timeout',
+            responseTimeMs: null,
+            consecutiveFailures: 0,
+        });
+    });
+
+    it('runtime state SELECT is compatible with the real camera_runtime_state columns', async () => {
+        const service = await import('../services/notificationDiagnosticsService.js');
+        const selectSql = service.RUNTIME_STATE_DIAGNOSTICS_SELECT;
+
+        expect(selectSql).toContain('camera_id');
+        expect(selectSql).toContain('is_online');
+        expect(selectSql).toContain('monitoring_state');
+        expect(selectSql).toContain('monitoring_reason');
+        expect(selectSql).toContain('last_runtime_signal_at');
+        expect(selectSql).toContain('last_runtime_signal_type');
+        expect(selectSql).toContain('last_health_check_at');
+        expect(selectSql).toContain('updated_at');
+        expect(selectSql).not.toContain('health_status');
+        expect(selectSql).not.toContain('last_checked_at');
+        expect(selectSql).not.toContain('response_time_ms');
+        expect(selectSql).not.toContain('consecutive_failures');
+    });
+
     it('runs a drill through production camera status routing and writes audit row', async () => {
         mockQueryOne
             .mockReturnValueOnce({
@@ -88,7 +138,14 @@ describe('notificationDiagnosticsService', () => {
                 location: 'North Gate',
                 enabled: 1,
             })
-            .mockReturnValueOnce({ camera_id: 5, health_status: 'online' });
+            .mockReturnValueOnce({
+                camera_id: 5,
+                is_online: 1,
+                monitoring_state: 'online',
+                monitoring_reason: 'health_check_ok',
+                last_health_check_at: '2026-05-11 10:00:00',
+                updated_at: '2026-05-11 10:00:01',
+            });
         mockInspectRouting.mockReturnValue({
             configured: true,
             canSend: true,
