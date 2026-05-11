@@ -18,6 +18,11 @@ import recordingProcessManager from './recordingProcessManager.js';
 import { createRecordingCleanupService } from './recordingCleanupService.js';
 import { canDeleteRecordingFile, computeRetentionWindow, isSafeRecordingFilename } from './recordingRetentionPolicy.js';
 import recordingSegmentRepository from './recordingSegmentRepository.js';
+import {
+    getCameraRecordingDir,
+    getPendingRecordingDir,
+    getPendingRecordingPattern,
+} from './recordingSegmentFilePolicy.js';
 const execPromise = promisify(exec);
 
 const __filename = fileURLToPath(import.meta.url);
@@ -326,8 +331,8 @@ export function getRecordingSourceConfig(camera) {
     };
 }
 
-export function buildRecordingFfmpegArgs({ cameraDir, inputUrl, streamSource, rtspTransport = 'tcp' }) {
-    const outputPattern = join(cameraDir, '%Y%m%d_%H%M%S.mp4');
+export function buildRecordingFfmpegArgs({ cameraDir, outputPattern, inputUrl, streamSource, rtspTransport = 'tcp' }) {
+    const resolvedOutputPattern = outputPattern || join(cameraDir, '%Y%m%d_%H%M%S.mp4');
     const inputArgs = streamSource === 'external'
         ? [
             '-protocol_whitelist', EXTERNAL_RECORDING_PROTOCOL_WHITELIST,
@@ -347,7 +352,7 @@ export function buildRecordingFfmpegArgs({ cameraDir, inputUrl, streamSource, rt
         '-segment_atclocktime', '1',
         '-reset_timestamps', '1',
         '-strftime', '1',
-        outputPattern
+        resolvedOutputPattern
     ];
 }
 
@@ -533,10 +538,10 @@ class RecordingService {
             }
 
             // Create camera recording directory
-            const cameraDir = join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
-            if (!existsSync(cameraDir)) {
-                mkdirSync(cameraDir, { recursive: true });
-            }
+            const cameraDir = getCameraRecordingDir(RECORDINGS_BASE_PATH, cameraId);
+            const pendingDir = getPendingRecordingDir(RECORDINGS_BASE_PATH, cameraId);
+            mkdirSync(cameraDir, { recursive: true });
+            mkdirSync(pendingDir, { recursive: true });
 
             console.log(`Starting recording for camera ${cameraId} (${camera.name})`);
             console.log(`[Recording] Source type: ${sourceConfig.streamSource}`);
@@ -545,6 +550,7 @@ class RecordingService {
             // FFmpeg command - stream copy with optimized MP4 for seeking
             const ffmpegArgs = buildRecordingFfmpegArgs({
                 cameraDir,
+                outputPattern: getPendingRecordingPattern(RECORDINGS_BASE_PATH, cameraId),
                 inputUrl: sourceConfig.inputUrl,
                 streamSource: sourceConfig.streamSource,
                 rtspTransport: sourceConfig.rtspTransport,

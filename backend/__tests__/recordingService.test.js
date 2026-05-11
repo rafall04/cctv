@@ -6,6 +6,7 @@
  * SideEffects: Uses fake timers and module mocks; no real filesystem or database writes.
  */
 import { EventEmitter } from 'events';
+import { join } from 'path';
 import { promisify } from 'util';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -180,6 +181,33 @@ describe('recordingService external recording support', () => {
         expect(args).not.toContain('-rtsp_transport');
         expect(args).toContain('-c:v');
         expect(args).toContain('copy');
+    });
+
+    it('builds recording args with pending partial output pattern', async () => {
+        const { buildRecordingFfmpegArgs } = await import('../services/recordingService.js');
+
+        const args = buildRecordingFfmpegArgs({
+            outputPattern: 'C:\\recordings\\camera1\\pending\\%Y%m%d_%H%M%S.mp4.partial',
+            inputUrl: 'rtsp://user:pass@10.0.0.2/stream',
+            streamSource: 'internal',
+        });
+
+        expect(args.at(-1)).toBe('C:\\recordings\\camera1\\pending\\%Y%m%d_%H%M%S.mp4.partial');
+        expect(args).toContain('-segment_format');
+        expect(args).toContain('mp4');
+    });
+
+    it('creates pending recording directory before starting recording', async () => {
+        const { recordingService } = await import('../services/recordingService.js');
+        const recordingsBasePath = join(process.cwd(), '..', 'recordings');
+        queryOneMock.mockReturnValue(createCamera({ id: 33 }));
+
+        await recordingService.startRecording(33);
+
+        expect(mkdirSyncMock).toHaveBeenCalledWith(join(recordingsBasePath, 'camera33', 'pending'), { recursive: true });
+        expect(spawnMock).toHaveBeenCalledWith('ffmpeg', expect.arrayContaining([
+            join(recordingsBasePath, 'camera33', 'pending', '%Y%m%d_%H%M%S.mp4.partial'),
+        ]));
     });
 
     it('starts recording external cameras from external_hls_url', async () => {
