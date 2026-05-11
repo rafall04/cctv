@@ -6,7 +6,7 @@
  * SideEffects: Adds authenticated admin routes to Fastify.
  */
 
-import { getDashboardStats, getTodayStats, testTelegramNotification, getTelegramConfig, updateTelegramConfig, getViewerAnalytics, getViewerHistoryPage, getRealTimeViewers, getCameraHealthDebug, getCacheStats, clearCache, getTimezoneConfig, updateTimezoneConfig, exportDatabaseBackup, importDatabaseBackup, getBackupPreview } from '../controllers/adminController.js';
+import { getDashboardStats, getTodayStats, testTelegramNotification, getTelegramConfig, updateTelegramConfig, previewNotificationDiagnostics, runNotificationDiagnosticsDrill, listNotificationDiagnosticsRuns, getViewerAnalytics, getViewerHistoryPage, getRealTimeViewers, getCameraHealthDebug, getCacheStats, clearCache, getTimezoneConfig, updateTimezoneConfig, exportDatabaseBackup, importDatabaseBackup, getBackupPreview } from '../controllers/adminController.js';
 import { generateApiKey, listApiKeys, deleteApiKey } from '../controllers/apiKeyController.js';
 import { clearPlaybackTokenSessions, createPlaybackToken, listPlaybackTokenAuditLogs, listPlaybackTokens, revokePlaybackToken, sharePlaybackToken, updatePlaybackToken } from '../controllers/playbackTokenController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
@@ -61,6 +61,21 @@ export default async function adminRoutes(fastify, options) {
     fastify.put('/telegram/config', {
         onRequest: [authMiddleware],
         handler: updateTelegramConfig,
+    });
+
+    fastify.post('/notification-diagnostics/preview', {
+        onRequest: [authMiddleware],
+        handler: previewNotificationDiagnostics,
+    });
+
+    fastify.post('/notification-diagnostics/drill', {
+        onRequest: [authMiddleware],
+        handler: runNotificationDiagnosticsDrill,
+    });
+
+    fastify.get('/notification-diagnostics/runs', {
+        onRequest: [authMiddleware],
+        handler: listNotificationDiagnosticsRuns,
     });
 
     fastify.get('/playback-tokens', {

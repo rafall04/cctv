@@ -22,6 +22,7 @@ import { getTimezone, setTimezone, TIMEZONE_MAP, formatDateTime } from '../servi
 import { logAdminAction } from '../services/securityAuditLogger.js';
 import backupService from '../services/backupService.js';
 import cameraHealthService from '../services/cameraHealthService.js';
+import notificationDiagnosticsService from '../services/notificationDiagnosticsService.js';
 
 export async function getDashboardStats(request, reply) {
     try {
@@ -162,6 +163,52 @@ export async function updateTelegramConfig(request, reply) {
         return reply.code(500).send({
             success: false,
             message: 'Internal server error',
+        });
+    }
+}
+
+export async function previewNotificationDiagnostics(request, reply) {
+    try {
+        const result = notificationDiagnosticsService.previewCameraEvent(request.body || {});
+        return reply.send({ success: true, data: result });
+    } catch (error) {
+        console.error('Notification diagnostics preview error:', error);
+        return reply.code(error.statusCode || 500).send({
+            success: false,
+            message: error.message || 'Failed to preview notification diagnostics',
+        });
+    }
+}
+
+export async function runNotificationDiagnosticsDrill(request, reply) {
+    try {
+        const result = await notificationDiagnosticsService.runCameraEventDrill({
+            ...(request.body || {}),
+            userId: request.user?.id || null,
+        });
+        return reply.send({
+            success: result.success,
+            data: result,
+            message: result.success ? 'Diagnostic drill sent' : 'Diagnostic drill skipped',
+        });
+    } catch (error) {
+        console.error('Notification diagnostics drill error:', error);
+        return reply.code(error.statusCode || 500).send({
+            success: false,
+            message: error.message || 'Failed to run notification diagnostics drill',
+        });
+    }
+}
+
+export async function listNotificationDiagnosticsRuns(request, reply) {
+    try {
+        const data = notificationDiagnosticsService.listRecentRuns(request.query || {});
+        return reply.send({ success: true, data });
+    } catch (error) {
+        console.error('Notification diagnostics history error:', error);
+        return reply.code(error.statusCode || 500).send({
+            success: false,
+            message: error.message || 'Failed to load notification diagnostics history',
         });
     }
 }

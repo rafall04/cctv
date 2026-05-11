@@ -257,4 +257,61 @@ describe('telegramService notification routing', () => {
             },
         ]);
     });
+
+    it('previews camera routing for area-scoped Telegram notification rules', async () => {
+        const telegram = await loadTelegramService({
+            botToken: '123456789:token',
+            notificationTargets: [
+                { id: 'area-a', name: 'Area A Group', chatId: '-1001', enabled: true },
+                { id: 'area-b', name: 'Area B Group', chatId: '-1002', enabled: true },
+            ],
+            notificationRules: [
+                { id: 'rule-area-a', targetId: 'area-a', scope: 'area', areaId: 10, events: ['offline'], ingestModes: ['any'], enabled: true },
+                { id: 'rule-area-b', targetId: 'area-b', scope: 'area', areaId: 20, events: ['offline'], ingestModes: ['any'], enabled: true },
+            ],
+        });
+
+        const preview = telegram.inspectCameraNotificationRouting('offline', {
+            id: 7,
+            name: 'Gate 1',
+            area_id: 10,
+            area_name: 'Area A',
+            source_profile: 'internal',
+            internal_ingest_policy_mode: 'always_on',
+        });
+
+        expect(preview.configured).toBe(true);
+        expect(preview.matchedTargets).toEqual([
+            expect.objectContaining({ id: 'area-a', name: 'Area A Group', chatIdMasked: '-1001' }),
+        ]);
+        expect(preview.matchedRules).toEqual([
+            expect.objectContaining({ id: 'rule-area-a', targetId: 'area-a', matched: true }),
+        ]);
+        expect(preview.unmatchedRules).toEqual([
+            expect.objectContaining({ id: 'rule-area-b', targetId: 'area-b', matched: false }),
+        ]);
+        expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('returns disabled reason when no Telegram target matches a camera event', async () => {
+        const telegram = await loadTelegramService({
+            botToken: '123456789:token',
+            notificationTargets: [{ id: 'online-only', name: 'Online Group', chatId: '-1009', enabled: true }],
+            notificationRules: [
+                { id: 'online-rule', targetId: 'online-only', scope: 'global', events: ['online'], ingestModes: ['any'], enabled: true },
+            ],
+        });
+
+        const preview = telegram.inspectCameraNotificationRouting('offline', {
+            id: 7,
+            name: 'Gate 1',
+            area_id: 10,
+            area_name: 'Area A',
+        });
+
+        expect(preview.configured).toBe(true);
+        expect(preview.canSend).toBe(false);
+        expect(preview.skippedReason).toBe('NO_MATCHING_TARGET');
+        expect(preview.matchedTargets).toEqual([]);
+    });
 });

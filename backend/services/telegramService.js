@@ -216,6 +216,81 @@ function buildNotificationRuleIssues(settings = {}) {
     return issues;
 }
 
+function maskChatId(chatId = '') {
+    const value = String(chatId || '').trim();
+    if (value.length <= 6) {
+        return value;
+    }
+    return `${value.slice(0, 3)}***${value.slice(-3)}`;
+}
+
+function formatTargetForDiagnostics(target = {}) {
+    return {
+        id: target.id,
+        name: target.name,
+        enabled: target.enabled !== false,
+        chatIdMasked: maskChatId(target.chatId),
+    };
+}
+
+export function inspectCameraNotificationRouting(eventType, camera = {}) {
+    const settings = getTelegramSettings();
+    const validEvent = VALID_EVENTS.has(eventType);
+    const targetsById = new Map(settings.notificationTargets.map((target) => [target.id, target]));
+    const matchedTargetByChatId = new Map();
+    const matchedRules = [];
+    const unmatchedRules = [];
+
+    if (!validEvent) {
+        return {
+            configured: false,
+            canSend: false,
+            skippedReason: 'INVALID_EVENT',
+            matchedTargets: [],
+            matchedRules: [],
+            unmatchedRules: [],
+            ruleIssues: buildNotificationRuleIssues(settings),
+        };
+    }
+
+    for (const rule of settings.notificationRules) {
+        const target = targetsById.get(rule.targetId);
+        const matched = Boolean(target?.chatId && ruleMatchesCamera(rule, camera, eventType));
+        const ruleInfo = {
+            id: rule.id,
+            targetId: rule.targetId,
+            targetName: target?.name || rule.targetId,
+            scope: rule.scope,
+            eventType,
+            matched,
+        };
+
+        if (matched) {
+            matchedRules.push(ruleInfo);
+            matchedTargetByChatId.set(target.chatId, formatTargetForDiagnostics(target));
+        } else {
+            unmatchedRules.push(ruleInfo);
+        }
+    }
+
+    const matchedTargets = Array.from(matchedTargetByChatId.values());
+    const configured = Boolean(settings.botToken && settings.notificationTargets.length > 0);
+
+    return {
+        configured,
+        canSend: configured && matchedTargets.length > 0,
+        skippedReason: !settings.botToken
+            ? 'BOT_TOKEN_MISSING'
+            : matchedTargets.length === 0
+                ? 'NO_MATCHING_TARGET'
+                : null,
+        matchedTargets,
+        matchedRules,
+        unmatchedRules,
+        ruleIssues: buildNotificationRuleIssues(settings),
+    };
+}
+
 function groupCamerasByArea(cameras = []) {
     const groups = new Map();
     for (const camera of cameras) {
@@ -378,7 +453,7 @@ async function sendToTelegram(message, chatId) {
     }
 }
 
-export async function sendCameraStatusNotifications(eventType, cameras = []) {
+export async function sendCameraStatusNotifications(eventType, cameras = [], options = {}) {
     if (!VALID_EVENTS.has(eventType) || cameras.length === 0) {
         return false;
     }
@@ -421,7 +496,7 @@ export async function sendCameraStatusNotifications(eventType, cameras = []) {
         }
 
         const cooldownKey = `camera_status_${eventType}_${target.chatId}_${targetCameras.map((camera) => camera.id).sort().join('_')}`;
-        if (isInCooldown(cooldownKey)) {
+        if (!options.bypassCooldown && isInCooldown(cooldownKey)) {
             console.log(`[Telegram] Skipping ${eventType} group notification for ${target.name} (cooldown)`);
             continue;
         }
@@ -429,7 +504,9 @@ export async function sendCameraStatusNotifications(eventType, cameras = []) {
         const message = buildCameraStatusMessage(eventType, targetCameras, target.name);
         const sent = await sendToTelegram(message, target.chatId);
         if (sent) {
-            setCooldown(cooldownKey);
+            if (!options.bypassCooldown) {
+                setCooldown(cooldownKey);
+            }
             sentCount += 1;
         }
     }
@@ -634,6 +711,7 @@ export default {
     sendMonitoringMessage,
     sendFeedbackMessage,
     sendTargetTestMessage,
+    inspectCameraNotificationRouting,
     sendCameraOfflineNotification,
     sendCameraOnlineNotification,
     sendCameraStatusNotifications,
