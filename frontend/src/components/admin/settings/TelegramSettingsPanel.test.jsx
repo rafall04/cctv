@@ -39,7 +39,7 @@ const statusPayload = {
             scope: 'area',
             areaId: 7,
             cameraId: null,
-            events: ['offline'],
+            events: ['offline', 'online'],
             ingestModes: ['always_on'],
         },
     ],
@@ -88,6 +88,27 @@ describe('TelegramSettingsPanel', () => {
         await waitFor(() => {
             expect(adminService.updateTelegramConfig).toHaveBeenCalledWith(
                 expect.objectContaining({ botToken: '123456789...' })
+            );
+        });
+    });
+
+    it('allows operators to disable online events for an area rule', async () => {
+        render(<TelegramSettingsPanel />);
+
+        fireEvent.click(await screen.findByText('Edit'));
+        fireEvent.click(screen.getByLabelText('Online rule-area'));
+        fireEvent.click(screen.getByText('Simpan'));
+
+        await waitFor(() => {
+            expect(adminService.updateTelegramConfig).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    notificationRules: [
+                        expect.objectContaining({
+                            id: 'rule-area',
+                            events: ['offline'],
+                        }),
+                    ],
+                })
             );
         });
     });

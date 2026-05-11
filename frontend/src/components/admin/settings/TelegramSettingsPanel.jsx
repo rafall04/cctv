@@ -200,6 +200,20 @@ export default function TelegramSettingsPanel() {
         }));
     };
 
+    const toggleRuleEvent = (index, eventName) => {
+        setFormData((prev) => ({
+            ...prev,
+            notificationRules: (prev.notificationRules || []).map((rule, ruleIndex) => {
+                if (ruleIndex !== index) return rule;
+                const currentEvents = Array.isArray(rule.events) ? rule.events : [];
+                const nextEvents = currentEvents.includes(eventName)
+                    ? currentEvents.filter((item) => item !== eventName)
+                    : [...currentEvents, eventName];
+                return { ...rule, events: nextEvents };
+            }),
+        }));
+    };
+
     const removeRule = (index) => {
         setFormData((prev) => ({
             ...prev,
@@ -358,7 +372,7 @@ export default function TelegramSettingsPanel() {
 
                                 <div className="space-y-3">
                                     {(formData.notificationRules || []).map((rule, index) => (
-                                        <div key={rule.id || index} className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] gap-3 items-end p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
+                                        <div key={rule.id || index} className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto] gap-3 items-end p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
                                             <div>
                                                 <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Kirim Ke</label>
                                                 <select
@@ -418,6 +432,23 @@ export default function TelegramSettingsPanel() {
                                                     <option value="on_demand">On Demand</option>
                                                     <option value="any">Semua</option>
                                                 </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Event</label>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {['offline', 'online'].map((eventName) => (
+                                                        <label key={eventName} className="inline-flex items-center gap-1 text-xs text-gray-700 dark:text-gray-300">
+                                                            <input
+                                                                type="checkbox"
+                                                                aria-label={`${eventName === 'offline' ? 'Offline' : 'Online'} ${rule.id}`}
+                                                                checked={(rule.events || []).includes(eventName)}
+                                                                onChange={() => toggleRuleEvent(index, eventName)}
+                                                                className="rounded border-gray-300 text-primary focus:ring-primary"
+                                                            />
+                                                            {eventName === 'offline' ? 'Offline' : 'Online'}
+                                                        </label>
+                                                    ))}
+                                                </div>
                                             </div>
                                             <button type="button" onClick={() => removeRule(index)} className="px-3 py-2 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-lg text-sm font-medium">
                                                 Hapus
