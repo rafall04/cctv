@@ -1,5 +1,5 @@
 /*
-Purpose: Guard the multi-view HLS player against lifecycle regressions that cause intermittent stream errors.
+Purpose: Guard the multi-view player against lifecycle regressions that cause intermittent stream errors.
 Caller: Vitest frontend component stability suite.
 Deps: Node fs/path/url, MultiViewVideoItem source.
 MainFuncs: MultiViewVideoItem source stability tests.
@@ -48,5 +48,22 @@ describe('MultiViewVideoItem HLS stability', () => {
         expect(source).toContain('manifestLoadError');
         expect(source).toContain('levelLoadError');
         expect(source).toContain('setRetryKey((current) => current + 1)');
+    });
+
+    it('routes non-HLS formats outside the HLS effect', () => {
+        expect(source).toContain("renderMode !== 'hls'");
+        expect(source).toContain("renderMode === 'flv'");
+        expect(source).toContain("renderMode === 'mjpeg'");
+        expect(source).toContain("renderMode === 'embed'");
+    });
+
+    it('cleans up FLV player instances on tile unmount', () => {
+        expect(source).toContain('flvRef.current.destroy()');
+        expect(source).toContain('flvRef.current = null');
+    });
+
+    it('does not silently stay connecting when no stream URL exists', () => {
+        expect(source).toContain('Stream URL belum tersedia untuk Multi-View');
+        expect(source).toContain('Format stream tidak didukung');
     });
 });
