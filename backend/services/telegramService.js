@@ -20,6 +20,34 @@ let settingsCacheTime = 0;
 const CACHE_TTL = 60000; // 60 seconds
 const LEGACY_MONITORING_TARGET_ID = 'legacy-monitoring';
 const VALID_EVENTS = new Set(['offline', 'online']);
+const MASKED_TOKEN_SUFFIX = '...';
+
+function isMaskedTelegramToken(value = '') {
+    return typeof value === 'string' && value.endsWith(MASKED_TOKEN_SUFFIX);
+}
+
+function resolveBotTokenForSave(nextToken = '', currentToken = '') {
+    const normalizedNext = String(nextToken || '').trim();
+    const normalizedCurrent = String(currentToken || '').trim();
+
+    if (!normalizedNext) {
+        return '';
+    }
+
+    if (isMaskedTelegramToken(normalizedNext)) {
+        const visiblePrefix = normalizedNext.slice(0, -MASKED_TOKEN_SUFFIX.length);
+        if (normalizedCurrent && normalizedCurrent.startsWith(visiblePrefix)) {
+            return normalizedCurrent;
+        }
+    }
+
+    return normalizedNext;
+}
+
+function hasCameraMonitoringTarget(settings = {}) {
+    return Boolean(settings.monitoringChatId)
+        || (Array.isArray(settings.notificationTargets) && settings.notificationTargets.length > 0);
+}
 
 function normalizeTelegramTarget(target = {}) {
     const id = String(target.id || target.name || target.chatId || '').trim();
@@ -229,8 +257,15 @@ export function clearSettingsCache() {
  */
 export function saveTelegramSettings(settings) {
     try {
-        const valueStr = JSON.stringify(normalizeTelegramSettings(settings));
         const existing = queryOne('SELECT * FROM settings WHERE key = ?', ['telegram_config']);
+        const currentSettings = existing?.value
+            ? normalizeTelegramSettings(JSON.parse(existing.value))
+            : normalizeTelegramSettings({});
+        const normalized = normalizeTelegramSettings({
+            ...settings,
+            botToken: resolveBotTokenForSave(settings.botToken, currentSettings.botToken),
+        });
+        const valueStr = JSON.stringify(normalized);
         
         if (existing) {
             execute(
@@ -515,8 +550,9 @@ export function isFeedbackConfigured() {
 export function getTelegramStatus() {
     const settings = getTelegramSettings();
     return {
-        enabled: !!(settings.botToken && (settings.monitoringChatId || settings.feedbackChatId)),
+        enabled: !!(settings.botToken && (hasCameraMonitoringTarget(settings) || settings.feedbackChatId)),
         monitoringConfigured: !!(settings.botToken && settings.monitoringChatId),
+        cameraMonitoringConfigured: !!(settings.botToken && hasCameraMonitoringTarget(settings)),
         feedbackConfigured: !!(settings.botToken && settings.feedbackChatId),
         botToken: settings.botToken ? `${settings.botToken.substring(0, 10)}...` : '',
         monitoringChatId: settings.monitoringChatId || '',

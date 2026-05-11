@@ -113,4 +113,66 @@ describe('telegramService notification routing', () => {
         expect(payload.chat_id).toBe('-100-noc');
         expect(payload.text).toContain('CCTV VIP');
     });
+
+    it('preserves the existing full bot token when admin saves a masked token', async () => {
+        const telegram = await loadTelegramService({
+            botToken: '123456789:real-secret-token',
+            monitoringChatId: '-100-main',
+            feedbackChatId: '',
+            notificationTargets: [],
+            notificationRules: [],
+        });
+
+        queryOneMock.mockReturnValueOnce({
+            value: JSON.stringify({
+                botToken: '123456789:real-secret-token',
+                monitoringChatId: '-100-main',
+                feedbackChatId: '',
+                notificationTargets: [],
+                notificationRules: [],
+            }),
+        });
+
+        const saved = telegram.saveTelegramSettings({
+            botToken: '123456789...',
+            monitoringChatId: '-100-main',
+            feedbackChatId: '',
+            notificationTargets: [],
+            notificationRules: [],
+        });
+
+        expect(saved).toBe(true);
+        const savedPayload = JSON.parse(executeMock.mock.calls[0][1][0]);
+        expect(savedPayload.botToken).toBe('123456789:real-secret-token');
+    });
+
+    it('reports camera monitoring configured when only custom routing targets exist', async () => {
+        const telegram = await loadTelegramService({
+            botToken: '123456789:test',
+            monitoringChatId: '',
+            feedbackChatId: '',
+            notificationTargets: [
+                { id: 'area-bojonegoro', name: 'Area Bojonegoro', chatId: '-100-area' },
+            ],
+            notificationRules: [
+                {
+                    id: 'rule-area',
+                    enabled: true,
+                    targetId: 'area-bojonegoro',
+                    scope: 'area',
+                    areaId: 7,
+                    events: ['offline', 'online'],
+                    ingestModes: ['always_on'],
+                },
+            ],
+        });
+
+        const status = telegram.getTelegramStatus();
+
+        expect(status.enabled).toBe(true);
+        expect(status.monitoringConfigured).toBe(false);
+        expect(status.cameraMonitoringConfigured).toBe(true);
+        expect(status.notificationTargets).toHaveLength(1);
+        expect(status.notificationRules).toHaveLength(1);
+    });
 });
