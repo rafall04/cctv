@@ -788,6 +788,33 @@ describe('recordingService external recording support', () => {
         expect(segmentSpy).toHaveBeenCalledWith(8, '20260511_211000.mp4.partial');
     });
 
+    it('removes stale pending partial when final segment already exists in DB', async () => {
+        const { recordingService } = await import('../services/recordingService.js');
+        queryOneMock.mockReturnValue({ id: 8, enable_recording: 1 });
+        queryMock.mockReturnValue([{ filename: '20260512_000005.mp4' }]);
+        fsPromisesMock.readdir.mockImplementation(async (targetPath) => {
+            if (targetPath.endsWith('recordings')) return ['camera8'];
+            if (targetPath.endsWith('camera8')) return ['pending'];
+            if (targetPath.endsWith('pending')) return ['20260512_000005.mp4.partial'];
+            return [];
+        });
+        fsPromisesMock.stat.mockImplementation(async (targetPath) => ({
+            isDirectory: () => targetPath.endsWith('camera8') || targetPath.endsWith('pending'),
+            size: 4096,
+            mtimeMs: Date.now() - 900000,
+        }));
+
+        const timers = [];
+        recordingService.startSegmentScanner((fn, delay) => {
+            timers.push({ fn, delay });
+            return 1;
+        });
+        await timers[0].fn();
+
+        expect(fsPromisesMock.unlink).toHaveBeenCalledWith(expect.stringContaining('20260512_000005.mp4.partial'));
+        expect(finalizerMock.finalizeSegment).not.toHaveBeenCalled();
+    });
+
     it('scanner reconciles valid final orphan MP4 files into DB through finalizer', async () => {
         finalizerMock.finalizeSegment.mockResolvedValue({ success: true });
         const { recordingService } = await import('../services/recordingService.js');

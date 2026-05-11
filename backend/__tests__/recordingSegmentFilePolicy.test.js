@@ -2,7 +2,7 @@
  * Purpose: Verify recording segment filename/path classification for finalization recovery.
  * Caller: Vitest backend test suite.
  * Deps: recordingSegmentFilePolicy.
- * MainFuncs: isFinalSegmentFilename, isPartialSegmentFilename, isTempSegmentFilename, parseSegmentFilename, getPendingRecordingDir, getFinalRecordingPath.
+ * MainFuncs: isFinalSegmentFilename, isPartialSegmentFilename, isTempSegmentFilename, parseSegmentFilename, getPendingRecordingDir, getFinalRecordingPath, getTempRecordingPath.
  * SideEffects: None.
  */
 import { describe, expect, it } from 'vitest';
@@ -23,6 +23,7 @@ describe('recordingSegmentFilePolicy', () => {
         expect(isFinalSegmentFilename('20260511_211000.mp4')).toBe(true);
         expect(isFinalSegmentFilename('20260511_211000.mp4.partial')).toBe(false);
         expect(isPartialSegmentFilename('20260511_211000.mp4.partial')).toBe(true);
+        expect(isTempSegmentFilename('20260511_211000.tmp.mp4')).toBe(true);
         expect(isTempSegmentFilename('20260511_211000.mp4.tmp')).toBe(true);
         expect(isTempSegmentFilename('20260511_211000.mp4.remux.mp4')).toBe(true);
     });
@@ -44,7 +45,18 @@ describe('recordingSegmentFilePolicy', () => {
         expect(getPendingRecordingDir(basePath, 3)).toBe('C:\\recordings\\camera3\\pending');
         expect(getPendingRecordingPattern(basePath, 3)).toBe('C:\\recordings\\camera3\\pending\\%Y%m%d_%H%M%S.mp4.partial');
         expect(getFinalRecordingPath(basePath, 3, '20260511_211000.mp4')).toBe('C:\\recordings\\camera3\\20260511_211000.mp4');
-        expect(getTempRecordingPath(basePath, 3, '20260511_211000.mp4')).toBe('C:\\recordings\\camera3\\20260511_211000.mp4.tmp');
+        expect(getTempRecordingPath(basePath, 3, '20260511_211000.mp4')).toBe('C:\\recordings\\camera3\\20260511_211000.tmp.mp4');
+    });
+
+    it('builds MP4-compatible temp remux filenames', () => {
+        expect(getTempRecordingPath('C:\\recordings', 7, '20260512_000005.mp4'))
+            .toBe('C:\\recordings\\camera7\\20260512_000005.tmp.mp4');
+    });
+
+    it('recognizes current and legacy temp remux filenames', () => {
+        expect(isTempSegmentFilename('20260512_000005.tmp.mp4')).toBe(true);
+        expect(isTempSegmentFilename('20260512_000005.mp4.tmp')).toBe(true);
+        expect(isTempSegmentFilename('20260512_000005.mp4.remux.mp4')).toBe(true);
     });
 
     it('rejects unsupported names', () => {

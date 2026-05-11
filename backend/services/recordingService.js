@@ -981,10 +981,17 @@ class RecordingService {
 
                         for (const filename of partialFiles) {
                             const finalFilename = toFinalSegmentFilename(filename);
-                            if (!finalFilename || existingFilesSet.has(finalFilename)) continue;
+                            if (!finalFilename) continue;
                             const filePath = join(pendingDir, filename);
                             const stats = await fsPromises.stat(filePath);
                             const fileAge = Date.now() - stats.mtimeMs;
+                            if (existingFilesSet.has(finalFilename)) {
+                                if (fileAge > 5 * 60 * 1000) {
+                                    await fsPromises.unlink(filePath);
+                                    console.log(`[Scanner] Removed finalized pending partial: camera${cameraId}/${filename}`);
+                                }
+                                continue;
+                            }
                             const fileKey = `${cameraId}:${finalFilename}`;
                             if (filesBeingProcessed.has(fileKey)) continue;
                             if (fileAge > 30000) {

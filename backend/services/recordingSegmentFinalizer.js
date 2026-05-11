@@ -48,6 +48,7 @@ async function remuxToTemp(sourcePath, tempPath) {
             '-movflags', '+faststart',
             '-fflags', '+genpts',
             '-avoid_negative_ts', 'make_zero',
+            '-f', 'mp4',
             '-y',
             tempPath,
         ]);
@@ -67,6 +68,16 @@ async function remuxToTemp(sourcePath, tempPath) {
         });
         ffmpeg.on('error', reject);
     });
+}
+
+async function removeFileIfExists(filePath) {
+    try {
+        await fsPromises.unlink(filePath);
+    } catch (error) {
+        if (error.code !== 'ENOENT') {
+            throw error;
+        }
+    }
 }
 
 export function createRecordingSegmentFinalizer({
@@ -96,6 +107,22 @@ export function createRecordingSegmentFinalizer({
             }
             await fsPromises.copyFile(tempPath, finalPath);
             await fsPromises.unlink(tempPath);
+        }
+    }
+
+    async function cleanupTempFile(tempPath) {
+        try {
+            await removeFileIfExists(tempPath);
+        } catch (error) {
+            console.warn(`[RecordingFinalizer] Failed to cleanup temp file ${tempPath}: ${error.message}`);
+        }
+    }
+
+    async function cleanupFinalizedPartial(sourcePath) {
+        try {
+            await removeFileIfExists(sourcePath);
+        } catch (error) {
+            console.warn(`[RecordingFinalizer] Failed to cleanup finalized partial ${sourcePath}: ${error.message}`);
         }
     }
 
@@ -183,9 +210,15 @@ export function createRecordingSegmentFinalizer({
                 filePath: finalPath,
             });
             diagnosticsRepository.clearDiagnostic({ cameraId, filename: finalFilename });
+            if (sourceType === 'partial' && sourcePath !== finalPath) {
+                await cleanupFinalizedPartial(sourcePath);
+            }
 
+            console.log(`[RecordingFinalizer] Finalized camera${cameraId}/${finalFilename} duration=${duration}s source=${sourceType}`);
             return { success: true, finalFilename, duration, filePath: finalPath };
         } catch (error) {
+            console.warn(`[RecordingFinalizer] Failed camera${cameraId}/${finalFilename}: ${error.message || 'finalize_failed'}`);
+            await cleanupTempFile(tempPath);
             diagnosticsRepository.upsertDiagnostic({
                 cameraId,
                 filename: finalFilename,
