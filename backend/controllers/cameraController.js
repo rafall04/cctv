@@ -1,3 +1,11 @@
+/**
+ * Purpose: Shapes camera API responses for admin/public camera CRUD, source lifecycle, import, restore, and bulk flows.
+ * Caller: backend/routes/cameraRoutes.js.
+ * Deps: cameraService.
+ * MainFuncs: getAllCameras, getActiveCameras, createCamera, updateCamera, refreshCameraStream, getCameraSourceLifecycleEvents.
+ * SideEffects: Delegates camera mutations and lifecycle recovery to cameraService.
+ */
+
 import cameraService from '../services/cameraService.js';
 
 // Get all cameras (admin only - includes disabled cameras)
@@ -62,8 +70,12 @@ export async function createCamera(request, reply) {
 export async function updateCamera(request, reply) {
     try {
         const { id } = request.params;
-        await cameraService.updateCamera(id, request.body, request);
-        return reply.send({ success: true, message: 'Camera updated successfully' });
+        const result = await cameraService.updateCamera(id, request.body, request);
+        return reply.send({
+            success: true,
+            message: 'Camera updated successfully',
+            data: result,
+        });
     } catch (error) {
         console.error('Update camera error:', error);
         if (error.statusCode === 400) {
@@ -135,6 +147,35 @@ export async function bulkUpdateByArea(request, reply) {
         if (error.statusCode === 404) {
             return reply.code(404).send({ success: false, message: error.message });
         }
+        return reply.code(500).send({ success: false, message: 'Internal server error' });
+    }
+}
+
+export async function refreshCameraStream(request, reply) {
+    try {
+        const { id } = request.params;
+        const result = await cameraService.refreshCameraStream(id, request);
+        return reply.send({
+            success: true,
+            message: 'Camera stream refreshed successfully',
+            data: result,
+        });
+    } catch (error) {
+        console.error('Refresh camera stream error:', error);
+        if (error.statusCode === 404) {
+            return reply.code(404).send({ success: false, message: error.message });
+        }
+        return reply.code(500).send({ success: false, message: 'Internal server error' });
+    }
+}
+
+export async function getCameraSourceLifecycleEvents(request, reply) {
+    try {
+        const { id } = request.params;
+        const events = cameraService.getCameraSourceLifecycleEvents(id);
+        return reply.send({ success: true, data: events });
+    } catch (error) {
+        console.error('Get camera source lifecycle events error:', error);
         return reply.code(500).send({ success: false, message: 'Internal server error' });
     }
 }

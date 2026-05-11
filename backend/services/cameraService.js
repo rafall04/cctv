@@ -2043,6 +2043,54 @@ class CameraService {
         }
     }
 
+    async refreshCameraStream(id, request = null) {
+        const camera = queryOne(
+            `SELECT id, name, private_rtsp_url, area_id, enabled, stream_key, enable_recording, video_codec, stream_source,
+                    stream_revision, source_updated_at,
+                    delivery_type, external_hls_url, internal_ingest_policy_override,
+                    internal_on_demand_close_after_seconds_override, internal_rtsp_transport_override, source_profile
+             FROM cameras WHERE id = ?`,
+            [id]
+        );
+
+        if (!camera) {
+            const err = new Error('Camera not found');
+            err.statusCode = 404;
+            throw err;
+        }
+
+        const sourceLifecycle = await cameraSourceLifecycleService.refreshCameraSource({
+            camera: {
+                ...camera,
+                _areaPolicy: getAreaInternalPolicy(camera.area_id),
+            },
+            reason: 'manual_refresh',
+            classification: {
+                sourceChanged: true,
+                changedFields: ['manual_refresh'],
+                maskedChanges: {},
+            },
+        });
+
+        this.invalidateCameraCache();
+
+        if (request?.user) {
+            execute(
+                'INSERT INTO audit_logs (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)',
+                [request.user.id, 'REFRESH_CAMERA_STREAM', `Refreshed camera stream ID: ${id}`, request.ip]
+            );
+        }
+
+        return {
+            cameraId: parseInt(id, 10),
+            sourceLifecycle,
+        };
+    }
+
+    getCameraSourceLifecycleEvents(id) {
+        return cameraSourceLifecycleService.getRecentEvents(parseInt(id, 10), 20);
+    }
+
     async bulkDeleteArea(areaId, request) {
         if (!areaId) {
             const err = new Error('Area ID is required');

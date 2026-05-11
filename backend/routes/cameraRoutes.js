@@ -1,9 +1,19 @@
+/**
+ * Purpose: Registers camera public/admin routes, including source lifecycle recovery endpoints.
+ * Caller: backend/server.js route bootstrap.
+ * Deps: cameraController handlers, authMiddleware, schemaValidators, cacheMiddleware.
+ * MainFuncs: cameraRoutes.
+ * SideEffects: Adds Fastify camera route definitions.
+ */
+
 import {
     getAllCameras,
     getActiveCameras,
     getCameraById,
     createCamera,
     updateCamera,
+    refreshCameraStream,
+    getCameraSourceLifecycleEvents,
     deleteCamera,
     exportCameras,
     importCameras,
@@ -50,6 +60,18 @@ export default async function cameraRoutes(fastify, options) {
         schema: updateCameraSchema,
         onRequest: [authMiddleware],
         handler: updateCamera,
+    });
+
+    fastify.post('/:id/stream/refresh', {
+        schema: cameraIdParamSchema,
+        onRequest: [authMiddleware],
+        handler: refreshCameraStream,
+    });
+
+    fastify.get('/:id/stream/events', {
+        schema: cameraIdParamSchema,
+        onRequest: [authMiddleware],
+        handler: getCameraSourceLifecycleEvents,
     });
 
     fastify.delete('/:id', {
