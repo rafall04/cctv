@@ -12,6 +12,7 @@ import {
     describeRecordingRetentionDecision,
     isSafeRecordingFilename,
 } from './recordingRetentionPolicy.js';
+import { isFinalSegmentFilename } from './recordingSegmentFilePolicy.js';
 
 const NORMAL_DELETE_BATCH_SIZE = 6;
 
@@ -34,6 +35,7 @@ export function createRecordingCleanupService({
     recordingsBasePath,
     safeDelete,
     isFileBeingProcessed,
+    onRecoverOrphan,
     logger = console,
 } = {}) {
     const inFlightCameraIds = new Set();
@@ -130,6 +132,17 @@ export function createRecordingCleanupService({
                     filename,
                     decision: deletePolicy,
                 })}`);
+                continue;
+            }
+
+            if (isFinalSegmentFilename(filename) && onRecoverOrphan) {
+                await onRecoverOrphan({
+                    cameraId,
+                    filename,
+                    filePath,
+                    sourceType: 'final_orphan',
+                });
+                logger.log?.(`[Cleanup] Requeued final orphan for recovery before delete: camera${cameraId}/${filename}`);
                 continue;
             }
 

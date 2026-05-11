@@ -1,0 +1,70 @@
+// Purpose: Persist recovery diagnostics for recording files that are pending, retryable, or unrecoverable.
+// Caller: recordingSegmentFinalizer, recordingService scanner, recording assurance service.
+// Deps: database connectionPool.
+// MainFuncs: upsertDiagnostic, clearDiagnostic, listActiveByCamera, summarizeActive.
+// SideEffects: Reads and writes recording_recovery_diagnostics rows.
+
+import { execute, query } from '../database/connectionPool.js';
+
+class RecordingRecoveryDiagnosticsRepository {
+    upsertDiagnostic({
+        cameraId,
+        filename,
+        filePath,
+        state,
+        reason,
+        fileSize = 0,
+        detectedAt = new Date().toISOString(),
+        lastSeenAt = detectedAt,
+        active = 1,
+    }) {
+        return execute(
+            `INSERT INTO recording_recovery_diagnostics
+            (camera_id, filename, file_path, state, reason, file_size, detected_at, last_seen_at, active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(camera_id, filename, active) DO UPDATE SET
+                file_path = excluded.file_path,
+                state = excluded.state,
+                reason = excluded.reason,
+                file_size = excluded.file_size,
+                last_seen_at = excluded.last_seen_at,
+                updated_at = CURRENT_TIMESTAMP`,
+            [cameraId, filename, filePath, state, reason, fileSize, detectedAt, lastSeenAt, active]
+        );
+    }
+
+    clearDiagnostic({ cameraId, filename }) {
+        return execute(
+            'UPDATE recording_recovery_diagnostics SET active = 0, resolved_at = CURRENT_TIMESTAMP WHERE camera_id = ? AND filename = ? AND active = 1',
+            [cameraId, filename]
+        );
+    }
+
+    listActiveByCamera(cameraId, limit = 100) {
+        return query(
+            `SELECT *
+            FROM recording_recovery_diagnostics
+            WHERE camera_id = ? AND active = 1
+            ORDER BY last_seen_at DESC
+            LIMIT ?`,
+            [cameraId, limit]
+        );
+    }
+
+    summarizeActive() {
+        const rows = query(
+            `SELECT state, COUNT(*) as count
+            FROM recording_recovery_diagnostics
+            WHERE active = 1
+            GROUP BY state`,
+            []
+        );
+
+        return rows.reduce((summary, row) => {
+            summary[row.state] = row.count;
+            return summary;
+        }, {});
+    }
+}
+
+export default new RecordingRecoveryDiagnosticsRepository();

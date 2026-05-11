@@ -6,6 +6,7 @@
  * SideEffects: Uses fake timers and module mocks; no real filesystem or database writes.
  */
 import { EventEmitter } from 'events';
+import { join } from 'path';
 import { promisify } from 'util';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -20,6 +21,10 @@ const readdirSyncMock = vi.fn();
 const executeMock = vi.fn();
 const queryMock = vi.fn();
 const queryOneMock = vi.fn();
+const finalizerMock = {
+    finalizeSegment: vi.fn(),
+    drain: vi.fn(),
+};
 const fsPromisesMock = {
     access: vi.fn(),
     unlink: vi.fn(),
@@ -49,6 +54,10 @@ vi.mock('../database/connectionPool.js', () => ({
     query: queryMock,
     queryOne: queryOneMock,
     execute: executeMock,
+}));
+
+vi.mock('../services/recordingSegmentFinalizer.js', () => ({
+    default: finalizerMock,
 }));
 
 function createSpawnProcess() {
@@ -99,6 +108,8 @@ describe('recordingService external recording support', () => {
             callback?.(null, '', '');
         });
         spawnMock.mockImplementation(() => createSpawnProcess());
+        finalizerMock.finalizeSegment.mockResolvedValue({ success: true });
+        finalizerMock.drain.mockResolvedValue({ drained: true, pending: 0 });
         queryMock.mockReturnValue([]);
         executeMock.mockReturnValue(undefined);
     });
@@ -180,6 +191,59 @@ describe('recordingService external recording support', () => {
         expect(args).not.toContain('-rtsp_transport');
         expect(args).toContain('-c:v');
         expect(args).toContain('copy');
+    });
+
+    it('builds recording args with pending partial output pattern', async () => {
+        const { buildRecordingFfmpegArgs } = await import('../services/recordingService.js');
+
+        const args = buildRecordingFfmpegArgs({
+            outputPattern: 'C:\\recordings\\camera1\\pending\\%Y%m%d_%H%M%S.mp4.partial',
+            inputUrl: 'rtsp://user:pass@10.0.0.2/stream',
+            streamSource: 'internal',
+        });
+
+        expect(args.at(-1)).toBe('C:\\recordings\\camera1\\pending\\%Y%m%d_%H%M%S.mp4.partial');
+        expect(args).toContain('-segment_format');
+        expect(args).toContain('mp4');
+    });
+
+    it('creates pending recording directory before starting recording', async () => {
+        const { recordingService } = await import('../services/recordingService.js');
+        const recordingsBasePath = join(process.cwd(), '..', 'recordings');
+        queryOneMock.mockReturnValue(createCamera({ id: 33 }));
+
+        await recordingService.startRecording(33);
+
+        expect(mkdirSyncMock).toHaveBeenCalledWith(join(recordingsBasePath, 'camera33', 'pending'), { recursive: true });
+        expect(spawnMock).toHaveBeenCalledWith('ffmpeg', expect.arrayContaining([
+            join(recordingsBasePath, 'camera33', 'pending', '%Y%m%d_%H%M%S.mp4.partial'),
+        ]));
+    });
+
+    it('delegates partial segment closing to the finalizer', async () => {
+        finalizerMock.finalizeSegment.mockResolvedValue({ success: true });
+        const { recordingService } = await import('../services/recordingService.js');
+
+        recordingService.handleRecordingStderr(
+            5,
+            "Opening 'C:\\recordings\\camera5\\pending\\20260511_211000.mp4.partial' for writing\nClosing segment"
+        );
+
+        expect(finalizerMock.finalizeSegment).toHaveBeenCalledWith(expect.objectContaining({
+            cameraId: 5,
+            filename: '20260511_211000.mp4.partial',
+            sourceType: 'partial',
+        }));
+    });
+
+    it('keeps duplicate partial close events idempotent through finalizer delegation', async () => {
+        finalizerMock.finalizeSegment.mockResolvedValue({ success: true });
+        const { recordingService } = await import('../services/recordingService.js');
+
+        recordingService.onSegmentCreated(5, '20260511_211000.mp4.partial');
+        recordingService.onSegmentCreated(5, '20260511_211000.mp4.partial');
+
+        expect(finalizerMock.finalizeSegment).toHaveBeenCalledTimes(1);
     });
 
     it('starts recording external cameras from external_hls_url', async () => {
@@ -458,6 +522,21 @@ describe('recordingService external recording support', () => {
         await expect(shutdownPromise).resolves.toHaveLength(2);
     });
 
+    it('drains segment finalizer during shutdown after stopping ffmpeg', async () => {
+        finalizerMock.drain.mockResolvedValue({ drained: true, pending: 0 });
+        const { recordingService } = await import('../services/recordingService.js');
+        const child = createSpawnProcess();
+        spawnMock.mockReturnValue(child);
+        queryOneMock.mockReturnValue(createCamera({ id: 44 }));
+
+        await recordingService.startRecording(44);
+        const shutdownPromise = recordingService.shutdown();
+        child.emit('close', 255, null);
+        await shutdownPromise;
+
+        expect(finalizerMock.drain).toHaveBeenCalledWith(30000);
+    });
+
     it('refuses cleanup delete when DB file path escapes the recording directory', async () => {
         const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
         const { join } = await import('path');
@@ -559,47 +638,26 @@ describe('recordingService external recording support', () => {
         expect(executeMock).not.toHaveBeenCalledWith('DELETE FROM recording_segments WHERE id = ?', [702]);
     });
 
-    it('quarantines invalid short segments instead of deleting them immediately', async () => {
-        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-        const { join } = await import('path');
-        vi.setSystemTime(Date.parse('2026-05-02T10:00:00.000Z'));
-        execMock[promisify.custom] = vi.fn(async () => ({ stdout: '0.2\n', stderr: '' }));
+    it('delegates short segment validation to the recovery finalizer', async () => {
+        finalizerMock.finalizeSegment.mockResolvedValue({ success: false, reason: 'invalid_duration' });
         const { recordingService } = await import('../services/recordingService.js');
-        const child = createSpawnProcess();
-        const recordingsBasePath = join(process.cwd(), '..', 'recordings');
 
         queryOneMock.mockImplementation((sql) => {
             if (sql.includes('SELECT fail_count FROM failed_remux_files')) {
                 return null;
             }
-            if (sql.includes('SELECT recording_duration_hours FROM cameras')) {
-                return { recording_duration_hours: 1 };
-            }
             return null;
         });
-        fsPromisesMock.stat.mockResolvedValue({
-            size: 1024,
-            mtimeMs: Date.parse('2026-05-02T00:01:00.000Z'),
-        });
-        execMock.mockImplementation((command, options, callback) => {
-            if (typeof options === 'function') {
-                callback = options;
-            }
-            callback?.(null, '0.2\n', '');
-        });
-        spawnMock.mockReturnValue(child);
 
         recordingService.onSegmentCreated(3, '20260502_000000.mp4');
-        await vi.advanceTimersByTimeAsync(3000);
         await Promise.resolve();
 
-        expect(fsPromisesMock.mkdir).toHaveBeenCalled();
-        expect(fsPromisesMock.rename).toHaveBeenCalledWith(
-            join(recordingsBasePath, 'camera3', '20260502_000000.mp4'),
-            expect.stringContaining('.quarantine')
-        );
-        expect(fsPromisesMock.unlink).not.toHaveBeenCalledWith(join(recordingsBasePath, 'camera3', '20260502_000000.mp4'));
-        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[Segment] Quarantined file: camera3/20260502_000000.mp4 -> .quarantine/camera3/'));
+        expect(finalizerMock.finalizeSegment).toHaveBeenCalledWith(expect.objectContaining({
+            cameraId: 3,
+            filename: '20260502_000000.mp4',
+            sourceType: 'final_orphan',
+        }));
+        expect(fsPromisesMock.unlink).not.toHaveBeenCalledWith(expect.stringContaining('20260502_000000.mp4'));
     });
 
     it('does not emergency-delete recent filesystem orphan recordings', async () => {
@@ -625,34 +683,25 @@ describe('recordingService external recording support', () => {
         expect(warnSpy).toHaveBeenCalledWith('[DiskCheck] ⚠️ LOW DISK SPACE: 0.00GB free. Starting emergency cleanup...');
     });
 
-    it('keeps short unstable-connection segments until retention expiry', async () => {
-        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-        const { join } = await import('path');
-        vi.setSystemTime(Date.parse('2026-05-02T10:00:00.000Z'));
-        execMock[promisify.custom] = vi.fn(async () => ({ stdout: '0.2\n', stderr: '' }));
+    it('keeps unstable-connection segment files in finalizer recovery instead of deleting them inline', async () => {
+        finalizerMock.finalizeSegment.mockResolvedValue({ success: false, reason: 'invalid_duration' });
         const { recordingService } = await import('../services/recordingService.js');
         const recordingsBasePath = join(process.cwd(), '..', 'recordings');
 
         queryOneMock.mockImplementation((sql) => {
             if (sql.includes('SELECT fail_count FROM failed_remux_files')) return null;
-            if (sql.includes('SELECT recording_duration_hours FROM cameras')) return { recording_duration_hours: 5 };
             return null;
-        });
-        fsPromisesMock.stat.mockResolvedValue({
-            size: 1024,
-            mtimeMs: Date.parse('2026-05-02T09:59:00.000Z'),
         });
 
         recordingService.onSegmentCreated(3, '20260502_095800.mp4');
-        await vi.advanceTimersByTimeAsync(3000);
         await Promise.resolve();
 
         expect(fsPromisesMock.unlink).not.toHaveBeenCalledWith(join(recordingsBasePath, 'camera3', '20260502_095800.mp4'));
-        expect(fsPromisesMock.rename).not.toHaveBeenCalledWith(
-            join(recordingsBasePath, 'camera3', '20260502_095800.mp4'),
-            expect.stringContaining('.quarantine')
-        );
-        expect(warnSpy).toHaveBeenCalledWith('[Segment] Keeping invalid segment until retention expiry: camera3/20260502_095800.mp4');
+        expect(finalizerMock.finalizeSegment).toHaveBeenCalledWith(expect.objectContaining({
+            cameraId: 3,
+            filename: '20260502_095800.mp4',
+            sourceType: 'final_orphan',
+        }));
     });
 
     it('keeps recent failed-remux segments in place until retention expiry', async () => {
@@ -690,9 +739,7 @@ describe('recordingService external recording support', () => {
     });
 
     it('registers the same segment idempotently when scanner and ffmpeg close detect it together', async () => {
-        execMock[promisify.custom] = vi.fn(async () => ({ stdout: '12\n', stderr: '' }));
-        const repository = (await import('../services/recordingSegmentRepository.js')).default;
-        const upsertSpy = vi.spyOn(repository, 'upsertSegment').mockReturnValue({ changes: 1 });
+        finalizerMock.finalizeSegment.mockResolvedValue({ success: true });
         const { recordingService } = await import('../services/recordingService.js');
 
         queryOneMock.mockImplementation((sql) => {
@@ -702,23 +749,74 @@ describe('recordingService external recording support', () => {
 
             return null;
         });
-        fsPromisesMock.stat.mockResolvedValue({
-            size: 4096,
-            mtimeMs: Date.now(),
-        });
-        spawnMock.mockImplementation(() => {
-            const child = createSpawnProcess();
-            setTimeout(() => child.emit('close', 0), 0);
-            return child;
-        });
-
         recordingService.onSegmentCreated(5, '20260503_020000.mp4');
         recordingService.onSegmentCreated(5, '20260503_020000.mp4');
-
-        await vi.advanceTimersByTimeAsync(3001);
         await Promise.resolve();
 
-        expect(upsertSpy).toHaveBeenCalledTimes(1);
+        expect(finalizerMock.finalizeSegment).toHaveBeenCalledTimes(1);
+    });
+
+    it('scanner recovers pending partial files that are not registered', async () => {
+        finalizerMock.finalizeSegment.mockResolvedValue({ success: true });
+        const { recordingService } = await import('../services/recordingService.js');
+        queryOneMock.mockReturnValue({ id: 8, enable_recording: 1 });
+        queryMock.mockReturnValue([]);
+        fsPromisesMock.readdir.mockImplementation(async (targetPath) => {
+            if (targetPath.endsWith('recordings')) return ['camera8'];
+            if (targetPath.endsWith('camera8')) return ['pending'];
+            if (targetPath.endsWith('pending')) return ['20260511_211000.mp4.partial'];
+            return [];
+        });
+        fsPromisesMock.stat.mockImplementation(async (targetPath) => ({
+            isDirectory: () => targetPath.endsWith('camera8') || targetPath.endsWith('pending'),
+            size: 4096,
+            mtimeMs: Date.now() - 120000,
+        }));
+        const segmentSpy = vi.spyOn(recordingService, 'onSegmentCreated');
+
+        const runs = [];
+        let scheduled = false;
+        recordingService.startSegmentScanner((callback) => {
+            if (!scheduled) {
+                scheduled = true;
+                runs.push(callback());
+            }
+            return 1;
+        });
+        await Promise.all(runs);
+
+        expect(segmentSpy).toHaveBeenCalledWith(8, '20260511_211000.mp4.partial');
+    });
+
+    it('scanner reconciles valid final orphan MP4 files into DB through finalizer', async () => {
+        finalizerMock.finalizeSegment.mockResolvedValue({ success: true });
+        const { recordingService } = await import('../services/recordingService.js');
+        queryOneMock.mockReturnValue({ id: 8, enable_recording: 1 });
+        queryMock.mockReturnValue([]);
+        fsPromisesMock.readdir.mockImplementation(async (targetPath) => {
+            if (targetPath.endsWith('recordings')) return ['camera8'];
+            if (targetPath.endsWith('camera8')) return ['20260511_211000.mp4'];
+            return [];
+        });
+        fsPromisesMock.stat.mockImplementation(async (targetPath) => ({
+            isDirectory: () => targetPath.endsWith('camera8'),
+            size: 4096,
+            mtimeMs: Date.now() - 120000,
+        }));
+        const segmentSpy = vi.spyOn(recordingService, 'onSegmentCreated');
+
+        const runs = [];
+        let scheduled = false;
+        recordingService.startSegmentScanner((callback) => {
+            if (!scheduled) {
+                scheduled = true;
+                runs.push(callback());
+            }
+            return 1;
+        });
+        await Promise.all(runs);
+
+        expect(segmentSpy).toHaveBeenCalledWith(8, '20260511_211000.mp4');
     });
 
     it('starts and stops the attached recording scheduler explicitly', async () => {

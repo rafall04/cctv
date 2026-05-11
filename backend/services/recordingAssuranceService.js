@@ -9,6 +9,7 @@
 import { existsSync, statSync } from 'fs';
 import { query } from '../database/connectionPool.js';
 import { recordingService } from './recordingService.js';
+import recordingRecoveryDiagnosticsRepository from './recordingRecoveryDiagnosticsRepository.js';
 
 const DEFAULT_STALE_AFTER_MS = 15 * 60 * 1000;
 const DEFAULT_GAP_TOLERANCE_SECONDS = 180;
@@ -37,6 +38,7 @@ function makeEmptySnapshot(now) {
             recent_gap_cameras: 0,
         },
         cameras: [],
+        recoveryDiagnostics: recordingRecoveryDiagnosticsRepository.summarizeActive(),
     };
 }
 
