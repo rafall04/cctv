@@ -895,7 +895,12 @@ class RecordingService {
     async shutdown() {
         this.isShuttingDown = true;
         this.scheduler?.stop();
-        return recordingProcessManager.shutdownAll('server_shutdown');
+        const results = await recordingProcessManager.shutdownAll('server_shutdown');
+        const drainResult = await recordingSegmentFinalizer.drain(30000);
+        if (!drainResult.drained) {
+            console.warn(`[Shutdown] Recording finalizer drain timed out with ${drainResult.pending} pending file(s)`);
+        }
+        return results;
     }
 
     attachScheduler(scheduler) {

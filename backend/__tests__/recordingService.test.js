@@ -108,6 +108,8 @@ describe('recordingService external recording support', () => {
             callback?.(null, '', '');
         });
         spawnMock.mockImplementation(() => createSpawnProcess());
+        finalizerMock.finalizeSegment.mockResolvedValue({ success: true });
+        finalizerMock.drain.mockResolvedValue({ drained: true, pending: 0 });
         queryMock.mockReturnValue([]);
         executeMock.mockReturnValue(undefined);
     });
@@ -518,6 +520,21 @@ describe('recordingService external recording support', () => {
         second.emit('close', 255, null);
 
         await expect(shutdownPromise).resolves.toHaveLength(2);
+    });
+
+    it('drains segment finalizer during shutdown after stopping ffmpeg', async () => {
+        finalizerMock.drain.mockResolvedValue({ drained: true, pending: 0 });
+        const { recordingService } = await import('../services/recordingService.js');
+        const child = createSpawnProcess();
+        spawnMock.mockReturnValue(child);
+        queryOneMock.mockReturnValue(createCamera({ id: 44 }));
+
+        await recordingService.startRecording(44);
+        const shutdownPromise = recordingService.shutdown();
+        child.emit('close', 255, null);
+        await shutdownPromise;
+
+        expect(finalizerMock.drain).toHaveBeenCalledWith(30000);
     });
 
     it('refuses cleanup delete when DB file path escapes the recording directory', async () => {
