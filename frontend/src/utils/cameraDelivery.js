@@ -74,10 +74,10 @@ export function getStreamCapabilities(camera = {}) {
     const fallbackCapabilities = {
         internal_hls: { live: true, popup: true, multiview: true, playback: true, supported_player: 'hls' },
         external_hls: { live: true, popup: true, multiview: true, playback: true, supported_player: 'hls' },
-        external_flv: { live: true, popup: true, multiview: false, playback: false, supported_player: 'flv' },
-        external_mjpeg: { live: true, popup: true, multiview: false, playback: false, supported_player: 'mjpeg' },
-        external_embed: { live: true, popup: true, multiview: false, playback: false, supported_player: 'embed' },
-        external_jsmpeg: { live: true, popup: true, multiview: false, playback: false, supported_player: 'embed_fallback' },
+        external_flv: { live: true, popup: true, multiview: true, playback: false, supported_player: 'flv' },
+        external_mjpeg: { live: true, popup: true, multiview: true, playback: false, supported_player: 'mjpeg' },
+        external_embed: { live: true, popup: true, multiview: true, playback: false, supported_player: 'embed' },
+        external_jsmpeg: { live: true, popup: true, multiview: true, playback: false, supported_player: 'embed_fallback' },
         external_custom_ws: { live: false, popup: true, multiview: false, playback: false, supported_player: 'unsupported' },
     };
 
@@ -92,11 +92,6 @@ export function getStreamCapabilities(camera = {}) {
 
 export function isHlsDeliveryType(deliveryType) {
     return deliveryType === 'internal_hls' || deliveryType === 'external_hls';
-}
-
-export function isMultiViewSupported(camera = {}) {
-    const capabilities = getStreamCapabilities(camera);
-    return capabilities.multiview === true;
 }
 
 export function getPrimaryExternalUrl(camera = {}) {
@@ -127,4 +122,34 @@ export function getPopupEmbedUrl(camera = {}) {
     }
 
     return null;
+}
+
+export function getMultiViewRenderMode(camera = {}) {
+    const deliveryType = getEffectiveDeliveryType(camera);
+
+    if (deliveryType === 'internal_hls' || deliveryType === 'external_hls') {
+        return 'hls';
+    }
+
+    if (deliveryType === 'external_flv') {
+        return 'flv';
+    }
+
+    if (deliveryType === 'external_mjpeg') {
+        return 'mjpeg';
+    }
+
+    if (deliveryType === 'external_embed' || deliveryType === 'external_jsmpeg') {
+        return getPopupEmbedUrl(camera) ? 'embed' : 'unsupported';
+    }
+
+    if (deliveryType === 'external_custom_ws') {
+        return getPopupEmbedUrl(camera) ? 'embed' : 'unsupported';
+    }
+
+    return 'unsupported';
+}
+
+export function isMultiViewSupported(camera = {}) {
+    return getMultiViewRenderMode(camera) !== 'unsupported';
 }

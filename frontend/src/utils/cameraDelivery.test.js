@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { getEffectiveDeliveryType, getPrimaryExternalUrl, getStreamCapabilities } from './cameraDelivery.js';
+import {
+    getEffectiveDeliveryType,
+    getMultiViewRenderMode,
+    getPrimaryExternalUrl,
+    getStreamCapabilities,
+    isMultiViewSupported,
+} from './cameraDelivery.js';
 
 describe('cameraDelivery compat inference', () => {
     it('maps legacy external_hls_url cameras to external_hls', () => {
@@ -72,16 +78,57 @@ describe('cameraDelivery compat inference', () => {
         })).toBe('https://example.com/new/index.m3u8');
     });
 
-    it('treats flv cameras as popup live-only sources', () => {
+    it('treats flv cameras as browser live-only sources with multi-view support', () => {
         expect(getStreamCapabilities({
             external_stream_url: 'https://surakarta.atcsindonesia.info:8086/camera/BalaiKota.flv',
             external_embed_url: 'https://example.com/flv-player#https://surakarta.atcsindonesia.info:8086/camera/BalaiKota.flv',
         })).toEqual(expect.objectContaining({
             live: true,
             popup: true,
-            multiview: false,
+            multiview: true,
             playback: false,
             supported_player: 'flv',
         }));
+    });
+
+    it.each([
+        ['internal_hls', 'hls'],
+        ['external_hls', 'hls'],
+        ['external_flv', 'flv'],
+        ['external_mjpeg', 'mjpeg'],
+        ['external_embed', 'embed'],
+        ['external_jsmpeg', 'embed'],
+    ])('supports %s in multi-view as %s', (deliveryType, expectedMode) => {
+        const camera = {
+            delivery_type: deliveryType,
+            external_stream_url: deliveryType === 'external_mjpeg' ? 'https://example.com/mjpeg' : undefined,
+            external_embed_url: deliveryType === 'external_embed' || deliveryType === 'external_jsmpeg'
+                ? 'https://example.com/embed'
+                : undefined,
+        };
+
+        expect(isMultiViewSupported(camera)).toBe(true);
+        expect(getMultiViewRenderMode(camera)).toBe(expectedMode);
+    });
+
+    it('does not claim unsupported custom websocket URLs are playable without an embed fallback', () => {
+        const camera = {
+            delivery_type: 'external_custom_ws',
+            external_stream_url: 'wss://example.com/live',
+        };
+
+        expect(isMultiViewSupported(camera)).toBe(false);
+        expect(getMultiViewRenderMode(camera)).toBe('unsupported');
+    });
+
+    it('supports custom websocket cameras when an embed fallback exists', () => {
+        const camera = {
+            delivery_type: 'external_custom_ws',
+            external_stream_url: 'wss://example.com/live',
+            external_embed_url: 'https://example.com/player',
+        };
+
+        expect(isMultiViewSupported(camera)).toBe(true);
+        expect(getMultiViewRenderMode(camera)).toBe('embed');
     });
 });
