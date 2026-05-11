@@ -175,4 +175,41 @@ describe('telegramService notification routing', () => {
         expect(status.notificationTargets).toHaveLength(1);
         expect(status.notificationRules).toHaveLength(1);
     });
+
+    it('sends a test notification to a custom monitoring target by target id', async () => {
+        const telegram = await loadTelegramService({
+            botToken: '123456789:test',
+            monitoringChatId: '',
+            feedbackChatId: '',
+            notificationTargets: [
+                { id: 'area-bojonegoro', name: 'Area Bojonegoro', chatId: '-100-area' },
+            ],
+            notificationRules: [],
+        });
+
+        const sent = await telegram.sendTestNotification('target', { targetId: 'area-bojonegoro' });
+
+        expect(sent).toBe(true);
+        expect(global.fetch).toHaveBeenCalledTimes(1);
+        const payload = JSON.parse(global.fetch.mock.calls[0][1].body);
+        expect(payload.chat_id).toBe('-100-area');
+        expect(payload.text).toContain('Area Bojonegoro');
+    });
+
+    it('does not send a custom target test for an unknown target id', async () => {
+        const telegram = await loadTelegramService({
+            botToken: '123456789:test',
+            monitoringChatId: '',
+            feedbackChatId: '',
+            notificationTargets: [
+                { id: 'area-bojonegoro', name: 'Area Bojonegoro', chatId: '-100-area' },
+            ],
+            notificationRules: [],
+        });
+
+        const sent = await telegram.sendTestNotification('target', { targetId: 'missing-target' });
+
+        expect(sent).toBe(false);
+        expect(global.fetch).not.toHaveBeenCalled();
+    });
 });

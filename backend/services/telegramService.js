@@ -405,6 +405,25 @@ export async function sendFeedbackMessage(message) {
     return sendToTelegram(message, settings.feedbackChatId);
 }
 
+export async function sendTargetTestMessage(targetId) {
+    const settings = getTelegramSettings();
+    const normalizedTargetId = String(targetId || '').trim();
+    const target = settings.notificationTargets.find((item) => item.id === normalizedTargetId);
+
+    if (!target?.chatId) {
+        return false;
+    }
+
+    const message = `
+<b>Test Notifikasi Berhasil</b>
+Bot Telegram terhubung dengan baik.
+Target: ${target.name}
+${formatDateTime(new Date())}
+    `.trim();
+
+    return sendToTelegram(message, target.chatId);
+}
+
 export async function sendCameraOfflineNotification(camera) {
     const cooldownKey = `camera_${camera.id}_offline`;
     
@@ -521,7 +540,7 @@ ${feedback.message}
     return sendFeedbackMessage(message);
 }
 
-export async function sendTestNotification(type = 'monitoring') {
+export async function sendTestNotification(type = 'monitoring', options = {}) {
     const message = `
 ✅ <b>Test Notifikasi Berhasil</b>
 ━━━━━━━━━━━━━━━━━━━━
@@ -534,6 +553,11 @@ Tipe: ${type === 'monitoring' ? 'Monitoring Kamera' : 'Kritik & Saran'}
     if (type === 'feedback') {
         return sendFeedbackMessage(message);
     }
+
+    if (type === 'target') {
+        return sendTargetTestMessage(options.targetId);
+    }
+
     return sendMonitoringMessage(message);
 }
 
@@ -565,6 +589,7 @@ export function getTelegramStatus() {
 export default {
     sendMonitoringMessage,
     sendFeedbackMessage,
+    sendTargetTestMessage,
     sendCameraOfflineNotification,
     sendCameraOnlineNotification,
     sendCameraStatusNotifications,

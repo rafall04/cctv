@@ -70,7 +70,7 @@ export async function getTodayStats(request, reply) {
  */
 export async function testTelegramNotification(request, reply) {
     try {
-        const { type = 'monitoring' } = request.body || {};
+        const { type = 'monitoring', targetId = '' } = request.body || {};
 
         if (type === 'monitoring' && !isTelegramConfigured()) {
             return reply.code(400).send({
@@ -79,7 +79,7 @@ export async function testTelegramNotification(request, reply) {
             });
         }
 
-        const sent = await sendTestNotification(type);
+        const sent = await sendTestNotification(type, { targetId });
 
         if (sent) {
             return reply.send({
