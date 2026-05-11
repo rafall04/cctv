@@ -237,6 +237,12 @@ const cleanupService = createRecordingCleanupService({
     recordingsBasePath: RECORDINGS_BASE_PATH,
     safeDelete: deleteRecordingFileSafely,
     isFileBeingProcessed: (targetCameraId, filename) => filesBeingProcessed.has(`${targetCameraId}:${filename}`),
+    onRecoverOrphan: ({ cameraId, filename, filePath, sourceType }) => recordingSegmentFinalizer.finalizeSegment({
+        cameraId,
+        filename,
+        sourcePath: filePath,
+        sourceType,
+    }),
     logger: console,
 });
 
