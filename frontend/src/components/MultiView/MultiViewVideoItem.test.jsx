@@ -31,6 +31,7 @@ const {
 }));
 
 const hlsInstances = [];
+const flvPlayers = [];
 
 vi.mock('hls.js', () => {
     class HlsMock {
@@ -70,6 +71,27 @@ vi.mock('hls.js', () => {
 
     return { default: HlsMock };
 });
+
+vi.mock('flv.js', () => ({
+    default: {
+        isSupported: vi.fn(() => true),
+        Events: {
+            ERROR: 'error',
+        },
+        createPlayer: vi.fn(() => {
+            const player = {
+                attachMediaElement: vi.fn(),
+                load: vi.fn(),
+                play: vi.fn(),
+                pause: vi.fn(),
+                destroy: vi.fn(),
+                on: vi.fn(),
+            };
+            flvPlayers.push(player);
+            return player;
+        }),
+    },
+}));
 
 vi.mock('../../utils/deviceDetector', () => ({
     detectDeviceTier: () => 'high',
@@ -154,6 +176,7 @@ async function waitForInitialHls() {
 describe('MultiViewVideoItem runtime stability', () => {
     beforeEach(() => {
         hlsInstances.length = 0;
+        flvPlayers.length = 0;
         enqueueMock.mockClear();
         startSessionMock.mockReset();
         startSessionMock.mockResolvedValue('viewer-session');
@@ -253,5 +276,90 @@ describe('MultiViewVideoItem runtime stability', () => {
         await waitFor(() => {
             expect(stopSessionMock).toHaveBeenCalledWith('late-session');
         });
+    });
+
+    it('renders external MJPEG streams with an image tile', async () => {
+        render(
+            <MultiViewVideoItem
+                camera={{
+                    ...baseCamera,
+                    id: 41,
+                    delivery_type: 'external_mjpeg',
+                    external_stream_url: 'https://example.com/live.mjpg',
+                    streams: {},
+                }}
+                onRemove={vi.fn()}
+                onError={vi.fn()}
+                onStatusChange={vi.fn()}
+            />
+        );
+
+        expect((await screen.findByTestId('multi-view-mjpeg')).getAttribute('src')).toBe('https://example.com/live.mjpg');
+        expect(hlsInstances).toHaveLength(0);
+    });
+
+    it('renders external embed fallback streams with an iframe tile', async () => {
+        render(
+            <MultiViewVideoItem
+                camera={{
+                    ...baseCamera,
+                    id: 42,
+                    delivery_type: 'external_embed',
+                    external_embed_url: 'https://example.com/embed',
+                    streams: {},
+                }}
+                onRemove={vi.fn()}
+                onError={vi.fn()}
+                onStatusChange={vi.fn()}
+            />
+        );
+
+        expect((await screen.findByTestId('multi-view-embed')).getAttribute('src')).toBe('https://example.com/embed');
+        expect(hlsInstances).toHaveLength(0);
+    });
+
+    it('initializes external FLV streams with flv.js', async () => {
+        render(
+            <MultiViewVideoItem
+                camera={{
+                    ...baseCamera,
+                    id: 43,
+                    delivery_type: 'external_flv',
+                    external_stream_url: 'https://example.com/live.flv',
+                    streams: {},
+                }}
+                onRemove={vi.fn()}
+                onError={vi.fn()}
+                onStatusChange={vi.fn()}
+            />
+        );
+
+        await waitFor(() => {
+            expect(flvPlayers).toHaveLength(1);
+        });
+        expect(flvPlayers[0].attachMediaElement).toHaveBeenCalledWith(screen.getByTestId('multi-view-video'));
+        expect(hlsInstances).toHaveLength(0);
+    });
+
+    it('shows a clear error for unsupported custom websocket streams without fallback', async () => {
+        const onError = vi.fn();
+
+        render(
+            <MultiViewVideoItem
+                camera={{
+                    ...baseCamera,
+                    id: 44,
+                    delivery_type: 'external_custom_ws',
+                    external_stream_url: 'wss://example.com/live',
+                    streams: {},
+                }}
+                onRemove={vi.fn()}
+                onError={onError}
+                onStatusChange={vi.fn()}
+            />
+        );
+
+        expect(await screen.findByText('Format stream tidak didukung')).toBeTruthy();
+        expect(onError).toHaveBeenCalledWith(44, expect.any(Error));
     });
 });

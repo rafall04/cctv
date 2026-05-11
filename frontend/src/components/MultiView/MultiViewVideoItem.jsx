@@ -8,6 +8,7 @@ SideEffects: Starts/stops viewer sessions, creates/destroys HLS instances, contr
 
 import { useRef, useState, useEffect, useCallback } from 'react';
 import Hls from 'hls.js';
+import flvjs from 'flv.js';
 import { Icons } from '../ui/Icons';
 import ZoomableVideo from './ZoomableVideo';
 import { detectDeviceTier } from '../../utils/deviceDetector';
@@ -22,6 +23,11 @@ import { useBranding } from '../../contexts/BrandingContext';
 import { useStreamTimeout } from '../../hooks/useStreamTimeout';
 import { resolveStreamUrl } from '../../utils/directStreamHelper';
 import { getCameraAvailabilityState, isCameraHardOffline } from '../../utils/cameraAvailability.js';
+import {
+    getMultiViewRenderMode,
+    getPopupEmbedUrl,
+    getPrimaryExternalUrl,
+} from '../../utils/cameraDelivery.js';
 
 // Now handles offline/maintenance cameras properly
 // **Validates: Requirements 1.1, 1.2, 1.3, 2.3, 4.1, 4.2, 4.3, 4.4, 6.1, 6.2, 6.3, 6.4, 7.1, 7.2, 7.3**
@@ -31,6 +37,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
     const wrapperRef = useRef(null);
     const containerRef = useRef(null);
     const hlsRef = useRef(null);
+    const flvRef = useRef(null);
     const fallbackHandlerRef = useRef(null);
     const abortControllerRef = useRef(null);
     const loadingStageRef = useRef(LoadingStage.CONNECTING);
@@ -81,6 +88,18 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
     const deviceTier = detectDeviceTier();
     const { targetUrl: resolvedUrl, proxyFallbackUrl, isDirectStream } = resolveStreamUrl(camera, { forceProxy: forceProxyFallback });
     const effectiveUrl = resolvedUrl || url;
+    const renderMode = getMultiViewRenderMode(camera);
+    const embedUrl = getPopupEmbedUrl(camera);
+    const primaryExternalUrl = getPrimaryExternalUrl(camera);
+    const flvUrl = renderMode === 'flv'
+        ? (camera.external_stream_url || camera.external_hls_url || null)
+        : null;
+    const mjpegUrl = renderMode === 'mjpeg'
+        ? (camera.external_stream_url || camera.external_hls_url || primaryExternalUrl || null)
+        : null;
+    const externalFrameUrl = renderMode === 'embed' ? embedUrl : null;
+    const hasRenderableExternalUrl = Boolean(flvUrl || mjpegUrl || externalFrameUrl);
+    const canCaptureSnapshot = renderMode === 'hls' || renderMode === 'flv';
 
     useEffect(() => {
         loadingStageRef.current = loadingStage;
@@ -240,6 +259,10 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             hlsRef.current.destroy();
             hlsRef.current = null;
         }
+        if (flvRef.current) {
+            flvRef.current.destroy();
+            flvRef.current = null;
+        }
         if (videoRef.current) {
             videoRef.current.pause();
             videoRef.current.src = '';
@@ -255,8 +278,14 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
     useEffect(() => {
         // Skip HLS loading if camera is in maintenance or offline
         if (isMaintenance || isOffline) return;
+        if (renderMode !== 'hls') return;
 
-        if (!effectiveUrl || !videoRef.current) return;
+        if (!effectiveUrl || !videoRef.current) {
+            setStatus('error');
+            setLoadingStage(LoadingStage.ERROR);
+            onError?.(camera.id, new Error('Stream URL belum tersedia untuk Multi-View'));
+            return;
+        }
         const video = videoRef.current;
         let hls = null;
         let cancelled = false;
@@ -556,9 +585,90 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         isOffline,
         onError,
         proxyFallbackUrl,
+        renderMode,
         retryKey,
         startTimeout,
         updateStreamStage,
+    ]);
+
+    useEffect(() => {
+        if (isMaintenance || isOffline || renderMode !== 'flv') return;
+
+        if (!flvUrl || !videoRef.current) {
+            setStatus('error');
+            setLoadingStage(LoadingStage.ERROR);
+            onError?.(camera.id, new Error('FLV URL tidak tersedia'));
+            return;
+        }
+
+        if (!flvjs.isSupported()) {
+            setStatus('error');
+            setLoadingStage(LoadingStage.ERROR);
+            onError?.(camera.id, new Error('Browser tidak mendukung FLV'));
+            return;
+        }
+
+        const video = videoRef.current;
+        const player = flvjs.createPlayer({
+            type: 'flv',
+            url: flvUrl,
+            isLive: true,
+            cors: true,
+        });
+        flvRef.current = player;
+        setStatus('connecting');
+        setLoadingStage(LoadingStage.LOADING);
+
+        const markLive = () => {
+            setStatus('live');
+            setLoadingStage(LoadingStage.PLAYING);
+            clearStreamTimeout();
+        };
+        const markError = () => {
+            setStatus('error');
+            setLoadingStage(LoadingStage.ERROR);
+            onError?.(camera.id, new Error('FLV stream error'));
+        };
+
+        video.addEventListener('playing', markLive);
+        video.addEventListener('error', markError);
+        player.attachMediaElement(video);
+        player.load();
+        video.play().catch(() => { });
+        player.on(flvjs.Events.ERROR, markError);
+
+        return () => {
+            video.removeEventListener('playing', markLive);
+            video.removeEventListener('error', markError);
+            player.destroy();
+            if (flvRef.current === player) {
+                flvRef.current = null;
+            }
+        };
+    }, [camera.id, clearStreamTimeout, flvUrl, isMaintenance, isOffline, onError, renderMode]);
+
+    useEffect(() => {
+        if (isMaintenance || isOffline) return;
+        if (renderMode !== 'mjpeg' && renderMode !== 'embed' && renderMode !== 'unsupported') return;
+
+        if (renderMode === 'unsupported' || !hasRenderableExternalUrl) {
+            setStatus('error');
+            setLoadingStage(LoadingStage.ERROR);
+            onError?.(camera.id, new Error('Format stream tidak didukung'));
+            return;
+        }
+
+        setStatus('live');
+        setLoadingStage(LoadingStage.PLAYING);
+        clearStreamTimeout();
+    }, [
+        camera.id,
+        clearStreamTimeout,
+        hasRenderableExternalUrl,
+        isMaintenance,
+        isOffline,
+        onError,
+        renderMode,
     ]);
 
     const handleRetry = useCallback(() => {
@@ -666,7 +776,32 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
     return (
         <div ref={containerRef} className={`relative w-full h-full bg-gray-100 dark:bg-black rounded-xl overflow-hidden group ${isFullscreen ? 'rounded-none' : ''}`}>
             <div ref={wrapperRef} className="w-full h-full">
-                <ZoomableVideo videoRef={videoRef} status={status} maxZoom={3} onZoomChange={setZoom} isFullscreen={isFullscreen} />
+                {renderMode === 'mjpeg' && mjpegUrl ? (
+                    <img
+                        src={mjpegUrl}
+                        alt={camera.name}
+                        data-testid="multi-view-mjpeg"
+                        className="h-full w-full object-contain bg-black"
+                        onLoad={() => setStatus('live')}
+                        onError={() => {
+                            setStatus('error');
+                            setLoadingStage(LoadingStage.ERROR);
+                            onError?.(camera.id, new Error('MJPEG stream error'));
+                        }}
+                    />
+                ) : renderMode === 'embed' && externalFrameUrl ? (
+                    <iframe
+                        src={externalFrameUrl}
+                        title={camera.name}
+                        data-testid="multi-view-embed"
+                        className="h-full w-full border-0 bg-black"
+                        allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+                        referrerPolicy="no-referrer"
+                        onLoad={() => setStatus('live')}
+                    />
+                ) : (
+                    <ZoomableVideo videoRef={videoRef} status={status} maxZoom={3} onZoomChange={setZoom} isFullscreen={isFullscreen} />
+                )}
             </div>
 
             {/* Snapshot Notification */}
@@ -702,7 +837,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                         <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 3} className="p-1 bg-white/10 hover:bg-white/20 disabled:opacity-30 rounded text-white"><Icons.ZoomIn /></button>
                         {zoom > 1 && <button onClick={() => getZoomableWrapper()?._reset?.()} className="p-1 bg-white/10 hover:bg-white/20 rounded text-white"><Icons.Reset /></button>}
                         <div className="w-px h-4 bg-white/20 mx-1" />
-                        {status === 'live' && <button onClick={takeSnapshot} className="p-1 bg-white/10 hover:bg-white/20 rounded text-white"><Icons.Image /></button>}
+                        {status === 'live' && canCaptureSnapshot && <button onClick={takeSnapshot} className="p-1 bg-white/10 hover:bg-white/20 rounded text-white"><Icons.Image /></button>}
                         <button onClick={toggleFS} className="p-1 bg-white/10 hover:bg-white/20 rounded text-white"><Icons.Fullscreen /></button>
                     </div>
                 </div>
@@ -731,7 +866,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                         <span className="text-gray-900 dark:text-white text-xs w-12 text-center">{Math.round(zoom * 100)}%</span>
                         <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 3} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 disabled:opacity-30 rounded text-gray-900 dark:text-white"><Icons.ZoomIn /></button>
                         {zoom > 1 && <button onClick={() => getZoomableWrapper()?._reset?.()} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 rounded text-gray-900 dark:text-white"><Icons.Reset /></button>}
-                        {status === 'live' && (
+                        {status === 'live' && canCaptureSnapshot && (
                             <>
                                 <div className="w-px h-4 bg-gray-400 dark:bg-white/20 mx-1" />
                                 <button onClick={takeSnapshot} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 rounded text-gray-900 dark:text-white"><Icons.Image /></button>
@@ -799,7 +934,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                             </>
                         ) : (
                             <>
-                                <p className="text-white text-xs font-medium mb-1">Tidak Terkoneksi</p>
+                                <p className="text-white text-xs font-medium mb-1">{renderMode === 'unsupported' ? 'Format stream tidak didukung' : 'Tidak Terkoneksi'}</p>
                                 <p className="text-gray-400 text-[10px] mb-3">Kamera offline atau jaringan bermasalah</p>
                             </>
                         )}
