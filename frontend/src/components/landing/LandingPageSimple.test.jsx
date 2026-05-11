@@ -8,6 +8,7 @@
  * SideEffects: Renders into jsdom only.
  */
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import LandingPageSimple from './LandingPageSimple';
 
@@ -66,11 +67,15 @@ vi.mock('../SaweriaSupport', () => ({
     default: () => <div>saweria-support</div>,
 }));
 
+function renderWithRouter(ui) {
+    return render(<MemoryRouter>{ui}</MemoryRouter>);
+}
+
 describe('LandingPageSimple', () => {
     it('merender footer banner di bawah cameras section dan sebelum footer', async () => {
         const CamerasSection = () => <div data-testid="cameras-section">cameras</div>;
 
-        render(
+        renderWithRouter(
             <LandingPageSimple
                 onCameraClick={vi.fn()}
                 onAddMulti={vi.fn()}
@@ -119,7 +124,7 @@ describe('LandingPageSimple', () => {
     it('menampilkan ringkasan online dan offline di bagian atas mode simpel', async () => {
         const CamerasSection = () => <div data-testid="cameras-section">cameras</div>;
 
-        render(
+        renderWithRouter(
             <LandingPageSimple
                 onCameraClick={vi.fn()}
                 onAddMulti={vi.fn()}
@@ -154,7 +159,7 @@ describe('LandingPageSimple', () => {
     it('menampilkan discovery compact yang sama di mode simpel', () => {
         const CamerasSection = () => <div data-testid="cameras-section">cameras</div>;
 
-        render(
+        renderWithRouter(
             <LandingPageSimple
                 onCameraClick={vi.fn()}
                 onAddMulti={vi.fn()}
