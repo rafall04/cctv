@@ -94,6 +94,19 @@ describe('AdminLayout dark mode readability', () => {
         expect(playbackAnalyticsLink.getAttribute('href')).toBe('/admin/playback-analytics');
     });
 
+    it('menampilkan tautan notification diagnostics di navigasi utama', () => {
+        render(
+            <TestRouter initialEntries={['/admin/dashboard']}>
+                <AdminLayout>
+                    <div>Content</div>
+                </AdminLayout>
+            </TestRouter>
+        );
+
+        const diagnosticsLink = screen.getByRole('link', { name: /^Notification Diagnostics$/i });
+        expect(diagnosticsLink.getAttribute('href')).toBe('/admin/notification-diagnostics');
+    });
+
     it('menampilkan quick action admin sebagai bottom dock mobile yang responsif', () => {
         render(
             <TestRouter initialEntries={['/admin/dashboard']}>

@@ -7,6 +7,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { adminService } from '../../../services/adminService';
 import { areaService } from '../../../services/areaService';
 import { Skeleton } from '../../ui/Skeleton';
@@ -269,12 +270,20 @@ export default function TelegramSettingsPanel() {
                             <p className="text-sm text-gray-500 dark:text-gray-400">Notifikasi status kamera dan kritik saran</p>
                         </div>
                         {!isEditing && (
-                            <button
-                                onClick={() => setIsEditing(true)}
-                                className="px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-xl transition-colors"
-                            >
-                                Edit
-                            </button>
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                                <Link
+                                    to="/admin/notification-diagnostics"
+                                    className="inline-flex items-center rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                                >
+                                    Buka Notification Diagnostics
+                                </Link>
+                                <button
+                                    onClick={() => setIsEditing(true)}
+                                    className="px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-xl transition-colors"
+                                >
+                                    Edit
+                                </button>
+                            </div>
                         )}
                     </div>
                 </div>

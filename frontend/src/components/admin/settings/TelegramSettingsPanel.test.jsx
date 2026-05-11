@@ -2,6 +2,7 @@
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import TelegramSettingsPanel from './TelegramSettingsPanel';
 import { adminService } from '../../../services/adminService';
 import { areaService } from '../../../services/areaService';
@@ -46,6 +47,14 @@ const statusPayload = {
     notificationRuleIssues: [],
 };
 
+function renderPanel() {
+    return render(
+        <MemoryRouter>
+            <TelegramSettingsPanel />
+        </MemoryRouter>
+    );
+}
+
 describe('TelegramSettingsPanel', () => {
     beforeEach(() => {
         adminService.getTelegramStatus.mockResolvedValue({ success: true, data: statusPayload });
@@ -58,16 +67,17 @@ describe('TelegramSettingsPanel', () => {
     });
 
     it('shows custom-only camera monitoring as active', async () => {
-        render(<TelegramSettingsPanel />);
+        renderPanel();
 
         expect(await screen.findByText('Telegram Bot')).toBeTruthy();
+        expect(screen.getByRole('link', { name: /Buka Notification Diagnostics/i }).getAttribute('href')).toBe('/admin/notification-diagnostics');
         expect(screen.getByText('Multi Grup Monitoring')).toBeTruthy();
         expect(screen.getByText('Routing Policy')).toBeTruthy();
         expect(screen.getAllByText('AKTIF').length).toBeGreaterThan(0);
     });
 
     it('sends a test notification to a custom target', async () => {
-        render(<TelegramSettingsPanel />);
+        renderPanel();
 
         expect(await screen.findByText('Area Bojonegoro')).toBeTruthy();
         fireEvent.click(screen.getByRole('button', { name: 'Test Area Bojonegoro' }));
@@ -80,7 +90,7 @@ describe('TelegramSettingsPanel', () => {
     });
 
     it('saves the masked token unchanged so backend can preserve the full token', async () => {
-        render(<TelegramSettingsPanel />);
+        renderPanel();
 
         fireEvent.click(await screen.findByText('Edit'));
         fireEvent.click(screen.getByText('Simpan'));
@@ -93,7 +103,7 @@ describe('TelegramSettingsPanel', () => {
     });
 
     it('allows operators to disable online events for an area rule', async () => {
-        render(<TelegramSettingsPanel />);
+        renderPanel();
 
         fireEvent.click(await screen.findByText('Edit'));
         fireEvent.click(screen.getByLabelText('Online rule-area'));

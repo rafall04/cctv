@@ -221,5 +221,53 @@ export const adminService = {
                 message: error.response?.data?.message || 'Failed to send test notification'
             };
         }
+    },
+
+    async previewNotificationDiagnostics(payload) {
+        try {
+            const response = await apiClient.post('/api/admin/notification-diagnostics/preview', payload);
+            return response.data;
+        } catch (error) {
+            console.error('Preview notification diagnostics error:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to preview notification diagnostics',
+            };
+        }
+    },
+
+    async runNotificationDiagnosticsDrill(payload) {
+        try {
+            const response = await apiClient.post('/api/admin/notification-diagnostics/drill', payload);
+            return response.data;
+        } catch (error) {
+            console.error('Run notification diagnostics drill error:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to run notification diagnostics drill',
+            };
+        }
+    },
+
+    async getNotificationDiagnosticsRuns(params = {}) {
+        try {
+            const searchParams = new URLSearchParams();
+            Object.entries(params || {}).forEach(([key, value]) => {
+                if (value !== undefined && value !== null && value !== '') {
+                    searchParams.set(key, String(value));
+                }
+            });
+
+            const response = await apiClient.get(
+                `/api/admin/notification-diagnostics/runs${searchParams.toString() ? `?${searchParams.toString()}` : ''}`
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Get notification diagnostics runs error:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to load notification diagnostics runs',
+            };
+        }
     }
 };

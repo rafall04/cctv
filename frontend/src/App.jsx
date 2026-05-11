@@ -35,6 +35,7 @@ const FeedbackManagement = lazyWithRetry(() => import('./pages/FeedbackManagemen
 const ViewerAnalytics = lazyWithRetry(() => import('./pages/ViewerAnalytics'), 'viewer-analytics');
 const PlaybackAnalytics = lazyWithRetry(() => import('./pages/PlaybackAnalytics'), 'playback-analytics');
 const PlaybackTokenManagement = lazyWithRetry(() => import('./pages/PlaybackTokenManagement'), 'playback-token-management');
+const NotificationDiagnostics = lazyWithRetry(() => import('./pages/NotificationDiagnostics'), 'notification-diagnostics');
 const UnifiedSettings = lazyWithRetry(() => import('./pages/UnifiedSettings'), 'unified-settings');
 const Dashboard = lazyWithRetry(() => import('./pages/Dashboard'), 'dashboard');
 const SponsorManagement = lazyWithRetry(() => import('./pages/SponsorManagement'), 'sponsor-management');
@@ -176,6 +177,14 @@ function App() {
                     element={
                         <AdminPageRoute>
                             <PlaybackTokenManagement />
+                        </AdminPageRoute>
+                    }
+                />
+                <Route
+                    path="/admin/notification-diagnostics"
+                    element={
+                        <AdminPageRoute>
+                            <NotificationDiagnostics />
                         </AdminPageRoute>
                     }
                 />
