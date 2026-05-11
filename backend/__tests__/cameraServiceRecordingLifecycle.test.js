@@ -18,6 +18,7 @@ const restartRecordingMock = vi.fn();
 const startRecordingMock = vi.fn();
 const stopRecordingMock = vi.fn();
 const clearCameraRuntimeStateMock = vi.fn();
+const upsertRuntimeStateMock = vi.fn();
 
 vi.mock('../database/connectionPool.js', () => ({
     query: queryMock,
@@ -31,6 +32,7 @@ vi.mock('../services/mediaMtxService.js', () => ({
         updateCameraPath: updateCameraPathMock,
         refreshCameraPathAfterSourceChange: refreshCameraPathAfterSourceChangeMock,
         removeCameraPathByKey: removeCameraPathByKeyMock,
+        getPathConfig: vi.fn().mockResolvedValue({ source: 'rtsp://user:pass@10.0.0.8/stream1' }),
     },
 }));
 
@@ -79,6 +81,7 @@ vi.mock('../services/cameraHealthService.js', () => ({
 vi.mock('../services/cameraRuntimeStateService.js', () => ({
     default: {
         updateState: vi.fn(),
+        upsertRuntimeState: upsertRuntimeStateMock,
     },
 }));
 
@@ -130,7 +133,7 @@ async function runUpdate(payload, existing = createExistingCamera()) {
         return null;
     });
     const cameraService = (await import('../services/cameraService.js')).default;
-    await cameraService.updateCamera(7, payload, {
+    return cameraService.updateCamera(7, payload, {
         user: { id: 3, username: 'admin' },
         ip: '127.0.0.1',
     });
@@ -150,7 +153,7 @@ describe('cameraService.updateCamera recording lifecycle reconciliation', () => 
     });
 
     it('restarts active recording after RTSP URL changes', async () => {
-        await runUpdate({ private_rtsp_url: 'rtsp://user:pass@10.0.0.8/stream1' });
+        const result = await runUpdate({ private_rtsp_url: 'rtsp://user:pass@10.0.0.8/stream1' });
 
         expect(refreshCameraPathAfterSourceChangeMock).toHaveBeenCalledWith(
             'stream-key-7',
@@ -159,6 +162,17 @@ describe('cameraService.updateCamera recording lifecycle reconciliation', () => 
         );
         expect(updateCameraPathMock).not.toHaveBeenCalled();
         expect(clearCameraRuntimeStateMock).toHaveBeenCalledWith(7, 'stream-key-7');
+        expect(upsertRuntimeStateMock).toHaveBeenCalledWith(7, expect.objectContaining({
+            monitoring_state: 'reconnecting',
+        }));
+        expect(result).toMatchObject({
+            cameraId: 7,
+            sourceLifecycle: {
+                sourceChanged: true,
+                status: 'refreshed',
+                reason: 'camera_update',
+            },
+        });
         expect(restartRecordingMock).toHaveBeenCalledWith(7, 'camera_source_updated');
         expect(startRecordingMock).not.toHaveBeenCalled();
         expect(stopRecordingMock).not.toHaveBeenCalled();

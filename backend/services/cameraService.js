@@ -21,6 +21,7 @@ import { cacheGetOrSetSync, cacheInvalidate, cacheKey, CacheNamespace } from './
 import { sanitizeCameraThumbnail, sanitizeCameraThumbnailList } from './thumbnailPathService.js';
 import cameraHealthService from './cameraHealthService.js';
 import cameraRuntimeStateService from './cameraRuntimeStateService.js';
+import cameraSourceLifecycleService from './cameraSourceLifecycleService.js';
 import {
     DELIVERY_TYPES,
     DELIVERY_TYPE_PATTERNS,
@@ -1659,6 +1660,7 @@ class CameraService {
 
         const existingCamera = queryOne(
             `SELECT id, name, private_rtsp_url, area_id, enabled, stream_key, enable_recording, video_codec, stream_source,
+                    stream_revision, source_updated_at,
                     delivery_type, external_hls_url, external_stream_url, external_embed_url,
                     external_snapshot_url,
                     CASE
@@ -1920,19 +1922,7 @@ class CameraService {
         const updatedCamera = resolveUpdatedCameraSnapshot(existingCamera, data, deliveryConfig);
         const currentDeliveryType = deliveryConfig.deliveryType;
         const newEnabled = updatedCamera.enabled;
-        const newRtspUrl = updatedCamera.private_rtsp_url;
-        const newAreaId = area_id !== undefined ? area_id : existingCamera.area_id;
-        const rtspChanged = private_rtsp_url !== undefined && private_rtsp_url !== existingCamera.private_rtsp_url;
-        const enabledChanged = enabled !== undefined && boolEnabled(enabled) !== boolEnabled(existingCamera.enabled);
-        const rtspTransportChanged = internal_rtsp_transport_override !== undefined
-            && normalizeInternalRtspTransport(internal_rtsp_transport_override) !== existingCamera.internal_rtsp_transport_override;
         const recordingSourceChanged = didRecordingSourceChange(existingCamera, updatedCamera, data);
-        const deliveryChanged = String(existingCamera.delivery_type ?? '') !== String(updatedCamera.delivery_type ?? '');
-        const streamSourceChanged = String(existingCamera.stream_source ?? '') !== String(updatedCamera.stream_source ?? '');
-        const codecChanged = String(existingCamera.video_codec ?? '') !== String(updatedCamera.video_codec ?? '');
-        const requiresStreamRuntimeRefresh = currentDeliveryType === 'internal_hls'
-            && boolEnabled(newEnabled)
-            && (rtspChanged || rtspTransportChanged || deliveryChanged || streamSourceChanged || codecChanged);
 
         // If stream source changed to external, remove MediaMTX path
         if (currentDeliveryType !== 'internal_hls') {
@@ -1947,37 +1937,37 @@ class CameraService {
             } catch (err) {
                 console.error('MediaMTX remove path error:', err.message);
             }
-        } else if (requiresStreamRuntimeRefresh || (enabledChanged && newEnabled)) {
-            try {
-                const areaPolicy = getAreaInternalPolicy(newAreaId);
-                const pathCamera = {
-                    ...existingCamera,
-                    internal_ingest_policy_override: internal_ingest_policy_override !== undefined
-                        ? normalizeInternalIngestPolicy(internal_ingest_policy_override)
-                        : existingCamera.internal_ingest_policy_override,
-                    internal_on_demand_close_after_seconds_override: internal_on_demand_close_after_seconds_override !== undefined
-                        ? normalizeOnDemandCloseAfterSeconds(internal_on_demand_close_after_seconds_override, null)
-                        : existingCamera.internal_on_demand_close_after_seconds_override,
-                    internal_rtsp_transport_override: internal_rtsp_transport_override !== undefined
-                        ? normalizeInternalRtspTransport(internal_rtsp_transport_override)
-                        : existingCamera.internal_rtsp_transport_override,
-                    _areaPolicy: areaPolicy,
-                    source_profile: source_profile !== undefined ? (source_profile || null) : existingCamera.source_profile,
-                    private_rtsp_url: newRtspUrl,
-                };
-                const mtxResult = requiresStreamRuntimeRefresh
-                    ? await mediaMtxService.refreshCameraPathAfterSourceChange(streamKey, newRtspUrl, pathCamera)
-                    : await mediaMtxService.updateCameraPath(streamKey, newRtspUrl, pathCamera);
-                if (requiresStreamRuntimeRefresh) {
-                    cameraHealthService.clearCameraRuntimeState(parseInt(id, 10), streamKey);
-                }
-                if (!mtxResult.success) {
-                    console.error(`[Camera] Failed to update MediaMTX path for camera ${id}:`, mtxResult.error);
-                }
-            } catch (err) {
-                console.error('MediaMTX update path error:', err.message);
-            }
         }
+
+        const sourceLifecycle = await cameraSourceLifecycleService.handleCameraUpdated({
+            existingCamera,
+            updatedCamera: {
+                ...updatedCamera,
+                stream_key: streamKey,
+                area_id: area_id !== undefined ? area_id : existingCamera.area_id,
+                internal_ingest_policy_override: internal_ingest_policy_override !== undefined
+                    ? normalizeInternalIngestPolicy(internal_ingest_policy_override)
+                    : existingCamera.internal_ingest_policy_override,
+                internal_on_demand_close_after_seconds_override: internal_on_demand_close_after_seconds_override !== undefined
+                    ? normalizeOnDemandCloseAfterSeconds(internal_on_demand_close_after_seconds_override, null)
+                    : existingCamera.internal_on_demand_close_after_seconds_override,
+                internal_rtsp_transport_override: internal_rtsp_transport_override !== undefined
+                    ? normalizeInternalRtspTransport(internal_rtsp_transport_override)
+                    : existingCamera.internal_rtsp_transport_override,
+                _areaPolicy: getAreaInternalPolicy(area_id !== undefined ? area_id : existingCamera.area_id),
+                source_profile: source_profile !== undefined ? (source_profile || null) : existingCamera.source_profile,
+            },
+            patch: {
+                ...data,
+                delivery_type: updatedCamera.delivery_type,
+                stream_source: updatedCamera.stream_source,
+                internal_rtsp_transport_override: updatedCamera.internal_rtsp_transport_override,
+                enabled: updatedCamera.enabled,
+                video_codec: updatedCamera.video_codec,
+                private_rtsp_url: updatedCamera.private_rtsp_url,
+            },
+            reason: 'camera_update',
+        });
 
         const oldShouldRecord = shouldRecordingBeActive(existingCamera);
         const nextShouldRecord = shouldRecordingBeActive(updatedCamera);
@@ -2012,6 +2002,11 @@ class CameraService {
                 }
             }
         }
+
+        return {
+            cameraId: parseInt(id, 10),
+            sourceLifecycle,
+        };
     }
 
     async deleteCamera(id, request) {
