@@ -574,11 +574,11 @@ class PlaybackTokenService {
         const rawRules = Array.isArray(payload.camera_rules)
             ? payload.camera_rules
             : existing.camera_ids.map((cameraId) => ({ camera_id: cameraId, enabled: true }));
-        const normalizedRules = scopeType === 'selected' || rawRules.length > 0
-            ? playbackTokenRuleService.replaceRulesForToken(normalizedTokenId, rawRules)
+        const candidateRules = scopeType === 'selected' || rawRules.length > 0
+            ? playbackTokenRuleService.normalizeRules(rawRules)
             : [];
         const cameraIds = scopeType === 'selected'
-            ? normalizedRules.filter((rule) => rule.enabled).map((rule) => rule.camera_id)
+            ? candidateRules.filter((rule) => rule.enabled).map((rule) => rule.camera_id)
             : [];
 
         if (scopeType === 'selected' && cameraIds.length === 0) {
@@ -586,6 +586,10 @@ class PlaybackTokenService {
             err.statusCode = 400;
             throw err;
         }
+
+        const normalizedRules = candidateRules.length > 0 || scopeType === 'selected'
+            ? playbackTokenRuleService.replaceRulesForToken(normalizedTokenId, candidateRules)
+            : [];
 
         execute(
             `UPDATE playback_tokens

@@ -531,6 +531,47 @@ describe('playbackTokenService', () => {
         );
     });
 
+    it('does not replace existing camera rules when selected update payload is invalid', async () => {
+        vi.spyOn(connectionPool, 'execute').mockReturnValue({ changes: 1 });
+        vi.spyOn(connectionPool, 'queryOne').mockReturnValueOnce({
+            id: 52,
+            label: 'Token Terpilih',
+            token_prefix: 'rafpb_safe',
+            share_key_prefix: 'SAFE1234',
+            preset: 'trial_3d',
+            scope_type: 'selected',
+            camera_ids_json: '[1,2]',
+            playback_window_hours: 72,
+            expires_at: '2026-05-08 12:00:00',
+            revoked_at: null,
+            last_used_at: null,
+            use_count: 8,
+            max_active_sessions: 1,
+            session_limit_mode: 'strict',
+            session_timeout_seconds: 60,
+            client_note: '',
+            share_template: null,
+            created_by: 1,
+            created_at: '2026-05-05 12:00:00',
+            updated_at: '2026-05-05 12:00:00',
+        });
+        const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
+
+        expect(() => playbackTokenService.updateTokenSettings(52, {
+            scope_type: 'selected',
+            camera_rules: [],
+        }, { user: { id: 3 }, headers: {} })).toThrow('Pilih minimal satu kamera untuk scope selected');
+
+        expect(connectionPool.execute).not.toHaveBeenCalledWith(
+            expect.stringContaining('DELETE FROM playback_token_camera_rules'),
+            expect.any(Array)
+        );
+        expect(connectionPool.execute).not.toHaveBeenCalledWith(
+            expect.stringContaining('UPDATE playback_tokens'),
+            expect.any(Array)
+        );
+    });
+
     it('lists recent audit logs with one bounded joined query', async () => {
         vi.spyOn(connectionPool, 'query').mockReturnValue([
             {
