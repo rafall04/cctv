@@ -94,6 +94,69 @@ function Playback({
         const saved = localStorage.getItem('playback-autoplay-enabled');
         return saved !== null ? saved === 'true' : true;
     });
+    const playbackCameras = useMemo(() => cameras.filter((camera) => getStreamCapabilities(camera).playback), [cameras]);
+    const updatePlaybackSearchParams = useCallback(({
+        camera,
+        cameraId,
+        timestamp,
+        replace = false,
+        stripAccessParams = false,
+    }) => {
+        setSearchParams((previous) => {
+            const next = buildPlaybackSearchParams({
+                currentParams: previous,
+                camera: camera ? createCameraSlug(camera) : cameraId,
+                timestamp,
+            });
+            const nextMode = next.get('mode');
+
+            if (stripAccessParams) {
+                next.delete('token');
+                next.delete('share');
+            }
+
+            if (!nextMode || !['full', 'simple'].includes(nextMode)) {
+                next.set('mode', 'full');
+            }
+
+            next.set('view', 'playback');
+
+            return next;
+        }, { replace });
+    }, [setSearchParams]);
+    const selectTokenDefaultCamera = useCallback((tokenData) => {
+        if (isAdminPlayback || !tokenData) {
+            return selectedCameraId;
+        }
+
+        const allowedIds = Array.isArray(tokenData.allowed_camera_ids)
+            ? tokenData.allowed_camera_ids
+                .map((cameraId) => Number.parseInt(cameraId, 10))
+                .filter((cameraId) => Number.isInteger(cameraId) && cameraId > 0)
+            : [];
+        const defaultCameraId = Number.parseInt(tokenData.default_camera_id, 10);
+        const targetCameraId = Number.isInteger(defaultCameraId) && defaultCameraId > 0
+            ? defaultCameraId
+            : allowedIds[0];
+        const targetCamera = playbackCameras.find((camera) => camera.id === targetCameraId);
+
+        if (!targetCamera) {
+            updatePlaybackSearchParams({
+                cameraId: selectedCameraId,
+                replace: true,
+                stripAccessParams: true,
+            });
+            return selectedCameraId;
+        }
+
+        setSelectedCameraId(targetCamera.id);
+        updatePlaybackSearchParams({
+            camera: targetCamera,
+            replace: true,
+            stripAccessParams: true,
+        });
+        return targetCamera.id;
+    }, [isAdminPlayback, playbackCameras, selectedCameraId, updatePlaybackSearchParams]);
     const {
         segments,
         segmentsCameraId,
@@ -122,7 +185,10 @@ function Playback({
         searchParams,
         setSearchParams,
         cameraId: selectedCameraId,
-        onActivated: () => reloadSegments(selectedCameraId, { mode: 'initial' }),
+        onActivated: (tokenData) => {
+            const targetCameraId = selectTokenDefaultCamera(tokenData);
+            reloadSegments(targetCameraId || selectedCameraId, { mode: 'initial' });
+        },
         onCleared: () => reloadSegments(selectedCameraId, { mode: 'initial' }),
     });
     const loading = camerasLoading;
@@ -147,7 +213,6 @@ function Playback({
     const autoPlayEnabledRef = useRef(autoPlayEnabled);
     const selectedCameraIdRef = useRef(selectedCameraId);
 
-    const playbackCameras = useMemo(() => cameras.filter((camera) => getStreamCapabilities(camera).playback), [cameras]);
     const visiblePlaybackCameras = useMemo(() => {
         if (isAdminPlayback || tokenStatus?.scope_type !== 'selected' || !Array.isArray(allowedCameraIds)) {
             return playbackCameras;
@@ -239,38 +304,19 @@ function Playback({
         const firstAllowedCamera = playbackCameras.find((camera) => allowedIds.has(camera.id));
         if (firstAllowedCamera) {
             setSelectedCameraId(firstAllowedCamera.id);
+            updatePlaybackSearchParams({
+                camera: firstAllowedCamera,
+                replace: true,
+                stripAccessParams: true,
+            });
         }
-    }, [allowedCameraIds, isAdminPlayback, playbackCameras, selectedCameraId, tokenStatus]);
+    }, [allowedCameraIds, isAdminPlayback, playbackCameras, selectedCameraId, tokenStatus, updatePlaybackSearchParams]);
 
     useEffect(() => {
         if (!showPlaybackPopunder) {
             queuedPlaybackPopunderRef.current = null;
         }
     }, [showPlaybackPopunder]);
-
-    const updatePlaybackSearchParams = useCallback(({
-        camera,
-        cameraId,
-        timestamp,
-        replace = false,
-    }) => {
-        setSearchParams((previous) => {
-            const next = buildPlaybackSearchParams({
-                currentParams: previous,
-                camera: camera ? createCameraSlug(camera) : cameraId,
-                timestamp,
-            });
-            const nextMode = next.get('mode');
-
-            if (!nextMode || !['full', 'simple'].includes(nextMode)) {
-                next.set('mode', 'full');
-            }
-
-            next.set('view', 'playback');
-
-            return next;
-        }, { replace });
-    }, [setSearchParams]);
 
     const resetBufferingTimeout = useCallback(() => {
         if (bufferingTimeoutRef.current) {

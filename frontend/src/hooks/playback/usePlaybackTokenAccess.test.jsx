@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /*
- * Purpose: Verify public playback token activation exposes camera entitlement metadata.
+ * Purpose: Verify public playback token activation exposes camera entitlement metadata without owning route cleanup.
  * Caller: Frontend Vitest suite for playback token access hook.
  * Deps: React Testing Library renderHook and mocked playbackTokenService.
  * MainFuncs: usePlaybackTokenAccess.
@@ -59,6 +59,6 @@ describe('usePlaybackTokenAccess', () => {
             allowed_camera_ids: [3],
         }));
         expect(playbackTokenService.activateShareKey).toHaveBeenCalledWith('CLIENT88', 3, expect.any(String));
-        expect(setSearchParams).toHaveBeenCalledWith(expect.any(Function), { replace: true });
+        expect(setSearchParams).not.toHaveBeenCalled();
     });
 });

@@ -27,6 +27,17 @@ const {
     stopPlaybackViewerSessionMock: vi.fn(),
     stopAllPlaybackViewerSessionsMock: vi.fn(),
 }));
+const {
+    activateTokenMock,
+    activateShareKeyMock,
+    heartbeatTokenMock,
+    clearTokenMock,
+} = vi.hoisted(() => ({
+    activateTokenMock: vi.fn(),
+    activateShareKeyMock: vi.fn(),
+    heartbeatTokenMock: vi.fn(),
+    clearTokenMock: vi.fn(),
+}));
 
 vi.mock('../services/recordingService', () => ({
     default: {
@@ -40,6 +51,15 @@ vi.mock('../services/playbackViewerService', () => ({
         startSession: startPlaybackViewerSessionMock,
         stopSession: stopPlaybackViewerSessionMock,
         stopAllSessions: stopAllPlaybackViewerSessionsMock,
+    },
+}));
+
+vi.mock('../services/playbackTokenService.js', () => ({
+    default: {
+        activateToken: activateTokenMock,
+        activateShareKey: activateShareKeyMock,
+        heartbeatToken: heartbeatTokenMock,
+        clearToken: clearTokenMock,
     },
 }));
 
@@ -158,6 +178,10 @@ describe('Playback', () => {
         startPlaybackViewerSessionMock.mockReset();
         stopPlaybackViewerSessionMock.mockReset();
         stopAllPlaybackViewerSessionsMock.mockReset();
+        activateTokenMock.mockReset();
+        activateShareKeyMock.mockReset();
+        heartbeatTokenMock.mockReset();
+        clearTokenMock.mockReset();
         localStorage.clear();
         getSegments.mockResolvedValue({
             success: true,
@@ -169,6 +193,10 @@ describe('Playback', () => {
         startPlaybackViewerSessionMock.mockResolvedValue('playback-session-1');
         stopPlaybackViewerSessionMock.mockResolvedValue(undefined);
         stopAllPlaybackViewerSessionsMock.mockResolvedValue(undefined);
+        activateTokenMock.mockResolvedValue({ success: false, message: 'Token tidak valid' });
+        activateShareKeyMock.mockResolvedValue({ success: false, message: 'Share tidak valid' });
+        heartbeatTokenMock.mockResolvedValue({ success: true });
+        clearTokenMock.mockResolvedValue({ success: true });
 
         Object.defineProperty(HTMLMediaElement.prototype, 'paused', {
             configurable: true,
@@ -293,6 +321,82 @@ describe('Playback', () => {
         );
 
         expect(await screen.findByText(/20 menit awal/i)).toBeTruthy();
+    });
+
+    it('memilih otomatis CCTV yang diizinkan setelah token manual diaktifkan', async () => {
+        activateTokenMock.mockResolvedValueOnce({
+            success: true,
+            data: {
+                id: 99,
+                scope_type: 'selected',
+                allowed_camera_ids: [2],
+                camera_rules: [{ camera_id: 2, enabled: true }],
+                default_camera_id: 2,
+            },
+        });
+
+        render(
+            <TestRouter initialEntries={['/playback?mode=full&view=playback&cam=1']}>
+                <LocationProbe />
+                <Playback
+                    cameras={[
+                        { id: 1, name: 'Lobby', enable_recording: 1 },
+                        { id: 2, name: 'Gate', enable_recording: 1 },
+                    ]}
+                />
+            </TestRouter>
+        );
+
+        fireEvent.change(screen.getByPlaceholderText('Masukkan token akses'), {
+            target: { value: 'SANDI1234' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Aktifkan' }));
+
+        await waitFor(() => {
+            expect(activateTokenMock).toHaveBeenCalledWith('SANDI1234', null, expect.any(String));
+        });
+        await waitFor(() => {
+            expect(getSegments).toHaveBeenCalledWith(2, 'blocking', {}, 'public_preview');
+        });
+        await waitFor(() => {
+            expect(screen.getByTestId('location-search').textContent).toContain('cam=2');
+        });
+    });
+
+    it('memilih otomatis CCTV default dari share link tanpa parameter cam', async () => {
+        activateShareKeyMock.mockResolvedValueOnce({
+            success: true,
+            data: {
+                id: 100,
+                scope_type: 'selected',
+                allowed_camera_ids: [2],
+                camera_rules: [{ camera_id: 2, enabled: true }],
+                default_camera_id: 2,
+            },
+        });
+
+        render(
+            <TestRouter initialEntries={['/playback?share=SANDI1234']}>
+                <LocationProbe />
+                <Playback
+                    cameras={[
+                        { id: 1, name: 'Lobby', enable_recording: 1 },
+                        { id: 2, name: 'Gate', enable_recording: 1 },
+                    ]}
+                />
+            </TestRouter>
+        );
+
+        await waitFor(() => {
+            expect(activateShareKeyMock).toHaveBeenCalledWith('SANDI1234', 1, expect.any(String));
+        });
+        await waitFor(() => {
+            expect(getSegments).toHaveBeenCalledWith(2, 'blocking', {}, 'public_preview');
+        });
+        await waitFor(() => {
+            expect(screen.getByTestId('location-search').textContent).toContain('cam=2');
+            expect(screen.getByTestId('location-search').textContent).not.toContain('share=');
+        });
     });
 
     it('stall awal tidak langsung me-reload video dan timeout dibersihkan saat playback pulih', async () => {

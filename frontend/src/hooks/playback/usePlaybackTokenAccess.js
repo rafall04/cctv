@@ -1,9 +1,9 @@
 /*
- * Purpose: Coordinate public playback token/share-key activation from URL/manual input and cleanup.
+ * Purpose: Coordinate public playback token/share-key activation from URL/manual input.
  * Caller: Playback page.
  * Deps: React hooks and playbackTokenService.
  * MainFuncs: usePlaybackTokenAccess.
- * SideEffects: Activates HttpOnly playback token/session cookies, sends session heartbeat, and rewrites URL token parameter.
+ * SideEffects: Activates HttpOnly playback token/session cookies and sends session heartbeat.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -32,7 +32,6 @@ function getOrCreateClientId() {
 export function usePlaybackTokenAccess({
     enabled,
     searchParams,
-    setSearchParams,
     cameraId,
     onActivated,
     onCleared,
@@ -42,7 +41,7 @@ export function usePlaybackTokenAccess({
     const [tokenMessage, setTokenMessage] = useState('');
     const [isTokenBusy, setIsTokenBusy] = useState(false);
 
-    const activateToken = useCallback(async (rawToken, { silent = false, mode = 'token' } = {}) => {
+    const activateToken = useCallback(async (rawToken, { silent = false, mode = 'token', cameraIdOverride = null } = {}) => {
         const token = String(rawToken || '').trim();
         if (!enabled || !token) {
             return false;
@@ -52,8 +51,8 @@ export function usePlaybackTokenAccess({
         setTokenMessage(silent ? '' : 'Mengaktifkan token...');
         try {
             const response = mode === 'share'
-                ? await playbackTokenService.activateShareKey(token, cameraId, getOrCreateClientId())
-                : await playbackTokenService.activateToken(token, cameraId, getOrCreateClientId());
+                ? await playbackTokenService.activateShareKey(token, cameraIdOverride, getOrCreateClientId())
+                : await playbackTokenService.activateToken(token, cameraIdOverride, getOrCreateClientId());
             if (!response?.success) {
                 setTokenMessage(response?.message || 'Token tidak valid');
                 return false;
@@ -71,7 +70,7 @@ export function usePlaybackTokenAccess({
         } finally {
             setIsTokenBusy(false);
         }
-    }, [cameraId, enabled, onActivated]);
+    }, [enabled, onActivated]);
 
     const clearToken = useCallback(async () => {
         if (!enabled) {
@@ -103,15 +102,8 @@ export function usePlaybackTokenAccess({
             return;
         }
 
-        activateToken(accessValue, { silent: true, mode: urlShareKey ? 'share' : 'token' }).then(() => {
-            setSearchParams((current) => {
-                const next = new URLSearchParams(current);
-                next.delete('token');
-                next.delete('share');
-                return next;
-            }, { replace: true });
-        });
-    }, [activateToken, enabled, searchParams, setSearchParams]);
+        activateToken(accessValue, { silent: true, mode: urlShareKey ? 'share' : 'token', cameraIdOverride: cameraId });
+    }, [activateToken, cameraId, enabled, searchParams]);
 
     useEffect(() => {
         if (!enabled || !tokenStatus) {
