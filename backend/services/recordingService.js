@@ -1049,81 +1049,15 @@ class RecordingService {
      */
     async cleanupTempFiles() {
         try {
-            console.log('[Cleanup] Scanning for temp files...');
+            console.log('[Cleanup] Delegating temp cleanup to shared recording cleanup service...');
 
             try { await fsPromises.access(RECORDINGS_BASE_PATH); } catch { return; }
 
             const cameraDirs = await fsPromises.readdir(RECORDINGS_BASE_PATH);
-            let cleanedCount = 0;
-            let dbCleanedCount = 0;
-
             for (const cameraDir of cameraDirs) {
-                const fullPath = join(RECORDINGS_BASE_PATH, cameraDir);
-                try {
-                    const st = await fsPromises.stat(fullPath);
-                    if (!st.isDirectory()) continue;
-                } catch { continue; }
-
-                // Extract camera ID from directory name (e.g., "camera1" -> 1)
-                const cameraIdMatch = cameraDir.match(/camera(\d+)/);
+                const cameraIdMatch = cameraDir.match(/^camera(\d+)$/);
                 if (!cameraIdMatch) continue;
-                const cameraId = parseInt(cameraIdMatch[1]);
-
-                const files = await fsPromises.readdir(fullPath);
-                for (const file of files) {
-                    // CRITICAL FIX: ONLY delete .temp.mp4 or .remux.mp4 files
-                    // NEVER delete actual recording files (YYYYMMDD_HHMMSS.mp4)
-                    if (file.includes('.temp.mp4') || file.includes('.remux.mp4')) {
-                        const filePath = join(fullPath, file);
-
-                        try {
-                            // Additional safety: check file age (at least 5 minutes old)
-                            const stats = await fsPromises.stat(filePath);
-                            const fileAge = Date.now() - stats.mtimeMs;
-
-                            if (fileAge > 5 * 60 * 1000) {
-                                await fsPromises.unlink(filePath);
-                                cleanedCount++;
-                                console.log(`[Cleanup] Deleted temp file: ${cameraDir}/${file} (age: ${Math.round(fileAge / 60000)}min)`);
-                            }
-                        } catch (statErr) {
-                            // File may have been deleted by another process
-                        }
-                    }
-                }
-
-                // CRITICAL FIX: Only cleanup database entries for TEMP files or very old missing files
-                const dbSegments = query(
-                    'SELECT * FROM recording_segments WHERE camera_id = ?',
-                    [cameraId]
-                );
-
-                for (const segment of dbSegments) {
-                    // SAFETY: Only cleanup entries older than 30 minutes (was 5 minutes)
-                    const segmentAge = Date.now() - new Date(segment.start_time || 0).getTime();
-                    const isVeryOld = segmentAge > 30 * 60 * 1000; // 30 minutes
-
-                    let fileExists = true;
-                    try { await fsPromises.access(segment.file_path); } catch { fileExists = false; }
-
-                    // Only delete DB entries for:
-                    // 1. Temp files (.temp.mp4 or .remux.mp4 in filename)
-                    // 2. Very old entries (30+ minutes) where file doesn't exist
-                    if (segment.filename.includes('.temp.mp4') ||
-                        segment.filename.includes('.remux.mp4') ||
-                        (isVeryOld && !fileExists)) {
-
-                        execute('DELETE FROM recording_segments WHERE id = ?', [segment.id]);
-                        dbCleanedCount++;
-                        console.log(`[Cleanup] Deleted DB entry: ${segment.filename} (age: ${Math.round(segmentAge / 60000)}min, file exists: ${fileExists})`);
-                    }
-                }
-            }
-
-            if (cleanedCount > 0 || dbCleanedCount > 0) {
-                console.log(`[Cleanup] ✓ Cleaned up ${cleanedCount} temp files and ${dbCleanedCount} DB entries`);
-            } else {
-                console.log('[Cleanup] No temp files or orphaned DB entries found');
+                await this.cleanupOldSegments(parseInt(cameraIdMatch[1], 10));
             }
         } catch (error) {
             console.error('[Cleanup] Error cleaning temp files:', error);

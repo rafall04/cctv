@@ -12,9 +12,17 @@ import {
     describeRecordingRetentionDecision,
     isSafeRecordingFilename,
 } from './recordingRetentionPolicy.js';
-import { isFinalSegmentFilename } from './recordingSegmentFilePolicy.js';
+import {
+    isFinalSegmentFilename,
+    isTempSegmentFilename,
+} from './recordingSegmentFilePolicy.js';
 
 const NORMAL_DELETE_BATCH_SIZE = 6;
+const TEMP_FILE_MIN_AGE_MS = 5 * 60 * 1000;
+
+function canDeleteTempFile({ filename, fileMtimeMs, nowMs }) {
+    return isTempSegmentFilename(filename) && (nowMs - fileMtimeMs) > TEMP_FILE_MIN_AGE_MS;
+}
 
 function createEmptyResult() {
     return {
@@ -118,6 +126,33 @@ export function createRecordingCleanupService({
                 stats = await fs.stat(filePath);
             } catch {
                 result.failed++;
+                continue;
+            }
+
+            if (canDeleteTempFile({ filename, fileMtimeMs: stats.mtimeMs, nowMs })) {
+                const deleteResult = await safeDelete({
+                    cameraId,
+                    filename,
+                    filePath,
+                    reason: 'temp_file_expired',
+                });
+
+                if (!deleteResult.success) {
+                    if (deleteResult.reason === 'unsafe_path') {
+                        result.unsafeSkipped++;
+                    } else {
+                        result.failed++;
+                    }
+                    continue;
+                }
+
+                result.orphanDeleted++;
+                result.deletedBytes += deleteResult.size || 0;
+                continue;
+            }
+
+            if (isTempSegmentFilename(filename)) {
+                logger.log?.(`[Cleanup] Keeping recent temp recording: camera${cameraId}/${filename}`);
                 continue;
             }
 

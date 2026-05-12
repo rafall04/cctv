@@ -221,6 +221,47 @@ describe('recordingCleanupService', () => {
         expect(result.orphanDeleted).toBe(1);
     });
 
+    it('deletes expired temp files through the shared safe delete path', async () => {
+        fsMock.readdir.mockResolvedValueOnce(['20260502_095800.tmp.mp4']);
+        repositoryMock.findExistingFilenames.mockReturnValueOnce([]);
+        fsMock.stat.mockResolvedValueOnce({
+            size: 2048,
+            mtimeMs: Date.parse('2026-05-02T09:50:00.000Z'),
+        });
+
+        const service = createService();
+        const result = await service.cleanupCamera({
+            cameraId: 7,
+            camera: { recording_duration_hours: 5, name: 'Camera 7' },
+            nowMs: Date.parse('2026-05-02T10:00:00.000Z'),
+        });
+
+        expect(safeDeleteMock).toHaveBeenCalledWith(expect.objectContaining({
+            filename: '20260502_095800.tmp.mp4',
+            reason: 'temp_file_expired',
+        }));
+        expect(result.orphanDeleted).toBe(1);
+    });
+
+    it('keeps recent temp files to avoid racing active remux work', async () => {
+        fsMock.readdir.mockResolvedValueOnce(['20260502_095800.tmp.mp4']);
+        repositoryMock.findExistingFilenames.mockReturnValueOnce([]);
+        fsMock.stat.mockResolvedValueOnce({
+            size: 2048,
+            mtimeMs: Date.parse('2026-05-02T09:59:00.000Z'),
+        });
+
+        const service = createService();
+        const result = await service.cleanupCamera({
+            cameraId: 7,
+            camera: { recording_duration_hours: 5, name: 'Camera 7' },
+            nowMs: Date.parse('2026-05-02T10:00:00.000Z'),
+        });
+
+        expect(safeDeleteMock).not.toHaveBeenCalled();
+        expect(result.orphanDeleted).toBe(0);
+    });
+
     it('does not require loading every DB filename to process orphan cleanup', async () => {
         repositoryMock.findExistingFilenames.mockReturnValueOnce([]);
         fsMock.readdir.mockResolvedValueOnce(['20260502_095800.mp4', 'ignore.txt']);
