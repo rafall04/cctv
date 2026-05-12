@@ -37,19 +37,27 @@ describe('usePlaybackTokenAccess', () => {
                 scope_type: 'selected',
                 allowed_camera_ids: [3],
                 camera_rules: [{ camera_id: 3, enabled: true, playback_window_hours: 24 }],
+                default_camera_id: 3,
             },
         });
+        const onActivated = vi.fn();
 
         const { result } = renderHook(() => usePlaybackTokenAccess({
             enabled: true,
             searchParams: new URLSearchParams('cam=3&share=CLIENT88'),
             setSearchParams,
             cameraId: 3,
+            onActivated,
         }));
 
         await waitFor(() => expect(result.current.tokenStatus?.allowed_camera_ids).toEqual([3]));
         expect(result.current.allowedCameraIds).toEqual([3]);
         expect(result.current.cameraRules).toEqual([{ camera_id: 3, enabled: true, playback_window_hours: 24 }]);
+        expect(result.current.defaultCameraId).toBe(3);
+        expect(onActivated).toHaveBeenCalledWith(expect.objectContaining({
+            default_camera_id: 3,
+            allowed_camera_ids: [3],
+        }));
         expect(playbackTokenService.activateShareKey).toHaveBeenCalledWith('CLIENT88', 3, expect.any(String));
         expect(setSearchParams).toHaveBeenCalledWith(expect.any(Function), { replace: true });
     });

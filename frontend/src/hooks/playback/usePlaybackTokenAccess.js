@@ -59,10 +59,11 @@ export function usePlaybackTokenAccess({
                 return false;
             }
 
-            setTokenStatus(response.data || null);
+            const tokenData = response.data || null;
+            setTokenStatus(tokenData);
             setTokenInput('');
             setTokenMessage('Token playback aktif');
-            onActivated?.();
+            onActivated?.(tokenData);
             return true;
         } catch (error) {
             setTokenMessage(error?.response?.data?.message || 'Token tidak valid atau sudah kedaluwarsa');
@@ -145,6 +146,7 @@ export function usePlaybackTokenAccess({
         tokenStatus,
         allowedCameraIds: tokenStatus?.allowed_camera_ids || null,
         cameraRules: tokenStatus?.camera_rules || [],
+        defaultCameraId: tokenStatus?.default_camera_id || null,
         tokenMessage,
         isTokenBusy,
         activateToken,
