@@ -683,6 +683,33 @@ describe('recordingService external recording support', () => {
         expect(warnSpy).toHaveBeenCalledWith('[DiskCheck] ⚠️ LOW DISK SPACE: 0.00GB free. Starting emergency cleanup...');
     });
 
+    it('emergency disk cleanup does not directly delete filesystem final orphans', async () => {
+        vi.setSystemTime(Date.parse('2026-05-02T10:00:00.000Z'));
+        execMock[promisify.custom] = vi.fn(async () => ({ stdout: '100\n', stderr: '' }));
+        const { recordingService } = await import('../services/recordingService.js');
+        const onSegmentSpy = vi.spyOn(recordingService, 'onSegmentCreated').mockImplementation(() => {});
+
+        queryMock.mockReturnValue([]);
+        queryOneMock.mockReturnValue({ recording_duration_hours: 1 });
+        fsPromisesMock.access.mockResolvedValue(undefined);
+        fsPromisesMock.readdir.mockImplementation(async (targetPath) => {
+            const text = String(targetPath);
+            if (text.endsWith('recordings')) return ['camera7'];
+            if (text.endsWith('camera7')) return ['20260502_070000.mp4'];
+            return [];
+        });
+        fsPromisesMock.stat.mockResolvedValue({
+            isDirectory: () => true,
+            mtimeMs: Date.parse('2026-05-02T07:00:00.000Z'),
+            size: 4096,
+        });
+
+        await recordingService.emergencyDiskSpaceCheck();
+
+        expect(onSegmentSpy).toHaveBeenCalledWith(7, '20260502_070000.mp4');
+        expect(fsPromisesMock.unlink).not.toHaveBeenCalledWith(expect.stringContaining('20260502_070000.mp4'));
+    });
+
     it('keeps unstable-connection segment files in finalizer recovery instead of deleting them inline', async () => {
         finalizerMock.finalizeSegment.mockResolvedValue({ success: false, reason: 'invalid_duration' });
         const { recordingService } = await import('../services/recordingService.js');

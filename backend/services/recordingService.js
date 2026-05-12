@@ -1400,6 +1400,11 @@ class RecordingService {
                                 continue;
                             }
 
+                            if (isFinalSegmentFilename(file.name)) {
+                                this.onSegmentCreated(cameraId, file.name);
+                                continue;
+                            }
+
                             const deleteResult = await deleteRecordingFileSafely({
                                 cameraId,
                                 filename: file.name,
