@@ -23,6 +23,13 @@ function getHlsEffectDependencies() {
     return source.slice(dependencyStart, dependencyEnd);
 }
 
+function getSourceBlock(startPattern, endPattern) {
+    const start = source.indexOf(startPattern);
+    const end = source.indexOf(endPattern, start);
+
+    return source.slice(start, end);
+}
+
 describe('MultiViewVideoItem HLS stability', () => {
     it('does not restart the HLS effect from transient loading state changes', () => {
         const dependencies = getHlsEffectDependencies();
@@ -86,5 +93,25 @@ describe('MultiViewVideoItem HLS stability', () => {
         expect(source).toContain('shouldTrackFrontendViewerSession');
         expect(source).toContain('return false;');
         expect(source).toContain('isDirectStream');
+    });
+
+    it('hides the base status badge while fullscreen controls render their own badge', () => {
+        const statusBadgeBlock = getSourceBlock(
+            '{/* Status badge - disable pulse animation in fullscreen and on low-end devices */}',
+            '<button onClick={handleClose}'
+        );
+
+        expect(statusBadgeBlock).toContain("isFullscreen ? 'hidden' : ''");
+    });
+
+    it('keeps fullscreen camera title compact and bounded', () => {
+        const fullscreenTopBarBlock = getSourceBlock(
+            '{/* Top bar with camera name and exit - Always visible */}',
+            '{/* Bottom controls - Always visible on mobile */}'
+        );
+
+        expect(fullscreenTopBarBlock).toContain('text-xs');
+        expect(fullscreenTopBarBlock).toContain('truncate');
+        expect(fullscreenTopBarBlock).toContain('max-w-');
     });
 });

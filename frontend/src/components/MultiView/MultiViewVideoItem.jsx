@@ -844,7 +844,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             )}
 
             {/* Status badge - disable pulse animation in fullscreen and on low-end devices */}
-            <div className="absolute top-2 left-2 z-10 pointer-events-none">
+            <div className={`absolute top-2 left-2 z-10 pointer-events-none ${isFullscreen ? 'hidden' : ''}`}>
                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold text-white shadow ${statusBadge.color}`}>
                     <span className={`w-1 h-1 rounded-full bg-white ${status === 'live' && !isFullscreen && !disableAnimations ? 'animate-pulse' : ''}`} />
                     {statusBadge.label}
@@ -874,14 +874,14 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             {isFullscreen && (
                 <div className="absolute inset-0 z-50 pointer-events-none">
                     {/* Top bar with camera name and exit - Always visible */}
-                    <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/80 to-transparent pointer-events-auto">
+                    <div className="absolute top-0 left-0 right-0 p-3 bg-gradient-to-b from-black/80 to-transparent pointer-events-auto">
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold text-white shadow ${statusBadge.color}`}>
-                                    <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                            <div className="flex min-w-0 items-center gap-2 pr-2">
+                                <span className={`inline-flex shrink-0 items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-white shadow ${statusBadge.color}`}>
+                                    <span className="w-1 h-1 rounded-full bg-white" />
                                     {statusBadge.label}
                                 </span>
-                                <p className="text-white text-sm font-medium">{camera.name}</p>
+                                <p className="max-w-[58vw] truncate text-xs font-medium text-white sm:max-w-[70vw]">{camera.name}</p>
                             </div>
                             <button onClick={toggleFS} className="p-2 hover:bg-gray-700/50 dark:hover:bg-white/20 active:bg-gray-700/70 dark:active:bg-white/30 rounded-xl text-gray-900 dark:text-white bg-gray-200/80 dark:bg-white/10"><Icons.Fullscreen /></button>
                         </div>
