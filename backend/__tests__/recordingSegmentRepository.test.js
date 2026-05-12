@@ -91,4 +91,19 @@ describe('recordingSegmentRepository', () => {
             [3, '20260502_100000.mp4']
         );
     });
+
+    it('fetches global oldest emergency cleanup candidates with stable cursor order', () => {
+        queryMock.mockReturnValueOnce([]);
+
+        recordingSegmentRepository.findOldestSegmentsForEmergency({
+            afterStartTime: '2026-05-02T08:00:00.000Z',
+            afterId: 44,
+            limit: 200,
+        });
+
+        expect(queryMock).toHaveBeenCalledWith(
+            expect.stringContaining('ORDER BY start_time ASC, id ASC'),
+            ['2026-05-02T08:00:00.000Z', '2026-05-02T08:00:00.000Z', 44, 200]
+        );
+    });
 });
