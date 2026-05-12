@@ -35,6 +35,8 @@ describe('LandingStatsBar', () => {
         await waitFor(() => {
             expect(screen.getByRole('dialog')).toBeTruthy();
         });
+        expect(screen.getByText('Kamera Online')).toBeTruthy();
+        expect(screen.getByText('CCTV Online')).toBeTruthy();
         expect(document.body.style.overflow).toBe('hidden');
 
         fireEvent.keyDown(window, { key: 'Escape' });

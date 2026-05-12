@@ -113,14 +113,16 @@ function LandingPageContent({ onRefreshPauseChange }) {
     const showSocialBar = !shouldSuspendSocialBar && shouldRenderAdSlot(adsConfig, 'socialBar', isMobileAdsViewport);
     const showFooterBanner = shouldRenderAdSlot(adsConfig, 'footerBanner', isMobileAdsViewport);
     const showAfterCamerasNative = shouldRenderAdSlot(adsConfig, 'afterCamerasNative', isMobileAdsViewport);
+    const favoriteIds = useMemo(() => new Set(favorites), [favorites]);
+    const cameraById = useMemo(() => new Map(cameras.map((camera) => [camera.id, camera])), [cameras]);
     const favoriteCameras = useMemo(() => (
-        cameras.filter((camera) => favorites.includes(camera.id)).slice(0, 5)
-    ), [cameras, favorites]);
+        cameras.filter((camera) => favoriteIds.has(camera.id)).slice(0, 5)
+    ), [cameras, favoriteIds]);
     const recentCameraItems = useMemo(() => (
         recentCameras
-            .map((recentCamera) => cameras.find((camera) => camera.id === recentCamera.id) || recentCamera)
             .slice(0, 5)
-    ), [cameras, recentCameras]);
+            .map((recentCamera) => cameraById.get(recentCamera.id) || recentCamera)
+    ), [cameraById, recentCameras]);
     const quickAccessCount = favoriteCameras.length + recentCameraItems.length;
     const favoriteCount = favoriteCameras.length;
     const relatedPopupCameras = useMemo(() => {

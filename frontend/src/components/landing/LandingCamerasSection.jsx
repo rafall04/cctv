@@ -210,6 +210,7 @@ export default function CamerasSection({
                         onSearchChange: setSearchQuery,
                         onFocus: () => searchQuery.trim() && setShowSearchDropdown(true),
                         onClear: clearSearch,
+                        onCloseDropdown: () => setShowSearchDropdown(false),
                         searchInputRef,
                         searchContainerRef,
                         showSearchDropdown,

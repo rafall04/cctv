@@ -475,6 +475,7 @@ describe('LandingPage connectivity recovery', () => {
         });
 
         expect(screen.getByTestId('landing-mobile-dock')).toBeTruthy();
+        expect(screen.getByLabelText(/Favorit/i)).toBeTruthy();
 
         await act(async () => {
             screen.getByTestId('multi-view-button').click();

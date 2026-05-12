@@ -1,3 +1,11 @@
+/*
+ * Purpose: Render public landing status counters and camera/area detail modals.
+ * Caller: LandingHero and public landing status surfaces.
+ * Deps: React state/effects/memo, CameraContext, camera availability helpers, landing UI icons.
+ * MainFuncs: StatsBar, ListModal.
+ * SideEffects: Locks body scroll while stats modal is open and handles Escape to close it.
+ */
+
 import { useState, useMemo, useEffect } from 'react';
 import { useCameras } from '../../contexts/CameraContext';
 import { getCameraAvailabilityState } from '../../utils/cameraAvailability.js';
@@ -164,18 +172,33 @@ export default function StatsBar({ onCameraClick }) {
     const disableAnimations = shouldDisableAnimations();
 
     const stats = useMemo(() => {
-        const onlineList = cameras.filter(c => c.status !== 'maintenance' && getCameraAvailabilityState(c) !== 'offline');
-        const offlineList = cameras.filter(c => c.status !== 'maintenance' && getCameraAvailabilityState(c) === 'offline');
-        const maintenanceList = cameras.filter(c => c.status === 'maintenance');
-        return {
-            online: onlineList.length,
-            offline: offlineList.length,
-            maintenance: maintenanceList.length,
+        const initialStats = {
+            online: 0,
+            offline: 0,
+            maintenance: 0,
             total: cameras.length,
-            onlineList,
-            offlineList,
-            maintenanceList
+            onlineList: [],
+            offlineList: [],
+            maintenanceList: [],
         };
+
+        return cameras.reduce((nextStats, camera) => {
+            if (camera.status === 'maintenance') {
+                nextStats.maintenance += 1;
+                nextStats.maintenanceList.push(camera);
+                return nextStats;
+            }
+
+            if (getCameraAvailabilityState(camera) === 'offline') {
+                nextStats.offline += 1;
+                nextStats.offlineList.push(camera);
+                return nextStats;
+            }
+
+            nextStats.online += 1;
+            nextStats.onlineList.push(camera);
+            return nextStats;
+        }, initialStats);
     }, [cameras]);
 
     const totalAreas = areas.length;

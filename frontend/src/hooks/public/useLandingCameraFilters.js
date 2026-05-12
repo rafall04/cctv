@@ -73,6 +73,7 @@ export function useLandingCameraFilters(cameras, areas, favorites, viewMode, onC
     const [focusedCameraId, setFocusedCameraId] = useState(null);
     const searchInputRef = useRef(null);
     const searchContainerRef = useRef(null);
+    const favoriteIds = useMemo(() => new Set(favorites), [favorites]);
 
     const areaOptions = useMemo(() => {
         const names = new Set();
@@ -185,14 +186,14 @@ export function useLandingCameraFilters(cameras, areas, favorites, viewMode, onC
             return gridAreaScopedCameras.filter((camera) => camera.is_tunnel === 1);
         }
         if (connectionTab === 'favorites') {
-            return gridAreaScopedCameras.filter((camera) => favorites.includes(camera.id));
+            return gridAreaScopedCameras.filter((camera) => favoriteIds.has(camera.id));
         }
         return gridAreaScopedCameras;
-    }, [areaFilteredCameras, gridAreaScopedCameras, connectionTab, favorites]);
+    }, [areaFilteredCameras, gridAreaScopedCameras, connectionTab, favoriteIds]);
 
     const favoritesInAreaCount = useMemo(() => (
-        areaFilteredCameras.filter((camera) => favorites.includes(camera.id)).length
-    ), [areaFilteredCameras, favorites]);
+        areaFilteredCameras.filter((camera) => favoriteIds.has(camera.id)).length
+    ), [areaFilteredCameras, favoriteIds]);
 
     const displayCameras = viewMode === 'map' ? areaFilteredCameras : filteredForGrid;
 

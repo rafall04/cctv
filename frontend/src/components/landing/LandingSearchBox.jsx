@@ -1,3 +1,12 @@
+/*
+ * Purpose: Render public landing camera search input, dropdown, and keyboard shortcuts.
+ * Caller: LandingCamerasSection.
+ * Deps: React effect cleanup and landing UI icons.
+ * MainFuncs: LandingSearchBox.
+ * SideEffects: Focuses search input on Ctrl/Cmd+K and closes dropdown on Escape/outside click.
+ */
+
+import { useEffect } from 'react';
 import { Icons } from '../ui/Icons';
 
 export default function LandingSearchBox({
@@ -5,11 +14,48 @@ export default function LandingSearchBox({
     onSearchChange,
     onFocus,
     onClear,
+    onCloseDropdown,
     searchInputRef,
     searchContainerRef,
     showSearchDropdown,
     dropdownContent,
 }) {
+    useEffect(() => {
+        const handleKeyDown = (event) => {
+            const isSearchShortcut = event.key.toLowerCase() === 'k' && (event.ctrlKey || event.metaKey);
+            if (isSearchShortcut) {
+                event.preventDefault();
+                searchInputRef?.current?.focus();
+                return;
+            }
+
+            if (event.key === 'Escape') {
+                if (searchQuery) {
+                    onClear?.();
+                }
+                onCloseDropdown?.();
+            }
+        };
+
+        const handleMouseDown = (event) => {
+            if (!showSearchDropdown) {
+                return;
+            }
+            if (searchContainerRef?.current?.contains(event.target)) {
+                return;
+            }
+            onCloseDropdown?.();
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        document.addEventListener('mousedown', handleMouseDown);
+
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            document.removeEventListener('mousedown', handleMouseDown);
+        };
+    }, [onClear, onCloseDropdown, searchContainerRef, searchInputRef, searchQuery, showSearchDropdown]);
+
     return (
         <div className="relative" ref={searchContainerRef}>
             <div className="relative flex items-center">
