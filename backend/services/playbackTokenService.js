@@ -9,6 +9,7 @@
 import crypto from 'crypto';
 import { execute, query, queryOne } from '../database/connectionPool.js';
 import { parseUtcSql, toUtcSql } from './timeService.js';
+import playbackTokenRuleService from './playbackTokenRuleService.js';
 
 export const PLAYBACK_TOKEN_COOKIE = 'raf_playback_token';
 export const PLAYBACK_TOKEN_SESSION_COOKIE = 'raf_playback_session';
@@ -202,6 +203,15 @@ function sanitizeTokenRow(row) {
     }
 
     const cameraIds = parseCameraIdsJson(row.camera_ids_json);
+    const cameraRules = Array.isArray(row.camera_rules) ? row.camera_rules : [];
+    const allowedCameraIds = Array.isArray(row.allowed_camera_ids)
+        ? row.allowed_camera_ids
+        : (cameraRules.length > 0
+            ? cameraRules
+                .filter((rule) => rule.enabled !== false && rule.enabled !== 0)
+                .map((rule) => Number.parseInt(rule.camera_id, 10))
+                .filter((cameraId) => Number.isInteger(cameraId) && cameraId > 0)
+            : cameraIds);
     return {
         id: row.id,
         label: row.label,
@@ -210,6 +220,8 @@ function sanitizeTokenRow(row) {
         preset: row.preset,
         scope_type: row.scope_type,
         camera_ids: cameraIds,
+        camera_rules: cameraRules,
+        allowed_camera_ids: [...new Set(allowedCameraIds)],
         playback_window_hours: row.playback_window_hours,
         expires_at: row.expires_at,
         revoked_at: row.revoked_at,
@@ -394,7 +406,12 @@ class PlaybackTokenService {
         const tokenHash = hashToken(token);
         const shareKeyHash = hashToken(shareKey);
         const scopeType = normalizeScopeType(payload.scope_type);
-        const cameraIds = scopeType === 'selected' ? normalizeCameraIds(payload.camera_ids) : [];
+        const payloadRules = playbackTokenRuleService.normalizeRules(payload.camera_rules || []);
+        const cameraIds = scopeType === 'selected'
+            ? (payloadRules.length > 0
+                ? payloadRules.filter((rule) => rule.enabled).map((rule) => rule.camera_id)
+                : normalizeCameraIds(payload.camera_ids))
+            : [];
 
         if (scopeType === 'selected' && cameraIds.length === 0) {
             const err = new Error('Pilih minimal satu kamera untuk scope selected');
@@ -440,8 +457,22 @@ class PlaybackTokenService {
             ]
         );
 
+        const normalizedRules = scopeType === 'selected' || payloadRules.length > 0
+            ? playbackTokenRuleService.replaceRulesForToken(
+                result.lastInsertRowid,
+                payloadRules.length > 0
+                    ? payloadRules
+                    : cameraIds.map((cameraId) => ({ camera_id: cameraId, enabled: true }))
+            )
+            : [];
         const row = queryOne('SELECT * FROM playback_tokens WHERE id = ?', [result.lastInsertRowid]);
-        const data = sanitizeTokenRow(row);
+        const data = sanitizeTokenRow({
+            ...row,
+            camera_rules: normalizedRules,
+            allowed_camera_ids: normalizedRules.length > 0
+                ? normalizedRules.filter((rule) => rule.enabled).map((rule) => rule.camera_id)
+                : cameraIds,
+        });
         this.recordAudit({
             tokenId: data.id,
             eventType: 'created',
@@ -523,10 +554,38 @@ class PlaybackTokenService {
         const shareTemplate = typeof payload.share_template === 'string' && payload.share_template.trim()
             ? payload.share_template.trim()
             : DEFAULT_SHARE_TEMPLATE;
+        const scopeType = Object.prototype.hasOwnProperty.call(payload, 'scope_type')
+            ? normalizeScopeType(payload.scope_type)
+            : existing.scope_type;
+        const customExpiresAt = Object.prototype.hasOwnProperty.call(payload, 'expires_at')
+            ? parseDate(payload.expires_at)
+            : parseUtcSql(existing.expires_at);
+        const playbackWindowHours = Object.prototype.hasOwnProperty.call(payload, 'playback_window_hours')
+            ? normalizePositiveInteger(payload.playback_window_hours)
+            : existing.playback_window_hours;
+        const rawRules = Array.isArray(payload.camera_rules)
+            ? payload.camera_rules
+            : existing.camera_ids.map((cameraId) => ({ camera_id: cameraId, enabled: true }));
+        const normalizedRules = scopeType === 'selected' || rawRules.length > 0
+            ? playbackTokenRuleService.replaceRulesForToken(normalizedTokenId, rawRules)
+            : [];
+        const cameraIds = scopeType === 'selected'
+            ? normalizedRules.filter((rule) => rule.enabled).map((rule) => rule.camera_id)
+            : [];
+
+        if (scopeType === 'selected' && cameraIds.length === 0) {
+            const err = new Error('Pilih minimal satu kamera untuk scope selected');
+            err.statusCode = 400;
+            throw err;
+        }
 
         execute(
             `UPDATE playback_tokens
             SET label = ?,
+                scope_type = ?,
+                camera_ids_json = ?,
+                playback_window_hours = ?,
+                expires_at = ?,
                 max_active_sessions = ?,
                 session_limit_mode = ?,
                 session_timeout_seconds = ?,
@@ -536,6 +595,10 @@ class PlaybackTokenService {
             WHERE id = ?`,
             [
                 label,
+                scopeType,
+                JSON.stringify(cameraIds),
+                playbackWindowHours,
+                toSqlDate(customExpiresAt),
                 sessionPolicy.maxActiveSessions,
                 sessionPolicy.sessionLimitMode,
                 sessionPolicy.sessionTimeoutSeconds,
@@ -545,7 +608,11 @@ class PlaybackTokenService {
             ]
         );
 
-        const updated = sanitizeTokenRow(queryOne('SELECT * FROM playback_tokens WHERE id = ?', [normalizedTokenId]));
+        const updated = sanitizeTokenRow({
+            ...queryOne('SELECT * FROM playback_tokens WHERE id = ?', [normalizedTokenId]),
+            camera_rules: normalizedRules,
+            allowed_camera_ids: cameraIds,
+        });
         this.recordAudit({
             tokenId: normalizedTokenId,
             eventType: 'updated',
@@ -553,6 +620,10 @@ class PlaybackTokenService {
             detail: {
                 fields: [
                     'label',
+                    'scope_type',
+                    'camera_rules',
+                    'playback_window_hours',
+                    'expires_at',
                     'max_active_sessions',
                     'session_limit_mode',
                     'session_timeout_seconds',
@@ -906,7 +977,19 @@ class PlaybackTokenService {
         }
 
         const normalizedCameraId = Number.parseInt(cameraId, 10);
-        if (token.scope_type === 'selected' && normalizedCameraId > 0 && !token.camera_ids.includes(normalizedCameraId)) {
+        const cameraPolicy = normalizedCameraId > 0
+            ? playbackTokenRuleService.resolveCameraAccess({
+                token,
+                camera: options.camera || {
+                    id: normalizedCameraId,
+                    public_playback_mode: options.publicPlaybackMode || 'inherit',
+                },
+            })
+            : {
+                allowed: true,
+                playbackWindowHours: token.playback_window_hours,
+            };
+        if (normalizedCameraId > 0 && !cameraPolicy.allowed) {
             const err = new Error('Token playback tidak mencakup kamera ini');
             err.statusCode = 403;
             throw err;
@@ -932,7 +1015,12 @@ class PlaybackTokenService {
             });
         }
 
-        return token;
+        return {
+            ...token,
+            effective_playback_window_hours: cameraPolicy.playbackWindowHours ?? token.playback_window_hours,
+            allowed_camera_ids: playbackTokenRuleService.getAllowedCameraIds(token),
+            camera_rules: Array.isArray(token.camera_rules) ? token.camera_rules : playbackTokenRuleService.getRulesForToken(token.id),
+        };
     }
 
     validateRequestForCamera(request, cameraId, options = {}) {

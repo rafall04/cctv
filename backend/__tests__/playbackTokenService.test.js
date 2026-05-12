@@ -182,6 +182,61 @@ describe('playbackTokenService', () => {
         expect(result.share_text).toContain(result.share_key);
     });
 
+    it('creates selected token camera rules from payload', async () => {
+        vi.spyOn(connectionPool, 'transaction').mockImplementation((callback) => callback);
+        vi.spyOn(connectionPool, 'execute').mockReturnValue({ lastInsertRowid: 52, changes: 1 });
+        vi.spyOn(connectionPool, 'queryOne')
+            .mockReturnValueOnce(null)
+            .mockReturnValueOnce({
+                id: 52,
+                label: 'Area Barat',
+                token_prefix: 'rafpb_rules',
+                share_key_prefix: 'RULE8888',
+                preset: 'custom',
+                scope_type: 'selected',
+                camera_ids_json: '[3,4]',
+                playback_window_hours: 48,
+                expires_at: null,
+                revoked_at: null,
+                last_used_at: null,
+                use_count: 0,
+                max_active_sessions: null,
+                session_limit_mode: 'unlimited',
+                session_timeout_seconds: 60,
+                client_note: '',
+                share_template: 'Kode {{token}}',
+                created_by: 1,
+                created_at: '2026-05-05 12:00:00',
+                updated_at: '2026-05-05 12:00:00',
+            });
+        const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
+
+        const result = playbackTokenService.createToken(
+            {
+                label: 'Area Barat',
+                preset: 'custom',
+                scope_type: 'selected',
+                camera_rules: [
+                    { camera_id: 3, enabled: true, playback_window_hours: 24 },
+                    { camera_id: 4, enabled: true },
+                ],
+                playback_window_hours: 48,
+                share_template: 'Kode {{token}}',
+            },
+            { user: { id: 1 }, headers: { origin: 'https://cctv.raf.my.id' } }
+        );
+
+        expect(result.data.allowed_camera_ids).toEqual([3, 4]);
+        expect(result.data.camera_rules).toEqual([
+            { camera_id: 3, enabled: true, playback_window_hours: 24, expires_at: null, note: '' },
+            { camera_id: 4, enabled: true, playback_window_hours: null, expires_at: null, note: '' },
+        ]);
+        expect(connectionPool.execute).toHaveBeenCalledWith(
+            expect.stringContaining('INSERT INTO playback_token_camera_rules'),
+            [52, 3, 1, 24, null, '']
+        );
+    });
+
     it('allows only cameras included in selected scope', async () => {
         vi.spyOn(connectionPool, 'execute').mockReturnValue({ changes: 1 });
         vi.spyOn(connectionPool, 'queryOne').mockReturnValue({
@@ -368,7 +423,8 @@ describe('playbackTokenService', () => {
         })).toThrow('Session playback tidak aktif');
     });
 
-    it('updates only safe editable token metadata without changing expiry or access scope', async () => {
+    it('updates mutable settings and camera entitlement rules without changing token secrets', async () => {
+        vi.spyOn(connectionPool, 'transaction').mockImplementation((callback) => callback);
         vi.spyOn(connectionPool, 'execute').mockReturnValue({ changes: 1 });
         vi.spyOn(connectionPool, 'queryOne')
             .mockReturnValueOnce({
@@ -400,9 +456,9 @@ describe('playbackTokenService', () => {
                 share_key_prefix: 'SAFE1234',
                 preset: 'trial_3d',
                 scope_type: 'selected',
-                camera_ids_json: '[1,2]',
-                playback_window_hours: 72,
-                expires_at: '2026-05-08 12:00:00',
+                camera_ids_json: '[1,3]',
+                playback_window_hours: 24,
+                expires_at: '2099-01-01 00:00:00',
                 revoked_at: null,
                 last_used_at: null,
                 use_count: 8,
@@ -419,29 +475,38 @@ describe('playbackTokenService', () => {
 
         const updated = playbackTokenService.updateTokenSettings(51, {
             label: 'Nama Baru',
+            scope_type: 'selected',
+            camera_rules: [
+                { camera_id: 1, enabled: true, playback_window_hours: 24 },
+                { camera_id: 3, enabled: true, playback_window_hours: 12 },
+            ],
+            playback_window_hours: 24,
+            expires_at: '2099-01-01 00:00:00',
             max_active_sessions: 2,
             session_limit_mode: 'replace_oldest',
             session_timeout_seconds: 120,
             client_note: 'NOC utama',
             share_template: 'Kode {{token}}',
-            expires_at: '2099-01-01 00:00:00',
-            scope_type: 'all',
         }, { user: { id: 3 }, headers: {} });
 
         expect(updated).toMatchObject({
             label: 'Nama Baru',
-            expires_at: '2026-05-08 12:00:00',
+            expires_at: '2099-01-01 00:00:00',
             scope_type: 'selected',
-            camera_ids: [1, 2],
+            allowed_camera_ids: [1, 3],
             use_count: 8,
             max_active_sessions: 2,
             session_limit_mode: 'replace_oldest',
             session_timeout_seconds: 120,
         });
-        expect(connectionPool.execute.mock.calls[0][0]).toContain('UPDATE playback_tokens');
-        expect(connectionPool.execute.mock.calls[0][0]).not.toContain('expires_at');
-        expect(connectionPool.execute.mock.calls[0][0]).not.toContain('scope_type');
-        expect(connectionPool.execute.mock.calls[0][0]).not.toContain('token_hash');
+        const updateCall = connectionPool.execute.mock.calls.find((call) => call[0].includes('UPDATE playback_tokens'));
+        expect(updateCall?.[0]).toContain('UPDATE playback_tokens');
+        expect(updateCall?.[0]).not.toContain('token_hash');
+        expect(updateCall?.[0]).not.toContain('share_key_hash');
+        expect(connectionPool.execute).toHaveBeenCalledWith(
+            expect.stringContaining('INSERT INTO playback_token_camera_rules'),
+            [51, 1, 1, 24, null, '']
+        );
         expect(connectionPool.execute).toHaveBeenCalledWith(
             expect.stringContaining('INSERT INTO playback_token_audit_logs'),
             expect.arrayContaining([51, 'updated'])
