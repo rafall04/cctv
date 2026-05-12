@@ -143,6 +143,8 @@ export function usePlaybackTokenAccess({
         tokenInput,
         setTokenInput,
         tokenStatus,
+        allowedCameraIds: tokenStatus?.allowed_camera_ids || null,
+        cameraRules: tokenStatus?.camera_rules || [],
         tokenMessage,
         isTokenBusy,
         activateToken,

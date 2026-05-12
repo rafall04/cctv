@@ -112,6 +112,7 @@ function Playback({
         tokenInput,
         setTokenInput,
         tokenStatus,
+        allowedCameraIds,
         tokenMessage,
         isTokenBusy,
         activateToken,
@@ -147,6 +148,14 @@ function Playback({
     const selectedCameraIdRef = useRef(selectedCameraId);
 
     const playbackCameras = useMemo(() => cameras.filter((camera) => getStreamCapabilities(camera).playback), [cameras]);
+    const visiblePlaybackCameras = useMemo(() => {
+        if (isAdminPlayback || tokenStatus?.scope_type !== 'selected' || !Array.isArray(allowedCameraIds)) {
+            return playbackCameras;
+        }
+
+        const allowedIds = new Set(allowedCameraIds);
+        return playbackCameras.filter((camera) => allowedIds.has(camera.id));
+    }, [allowedCameraIds, isAdminPlayback, playbackCameras, tokenStatus]);
     const selectedCamera = useMemo(() => {
         if (!selectedCameraId) {
             return null;
@@ -218,11 +227,11 @@ function Playback({
     }, [playbackCameras, selectedCameraId]);
 
     useEffect(() => {
-        if (isAdminPlayback || tokenStatus?.scope_type !== 'selected' || !Array.isArray(tokenStatus.camera_ids)) {
+        if (isAdminPlayback || tokenStatus?.scope_type !== 'selected' || !Array.isArray(allowedCameraIds)) {
             return;
         }
 
-        const allowedIds = new Set(tokenStatus.camera_ids);
+        const allowedIds = new Set(allowedCameraIds);
         if (allowedIds.has(selectedCameraId)) {
             return;
         }
@@ -231,7 +240,7 @@ function Playback({
         if (firstAllowedCamera) {
             setSelectedCameraId(firstAllowedCamera.id);
         }
-    }, [isAdminPlayback, playbackCameras, selectedCameraId, tokenStatus]);
+    }, [allowedCameraIds, isAdminPlayback, playbackCameras, selectedCameraId, tokenStatus]);
 
     useEffect(() => {
         if (!showPlaybackPopunder) {
@@ -991,7 +1000,7 @@ function Playback({
             <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-2 sm:py-6 md:py-8 px-2 sm:px-4">
             <div className="max-w-7xl mx-auto space-y-3 sm:space-y-4 md:space-y-6">
                 <PlaybackHeader
-                    cameras={playbackCameras}
+                    cameras={visiblePlaybackCameras}
                     selectedCamera={selectedCamera}
                     onCameraChange={handleCameraChange}
                     autoPlayEnabled={autoPlayEnabled}

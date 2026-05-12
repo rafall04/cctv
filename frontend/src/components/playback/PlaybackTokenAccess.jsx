@@ -20,6 +20,11 @@ export default function PlaybackTokenAccess({
         event.preventDefault();
         onActivate(tokenInput);
     };
+    const activeCameraCount = tokenStatus?.allowed_camera_ids?.length || tokenStatus?.camera_ids?.length || 0;
+    const activeRuleWindow = tokenStatus?.effective_playback_window_hours
+        || tokenStatus?.playback_window_hours
+        || tokenStatus?.camera_rules?.find((rule) => rule?.playback_window_hours)?.playback_window_hours
+        || null;
 
     return (
         <form
@@ -63,6 +68,8 @@ export default function PlaybackTokenAccess({
                 <div className="mt-2 text-xs text-gray-600 dark:text-gray-300">
                     {message || 'Token aktif'}
                     {tokenStatus?.expires_at ? ` sampai ${tokenStatus.expires_at}` : tokenStatus ? ' tanpa tanggal kedaluwarsa' : ''}
+                    {tokenStatus && activeCameraCount > 0 ? ` - Akses: ${activeCameraCount} kamera` : ''}
+                    {tokenStatus && activeRuleWindow ? ` - Window: ${activeRuleWindow} jam terakhir` : ''}
                 </div>
             )}
         </form>
