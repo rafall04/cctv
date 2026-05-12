@@ -40,12 +40,12 @@ describe('LandingResultsGrid optimization', () => {
         expect(getAdaptiveGridWindow({ isMobile: true, tier: 'medium' })).toEqual({
             initialVisibleCount: 12,
             loadMoreCount: 12,
-            priorityThumbnailCount: 4,
+            priorityThumbnailCount: 2,
         });
         expect(getAdaptiveGridWindow({ isMobile: false, tier: 'low' })).toEqual({
             initialVisibleCount: 12,
             loadMoreCount: 12,
-            priorityThumbnailCount: 4,
+            priorityThumbnailCount: 2,
         });
         expect(getAdaptiveGridWindow({ isMobile: false, tier: 'high' })).toEqual({
             initialVisibleCount: 24,

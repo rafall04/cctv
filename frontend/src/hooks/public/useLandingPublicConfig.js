@@ -5,6 +5,7 @@ import { DEFAULT_PUBLIC_ADS_CONFIG } from '../../components/ads/adsConfig';
 import {
     DEFAULT_LANDING_SETTINGS,
     LANDING_SCHEDULE_RECHECK_MS,
+    hasLandingScheduleWindow,
     normalizeLandingSettings,
 } from './landingScheduledContent';
 
@@ -70,7 +71,15 @@ export function useLandingPublicConfig() {
         };
     }, []);
 
+    const shouldRecheckSchedule = useMemo(() => (
+        hasLandingScheduleWindow(rawLandingSettings)
+    ), [rawLandingSettings]);
+
     useEffect(() => {
+        if (!shouldRecheckSchedule) {
+            return undefined;
+        }
+
         const intervalId = window.setInterval(() => {
             setScheduleNow(Date.now());
         }, LANDING_SCHEDULE_RECHECK_MS);
@@ -78,7 +87,7 @@ export function useLandingPublicConfig() {
         return () => {
             window.clearInterval(intervalId);
         };
-    }, []);
+    }, [shouldRecheckSchedule]);
 
     const landingSettings = useMemo(() => {
         return normalizeLandingSettings(rawLandingSettings, scheduleNow);

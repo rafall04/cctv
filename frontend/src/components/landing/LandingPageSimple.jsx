@@ -113,7 +113,14 @@ function SimpleFooter({ branding, saweriaEnabled, saweriaLink }) {
 function SimpleStatusOverview() {
     const { cameras, loading } = useCameras();
 
-    const onlineCount = cameras.filter((camera) => camera?.is_online === 1 || camera?.is_online === true).length;
+    const statusCounts = cameras.reduce((counts, camera) => {
+        if (camera?.is_online === 1 || camera?.is_online === true) {
+            counts.online += 1;
+        }
+
+        return counts;
+    }, { online: 0 });
+    const onlineCount = statusCounts.online;
     const offlineCount = Math.max(cameras.length - onlineCount, 0);
     const cards = [
         {
@@ -197,6 +204,7 @@ export default function LandingPageSimple({
 }) {
     const { branding } = useBranding();
     const showFooterBanner = shouldRenderAdSlot(adsConfig, 'footerBanner', isAdsMobileViewport());
+    const shouldRenderFloatingWidgets = !hideFloatingWidgets;
 
     return (
         <div className="min-h-screen bg-gray-50 pb-24 dark:bg-gray-950 flex flex-col sm:pb-0">
@@ -268,7 +276,7 @@ export default function LandingPageSimple({
                 saweriaLink={saweriaLink}
             />
 
-            {!hideFloatingWidgets && (
+            {shouldRenderFloatingWidgets && (
                 <>
                     <Suspense fallback={null}>
                         <FeedbackWidget />

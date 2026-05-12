@@ -674,6 +674,7 @@ describe('LandingPage connectivity recovery', () => {
     });
 
     it('meneruskan discovery publik yang sama ke simple mode', async () => {
+        cameraContextState.deviceTier = 'low';
         getDiscovery.mockResolvedValueOnce({
             success: true,
             data: {
@@ -692,6 +693,7 @@ describe('LandingPage connectivity recovery', () => {
                     live_now: [expect.objectContaining({ id: 4, name: 'CCTV Ramai' })],
                 }),
                 discoveryLoading: false,
+                hideFloatingWidgets: true,
             }));
         });
     });

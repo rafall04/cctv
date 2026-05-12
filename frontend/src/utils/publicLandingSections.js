@@ -20,7 +20,7 @@ const DEFAULT_GRID_WINDOW = {
 const COMPACT_GRID_WINDOW = {
     initialVisibleCount: 12,
     loadMoreCount: 12,
-    priorityThumbnailCount: 4,
+    priorityThumbnailCount: 2,
 };
 
 function formatCount(value) {

@@ -65,6 +65,31 @@ describe('CameraThumbnail', () => {
         expect(screen.queryByAltText('Pos preview')).toBeNull();
     });
 
+    it('retries image rendering when thumbnail path changes after an error', () => {
+        const { rerender, container } = render(
+            <CameraThumbnail
+                thumbnailPath="/api/thumbnails/failed.jpg"
+                cameraName="Retry Camera"
+            />
+        );
+
+        const firstImage = container.querySelector('img');
+        fireEvent.error(firstImage);
+
+        expect(container.querySelector('img')).toBeNull();
+
+        rerender(
+            <CameraThumbnail
+                thumbnailPath="/api/thumbnails/recovered.jpg"
+                cameraName="Retry Camera"
+            />
+        );
+
+        const recoveredImage = container.querySelector('img');
+        expect(recoveredImage).toBeTruthy();
+        expect(recoveredImage.getAttribute('src')).toBe('/api/thumbnails/recovered.jpg');
+    });
+
     it('falls back to the maintenance icon when camera is in maintenance mode', () => {
         render(
             <CameraThumbnail

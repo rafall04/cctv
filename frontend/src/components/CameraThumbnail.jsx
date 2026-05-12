@@ -20,6 +20,10 @@ export default function CameraThumbnail({
     const imageRef = useRef(null);
 
     useEffect(() => {
+        setError(false);
+    }, [thumbnailPath]);
+
+    useEffect(() => {
         if (!imageRef.current) {
             return;
         }

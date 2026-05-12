@@ -16,6 +16,7 @@ import { useCameraHistory } from '../hooks/useCameraHistory';
 import { useLandingModeState } from '../hooks/public/useLandingModeState';
 import { useLandingPublicConfig } from '../hooks/public/useLandingPublicConfig';
 import { useLandingPageController } from '../hooks/public/useLandingPageController';
+import { useDeferredPublicFloatingWidgets } from '../hooks/public/useDeferredPublicFloatingWidgets';
 import LandingNavbar from '../components/landing/LandingNavbar';
 import LandingHero from '../components/landing/LandingHero';
 import LandingFooter from '../components/landing/LandingFooter';
@@ -109,6 +110,10 @@ function LandingPageContent({ onRefreshPauseChange }) {
     const isPublicModalActive = Boolean(popup);
     const shouldHideFixedUiForPopup = isPublicModalActive && adsConfig?.popup?.hideFloatingWidgetsOnPopup !== false;
     const shouldHideFloatingWidgets = (showMulti && viewMode === 'grid') || shouldHideFixedUiForPopup;
+    const shouldRenderFloatingWidgets = useDeferredPublicFloatingWidgets({
+        enabled: !shouldHideFloatingWidgets,
+        deviceTier,
+    });
     const shouldSuspendSocialBar = isPublicModalActive && adsConfig?.popup?.hideSocialBarOnPopup !== false;
     const showSocialBar = !shouldSuspendSocialBar && shouldRenderAdSlot(adsConfig, 'socialBar', isMobileAdsViewport);
     const showFooterBanner = shouldRenderAdSlot(adsConfig, 'footerBanner', isMobileAdsViewport);
@@ -174,7 +179,8 @@ function LandingPageContent({ onRefreshPauseChange }) {
                         setViewMode={setViewMode}
                         adsConfig={adsConfig}
                         onMapCameraOpen={handleMapPopupOpen}
-                        hideFloatingWidgets={shouldHideFloatingWidgets}
+                        hideFloatingWidgets={!shouldRenderFloatingWidgets}
+                        deviceTier={deviceTier}
                         announcement={landingSettings.announcement}
                         eventBanner={landingSettings.eventBanner}
                         publicConfigLoading={publicConfigReady}
@@ -364,7 +370,7 @@ function LandingPageContent({ onRefreshPauseChange }) {
                     </Suspense>
                 )}
 
-                {!shouldHideFloatingWidgets && (
+                {shouldRenderFloatingWidgets && (
                     <>
                         <Suspense fallback={null}>
                             <FeedbackWidget />

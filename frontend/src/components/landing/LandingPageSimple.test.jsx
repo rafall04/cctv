@@ -186,4 +186,30 @@ describe('LandingPageSimple', () => {
 
         expect(screen.getByTestId('landing-discovery-strip').textContent).toContain('CCTV Compact');
     });
+
+    it('menyembunyikan floating widget saat diminta parent shell', () => {
+        const CamerasSection = () => <div data-testid="cameras-section">cameras</div>;
+
+        renderWithRouter(
+            <LandingPageSimple
+                onCameraClick={vi.fn()}
+                onAddMulti={vi.fn()}
+                multiCameras={[]}
+                saweriaEnabled={false}
+                saweriaLink=""
+                CamerasSection={CamerasSection}
+                layoutMode="simple"
+                onLayoutToggle={vi.fn()}
+                favorites={[]}
+                onToggleFavorite={vi.fn()}
+                isFavorite={vi.fn(() => false)}
+                viewMode="grid"
+                setViewMode={vi.fn()}
+                adsConfig={null}
+                hideFloatingWidgets={true}
+            />
+        );
+
+        expect(screen.queryByText('feedback-widget')).toBeNull();
+    });
 });

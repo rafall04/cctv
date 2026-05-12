@@ -60,6 +60,18 @@ function parseScheduleDate(value) {
     return Number.isFinite(parsedAt) ? parsedAt : null;
 }
 
+export function hasLandingScheduleWindow(settings) {
+    const source = settings && typeof settings === 'object' ? settings : {};
+
+    return [source.eventBanner, source.announcement].some((content) => {
+        if (!content || typeof content !== 'object' || content.enabled !== true) {
+            return false;
+        }
+
+        return Boolean(normalizeScheduleValue(content.start_at) || normalizeScheduleValue(content.end_at));
+    });
+}
+
 export function isScheduledLandingContentActive(content, now = Date.now()) {
     const text = normalizeText(content?.text).trim();
     if (!content?.enabled || !text) {
