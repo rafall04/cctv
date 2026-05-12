@@ -1221,22 +1221,8 @@ class RecordingService {
                         if (filesBeingProcessed.has(fileKey)) {
                             console.log(`[BGCleanup] File being processed, skipping: ${file.filename}`);
                         } else if (file.beyondRetention) {
-                            try {
-                                const deleteResult = await deleteRecordingFileSafely({
-                                    cameraId: file.cameraId,
-                                    filename: file.filename,
-                                    filePath: file.path,
-                                    reason: 'background_orphan_retention_expired',
-                                });
-                                if (!deleteResult.success) {
-                                    throw new Error(deleteResult.reason || 'delete_failed');
-                                }
-                                const fileSizeMB = (deleteResult.size / (1024 * 1024)).toFixed(2);
-                                console.log(`[BGCleanup] ✓ Deleted old unregistered file beyond retention: camera${file.cameraId}/${file.filename} (age: ${Math.round(file.age / 3600000)}h, size: ${fileSizeMB}MB)`);
-                                removeFailedFile(file.cameraId, file.filename);
-                            } catch (err) {
-                                console.error(`[BGCleanup] Error deleting old file ${file.filename}:`, err.message);
-                            }
+                            console.log(`[BGCleanup] Requeueing old unregistered final file for recovery before deletion: camera${file.cameraId}/${file.filename}`);
+                            this.onSegmentCreated(file.cameraId, file.filename);
                         } else {
                             try {
                                 await execPromise(`ffprobe -v error "${file.path}"`, { timeout: 3000 });

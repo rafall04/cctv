@@ -846,6 +846,40 @@ describe('recordingService external recording support', () => {
         expect(segmentSpy).toHaveBeenCalledWith(8, '20260511_211000.mp4');
     });
 
+    it('background cleanup requeues final orphans for recovery before deletion', async () => {
+        vi.setSystemTime(Date.parse('2026-05-02T10:00:00.000Z'));
+        const { recordingService } = await import('../services/recordingService.js');
+        const onSegmentSpy = vi.spyOn(recordingService, 'onSegmentCreated').mockImplementation(() => {});
+
+        const scheduled = [];
+        const scheduleTimeout = (callback) => {
+            scheduled.push(callback);
+            return scheduled.length;
+        };
+
+        queryOneMock.mockReturnValue({ recording_duration_hours: 1 });
+        queryMock.mockReturnValue([]);
+        fsPromisesMock.access.mockResolvedValue(undefined);
+        fsPromisesMock.readdir.mockImplementation(async (targetPath) => {
+            const text = String(targetPath);
+            if (text.endsWith('recordings')) return ['camera3'];
+            if (text.endsWith('camera3')) return ['20260502_070000.mp4'];
+            return [];
+        });
+        fsPromisesMock.stat.mockResolvedValue({
+            isDirectory: () => true,
+            size: 4096,
+            mtimeMs: Date.parse('2026-05-02T07:00:00.000Z'),
+        });
+
+        recordingService.startBackgroundCleanup(scheduleTimeout);
+        await scheduled[0]();
+        await scheduled[1]();
+
+        expect(onSegmentSpy).toHaveBeenCalledWith(3, '20260502_070000.mp4');
+        expect(fsPromisesMock.unlink).not.toHaveBeenCalledWith(expect.stringContaining('20260502_070000.mp4'));
+    });
+
     it('starts and stops the attached recording scheduler explicitly', async () => {
         const { recordingService } = await import('../services/recordingService.js');
         const scheduler = {
