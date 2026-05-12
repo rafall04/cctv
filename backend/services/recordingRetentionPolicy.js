@@ -5,12 +5,10 @@
 // SideEffects: None.
 
 import { basename } from 'path';
+import { isFinalSegmentFilename, isTempSegmentFilename } from './recordingSegmentFilePolicy.js';
 
 export const RECORDING_RETENTION_GRACE_MS = 10 * 60 * 1000;
 export const DEFAULT_RECORDING_RETENTION_HOURS = 5;
-
-const FINAL_SEGMENT_PATTERN = /^\d{8}_\d{6}\.mp4$/;
-const TEMP_SEGMENT_PATTERN = /^\d{8}_\d{6}\.mp4\.(remux|temp)\.mp4$/;
 
 export function normalizeRetentionHours(retentionHours) {
     const parsed = Number(retentionHours);
@@ -54,7 +52,7 @@ export function isSafeRecordingFilename(filename) {
         return false;
     }
 
-    return FINAL_SEGMENT_PATTERN.test(value) || TEMP_SEGMENT_PATTERN.test(value);
+    return isFinalSegmentFilename(value) || isTempSegmentFilename(value);
 }
 
 export function getSegmentAgeMs({ filename, startTime, fileMtimeMs, nowMs = Date.now() }) {

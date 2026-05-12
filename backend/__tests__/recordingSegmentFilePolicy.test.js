@@ -59,6 +59,16 @@ describe('recordingSegmentFilePolicy', () => {
         expect(isTempSegmentFilename('20260512_000005.mp4.remux.mp4')).toBe(true);
     });
 
+    it('classifies all supported recording temp segment names', () => {
+        expect(isTempSegmentFilename('20260512_000005.tmp.mp4')).toBe(true);
+        expect(isTempSegmentFilename('20260512_000005.mp4.tmp')).toBe(true);
+        expect(isTempSegmentFilename('20260512_000005.mp4.remux.mp4')).toBe(true);
+        expect(isTempSegmentFilename('20260512_000005.mp4.temp.mp4')).toBe(true);
+        expect(isTempSegmentFilename('20260512_000005.temp.mp4')).toBe(true);
+        expect(isTempSegmentFilename('x.temp.mp4')).toBe(false);
+        expect(isTempSegmentFilename('../20260512_000005.tmp.mp4')).toBe(false);
+    });
+
     it('rejects unsupported names', () => {
         expect(parseSegmentFilename('bad.mp4')).toBeNull();
         expect(parseSegmentFilename('../20260511_211000.mp4')).toBeNull();

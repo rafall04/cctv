@@ -9,7 +9,7 @@ import { join } from 'path';
 const SEGMENT_STAMP = '(\\d{4})(\\d{2})(\\d{2})_(\\d{2})(\\d{2})(\\d{2})';
 const FINAL_RE = new RegExp(`^${SEGMENT_STAMP}\\.mp4$`);
 const PARTIAL_RE = new RegExp(`^${SEGMENT_STAMP}\\.mp4\\.partial$`);
-const TEMP_RE = new RegExp(`^${SEGMENT_STAMP}\\.(tmp\\.mp4|mp4\\.tmp|mp4\\.remux\\.mp4)$`);
+const TEMP_RE = new RegExp(`^${SEGMENT_STAMP}(\\.tmp\\.mp4|\\.mp4\\.tmp|\\.mp4\\.remux\\.mp4|\\.mp4\\.temp\\.mp4|\\.temp\\.mp4)$`);
 
 export function getCameraRecordingDir(basePath, cameraId) {
     return join(basePath, `camera${cameraId}`);

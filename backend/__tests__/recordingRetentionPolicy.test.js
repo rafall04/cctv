@@ -58,6 +58,16 @@ describe('recordingRetentionPolicy', () => {
         expect(isSafeRecordingFilename('../20260502_174501.mp4')).toBe(false);
     });
 
+    it('treats all supported temp recording names as safe cleanup filenames', () => {
+        expect(isSafeRecordingFilename('20260502_174501.tmp.mp4')).toBe(true);
+        expect(isSafeRecordingFilename('20260502_174501.mp4.tmp')).toBe(true);
+        expect(isSafeRecordingFilename('20260502_174501.mp4.remux.mp4')).toBe(true);
+        expect(isSafeRecordingFilename('20260502_174501.mp4.temp.mp4')).toBe(true);
+        expect(isSafeRecordingFilename('20260502_174501.temp.mp4')).toBe(true);
+        expect(isSafeRecordingFilename('x.temp.mp4')).toBe(false);
+        expect(isSafeRecordingFilename('20260502_174501.tmp.mp4.exe')).toBe(false);
+    });
+
     it('marks a segment expired only after retention plus grace', () => {
         const nowMs = Date.parse('2026-05-02T10:00:00.000Z');
         const window = computeRetentionWindow({ retentionHours: 1, nowMs });
