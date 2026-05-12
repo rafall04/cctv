@@ -75,4 +75,35 @@ describe('playbackTokenController', () => {
             options: { maxAge: 600 },
         });
     });
+
+    it('returns allowed camera metadata after playback token activation', async () => {
+        validateRawTokenForCameraMock.mockReturnValue({
+            id: 2,
+            expires_at: null,
+            scope_type: 'selected',
+            allowed_camera_ids: [7],
+            camera_rules: [{ camera_id: 7, enabled: true, playback_window_hours: 24 }],
+        });
+        createPlaybackSessionMock.mockReturnValue({
+            session_id: 'session-2',
+            timeout_seconds: 60,
+        });
+
+        const reply = buildReply();
+        const payload = await activatePlaybackToken({
+            body: { share_key: 'CLIENT88', camera_id: 7, client_id: 'client-1' },
+            query: {},
+            headers: {},
+        }, reply);
+
+        expect(validateRawTokenForCameraMock).toHaveBeenCalledWith('CLIENT88', 7, expect.objectContaining({
+            touch: true,
+            eventType: 'activated_share',
+        }));
+        expect(payload.data).toMatchObject({
+            scope_type: 'selected',
+            allowed_camera_ids: [7],
+            camera_rules: [{ camera_id: 7, enabled: true, playback_window_hours: 24 }],
+        });
+    });
 });

@@ -318,6 +318,24 @@ describe('playbackTokenService', () => {
         expect(connectionPool.execute.mock.calls.at(-1)[0]).toContain('INSERT INTO playback_token_audit_logs');
     });
 
+    it('builds selected-camera share link with target camera id', async () => {
+        const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
+
+        const shareText = playbackTokenService.buildShareText({
+            shareKey: 'CLIENT88',
+            tokenRow: {
+                label: 'Client Gate',
+                scope_type: 'selected',
+                camera_rules: [{ camera_id: 7, enabled: true }],
+                allowed_camera_ids: [7],
+                share_template: 'Link: {{playback_url}}',
+            },
+            request: { headers: { origin: 'https://cctv.raf.my.id' } },
+        });
+
+        expect(shareText).toContain('/playback?cam=7&share=CLIENT88');
+    });
+
     it('records camera access audit when token validation is touched', async () => {
         vi.spyOn(connectionPool, 'execute').mockReturnValue({ changes: 1 });
         vi.spyOn(connectionPool, 'queryOne').mockReturnValue({

@@ -304,11 +304,16 @@ class PlaybackTokenService {
         }
     }
 
-    buildPlaybackUrl({ token, shareKey, request }) {
+    buildPlaybackUrl({ token, shareKey, request, targetCameraId = null }) {
         const origin = getRequestOrigin(request);
         const queryName = shareKey ? 'share' : 'token';
         const queryValue = encodeURIComponent(shareKey || token);
-        return `${origin}/playback?${queryName}=${queryValue}`;
+        const params = new URLSearchParams();
+        if (targetCameraId) {
+            params.set('cam', String(targetCameraId));
+        }
+        params.set(queryName, queryValue);
+        return `${origin}/playback?${params.toString()}`;
     }
 
     ensureShareKeyAvailable(shareKey) {
@@ -380,7 +385,10 @@ class PlaybackTokenService {
         const row = sanitizeTokenRow(tokenRow) || tokenRow;
         const template = row?.share_template?.trim() || DEFAULT_SHARE_TEMPLATE;
         const accessCode = shareKey || token;
-        const playbackUrl = this.buildPlaybackUrl({ token, shareKey, request });
+        const targetCameraId = row?.scope_type === 'selected'
+            ? row.allowed_camera_ids?.[0] || row.camera_rules?.find((rule) => rule.enabled)?.camera_id || null
+            : null;
+        const playbackUrl = this.buildPlaybackUrl({ token, shareKey, request, targetCameraId });
         const cameraScope = row?.scope_type === 'selected'
             ? `${row.camera_ids?.length || 0} kamera terpilih`
             : 'Semua kamera playback';
