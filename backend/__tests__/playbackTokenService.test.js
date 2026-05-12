@@ -264,6 +264,37 @@ describe('playbackTokenService', () => {
         expect(() => playbackTokenService.validateRawTokenForCamera('rafpb_test', 12)).toThrow('Token playback tidak mencakup kamera ini');
     });
 
+    it('returns default selected camera metadata when validating a token without requested camera', async () => {
+        vi.spyOn(connectionPool, 'execute').mockReturnValue({ changes: 1 });
+        vi.spyOn(connectionPool, 'queryOne').mockReturnValue({
+            id: 77,
+            label: 'Client Single CCTV',
+            token_prefix: 'rafpb_single',
+            share_key_prefix: 'SANDI1234',
+            preset: 'custom',
+            scope_type: 'selected',
+            camera_ids_json: '[]',
+            playback_window_hours: null,
+            expires_at: null,
+            revoked_at: null,
+            last_used_at: null,
+            use_count: 0,
+            share_template: null,
+            created_by: 1,
+            created_at: '2026-05-05 12:00:00',
+            updated_at: '2026-05-05 12:00:00',
+        });
+        vi.spyOn(connectionPool, 'query').mockReturnValue([
+            { camera_id: 1168, enabled: 1, playback_window_hours: null, expires_at: null, note: '' },
+        ]);
+        const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
+
+        const result = playbackTokenService.validateRawTokenForCamera('SANDI1234', 0, { touch: false });
+
+        expect(result.allowed_camera_ids).toEqual([1168]);
+        expect(result.default_camera_id).toBe(1168);
+    });
+
     it('builds repeat share text with a share key instead of exposing the original token', async () => {
         vi.spyOn(connectionPool, 'execute').mockReturnValue({ changes: 1 });
         vi.spyOn(connectionPool, 'queryOne')
@@ -334,6 +365,29 @@ describe('playbackTokenService', () => {
         });
 
         expect(shareText).toContain('/playback?cam=7&share=CLIENT88');
+    });
+
+    it('builds selected-camera share text count from allowed camera metadata', async () => {
+        const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
+
+        const shareText = playbackTokenService.buildShareText({
+            shareKey: 'SANDI1234',
+            tokenRow: {
+                label: 'Client Alang Alang',
+                scope_type: 'selected',
+                camera_ids_json: '[]',
+                camera_rules: [{ camera_id: 1168, enabled: true }],
+                allowed_camera_ids: [1168],
+                expires_at: null,
+                share_template: 'Kode Akses: {{token}}\nLink: {{playback_url}}\nBerlaku: {{expires_at}}\nAkses: {{camera_scope}}',
+            },
+            request: { headers: { origin: 'http://172.17.11.12:800' } },
+        });
+
+        expect(shareText).toContain('Kode Akses: SANDI1234');
+        expect(shareText).toContain('Link: http://172.17.11.12:800/playback?cam=1168&share=SANDI1234');
+        expect(shareText).toContain('Akses: 1 kamera terpilih');
+        expect(shareText).not.toContain('Akses: 0 kamera terpilih');
     });
 
     it('records camera access audit when token validation is touched', async () => {

@@ -243,6 +243,49 @@ function sanitizeTokenRow(row) {
     };
 }
 
+function getEnabledRuleCameraIds(row = {}) {
+    const rules = Array.isArray(row.camera_rules) ? row.camera_rules : [];
+    return [...new Set(rules
+        .filter((rule) => rule && rule.enabled !== false && rule.enabled !== 0)
+        .map((rule) => Number.parseInt(rule.camera_id, 10))
+        .filter((cameraId) => Number.isInteger(cameraId) && cameraId > 0))];
+}
+
+function resolveAllowedCameraIds(row = {}) {
+    if (Array.isArray(row.allowed_camera_ids) && row.allowed_camera_ids.length > 0) {
+        return [...new Set(row.allowed_camera_ids
+            .map((cameraId) => Number.parseInt(cameraId, 10))
+            .filter((cameraId) => Number.isInteger(cameraId) && cameraId > 0))];
+    }
+
+    const ruleCameraIds = getEnabledRuleCameraIds(row);
+    if (ruleCameraIds.length > 0) {
+        return ruleCameraIds;
+    }
+
+    if (Array.isArray(row.camera_ids) && row.camera_ids.length > 0) {
+        return [...new Set(row.camera_ids
+            .map((cameraId) => Number.parseInt(cameraId, 10))
+            .filter((cameraId) => Number.isInteger(cameraId) && cameraId > 0))];
+    }
+
+    return parseCameraIdsJson(row.camera_ids_json);
+}
+
+function resolveDefaultCameraId(row = {}, requestedCameraId = null) {
+    const allowedCameraIds = resolveAllowedCameraIds(row);
+    const normalizedRequestedCameraId = Number.parseInt(requestedCameraId, 10);
+    if (
+        Number.isInteger(normalizedRequestedCameraId)
+        && normalizedRequestedCameraId > 0
+        && allowedCameraIds.includes(normalizedRequestedCameraId)
+    ) {
+        return normalizedRequestedCameraId;
+    }
+
+    return allowedCameraIds[0] || null;
+}
+
 function getRequestOrigin(request) {
     const origin = request?.headers?.origin;
     if (origin) {
@@ -385,12 +428,15 @@ class PlaybackTokenService {
         const row = sanitizeTokenRow(tokenRow) || tokenRow;
         const template = row?.share_template?.trim() || DEFAULT_SHARE_TEMPLATE;
         const accessCode = shareKey || token;
+        const allowedCameraIds = row?.scope_type === 'selected'
+            ? resolveAllowedCameraIds(row)
+            : [];
         const targetCameraId = row?.scope_type === 'selected'
-            ? row.allowed_camera_ids?.[0] || row.camera_rules?.find((rule) => rule.enabled)?.camera_id || null
+            ? resolveDefaultCameraId({ ...row, allowed_camera_ids: allowedCameraIds })
             : null;
         const playbackUrl = this.buildPlaybackUrl({ token, shareKey, request, targetCameraId });
         const cameraScope = row?.scope_type === 'selected'
-            ? `${row.camera_ids?.length || 0} kamera terpilih`
+            ? `${allowedCameraIds.length} kamera terpilih`
             : 'Semua kamera playback';
         const expiresAt = row?.expires_at || 'Selamanya';
         const playbackWindow = row?.playback_window_hours
@@ -989,9 +1035,13 @@ class PlaybackTokenService {
         }
 
         const normalizedCameraId = Number.parseInt(cameraId, 10);
+        const cameraRules = Array.isArray(token.camera_rules) && token.camera_rules.length > 0
+            ? token.camera_rules
+            : playbackTokenRuleService.getRulesForToken(token.id);
+        const tokenWithRules = { ...token, camera_rules: cameraRules };
         const cameraPolicy = normalizedCameraId > 0
             ? playbackTokenRuleService.resolveCameraAccess({
-                token,
+                token: tokenWithRules,
                 camera: options.camera || {
                     id: normalizedCameraId,
                     public_playback_mode: options.publicPlaybackMode || 'inherit',
@@ -1027,11 +1077,16 @@ class PlaybackTokenService {
             });
         }
 
+        const allowedCameraIds = playbackTokenRuleService.getAllowedCameraIds(tokenWithRules);
+
         return {
             ...token,
             effective_playback_window_hours: cameraPolicy.playbackWindowHours ?? token.playback_window_hours,
-            allowed_camera_ids: playbackTokenRuleService.getAllowedCameraIds(token),
-            camera_rules: Array.isArray(token.camera_rules) ? token.camera_rules : playbackTokenRuleService.getRulesForToken(token.id),
+            allowed_camera_ids: allowedCameraIds,
+            camera_rules: cameraRules,
+            default_camera_id: token.scope_type === 'selected'
+                ? resolveDefaultCameraId({ ...tokenWithRules, allowed_camera_ids: allowedCameraIds }, normalizedCameraId)
+                : null,
         };
     }
 
