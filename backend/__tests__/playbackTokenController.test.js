@@ -83,6 +83,7 @@ describe('playbackTokenController', () => {
             scope_type: 'selected',
             allowed_camera_ids: [7],
             camera_rules: [{ camera_id: 7, enabled: true, playback_window_hours: 24 }],
+            default_camera_id: 7,
         });
         createPlaybackSessionMock.mockReturnValue({
             session_id: 'session-2',
@@ -104,6 +105,7 @@ describe('playbackTokenController', () => {
             scope_type: 'selected',
             allowed_camera_ids: [7],
             camera_rules: [{ camera_id: 7, enabled: true, playback_window_hours: 24 }],
+            default_camera_id: 7,
         });
     });
 });
