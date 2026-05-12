@@ -12,6 +12,7 @@ const logAdminActionMock = vi.fn();
 const getPublicPlaybackSettingsMock = vi.fn();
 const existsSyncMock = vi.fn();
 const statSyncMock = vi.fn();
+const validateRequestForCameraMock = vi.fn();
 
 vi.mock('../database/database.js', () => ({
     query: queryMock,
@@ -49,6 +50,12 @@ vi.mock('../services/settingsService.js', () => ({
     },
 }));
 
+vi.mock('../services/playbackTokenService.js', () => ({
+    default: {
+        validateRequestForCamera: validateRequestForCameraMock,
+    },
+}));
+
 const { default: recordingPlaybackService } = await import('../services/recordingPlaybackService.js');
 
 describe('recordingPlaybackService', () => {
@@ -66,6 +73,7 @@ describe('recordingPlaybackService', () => {
             },
             contactMode: 'branding_whatsapp',
         });
+        validateRequestForCameraMock.mockReturnValue(null);
     });
 
     it('returns enriched overview camera fields for recording dashboard', () => {
@@ -180,6 +188,48 @@ describe('recordingPlaybackService', () => {
         });
 
         expect(() => recordingPlaybackService.getSegments(11, { query: {} })).toThrow('Playback publik tidak tersedia untuk kamera ini');
+    });
+
+    it('allows explicit selected token for admin_only camera', () => {
+        validateRequestForCameraMock.mockReturnValue({
+            id: 20,
+            scope_type: 'selected',
+            effective_playback_window_hours: 12,
+        });
+
+        const access = recordingPlaybackService.resolvePlaybackAccess({
+            id: 4,
+            public_playback_mode: 'admin_only',
+            public_playback_preview_minutes: 10,
+        }, { query: {}, url: '/api/recordings/4/segments', cookies: { raf_playback_token: 'token' } });
+
+        expect(validateRequestForCameraMock).toHaveBeenCalledWith(
+            expect.any(Object),
+            4,
+            expect.objectContaining({
+                camera: expect.objectContaining({ id: 4 }),
+            })
+        );
+        expect(access).toMatchObject({
+            accessMode: 'token_full',
+            playbackWindowHours: 12,
+            tokenId: 20,
+        });
+    });
+
+    it('denies all-scope token for admin_only camera when token service rejects it', () => {
+        validateRequestForCameraMock.mockImplementation(() => {
+            const err = new Error('Token playback tidak mencakup kamera ini');
+            err.statusCode = 403;
+            throw err;
+        });
+
+        expect(() => recordingPlaybackService.resolvePlaybackAccess({
+            id: 4,
+            public_playback_mode: 'admin_only',
+            public_playback_preview_minutes: 10,
+        }, { query: {}, url: '/api/recordings/4/segments', cookies: { raf_playback_token: 'token' } }))
+            .toThrow('Token playback tidak mencakup kamera ini');
     });
 
     it('streams by filename without loading every segment for the camera', () => {

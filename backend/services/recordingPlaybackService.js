@@ -215,13 +215,14 @@ class RecordingPlaybackService {
         const tokenAccess = playbackTokenService.validateRequestForCamera(request, camera.id, {
             touch: shouldTouchToken,
             eventType: isPlaylistRequest ? 'access_playlist' : 'access_segments',
+            camera,
         });
         if (tokenAccess) {
             return {
                 accessMode: 'token_full',
                 isPublicPreview: false,
                 previewMinutes: null,
-                playbackWindowHours: tokenAccess.playback_window_hours,
+                playbackWindowHours: tokenAccess.effective_playback_window_hours ?? tokenAccess.playback_window_hours,
                 tokenId: tokenAccess.id,
                 notice: null,
                 contact: null,
