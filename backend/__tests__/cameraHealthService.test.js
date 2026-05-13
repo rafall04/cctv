@@ -1086,6 +1086,97 @@ describe('cameraHealthService check loop', () => {
         expect(service.evaluateCameraStatus).toHaveBeenCalledTimes(1);
         expect(service.evaluateCameraStatus).toHaveBeenCalledWith(dueCamera, expect.any(Map));
     });
+
+    it('sends Telegram offline when monitoring state changes even if stream availability stays online', async () => {
+        const telegram = await import('../services/telegramService.js');
+        telegram.isTelegramConfigured.mockReturnValue(true);
+
+        const service = new CameraHealthService();
+        const camera = {
+            id: 61,
+            name: 'Always On Internal',
+            enabled: 1,
+            is_online: 1,
+            monitoring_state: 'online',
+            stream_source: 'internal',
+            delivery_type: 'internal_hls',
+            private_rtsp_url: 'rtsp://admin:secret@10.0.0.61/stream',
+            stream_key: 'camera-61',
+            internal_ingest_policy_override: 'always_on',
+        };
+
+        vi.spyOn(service, 'getActivePaths').mockResolvedValue(new Map());
+        vi.spyOn(service, 'evaluateCameraStatus').mockResolvedValue({
+            camera,
+            isOnline: 1,
+            rawReason: 'mediamtx_path_configured_idle',
+            rawDetails: null,
+        });
+        vi.spyOn(service, 'evaluateCameraMonitoringStatus').mockResolvedValue({
+            isOnline: 0,
+            monitoring_state: 'offline',
+            monitoring_reason: 'rtsp_stream_not_found',
+        });
+
+        queryMock
+            .mockReturnValueOnce([{ id: 61, is_online: 1 }])
+            .mockReturnValueOnce([camera]);
+        executeMock.mockReturnValue({ changes: 1 });
+        upsertRuntimeStateMock.mockImplementation(() => {});
+
+        await service.checkAllCameras();
+
+        expect(telegram.sendCameraStatusNotifications).toHaveBeenCalledWith('offline', [camera]);
+        expect(connectionPool.execute).toHaveBeenCalledWith(
+            expect.stringContaining('UPDATE cameras SET is_online'),
+            expect.arrayContaining([1, expect.any(String), 61])
+        );
+        expect(upsertRuntimeStateMock).toHaveBeenCalledWith(61, expect.objectContaining({
+            is_online: 1,
+            monitoring_state: 'offline',
+            monitoring_reason: 'rtsp_stream_not_found',
+        }));
+    });
+
+    it('does not send Telegram when monitoring state has not crossed online/offline boundary', async () => {
+        const telegram = await import('../services/telegramService.js');
+        telegram.isTelegramConfigured.mockReturnValue(true);
+
+        const service = new CameraHealthService();
+        const camera = {
+            id: 62,
+            name: 'Stable Internal',
+            enabled: 1,
+            is_online: 1,
+            monitoring_state: 'online',
+            delivery_type: 'internal_hls',
+            private_rtsp_url: 'rtsp://admin:secret@10.0.0.62/stream',
+            internal_ingest_policy_override: 'always_on',
+        };
+
+        vi.spyOn(service, 'getActivePaths').mockResolvedValue(new Map());
+        vi.spyOn(service, 'evaluateCameraStatus').mockResolvedValue({
+            camera,
+            isOnline: 1,
+            rawReason: 'mediamtx_path_ready',
+            rawDetails: null,
+        });
+        vi.spyOn(service, 'evaluateCameraMonitoringStatus').mockResolvedValue({
+            isOnline: 1,
+            monitoring_state: 'online',
+            monitoring_reason: 'rtsp_reachable',
+        });
+
+        queryMock
+            .mockReturnValueOnce([{ id: 62, is_online: 1 }])
+            .mockReturnValueOnce([camera]);
+        executeMock.mockReturnValue({ changes: 1 });
+        upsertRuntimeStateMock.mockImplementation(() => {});
+
+        await service.checkAllCameras();
+
+        expect(telegram.sendCameraStatusNotifications).not.toHaveBeenCalled();
+    });
 });
 
 describe('cameraHealthService health debug pagination', () => {

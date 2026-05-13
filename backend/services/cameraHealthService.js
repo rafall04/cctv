@@ -1,7 +1,7 @@
 /*
 Purpose: Monitor camera availability, update runtime health state, and trigger recording/thumbnail transitions.
 Caller: Backend server startup, camera health routes, and runtime stream signal handlers.
-Deps: connectionPool, cameraRuntimeStateService, mediaMtxService, recordingService, thumbnailService, cameraHealthPolicy.
+Deps: connectionPool, cameraRuntimeStateService, mediaMtxService, recordingService, thumbnailService, cameraHealthPolicy, cameraMonitoringAlertPolicy.
 MainFuncs: CameraHealthService, checkAllCameras(), checkCamera(), evaluateCameraStatus(), clearCameraRuntimeState(), recordRuntimeSignal().
 SideEffects: Updates camera online state/runtime state, repairs MediaMTX paths, sends notifications, pauses/resumes recording.
 */
@@ -36,6 +36,10 @@ import {
     isStrictOnDemandSourceProfile,
 } from '../utils/internalIngestPolicy.js';
 import { resolveExternalHealthMode as resolveExternalHealthModePolicy } from './cameraHealthPolicy.js';
+import {
+    getMonitoringAlertTransition,
+    shouldUseStrictInternalMonitoring,
+} from './cameraMonitoringAlertPolicy.js';
 
 const mediaMtxApiBaseUrl = `${(config.mediamtx?.apiUrl || 'http://localhost:9997').replace(/\/$/, '')}/v3`;
 
@@ -1060,8 +1064,9 @@ class CameraHealthService {
 
     getEnabledCameraCandidates() {
         return query(`
-            SELECT c.id, c.is_online
+            SELECT c.id, c.is_online, crs.monitoring_state
             FROM cameras c
+            LEFT JOIN camera_runtime_state crs ON crs.camera_id = c.id
             WHERE c.enabled = 1
             ORDER BY c.id ASC
         `);
@@ -1074,9 +1079,12 @@ class CameraHealthService {
 
         const placeholders = cameraIds.map(() => '?').join(', ');
         return query(`
-            SELECT ${SHARED_CAMERA_STREAM_WITH_AREA_PROJECTION}
+            SELECT ${SHARED_CAMERA_STREAM_WITH_AREA_PROJECTION},
+                   crs.monitoring_state,
+                   crs.monitoring_reason
             FROM cameras c
             LEFT JOIN areas a ON c.area_id = a.id
+            LEFT JOIN camera_runtime_state crs ON crs.camera_id = c.id
             WHERE c.enabled = 1
               AND c.id IN (${placeholders})
             ORDER BY c.id ASC
@@ -2479,6 +2487,23 @@ class CameraHealthService {
         };
     }
 
+    async evaluateCameraMonitoringStatus(camera, activePaths, streamResult) {
+        if (shouldUseStrictInternalMonitoring(camera)) {
+            const rtspResult = await this.probeInternalRtspSource(camera.private_rtsp_url);
+            return {
+                isOnline: rtspResult.online ? 1 : 0,
+                monitoring_state: rtspResult.online ? 'online' : 'offline',
+                monitoring_reason: rtspResult.reason || (rtspResult.online ? 'rtsp_reachable' : 'rtsp_unreachable'),
+            };
+        }
+
+        return {
+            isOnline: streamResult.isOnline,
+            monitoring_state: deriveMonitoringStateFromOnline(streamResult.isOnline),
+            monitoring_reason: streamResult.rawReason || (streamResult.isOnline ? 'health_check_online' : 'health_check_offline'),
+        };
+    }
+
     async checkAllCameras() {
         if (this.isChecking) {
             console.log('[CameraHealth] Previous check still running, skipping this tick');
@@ -2505,13 +2530,22 @@ class CameraHealthService {
                 return this.evaluateCameraStatus(camera, activePaths);
             });
 
-            const finalResults = probeResults
-                .filter(p => p.result.status === 'fulfilled')
-                .map(p => ({
-                    cameraId: p.result.value.camera.id,
-                    isOnline: p.result.value.isOnline,
+            const finalResults = [];
+            const finalResultsById = new Map();
+            for (const probe of probeResults.filter(p => p.result.status === 'fulfilled')) {
+                const streamResult = probe.result.value;
+                const monitoring = await this.evaluateCameraMonitoringStatus(streamResult.camera, activePaths, streamResult);
+                const finalResult = {
+                    cameraId: streamResult.camera.id,
+                    isOnline: streamResult.isOnline,
+                    monitoringOnline: monitoring.isOnline,
+                    monitoringState: monitoring.monitoring_state,
+                    monitoringReason: monitoring.monitoring_reason,
                     timestamp
-                }));
+                };
+                finalResults.push(finalResult);
+                finalResultsById.set(finalResult.cameraId, finalResult);
+            }
 
             const shouldCheckpoint = now - this.lastCheckpointWriteAt >= CHECKPOINT_DB_WRITE_MS;
             const batchUpdate = transaction((results) => {
@@ -2521,8 +2555,8 @@ class CameraHealthService {
                     );
                     cameraRuntimeStateService.upsertRuntimeState(res.cameraId, {
                         is_online: res.isOnline,
-                        monitoring_state: deriveMonitoringStateFromOnline(res.isOnline),
-                        monitoring_reason: res.isOnline ? 'health_check_online' : 'health_check_offline',
+                        monitoring_state: res.monitoringState,
+                        monitoring_reason: res.monitoringReason,
                         last_health_check_at: res.timestamp,
                     });
                 }
@@ -2548,15 +2582,20 @@ class CameraHealthService {
 
                 const { camera, isOnline, rawReason } = result.value;
                 processedIds.add(camera.id);
+                const finalResult = finalResultsById.get(camera.id);
                 const statusChanged = camera.is_online !== isOnline;
+                const alertTransition = getMonitoringAlertTransition(
+                    camera.monitoring_state || deriveMonitoringStateFromOnline(camera.is_online),
+                    finalResult?.monitoringState || deriveMonitoringStateFromOnline(isOnline)
+                );
 
                 if (statusChanged) {
                     await this.handleCameraStatusTransition(camera, camera.is_online, isOnline, rawReason);
                     changedCount += 1;
-                    
-                    if (isOnline) wentOnline.push(camera);
-                    else wentOffline.push(camera);
                 }
+
+                if (alertTransition === 'online') wentOnline.push(camera);
+                if (alertTransition === 'offline') wentOffline.push(camera);
 
                 if (isOnline) onlineCount += 1;
                 else {
@@ -2588,11 +2627,11 @@ class CameraHealthService {
                     
                     if (realOffline.length > 0) {
                         for (const cam of realOffline) this.offlineSince.set(cam.id, Date.now());
-                        sendCameraStatusNotifications('offline', realOffline).catch(e => console.error(e));
+                        Promise.resolve(sendCameraStatusNotifications('offline', realOffline)).catch(e => console.error(e));
                     }
                     if (realOnline.length > 0) {
                         for (const cam of realOnline) this.offlineSince.delete(cam.id);
-                        sendCameraStatusNotifications('online', realOnline).catch(e => console.error(e));
+                        Promise.resolve(sendCameraStatusNotifications('online', realOnline)).catch(e => console.error(e));
                     }
                 } catch (err) {
                     console.error('[CameraHealth] Error routing telegram notification', err);
