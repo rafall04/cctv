@@ -1109,7 +1109,7 @@ describe('cameraHealthService check loop', () => {
         expect(service.evaluateCameraStatus).toHaveBeenCalledWith(dueCamera, expect.any(Map));
     });
 
-    it('sends Telegram offline when monitoring state changes even if stream availability stays online', async () => {
+    it('updates monitoring offline immediately when stream availability stays online but delays Telegram alert', async () => {
         const telegram = await import('../services/telegramService.js');
         telegram.isTelegramConfigured.mockReturnValue(true);
 
@@ -1148,7 +1148,7 @@ describe('cameraHealthService check loop', () => {
 
         await service.checkAllCameras();
 
-        expect(telegram.sendCameraStatusNotifications).toHaveBeenCalledWith('offline', [camera]);
+        expect(telegram.sendCameraStatusNotifications).not.toHaveBeenCalled();
         expect(connectionPool.execute).toHaveBeenCalledWith(
             expect.stringContaining('UPDATE cameras SET is_online'),
             expect.arrayContaining([1, expect.any(String), 61])
@@ -1249,7 +1249,7 @@ describe('cameraHealthService check loop', () => {
         }));
     });
 
-    it('still sends Telegram DOWN for explicit strict internal HLS monitoring when RTSP probe fails', async () => {
+    it('updates explicit strict internal HLS monitoring offline immediately when RTSP probe fails', async () => {
         const telegram = await import('../services/telegramService.js');
         telegram.isTelegramConfigured.mockReturnValue(true);
 
@@ -1288,12 +1288,120 @@ describe('cameraHealthService check loop', () => {
 
         await service.checkAllCameras();
 
-        expect(telegram.sendCameraStatusNotifications).toHaveBeenCalledWith('offline', [camera]);
+        expect(telegram.sendCameraStatusNotifications).not.toHaveBeenCalled();
         expect(upsertRuntimeStateMock).toHaveBeenCalledWith(64, expect.objectContaining({
             is_online: 1,
             monitoring_state: 'offline',
             monitoring_reason: 'rtsp_auth_failed',
         }));
+    });
+
+    it('updates runtime offline immediately but delays Telegram DOWN until confirmation window passes', async () => {
+        const telegram = await import('../services/telegramService.js');
+        telegram.isTelegramConfigured.mockReturnValue(true);
+
+        const service = new CameraHealthService();
+        service.telegramAlertConfirmationMs = {
+            down: 120_000,
+            up: 60_000,
+        };
+
+        const camera = {
+            id: 65,
+            name: 'Delayed Telegram Internal',
+            enabled: 1,
+            is_online: 1,
+            monitoring_state: 'online',
+            stream_source: 'internal',
+            delivery_type: 'internal_hls',
+            private_rtsp_url: 'rtsp://admin:secret@10.0.0.65/stream',
+            stream_key: 'camera-65',
+            internal_ingest_policy_override: 'always_on',
+        };
+
+        vi.spyOn(Date, 'now').mockReturnValue(1_000);
+        vi.spyOn(service, 'getActivePaths').mockResolvedValue(new Map());
+        vi.spyOn(service, 'evaluateCameraStatus').mockResolvedValue({
+            camera,
+            isOnline: 1,
+            rawReason: 'mediamtx_path_configured_idle',
+            rawDetails: null,
+        });
+        vi.spyOn(service, 'probeInternalRtspSource').mockResolvedValue({
+            online: false,
+            reason: 'rtsp_auth_failed',
+            details: {},
+        });
+
+        queryMock
+            .mockReturnValueOnce([{ id: 65, is_online: 1, monitoring_state: 'online' }])
+            .mockReturnValueOnce([camera]);
+        executeMock.mockReturnValue({ changes: 1 });
+        upsertRuntimeStateMock.mockImplementation(() => {});
+
+        await service.checkAllCameras();
+
+        expect(telegram.sendCameraStatusNotifications).not.toHaveBeenCalled();
+        expect(upsertRuntimeStateMock).toHaveBeenCalledWith(65, expect.objectContaining({
+            is_online: 1,
+            monitoring_state: 'offline',
+            monitoring_reason: 'rtsp_auth_failed',
+        }));
+    });
+
+    it('sends Telegram DOWN after offline state stays stable through the confirmation window', async () => {
+        const telegram = await import('../services/telegramService.js');
+        telegram.isTelegramConfigured.mockReturnValue(true);
+
+        const service = new CameraHealthService();
+        service.telegramAlertConfirmationMs = {
+            down: 120_000,
+            up: 60_000,
+        };
+        service.telegramAlertState.set(66, {
+            confirmedState: 'online',
+            pendingTransition: 'offline',
+            pendingSince: 1_000,
+            lastObservedState: 'offline',
+            lastUpdatedAt: 1_000,
+        });
+
+        const camera = {
+            id: 66,
+            name: 'Confirmed Telegram Internal',
+            enabled: 1,
+            is_online: 1,
+            monitoring_state: 'online',
+            stream_source: 'internal',
+            delivery_type: 'internal_hls',
+            private_rtsp_url: 'rtsp://admin:secret@10.0.0.66/stream',
+            stream_key: 'camera-66',
+            internal_ingest_policy_override: 'always_on',
+        };
+
+        vi.spyOn(Date, 'now').mockReturnValue(121_000);
+        vi.spyOn(service, 'getActivePaths').mockResolvedValue(new Map());
+        vi.spyOn(service, 'evaluateCameraStatus').mockResolvedValue({
+            camera,
+            isOnline: 1,
+            rawReason: 'mediamtx_path_configured_idle',
+            rawDetails: null,
+        });
+        vi.spyOn(service, 'probeInternalRtspSource').mockResolvedValue({
+            online: false,
+            reason: 'rtsp_auth_failed',
+            details: {},
+        });
+
+        queryMock
+            .mockReturnValueOnce([{ id: 66, is_online: 1, monitoring_state: 'online' }])
+            .mockReturnValueOnce([camera]);
+        executeMock.mockReturnValue({ changes: 1 });
+        upsertRuntimeStateMock.mockImplementation(() => {});
+
+        await service.checkAllCameras();
+
+        expect(telegram.sendCameraStatusNotifications).toHaveBeenCalledWith('offline', [camera]);
     });
 });
 

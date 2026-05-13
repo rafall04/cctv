@@ -1,7 +1,7 @@
 /*
 Purpose: Monitor camera availability, update runtime health state, and trigger recording/thumbnail transitions.
 Caller: Backend server startup, camera health routes, and runtime stream signal handlers.
-Deps: connectionPool, cameraRuntimeStateService, mediaMtxService, recordingService, thumbnailService, cameraHealthPolicy, cameraMonitoringAlertPolicy.
+Deps: connectionPool, cameraRuntimeStateService, mediaMtxService, recordingService, thumbnailService, cameraHealthPolicy, cameraMonitoringAlertPolicy, telegramAlertConfirmationPolicy.
 MainFuncs: CameraHealthService, checkAllCameras(), checkCamera(), evaluateCameraStatus(), clearCameraRuntimeState(), recordRuntimeSignal().
 SideEffects: Updates camera online state/runtime state, repairs MediaMTX paths, sends notifications, pauses/resumes recording.
 */
@@ -40,6 +40,12 @@ import {
     getMonitoringAlertTransition,
     shouldUseStrictInternalMonitoring,
 } from './cameraMonitoringAlertPolicy.js';
+import {
+    DEFAULT_TELEGRAM_DOWN_CONFIRMATION_MS,
+    DEFAULT_TELEGRAM_UP_CONFIRMATION_MS,
+    createTelegramAlertConfirmationState,
+    evaluateTelegramAlertConfirmation,
+} from './telegramAlertConfirmationPolicy.js';
 
 const mediaMtxApiBaseUrl = `${(config.mediamtx?.apiUrl || 'http://localhost:9997').replace(/\/$/, '')}/v3`;
 
@@ -837,6 +843,11 @@ class CameraHealthService {
         this.lastCheck = null;
         this.lastCheckpointWriteAt = 0;
         this.offlineSince = new Map();
+        this.telegramAlertState = new Map();
+        this.telegramAlertConfirmationMs = {
+            down: DEFAULT_TELEGRAM_DOWN_CONFIRMATION_MS,
+            up: DEFAULT_TELEGRAM_UP_CONFIRMATION_MS,
+        };
         this.healthState = new Map();
         this.domainHealth = new Map();
         this.probeCache = new Map();
@@ -848,6 +859,7 @@ class CameraHealthService {
         const normalizedCameraId = Number(cameraId);
         this.healthState.delete(normalizedCameraId);
         this.offlineSince.delete(normalizedCameraId);
+        this.telegramAlertState.delete(normalizedCameraId);
 
         const cameraToken = `camera:${normalizedCameraId}`;
         for (const key of this.probeCache.keys()) {
@@ -2584,10 +2596,19 @@ class CameraHealthService {
                 processedIds.add(camera.id);
                 const finalResult = finalResultsById.get(camera.id);
                 const statusChanged = camera.is_online !== isOnline;
-                const alertTransition = getMonitoringAlertTransition(
-                    camera.monitoring_state || deriveMonitoringStateFromOnline(camera.is_online),
-                    finalResult?.monitoringState || deriveMonitoringStateFromOnline(isOnline)
-                );
+                const previousMonitoringState = camera.monitoring_state || deriveMonitoringStateFromOnline(camera.is_online);
+                const nextMonitoringState = finalResult?.monitoringState || deriveMonitoringStateFromOnline(isOnline);
+                const rawAlertTransition = getMonitoringAlertTransition(previousMonitoringState, nextMonitoringState);
+                const currentAlertState = this.telegramAlertState.get(camera.id)
+                    || createTelegramAlertConfirmationState(previousMonitoringState, Date.now());
+                const confirmedAlert = evaluateTelegramAlertConfirmation(currentAlertState, {
+                    nextState: rawAlertTransition ? nextMonitoringState : previousMonitoringState === nextMonitoringState ? nextMonitoringState : null,
+                    now: Date.now(),
+                    downConfirmationMs: this.telegramAlertConfirmationMs.down,
+                    upConfirmationMs: this.telegramAlertConfirmationMs.up,
+                });
+                this.telegramAlertState.set(camera.id, confirmedAlert.state);
+                const alertTransition = confirmedAlert.transitionToSend;
 
                 if (statusChanged) {
                     await this.handleCameraStatusTransition(camera, camera.is_online, isOnline, rawReason);
@@ -2642,6 +2663,7 @@ class CameraHealthService {
                 if (!activeCameraIds.has(cameraId)) {
                     this.healthState.delete(cameraId);
                     this.offlineSince.delete(cameraId);
+                    this.telegramAlertState.delete(cameraId);
                 }
             }
 
