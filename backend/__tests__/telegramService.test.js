@@ -26,7 +26,10 @@ vi.mock('../database/database.js', () => ({
 }));
 
 vi.mock('../services/timezoneService.js', () => ({
-    formatDateTime: () => '2026-05-05 04:10:00',
+    formatDateTime: (date) => {
+        const value = date instanceof Date ? date : new Date(date);
+        return value.toISOString().replace('T', ' ').replace('.000Z', '');
+    },
 }));
 
 async function loadTelegramService(config) {
@@ -47,6 +50,7 @@ describe('telegramService notification routing', () => {
     });
 
     afterEach(() => {
+        vi.useRealTimers();
         process.env.TELEGRAM_BOT_TOKEN = ORIGINAL_TELEGRAM_ENV.TELEGRAM_BOT_TOKEN;
         process.env.TELEGRAM_MONITORING_CHAT_ID = ORIGINAL_TELEGRAM_ENV.TELEGRAM_MONITORING_CHAT_ID;
         process.env.TELEGRAM_CHAT_ID = ORIGINAL_TELEGRAM_ENV.TELEGRAM_CHAT_ID;
@@ -97,6 +101,86 @@ describe('telegramService notification routing', () => {
         expect(payload.chat_id).toBe('-100-area');
         expect(payload.text).toContain('CCTV Lokal');
         expect(payload.text).not.toContain('CCTV Surabaya');
+    });
+
+    it('includes per-camera detected DOWN time and alert send time in grouped notifications', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-05-13T07:23:00.000Z'));
+        const telegram = await loadTelegramService({
+            botToken: '123456789:test',
+            monitoringChatId: '-100-main',
+            notificationTargets: [
+                { id: 'area-bojonegoro', name: 'Area Bojonegoro', chatId: '-100-area' },
+            ],
+            notificationRules: [
+                {
+                    id: 'rule-area',
+                    enabled: true,
+                    targetId: 'area-bojonegoro',
+                    scope: 'area',
+                    areaId: 7,
+                    events: ['offline'],
+                    ingestModes: ['always_on'],
+                },
+            ],
+        });
+
+        await telegram.sendCameraStatusNotifications('offline', [
+            {
+                id: 10,
+                name: 'CCTV Lokal',
+                area_id: 7,
+                area_name: 'KAB BOJONEGORO',
+                delivery_type: 'internal_hls',
+                internal_ingest_policy_override: 'always_on',
+                alertDetectedAt: 1_778_656_860_000,
+            },
+        ], { bypassCooldown: true });
+
+        const payload = JSON.parse(global.fetch.mock.calls[0][1].body);
+        expect(payload.text).toContain('1. CCTV Lokal');
+        expect(payload.text).toContain('Terdeteksi DOWN: 2026-05-13 07:21:00');
+        expect(payload.text).toContain('Alert dikirim: 2026-05-13 07:23:00');
+    });
+
+    it('includes per-camera detected UP time in grouped recovery notifications', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-05-13T07:26:00.000Z'));
+        const telegram = await loadTelegramService({
+            botToken: '123456789:test',
+            monitoringChatId: '-100-main',
+            notificationTargets: [
+                { id: 'area-bojonegoro', name: 'Area Bojonegoro', chatId: '-100-area' },
+            ],
+            notificationRules: [
+                {
+                    id: 'rule-area',
+                    enabled: true,
+                    targetId: 'area-bojonegoro',
+                    scope: 'area',
+                    areaId: 7,
+                    events: ['online'],
+                    ingestModes: ['always_on'],
+                },
+            ],
+        });
+
+        await telegram.sendCameraStatusNotifications('online', [
+            {
+                id: 10,
+                name: 'CCTV Lokal',
+                area_id: 7,
+                area_name: 'KAB BOJONEGORO',
+                delivery_type: 'internal_hls',
+                internal_ingest_policy_override: 'always_on',
+                alertDetectedAt: 1_778_657_100_000,
+            },
+        ], { bypassCooldown: true });
+
+        const payload = JSON.parse(global.fetch.mock.calls[0][1].body);
+        expect(payload.text).toContain('1. CCTV Lokal');
+        expect(payload.text).toContain('Terdeteksi UP: 2026-05-13 07:25:00');
+        expect(payload.text).toContain('Alert dikirim: 2026-05-13 07:26:00');
     });
 
     it('dedupes identical chat IDs when a camera matches multiple rules', async () => {

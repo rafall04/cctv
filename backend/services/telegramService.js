@@ -304,6 +304,34 @@ function groupCamerasByArea(cameras = []) {
     return groups;
 }
 
+function normalizeAlertDetectedAt(value) {
+    if (value instanceof Date && Number.isFinite(value.getTime())) {
+        return value;
+    }
+
+    if (Number.isFinite(value)) {
+        const date = new Date(value);
+        return Number.isFinite(date.getTime()) ? date : null;
+    }
+
+    if (typeof value === 'string' && value.trim()) {
+        const date = new Date(value);
+        return Number.isFinite(date.getTime()) ? date : null;
+    }
+
+    return null;
+}
+
+function buildCameraStatusLine(camera, index, eventType) {
+    const lines = [`${index + 1}. ${camera.name}`];
+    const detectedAt = normalizeAlertDetectedAt(camera.alertDetectedAt);
+    if (detectedAt) {
+        const label = eventType === 'offline' ? 'Terdeteksi DOWN' : 'Terdeteksi UP';
+        lines.push(`   ${label}: ${formatDateTime(detectedAt)}`);
+    }
+    return lines;
+}
+
 function buildCameraStatusMessage(eventType, cameras = [], targetName = '') {
     const title = eventType === 'offline' ? 'CCTV DOWN' : 'CCTV RECOVERED';
     const groups = groupCamerasByArea(cameras);
@@ -316,7 +344,7 @@ function buildCameraStatusMessage(eventType, cameras = [], targetName = '') {
     for (const [areaName, areaCameras] of groups.entries()) {
         lines.push(`<b>${areaName}</b>`);
         areaCameras.slice(0, 20).forEach((camera, index) => {
-            lines.push(`${index + 1}. ${camera.name}`);
+            lines.push(...buildCameraStatusLine(camera, index, eventType));
         });
         if (areaCameras.length > 20) {
             lines.push(`...dan ${areaCameras.length - 20} kamera lainnya`);
@@ -324,7 +352,7 @@ function buildCameraStatusMessage(eventType, cameras = [], targetName = '') {
         lines.push('');
     }
 
-    lines.push(formatDateTime(new Date()));
+    lines.push(`Alert dikirim: ${formatDateTime(new Date())}`);
     return lines.join('\n').trim();
 }
 
