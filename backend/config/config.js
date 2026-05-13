@@ -173,9 +173,16 @@ export const config = {
 
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN || '',
-    monitoringChatId: process.env.TELEGRAM_MONITORING_CHAT_ID || '',
+    monitoringChatId: process.env.TELEGRAM_MONITORING_CHAT_ID || process.env.TELEGRAM_CHAT_ID || '',
     feedbackChatId: process.env.TELEGRAM_FEEDBACK_CHAT_ID || '',
-    enabled: !!(process.env.TELEGRAM_BOT_TOKEN && (process.env.TELEGRAM_MONITORING_CHAT_ID || process.env.TELEGRAM_FEEDBACK_CHAT_ID)),
+    enabled: !!(
+      process.env.TELEGRAM_BOT_TOKEN
+      && (
+        process.env.TELEGRAM_MONITORING_CHAT_ID
+        || process.env.TELEGRAM_CHAT_ID
+        || process.env.TELEGRAM_FEEDBACK_CHAT_ID
+      )
+    ),
   },
 };
 

@@ -6,12 +6,19 @@
  * SideEffects: Mocks Telegram HTTP calls; no real network or database writes.
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { queryOneMock, executeMock } = vi.hoisted(() => ({
     queryOneMock: vi.fn(),
     executeMock: vi.fn(),
 }));
+
+const ORIGINAL_TELEGRAM_ENV = {
+    TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
+    TELEGRAM_MONITORING_CHAT_ID: process.env.TELEGRAM_MONITORING_CHAT_ID,
+    TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID,
+    TELEGRAM_FEEDBACK_CHAT_ID: process.env.TELEGRAM_FEEDBACK_CHAT_ID,
+};
 
 vi.mock('../database/database.js', () => ({
     queryOne: queryOneMock,
@@ -37,6 +44,13 @@ describe('telegramService notification routing', () => {
         global.fetch = vi.fn(async () => ({
             json: async () => ({ ok: true }),
         }));
+    });
+
+    afterEach(() => {
+        process.env.TELEGRAM_BOT_TOKEN = ORIGINAL_TELEGRAM_ENV.TELEGRAM_BOT_TOKEN;
+        process.env.TELEGRAM_MONITORING_CHAT_ID = ORIGINAL_TELEGRAM_ENV.TELEGRAM_MONITORING_CHAT_ID;
+        process.env.TELEGRAM_CHAT_ID = ORIGINAL_TELEGRAM_ENV.TELEGRAM_CHAT_ID;
+        process.env.TELEGRAM_FEEDBACK_CHAT_ID = ORIGINAL_TELEGRAM_ENV.TELEGRAM_FEEDBACK_CHAT_ID;
     });
 
     it('routes one camera event to an area target and excludes on-demand cameras by default', async () => {
@@ -313,5 +327,41 @@ describe('telegramService notification routing', () => {
         expect(preview.canSend).toBe(false);
         expect(preview.skippedReason).toBe('NO_MATCHING_TARGET');
         expect(preview.matchedTargets).toEqual([]);
+    });
+
+    it('falls back to env Telegram config when DB config is missing', async () => {
+        vi.resetModules();
+        queryOneMock.mockReturnValue(null);
+        process.env.TELEGRAM_BOT_TOKEN = '123456789:env-token';
+        process.env.TELEGRAM_MONITORING_CHAT_ID = '-100-env-monitoring';
+        process.env.TELEGRAM_CHAT_ID = '';
+        process.env.TELEGRAM_FEEDBACK_CHAT_ID = '';
+
+        const telegram = await import('../services/telegramService.js');
+        const status = telegram.getTelegramStatus();
+
+        expect(status.cameraMonitoringConfigured).toBe(true);
+        expect(status.monitoringChatId).toBe('-100-env-monitoring');
+    });
+
+    it('keeps DB Telegram config ahead of env fallback', async () => {
+        vi.resetModules();
+        process.env.TELEGRAM_BOT_TOKEN = '123456789:env-token';
+        process.env.TELEGRAM_MONITORING_CHAT_ID = '-100-env-monitoring';
+        queryOneMock.mockReturnValue({
+            value: JSON.stringify({
+                botToken: '123456789:db-token',
+                monitoringChatId: '-100-db-monitoring',
+                feedbackChatId: '',
+                notificationTargets: [],
+                notificationRules: [],
+            }),
+        });
+
+        const telegram = await import('../services/telegramService.js');
+        const status = telegram.getTelegramStatus();
+
+        expect(status.cameraMonitoringConfigured).toBe(true);
+        expect(status.monitoringChatId).toBe('-100-db-monitoring');
     });
 });

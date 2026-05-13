@@ -7,6 +7,7 @@
  */
 
 import { queryOne, execute } from '../database/database.js';
+import { config } from '../config/config.js';
 import { formatDateTime } from './timezoneService.js';
 import { resolveInternalIngestPolicy } from '../utils/internalIngestPolicy.js';
 
@@ -327,6 +328,15 @@ function buildCameraStatusMessage(eventType, cameras = [], targetName = '') {
     return lines.join('\n').trim();
 }
 
+function getEnvTelegramSettings() {
+    return normalizeTelegramSettings({
+        botToken: config.telegram.botToken || '',
+        monitoringChatId: config.telegram.monitoringChatId || '',
+        feedbackChatId: config.telegram.feedbackChatId || '',
+        enabled: config.telegram.enabled,
+    });
+}
+
 /**
  * Get Telegram settings from database with caching
  */
@@ -341,23 +351,13 @@ function getTelegramSettings() {
         if (setting) {
             settingsCache = normalizeTelegramSettings(JSON.parse(setting.value));
         } else {
-            settingsCache = normalizeTelegramSettings({
-                botToken: '',
-                monitoringChatId: '',
-                feedbackChatId: '',
-                enabled: false
-            });
+            settingsCache = getEnvTelegramSettings();
         }
         settingsCacheTime = now;
         return settingsCache;
     } catch (error) {
         console.error('[Telegram] Error reading settings:', error);
-        return {
-            botToken: '',
-            monitoringChatId: '',
-            feedbackChatId: '',
-            enabled: false
-        };
+        return getEnvTelegramSettings();
     }
 }
 
