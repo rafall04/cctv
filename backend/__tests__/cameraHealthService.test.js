@@ -1199,6 +1199,102 @@ describe('cameraHealthService check loop', () => {
 
         expect(telegram.sendCameraStatusNotifications).not.toHaveBeenCalled();
     });
+
+    it('does not send Telegram DOWN for default internal HLS when direct RTSP would fail but stream health is online', async () => {
+        const telegram = await import('../services/telegramService.js');
+        telegram.isTelegramConfigured.mockReturnValue(true);
+
+        const service = new CameraHealthService();
+        const camera = {
+            id: 63,
+            name: 'Default Internal',
+            enabled: 1,
+            is_online: 1,
+            monitoring_state: 'online',
+            stream_source: 'internal',
+            delivery_type: 'internal_hls',
+            private_rtsp_url: 'rtsp://admin:wrong@10.0.0.63/stream',
+            stream_key: 'camera-63',
+            internal_ingest_policy_override: 'default',
+            area_internal_ingest_policy_default: 'default',
+        };
+
+        vi.spyOn(service, 'getActivePaths').mockResolvedValue(new Map());
+        vi.spyOn(service, 'evaluateCameraStatus').mockResolvedValue({
+            camera,
+            isOnline: 1,
+            rawReason: 'mediamtx_path_configured_idle',
+            rawDetails: null,
+        });
+        const rtspProbeSpy = vi.spyOn(service, 'probeInternalRtspSource').mockResolvedValue({
+            online: false,
+            reason: 'rtsp_auth_failed',
+            details: {},
+        });
+
+        queryMock
+            .mockReturnValueOnce([{ id: 63, is_online: 1, monitoring_state: 'online' }])
+            .mockReturnValueOnce([camera]);
+        executeMock.mockReturnValue({ changes: 1 });
+        upsertRuntimeStateMock.mockImplementation(() => {});
+
+        await service.checkAllCameras();
+
+        expect(rtspProbeSpy).not.toHaveBeenCalled();
+        expect(telegram.sendCameraStatusNotifications).not.toHaveBeenCalled();
+        expect(upsertRuntimeStateMock).toHaveBeenCalledWith(63, expect.objectContaining({
+            is_online: 1,
+            monitoring_state: 'online',
+            monitoring_reason: 'mediamtx_path_configured_idle',
+        }));
+    });
+
+    it('still sends Telegram DOWN for explicit strict internal HLS monitoring when RTSP probe fails', async () => {
+        const telegram = await import('../services/telegramService.js');
+        telegram.isTelegramConfigured.mockReturnValue(true);
+
+        const service = new CameraHealthService();
+        const camera = {
+            id: 64,
+            name: 'Explicit Strict Internal',
+            enabled: 1,
+            is_online: 1,
+            monitoring_state: 'online',
+            stream_source: 'internal',
+            delivery_type: 'internal_hls',
+            private_rtsp_url: 'rtsp://admin:wrong@10.0.0.64/stream',
+            stream_key: 'camera-64',
+            internal_ingest_policy_override: 'always_on',
+        };
+
+        vi.spyOn(service, 'getActivePaths').mockResolvedValue(new Map());
+        vi.spyOn(service, 'evaluateCameraStatus').mockResolvedValue({
+            camera,
+            isOnline: 1,
+            rawReason: 'mediamtx_path_configured_idle',
+            rawDetails: null,
+        });
+        vi.spyOn(service, 'probeInternalRtspSource').mockResolvedValue({
+            online: false,
+            reason: 'rtsp_auth_failed',
+            details: {},
+        });
+
+        queryMock
+            .mockReturnValueOnce([{ id: 64, is_online: 1, monitoring_state: 'online' }])
+            .mockReturnValueOnce([camera]);
+        executeMock.mockReturnValue({ changes: 1 });
+        upsertRuntimeStateMock.mockImplementation(() => {});
+
+        await service.checkAllCameras();
+
+        expect(telegram.sendCameraStatusNotifications).toHaveBeenCalledWith('offline', [camera]);
+        expect(upsertRuntimeStateMock).toHaveBeenCalledWith(64, expect.objectContaining({
+            is_online: 1,
+            monitoring_state: 'offline',
+            monitoring_reason: 'rtsp_auth_failed',
+        }));
+    });
 });
 
 describe('cameraHealthService health debug pagination', () => {
