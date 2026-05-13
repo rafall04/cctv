@@ -10,7 +10,11 @@
 
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { usePlaybackTokenManagementPage } from './usePlaybackTokenManagementPage.js';
+import {
+    cameraMatchesPlaybackTokenSearch,
+    extractPlaybackTokenShareText,
+    usePlaybackTokenManagementPage,
+} from './usePlaybackTokenManagementPage.js';
 import playbackTokenService from '../../services/playbackTokenService.js';
 
 const notifySuccessMock = vi.fn();
@@ -139,5 +143,58 @@ describe('usePlaybackTokenManagementPage', () => {
             'Teks share dibuat',
             'Kode akses yang sama siap dibagikan ulang.'
         );
+    });
+
+    it('extracts playback token share text from top-level and nested responses', () => {
+        expect(extractPlaybackTokenShareText({ share_text: 'Top' })).toBe('Top');
+        expect(extractPlaybackTokenShareText({ shareText: 'Camel' })).toBe('Camel');
+        expect(extractPlaybackTokenShareText({ data: { share_text: 'Nested' } })).toBe('Nested');
+        expect(extractPlaybackTokenShareText({ data: { shareText: 'Nested camel' } })).toBe('Nested camel');
+        expect(extractPlaybackTokenShareText({})).toBe('');
+    });
+
+    it('stores share text from nested create response data', async () => {
+        playbackTokenService.createToken.mockResolvedValue({
+            data: {
+                share_text: 'Halo token nested',
+            },
+        });
+        const { result } = renderHook(() => usePlaybackTokenManagementPage());
+
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        await act(async () => {
+            await result.current.handleCreate(submitEvent());
+        });
+
+        expect(result.current.createdShare.shareText).toBe('Halo token nested');
+    });
+
+    it('matches camera filter text by id, name, and area', () => {
+        expect(cameraMatchesPlaybackTokenSearch({ id: 1168, name: 'CCTV ALANG ALANG' }, '1168')).toBe(true);
+        expect(cameraMatchesPlaybackTokenSearch({ name: 'CCTV POS', area_name: 'Utara' }, 'utara')).toBe(true);
+        expect(cameraMatchesPlaybackTokenSearch({ name: 'CCTV POS', areaName: 'Kantor' }, 'kantor')).toBe(true);
+        expect(cameraMatchesPlaybackTokenSearch({ name: 'CCTV POS', area_name: 'Utara' }, 'selatan')).toBe(false);
+    });
+
+    it('filters create token camera picker by name and keeps selected cameras visible', async () => {
+        const { cameraService } = await import('../../services/cameraService');
+        cameraService.getAllCameras.mockResolvedValue({
+            data: [
+                { id: 1168, name: 'CCTV ALANG ALANG', area_name: 'Utara' },
+                { id: 2001, name: 'CCTV LOBBY RAF NET', area_name: 'Kantor' },
+                { id: 3001, name: 'CCTV JALAN DEPAN', area_name: 'Jalan' },
+            ],
+        });
+        const { result } = renderHook(() => usePlaybackTokenManagementPage());
+
+        await waitFor(() => expect(result.current.cameras).toHaveLength(3));
+
+        act(() => {
+            result.current.toggleCameraRule(2001, true);
+            result.current.setCameraSearch('alang');
+        });
+
+        expect(result.current.visibleCreateCameras.map((camera) => camera.id)).toEqual([2001, 1168]);
     });
 });

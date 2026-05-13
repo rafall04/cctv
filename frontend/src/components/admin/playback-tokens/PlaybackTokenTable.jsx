@@ -22,11 +22,16 @@ export default function PlaybackTokenTable({
     editForm,
     selectedEditCameraIds,
     cameras,
+    visibleEditCameras = cameras,
+    editCameraSearch = '',
+    totalCameraCount = cameras.length,
+    visibleEditCameraCount = visibleEditCameras.length,
     formatTokenDate,
     onRefresh,
     onEdit,
     onCancelEdit,
     onUpdateEditForm,
+    onUpdateEditCameraSearch,
     onToggleEditCameraRule,
     onUpdateEditCameraRule,
     onUpdateToken,
@@ -76,21 +81,31 @@ export default function PlaybackTokenTable({
                                                     <option value="selected">Kamera tertentu</option>
                                                 </select>
                                                 {editForm.scope_type === 'selected' && (
-                                                    <div className="max-h-48 space-y-2 overflow-y-auto">
-                                                        {cameras.map((camera) => (
-                                                            <div key={camera.id} className="rounded bg-gray-50 p-2 dark:bg-gray-950">
-                                                                <label className="flex items-center gap-2 text-xs">
-                                                                    <input type="checkbox" checked={selectedEditCameraIds.has(camera.id)} onChange={() => onToggleEditCameraRule(camera.id)} />
-                                                                    <span>{camera.name}</span>
-                                                                </label>
-                                                                {selectedEditCameraIds.has(camera.id) && (
-                                                                    <div className="mt-1 grid gap-1 sm:grid-cols-2">
-                                                                        <input type="number" min="1" placeholder="Window jam" value={editForm.camera_rules[camera.id]?.playback_window_hours || ''} onChange={(event) => onUpdateEditCameraRule(camera.id, 'playback_window_hours', event.target.value)} className="rounded border border-gray-300 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
-                                                                        <input placeholder="Catatan" value={editForm.camera_rules[camera.id]?.note || ''} onChange={(event) => onUpdateEditCameraRule(camera.id, 'note', event.target.value)} className="rounded border border-gray-300 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        ))}
+                                                    <div className="space-y-2">
+                                                        <input
+                                                            type="search"
+                                                            value={editCameraSearch}
+                                                            onChange={(event) => onUpdateEditCameraSearch?.(event.target.value)}
+                                                            placeholder="Filter nama CCTV"
+                                                            className="w-full rounded-lg border border-gray-300 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                                                        />
+                                                        <div className="text-xs text-gray-500 dark:text-gray-400">Menampilkan {visibleEditCameraCount} dari {totalCameraCount} CCTV</div>
+                                                        <div className="max-h-48 space-y-2 overflow-y-auto">
+                                                            {visibleEditCameras.map((camera) => (
+                                                                <div key={camera.id} className="rounded bg-gray-50 p-2 dark:bg-gray-950">
+                                                                    <label className="flex items-center gap-2 text-xs">
+                                                                        <input type="checkbox" checked={selectedEditCameraIds.has(camera.id)} onChange={() => onToggleEditCameraRule(camera.id)} />
+                                                                        <span>{camera.name}</span>
+                                                                    </label>
+                                                                    {selectedEditCameraIds.has(camera.id) && (
+                                                                        <div className="mt-1 grid gap-1 sm:grid-cols-2">
+                                                                            <input type="number" min="1" placeholder="Window jam" value={editForm.camera_rules[camera.id]?.playback_window_hours || ''} onChange={(event) => onUpdateEditCameraRule(camera.id, 'playback_window_hours', event.target.value)} className="rounded border border-gray-300 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
+                                                                            <input placeholder="Catatan" value={editForm.camera_rules[camera.id]?.note || ''} onChange={(event) => onUpdateEditCameraRule(camera.id, 'note', event.target.value)} className="rounded border border-gray-300 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
                                                     </div>
                                                 )}
                                             </div>

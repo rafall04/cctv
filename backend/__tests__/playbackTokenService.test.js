@@ -238,6 +238,55 @@ describe('playbackTokenService', () => {
         );
     });
 
+    it('includes selected camera names in share text after initial token creation', async () => {
+        vi.spyOn(connectionPool, 'transaction').mockImplementation((callback) => callback);
+        vi.spyOn(connectionPool, 'execute').mockReturnValue({ lastInsertRowid: 77, changes: 1 });
+        vi.spyOn(connectionPool, 'queryOne')
+            .mockReturnValueOnce(null)
+            .mockReturnValueOnce({
+                id: 77,
+                label: 'Client Alang',
+                token_prefix: 'rafpb_alang',
+                share_key_prefix: 'SANDI1234',
+                preset: 'lifetime',
+                scope_type: 'selected',
+                camera_ids_json: '[1168]',
+                playback_window_hours: null,
+                expires_at: null,
+                revoked_at: null,
+                last_used_at: null,
+                use_count: 0,
+                max_active_sessions: null,
+                session_limit_mode: 'unlimited',
+                session_timeout_seconds: 60,
+                client_note: '',
+                share_template: 'Halo, berikut token akses playback CCTV RAF NET.\n\nKode Akses: {{token}}\nAkses: {{camera_scope}}',
+                created_by: 1,
+                created_at: '2026-05-05 12:00:00',
+                updated_at: '2026-05-05 12:00:00',
+            });
+        vi.spyOn(connectionPool, 'query').mockReturnValue([
+            { id: 1168, name: 'CCTV ALANG ALANG' },
+        ]);
+        const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
+
+        const result = playbackTokenService.createToken(
+            {
+                label: 'Client Alang',
+                preset: 'lifetime',
+                access_code_mode: 'custom',
+                custom_access_code: 'SANDI1234',
+                scope_type: 'selected',
+                camera_rules: [{ camera_id: 1168, enabled: true }],
+                share_template: 'Halo, berikut token akses playback CCTV RAF NET.\n\nKode Akses: {{token}}\nAkses: {{camera_scope}}',
+            },
+            { user: { id: 1 }, headers: { origin: 'https://cctv.raf.my.id' } }
+        );
+
+        expect(result.share_text).toContain('Kode Akses: SANDI1234');
+        expect(result.share_text).toContain('Akses: 1 kamera terpilih: CCTV ALANG ALANG');
+    });
+
     it('allows only cameras included in selected scope', async () => {
         vi.spyOn(connectionPool, 'execute').mockReturnValue({ changes: 1 });
         vi.spyOn(connectionPool, 'queryOne').mockReturnValue({

@@ -296,6 +296,24 @@ function resolveReusableShareKey(row = {}) {
     return hashToken(shareKey) === row.share_key_hash ? shareKey : null;
 }
 
+function getCameraNamesByIds(cameraIds = []) {
+    const ids = [...new Set(
+        cameraIds
+            .map((id) => Number.parseInt(id, 10))
+            .filter((id) => Number.isInteger(id) && id > 0)
+    )];
+
+    if (ids.length === 0) {
+        return [];
+    }
+
+    const placeholders = ids.map(() => '?').join(', ');
+    return query(
+        `SELECT id, name FROM cameras WHERE id IN (${placeholders}) ORDER BY id ASC`,
+        ids
+    );
+}
+
 function buildSelectedCameraScope(row = {}, allowedCameraIds = []) {
     const cameraNames = new Map();
     const addCameraName = (camera) => {
@@ -557,12 +575,17 @@ class PlaybackTokenService {
             )
             : [];
         const row = queryOne('SELECT * FROM playback_tokens WHERE id = ?', [result.lastInsertRowid]);
+        const allowedCameraIds = normalizedRules.length > 0
+            ? normalizedRules.filter((rule) => rule.enabled).map((rule) => rule.camera_id)
+            : cameraIds;
+        const cameraNames = scopeType === 'selected'
+            ? getCameraNamesByIds(allowedCameraIds)
+            : [];
         const data = sanitizeTokenRow({
             ...row,
             camera_rules: normalizedRules,
-            allowed_camera_ids: normalizedRules.length > 0
-                ? normalizedRules.filter((rule) => rule.enabled).map((rule) => rule.camera_id)
-                : cameraIds,
+            allowed_camera_ids: allowedCameraIds,
+            camera_names: cameraNames,
         });
         this.recordAudit({
             tokenId: data.id,
@@ -991,15 +1014,8 @@ class PlaybackTokenService {
             throw err;
         }
 
-        let cameraNames = [];
         const allowedCameraIds = token.scope_type === 'selected' ? resolveAllowedCameraIds(token) : [];
-        if (allowedCameraIds.length > 0) {
-            const placeholders = allowedCameraIds.map(() => '?').join(', ');
-            cameraNames = query(
-                `SELECT id, name FROM cameras WHERE id IN (${placeholders})`,
-                allowedCameraIds
-            );
-        }
+        const cameraNames = getCameraNamesByIds(allowedCameraIds);
 
         const updated = sanitizeTokenRow({ ...row, camera_names: cameraNames });
         const shareText = this.buildShareText({ shareKey, tokenRow: updated, request });

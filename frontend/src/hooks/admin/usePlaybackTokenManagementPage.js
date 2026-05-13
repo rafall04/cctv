@@ -34,6 +34,8 @@ export const PLAYBACK_TOKEN_SESSION_LIMIT_MODES = [
     { value: 'unlimited', label: 'Unlimited' },
 ];
 
+export const CAMERA_PICKER_VISIBLE_LIMIT = 100;
+
 function normalizeCameraRows(response) {
     const rows = response?.data?.cameras || response?.data || [];
     return Array.isArray(rows) ? rows : [];
@@ -42,6 +44,53 @@ function normalizeCameraRows(response) {
 function normalizeNumberOrNull(value) {
     const parsed = Number.parseInt(value, 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+export function extractPlaybackTokenShareText(response = {}) {
+    return String(
+        response.share_text
+        || response.shareText
+        || response.data?.share_text
+        || response.data?.shareText
+        || ''
+    ).trim();
+}
+
+export function normalizePlaybackTokenCameraSearch(value = '') {
+    return String(value).trim().toLowerCase();
+}
+
+export function cameraMatchesPlaybackTokenSearch(camera = {}, searchValue = '') {
+    const search = normalizePlaybackTokenCameraSearch(searchValue);
+    if (!search) {
+        return true;
+    }
+
+    return [
+        camera.id,
+        camera.name,
+        camera.area_name,
+        camera.areaName,
+    ].some((value) => String(value || '').toLowerCase().includes(search));
+}
+
+export function buildVisiblePlaybackTokenCameras({
+    cameras = [],
+    selectedIds = [],
+    search = '',
+    limit = CAMERA_PICKER_VISIBLE_LIMIT,
+}) {
+    const selectedIdSet = new Set(Array.from(selectedIds).map((id) => Number.parseInt(id, 10)));
+    const selected = cameras.filter((camera) => selectedIdSet.has(Number.parseInt(camera.id, 10)));
+    const unselectedMatches = cameras.filter((camera) => {
+        const cameraId = Number.parseInt(camera.id, 10);
+        return !selectedIdSet.has(cameraId) && cameraMatchesPlaybackTokenSearch(camera, search);
+    });
+
+    return [
+        ...selected,
+        ...unselectedMatches.slice(0, limit),
+    ];
 }
 
 function buildInitialRuleMap(rules = [], fallbackIds = []) {
@@ -124,6 +173,8 @@ export function usePlaybackTokenManagementPage() {
     const [tokens, setTokens] = useState([]);
     const [auditLogs, setAuditLogs] = useState([]);
     const [cameras, setCameras] = useState([]);
+    const [cameraSearch, setCameraSearch] = useState('');
+    const [editCameraSearch, setEditCameraSearch] = useState('');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [sharingTokenId, setSharingTokenId] = useState(null);
@@ -153,6 +204,16 @@ export function usePlaybackTokenManagementPage() {
         () => new Set(buildTokenCameraRulesPayload(editForm.camera_rules).map((rule) => rule.camera_id)),
         [editForm.camera_rules]
     );
+    const visibleCreateCameras = useMemo(() => buildVisiblePlaybackTokenCameras({
+        cameras,
+        selectedIds: selectedCameraIds,
+        search: cameraSearch,
+    }), [cameras, selectedCameraIds, cameraSearch]);
+    const visibleEditCameras = useMemo(() => buildVisiblePlaybackTokenCameras({
+        cameras,
+        selectedIds: selectedEditCameraIds,
+        search: editCameraSearch,
+    }), [cameras, selectedEditCameraIds, editCameraSearch]);
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -287,6 +348,7 @@ export function usePlaybackTokenManagementPage() {
     const beginEditToken = (token) => {
         const fallbackIds = token.allowed_camera_ids || token.camera_ids || [];
         setEditingTokenId(token.id);
+        setEditCameraSearch('');
         setEditForm({
             label: token.label || '',
             scope_type: token.scope_type || 'all',
@@ -305,6 +367,7 @@ export function usePlaybackTokenManagementPage() {
     const cancelEditToken = () => {
         setEditingTokenId(null);
         setUpdatingTokenId(null);
+        setEditCameraSearch('');
     };
 
     const handleCreate = async (event) => {
@@ -320,9 +383,16 @@ export function usePlaybackTokenManagementPage() {
                 expires_at: form.expires_at || null,
             };
             const response = await playbackTokenService.createToken(payload);
-            setCreatedShare({ shareText: response.share_text });
-            showSuccess('Token playback dibuat', 'Teks share memakai kode akses aktif yang bisa dibagikan ulang.');
+            const shareText = extractPlaybackTokenShareText(response);
+            if (shareText) {
+                setCreatedShare({ shareText });
+                showSuccess('Token playback dibuat', 'Teks share memakai kode akses aktif yang bisa dibagikan ulang.');
+            } else {
+                setCreatedShare(null);
+                showError('Teks share kosong', 'Backend tidak mengirim teks share token.');
+            }
             setForm((current) => ({ ...current, label: '', camera_ids: [], camera_rules: {}, custom_access_code: '' }));
+            setCameraSearch('');
             await loadData();
         } catch (error) {
             showError('Gagal membuat token', error?.response?.data?.message || error.message);
@@ -332,29 +402,43 @@ export function usePlaybackTokenManagementPage() {
     };
 
     const handleCopy = async (text) => {
-        await navigator.clipboard.writeText(text);
+        const shareText = String(text || '').trim();
+        if (!shareText) {
+            showError('Teks share kosong', 'Tidak ada teks token yang bisa disalin.');
+            return;
+        }
+
+        await navigator.clipboard.writeText(shareText);
         showSuccess('Disalin', 'Teks share token sudah disalin.');
     };
 
-    const handleNativeShare = async () => {
-        if (!createdShare?.shareText) {
+    const handleNativeShare = async (text = createdShare?.shareText) => {
+        const shareText = String(text || '').trim();
+        if (!shareText) {
+            showError('Teks share kosong', 'Tidak ada teks token yang bisa dibagikan.');
             return;
         }
 
         if (navigator.share) {
-            await navigator.share({ text: createdShare.shareText });
+            await navigator.share({ text: shareText });
             return;
         }
 
-        await handleCopy(createdShare.shareText);
+        await handleCopy(shareText);
     };
 
     const handleRepeatShare = async (tokenId) => {
         setSharingTokenId(tokenId);
         try {
             const response = await playbackTokenService.shareToken(tokenId);
-            setCreatedShare({ shareText: response.share_text });
-            showSuccess('Teks share dibuat', 'Kode akses yang sama siap dibagikan ulang.');
+            const shareText = extractPlaybackTokenShareText(response);
+            if (shareText) {
+                setCreatedShare({ shareText });
+                showSuccess('Teks share dibuat', 'Kode akses yang sama siap dibagikan ulang.');
+            } else {
+                setCreatedShare(null);
+                showError('Teks share kosong', 'Backend tidak mengirim teks share token.');
+            }
         } catch (error) {
             showError('Gagal membuat share ulang', error?.response?.data?.message || error.message);
         } finally {
@@ -391,6 +475,7 @@ export function usePlaybackTokenManagementPage() {
             });
             showSuccess('Token diperbarui', 'Policy token aktif sudah disimpan.');
             setEditingTokenId(null);
+            setEditCameraSearch('');
             await loadData();
         } catch (error) {
             showError('Gagal memperbarui token', error?.response?.data?.message || error.message);
@@ -417,6 +502,11 @@ export function usePlaybackTokenManagementPage() {
         tokens,
         auditLogs,
         cameras,
+        cameraSearch,
+        editCameraSearch,
+        visibleCreateCameras,
+        visibleEditCameras,
+        cameraPickerVisibleLimit: CAMERA_PICKER_VISIBLE_LIMIT,
         loading,
         saving,
         sharingTokenId,
@@ -429,6 +519,8 @@ export function usePlaybackTokenManagementPage() {
         selectedEditCameraIds,
         whatsappHref,
         loadData,
+        setCameraSearch,
+        setEditCameraSearch,
         updateForm,
         updateEditForm,
         toggleCameraRule,

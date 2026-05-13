@@ -13,7 +13,11 @@ export default function PlaybackTokenForm({
     cameras,
     saving,
     selectedCameraIds,
+    cameraSearch = '',
+    totalCameraCount = cameras.length,
+    visibleCameraCount = cameras.length,
     onUpdateForm,
+    onUpdateCameraSearch,
     onToggleCameraRule,
     onUpdateCameraRule,
     onSubmit,
@@ -76,7 +80,17 @@ export default function PlaybackTokenForm({
 
             {form.scope_type === 'selected' && (
                 <div className="mt-4 rounded-lg border border-gray-200 p-3 dark:border-gray-800">
-                    <div className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Pilih Kamera</div>
+                    <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Pilih Kamera</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Menampilkan {visibleCameraCount} dari {totalCameraCount} CCTV</div>
+                    </div>
+                    <input
+                        type="search"
+                        value={cameraSearch}
+                        onChange={(event) => onUpdateCameraSearch?.(event.target.value)}
+                        placeholder="Filter nama CCTV"
+                        className="mb-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                    />
                     <div className="grid max-h-72 gap-2 overflow-y-auto lg:grid-cols-2">
                         {cameras.map((camera) => (
                             <div key={camera.id} className="rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-950">

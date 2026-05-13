@@ -25,10 +25,14 @@ export default function PlaybackTokenManagement() {
 
             <PlaybackTokenForm
                 form={page.form}
-                cameras={page.cameras}
+                cameras={page.visibleCreateCameras}
                 saving={page.saving}
                 selectedCameraIds={page.selectedCameraIds}
+                cameraSearch={page.cameraSearch}
+                totalCameraCount={page.cameras.length}
+                visibleCameraCount={page.visibleCreateCameras.length}
                 onUpdateForm={page.updateForm}
+                onUpdateCameraSearch={page.setCameraSearch}
                 onToggleCameraRule={page.toggleCameraRule}
                 onUpdateCameraRule={page.updateCameraRule}
                 onSubmit={page.handleCreate}
@@ -50,11 +54,16 @@ export default function PlaybackTokenManagement() {
                 editForm={page.editForm}
                 selectedEditCameraIds={page.selectedEditCameraIds}
                 cameras={page.cameras}
+                visibleEditCameras={page.visibleEditCameras}
+                editCameraSearch={page.editCameraSearch}
+                totalCameraCount={page.cameras.length}
+                visibleEditCameraCount={page.visibleEditCameras.length}
                 formatTokenDate={page.formatTokenDate}
                 onRefresh={page.loadData}
                 onEdit={page.beginEditToken}
                 onCancelEdit={page.cancelEditToken}
                 onUpdateEditForm={page.updateEditForm}
+                onUpdateEditCameraSearch={page.setEditCameraSearch}
                 onToggleEditCameraRule={page.toggleEditCameraRule}
                 onUpdateEditCameraRule={page.updateEditCameraRule}
                 onUpdateToken={page.handleUpdateToken}
