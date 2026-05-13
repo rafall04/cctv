@@ -2599,11 +2599,19 @@ class CameraHealthService {
                 const previousMonitoringState = camera.monitoring_state || deriveMonitoringStateFromOnline(camera.is_online);
                 const nextMonitoringState = finalResult?.monitoringState || deriveMonitoringStateFromOnline(isOnline);
                 const rawAlertTransition = getMonitoringAlertTransition(previousMonitoringState, nextMonitoringState);
+                const now = Date.now();
                 const currentAlertState = this.telegramAlertState.get(camera.id)
-                    || createTelegramAlertConfirmationState(previousMonitoringState, Date.now());
+                    || createTelegramAlertConfirmationState(previousMonitoringState, now);
+                const nextAlertState = rawAlertTransition
+                    ? nextMonitoringState
+                    : previousMonitoringState === nextMonitoringState ? nextMonitoringState : null;
+                const alertDetectedAt = currentAlertState.pendingTransition === nextAlertState
+                    && Number.isFinite(currentAlertState.pendingSince)
+                    ? currentAlertState.pendingSince
+                    : now;
                 const confirmedAlert = evaluateTelegramAlertConfirmation(currentAlertState, {
-                    nextState: rawAlertTransition ? nextMonitoringState : previousMonitoringState === nextMonitoringState ? nextMonitoringState : null,
-                    now: Date.now(),
+                    nextState: nextAlertState,
+                    now,
                     downConfirmationMs: this.telegramAlertConfirmationMs.down,
                     upConfirmationMs: this.telegramAlertConfirmationMs.up,
                 });
@@ -2615,8 +2623,8 @@ class CameraHealthService {
                     changedCount += 1;
                 }
 
-                if (alertTransition === 'online') wentOnline.push(camera);
-                if (alertTransition === 'offline') wentOffline.push(camera);
+                if (alertTransition === 'online') wentOnline.push({ ...camera, alertDetectedAt });
+                if (alertTransition === 'offline') wentOffline.push({ ...camera, alertDetectedAt });
 
                 if (isOnline) onlineCount += 1;
                 else {

@@ -1401,7 +1401,64 @@ describe('cameraHealthService check loop', () => {
 
         await service.checkAllCameras();
 
-        expect(telegram.sendCameraStatusNotifications).toHaveBeenCalledWith('offline', [camera]);
+        expect(telegram.sendCameraStatusNotifications).toHaveBeenCalledWith('offline', [
+            expect.objectContaining({
+                id: 66,
+                name: 'Confirmed Telegram Internal',
+                alertDetectedAt: 1_000,
+            }),
+        ]);
+    });
+
+    it('sends Telegram UP with the original recovery detected time after confirmation', async () => {
+        const telegram = await import('../services/telegramService.js');
+        telegram.isTelegramConfigured.mockReturnValue(true);
+
+        const service = new CameraHealthService();
+        service.telegramAlertConfirmationMs = {
+            down: 120_000,
+            up: 60_000,
+        };
+        service.telegramAlertState.set(67, {
+            confirmedState: 'offline',
+            pendingTransition: 'online',
+            pendingSince: 2_000,
+            lastObservedState: 'online',
+            lastUpdatedAt: 2_000,
+        });
+
+        const camera = {
+            id: 67,
+            name: 'Confirmed Recovery Telegram Internal',
+            enabled: 1,
+            is_online: 1,
+            monitoring_state: 'offline',
+            delivery_type: 'internal_hls',
+            internal_ingest_policy_override: 'always_on',
+            rtsp_url: 'rtsp://example/recovery-confirmed',
+        };
+
+        queryMock.mockReturnValueOnce([camera]);
+        service.evaluateCameraStatus = vi.fn(async () => ({
+            camera,
+            isOnline: true,
+            rawReason: 'online',
+        }));
+        service.evaluateCameraMonitoringResult = vi.fn(async () => ({
+            monitoringState: 'online',
+            monitoringReason: 'rtsp_probe_ok',
+        }));
+        vi.spyOn(Date, 'now').mockReturnValue(62_000);
+
+        await service.checkAllCameras();
+
+        expect(telegram.sendCameraStatusNotifications).toHaveBeenCalledWith('online', [
+            expect.objectContaining({
+                id: 67,
+                name: 'Confirmed Recovery Telegram Internal',
+                alertDetectedAt: 2_000,
+            }),
+        ]);
     });
 });
 
