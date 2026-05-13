@@ -30,6 +30,42 @@ function FeatureItem({ title, description, enabled }) {
     );
 }
 
+function AlertTimingSummary() {
+    const timingRows = [
+        {
+            label: 'DOWN',
+            description: 'DOWN dikirim setelah offline stabil 2 menit.',
+        },
+        {
+            label: 'UP',
+            description: 'UP dikirim setelah online stabil 1 menit.',
+        },
+        {
+            label: 'Cooldown',
+            description: 'Cooldown 5 menit hanya menahan pesan berulang setelah alert terkirim.',
+        },
+    ];
+
+    return (
+        <div className="mt-6 rounded-xl border border-blue-100 bg-blue-50/70 p-4 dark:border-blue-500/20 dark:bg-blue-500/10">
+            <h4 className="text-sm font-bold text-gray-900 dark:text-white">Timing Alert Telegram</h4>
+            <div className="mt-3 space-y-2">
+                {timingRows.map((row) => (
+                    <div key={row.label} className="flex items-start gap-3">
+                        <span className="min-w-20 rounded-md bg-white px-2 py-1 text-xs font-bold text-blue-700 shadow-sm dark:bg-gray-900/70 dark:text-blue-300">
+                            {row.label}
+                        </span>
+                        <p className="text-sm text-gray-700 dark:text-gray-300">{row.description}</p>
+                    </div>
+                ))}
+            </div>
+            <p className="mt-3 text-xs font-medium text-gray-600 dark:text-gray-400">
+                Status di Map/Grid tetap mengikuti runtime kamera; delay ini hanya berlaku untuk pesan Telegram.
+            </p>
+        </div>
+    );
+}
+
 function formatTargetOptionLabel(target = {}) {
     const name = target.name || target.id || 'Target Telegram';
     const chatId = target.chatId ? ` (${target.chatId})` : '';
@@ -590,6 +626,7 @@ export default function TelegramSettingsPanel() {
                         enabled={telegramStatus?.enabled}
                     />
                 </div>
+                <AlertTimingSummary />
             </div>
         </div>
     );

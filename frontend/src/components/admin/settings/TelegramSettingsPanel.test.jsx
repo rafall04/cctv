@@ -76,12 +76,15 @@ describe('TelegramSettingsPanel', () => {
         expect(screen.getAllByText('AKTIF').length).toBeGreaterThan(0);
     });
 
-    it('explains cooldown as anti-spam instead of first DOWN delay', async () => {
+    it('explains Telegram alert confirmation timing separately from cooldown', async () => {
         renderPanel();
 
         expect(await screen.findByText('Telegram Bot')).toBeTruthy();
-        expect(screen.getByText('Cooldown Anti-Spam 5 Menit')).toBeTruthy();
-        expect(screen.getByText('Mencegah pesan berulang setelah alert terkirim, bukan menunda deteksi DOWN pertama.')).toBeTruthy();
+        expect(screen.getByText('Timing Alert Telegram')).toBeTruthy();
+        expect(screen.getByText('DOWN dikirim setelah offline stabil 2 menit.')).toBeTruthy();
+        expect(screen.getByText('UP dikirim setelah online stabil 1 menit.')).toBeTruthy();
+        expect(screen.getByText('Cooldown 5 menit hanya menahan pesan berulang setelah alert terkirim.')).toBeTruthy();
+        expect(screen.getByText('Status di Map/Grid tetap mengikuti runtime kamera; delay ini hanya berlaku untuk pesan Telegram.')).toBeTruthy();
     });
 
     it('sends a test notification to a custom target', async () => {
