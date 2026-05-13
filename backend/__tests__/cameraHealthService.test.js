@@ -897,6 +897,28 @@ describe('cameraHealthService external TLS policy', () => {
         });
     });
 
+    it('keeps public availability derived from existing availability state, not Telegram transition side effects', () => {
+        const service = new CameraHealthService();
+        const camera = {
+            id: 397,
+            is_online: 1,
+            status: 'active',
+            delivery_type: 'internal_hls',
+        };
+
+        const state = service.ensureCameraState(camera.id, camera.is_online);
+        state.effectiveOnline = true;
+        state.state = 'healthy';
+        state.lastReason = 'mediamtx_path_ready';
+        state.confidence = 0.98;
+
+        expect(service.getPublicAvailability(camera)).toEqual({
+            availability_state: 'online',
+            availability_reason: 'mediamtx_path_ready',
+            availability_confidence: 0.98,
+        });
+    });
+
     it('keeps hard config failures offline in public availability', () => {
         const service = new CameraHealthService();
         service.healthState.set(396, {
