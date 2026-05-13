@@ -221,6 +221,7 @@ function sanitizeTokenRow(row) {
         scope_type: row.scope_type,
         camera_ids: cameraIds,
         camera_rules: cameraRules,
+        camera_names: Array.isArray(row.camera_names) ? row.camera_names : [],
         allowed_camera_ids: [...new Set(allowedCameraIds)],
         playback_window_hours: row.playback_window_hours,
         expires_at: row.expires_at,
@@ -284,6 +285,42 @@ function resolveDefaultCameraId(row = {}, requestedCameraId = null) {
     }
 
     return allowedCameraIds[0] || null;
+}
+
+function resolveReusableShareKey(row = {}) {
+    const shareKey = String(row.share_key_prefix || '').trim();
+    if (!shareKey || !row.share_key_hash) {
+        return null;
+    }
+
+    return hashToken(shareKey) === row.share_key_hash ? shareKey : null;
+}
+
+function buildSelectedCameraScope(row = {}, allowedCameraIds = []) {
+    const cameraNames = new Map();
+    const addCameraName = (camera) => {
+        const cameraId = Number.parseInt(camera?.id ?? camera?.camera_id, 10);
+        const cameraName = String(camera?.name ?? camera?.camera_name ?? '').trim();
+        if (Number.isInteger(cameraId) && cameraId > 0 && cameraName) {
+            cameraNames.set(cameraId, cameraName);
+        }
+    };
+
+    if (Array.isArray(row.camera_names)) {
+        row.camera_names.forEach(addCameraName);
+    }
+    if (Array.isArray(row.camera_rules)) {
+        row.camera_rules.forEach(addCameraName);
+    }
+
+    const selectedNames = allowedCameraIds
+        .map((cameraId) => cameraNames.get(cameraId))
+        .filter(Boolean);
+    const baseLabel = `${allowedCameraIds.length} kamera terpilih`;
+
+    return selectedNames.length > 0
+        ? `${baseLabel}: ${selectedNames.join(', ')}`
+        : baseLabel;
 }
 
 function getRequestOrigin(request) {
@@ -436,7 +473,7 @@ class PlaybackTokenService {
             : null;
         const playbackUrl = this.buildPlaybackUrl({ token, shareKey, request, targetCameraId });
         const cameraScope = row?.scope_type === 'selected'
-            ? `${allowedCameraIds.length} kamera terpilih`
+            ? buildSelectedCameraScope(row, allowedCameraIds)
             : 'Semua kamera playback';
         const expiresAt = row?.expires_at || 'Selamanya';
         const playbackWindow = row?.playback_window_hours
@@ -496,7 +533,7 @@ class PlaybackTokenService {
                 tokenHash,
                 token.slice(0, 12),
                 shareKeyHash,
-                shareKey.slice(0, 12),
+                shareKey,
                 presetKey,
                 scopeType,
                 JSON.stringify(cameraIds),
@@ -947,21 +984,30 @@ class PlaybackTokenService {
             throw err;
         }
 
-        const shareKey = this.createShareKey({ access_code_length: DEFAULT_ACCESS_CODE_LENGTH });
-        execute(
-            `UPDATE playback_tokens
-            SET share_key_hash = ?, share_key_prefix = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?`,
-            [hashToken(shareKey), shareKey.slice(0, 12), tokenId]
-        );
+        const shareKey = resolveReusableShareKey(row);
+        if (!shareKey) {
+            const err = new Error('Kode akses lama tidak bisa dibagikan ulang karena kode lengkap tidak tersedia. Buat kode akses baru.');
+            err.statusCode = 409;
+            throw err;
+        }
 
-        const updated = sanitizeTokenRow(queryOne('SELECT * FROM playback_tokens WHERE id = ?', [tokenId]));
+        let cameraNames = [];
+        const allowedCameraIds = token.scope_type === 'selected' ? resolveAllowedCameraIds(token) : [];
+        if (allowedCameraIds.length > 0) {
+            const placeholders = allowedCameraIds.map(() => '?').join(', ');
+            cameraNames = query(
+                `SELECT id, name FROM cameras WHERE id IN (${placeholders})`,
+                allowedCameraIds
+            );
+        }
+
+        const updated = sanitizeTokenRow({ ...row, camera_names: cameraNames });
         const shareText = this.buildShareText({ shareKey, tokenRow: updated, request });
         this.recordAudit({
             tokenId,
             eventType: 'shared',
             request,
-            detail: { share_key_prefix: shareKey.slice(0, 12) },
+            detail: { share_key_prefix: shareKey, reused: true },
         });
 
         return {

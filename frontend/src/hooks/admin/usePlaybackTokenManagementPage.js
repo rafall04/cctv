@@ -321,7 +321,7 @@ export function usePlaybackTokenManagementPage() {
             };
             const response = await playbackTokenService.createToken(payload);
             setCreatedShare({ shareText: response.share_text });
-            showSuccess('Token playback dibuat', 'Teks share memakai kode akses sekali pakai yang bisa dibuat ulang.');
+            showSuccess('Token playback dibuat', 'Teks share memakai kode akses aktif yang bisa dibagikan ulang.');
             setForm((current) => ({ ...current, label: '', camera_ids: [], camera_rules: {}, custom_access_code: '' }));
             await loadData();
         } catch (error) {
@@ -354,7 +354,7 @@ export function usePlaybackTokenManagementPage() {
         try {
             const response = await playbackTokenService.shareToken(tokenId);
             setCreatedShare({ shareText: response.share_text });
-            showSuccess('Teks share dibuat', 'Kode akses lama diganti dengan kode share baru.');
+            showSuccess('Teks share dibuat', 'Kode akses yang sama siap dibagikan ulang.');
         } catch (error) {
             showError('Gagal membuat share ulang', error?.response?.data?.message || error.message);
         } finally {

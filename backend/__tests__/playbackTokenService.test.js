@@ -7,6 +7,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import crypto from 'crypto';
 import * as connectionPool from '../database/connectionPool.js';
 
 describe('playbackTokenService', () => {
@@ -295,33 +296,15 @@ describe('playbackTokenService', () => {
         expect(result.default_camera_id).toBe(1168);
     });
 
-    it('builds repeat share text with a share key instead of exposing the original token', async () => {
+    it('builds repeat share text with the existing share key without rotating access code', async () => {
         vi.spyOn(connectionPool, 'execute').mockReturnValue({ changes: 1 });
         vi.spyOn(connectionPool, 'queryOne')
             .mockReturnValueOnce({
                 id: 17,
                 label: 'Client Lama',
                 token_prefix: 'rafpb_secret',
-                share_key_prefix: null,
-                preset: 'client_30d',
-                scope_type: 'all',
-                camera_ids_json: '[]',
-                playback_window_hours: 720,
-                expires_at: '2026-06-05 12:00:00',
-                revoked_at: null,
-                last_used_at: null,
-                use_count: 0,
-                share_template: 'Kode: {{token}}\nLink: {{playback_url}}',
-                created_by: 1,
-                created_at: '2026-05-05 12:00:00',
-                updated_at: '2026-05-05 12:00:00',
-            })
-            .mockReturnValueOnce(null)
-            .mockReturnValueOnce({
-                id: 17,
-                label: 'Client Lama',
-                token_prefix: 'rafpb_secret',
-                share_key_prefix: 'rafps_newkey',
+                share_key_hash: crypto.createHash('sha256').update('SANDI1234').digest('hex'),
+                share_key_prefix: 'SANDI1234',
                 preset: 'client_30d',
                 scope_type: 'all',
                 camera_ids_json: '[]',
@@ -342,10 +325,13 @@ describe('playbackTokenService', () => {
             headers: { origin: 'https://cctv.raf.my.id' },
         });
 
-        expect(result.share_text).toMatch(/Kode: [A-Z0-9]{8}/);
-        expect(result.share_text).toContain('/playback?share=');
+        expect(result.share_text).toContain('Kode: SANDI1234');
+        expect(result.share_text).toContain('/playback?share=SANDI1234');
         expect(result.share_text).not.toContain('rafpb_secret');
-        expect(connectionPool.execute.mock.calls[0][0]).toContain('share_key_hash');
+        expect(connectionPool.execute).not.toHaveBeenCalledWith(
+            expect.stringContaining('share_key_hash'),
+            expect.any(Array)
+        );
         expect(connectionPool.execute.mock.calls.at(-1)[0]).toContain('INSERT INTO playback_token_audit_logs');
     });
 
@@ -388,6 +374,41 @@ describe('playbackTokenService', () => {
         expect(shareText).toContain('Link: http://172.17.11.12:800/playback?cam=1168&share=SANDI1234');
         expect(shareText).toContain('Akses: 1 kamera terpilih');
         expect(shareText).not.toContain('Akses: 0 kamera terpilih');
+    });
+
+    it('builds repeat share text with selected camera names', async () => {
+        vi.spyOn(connectionPool, 'execute').mockReturnValue({ changes: 1 });
+        vi.spyOn(connectionPool, 'queryOne').mockReturnValue({
+            id: 18,
+            label: 'Client Alang Alang',
+            token_prefix: 'rafpb_secret',
+            share_key_hash: crypto.createHash('sha256').update('SANDI1234').digest('hex'),
+            share_key_prefix: 'SANDI1234',
+            preset: 'lifetime',
+            scope_type: 'selected',
+            camera_ids_json: '[1168]',
+            playback_window_hours: null,
+            expires_at: null,
+            revoked_at: null,
+            last_used_at: null,
+            use_count: 0,
+            share_template: 'Kode Akses: {{token}}\nAkses: {{camera_scope}}',
+            created_by: 1,
+            created_at: '2026-05-05 12:00:00',
+            updated_at: '2026-05-05 12:00:00',
+        });
+        vi.spyOn(connectionPool, 'query').mockReturnValue([
+            { id: 1168, name: 'CCTV ALANG ALANG' },
+        ]);
+        const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
+
+        const result = playbackTokenService.buildRepeatShareText(18, {
+            user: { id: 2 },
+            headers: { origin: 'http://172.17.11.12:800' },
+        });
+
+        expect(result.share_text).toContain('Kode Akses: SANDI1234');
+        expect(result.share_text).toContain('Akses: 1 kamera terpilih: CCTV ALANG ALANG');
     });
 
     it('records camera access audit when token validation is touched', async () => {

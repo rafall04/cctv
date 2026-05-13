@@ -118,4 +118,26 @@ describe('usePlaybackTokenManagementPage', () => {
             camera_rules: [{ camera_id: 3, enabled: true, playback_window_hours: 12, expires_at: null, note: '' }],
         }));
     });
+
+    it('shares an existing token without telling operator the access code changed', async () => {
+        playbackTokenService.shareToken.mockResolvedValue({
+            success: true,
+            share_text: 'Kode Akses: SANDI1234\nAkses: 1 kamera terpilih: CCTV Gate',
+        });
+        const { result } = renderHook(() => usePlaybackTokenManagementPage());
+
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        await act(async () => {
+            await result.current.handleRepeatShare(9);
+        });
+
+        expect(playbackTokenService.shareToken).toHaveBeenCalledWith(9);
+        expect(result.current.createdShare.shareText).toContain('SANDI1234');
+        expect(result.current.createdShare.shareText).toContain('CCTV Gate');
+        expect(notifySuccessMock).toHaveBeenCalledWith(
+            'Teks share dibuat',
+            'Kode akses yang sama siap dibagikan ulang.'
+        );
+    });
 });
