@@ -584,7 +584,11 @@ export default function TelegramSettingsPanel() {
                     <FeatureItem title="Kamera Offline" description="Notifikasi otomatis saat kamera terputus." enabled={telegramStatus?.cameraMonitoringConfigured} />
                     <FeatureItem title="Kamera Online" description="Notifikasi saat kamera kembali terhubung." enabled={telegramStatus?.cameraMonitoringConfigured} />
                     <FeatureItem title="Kritik dan Saran" description="Notifikasi saat ada feedback baru." enabled={telegramStatus?.feedbackConfigured} />
-                    <FeatureItem title="Cooldown 5 Menit" description="Mengurangi spam notifikasi berulang." enabled={telegramStatus?.enabled} />
+                    <FeatureItem
+                        title="Cooldown Anti-Spam 5 Menit"
+                        description="Mencegah pesan berulang setelah alert terkirim, bukan menunda deteksi DOWN pertama."
+                        enabled={telegramStatus?.enabled}
+                    />
                 </div>
             </div>
         </div>

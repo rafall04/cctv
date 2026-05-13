@@ -76,6 +76,14 @@ describe('TelegramSettingsPanel', () => {
         expect(screen.getAllByText('AKTIF').length).toBeGreaterThan(0);
     });
 
+    it('explains cooldown as anti-spam instead of first DOWN delay', async () => {
+        renderPanel();
+
+        expect(await screen.findByText('Telegram Bot')).toBeTruthy();
+        expect(screen.getByText('Cooldown Anti-Spam 5 Menit')).toBeTruthy();
+        expect(screen.getByText('Mencegah pesan berulang setelah alert terkirim, bukan menunda deteksi DOWN pertama.')).toBeTruthy();
+    });
+
     it('sends a test notification to a custom target', async () => {
         renderPanel();
 
