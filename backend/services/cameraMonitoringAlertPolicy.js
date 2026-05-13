@@ -1,12 +1,10 @@
 /*
 Purpose: Pure policy helpers for Telegram CCTV monitoring alert decisions.
 Caller: cameraHealthService and focused monitoring policy tests.
-Deps: internal ingest policy resolver.
+Deps: None.
 MainFuncs: normalizeMonitoringOnline, getMonitoringAlertTransition, shouldUseStrictInternalMonitoring.
 SideEffects: None.
 */
-
-import { resolveInternalIngestPolicy } from '../utils/internalIngestPolicy.js';
 
 const ONLINE_MONITORING_STATES = new Set(['online', 'passive', 'stale']);
 const OFFLINE_MONITORING_STATES = new Set(['offline', 'probe_failed', 'unresolved']);
@@ -39,10 +37,13 @@ export function shouldUseStrictInternalMonitoring(camera = {}) {
         return false;
     }
 
-    const policy = resolveInternalIngestPolicy(camera, {
-        internal_ingest_policy_default: camera.area_internal_ingest_policy_default,
-        internal_on_demand_close_after_seconds: camera.area_internal_on_demand_close_after_seconds,
-    });
+    if (camera.source_profile === 'surabaya_private_rtsp') {
+        return true;
+    }
 
-    return policy.mode === 'always_on';
+    if (camera.internal_ingest_policy_override === 'always_on') {
+        return true;
+    }
+
+    return false;
 }

@@ -32,13 +32,32 @@ describe('cameraMonitoringAlertPolicy', () => {
         expect(getMonitoringAlertTransition('offline', null)).toBeNull();
     });
 
-    it('uses strict internal monitoring only for always-on internal HLS cameras with RTSP source', () => {
+    it('does not use strict internal monitoring for default internal HLS cameras', () => {
+        expect(shouldUseStrictInternalMonitoring({
+            delivery_type: 'internal_hls',
+            private_rtsp_url: 'rtsp://admin:secret@10.0.0.10/stream',
+            internal_ingest_policy_override: 'default',
+            area_internal_ingest_policy_default: 'default',
+        })).toBe(false);
+    });
+
+    it('uses strict internal monitoring for explicitly always-on internal HLS cameras', () => {
         expect(shouldUseStrictInternalMonitoring({
             delivery_type: 'internal_hls',
             private_rtsp_url: 'rtsp://admin:secret@10.0.0.10/stream',
             internal_ingest_policy_override: 'always_on',
         })).toBe(true);
+    });
 
+    it('uses strict internal monitoring for Surabaya private RTSP source profile cameras', () => {
+        expect(shouldUseStrictInternalMonitoring({
+            delivery_type: 'internal_hls',
+            private_rtsp_url: 'rtsp://admin:secret@10.0.0.10/stream',
+            source_profile: 'surabaya_private_rtsp',
+        })).toBe(true);
+    });
+
+    it('does not use strict internal monitoring for on-demand or external cameras', () => {
         expect(shouldUseStrictInternalMonitoring({
             delivery_type: 'internal_hls',
             private_rtsp_url: 'rtsp://admin:secret@10.0.0.10/stream',
