@@ -13,12 +13,16 @@ import {
     isSafeRecordingFilename,
 } from './recordingRetentionPolicy.js';
 import {
+    getPendingRecordingDir,
     isFinalSegmentFilename,
+    isPartialSegmentFilename,
     isTempSegmentFilename,
+    toFinalSegmentFilename,
 } from './recordingSegmentFilePolicy.js';
 
 const NORMAL_DELETE_BATCH_SIZE = 6;
 const TEMP_FILE_MIN_AGE_MS = 5 * 60 * 1000;
+const FINALIZED_PARTIAL_MIN_AGE_MS = 5 * 60 * 1000;
 
 function canDeleteTempFile({ filename, fileMtimeMs, nowMs }) {
     return isTempSegmentFilename(filename) && (nowMs - fileMtimeMs) > TEMP_FILE_MIN_AGE_MS;
@@ -202,6 +206,112 @@ export function createRecordingCleanupService({
         }
     }
 
+    async function cleanupPendingPartials({ cameraId, retentionWindow, nowMs, result }) {
+        const pendingDir = getPendingRecordingDir(recordingsBasePath, cameraId);
+        let filenames;
+        try {
+            filenames = (await fs.readdir(pendingDir))
+                .filter((filename) => isPartialSegmentFilename(filename));
+        } catch {
+            return;
+        }
+
+        if (!filenames.length) {
+            return;
+        }
+
+        const finalFilenames = filenames
+            .map((filename) => toFinalSegmentFilename(filename))
+            .filter(Boolean);
+        const dbFilenames = new Set(repository.findExistingFilenames({
+            cameraId,
+            filenames: finalFilenames,
+        }));
+
+        for (const filename of filenames) {
+            const finalFilename = toFinalSegmentFilename(filename);
+            if (!finalFilename) {
+                result.unsafeSkipped++;
+                continue;
+            }
+
+            if (
+                isFileBeingProcessed?.(cameraId, filename)
+                || isFileBeingProcessed?.(cameraId, finalFilename)
+            ) {
+                result.processingSkipped++;
+                continue;
+            }
+
+            const filePath = join(pendingDir, filename);
+            let stats;
+            try {
+                stats = await fs.stat(filePath);
+            } catch {
+                result.failed++;
+                continue;
+            }
+
+            const fileAgeMs = nowMs - stats.mtimeMs;
+            const isFinalizedDuplicate = dbFilenames.has(finalFilename)
+                && fileAgeMs > FINALIZED_PARTIAL_MIN_AGE_MS;
+            if (isFinalizedDuplicate) {
+                const deleteResult = await safeDelete({
+                    cameraId,
+                    filename,
+                    filePath,
+                    reason: 'pending_partial_finalized_duplicate',
+                });
+
+                if (!deleteResult.success) {
+                    if (deleteResult.reason === 'unsafe_path') {
+                        result.unsafeSkipped++;
+                    } else {
+                        result.failed++;
+                    }
+                    continue;
+                }
+
+                result.orphanDeleted++;
+                result.deletedBytes += deleteResult.size || 0;
+                continue;
+            }
+
+            const deletePolicy = canDeleteRecordingFile({
+                filename,
+                fileMtimeMs: stats.mtimeMs,
+                retentionWindow,
+                nowMs,
+            });
+            if (!deletePolicy.allowed) {
+                logger.log?.(`[Cleanup] Keeping pending partial recording: camera${cameraId}/${describeRecordingRetentionDecision({
+                    filename,
+                    decision: deletePolicy,
+                })}`);
+                continue;
+            }
+
+            const deleteResult = await safeDelete({
+                cameraId,
+                filename,
+                filePath,
+                reason: 'pending_partial_retention_expired',
+            });
+
+            if (!deleteResult.success) {
+                if (deleteResult.reason === 'unsafe_path') {
+                    result.unsafeSkipped++;
+                } else {
+                    result.failed++;
+                }
+                continue;
+            }
+
+            result.orphanDeleted++;
+            result.deletedBytes += deleteResult.size || 0;
+        }
+    }
+
     async function cleanupCamera({ cameraId, camera, nowMs = Date.now() }) {
         if (inFlightCameraIds.has(cameraId)) {
             return { ...createEmptyResult(), skippedReason: 'cleanup_in_flight' };
@@ -218,6 +328,7 @@ export function createRecordingCleanupService({
 
             await cleanupExpiredDbSegments({ cameraId, retentionWindow, result });
             await cleanupFilesystemOrphans({ cameraId, retentionWindow, nowMs, result });
+            await cleanupPendingPartials({ cameraId, retentionWindow, nowMs, result });
 
             logger.log?.(`[Cleanup] Camera ${cameraId} summary: ${JSON.stringify(result)}`);
             return result;

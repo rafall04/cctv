@@ -337,6 +337,105 @@ describe('recordingCleanupService', () => {
         expect(result.orphanDeleted).toBe(0);
     });
 
+    it('deletes expired pending partial files through the shared safe delete path', async () => {
+        fsMock.readdir.mockImplementation(async (targetPath) => {
+            if (targetPath.endsWith('camera7')) return [];
+            if (targetPath.endsWith('pending')) return ['20260502_020000.mp4.partial'];
+            return [];
+        });
+        repositoryMock.findExistingFilenames.mockReturnValue([]);
+        fsMock.stat.mockResolvedValue({
+            isDirectory: () => false,
+            size: 2048,
+            mtimeMs: Date.parse('2026-05-02T02:01:00.000Z'),
+        });
+
+        const service = createService();
+        const result = await service.cleanupCamera({
+            cameraId: 7,
+            camera: { recording_duration_hours: 5, name: 'Camera 7' },
+            nowMs: Date.parse('2026-05-02T10:00:00.000Z'),
+        });
+
+        expect(safeDeleteMock).toHaveBeenCalledWith({
+            cameraId: 7,
+            filename: '20260502_020000.mp4.partial',
+            filePath: join(recordingsBasePath, 'camera7', 'pending', '20260502_020000.mp4.partial'),
+            reason: 'pending_partial_retention_expired',
+        });
+        expect(result.orphanDeleted).toBe(1);
+    });
+
+    it('keeps recent pending partial files until retention expires', async () => {
+        fsMock.readdir.mockImplementation(async (targetPath) => {
+            if (targetPath.endsWith('camera7')) return [];
+            if (targetPath.endsWith('pending')) return ['20260502_095800.mp4.partial'];
+            return [];
+        });
+        repositoryMock.findExistingFilenames.mockReturnValue([]);
+        fsMock.stat.mockResolvedValue({
+            isDirectory: () => false,
+            size: 2048,
+            mtimeMs: Date.parse('2026-05-02T09:59:00.000Z'),
+        });
+
+        const service = createService();
+        const result = await service.cleanupCamera({
+            cameraId: 7,
+            camera: { recording_duration_hours: 5, name: 'Camera 7' },
+            nowMs: Date.parse('2026-05-02T10:00:00.000Z'),
+        });
+
+        expect(safeDeleteMock).not.toHaveBeenCalled();
+        expect(result.orphanDeleted).toBe(0);
+    });
+
+    it('skips pending partial files currently being processed', async () => {
+        fsMock.readdir.mockImplementation(async (targetPath) => {
+            if (targetPath.endsWith('camera7')) return [];
+            if (targetPath.endsWith('pending')) return ['20260502_020000.mp4.partial'];
+            return [];
+        });
+        isProcessingMock.mockReturnValue(true);
+
+        const service = createService();
+        const result = await service.cleanupCamera({
+            cameraId: 7,
+            camera: { recording_duration_hours: 5, name: 'Camera 7' },
+            nowMs: Date.parse('2026-05-02T10:00:00.000Z'),
+        });
+
+        expect(safeDeleteMock).not.toHaveBeenCalled();
+        expect(result.processingSkipped).toBe(1);
+    });
+
+    it('deletes stale pending partial files when the final segment already exists in DB', async () => {
+        fsMock.readdir.mockImplementation(async (targetPath) => {
+            if (targetPath.endsWith('camera7')) return [];
+            if (targetPath.endsWith('pending')) return ['20260512_000005.mp4.partial'];
+            return [];
+        });
+        repositoryMock.findExistingFilenames.mockReturnValue(['20260512_000005.mp4']);
+        fsMock.stat.mockResolvedValue({
+            isDirectory: () => false,
+            size: 2048,
+            mtimeMs: Date.parse('2026-05-02T09:50:00.000Z'),
+        });
+
+        const service = createService();
+        const result = await service.cleanupCamera({
+            cameraId: 7,
+            camera: { recording_duration_hours: 5, name: 'Camera 7' },
+            nowMs: Date.parse('2026-05-02T10:00:00.000Z'),
+        });
+
+        expect(safeDeleteMock).toHaveBeenCalledWith(expect.objectContaining({
+            filename: '20260512_000005.mp4.partial',
+            reason: 'pending_partial_finalized_duplicate',
+        }));
+        expect(result.orphanDeleted).toBe(1);
+    });
+
     it('asks recovery to reconcile final orphans before deleting them', async () => {
         const onRecoverOrphan = vi.fn();
         fsMock.readdir.mockResolvedValueOnce(['20260502_020000.mp4']);
