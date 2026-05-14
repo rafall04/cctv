@@ -35,6 +35,8 @@ if (!existsSync(dbDir)) {
   mkdirSync(dbDir, { recursive: true });
 }
 
+const SQLITE_BUSY_TIMEOUT_MS = 5000;
+
 class DatabaseConnectionPool {
     constructor() {
         // Read connection pool (for SELECT queries)
@@ -80,6 +82,7 @@ class DatabaseConnectionPool {
                 readonly: true,
                 fileMustExist: true
             });
+            conn.pragma(`busy_timeout = ${SQLITE_BUSY_TIMEOUT_MS}`);
             this.readPool.push(conn);
             this.readPoolInUse.add(conn);
             this.stats.readMisses++;
@@ -91,10 +94,12 @@ class DatabaseConnectionPool {
         // In practice, this should rarely happen with proper pool size
         this.stats.readMisses++;
         console.warn('[ConnectionPool] Read pool exhausted, creating temporary connection');
-        return new Database(dbPath, { 
+        const conn = new Database(dbPath, {
             readonly: true,
             fileMustExist: true
         });
+        conn.pragma(`busy_timeout = ${SQLITE_BUSY_TIMEOUT_MS}`);
+        return conn;
     }
 
     /**
@@ -119,6 +124,7 @@ class DatabaseConnectionPool {
         
         if (!this.writeConnection) {
             this.writeConnection = new Database(dbPath);
+            this.writeConnection.pragma(`busy_timeout = ${SQLITE_BUSY_TIMEOUT_MS}`);
             // Enable WAL mode for better concurrency
             this.writeConnection.pragma('journal_mode = WAL');
             // Enable foreign keys
@@ -194,7 +200,7 @@ class DatabaseConnectionPool {
      */
     transaction(callback) {
         const conn = this.getWriteConnection();
-        const txn = conn.transaction(callback);
+        const txn = conn.transaction((...args) => callback(...args, conn));
         return txn;
     }
 

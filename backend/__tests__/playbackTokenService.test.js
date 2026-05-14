@@ -500,6 +500,7 @@ describe('playbackTokenService', () => {
     });
 
     it('rejects a new strict session when token active session limit is full', async () => {
+        vi.spyOn(connectionPool, 'transaction').mockImplementation((callback) => callback);
         vi.spyOn(connectionPool, 'execute').mockReturnValue({ changes: 1 });
         vi.spyOn(connectionPool, 'query')
             .mockReturnValueOnce([
@@ -517,9 +518,11 @@ describe('playbackTokenService', () => {
             clientId: 'client-a',
             request: { headers: { 'user-agent': 'vitest' }, ip: '127.0.0.1' },
         })).toThrow('Batas perangkat aktif untuk token ini sudah penuh');
+        expect(connectionPool.transaction).toHaveBeenCalledTimes(1);
     });
 
     it('replaces oldest active session when token uses replace_oldest mode', async () => {
+        vi.spyOn(connectionPool, 'transaction').mockImplementation((callback) => callback);
         vi.spyOn(connectionPool, 'execute').mockReturnValue({ lastInsertRowid: 2, changes: 1 });
         vi.spyOn(connectionPool, 'query')
             .mockReturnValueOnce([
@@ -546,6 +549,68 @@ describe('playbackTokenService', () => {
         expect(connectionPool.execute).toHaveBeenCalledWith(
             expect.stringContaining('INSERT INTO playback_token_sessions'),
             expect.any(Array)
+        );
+        expect(connectionPool.transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not extend active playback sessions when the last touch is still fresh', async () => {
+        vi.spyOn(connectionPool, 'execute').mockReturnValue({ changes: 1 });
+        vi.spyOn(connectionPool, 'queryOne').mockReturnValueOnce({
+            id: 9,
+            token_id: 44,
+            last_seen_at: new Date().toISOString(),
+            expires_at: new Date(Date.now() + 60_000).toISOString(),
+        });
+        const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
+
+        const row = playbackTokenService.assertPlaybackSession({
+            request: {
+                cookies: { raf_playback_session: 'rafpsess_active' },
+                headers: {},
+            },
+            token: {
+                id: 44,
+                max_active_sessions: 2,
+                session_limit_mode: 'strict',
+                session_timeout_seconds: 60,
+            },
+            touch: true,
+        });
+
+        expect(row.id).toBe(9);
+        expect(connectionPool.execute).not.toHaveBeenCalledWith(
+            expect.stringContaining('UPDATE playback_token_sessions'),
+            expect.any(Array)
+        );
+    });
+
+    it('cleans expired token sessions and old token maintenance rows with bounded deletes', async () => {
+        vi.spyOn(connectionPool, 'execute').mockReturnValue({ changes: 3 });
+        const { default: playbackTokenService } = await import('../services/playbackTokenService.js');
+
+        const result = playbackTokenService.cleanupExpiredMaintenanceRows();
+
+        expect(result).toEqual({
+            expiredSessions: 3,
+            oldSessions: 3,
+            oldAuditLogs: 3,
+            expiredBlacklistEntries: 3,
+        });
+        expect(connectionPool.execute).toHaveBeenCalledWith(
+            expect.stringContaining('expires_at <= CURRENT_TIMESTAMP'),
+            []
+        );
+        expect(connectionPool.execute).toHaveBeenCalledWith(
+            expect.stringContaining('DELETE FROM playback_token_sessions'),
+            ['-7 days', 1000]
+        );
+        expect(connectionPool.execute).toHaveBeenCalledWith(
+            expect.stringContaining('DELETE FROM playback_token_audit_logs'),
+            ['-90 days', 1000]
+        );
+        expect(connectionPool.execute).toHaveBeenCalledWith(
+            expect.stringContaining('DELETE FROM token_blacklist'),
+            [1000]
         );
     });
 

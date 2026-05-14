@@ -7,7 +7,7 @@
  */
 
 import crypto from 'crypto';
-import { execute, query, queryOne } from '../database/connectionPool.js';
+import { execute, query, queryOne, transaction } from '../database/connectionPool.js';
 import { parseUtcSql, toUtcSql } from './timeService.js';
 import playbackTokenRuleService from './playbackTokenRuleService.js';
 
@@ -57,6 +57,10 @@ const SESSION_LIMIT_MODES = new Set(['strict', 'replace_oldest', 'unlimited']);
 const DEFAULT_SESSION_TIMEOUT_SECONDS = 60;
 const MIN_SESSION_TIMEOUT_SECONDS = 30;
 const MAX_SESSION_TIMEOUT_SECONDS = 3600;
+const SESSION_TOUCH_THROTTLE_SECONDS = 30;
+const DEFAULT_SESSION_RETENTION_DAYS = 7;
+const DEFAULT_AUDIT_RETENTION_DAYS = 90;
+const DEFAULT_MAINTENANCE_LIMIT = 1000;
 
 function toSqlDate(date) {
     return toUtcSql(date);
@@ -186,6 +190,23 @@ function isMissingSessionSchemaError(error) {
             message.includes('no such table')
             || message.includes('no such column')
         );
+}
+
+function executeWithOptionalDb(db, sql, params = []) {
+    return db ? db.prepare(sql).run(params) : execute(sql, params);
+}
+
+function queryWithOptionalDb(db, sql, params = []) {
+    return db ? db.prepare(sql).all(params) : query(sql, params);
+}
+
+function shouldTouchSession(row, now = new Date()) {
+    const lastSeenAt = parseUtcSql(row?.last_seen_at);
+    if (!lastSeenAt) {
+        return true;
+    }
+
+    return (now.getTime() - lastSeenAt.getTime()) >= SESSION_TOUCH_THROTTLE_SECONDS * 1000;
 }
 
 function parseCameraIdsJson(value) {
@@ -753,9 +774,10 @@ class PlaybackTokenService {
         return updated;
     }
 
-    cleanupExpiredSessions(tokenId) {
+    cleanupExpiredSessions(tokenId, db = null) {
         try {
-            execute(
+            executeWithOptionalDb(
+                db,
                 `UPDATE playback_token_sessions
                 SET ended_at = CURRENT_TIMESTAMP, end_reason = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE token_id = ?
@@ -770,9 +792,10 @@ class PlaybackTokenService {
         }
     }
 
-    getActiveSessions(tokenId) {
+    getActiveSessions(tokenId, db = null) {
         try {
-            return query(
+            return queryWithOptionalDb(
+                db,
                 `SELECT *
                 FROM playback_token_sessions
                 WHERE token_id = ?
@@ -801,40 +824,49 @@ class PlaybackTokenService {
         const maxActiveSessions = token.max_active_sessions ?? null;
         const timeoutSeconds = normalizeSessionTimeoutSeconds(token.session_timeout_seconds);
 
-        this.cleanupExpiredSessions(token.id);
-        const activeSessions = this.getActiveSessions(token.id);
+        const createSession = (db = null) => {
+            this.cleanupExpiredSessions(token.id, db);
+            const activeSessions = this.getActiveSessions(token.id, db);
 
-        if (mode !== 'unlimited' && maxActiveSessions && activeSessions.length >= maxActiveSessions) {
-            if (mode === 'replace_oldest') {
-                execute(
-                    `UPDATE playback_token_sessions
-                    SET ended_at = CURRENT_TIMESTAMP, end_reason = ?, updated_at = CURRENT_TIMESTAMP
-                    WHERE id = ?`,
-                    ['replaced', activeSessions[0].id]
-                );
-            } else {
-                const err = new Error('Batas perangkat aktif untuk token ini sudah penuh');
-                err.statusCode = 429;
-                throw err;
+            if (mode !== 'unlimited' && maxActiveSessions && activeSessions.length >= maxActiveSessions) {
+                if (mode === 'replace_oldest') {
+                    executeWithOptionalDb(
+                        db,
+                        `UPDATE playback_token_sessions
+                        SET ended_at = CURRENT_TIMESTAMP, end_reason = ?, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?`,
+                        ['replaced', activeSessions[0].id]
+                    );
+                } else {
+                    const err = new Error('Batas perangkat aktif untuk token ini sudah penuh');
+                    err.statusCode = 429;
+                    throw err;
+                }
             }
-        }
 
-        const sessionId = generateSessionId();
-        const now = new Date();
-        const expiresAt = new Date(now.getTime() + timeoutSeconds * 1000);
-        execute(
-            `INSERT INTO playback_token_sessions
-            (token_id, session_id_hash, client_id_hash, ip_address, user_agent, last_seen_at, expires_at)
-            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)`,
-            [
-                token.id,
-                hashToken(sessionId),
-                clientId ? hashToken(clientId) : null,
-                this.getClientIp(request),
-                request?.headers?.['user-agent'] || null,
-                toSqlDate(expiresAt),
-            ]
-        );
+            const sessionId = generateSessionId();
+            const now = new Date();
+            const expiresAt = new Date(now.getTime() + timeoutSeconds * 1000);
+            executeWithOptionalDb(
+                db,
+                `INSERT INTO playback_token_sessions
+                (token_id, session_id_hash, client_id_hash, ip_address, user_agent, last_seen_at, expires_at)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)`,
+                [
+                    token.id,
+                    hashToken(sessionId),
+                    clientId ? hashToken(clientId) : null,
+                    this.getClientIp(request),
+                    request?.headers?.['user-agent'] || null,
+                    toSqlDate(expiresAt),
+                ]
+            );
+
+            return { sessionId, activeSessions };
+        };
+
+        const createSessionInTransaction = transaction(createSession);
+        const { sessionId, activeSessions } = createSessionInTransaction();
 
         this.recordAudit({
             tokenId: token.id,
@@ -884,7 +916,7 @@ class PlaybackTokenService {
             throw err;
         }
 
-        if (touch) {
+        if (touch && shouldTouchSession(row)) {
             const timeoutSeconds = normalizeSessionTimeoutSeconds(token.session_timeout_seconds);
             const expiresAt = new Date(Date.now() + timeoutSeconds * 1000);
             execute(
@@ -921,6 +953,73 @@ class PlaybackTokenService {
         );
         this.recordAudit({ tokenId, eventType: 'sessions_cleared', request, detail: { cleared: result.changes } });
         return result.changes;
+    }
+
+    cleanupExpiredMaintenanceRows({
+        sessionRetentionDays = DEFAULT_SESSION_RETENTION_DAYS,
+        auditRetentionDays = DEFAULT_AUDIT_RETENTION_DAYS,
+        limit = DEFAULT_MAINTENANCE_LIMIT,
+    } = {}) {
+        const boundedLimit = Math.min(Math.max(Number.parseInt(limit, 10) || DEFAULT_MAINTENANCE_LIMIT, 1), 5000);
+        const sessionRetentionModifier = `-${Math.max(Number.parseInt(sessionRetentionDays, 10) || DEFAULT_SESSION_RETENTION_DAYS, 1)} days`;
+        const auditRetentionModifier = `-${Math.max(Number.parseInt(auditRetentionDays, 10) || DEFAULT_AUDIT_RETENTION_DAYS, 1)} days`;
+        const result = {
+            expiredSessions: 0,
+            oldSessions: 0,
+            oldAuditLogs: 0,
+            expiredBlacklistEntries: 0,
+        };
+
+        const runMaintenance = (key, sql, params = []) => {
+            try {
+                result[key] = execute(sql, params).changes || 0;
+            } catch (error) {
+                if (!isMissingSessionSchemaError(error) && !isMissingAuditSchemaError(error)) {
+                    throw error;
+                }
+            }
+        };
+
+        runMaintenance(
+            'expiredSessions',
+            `UPDATE playback_token_sessions
+            SET ended_at = CURRENT_TIMESTAMP, end_reason = 'expired', updated_at = CURRENT_TIMESTAMP
+            WHERE ended_at IS NULL
+              AND expires_at <= CURRENT_TIMESTAMP`
+        );
+        runMaintenance(
+            'oldSessions',
+            `DELETE FROM playback_token_sessions
+            WHERE id IN (
+                SELECT id FROM playback_token_sessions
+                WHERE ended_at IS NOT NULL
+                  AND updated_at < datetime('now', ?)
+                LIMIT ?
+            )`,
+            [sessionRetentionModifier, boundedLimit]
+        );
+        runMaintenance(
+            'oldAuditLogs',
+            `DELETE FROM playback_token_audit_logs
+            WHERE id IN (
+                SELECT id FROM playback_token_audit_logs
+                WHERE created_at < datetime('now', ?)
+                LIMIT ?
+            )`,
+            [auditRetentionModifier, boundedLimit]
+        );
+        runMaintenance(
+            'expiredBlacklistEntries',
+            `DELETE FROM token_blacklist
+            WHERE id IN (
+                SELECT id FROM token_blacklist
+                WHERE expires_at < datetime('now')
+                LIMIT ?
+            )`,
+            [boundedLimit]
+        );
+
+        return result;
     }
 
     listAuditLogs({ tokenId = null, limit = 100 } = {}) {
