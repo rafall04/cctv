@@ -5,7 +5,11 @@
 // SideEffects: None.
 
 import { basename } from 'path';
-import { isFinalSegmentFilename, isTempSegmentFilename } from './recordingSegmentFilePolicy.js';
+import {
+    isFinalSegmentFilename,
+    isPartialSegmentFilename,
+    isTempSegmentFilename,
+} from './recordingSegmentFilePolicy.js';
 
 export const RECORDING_RETENTION_GRACE_MS = 10 * 60 * 1000;
 export const DEFAULT_RECORDING_RETENTION_HOURS = 5;
@@ -36,7 +40,7 @@ export function computeRetentionWindow({ retentionHours, nowMs = Date.now() }) {
 
 export function parseSegmentFilenameTimeMs(filename) {
     const safeName = basename(String(filename || ''));
-    const match = safeName.match(/^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})\.mp4$/);
+    const match = safeName.match(/^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})\.mp4(?:\.partial)?$/);
 
     if (!match) {
         return null;
@@ -52,7 +56,9 @@ export function isSafeRecordingFilename(filename) {
         return false;
     }
 
-    return isFinalSegmentFilename(value) || isTempSegmentFilename(value);
+    return isFinalSegmentFilename(value)
+        || isPartialSegmentFilename(value)
+        || isTempSegmentFilename(value);
 }
 
 export function getSegmentAgeMs({ filename, startTime, fileMtimeMs, nowMs = Date.now() }) {
