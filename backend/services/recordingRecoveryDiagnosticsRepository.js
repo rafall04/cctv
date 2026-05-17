@@ -40,6 +40,15 @@ class RecordingRecoveryDiagnosticsRepository {
         );
     }
 
+    getActiveDiagnostic({ cameraId, filename }) {
+        return queryOne(
+            `SELECT *
+            FROM recording_recovery_diagnostics
+            WHERE camera_id = ? AND filename = ? AND active = 1`,
+            [cameraId, filename]
+        );
+    }
+
     listActiveByCamera(cameraId, limit = 100) {
         return query(
             `SELECT *
@@ -104,7 +113,18 @@ class RecordingRecoveryDiagnosticsRepository {
         );
 
         return queryOne(
-            `SELECT camera_id, filename, file_path, state, reason, attempt_count, terminal_state, quarantined_path
+            `SELECT
+                camera_id,
+                filename,
+                file_path,
+                state,
+                reason,
+                detected_at,
+                last_seen_at,
+                updated_at,
+                attempt_count,
+                terminal_state,
+                quarantined_path
             FROM recording_recovery_diagnostics
             WHERE camera_id = ? AND filename = ? AND active = 1`,
             [cameraId, filename]

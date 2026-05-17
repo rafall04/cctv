@@ -61,6 +61,32 @@ describe('recordingRecoveryDiagnosticsRepository', () => {
         );
     });
 
+    it('returns an active diagnostic by camera and filename', async () => {
+        queryOneMock.mockReturnValue({
+            camera_id: 7,
+            filename: '20260517_211000.mp4',
+            state: 'retryable_failed',
+            reason: 'invalid_duration',
+        });
+        const repository = (await import('../services/recordingRecoveryDiagnosticsRepository.js')).default;
+
+        const row = repository.getActiveDiagnostic({
+            cameraId: 7,
+            filename: '20260517_211000.mp4',
+        });
+
+        expect(row).toMatchObject({
+            camera_id: 7,
+            filename: '20260517_211000.mp4',
+            state: 'retryable_failed',
+            reason: 'invalid_duration',
+        });
+        expect(queryOneMock).toHaveBeenCalledWith(
+            expect.stringContaining('WHERE camera_id = ? AND filename = ? AND active = 1'),
+            [7, '20260517_211000.mp4']
+        );
+    });
+
     it('summarizes active diagnostics by state', async () => {
         queryMock.mockReturnValue([{ state: 'retryable_failed', count: 2 }, { state: 'unrecoverable', count: 1 }]);
         const repository = (await import('../services/recordingRecoveryDiagnosticsRepository.js')).default;
@@ -133,8 +159,43 @@ describe('recordingRecoveryDiagnosticsRepository', () => {
             attempt_count: 2,
         }));
         expect(queryOneMock).toHaveBeenCalledWith(
-            expect.stringContaining('SELECT camera_id'),
+            expect.stringContaining('camera_id'),
             [7, '20260517_010000.mp4']
+        );
+    });
+
+    it('returns timing fields when incrementing recovery attempts', async () => {
+        queryOneMock.mockReturnValue({
+            camera_id: 7,
+            filename: '20260517_211500.mp4',
+            reason: 'invalid_duration',
+            attempt_count: 1,
+            detected_at: '2026-05-17T21:16:00.000Z',
+            last_seen_at: '2026-05-17T21:16:00.000Z',
+            updated_at: '2026-05-17T21:16:00.000Z',
+        });
+        const repository = (await import('../services/recordingRecoveryDiagnosticsRepository.js')).default;
+
+        const row = repository.incrementAttempt({
+            cameraId: 7,
+            filename: '20260517_211500.mp4',
+            filePath: 'C:\\recordings\\camera7\\pending\\20260517_211500.mp4.partial',
+            reason: 'invalid_duration',
+            attemptedAt: '2026-05-17T21:16:00.000Z',
+        });
+
+        expect(row).toMatchObject({
+            camera_id: 7,
+            filename: '20260517_211500.mp4',
+            reason: 'invalid_duration',
+            attempt_count: 1,
+        });
+        expect(row.detected_at).toBeTruthy();
+        expect(row.last_seen_at).toBeTruthy();
+        expect(row.updated_at).toBeTruthy();
+        expect(queryOneMock).toHaveBeenCalledWith(
+            expect.stringContaining('updated_at'),
+            [7, '20260517_211500.mp4']
         );
     });
 
