@@ -159,6 +159,10 @@ class RecordingAssuranceService {
             const latestSegment = latestByCamera.get(camera.id) || null;
             const recentGap = gapByCamera.get(camera.id) || null;
             const reasons = [];
+            const recoveryDiagnostics = recordingRecoveryDiagnosticsRepository.listActiveByCamera(camera.id, 10);
+            if (recoveryDiagnostics.some((diagnostic) => diagnostic.state === 'retryable_failed' || diagnostic.state === 'pending')) {
+                reasons.push('recording_recovery_attention');
+            }
 
             if (!runtimeStatus?.isRecording) {
                 reasons.push('recording_process_down');
@@ -225,6 +229,14 @@ class RecordingAssuranceService {
                     gap_count: Number(recentGap.gap_count || 0),
                     max_gap_seconds: Number(recentGap.max_gap_seconds || 0),
                 } : null,
+                recovery_diagnostics: recoveryDiagnostics.map((diagnostic) => ({
+                    filename: diagnostic.filename,
+                    state: diagnostic.state,
+                    reason: diagnostic.reason,
+                    attempt_count: Number(diagnostic.attempt_count || 0),
+                    last_seen_at: diagnostic.last_seen_at,
+                    file_path: diagnostic.file_path,
+                })),
             };
         });
 

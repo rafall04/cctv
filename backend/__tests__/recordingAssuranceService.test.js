@@ -15,6 +15,7 @@ const existsSyncMock = vi.fn();
 const statSyncMock = vi.fn();
 const summarizeActiveMock = vi.fn();
 const getActiveHealthSummaryMock = vi.fn();
+const listActiveByCameraMock = vi.fn();
 
 vi.mock('../database/connectionPool.js', () => ({
     query: queryMock,
@@ -30,6 +31,7 @@ vi.mock('../services/recordingRecoveryDiagnosticsRepository.js', () => ({
     default: {
         summarizeActive: summarizeActiveMock,
         getActiveHealthSummary: getActiveHealthSummaryMock,
+        listActiveByCamera: listActiveByCameraMock,
     },
 }));
 
@@ -46,6 +48,7 @@ describe('recordingAssuranceService', () => {
         existsSyncMock.mockReturnValue(true);
         statSyncMock.mockReturnValue({ size: 1048576 });
         summarizeActiveMock.mockReturnValue({});
+        listActiveByCameraMock.mockReturnValue([]);
         getActiveHealthSummaryMock.mockReturnValue({
             oldest_active_seen_at: null,
             max_attempt_count: 0,
@@ -199,5 +202,48 @@ describe('recordingAssuranceService', () => {
             max_attempt_count: 2,
             active_total: 3,
         });
+    });
+
+    it('includes active partial recovery diagnostics in camera assurance', () => {
+        queryMock.mockImplementation((sql) => {
+            if (sql.includes('FROM cameras c')) {
+                return [{
+                    id: 7,
+                    name: 'CCTV Pasar',
+                    stream_source: 'internal',
+                    recording_status: 'recording',
+                    last_recording_start: '2026-05-17T21:00:00.000Z',
+                }];
+            }
+            if (sql.includes('ranked_segments')) {
+                return [];
+            }
+            if (sql.includes('ordered_segments')) {
+                return [];
+            }
+            return [];
+        });
+        getRecordingStatusMock.mockReturnValue({ isRecording: true, status: 'recording' });
+        listActiveByCameraMock.mockReturnValue([{
+            camera_id: 7,
+            filename: '20260517_211000.mp4',
+            file_path: 'C:\\recordings\\camera7\\pending\\20260517_211000.mp4.partial',
+            state: 'retryable_failed',
+            reason: 'invalid_duration',
+            attempt_count: 4,
+            last_seen_at: '2026-05-17T21:15:00.000Z',
+        }]);
+
+        const snapshot = recordingAssuranceService.getSnapshot({
+            now: new Date('2026-05-17T21:20:00.000Z'),
+        });
+
+        expect(snapshot.cameras[0].recovery_diagnostics).toEqual([expect.objectContaining({
+            filename: '20260517_211000.mp4',
+            state: 'retryable_failed',
+            reason: 'invalid_duration',
+            attempt_count: 4,
+        })]);
+        expect(snapshot.cameras[0].reasons).toContain('recording_recovery_attention');
     });
 });
