@@ -15,6 +15,7 @@ import * as connectionPool from '../database/connectionPool.js';
 const {
     handleCameraBecameOnlineMock,
     handleCameraBecameOfflineMock,
+    reconcileCameraLifecycleMock,
     refreshCameraThumbnailMock,
     updateCameraPathMock,
     queryMock,
@@ -24,6 +25,7 @@ const {
 } = vi.hoisted(() => ({
     handleCameraBecameOnlineMock: vi.fn(),
     handleCameraBecameOfflineMock: vi.fn(),
+    reconcileCameraLifecycleMock: vi.fn(),
     refreshCameraThumbnailMock: vi.fn(),
     updateCameraPathMock: vi.fn(),
     queryMock: vi.fn(),
@@ -36,6 +38,7 @@ vi.mock('../services/recordingService.js', () => ({
     recordingService: {
         handleCameraBecameOnline: handleCameraBecameOnlineMock,
         handleCameraBecameOffline: handleCameraBecameOfflineMock,
+        reconcileRecordingLifecycle: reconcileCameraLifecycleMock,
     },
 }));
 
@@ -722,6 +725,19 @@ describe('cameraHealthService external TLS policy', () => {
         expect(axios.get).not.toHaveBeenCalled();
     });
 
+    it('triggers recording reconciliation when runtime signal marks a camera online', () => {
+        const service = new CameraHealthService();
+
+        service.recordRuntimeSignal(393, {
+            targetUrl: 'https://example.test/live.m3u8',
+            signalType: 'runtime_success',
+            success: true,
+            timestamp: Date.now(),
+        });
+
+        expect(reconcileCameraLifecycleMock).toHaveBeenCalledWith(393, 'runtime_online_signal');
+    });
+
     it('uses passive-first FLV runtime evidence without probing backend by default', async () => {
         const service = new CameraHealthService();
         service.recordRuntimeSignal(401, {
@@ -994,7 +1010,7 @@ describe('cameraHealthService status transitions', () => {
         expect(refreshCameraThumbnailMock).not.toHaveBeenCalled();
     });
 
-    it('resumes recording and refreshes thumbnail when a camera transitions online', async () => {
+    it('reconciles recording and refreshes thumbnail when a camera transitions online', async () => {
         const service = new CameraHealthService();
 
         await service.handleCameraStatusTransition(
@@ -1004,7 +1020,8 @@ describe('cameraHealthService status transitions', () => {
             'stream_recovered'
         );
 
-        expect(handleCameraBecameOnlineMock).toHaveBeenCalledWith(42);
+        expect(reconcileCameraLifecycleMock).toHaveBeenCalledWith(42, 'health_transition_online');
+        expect(handleCameraBecameOnlineMock).not.toHaveBeenCalled();
         expect(refreshCameraThumbnailMock).toHaveBeenCalledWith(42);
         expect(handleCameraBecameOfflineMock).not.toHaveBeenCalled();
     });

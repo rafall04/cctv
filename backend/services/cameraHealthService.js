@@ -1243,6 +1243,12 @@ class CameraHealthService {
         };
     }
 
+    triggerRecordingLifecycleReconcile(cameraId, reason) {
+        Promise.resolve(recordingService.reconcileRecordingLifecycle(cameraId, reason)).catch((error) => {
+            console.error(`[CameraHealth] Failed to reconcile recording for camera ${cameraId}:`, error.message);
+        });
+    }
+
     recordRuntimeSignal(cameraId, { targetUrl = null, signalType = 'runtime_success', timestamp = Date.now(), success = true } = {}) {
         const state = this.ensureCameraState(cameraId, 0);
         const providerDomain = extractProviderDomain(targetUrl);
@@ -1293,6 +1299,7 @@ class CameraHealthService {
                 last_runtime_signal_type: signalType,
                 last_health_check_at: currentTimestamp,
             });
+            this.triggerRecordingLifecycleReconcile(cameraId, 'runtime_online_signal');
         }
 
         return state;
@@ -1551,7 +1558,7 @@ class CameraHealthService {
         if (nextOnline === 1) {
             try {
                 if (camera.enabled && camera.enable_recording) {
-                    await recordingService.handleCameraBecameOnline(camera.id);
+                    await recordingService.reconcileRecordingLifecycle(camera.id, 'health_transition_online');
                 }
             } catch (error) {
                 console.error(`[CameraHealth] Failed to auto-resume recording for camera ${camera.id}:`, error.message);
