@@ -1,7 +1,7 @@
 // Purpose: Coordinate recording facade behavior, DB state, health recovery, and segment processing.
 // Caller: recording routes, camera health service, server shutdown lifecycle.
-// Deps: FFmpeg process manager, SQLite connection pool, filesystem, camera delivery utilities.
-// MainFuncs: startRecording, stopRecording, restartRecording, shutdown, getRecordingStatus, quarantineFailedRemuxFileIfExpired.
+// Deps: FFmpeg process manager, SQLite connection pool, filesystem, camera delivery utilities, lifecycle reconciler.
+// MainFuncs: startRecording, stopRecording, restartRecording, shutdown, getRecordingStatus, reconcileRecordingLifecycleAll.
 // SideEffects: Starts/stops FFmpeg via process manager, updates DB state, remuxes segment files, quarantines expired invalid files.
 
 import { spawn } from 'child_process';
@@ -22,6 +22,7 @@ import recordingSegmentFinalizer from './recordingSegmentFinalizer.js';
 import recordingRecoveryService from './recordingRecoveryService.js';
 import recordingFileOperationService from './recordingFileOperationService.js';
 import { createRecordingRecoveryScanner } from './recordingRecoveryScanner.js';
+import { createRecordingLifecycleReconciler } from './recordingLifecycleReconciler.js';
 import {
     getCameraRecordingDir as getPolicyCameraRecordingDir,
     getFinalRecordingPath,
@@ -41,6 +42,7 @@ const RECORDINGS_BASE_PATH = join(__dirname, '..', '..', 'recordings');
 const RECORDING_RETENTION_GRACE_MS = 10 * 60 * 1000;
 const SCHEDULED_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 const SCHEDULED_CLEANUP_INITIAL_DELAY_MS = 2 * 60 * 1000;
+const RECORDING_LIFECYCLE_RECONCILE_INTERVAL_MS = 60 * 1000;
 
 // Stream health monitoring
 const streamHealthMap = new Map();
@@ -327,6 +329,13 @@ class RecordingService {
 
         // CRITICAL: Initialize cleanup throttle map
         this.lastCleanupTime = {};
+        this.lifecycleReconciler = createRecordingLifecycleReconciler({
+            query,
+            queryOne,
+            recordingService: this,
+            recordingProcessManager,
+            logger: console,
+        });
 
         // Start health monitoring
         this.startHealthMonitoring();
@@ -423,7 +432,7 @@ class RecordingService {
         return this.getRecordingStatus(cameraId);
     }
 
-    async handleCameraBecameOnline(cameraId, now = Date.now()) {
+    async handleCameraBecameOnline(cameraId, now = Date.now(), { clearCooldown = true } = {}) {
         if (recordingProcessManager.getStatus(cameraId).status !== 'stopped') {
             return this.getRecordingStatus(cameraId);
         }
@@ -432,7 +441,9 @@ class RecordingService {
         if (!health.suspendedReason) {
             health.suspendedReason = 'waiting_retry';
         }
-        health.cooldownUntil = 0;
+        if (clearCooldown) {
+            health.cooldownUntil = 0;
+        }
 
         return this.attemptRecordingRecovery(cameraId, health.suspendedReason, now);
     }
@@ -820,6 +831,30 @@ class RecordingService {
         }
     }
 
+    async reconcileRecordingLifecycle(cameraId, reason = 'manual', now = Date.now()) {
+        return this.lifecycleReconciler.reconcileCamera(cameraId, reason, now);
+    }
+
+    async reconcileRecordingLifecycleAll(reason = 'periodic_safety_net', now = Date.now()) {
+        return this.lifecycleReconciler.reconcileAll(reason, now);
+    }
+
+    startLifecycleReconciler(scheduleTimeout = setTimeout) {
+        const reconcileCycle = async () => {
+            try {
+                if (!this.isShuttingDown) {
+                    await this.reconcileRecordingLifecycleAll('periodic_safety_net');
+                }
+            } catch (error) {
+                console.error('[RecordingReconciler] Error during lifecycle reconciliation:', error.message);
+            } finally {
+                scheduleTimeout(reconcileCycle, RECORDING_LIFECYCLE_RECONCILE_INTERVAL_MS);
+            }
+        };
+
+        scheduleTimeout(reconcileCycle, RECORDING_LIFECYCLE_RECONCILE_INTERVAL_MS);
+    }
+
     async shutdown() {
         this.isShuttingDown = true;
         this.scheduler?.stop();
@@ -841,6 +876,7 @@ class RecordingService {
             this.startSegmentScanner();
             this.startBackgroundCleanup();
             this.startScheduledCleanup();
+            this.startLifecycleReconciler();
             return;
         }
 
@@ -848,6 +884,7 @@ class RecordingService {
             startSegmentScanner: (scheduleTimeout) => this.startSegmentScanner(scheduleTimeout),
             startBackgroundCleanup: (scheduleTimeout) => this.startBackgroundCleanup(scheduleTimeout),
             startScheduledCleanup: (scheduleTimeout) => this.startScheduledCleanup(scheduleTimeout),
+            startLifecycleReconciler: (scheduleTimeout) => this.startLifecycleReconciler(scheduleTimeout),
         });
     }
 

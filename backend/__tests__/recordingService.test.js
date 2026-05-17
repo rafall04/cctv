@@ -495,6 +495,48 @@ describe('recordingService external recording support', () => {
         });
     });
 
+    it('periodic lifecycle reconciliation starts a stopped online camera missing from stream health state', async () => {
+        const { recordingService } = await import('../services/recordingService.js');
+        const camera = createCamera({
+            id: 91,
+            delivery_type: 'internal_hls',
+            is_online: 1,
+            enable_recording: 1,
+            enabled: 1,
+        });
+
+        queryMock.mockReturnValue([camera]);
+        queryOneMock.mockImplementation((sql) => {
+            if (sql.includes('SELECT id, enabled, enable_recording, is_online, delivery_type')) {
+                return camera;
+            }
+            if (sql.includes('SELECT * FROM cameras')) {
+                return camera;
+            }
+            return null;
+        });
+
+        expect(recordingService.getRecordingStatus(91)).toMatchObject({ status: 'stopped' });
+
+        const result = await recordingService.reconcileRecordingLifecycleAll('test_periodic', 1000);
+
+        expect(result).toMatchObject({ success: true, checked: 1 });
+        expect(recordingService.getRecordingStatus(91)).toMatchObject({
+            isRecording: true,
+            status: 'recording',
+        });
+        expect(spawnMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('starts lifecycle reconciliation through the recording scheduler', async () => {
+        const { recordingService } = await import('../services/recordingService.js');
+        const scheduleTimeout = vi.fn();
+
+        recordingService.startLifecycleReconciler(scheduleTimeout);
+
+        expect(scheduleTimeout).toHaveBeenCalledWith(expect.any(Function), 60000);
+    });
+
     it('does not mark intentional stop exit as ffmpeg_failed', async () => {
         const { recordingService } = await import('../services/recordingService.js');
         const child = createSpawnProcess();

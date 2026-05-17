@@ -1,7 +1,7 @@
 // Purpose: Own recording scanner and cleanup timer lifecycle outside the recording facade.
 // Caller: backend/server.js startup and shutdown orchestration, recordingService compatibility hooks.
-// Deps: injected callbacks for scanner, background cleanup, and scheduled cleanup work.
-// MainFuncs: start, stop, registerTimeout, isRunning.
+// Deps: injected callbacks for scanner, background cleanup, scheduled cleanup, and lifecycle reconciliation work.
+// MainFuncs: start, stop, registerTimeout, isRunning, startLifecycleReconciler task dispatch.
 // SideEffects: Starts and clears recursive timers for recording maintenance loops.
 
 class RecordingScheduler {
@@ -38,6 +38,7 @@ class RecordingScheduler {
         tasks.startSegmentScanner?.(scheduleTimeout);
         tasks.startBackgroundCleanup?.(scheduleTimeout);
         tasks.startScheduledCleanup?.(scheduleTimeout);
+        tasks.startLifecycleReconciler?.(scheduleTimeout);
     }
 
     stop() {
