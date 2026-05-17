@@ -9,10 +9,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const executeMock = vi.fn();
 const queryMock = vi.fn();
+const queryOneMock = vi.fn();
 
 vi.mock('../database/connectionPool.js', () => ({
     execute: executeMock,
     query: queryMock,
+    queryOne: queryOneMock,
 }));
 
 describe('recordingRecoveryDiagnosticsRepository', () => {
@@ -21,6 +23,7 @@ describe('recordingRecoveryDiagnosticsRepository', () => {
         vi.clearAllMocks();
         executeMock.mockReturnValue({ changes: 1 });
         queryMock.mockReturnValue([]);
+        queryOneMock.mockReturnValue(null);
     });
 
     it('upserts active diagnostic by camera and filename', async () => {
@@ -65,6 +68,23 @@ describe('recordingRecoveryDiagnosticsRepository', () => {
         expect(repository.summarizeActive()).toEqual({ retryable_failed: 2, unrecoverable: 1 });
     });
 
+    it('returns oldest active recovery diagnostic metadata', async () => {
+        queryOneMock.mockReturnValue({
+            oldest_active_seen_at: '2026-05-17T00:00:00.000Z',
+            max_attempt_count: 3,
+            active_total: 4,
+        });
+        const repository = (await import('../services/recordingRecoveryDiagnosticsRepository.js')).default;
+
+        const result = repository.getActiveHealthSummary();
+
+        expect(result).toEqual({
+            oldest_active_seen_at: '2026-05-17T00:00:00.000Z',
+            max_attempt_count: 3,
+            active_total: 4,
+        });
+    });
+
     it('increments active recovery attempts for one file', async () => {
         const repository = (await import('../services/recordingRecoveryDiagnosticsRepository.js')).default;
         repository.incrementAttempt({
@@ -86,6 +106,35 @@ describe('recordingRecoveryDiagnosticsRepository', () => {
                 '2026-05-17T01:30:00.000Z',
                 '2026-05-17T01:30:00.000Z',
             ]
+        );
+    });
+
+    it('returns the latest active attempt count after incrementing', async () => {
+        queryOneMock.mockReturnValue({
+            camera_id: 7,
+            filename: '20260517_010000.mp4',
+            state: 'retryable_failed',
+            reason: 'invalid_duration',
+            attempt_count: 2,
+        });
+        const repository = (await import('../services/recordingRecoveryDiagnosticsRepository.js')).default;
+
+        const row = repository.incrementAttempt({
+            cameraId: 7,
+            filename: '20260517_010000.mp4',
+            filePath: 'C:\\recordings\\camera7\\20260517_010000.mp4',
+            reason: 'invalid_duration',
+            attemptedAt: '2026-05-17T01:30:00.000Z',
+        });
+
+        expect(row).toEqual(expect.objectContaining({
+            camera_id: 7,
+            filename: '20260517_010000.mp4',
+            attempt_count: 2,
+        }));
+        expect(queryOneMock).toHaveBeenCalledWith(
+            expect.stringContaining('SELECT camera_id'),
+            [7, '20260517_010000.mp4']
         );
     });
 

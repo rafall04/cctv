@@ -15,6 +15,23 @@ function sleep(ms) {
     });
 }
 
+const PENDING_RECOVERY_REASONS = new Set([
+    'file_still_changing',
+]);
+
+function shouldCountRecoveryFailure(reason) {
+    return !PENDING_RECOVERY_REASONS.has(reason);
+}
+
+function resolveAttemptCountAfterIncrement(inputAttemptCount, diagnosticRow) {
+    const persistedAttemptCount = Number(diagnosticRow?.attempt_count);
+    if (Number.isFinite(persistedAttemptCount) && persistedAttemptCount > 0) {
+        return persistedAttemptCount;
+    }
+
+    return Number(inputAttemptCount || 0) + 1;
+}
+
 export function createRecordingRecoveryService({
     finalizer = recordingSegmentFinalizer,
     diagnosticsRepository = recordingRecoveryDiagnosticsRepository,
@@ -77,13 +94,24 @@ export function createRecordingRecoveryService({
             }
 
             const reason = result?.reason || 'recovery_failed';
-            const attemptCount = Number(input.attemptCount || 0) + 1;
-            diagnosticsRepository.incrementAttempt?.({
+            if (!shouldCountRecoveryFailure(reason)) {
+                return {
+                    ...(result || {}),
+                    success: false,
+                    terminal: false,
+                    pending: true,
+                    reason,
+                    attemptCount: Number(input.attemptCount || 0),
+                };
+            }
+
+            const diagnosticRow = diagnosticsRepository.incrementAttempt?.({
                 cameraId: input.cameraId,
                 filename: result?.finalFilename || finalFilename,
                 filePath: input.sourcePath,
                 reason,
             });
+            const attemptCount = resolveAttemptCountAfterIncrement(input.attemptCount, diagnosticRow);
 
             if (attemptCount < maxAttempts) {
                 return {
@@ -98,13 +126,23 @@ export function createRecordingRecoveryService({
             return handleTerminalFailure(input, result?.finalFilename || finalFilename, reason, result || {});
         } catch (error) {
             const reason = error.message || 'recovery_exception';
-            const attemptCount = Number(input.attemptCount || 0) + 1;
-            diagnosticsRepository.incrementAttempt?.({
+            if (!shouldCountRecoveryFailure(reason)) {
+                return {
+                    success: false,
+                    terminal: false,
+                    pending: true,
+                    reason,
+                    attemptCount: Number(input.attemptCount || 0),
+                };
+            }
+
+            const diagnosticRow = diagnosticsRepository.incrementAttempt?.({
                 cameraId: input.cameraId,
                 filename: finalFilename,
                 filePath: input.sourcePath,
                 reason,
             });
+            const attemptCount = resolveAttemptCountAfterIncrement(input.attemptCount, diagnosticRow);
 
             if (attemptCount < maxAttempts) {
                 logger.warn?.(`[Recovery] Retryable recovery failure for camera${input.cameraId}/${finalFilename}: ${reason}`);

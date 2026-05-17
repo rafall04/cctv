@@ -39,6 +39,7 @@ function makeEmptySnapshot(now) {
         },
         cameras: [],
         recoveryDiagnostics: recordingRecoveryDiagnosticsRepository.summarizeActive(),
+        recoveryHealth: recordingRecoveryDiagnosticsRepository.getActiveHealthSummary(),
     };
 }
 

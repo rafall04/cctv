@@ -7,6 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { join } from 'path';
+import fc from 'fast-check';
 import {
     isPathInside,
     isSafeRecordingFilePath,
@@ -68,5 +69,42 @@ describe('recordingPathSafetyPolicy', () => {
             statusCode: 416,
             reason: 'range_not_satisfiable',
         });
+    });
+
+    it('property: rejects filenames that do not exactly match the resolved basename', () => {
+        fc.assert(fc.property(
+            fc.string({ minLength: 1, maxLength: 80 }),
+            (name) => {
+                fc.pre(name !== '20260517_010000.mp4');
+                expect(isSafeRecordingFilePath({
+                    recordingsBasePath: base,
+                    cameraId: 7,
+                    filePath: join(base, 'camera7', '20260517_010000.mp4'),
+                    filename: name,
+                })).toBe(false);
+            }
+        ));
+    });
+
+    it('property: never returns an invalid normalized range with positive chunk size', () => {
+        fc.assert(fc.property(
+            fc.integer({ min: 1, max: 1000000 }),
+            fc.integer({ min: 0, max: 1000000 }),
+            fc.integer({ min: 0, max: 1000000 }),
+            (fileSize, start, end) => {
+                const range = normalizeRecordingRange({
+                    rangeHeader: `bytes=${start}-${end}`,
+                    fileSize,
+                });
+
+                if (range.valid) {
+                    expect(range.start).toBeGreaterThanOrEqual(0);
+                    expect(range.end).toBeLessThan(fileSize);
+                    expect(range.chunkSize).toBe(range.end - range.start + 1);
+                } else {
+                    expect(range.statusCode).toBe(416);
+                }
+            }
+        ));
     });
 });

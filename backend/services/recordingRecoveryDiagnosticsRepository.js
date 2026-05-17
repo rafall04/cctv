@@ -4,7 +4,7 @@
 // MainFuncs: upsertDiagnostic, clearDiagnostic, listActiveByCamera, summarizeActive.
 // SideEffects: Reads and writes recording_recovery_diagnostics rows.
 
-import { execute, query } from '../database/connectionPool.js';
+import { execute, query, queryOne } from '../database/connectionPool.js';
 
 class RecordingRecoveryDiagnosticsRepository {
     upsertDiagnostic({
@@ -66,6 +66,22 @@ class RecordingRecoveryDiagnosticsRepository {
         }, {});
     }
 
+    getActiveHealthSummary() {
+        return queryOne(
+            `SELECT
+                MIN(last_seen_at) as oldest_active_seen_at,
+                MAX(attempt_count) as max_attempt_count,
+                COUNT(*) as active_total
+            FROM recording_recovery_diagnostics
+            WHERE active = 1`,
+            []
+        ) || {
+            oldest_active_seen_at: null,
+            max_attempt_count: 0,
+            active_total: 0,
+        };
+    }
+
     incrementAttempt({
         cameraId,
         filename,
@@ -73,7 +89,7 @@ class RecordingRecoveryDiagnosticsRepository {
         reason,
         attemptedAt = new Date().toISOString(),
     }) {
-        return execute(
+        execute(
             `INSERT INTO recording_recovery_diagnostics
             (camera_id, filename, file_path, state, reason, detected_at, last_seen_at, active, attempt_count)
             VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1)
@@ -85,6 +101,13 @@ class RecordingRecoveryDiagnosticsRepository {
                 attempt_count = attempt_count + 1,
                 updated_at = CURRENT_TIMESTAMP`,
             [cameraId, filename, filePath, 'retryable_failed', reason, attemptedAt, attemptedAt]
+        );
+
+        return queryOne(
+            `SELECT camera_id, filename, file_path, state, reason, attempt_count, terminal_state, quarantined_path
+            FROM recording_recovery_diagnostics
+            WHERE camera_id = ? AND filename = ? AND active = 1`,
+            [cameraId, filename]
         );
     }
 

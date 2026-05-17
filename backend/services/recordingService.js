@@ -21,6 +21,7 @@ import recordingSegmentRepository from './recordingSegmentRepository.js';
 import recordingSegmentFinalizer from './recordingSegmentFinalizer.js';
 import recordingRecoveryService from './recordingRecoveryService.js';
 import recordingFileOperationService from './recordingFileOperationService.js';
+import { createRecordingRecoveryScanner } from './recordingRecoveryScanner.js';
 import {
     getCameraRecordingDir as getPolicyCameraRecordingDir,
     getFinalRecordingPath,
@@ -856,119 +857,20 @@ class RecordingService {
      * FIX: Now scans ALL camera directories, not just active recordings
      */
     startSegmentScanner(scheduleTimeout = setTimeout) {
-        // Initial cleanup of temp files
         this.cleanupTempFiles();
+        if (!this.recoveryScanner) {
+            this.recoveryScanner = createRecordingRecoveryScanner({
+                recordingsBasePath: RECORDINGS_BASE_PATH,
+                isFileBeingProcessed: (cameraId, filename) => filesBeingProcessed.has(`${cameraId}:${filename}`),
+                isFileFailed,
+                onFailedFileExpired: quarantineFailedRemuxFileIfExpired,
+                removeFailedFile,
+                onSegmentCreated: (cameraId, filename) => this.onSegmentCreated(cameraId, filename),
+                logger: console,
+            });
+        }
 
-        const scanCycle = async () => {
-            try {
-                // FIX: Scan ALL camera directories on disk, not just active recordings
-                // This ensures stopped cameras with orphaned files are also processed
-                try { await fsPromises.access(RECORDINGS_BASE_PATH); } catch { scheduleTimeout(scanCycle, 60000); return; }
-
-                const cameraDirs = await fsPromises.readdir(RECORDINGS_BASE_PATH);
-
-                for (const dirName of cameraDirs) {
-                    const cameraDir = join(RECORDINGS_BASE_PATH, dirName);
-
-                    // Skip non-directories
-                    try {
-                        const st = await fsPromises.stat(cameraDir);
-                        if (!st.isDirectory()) continue;
-                    } catch { continue; }
-
-                    // Extract camera ID
-                    const cameraIdMatch = dirName.match(/camera(\d+)/);
-                    if (!cameraIdMatch) continue;
-                    const cameraId = parseInt(cameraIdMatch[1]);
-
-                    // Verify camera exists. Disabled recording only stops new FFmpeg work, not recovery.
-                    const camera = queryOne('SELECT id, enable_recording FROM cameras WHERE id = ?', [cameraId]);
-                    if (!camera) continue;
-
-                    try {
-                        const allFiles = await fsPromises.readdir(cameraDir);
-                        const finalFiles = allFiles.filter(isFinalSegmentFilename);
-                        let partialFiles = [];
-                        const pendingDir = getPendingRecordingDir(RECORDINGS_BASE_PATH, cameraId);
-                        try {
-                            partialFiles = (await fsPromises.readdir(pendingDir)).filter(isPartialSegmentFilename);
-                        } catch {
-                            partialFiles = [];
-                        }
-
-                        const existingFilesSet = new Set(
-                            query('SELECT filename FROM recording_segments WHERE camera_id = ?', [cameraId])
-                                .map(row => row.filename)
-                        );
-
-                        for (const filename of partialFiles) {
-                            const finalFilename = toFinalSegmentFilename(filename);
-                            if (!finalFilename) continue;
-                            const filePath = join(pendingDir, filename);
-                            const stats = await fsPromises.stat(filePath);
-                            const fileAge = Date.now() - stats.mtimeMs;
-                            if (existingFilesSet.has(finalFilename)) {
-                                if (fileAge > 5 * 60 * 1000) {
-                                    const deleteResult = await recordingFileOperationService.deleteFileSafely({
-                                        cameraId,
-                                        filename,
-                                        filePath,
-                                        reason: 'pending_partial_finalized_duplicate',
-                                    });
-                                    if (deleteResult.success) {
-                                        console.log(`[Scanner] Removed finalized pending partial: camera${cameraId}/${filename}`);
-                                    }
-                                }
-                                continue;
-                            }
-                            const fileKey = `${cameraId}:${finalFilename}`;
-                            if (filesBeingProcessed.has(fileKey) || recordingRecoveryService.isFileOwned(cameraId, finalFilename)) continue;
-                            if (fileAge > 30000) {
-                                console.log(`[Scanner] Found pending segment: ${filename} (age: ${Math.round(fileAge / 1000)}s)`);
-                                this.onSegmentCreated(cameraId, filename);
-                            }
-                        }
-
-                        for (const filename of finalFiles) {
-                            if (isFileFailed(cameraId, filename)) {
-                                const failedPath = join(cameraDir, filename);
-                                try {
-                                    await fsPromises.access(failedPath);
-                                    const quarantineResult = await quarantineFailedRemuxFileIfExpired(cameraId, filename, failedPath, 'scanner_remux_failed_3x');
-                                    if (!quarantineResult.retained) {
-                                        console.log(`[Scanner] Quarantined expired failed-remux file: ${filename}`);
-                                    }
-                                } catch {
-                                    removeFailedFile(cameraId, filename);
-                                }
-                                continue;
-                            }
-
-                            if (!existingFilesSet.has(filename)) {
-                                const filePath = join(cameraDir, filename);
-                                const stats = await fsPromises.stat(filePath);
-                                const fileKey = `${cameraId}:${filename}`;
-                                if (filesBeingProcessed.has(fileKey) || recordingRecoveryService.isFileOwned(cameraId, filename)) continue;
-                                const fileAge = Date.now() - stats.mtimeMs;
-                                if (fileAge > 30000) {
-                                    console.log(`[Scanner] Found unregistered final segment: ${filename} (age: ${Math.round(fileAge / 1000)}s)`);
-                                    this.onSegmentCreated(cameraId, filename);
-                                }
-                            }
-                        }                    } catch (error) {
-                        console.error(`[Scanner] Error scanning camera ${cameraId}:`, error);
-                    }
-                }
-            } catch (error) {
-                console.error(`[Scanner] Error in segment scanner:`, error);
-            }
-
-            // Recursive timeout to prevent intervals from overlapping each other
-            scheduleTimeout(scanCycle, 60000);
-        };
-
-        // Delay first scan by 60s
-        scheduleTimeout(scanCycle, 60000);
+        this.recoveryScanner.start(scheduleTimeout);
     }
 
     /**

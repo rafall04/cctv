@@ -14,6 +14,7 @@ const getRecordingStatusMock = vi.fn();
 const existsSyncMock = vi.fn();
 const statSyncMock = vi.fn();
 const summarizeActiveMock = vi.fn();
+const getActiveHealthSummaryMock = vi.fn();
 
 vi.mock('../database/connectionPool.js', () => ({
     query: queryMock,
@@ -28,6 +29,7 @@ vi.mock('../services/recordingService.js', () => ({
 vi.mock('../services/recordingRecoveryDiagnosticsRepository.js', () => ({
     default: {
         summarizeActive: summarizeActiveMock,
+        getActiveHealthSummary: getActiveHealthSummaryMock,
     },
 }));
 
@@ -44,6 +46,11 @@ describe('recordingAssuranceService', () => {
         existsSyncMock.mockReturnValue(true);
         statSyncMock.mockReturnValue({ size: 1048576 });
         summarizeActiveMock.mockReturnValue({});
+        getActiveHealthSummaryMock.mockReturnValue({
+            oldest_active_seen_at: null,
+            max_attempt_count: 0,
+            active_total: 0,
+        });
     });
 
     it('classifies enabled recording cameras from batched latest segment and gap queries', () => {
@@ -173,6 +180,24 @@ describe('recordingAssuranceService', () => {
             pending: 2,
             retryable_failed: 1,
             unrecoverable: 1,
+        });
+    });
+
+    it('includes recovery health metadata in assurance snapshot', () => {
+        summarizeActiveMock.mockReturnValue({ pending: 2, retryable_failed: 1 });
+        getActiveHealthSummaryMock.mockReturnValue({
+            oldest_active_seen_at: '2026-05-17T00:00:00.000Z',
+            max_attempt_count: 2,
+            active_total: 3,
+        });
+        queryMock.mockReturnValueOnce([]);
+
+        const snapshot = recordingAssuranceService.getSnapshot();
+
+        expect(snapshot.recoveryHealth).toEqual({
+            oldest_active_seen_at: '2026-05-17T00:00:00.000Z',
+            max_attempt_count: 2,
+            active_total: 3,
         });
     });
 });
