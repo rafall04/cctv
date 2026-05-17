@@ -236,6 +236,22 @@ describe('recordingService external recording support', () => {
         }));
     });
 
+    it('delegates segment recovery through the recovery queue facade', async () => {
+        const recoveryModule = await import('../services/recordingRecoveryService.js');
+        const recoverSpy = vi.spyOn(recoveryModule.default, 'recoverNow')
+            .mockResolvedValue({ success: true, finalFilename: '20260511_211000.mp4' });
+        const { recordingService } = await import('../services/recordingService.js');
+
+        recordingService.onSegmentCreated(5, '20260511_211000.mp4.partial');
+        await Promise.resolve();
+
+        expect(recoverSpy).toHaveBeenCalledWith(expect.objectContaining({
+            cameraId: 5,
+            filename: '20260511_211000.mp4.partial',
+            sourceType: 'partial',
+        }));
+    });
+
     it('keeps duplicate partial close events idempotent through finalizer delegation', async () => {
         finalizerMock.finalizeSegment.mockResolvedValue({ success: true });
         const { recordingService } = await import('../services/recordingService.js');
@@ -765,6 +781,15 @@ describe('recordingService external recording support', () => {
         expect(warnSpy).toHaveBeenCalledWith('[Segment] Keeping failed remux segment until retention expiry: camera3/20260502_095800.mp4');
     });
 
+    it('does not keep local recording delete or quarantine helpers in the facade', async () => {
+        const { readFile } = await import('fs/promises');
+        const source = await readFile(new URL('../services/recordingService.js', import.meta.url), 'utf8');
+
+        expect(source).not.toContain('async function deleteRecordingFileSafely');
+        expect(source).not.toContain('async function quarantineRecordingFile');
+        expect(source).toContain('recordingFileOperationService');
+    });
+
     it('registers the same segment idempotently when scanner and ffmpeg close detect it together', async () => {
         finalizerMock.finalizeSegment.mockResolvedValue({ success: true });
         const { recordingService } = await import('../services/recordingService.js');
@@ -787,6 +812,38 @@ describe('recordingService external recording support', () => {
         finalizerMock.finalizeSegment.mockResolvedValue({ success: true });
         const { recordingService } = await import('../services/recordingService.js');
         queryOneMock.mockReturnValue({ id: 8, enable_recording: 1 });
+        queryMock.mockReturnValue([]);
+        fsPromisesMock.readdir.mockImplementation(async (targetPath) => {
+            if (targetPath.endsWith('recordings')) return ['camera8'];
+            if (targetPath.endsWith('camera8')) return ['pending'];
+            if (targetPath.endsWith('pending')) return ['20260511_211000.mp4.partial'];
+            return [];
+        });
+        fsPromisesMock.stat.mockImplementation(async (targetPath) => ({
+            isDirectory: () => targetPath.endsWith('camera8') || targetPath.endsWith('pending'),
+            size: 4096,
+            mtimeMs: Date.now() - 120000,
+        }));
+        const segmentSpy = vi.spyOn(recordingService, 'onSegmentCreated');
+
+        const runs = [];
+        let scheduled = false;
+        recordingService.startSegmentScanner((callback) => {
+            if (!scheduled) {
+                scheduled = true;
+                runs.push(callback());
+            }
+            return 1;
+        });
+        await Promise.all(runs);
+
+        expect(segmentSpy).toHaveBeenCalledWith(8, '20260511_211000.mp4.partial');
+    });
+
+    it('scanner recovers pending partial files for disabled cameras', async () => {
+        finalizerMock.finalizeSegment.mockResolvedValue({ success: true });
+        const { recordingService } = await import('../services/recordingService.js');
+        queryOneMock.mockReturnValue({ id: 8, enable_recording: 0 });
         queryMock.mockReturnValue([]);
         fsPromisesMock.readdir.mockImplementation(async (targetPath) => {
             if (targetPath.endsWith('recordings')) return ['camera8'];

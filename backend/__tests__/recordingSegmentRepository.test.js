@@ -2,7 +2,7 @@
  * Purpose: Validate bounded SQL access for recording segment cleanup and playback.
  * Caller: Vitest backend test suite.
  * Deps: mocked connectionPool and recordingSegmentRepository.
- * MainFuncs: findExpiredSegments, findExistingFilenames, findPlaybackSegments, findSegmentByFilename.
+ * MainFuncs: findExpiredSegments, findExistingFilenames, findPlaybackSegments, findSegmentByFilename, findSegmentInWindow.
  * SideEffects: None; database calls are mocked.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -89,6 +89,22 @@ describe('recordingSegmentRepository', () => {
         expect(queryOneMock).toHaveBeenCalledWith(
             expect.stringContaining('WHERE camera_id = ? AND filename = ?'),
             [3, '20260502_100000.mp4']
+        );
+    });
+
+    it('checks one filename inside a playback window without loading all segments', () => {
+        queryOneMock.mockReturnValueOnce({ id: 9, filename: '20260517_010000.mp4' });
+
+        const result = recordingSegmentRepository.findSegmentInWindow({
+            cameraId: 7,
+            filename: '20260517_010000.mp4',
+            startAfterIso: '2026-05-16T01:00:00.000Z',
+        });
+
+        expect(result.id).toBe(9);
+        expect(queryOneMock).toHaveBeenCalledWith(
+            expect.stringContaining('AND start_time >= ?'),
+            [7, '20260517_010000.mp4', '2026-05-16T01:00:00.000Z']
         );
     });
 

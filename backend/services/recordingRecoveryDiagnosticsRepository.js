@@ -65,6 +65,48 @@ class RecordingRecoveryDiagnosticsRepository {
             return summary;
         }, {});
     }
+
+    incrementAttempt({
+        cameraId,
+        filename,
+        filePath,
+        reason,
+        attemptedAt = new Date().toISOString(),
+    }) {
+        return execute(
+            `INSERT INTO recording_recovery_diagnostics
+            (camera_id, filename, file_path, state, reason, detected_at, last_seen_at, active, attempt_count)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1)
+            ON CONFLICT(camera_id, filename, active) DO UPDATE SET
+                file_path = excluded.file_path,
+                state = excluded.state,
+                reason = excluded.reason,
+                last_seen_at = excluded.last_seen_at,
+                attempt_count = attempt_count + 1,
+                updated_at = CURRENT_TIMESTAMP`,
+            [cameraId, filename, filePath, 'retryable_failed', reason, attemptedAt, attemptedAt]
+        );
+    }
+
+    markTerminal({
+        cameraId,
+        filename,
+        reason,
+        terminalState = 'unrecoverable',
+        quarantinedPath = null,
+    }) {
+        return execute(
+            `UPDATE recording_recovery_diagnostics
+            SET
+                state = ?,
+                reason = ?,
+                terminal_state = ?,
+                quarantined_path = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE camera_id = ? AND filename = ? AND active = 1`,
+            [terminalState, reason, terminalState, quarantinedPath, cameraId, filename]
+        );
+    }
 }
 
 export default new RecordingRecoveryDiagnosticsRepository();

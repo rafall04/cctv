@@ -1,14 +1,15 @@
 /**
  * Purpose: HTTP handlers for recording control, playback segment access, and recording assurance.
  * Caller: recordingRoutes mounted under /api.
- * Deps: recordingPlaybackService, recordingAssuranceService, and fs streaming utilities.
- * MainFuncs: startRecording(), stopRecording(), getRecordingsOverview(), getRecordingAssurance(), getSegments().
+ * Deps: recordingPlaybackService, recordingAssuranceService, recordingPathSafetyPolicy, and fs streaming utilities.
+ * MainFuncs: startRecording(), stopRecording(), getRecordingsOverview(), getRecordingAssurance(), getSegments(), streamSegment().
  * SideEffects: Starts/stops recordings, updates settings, streams MP4 files, and returns read-only assurance data.
  */
 
 import { createReadStream } from 'fs';
 import recordingPlaybackService from '../services/recordingPlaybackService.js';
 import recordingAssuranceService from '../services/recordingAssuranceService.js';
+import { normalizeRecordingRange } from '../services/recordingPathSafetyPolicy.js';
 
 // Start recording untuk camera
 export async function startRecording(request, reply) {
@@ -117,21 +118,24 @@ export async function streamSegment(request, reply) {
         reply.header('Accept-Ranges', 'bytes');
         reply.header('Cache-Control', 'public, max-age=3600');
 
-        // Handle range requests (for seeking)
-        const range = request.headers.range;
-        if (range) {
-            const parts = range.replace(/bytes=/, '').split('-');
-            const start = parseInt(parts[0], 10);
-            const end = parts[1] ? parseInt(parts[1], 10) : stats.size - 1;
-            const chunksize = (end - start) + 1;
+        const range = normalizeRecordingRange({
+            rangeHeader: request.headers?.range,
+            fileSize: stats.size,
+        });
+        if (!range.valid) {
+            return reply
+                .code(range.statusCode)
+                .header('Content-Range', `bytes */${stats.size}`)
+                .send({ success: false, message: range.reason });
+        }
 
-            console.log(`[Stream Info] Range request: ${start}-${end}/${stats.size}`);
-
+        if (range.partial) {
+            console.log(`[Stream Info] Range request: ${range.start}-${range.end}/${stats.size}`);
             reply.code(206);
-            reply.header('Content-Range', `bytes ${start}-${end}/${stats.size}`);
-            reply.header('Content-Length', chunksize);
+            reply.header('Content-Range', range.contentRange);
+            reply.header('Content-Length', range.chunkSize);
 
-            const stream = createReadStream(segment.file_path, { start, end });
+            const stream = createReadStream(segment.file_path, { start: range.start, end: range.end });
             return reply.send(stream);
         }
 

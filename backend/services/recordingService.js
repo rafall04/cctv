@@ -5,9 +5,9 @@
 // SideEffects: Starts/stops FFmpeg via process manager, updates DB state, remuxes segment files, quarantines expired invalid files.
 
 import { spawn } from 'child_process';
-import { existsSync, mkdirSync, unlinkSync, statSync, renameSync, readdirSync } from 'fs';
+import { existsSync, mkdirSync } from 'fs';
 import { promises as fsPromises } from 'fs';
-import { basename, isAbsolute, join, dirname, relative, resolve } from 'path';
+import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import { promisify } from 'util';
@@ -16,9 +16,11 @@ import { getEffectiveDeliveryType, getPrimaryExternalStreamUrl } from '../utils/
 import { buildFfmpegRtspInputArgs, resolveInternalRtspTransport } from '../utils/internalRtspTransportPolicy.js';
 import recordingProcessManager from './recordingProcessManager.js';
 import { createRecordingCleanupService } from './recordingCleanupService.js';
-import { canDeleteRecordingFile, computeRetentionWindow, isSafeRecordingFilename } from './recordingRetentionPolicy.js';
+import { canDeleteRecordingFile, computeRetentionWindow } from './recordingRetentionPolicy.js';
 import recordingSegmentRepository from './recordingSegmentRepository.js';
 import recordingSegmentFinalizer from './recordingSegmentFinalizer.js';
+import recordingRecoveryService from './recordingRecoveryService.js';
+import recordingFileOperationService from './recordingFileOperationService.js';
 import {
     getCameraRecordingDir as getPolicyCameraRecordingDir,
     getFinalRecordingPath,
@@ -38,7 +40,6 @@ const RECORDINGS_BASE_PATH = join(__dirname, '..', '..', 'recordings');
 const RECORDING_RETENTION_GRACE_MS = 10 * 60 * 1000;
 const SCHEDULED_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 const SCHEDULED_CLEANUP_INITIAL_DELAY_MS = 2 * 60 * 1000;
-const QUARANTINE_DIR_NAME = '.quarantine';
 
 // Stream health monitoring
 const streamHealthMap = new Map();
@@ -115,92 +116,6 @@ const removeFailedFile = (cameraId, filename) => {
     }
 };
 
-function getCameraRecordingDir(cameraId) {
-    return join(RECORDINGS_BASE_PATH, `camera${cameraId}`);
-}
-
-function isPathInside(parentPath, candidatePath) {
-    const parent = resolve(parentPath);
-    const candidate = resolve(candidatePath);
-    const pathDiff = relative(parent, candidate);
-    return Boolean(pathDiff) && !pathDiff.startsWith('..') && !isAbsolute(pathDiff);
-}
-
-export function isSafeRecordingFilePath(cameraId, filePath, filename = null) {
-    if (!cameraId || !filePath) {
-        return false;
-    }
-
-    const cameraDir = getCameraRecordingDir(cameraId);
-    const resolvedPath = resolve(filePath);
-
-    if (!isPathInside(cameraDir, resolvedPath)) {
-        return false;
-    }
-
-    if (filename && basename(resolvedPath) !== filename) {
-        return false;
-    }
-
-    const fileName = filename || basename(resolvedPath);
-    return isSafeRecordingFilename(fileName);
-}
-
-async function deleteRecordingFileSafely({ cameraId, filename, filePath, reason }) {
-    if (!isSafeRecordingFilePath(cameraId, filePath, filename)) {
-        console.warn(`[Cleanup] Refusing unsafe delete for camera${cameraId}/${filename || basename(filePath || '')} (${reason})`);
-        return { success: false, skipped: true, reason: 'unsafe_path', size: 0 };
-    }
-
-    try {
-        const stats = await fsPromises.stat(filePath);
-        await fsPromises.unlink(filePath);
-        return { success: true, size: stats.size };
-    } catch (error) {
-        if (error.code === 'ENOENT') {
-            return { success: true, missing: true, size: 0 };
-        }
-
-        console.error(`[Cleanup] Error deleting ${filename || basename(filePath)} (${reason}):`, error.message);
-        return { success: false, reason: error.message, size: 0 };
-    }
-}
-
-async function quarantineRecordingFile(cameraId, filename, filePath, reason) {
-    if (!isSafeRecordingFilePath(cameraId, filePath, filename)) {
-        console.warn(`[Segment] Refusing unsafe quarantine for camera${cameraId}/${filename || basename(filePath || '')} (${reason})`);
-        return { success: false, skipped: true, reason: 'unsafe_path' };
-    }
-
-    try {
-        await fsPromises.access(filePath);
-    } catch {
-        return { success: true, missing: true };
-    }
-
-    const quarantineDir = join(RECORDINGS_BASE_PATH, QUARANTINE_DIR_NAME, `camera${cameraId}`);
-    const safeReason = String(reason || 'unknown').replace(/[^a-z0-9_-]/gi, '_').slice(0, 40);
-    const quarantineName = `${Date.now()}_${safeReason}_${filename}`;
-    const quarantinePath = join(quarantineDir, quarantineName);
-
-    try {
-        await fsPromises.mkdir(quarantineDir, { recursive: true });
-        await fsPromises.rename(filePath, quarantinePath);
-        console.warn(`[Segment] Quarantined file: camera${cameraId}/${filename} -> ${QUARANTINE_DIR_NAME}/camera${cameraId}/${quarantineName}`);
-        return { success: true, path: quarantinePath };
-    } catch (error) {
-        if (error.code === 'EXDEV') {
-            await fsPromises.copyFile(filePath, quarantinePath);
-            await fsPromises.unlink(filePath);
-            console.warn(`[Segment] Quarantined file with copy fallback: camera${cameraId}/${filename}`);
-            return { success: true, path: quarantinePath };
-        }
-
-        console.error(`[Segment] Failed to quarantine ${filename}:`, error.message);
-        return { success: false, reason: error.message };
-    }
-}
-
 async function quarantineFailedRemuxFileIfExpired(cameraId, filename, filePath, reason) {
     let fileMtimeMs = null;
     try {
@@ -225,7 +140,12 @@ async function quarantineFailedRemuxFileIfExpired(cameraId, filename, filePath, 
         return { success: true, retained: true };
     }
 
-    const result = await quarantineRecordingFile(cameraId, filename, filePath, reason);
+    const result = await recordingFileOperationService.quarantineFile({
+        cameraId,
+        filename,
+        filePath,
+        reason,
+    });
     if (result.success) {
         removeFailedFile(cameraId, filename);
     }
@@ -235,9 +155,10 @@ async function quarantineFailedRemuxFileIfExpired(cameraId, filename, filePath, 
 const cleanupService = createRecordingCleanupService({
     repository: recordingSegmentRepository,
     recordingsBasePath: RECORDINGS_BASE_PATH,
-    safeDelete: deleteRecordingFileSafely,
-    isFileBeingProcessed: (targetCameraId, filename) => filesBeingProcessed.has(`${targetCameraId}:${filename}`),
-    onRecoverOrphan: ({ cameraId, filename, filePath, sourceType }) => recordingSegmentFinalizer.finalizeSegment({
+    safeDelete: recordingFileOperationService.deleteFileSafely,
+    isFileBeingProcessed: (targetCameraId, filename) => filesBeingProcessed.has(`${targetCameraId}:${filename}`)
+        || recordingRecoveryService.isFileOwned(targetCameraId, filename),
+    onRecoverOrphan: ({ cameraId, filename, filePath, sourceType }) => recordingRecoveryService.recoverNow({
         cameraId,
         filename,
         sourcePath: filePath,
@@ -742,8 +663,8 @@ class RecordingService {
             ? join(getPendingRecordingDir(RECORDINGS_BASE_PATH, cameraId), filename)
             : getFinalRecordingPath(RECORDINGS_BASE_PATH, cameraId, finalFilename);
 
-        console.log(`[Segment] Enqueue finalization: camera${cameraId}/${filename}`);
-        recordingSegmentFinalizer.finalizeSegment({
+        console.log(`[Segment] Enqueue recovery: camera${cameraId}/${filename}`);
+        recordingRecoveryService.recoverNow({
             cameraId,
             sourcePath,
             filename,
@@ -902,6 +823,7 @@ class RecordingService {
         this.isShuttingDown = true;
         this.scheduler?.stop();
         const results = await recordingProcessManager.shutdownAll('server_shutdown');
+        await recordingRecoveryService.drain(30000);
         const drainResult = await recordingSegmentFinalizer.drain(30000);
         if (!drainResult.drained) {
             console.warn(`[Shutdown] Recording finalizer drain timed out with ${drainResult.pending} pending file(s)`);
@@ -959,9 +881,9 @@ class RecordingService {
                     if (!cameraIdMatch) continue;
                     const cameraId = parseInt(cameraIdMatch[1]);
 
-                    // Verify camera exists and has recording enabled
+                    // Verify camera exists. Disabled recording only stops new FFmpeg work, not recovery.
                     const camera = queryOne('SELECT id, enable_recording FROM cameras WHERE id = ?', [cameraId]);
-                    if (!camera || !camera.enable_recording) continue;
+                    if (!camera) continue;
 
                     try {
                         const allFiles = await fsPromises.readdir(cameraDir);
@@ -987,13 +909,20 @@ class RecordingService {
                             const fileAge = Date.now() - stats.mtimeMs;
                             if (existingFilesSet.has(finalFilename)) {
                                 if (fileAge > 5 * 60 * 1000) {
-                                    await fsPromises.unlink(filePath);
-                                    console.log(`[Scanner] Removed finalized pending partial: camera${cameraId}/${filename}`);
+                                    const deleteResult = await recordingFileOperationService.deleteFileSafely({
+                                        cameraId,
+                                        filename,
+                                        filePath,
+                                        reason: 'pending_partial_finalized_duplicate',
+                                    });
+                                    if (deleteResult.success) {
+                                        console.log(`[Scanner] Removed finalized pending partial: camera${cameraId}/${filename}`);
+                                    }
                                 }
                                 continue;
                             }
                             const fileKey = `${cameraId}:${finalFilename}`;
-                            if (filesBeingProcessed.has(fileKey)) continue;
+                            if (filesBeingProcessed.has(fileKey) || recordingRecoveryService.isFileOwned(cameraId, finalFilename)) continue;
                             if (fileAge > 30000) {
                                 console.log(`[Scanner] Found pending segment: ${filename} (age: ${Math.round(fileAge / 1000)}s)`);
                                 this.onSegmentCreated(cameraId, filename);
@@ -1019,7 +948,7 @@ class RecordingService {
                                 const filePath = join(cameraDir, filename);
                                 const stats = await fsPromises.stat(filePath);
                                 const fileKey = `${cameraId}:${filename}`;
-                                if (filesBeingProcessed.has(fileKey)) continue;
+                                if (filesBeingProcessed.has(fileKey) || recordingRecoveryService.isFileOwned(cameraId, filename)) continue;
                                 const fileAge = Date.now() - stats.mtimeMs;
                                 if (fileAge > 30000) {
                                     console.log(`[Scanner] Found unregistered final segment: ${filename} (age: ${Math.round(fileAge / 1000)}s)`);
@@ -1405,7 +1334,7 @@ class RecordingService {
                                 continue;
                             }
 
-                            const deleteResult = await deleteRecordingFileSafely({
+                            const deleteResult = await recordingFileOperationService.deleteFileSafely({
                                 cameraId,
                                 filename: file.name,
                                 filePath: file.path,

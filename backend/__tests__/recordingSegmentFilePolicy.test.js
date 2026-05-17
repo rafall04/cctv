@@ -31,11 +31,11 @@ describe('recordingSegmentFilePolicy', () => {
     it('parses timestamps from final and partial names into the same final filename', () => {
         expect(parseSegmentFilename('20260511_211000.mp4')).toMatchObject({
             finalFilename: '20260511_211000.mp4',
-            timestampIso: '2026-05-11T14:10:00.000Z',
+            timestampIso: '2026-05-11T21:10:00.000Z',
         });
         expect(parseSegmentFilename('20260511_211000.mp4.partial')).toMatchObject({
             finalFilename: '20260511_211000.mp4',
-            timestampIso: '2026-05-11T14:10:00.000Z',
+            timestampIso: '2026-05-11T21:10:00.000Z',
         });
         expect(toFinalSegmentFilename('20260511_211000.mp4.partial')).toBe('20260511_211000.mp4');
     });

@@ -1,7 +1,7 @@
 // Purpose: Centralize bounded SQLite queries for recording segment cleanup and playback.
 // Caller: recordingCleanupService, recordingPlaybackService, repository tests.
 // Deps: SQLite connectionPool query/queryOne/execute helpers.
-// MainFuncs: upsertSegment, findExpiredSegments, findPlaybackSegments, findSegmentByFilename, deleteSegmentById.
+// MainFuncs: upsertSegment, findExpiredSegments, findPlaybackSegments, findSegmentByFilename, findSegmentInWindow, deleteSegmentById.
 // SideEffects: Reads, inserts, updates, and deletes recording_segments rows.
 
 import { execute, query, queryOne, transaction } from '../database/connectionPool.js';
@@ -141,6 +141,19 @@ class RecordingSegmentRepository {
             FROM recording_segments
             WHERE camera_id = ? AND filename = ?`,
             [cameraId, filename]
+        );
+    }
+
+    findSegmentInWindow({ cameraId, filename, startAfterIso = null }) {
+        if (!startAfterIso) {
+            return this.findSegmentByFilename({ cameraId, filename });
+        }
+
+        return queryOne(
+            `SELECT ${SEGMENT_SELECT_FIELDS}
+            FROM recording_segments
+            WHERE camera_id = ? AND filename = ? AND start_time >= ?`,
+            [cameraId, filename, startAfterIso]
         );
     }
 

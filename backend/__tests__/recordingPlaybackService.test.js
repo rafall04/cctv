@@ -1,5 +1,13 @@
+/**
+ * Purpose: Validate recording playback service controls, stream authorization, and safe file access.
+ * Caller: Vitest backend test suite.
+ * Deps: mocked connectionPool, fs, recordingService, settings, tokens, and security audit logger.
+ * MainFuncs: getSegments, getStreamSegment, updateRecordingSettings.
+ * SideEffects: None; external services and filesystem access are mocked.
+ */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFile } from 'fs/promises';
+import { join } from 'path';
 
 const queryMock = vi.fn();
 const queryOneMock = vi.fn();
@@ -133,6 +141,49 @@ describe('recordingPlaybackService', () => {
         expect(logAdminActionMock).toHaveBeenCalled();
     });
 
+    it('rejects enabling recording for non-recordable delivery types', async () => {
+        queryOneMock.mockReturnValueOnce({
+            id: 7,
+            name: 'CCTV MJPEG',
+            enabled: 1,
+            delivery_type: 'external_mjpeg',
+            stream_source: 'external',
+        });
+
+        await expect(recordingPlaybackService.updateRecordingSettings(
+            7,
+            { enable_recording: true },
+            { user: { id: 1 } }
+        )).rejects.toMatchObject({
+            statusCode: 400,
+            message: 'Recording only supports internal HLS or external HLS cameras',
+        });
+
+        expect(executeMock).not.toHaveBeenCalledWith(
+            expect.stringContaining('UPDATE cameras SET enable_recording'),
+            expect.any(Array)
+        );
+    });
+
+    it('rejects recording retention outside accepted bounds', async () => {
+        queryOneMock.mockReturnValueOnce({
+            id: 7,
+            name: 'CCTV HLS',
+            enabled: 1,
+            delivery_type: 'internal_hls',
+            stream_source: 'internal',
+        });
+
+        await expect(recordingPlaybackService.updateRecordingSettings(
+            7,
+            { recording_duration_hours: 3000 },
+            { user: { id: 1 } }
+        )).rejects.toMatchObject({
+            statusCode: 400,
+            message: 'Recording retention must be between 1 and 2160 hours',
+        });
+    });
+
     it('returns the latest preview segments for public playback', () => {
         queryOneMock
             .mockReturnValueOnce({
@@ -233,6 +284,7 @@ describe('recordingPlaybackService', () => {
     });
 
     it('streams by filename without loading every segment for the camera', () => {
+        const filePath = join(process.cwd(), '..', 'recordings', 'camera9', '20260517_010000.mp4');
         queryOneMock
             .mockReturnValueOnce({
                 id: 9,
@@ -243,31 +295,99 @@ describe('recordingPlaybackService', () => {
             .mockReturnValueOnce({ value: '628111111111' })
             .mockReturnValueOnce({
                 id: 2,
-                filename: 'second.mp4',
+                filename: '20260517_010000.mp4',
                 start_time: '2026-03-20T10:10:00.000Z',
                 end_time: '2026-03-20T10:20:00.000Z',
                 duration: 600,
-                file_path: 'b',
+                file_path: filePath,
                 file_size: 100,
                 created_at: '2026-03-20T10:10:00.000Z',
             });
         queryMock.mockReturnValueOnce([
             {
                 id: 2,
-                filename: 'second.mp4',
+                filename: '20260517_010000.mp4',
                 start_time: '2026-03-20T10:10:00.000Z',
             },
         ]);
 
-        const result = recordingPlaybackService.getStreamSegment(9, 'second.mp4', { query: {} });
+        const result = recordingPlaybackService.getStreamSegment(9, '20260517_010000.mp4', { query: {} });
 
-        expect(result.segment.filename).toBe('second.mp4');
+        expect(result.segment.filename).toBe('20260517_010000.mp4');
         expect(queryOneMock.mock.calls[2][0]).toContain('WHERE camera_id = ? AND filename = ?');
         expect(queryMock.mock.calls[0][0]).toContain('ORDER BY start_time DESC');
         expect(queryMock).not.toHaveBeenCalledWith(expect.stringContaining('ORDER BY start_time ASC'), [9]);
     });
 
+    it('authorizes token stream lookup with a direct playback-window filename query', () => {
+        const filePath = join(process.cwd(), '..', 'recordings', 'camera9', '20260517_010000.mp4');
+        validateRequestForCameraMock.mockReturnValue({
+            id: 20,
+            scope_type: 'selected',
+            effective_playback_window_hours: 12,
+        });
+        queryOneMock
+            .mockReturnValueOnce({
+                id: 9,
+                name: 'CCTV TAMAN',
+                public_playback_mode: 'admin_only',
+                public_playback_preview_minutes: null,
+            })
+            .mockReturnValueOnce({
+                id: 2,
+                filename: '20260517_010000.mp4',
+                start_time: '2026-05-17T01:00:00.000Z',
+                end_time: '2026-05-17T01:10:00.000Z',
+                duration: 600,
+                file_path: filePath,
+                file_size: 100,
+                created_at: '2026-05-17T01:00:00.000Z',
+            })
+            .mockReturnValueOnce({ id: 2, filename: '20260517_010000.mp4' });
+
+        const result = recordingPlaybackService.getStreamSegment(9, '20260517_010000.mp4', {
+            query: {},
+            url: '/api/recordings/9/stream/20260517_010000.mp4',
+            cookies: { raf_playback_token: 'token' },
+        });
+
+        expect(result.segment.filename).toBe('20260517_010000.mp4');
+        expect(queryOneMock.mock.calls[2][0]).toContain('AND start_time >= ?');
+        expect(queryMock).not.toHaveBeenCalledWith(
+            expect.stringContaining('LIMIT ?'),
+            [9, 1000]
+        );
+    });
+
+    it('rejects stream segment when DB path escapes camera recording directory', () => {
+        queryOneMock
+            .mockReturnValueOnce({
+                id: 9,
+                name: 'CCTV TAMAN',
+                public_playback_mode: 'inherit',
+                public_playback_preview_minutes: null,
+            })
+            .mockReturnValueOnce({ value: '628111111111' })
+            .mockReturnValueOnce({
+                id: 2,
+                filename: '20260517_010000.mp4',
+                start_time: '2026-05-17T01:00:00.000Z',
+                end_time: '2026-05-17T01:10:00.000Z',
+                duration: 600,
+                file_path: 'C:\\escape\\20260517_010000.mp4',
+                file_size: 100,
+                created_at: '2026-05-17T01:00:00.000Z',
+            });
+        queryMock.mockReturnValueOnce([
+            { id: 2, filename: '20260517_010000.mp4', start_time: '2026-05-17T01:00:00.000Z' },
+        ]);
+
+        expect(() => recordingPlaybackService.getStreamSegment(9, '20260517_010000.mp4', { query: {} }))
+            .toThrow('Segment file path is not safe');
+    });
+
     it('does not mutate recording_segments during stream lookup when file size differs on disk', () => {
+        const filePath = join(process.cwd(), '..', 'recordings', 'camera12', '20260517_011000.mp4');
         queryOneMock
             .mockReturnValueOnce({
                 id: 12,
@@ -278,27 +398,27 @@ describe('recordingPlaybackService', () => {
             .mockReturnValueOnce({ value: '628111111111' })
             .mockReturnValueOnce({
                 id: 4,
-                filename: 'mismatch.mp4',
+                filename: '20260517_011000.mp4',
                 start_time: '2026-03-20T10:10:00.000Z',
                 end_time: '2026-03-20T10:20:00.000Z',
                 duration: 600,
-                file_path: 'mismatch-path',
+                file_path: filePath,
                 file_size: 100,
                 created_at: '2026-03-20T10:10:00.000Z',
             });
         queryMock.mockReturnValueOnce([
             {
                 id: 4,
-                filename: 'mismatch.mp4',
+                filename: '20260517_011000.mp4',
                 start_time: '2026-03-20T10:10:00.000Z',
             },
         ]);
 
         statSyncMock.mockReturnValue({ size: 2 * 1024 * 1024 });
 
-        const result = recordingPlaybackService.getStreamSegment(12, 'mismatch.mp4', { query: {} });
+        const result = recordingPlaybackService.getStreamSegment(12, '20260517_011000.mp4', { query: {} });
 
-        expect(result.segment.filename).toBe('mismatch.mp4');
+        expect(result.segment.filename).toBe('20260517_011000.mp4');
         expect(executeMock).not.toHaveBeenCalledWith(
             'UPDATE recording_segments SET file_size = ? WHERE id = ?',
             [2 * 1024 * 1024, 4]

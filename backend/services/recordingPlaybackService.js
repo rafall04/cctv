@@ -1,21 +1,29 @@
 /**
  * Purpose: Coordinate recording controls, public/admin playback policy, token access, and MP4 segment delivery.
  * Caller: recordingController playback and recording handlers.
- * Deps: database connection helpers, recording services, segment repository, settings, playback tokens, fs.
+ * Deps: database connection helpers, camera delivery policy, recording services, segment repository, settings, playback tokens, fs, path safety policy.
  * MainFuncs: startRecording, stopRecording, getSegments, getStreamSegment, generatePlaylist, updateRecordingSettings.
  * SideEffects: Starts/stops recordings, writes camera settings, logs admin actions, reads segment files.
  */
 
 import { query, queryOne, execute } from '../database/connectionPool.js';
+import { getEffectiveDeliveryType } from '../utils/cameraDelivery.js';
 import { recordingService } from './recordingService.js';
 import recordingSegmentRepository from './recordingSegmentRepository.js';
 import { logAdminAction } from './securityAuditLogger.js';
 import settingsService from './settingsService.js';
 import playbackTokenService from './playbackTokenService.js';
 import { existsSync, statSync } from 'fs';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+import { isSafeRecordingFilePath } from './recordingPathSafetyPolicy.js';
 
 const PUBLIC_PLAYBACK_MODES = new Set(['inherit', 'disabled', 'preview_only', 'admin_only']);
 const VALID_PREVIEW_MINUTES = new Set([0, 10, 20, 30, 60]);
+const RECORDABLE_DELIVERY_TYPES = new Set(['internal_hls', 'external_hls']);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const RECORDINGS_BASE_PATH = join(__dirname, '..', '..', 'recordings');
 
 function normalizePublicPlaybackMode(value) {
     return PUBLIC_PLAYBACK_MODES.has(value) ? value : 'inherit';
@@ -32,6 +40,26 @@ function getPreviewSegmentLimit(previewMinutes) {
     }
 
     return Math.max(0, Math.floor(previewMinutes / 10));
+}
+
+function assertRecordingSettingsAllowed(camera, data) {
+    if (data.recording_duration_hours !== undefined) {
+        const hours = Number(data.recording_duration_hours);
+        if (!Number.isInteger(hours) || hours < 1 || hours > 2160) {
+            const err = new Error('Recording retention must be between 1 and 2160 hours');
+            err.statusCode = 400;
+            throw err;
+        }
+    }
+
+    if (data.enable_recording === true || data.enable_recording === 1) {
+        const deliveryType = getEffectiveDeliveryType(camera);
+        if (!RECORDABLE_DELIVERY_TYPES.has(deliveryType)) {
+            const err = new Error('Recording only supports internal HLS or external HLS cameras');
+            err.statusCode = 400;
+            throw err;
+        }
+    }
 }
 
 class RecordingPlaybackService {
@@ -406,25 +434,45 @@ class RecordingPlaybackService {
         }
 
         if (access.accessMode !== 'admin_full') {
-            const previewSegments = access.accessMode === 'token_full'
-                ? this.applyPlaybackWindow(recordingSegmentRepository.findPlaybackSegments({
+            if (access.accessMode === 'token_full') {
+                const cutoffIso = access.playbackWindowHours
+                    ? new Date(Date.now() - access.playbackWindowHours * 60 * 60 * 1000).toISOString()
+                    : null;
+                const allowedSegment = recordingSegmentRepository.findSegmentInWindow({
                     cameraId,
-                    order: 'oldest',
-                    limit: 1000,
-                    returnAscending: true,
-                }), access)
-                : recordingSegmentRepository.findPlaybackSegments({
+                    filename,
+                    startAfterIso: cutoffIso,
+                });
+                if (!allowedSegment) {
+                    const err = new Error('Segment not available for this playback scope');
+                    err.statusCode = 403;
+                    throw err;
+                }
+            } else {
+                const previewSegments = recordingSegmentRepository.findPlaybackSegments({
                     cameraId,
                     order: 'latest',
                     limit: getPreviewSegmentLimit(access.previewMinutes),
                     returnAscending: true,
                 });
 
-            if (!previewSegments.some((item) => item.filename === filename)) {
-                const err = new Error('Segment not available for this playback scope');
-                err.statusCode = 403;
-                throw err;
+                if (!previewSegments.some((item) => item.filename === filename)) {
+                    const err = new Error('Segment not available for this playback scope');
+                    err.statusCode = 403;
+                    throw err;
+                }
             }
+        }
+
+        if (!isSafeRecordingFilePath({
+            recordingsBasePath: RECORDINGS_BASE_PATH,
+            cameraId,
+            filePath: segment.file_path,
+            filename,
+        })) {
+            const err = new Error('Segment file path is not safe');
+            err.statusCode = 403;
+            throw err;
         }
 
         if (!existsSync(segment.file_path)) {
@@ -501,6 +549,7 @@ class RecordingPlaybackService {
             err.statusCode = 404;
             throw err;
         }
+        assertRecordingSettingsAllowed(camera, data);
 
         const updates = [];
         const values = [];

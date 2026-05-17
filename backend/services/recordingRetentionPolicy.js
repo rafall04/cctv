@@ -1,6 +1,6 @@
 // Purpose: Provide pure retention and recording filename decisions for cleanup flows.
 // Caller: recordingService, recordingCleanupService, recordingRetentionPolicy tests.
-// Deps: Node path basename utility.
+// Deps: Node path basename utility, recording time policy.
 // MainFuncs: computeRetentionWindow, parseSegmentFilenameTimeMs, isSafeRecordingFilename, canDeleteRecordingFile, describeRecordingRetentionDecision.
 // SideEffects: None.
 
@@ -10,6 +10,11 @@ import {
     isPartialSegmentFilename,
     isTempSegmentFilename,
 } from './recordingSegmentFilePolicy.js';
+import {
+    getRecordingAgeMs,
+    parseRecordingDateMs,
+    parseRecordingFilenameTimestampMs,
+} from './recordingTimePolicy.js';
 
 export const RECORDING_RETENTION_GRACE_MS = 10 * 60 * 1000;
 export const DEFAULT_RECORDING_RETENTION_HOURS = 5;
@@ -39,15 +44,7 @@ export function computeRetentionWindow({ retentionHours, nowMs = Date.now() }) {
 }
 
 export function parseSegmentFilenameTimeMs(filename) {
-    const safeName = basename(String(filename || ''));
-    const match = safeName.match(/^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})\.mp4(?:\.partial)?$/);
-
-    if (!match) {
-        return null;
-    }
-
-    const [, year, month, day, hour, minute, second] = match.map(Number);
-    return Date.UTC(year, month - 1, day, hour, minute, second);
+    return parseRecordingFilenameTimestampMs(filename);
 }
 
 export function isSafeRecordingFilename(filename) {
@@ -62,21 +59,11 @@ export function isSafeRecordingFilename(filename) {
 }
 
 export function getSegmentAgeMs({ filename, startTime, fileMtimeMs, nowMs = Date.now() }) {
-    const filenameTimeMs = parseSegmentFilenameTimeMs(filename);
-    const startTimeMs = startTime ? Date.parse(startTime) : NaN;
-    const candidates = [filenameTimeMs, startTimeMs, fileMtimeMs]
-        .filter((value) => Number.isFinite(value));
-
-    if (candidates.length === 0) {
-        return 0;
-    }
-
-    const newestTrustworthyTimeMs = Math.max(...candidates);
-    return Math.max(0, nowMs - newestTrustworthyTimeMs);
+    return getRecordingAgeMs({ filename, startTime, fileMtimeMs, nowMs });
 }
 
 export function isExpiredByRetention(startTime, retentionWindow) {
-    const startMs = Date.parse(startTime);
+    const startMs = parseRecordingDateMs(startTime);
     return Number.isFinite(startMs) && startMs < retentionWindow.cutoffMs;
 }
 

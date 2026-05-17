@@ -64,4 +64,50 @@ describe('recordingRecoveryDiagnosticsRepository', () => {
 
         expect(repository.summarizeActive()).toEqual({ retryable_failed: 2, unrecoverable: 1 });
     });
+
+    it('increments active recovery attempts for one file', async () => {
+        const repository = (await import('../services/recordingRecoveryDiagnosticsRepository.js')).default;
+        repository.incrementAttempt({
+            cameraId: 7,
+            filename: '20260517_010000.mp4',
+            filePath: 'C:\\recordings\\camera7\\20260517_010000.mp4',
+            reason: 'invalid_duration',
+            attemptedAt: '2026-05-17T01:30:00.000Z',
+        });
+
+        expect(executeMock).toHaveBeenCalledWith(
+            expect.stringContaining('attempt_count = attempt_count + 1'),
+            [
+                7,
+                '20260517_010000.mp4',
+                'C:\\recordings\\camera7\\20260517_010000.mp4',
+                'retryable_failed',
+                'invalid_duration',
+                '2026-05-17T01:30:00.000Z',
+                '2026-05-17T01:30:00.000Z',
+            ]
+        );
+    });
+
+    it('marks a file terminal and quarantined', async () => {
+        const repository = (await import('../services/recordingRecoveryDiagnosticsRepository.js')).default;
+        repository.markTerminal({
+            cameraId: 7,
+            filename: '20260517_010000.mp4',
+            reason: 'retry_limit_exhausted',
+            quarantinedPath: 'C:\\recordings\\.quarantine\\camera7\\x.mp4',
+        });
+
+        expect(executeMock).toHaveBeenCalledWith(
+            expect.stringContaining('terminal_state = ?'),
+            [
+                'unrecoverable',
+                'retry_limit_exhausted',
+                'unrecoverable',
+                'C:\\recordings\\.quarantine\\camera7\\x.mp4',
+                7,
+                '20260517_010000.mp4',
+            ]
+        );
+    });
 });

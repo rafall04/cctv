@@ -1,10 +1,11 @@
 // Purpose: Classify and build recording segment paths for MP4 finalization recovery.
 // Caller: recordingService, recordingSegmentFinalizer, recording cleanup, and tests.
-// Deps: node:path.
+// Deps: node:path, recordingTimePolicy.
 // MainFuncs: getPendingRecordingDir, getPendingRecordingPattern, isFinalSegmentFilename, parseSegmentFilename.
 // SideEffects: None.
 
 import { join } from 'path';
+import { parseRecordingFilenameTimestampMs } from './recordingTimePolicy.js';
 
 const SEGMENT_STAMP = '(\\d{4})(\\d{2})(\\d{2})_(\\d{2})(\\d{2})(\\d{2})';
 const FINAL_RE = new RegExp(`^${SEGMENT_STAMP}\\.mp4$`);
@@ -64,10 +65,12 @@ export function parseSegmentFilename(filename) {
     }
 
     const [, year, month, day, hour, minute, second] = match;
-    const timestamp = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
-    if (Number.isNaN(timestamp.getTime())) {
+    const finalFilename = `${year}${month}${day}_${hour}${minute}${second}.mp4`;
+    const timestampMs = parseRecordingFilenameTimestampMs(finalFilename);
+    if (!Number.isFinite(timestampMs)) {
         return null;
     }
+    const timestamp = new Date(timestampMs);
 
     return {
         year,
@@ -78,6 +81,6 @@ export function parseSegmentFilename(filename) {
         second,
         timestamp,
         timestampIso: timestamp.toISOString(),
-        finalFilename: `${year}${month}${day}_${hour}${minute}${second}.mp4`,
+        finalFilename,
     };
 }
