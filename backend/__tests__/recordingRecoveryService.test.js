@@ -131,6 +131,95 @@ describe('recordingRecoveryService', () => {
         }));
     });
 
+    it('does not quarantine partial media failures after retry exhaustion', async () => {
+        const finalizer = {
+            finalizeSegment: vi.fn(async () => ({
+                success: false,
+                reason: 'invalid_duration',
+                finalFilename: '20260517_211000.mp4',
+            })),
+        };
+        const diagnosticsRepository = {
+            incrementAttempt: vi.fn(() => ({
+                attempt_count: 99,
+                detected_at: '2026-05-17T21:11:00.000Z',
+                last_seen_at: '2026-05-17T21:12:00.000Z',
+                updated_at: '2026-05-17T21:12:00.000Z',
+            })),
+            markTerminal: vi.fn(),
+            clearDiagnostic: vi.fn(),
+            getActiveDiagnostic: vi.fn(() => null),
+        };
+        const fileOperations = {
+            quarantineFile: vi.fn(async () => ({ success: true, path: 'quarantine-path' })),
+        };
+        const service = createService({
+            finalizer,
+            diagnosticsRepository,
+            fileOperations,
+            maxAttempts: 3,
+        });
+
+        const result = await service.recoverNow({
+            cameraId: 7,
+            filename: '20260517_211000.mp4.partial',
+            sourcePath: 'pending-path',
+            sourceType: 'partial',
+        });
+
+        expect(result).toMatchObject({
+            success: false,
+            terminal: false,
+            reason: 'invalid_duration',
+        });
+        expect(fileOperations.quarantineFile).not.toHaveBeenCalled();
+        expect(diagnosticsRepository.markTerminal).not.toHaveBeenCalled();
+    });
+
+    it('still quarantines final orphan media failures after retry exhaustion', async () => {
+        const finalizer = {
+            finalizeSegment: vi.fn(async () => ({
+                success: false,
+                reason: 'invalid_duration',
+                finalFilename: '20260517_211000.mp4',
+            })),
+        };
+        const diagnosticsRepository = {
+            incrementAttempt: vi.fn(() => ({
+                attempt_count: 3,
+                detected_at: '2026-05-17T21:11:00.000Z',
+                last_seen_at: '2026-05-17T21:12:00.000Z',
+                updated_at: '2026-05-17T21:12:00.000Z',
+            })),
+            markTerminal: vi.fn(),
+            clearDiagnostic: vi.fn(),
+            getActiveDiagnostic: vi.fn(() => null),
+        };
+        const fileOperations = {
+            quarantineFile: vi.fn(async () => ({ success: true, path: 'quarantine-path' })),
+        };
+        const service = createService({
+            finalizer,
+            diagnosticsRepository,
+            fileOperations,
+            maxAttempts: 3,
+        });
+
+        const result = await service.recoverNow({
+            cameraId: 7,
+            filename: '20260517_211000.mp4',
+            sourcePath: 'final-path',
+            sourceType: 'final_orphan',
+        });
+
+        expect(result).toMatchObject({
+            success: false,
+            terminal: true,
+            reason: 'invalid_duration',
+        });
+        expect(fileOperations.quarantineFile).toHaveBeenCalledTimes(1);
+    });
+
     it('does not count file_still_changing as a failed recovery attempt', async () => {
         const finalizer = {
             finalizeSegment: vi.fn(async () => ({

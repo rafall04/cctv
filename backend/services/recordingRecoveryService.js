@@ -5,6 +5,7 @@
 // SideEffects: Starts bounded FFmpeg/ffprobe recovery work and may quarantine terminal files.
 
 import recordingFileOperationService from './recordingFileOperationService.js';
+import { decideRecoveryRetry } from './recordingPartialRecoveryPolicy.js';
 import recordingRecoveryDiagnosticsRepository from './recordingRecoveryDiagnosticsRepository.js';
 import recordingSegmentFinalizer from './recordingSegmentFinalizer.js';
 import { toFinalSegmentFilename } from './recordingSegmentFilePolicy.js';
@@ -80,6 +81,23 @@ export function createRecordingRecoveryService({
         };
     }
 
+    function decideFailureAction({ input, reason, attemptCount, diagnosticRow }) {
+        const lastAttemptAtMs = Date.parse(
+            diagnosticRow?.last_seen_at
+            || diagnosticRow?.updated_at
+            || diagnosticRow?.detected_at
+            || ''
+        );
+
+        return decideRecoveryRetry({
+            sourceType: input.sourceType,
+            reason,
+            attemptCount,
+            lastAttemptAtMs: Number.isFinite(lastAttemptAtMs) ? lastAttemptAtMs : null,
+            maxAttempts,
+        });
+    }
+
     async function runRecovery(input) {
         const finalFilename = toFinalSegmentFilename(input.filename) || input.filename;
 
@@ -123,6 +141,25 @@ export function createRecordingRecoveryService({
                 };
             }
 
+            const failureAction = decideFailureAction({
+                input,
+                reason,
+                attemptCount,
+                diagnosticRow,
+            });
+
+            if (!failureAction.shouldQuarantine) {
+                return {
+                    ...(result || {}),
+                    success: false,
+                    terminal: false,
+                    pending: failureAction.action === 'pending',
+                    reason,
+                    attemptCount,
+                    nextRetryAtMs: failureAction.nextRetryAtMs,
+                };
+            }
+
             return handleTerminalFailure(input, result?.finalFilename || finalFilename, reason, result || {});
         } catch (error) {
             const reason = error.message || 'recovery_exception';
@@ -147,6 +184,24 @@ export function createRecordingRecoveryService({
             if (attemptCount < maxAttempts) {
                 logger.warn?.(`[Recovery] Retryable recovery failure for camera${input.cameraId}/${finalFilename}: ${reason}`);
                 return { success: false, terminal: false, reason, attemptCount };
+            }
+
+            const failureAction = decideFailureAction({
+                input,
+                reason,
+                attemptCount,
+                diagnosticRow,
+            });
+
+            if (!failureAction.shouldQuarantine) {
+                return {
+                    success: false,
+                    terminal: false,
+                    pending: failureAction.action === 'pending',
+                    reason,
+                    attemptCount,
+                    nextRetryAtMs: failureAction.nextRetryAtMs,
+                };
             }
 
             return handleTerminalFailure(input, finalFilename, reason, {});
