@@ -96,6 +96,18 @@ export function createRecordingRecoveryScanner({
             }
 
             if (fileAge > RECOVERY_MIN_AGE_MS) {
+                const retryDecision = recoveryService.shouldRetryNow?.({
+                    cameraId,
+                    filename,
+                    sourceType: 'partial',
+                    nowMs: nowMs(),
+                }) || { allowed: true };
+
+                if (!retryDecision.allowed) {
+                    result.retrySkipped += 1;
+                    continue;
+                }
+
                 logger.log?.(`[Scanner] Found pending segment: ${filename} (age: ${Math.round(fileAge / 1000)}s)`);
                 onSegmentCreated(cameraId, filename);
                 result.queuedSegments += 1;
@@ -134,6 +146,18 @@ export function createRecordingRecoveryScanner({
 
             const fileAge = nowMs() - stats.mtimeMs;
             if (fileAge > RECOVERY_MIN_AGE_MS) {
+                const retryDecision = recoveryService.shouldRetryNow?.({
+                    cameraId,
+                    filename,
+                    sourceType: 'final_orphan',
+                    nowMs: nowMs(),
+                }) || { allowed: true };
+
+                if (!retryDecision.allowed) {
+                    result.retrySkipped += 1;
+                    continue;
+                }
+
                 logger.log?.(`[Scanner] Found unregistered final segment: ${filename} (age: ${Math.round(fileAge / 1000)}s)`);
                 onSegmentCreated(cameraId, filename);
                 result.queuedSegments += 1;
@@ -185,6 +209,7 @@ export function createRecordingRecoveryScanner({
             scannedCameras: 0,
             queuedSegments: 0,
             duplicatePartialsDeleted: 0,
+            retrySkipped: 0,
         };
 
         try {

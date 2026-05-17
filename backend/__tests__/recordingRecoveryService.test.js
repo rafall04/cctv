@@ -254,4 +254,35 @@ describe('recordingRecoveryService', () => {
         expect(diagnosticsRepository.incrementAttempt).not.toHaveBeenCalled();
         expect(fileOperations.quarantineFile).not.toHaveBeenCalled();
     });
+
+    it('reports retry backoff from active diagnostics', () => {
+        const diagnosticsRepository = {
+            getActiveDiagnostic: vi.fn(() => ({
+                camera_id: 7,
+                filename: '20260517_211000.mp4',
+                state: 'retryable_failed',
+                reason: 'invalid_duration',
+                attempt_count: 3,
+                last_seen_at: '2026-05-17T21:10:00.000Z',
+            })),
+            incrementAttempt: vi.fn(),
+            markTerminal: vi.fn(),
+            clearDiagnostic: vi.fn(),
+        };
+        const service = createService({
+            diagnosticsRepository,
+            fileOperations: { quarantineFile: vi.fn() },
+        });
+
+        const decision = service.shouldRetryNow({
+            cameraId: 7,
+            filename: '20260517_211000.mp4.partial',
+            sourceType: 'partial',
+            nowMs: Date.parse('2026-05-17T21:11:00.000Z'),
+        });
+
+        expect(decision.allowed).toBe(false);
+        expect(decision.reason).toBe('retry_backoff');
+        expect(decision.nextRetryAtMs).toBeGreaterThan(Date.parse('2026-05-17T21:11:00.000Z'));
+    });
 });

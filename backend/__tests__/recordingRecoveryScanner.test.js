@@ -19,6 +19,7 @@ const queryRows = vi.fn();
 const querySingle = vi.fn();
 const deleteFileSafely = vi.fn();
 const isFileOwned = vi.fn();
+const shouldRetryNow = vi.fn();
 const onSegmentCreated = vi.fn();
 const logger = {
     log: vi.fn(),
@@ -33,7 +34,7 @@ function createScanner(overrides = {}) {
         queryRows,
         querySingle,
         fileOperations: { deleteFileSafely },
-        recoveryService: { isFileOwned },
+        recoveryService: { isFileOwned, shouldRetryNow },
         isFileBeingProcessed: () => false,
         onSegmentCreated,
         nowMs: () => Date.parse('2026-05-17T01:10:00.000Z'),
@@ -61,6 +62,7 @@ describe('recordingRecoveryScanner', () => {
         queryRows.mockReturnValue([]);
         deleteFileSafely.mockResolvedValue({ success: true, size: 1024 });
         isFileOwned.mockReturnValue(false);
+        shouldRetryNow.mockReturnValue({ allowed: true, reason: 'no_active_diagnostic' });
     });
 
     it('queues old pending partials even when recording is disabled but the camera still exists', async () => {
@@ -70,6 +72,21 @@ describe('recordingRecoveryScanner', () => {
 
         expect(onSegmentCreated).toHaveBeenCalledWith(7, '20260517_010000.mp4.partial');
         expect(result.queuedSegments).toBe(1);
+        expect(result.retrySkipped).toBe(0);
+    });
+
+    it('skips pending partials that are not due for retry yet', async () => {
+        shouldRetryNow.mockReturnValue({
+            allowed: false,
+            reason: 'retry_backoff',
+            nextRetryAtMs: Date.parse('2026-05-17T01:30:00.000Z'),
+        });
+        const scanner = createScanner();
+
+        const result = await scanner.scanOnce();
+
+        expect(onSegmentCreated).not.toHaveBeenCalled();
+        expect(result.retrySkipped).toBe(1);
     });
 
     it('deletes only finalized duplicate pending partials through safe delete', async () => {

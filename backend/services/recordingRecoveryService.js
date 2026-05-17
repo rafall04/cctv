@@ -234,6 +234,46 @@ export function createRecordingRecoveryService({
     }
 
     return {
+        shouldRetryNow({ cameraId, filename, sourceType, nowMs = Date.now() }) {
+            const finalFilename = toFinalSegmentFilename(filename) || filename;
+            const diagnostic = diagnosticsRepository.getActiveDiagnostic?.({
+                cameraId,
+                filename: finalFilename,
+            });
+
+            if (!diagnostic || diagnostic.filename !== finalFilename || !diagnostic.reason) {
+                return { allowed: true, reason: 'no_active_diagnostic' };
+            }
+
+            const lastAttemptAtMs = Date.parse(
+                diagnostic.last_seen_at
+                || diagnostic.updated_at
+                || diagnostic.detected_at
+                || ''
+            );
+            const decision = decideRecoveryRetry({
+                sourceType,
+                reason: diagnostic.reason,
+                attemptCount: diagnostic.attempt_count,
+                lastAttemptAtMs: Number.isFinite(lastAttemptAtMs) ? lastAttemptAtMs : null,
+                nowMs,
+                maxAttempts,
+            });
+
+            if (!decision.nextRetryAtMs || decision.nextRetryAtMs <= nowMs) {
+                return {
+                    allowed: true,
+                    reason: decision.action,
+                    nextRetryAtMs: decision.nextRetryAtMs,
+                };
+            }
+
+            return {
+                allowed: false,
+                reason: 'retry_backoff',
+                nextRetryAtMs: decision.nextRetryAtMs,
+            };
+        },
         enqueue(input) {
             const key = keyFor(input);
             if (queuedKeys.has(key) || inFlight.has(key)) {
