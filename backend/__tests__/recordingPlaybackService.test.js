@@ -14,6 +14,7 @@ const queryOneMock = vi.fn();
 const executeMock = vi.fn();
 const startRecordingMock = vi.fn();
 const stopRecordingMock = vi.fn();
+const reconcileRecordingLifecycleMock = vi.fn();
 const getRecordingStatusMock = vi.fn();
 const getStorageUsageMock = vi.fn();
 const logAdminActionMock = vi.fn();
@@ -43,6 +44,7 @@ vi.mock('../services/recordingService.js', () => ({
     recordingService: {
         startRecording: startRecordingMock,
         stopRecording: stopRecordingMock,
+        reconcileRecordingLifecycle: reconcileRecordingLifecycleMock,
         getRecordingStatus: getRecordingStatusMock,
         getStorageUsage: getStorageUsageMock,
     },
@@ -118,13 +120,13 @@ describe('recordingPlaybackService', () => {
         ]);
     });
 
-    it('updates recording settings and starts recording when enabled', async () => {
+    it('updates recording settings and reconciles lifecycle when enabled', async () => {
         queryOneMock.mockReturnValueOnce({
             id: 7,
             name: 'CCTV PASAR',
             enabled: 1,
         });
-        startRecordingMock.mockResolvedValue({ success: true });
+        reconcileRecordingLifecycleMock.mockResolvedValue({ success: true });
 
         await recordingPlaybackService.updateRecordingSettings(
             7,
@@ -136,7 +138,8 @@ describe('recordingPlaybackService', () => {
             'UPDATE cameras SET enable_recording = ?, recording_duration_hours = ? WHERE id = ?',
             [1, 12, 7]
         );
-        expect(startRecordingMock).toHaveBeenCalledWith(7);
+        expect(reconcileRecordingLifecycleMock).toHaveBeenCalledWith(7, 'settings_changed');
+        expect(startRecordingMock).not.toHaveBeenCalled();
         expect(stopRecordingMock).not.toHaveBeenCalled();
         expect(logAdminActionMock).toHaveBeenCalled();
     });

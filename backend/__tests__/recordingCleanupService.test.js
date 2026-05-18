@@ -35,7 +35,7 @@ function createService() {
         fs: fsMock,
         recordingsBasePath,
         safeDelete: safeDeleteMock,
-        isFileBeingProcessed: isProcessingMock,
+        recoveryService: { isFileOwned: isProcessingMock },
         logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn() },
     });
 }
@@ -484,7 +484,7 @@ describe('recordingCleanupService', () => {
             fs: fsMock,
             recordingsBasePath,
             safeDelete: safeDeleteMock,
-            isFileBeingProcessed: isProcessingMock,
+            recoveryService: { isFileOwned: isProcessingMock },
             onRecoverOrphan,
             logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn() },
         });

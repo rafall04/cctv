@@ -42,6 +42,11 @@ export function createRecordingLifecycleReconciler({
             return { cameraId: camera.id, action: decision.action, success: result?.success !== false, decision, result };
         }
 
+        if (decision.action === 'stop_disabled' || decision.action === 'stop_unrecordable') {
+            const result = await recordingService.stopRecording(camera.id, { reason: decision.reason });
+            return { cameraId: camera.id, action: decision.action, success: result?.success !== false, decision, result };
+        }
+
         return { cameraId: camera.id, action: decision.action, success: true, decision };
     }
 

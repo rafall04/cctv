@@ -2,7 +2,7 @@
  * Purpose: Validate bounded, idempotent recording recovery queue behavior.
  * Caller: Vitest backend test suite.
  * Deps: recordingRecoveryService with mocked finalizer, diagnostics, and file operations.
- * MainFuncs: enqueue, recoverNow, drain, isFileOwned.
+ * MainFuncs: enqueueRecovery, drain, isFileOwned, shouldRetryNow.
  * SideEffects: All side effects are mocked.
  */
 import { describe, expect, it, vi } from 'vitest';
@@ -34,13 +34,13 @@ describe('recordingRecoveryService', () => {
         };
         const service = createService({ finalizer });
 
-        const first = service.recoverNow({
+        const first = service.enqueueRecovery({
             cameraId: 7,
             filename: '20260517_010000.mp4.partial',
             sourcePath: 'pending-path',
             sourceType: 'partial',
         });
-        const second = service.recoverNow({
+        const second = service.enqueueRecovery({
             cameraId: 7,
             filename: '20260517_010000.mp4.partial',
             sourcePath: 'pending-path',
@@ -70,7 +70,7 @@ describe('recordingRecoveryService', () => {
         };
         const service = createService({ finalizer, diagnosticsRepository, fileOperations, maxAttempts: 1 });
 
-        const result = await service.recoverNow({
+        const result = await service.enqueueRecovery({
             cameraId: 7,
             filename: '20260517_010000.mp4',
             sourcePath: 'final-path',
@@ -119,9 +119,9 @@ describe('recordingRecoveryService', () => {
             sourceType: 'final_orphan',
         };
 
-        await service.recoverNow(input);
-        await service.recoverNow(input);
-        const result = await service.recoverNow(input);
+        await service.enqueueRecovery(input);
+        await service.enqueueRecovery(input);
+        const result = await service.enqueueRecovery(input);
 
         expect(result).toMatchObject({ success: false, terminal: true, reason: 'invalid_duration' });
         expect(fileOperations.quarantineFile).toHaveBeenCalledTimes(1);
@@ -160,7 +160,7 @@ describe('recordingRecoveryService', () => {
             maxAttempts: 3,
         });
 
-        const result = await service.recoverNow({
+        const result = await service.enqueueRecovery({
             cameraId: 7,
             filename: '20260517_211000.mp4.partial',
             sourcePath: 'pending-path',
@@ -205,7 +205,7 @@ describe('recordingRecoveryService', () => {
             maxAttempts: 3,
         });
 
-        const result = await service.recoverNow({
+        const result = await service.enqueueRecovery({
             cameraId: 7,
             filename: '20260517_211000.mp4',
             sourcePath: 'final-path',
@@ -238,7 +238,7 @@ describe('recordingRecoveryService', () => {
         };
         const service = createService({ finalizer, diagnosticsRepository, fileOperations, maxAttempts: 1 });
 
-        const result = await service.recoverNow({
+        const result = await service.enqueueRecovery({
             cameraId: 7,
             filename: '20260517_010000.mp4.partial',
             sourcePath: 'pending-path',

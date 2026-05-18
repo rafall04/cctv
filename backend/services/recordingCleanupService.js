@@ -1,11 +1,12 @@
 // Purpose: Orchestrate recording segment cleanup with bounded batches and per-camera locking.
 // Caller: recordingService scheduled cleanup and cleanup tests.
-// Deps: fs promises, path join, recording retention policy, segment repository.
+// Deps: fs promises, path join, recording retention policy, segment repository, recovery service ownership.
 // MainFuncs: createRecordingCleanupService, cleanupCamera.
 // SideEffects: Deletes recording files through injected safeDelete and removes DB rows through repository.
 
 import { promises as defaultFs } from 'fs';
 import { join } from 'path';
+import recordingRecoveryService from './recordingRecoveryService.js';
 import {
     canDeleteRecordingFile,
     computeRetentionWindow,
@@ -23,6 +24,7 @@ import {
 const NORMAL_DELETE_BATCH_SIZE = 6;
 const TEMP_FILE_MIN_AGE_MS = 5 * 60 * 1000;
 const FINALIZED_PARTIAL_MIN_AGE_MS = 5 * 60 * 1000;
+const DEFAULT_MIN_CLEANUP_INTERVAL_MS = 60 * 1000;
 
 function canDeleteTempFile({ filename, fileMtimeMs, nowMs }) {
     return isTempSegmentFilename(filename) && (nowMs - fileMtimeMs) > TEMP_FILE_MIN_AGE_MS;
@@ -46,11 +48,15 @@ export function createRecordingCleanupService({
     fs = defaultFs,
     recordingsBasePath,
     safeDelete,
-    isFileBeingProcessed,
+    recoveryService = recordingRecoveryService,
     onRecoverOrphan,
+    minIntervalMs = DEFAULT_MIN_CLEANUP_INTERVAL_MS,
     logger = console,
 } = {}) {
     const inFlightCameraIds = new Set();
+    const lastRunAtByCamera = new Map();
+    const isFileBeingProcessed = (cameraId, filename) =>
+        recoveryService?.isFileOwned?.(cameraId, filename) === true;
 
     async function cleanupExpiredDbSegments({ cameraId, retentionWindow, result }) {
         const segments = repository.findExpiredSegments({
@@ -60,7 +66,7 @@ export function createRecordingCleanupService({
         });
 
         for (const segment of segments) {
-            if (isFileBeingProcessed?.(cameraId, segment.filename)) {
+            if (isFileBeingProcessed(cameraId, segment.filename)) {
                 result.processingSkipped++;
                 continue;
             }
@@ -119,7 +125,7 @@ export function createRecordingCleanupService({
             if (dbFilenames.has(filename)) {
                 continue;
             }
-            if (isFileBeingProcessed?.(cameraId, filename)) {
+            if (isFileBeingProcessed(cameraId, filename)) {
                 result.processingSkipped++;
                 continue;
             }
@@ -236,8 +242,8 @@ export function createRecordingCleanupService({
             }
 
             if (
-                isFileBeingProcessed?.(cameraId, filename)
-                || isFileBeingProcessed?.(cameraId, finalFilename)
+                isFileBeingProcessed(cameraId, filename)
+                || isFileBeingProcessed(cameraId, finalFilename)
             ) {
                 result.processingSkipped++;
                 continue;
@@ -317,7 +323,15 @@ export function createRecordingCleanupService({
             return { ...createEmptyResult(), skippedReason: 'cleanup_in_flight' };
         }
 
+        const lastRunAt = lastRunAtByCamera.get(cameraId) || 0;
+        const timeSinceLastRun = nowMs - lastRunAt;
+        if (timeSinceLastRun < minIntervalMs) {
+            logger.log?.(`[Cleanup] Skipping cleanup for camera ${cameraId} (last cleanup ${Math.round(timeSinceLastRun / 1000)}s ago)`);
+            return { ...createEmptyResult(), skippedReason: 'cleanup_throttled' };
+        }
+
         inFlightCameraIds.add(cameraId);
+        lastRunAtByCamera.set(cameraId, nowMs);
         const result = createEmptyResult();
 
         try {
@@ -368,7 +382,7 @@ export function createRecordingCleanupService({
                     break;
                 }
 
-                if (isFileBeingProcessed?.(segment.camera_id, segment.filename)) {
+                if (isFileBeingProcessed(segment.camera_id, segment.filename)) {
                     result.processingSkipped++;
                     continue;
                 }

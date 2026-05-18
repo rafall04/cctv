@@ -1,7 +1,7 @@
 // Purpose: Own bounded recording file recovery, finalizer delegation, retry limits, and terminal recovery state.
 // Caller: recordingService scanners and recordingCleanupService orphan reconciliation.
 // Deps: recordingSegmentFinalizer, recordingRecoveryDiagnosticsRepository, recordingFileOperationService.
-// MainFuncs: createRecordingRecoveryService, enqueue, recoverNow, drain, isFileOwned.
+// MainFuncs: createRecordingRecoveryService, enqueueRecovery, drain, isFileOwned, shouldRetryNow.
 // SideEffects: Starts bounded FFmpeg/ffprobe recovery work and may quarantine terminal files.
 
 import recordingFileOperationService from './recordingFileOperationService.js';
@@ -208,7 +208,8 @@ export function createRecordingRecoveryService({
         }
     }
 
-    function recoverNow(input) {
+    // Internal: execute a single recovery job (used by pump() and inFlight dedup).
+    function startRecoveryJob(input) {
         const key = keyFor(input);
         if (inFlight.has(key)) {
             return inFlight.get(key);
@@ -225,12 +226,43 @@ export function createRecordingRecoveryService({
         while (activeCount < maxConcurrent && queue.length > 0) {
             const job = queue.shift();
             queuedKeys.delete(job.key);
+            const pending = pendingPromises.get(job.key);
+            pendingPromises.delete(job.key);
             activeCount += 1;
-            recoverNow(job.input).finally(() => {
-                activeCount -= 1;
-                pump();
-            });
+            startRecoveryJob(job.input)
+                .then((result) => pending?.resolve(result))
+                .catch((error) => pending?.resolve({
+                    success: false,
+                    terminal: false,
+                    reason: error?.message || 'recovery_exception',
+                }))
+                .finally(() => {
+                    activeCount -= 1;
+                    pump();
+                });
         }
+    }
+
+    const pendingPromises = new Map();
+
+    function enqueueRecovery(input) {
+        const key = keyFor(input);
+        if (inFlight.has(key)) {
+            return inFlight.get(key);
+        }
+        if (pendingPromises.has(key)) {
+            return pendingPromises.get(key).promise;
+        }
+
+        let resolveFn;
+        const promise = new Promise((resolve) => {
+            resolveFn = resolve;
+        });
+        pendingPromises.set(key, { promise, resolve: resolveFn });
+        queuedKeys.add(key);
+        queue.push({ key, input });
+        pump();
+        return promise;
     }
 
     return {
@@ -274,18 +306,7 @@ export function createRecordingRecoveryService({
                 nextRetryAtMs: decision.nextRetryAtMs,
             };
         },
-        enqueue(input) {
-            const key = keyFor(input);
-            if (queuedKeys.has(key) || inFlight.has(key)) {
-                return { queued: false, duplicate: true, key };
-            }
-
-            queuedKeys.add(key);
-            queue.push({ key, input });
-            pump();
-            return { queued: true, key };
-        },
-        recoverNow,
+        enqueueRecovery,
         async drain(timeoutMs = 30000) {
             const deadline = Date.now() + timeoutMs;
             while (queue.length > 0 || activeCount > 0 || inFlight.size > 0) {

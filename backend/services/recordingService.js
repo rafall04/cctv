@@ -45,17 +45,12 @@ const RECORDING_LIFECYCLE_RECONCILE_INTERVAL_MS = 60 * 1000;
 // Stream health monitoring
 const streamHealthMap = new Map();
 
-// Track files being processed (prevent deletion during remux/finalize).
-// Tracked here so cleanup + scanner can short-circuit before touching a file.
-const filesBeingProcessed = new Set();
-
 const cleanupService = createRecordingCleanupService({
     repository: recordingSegmentRepository,
     recordingsBasePath: RECORDINGS_BASE_PATH,
     safeDelete: recordingFileOperationService.deleteFileSafely,
-    isFileBeingProcessed: (targetCameraId, filename) => filesBeingProcessed.has(`${targetCameraId}:${filename}`)
-        || recordingRecoveryService.isFileOwned(targetCameraId, filename),
-    onRecoverOrphan: ({ cameraId, filename, filePath, sourceType }) => recordingRecoveryService.recoverNow({
+    recoveryService: recordingRecoveryService,
+    onRecoverOrphan: ({ cameraId, filename, filePath, sourceType }) => recordingRecoveryService.enqueueRecovery({
         cameraId,
         filename,
         sourcePath: filePath,
@@ -223,8 +218,6 @@ class RecordingService {
             mkdirSync(RECORDINGS_BASE_PATH, { recursive: true });
         }
 
-        // CRITICAL: Initialize cleanup throttle map
-        this.lastCleanupTime = {};
         this.lifecycleReconciler = createRecordingLifecycleReconciler({
             query,
             queryOne,
@@ -554,26 +547,22 @@ class RecordingService {
             return;
         }
 
-        const fileKey = `${cameraId}:${finalFilename}`;
-        if (filesBeingProcessed.has(fileKey)) {
+        if (recordingRecoveryService.isFileOwned(cameraId, finalFilename)) {
             console.log(`[Segment] Already processing: ${finalFilename}, skipping duplicate`);
             return;
         }
 
-        filesBeingProcessed.add(fileKey);
         const sourceType = isPartialSegmentFilename(filename) ? 'partial' : 'final_orphan';
         const sourcePath = sourceType === 'partial'
             ? join(getPendingRecordingDir(RECORDINGS_BASE_PATH, cameraId), filename)
             : getFinalRecordingPath(RECORDINGS_BASE_PATH, cameraId, finalFilename);
 
         console.log(`[Segment] Enqueue recovery: camera${cameraId}/${filename}`);
-        recordingRecoveryService.recoverNow({
+        recordingRecoveryService.enqueueRecovery({
             cameraId,
             sourcePath,
             filename,
             sourceType,
-        }).finally(() => {
-            filesBeingProcessed.delete(fileKey);
         });
     }
     /**
@@ -586,22 +575,6 @@ class RecordingService {
      */
     async cleanupOldSegments(cameraId) {
         try {
-            // SAFETY #1: Don't cleanup if called too frequently (prevent race condition)
-            const now = Date.now();
-            if (!this.lastCleanupTime) this.lastCleanupTime = {};
-
-            const lastCleanup = this.lastCleanupTime[cameraId] || 0;
-            const timeSinceLastCleanup = now - lastCleanup;
-
-            // Only cleanup once per 60 seconds (prevent race condition with new segments)
-            if (timeSinceLastCleanup < 60000) {
-                console.log(`[Cleanup] Skipping cleanup for camera ${cameraId} (last cleanup ${Math.round(timeSinceLastCleanup / 1000)}s ago)`);
-                return;
-            }
-
-            this.lastCleanupTime[cameraId] = now;
-
-            // Get camera recording duration (retention period)
             const camera = queryOne('SELECT recording_duration_hours, name FROM cameras WHERE id = ?', [cameraId]);
             if (!camera) {
                 console.log(`[Cleanup] Camera ${cameraId} not found, skipping cleanup`);
@@ -611,9 +584,8 @@ class RecordingService {
             return await cleanupService.cleanupCamera({
                 cameraId,
                 camera,
-                nowMs: now,
+                nowMs: Date.now(),
             });
-
         } catch (error) {
             console.error(`[Cleanup] Error cleaning up camera ${cameraId}:`, error);
         }
@@ -788,7 +760,6 @@ class RecordingService {
         if (!this.recoveryScanner) {
             this.recoveryScanner = createRecordingRecoveryScanner({
                 recordingsBasePath: RECORDINGS_BASE_PATH,
-                isFileBeingProcessed: (cameraId, filename) => filesBeingProcessed.has(`${cameraId}:${filename}`),
                 onSegmentCreated: (cameraId, filename) => this.onSegmentCreated(cameraId, filename),
                 logger: console,
             });
@@ -869,7 +840,6 @@ class RecordingService {
                 query,
                 queryOne,
                 ffprobe: (filePath) => execPromise(`ffprobe -v error "${filePath}"`, { timeout: 3000 }),
-                isFileBeingProcessed: (cameraId, filename) => filesBeingProcessed.has(`${cameraId}:${filename}`),
                 onSegmentCreated: (cameraId, filename) => this.onSegmentCreated(cameraId, filename),
                 logger: console,
             });
@@ -946,66 +916,25 @@ class RecordingService {
     }
 
     /**
-     * Auto-start recordings on service init with retry logic
+     * Auto-start recordings on service init.
+     * Delegates to the lifecycle reconciler so policy (offline suspension, cooldown,
+     * delivery type, eligibility) lives in one place. The periodic reconciler will
+     * retry every 60s for cameras that failed first attempt. Offline cameras are
+     * pre-marked as suspended so the assurance UI reflects state immediately.
      */
     async autoStartRecordings() {
         try {
-            const cameras = query(
-                'SELECT id, COALESCE(is_online, 1) as is_online FROM cameras WHERE enable_recording = 1 AND enabled = 1'
+            const offlineCameras = query(
+                'SELECT id FROM cameras WHERE enable_recording = 1 AND enabled = 1 AND COALESCE(is_online, 1) != 1'
             );
-
-            console.log(`[Recording] Found ${cameras.length} cameras with recording enabled`);
-
-            if (cameras.length === 0) {
-                console.log('[Recording] No cameras configured for recording');
-                return;
+            for (const camera of offlineCameras) {
+                this.suspendRecordingForOffline(camera.id);
             }
 
-            let successCount = 0;
-            let failCount = 0;
-
-            for (const camera of cameras) {
-                if (camera.is_online !== 1) {
-                    this.suspendRecordingForOffline(camera.id);
-                    console.log(`[Recording] Skipping camera ${camera.id} auto-start because source is currently offline`);
-                    continue;
-                }
-
-                let retries = 3;
-                let success = false;
-
-                while (retries > 0 && !success) {
-                    const attemptNum = 4 - retries;
-                    console.log(`[Recording] Starting camera ${camera.id} (attempt ${attemptNum}/3)...`);
-
-                    const result = await this.startRecording(camera.id);
-
-                    if (result.success) {
-                        console.log(`[Recording] ✓ Camera ${camera.id} recording started successfully`);
-                        successCount++;
-                        success = true;
-                    } else {
-                        console.error(`[Recording] ✗ Camera ${camera.id} failed: ${result.message}`);
-                        retries--;
-
-                        if (retries > 0) {
-                            console.log(`[Recording] Retrying camera ${camera.id} in 2 seconds...`);
-                            await new Promise(resolve => setTimeout(resolve, 2000)); // Reduced from 5s to 2s
-                        }
-                    }
-                }
-
-                if (!success) {
-                    console.error(`[Recording] ✗ Camera ${camera.id} failed after 3 attempts - skipping`);
-                    failCount++;
-                }
-
-                // Stagger starts between cameras (reduced from 2s to 500ms)
-                await new Promise(resolve => setTimeout(resolve, 500));
-            }
-
-            console.log(`[Recording] Auto-start complete: ${successCount} succeeded, ${failCount} failed`);
-
+            const result = await this.reconcileRecordingLifecycleAll('auto_start');
+            const started = result.results.filter((r) => r.action === 'start' && r.success).length;
+            const skipped = result.results.length - started;
+            console.log(`[Recording] Auto-start complete: ${started} started, ${skipped} skipped (offline/cooldown/disabled)`);
         } catch (error) {
             console.error('[Recording] Error in auto-starting recordings:', error);
         }

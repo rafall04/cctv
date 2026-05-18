@@ -31,7 +31,6 @@ export function createRecordingRecoveryScanner({
     querySingle = queryOne,
     fileOperations = recordingFileOperationService,
     recoveryService = recordingRecoveryService,
-    isFileBeingProcessed = () => false,
     onSegmentCreated,
     nowMs = () => Date.now(),
     logger = console,
@@ -85,10 +84,7 @@ export function createRecordingRecoveryScanner({
                 continue;
             }
 
-            if (
-                isFileBeingProcessed(cameraId, finalFilename)
-                || recoveryService.isFileOwned(cameraId, finalFilename)
-            ) {
+            if (recoveryService.isFileOwned(cameraId, finalFilename)) {
                 continue;
             }
 
@@ -120,10 +116,7 @@ export function createRecordingRecoveryScanner({
 
             const filePath = join(cameraDir, filename);
             const stats = await fs.stat(filePath);
-            if (
-                isFileBeingProcessed(cameraId, filename)
-                || recoveryService.isFileOwned(cameraId, filename)
-            ) {
+            if (recoveryService.isFileOwned(cameraId, filename)) {
                 continue;
             }
 

@@ -244,7 +244,7 @@ describe('recordingService external recording support', () => {
 
     it('delegates segment recovery through the recovery queue facade', async () => {
         const recoveryModule = await import('../services/recordingRecoveryService.js');
-        const recoverSpy = vi.spyOn(recoveryModule.default, 'recoverNow')
+        const recoverSpy = vi.spyOn(recoveryModule.default, 'enqueueRecovery')
             .mockResolvedValue({ success: true, finalFilename: '20260511_211000.mp4' });
         const { recordingService } = await import('../services/recordingService.js');
 

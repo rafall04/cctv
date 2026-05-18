@@ -49,7 +49,7 @@ function createService(overrides = {}) {
             query,
             queryOne,
             ffprobe,
-            isFileBeingProcessed: () => false,
+            recoveryService: { isFileOwned: () => false },
             onSegmentCreated,
             logger: { log: vi.fn(), error: vi.fn() },
             now: () => Date.parse('2026-05-18T10:40:00.000Z'),
@@ -74,7 +74,7 @@ describe('recordingBackgroundCleanupService', () => {
     it('does not process a file currently being finalized', async () => {
         const { createRecordingBackgroundCleanupService } = await import('../services/recordingBackgroundCleanupService.js');
         const { serviceOptions, scheduleTimeout, scheduledCallbacks, onSegmentCreated } = createService({
-            isFileBeingProcessed: () => true,
+            recoveryService: { isFileOwned: () => true },
         });
         const service = createRecordingBackgroundCleanupService(serviceOptions);
 

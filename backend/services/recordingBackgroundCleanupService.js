@@ -5,6 +5,7 @@
 // SideEffects: Schedules queue build/process loops and may enqueue segment recovery.
 
 import { join } from 'path';
+import recordingRecoveryService from './recordingRecoveryService.js';
 import { computeRetentionWindow, getSegmentAgeMs } from './recordingRetentionPolicy.js';
 
 const BUILD_QUEUE_INTERVAL_MS = 5 * 60 * 1000;
@@ -18,7 +19,7 @@ export function createRecordingBackgroundCleanupService({
     query,
     queryOne,
     ffprobe,
-    isFileBeingProcessed,
+    recoveryService = recordingRecoveryService,
     onSegmentCreated,
     logger = console,
     now = Date.now,
@@ -131,7 +132,7 @@ export function createRecordingBackgroundCleanupService({
             return;
         }
 
-        if (isFileBeingProcessed(file.cameraId, file.filename)) {
+        if (recoveryService.isFileOwned(file.cameraId, file.filename)) {
             logger.log?.(`[BGCleanup] File being processed, skipping: ${file.filename}`);
             return;
         }

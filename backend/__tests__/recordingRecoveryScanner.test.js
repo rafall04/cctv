@@ -35,7 +35,6 @@ function createScanner(overrides = {}) {
         querySingle,
         fileOperations: { deleteFileSafely },
         recoveryService: { isFileOwned, shouldRetryNow },
-        isFileBeingProcessed: () => false,
         onSegmentCreated,
         nowMs: () => Date.parse('2026-05-17T01:10:00.000Z'),
         logger,

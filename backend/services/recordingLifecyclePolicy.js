@@ -31,10 +31,16 @@ export function decideRecordingLifecycleAction({
     }
 
     if (!isEnabled(camera.enabled) || !isEnabled(camera.enable_recording)) {
+        if (!isStopped(processStatus)) {
+            return { action: 'stop_disabled', reason: 'camera_or_recording_disabled' };
+        }
         return { action: 'noop_disabled', reason: 'camera_or_recording_disabled' };
     }
 
     if (!RECORDABLE_DELIVERY_TYPES.has(camera.delivery_type)) {
+        if (!isStopped(processStatus)) {
+            return { action: 'stop_unrecordable', reason: 'delivery_not_recordable' };
+        }
         return { action: 'noop_unrecordable', reason: 'delivery_not_recordable' };
     }
 

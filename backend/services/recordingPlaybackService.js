@@ -588,11 +588,9 @@ class RecordingPlaybackService {
         );
 
         if (enable_recording !== undefined) {
-            if (enable_recording && camera.enabled) {
-                await recordingService.startRecording(cameraId);
-            } else {
-                await recordingService.stopRecording(cameraId);
-            }
+            // Delegate to reconciler so the same policy used by periodic safety net
+            // (delivery type, online state, cooldown) decides start vs stop.
+            await recordingService.reconcileRecordingLifecycle(cameraId, 'settings_changed');
         }
 
         logAdminAction({
