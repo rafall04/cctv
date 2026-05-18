@@ -15,10 +15,11 @@ import {
     isPartialSegmentFilename,
     toFinalSegmentFilename,
 } from './recordingSegmentFilePolicy.js';
-
-const SCAN_INTERVAL_MS = 60000;
-const RECOVERY_MIN_AGE_MS = 30000;
-const DUPLICATE_PARTIAL_MIN_AGE_MS = 5 * 60 * 1000;
+import {
+    RECORDING_RECOVERY_DUPLICATE_PARTIAL_MIN_AGE_MS as DUPLICATE_PARTIAL_MIN_AGE_MS,
+    RECORDING_RECOVERY_MIN_AGE_MS as RECOVERY_MIN_AGE_MS,
+    RECORDING_SEGMENT_SCAN_INTERVAL_MS as SCAN_INTERVAL_MS,
+} from './recordingIntervalsPolicy.js';
 
 function isDirectoryStat(stats) {
     return typeof stats?.isDirectory === 'function' && stats.isDirectory();
@@ -206,16 +207,7 @@ export function createRecordingRecoveryScanner({
         return result;
     }
 
-    function start(scheduleTimeout = setTimeout) {
-        const scanCycle = async () => {
-            await scanOnce();
-            scheduleTimeout(scanCycle, SCAN_INTERVAL_MS);
-        };
-
-        scheduleTimeout(scanCycle, SCAN_INTERVAL_MS);
-    }
-
-    return { scanOnce, start };
+    return { scanOnce, intervalMs: SCAN_INTERVAL_MS };
 }
 
 export default createRecordingRecoveryScanner;

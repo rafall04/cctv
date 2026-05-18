@@ -15,9 +15,13 @@ import {
     parseRecordingDateMs,
     parseRecordingFilenameTimestampMs,
 } from './recordingTimePolicy.js';
+import {
+    RECORDING_DEFAULT_RETENTION_HOURS,
+    RECORDING_RETENTION_GRACE_MS,
+} from './recordingIntervalsPolicy.js';
 
-export const RECORDING_RETENTION_GRACE_MS = 10 * 60 * 1000;
-export const DEFAULT_RECORDING_RETENTION_HOURS = 5;
+export { RECORDING_RETENTION_GRACE_MS };
+export const DEFAULT_RECORDING_RETENTION_HOURS = RECORDING_DEFAULT_RETENTION_HOURS;
 
 export function normalizeRetentionHours(retentionHours) {
     const parsed = Number(retentionHours);

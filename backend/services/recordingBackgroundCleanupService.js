@@ -7,11 +7,12 @@
 import { join } from 'path';
 import recordingRecoveryService from './recordingRecoveryService.js';
 import { computeRetentionWindow, getSegmentAgeMs } from './recordingRetentionPolicy.js';
-
-const BUILD_QUEUE_INTERVAL_MS = 5 * 60 * 1000;
-const BUILD_QUEUE_INITIAL_DELAY_MS = 30 * 1000;
-const PROCESS_QUEUE_INTERVAL_MS = 10 * 1000;
-const MIN_UNREGISTERED_FILE_AGE_MS = 30 * 60 * 1000;
+import {
+    RECORDING_BG_CLEANUP_BUILD_INITIAL_DELAY_MS as BUILD_QUEUE_INITIAL_DELAY_MS,
+    RECORDING_BG_CLEANUP_BUILD_INTERVAL_MS as BUILD_QUEUE_INTERVAL_MS,
+    RECORDING_BG_CLEANUP_PROCESS_INTERVAL_MS as PROCESS_QUEUE_INTERVAL_MS,
+    RECORDING_BG_UNREGISTERED_MIN_AGE_MS as MIN_UNREGISTERED_FILE_AGE_MS,
+} from './recordingIntervalsPolicy.js';
 
 export function createRecordingBackgroundCleanupService({
     recordingsBasePath,
@@ -26,23 +27,6 @@ export function createRecordingBackgroundCleanupService({
 } = {}) {
     let cleanupQueue = [];
     let isBuildingQueue = false;
-
-    function start(scheduleTimeout = setTimeout) {
-        logger.log?.('[Cleanup] Starting background cleanup service (1 file per 10s)');
-
-        const scheduledBuildQueue = async () => {
-            await buildQueue();
-            scheduleTimeout(scheduledBuildQueue, BUILD_QUEUE_INTERVAL_MS);
-        };
-
-        const processQueueCycle = async () => {
-            await processOneQueueItem();
-            scheduleTimeout(processQueueCycle, PROCESS_QUEUE_INTERVAL_MS);
-        };
-
-        scheduleTimeout(scheduledBuildQueue, BUILD_QUEUE_INITIAL_DELAY_MS);
-        scheduleTimeout(processQueueCycle, PROCESS_QUEUE_INTERVAL_MS);
-    }
 
     async function buildQueue() {
         if (isBuildingQueue) return;
@@ -152,5 +136,20 @@ export function createRecordingBackgroundCleanupService({
         }
     }
 
-    return { start, buildQueue, processOneQueueItem };
+    async function drain(timeoutMs = 30000) {
+        const deadline = Date.now() + timeoutMs;
+        while (isBuildingQueue && Date.now() < deadline) {
+            await new Promise((resolve) => setTimeout(resolve, 25));
+        }
+        return { drained: !isBuildingQueue, pending: isBuildingQueue ? 1 : 0 };
+    }
+
+    return {
+        buildQueue,
+        processOneQueueItem,
+        drain,
+        buildIntervalMs: BUILD_QUEUE_INTERVAL_MS,
+        buildInitialDelayMs: BUILD_QUEUE_INITIAL_DELAY_MS,
+        processIntervalMs: PROCESS_QUEUE_INTERVAL_MS,
+    };
 }

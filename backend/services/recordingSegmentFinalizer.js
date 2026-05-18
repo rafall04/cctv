@@ -16,6 +16,7 @@ import {
     toFinalSegmentFilename,
 } from './recordingSegmentFilePolicy.js';
 import { RECORDINGS_BASE_PATH } from './recordingPaths.js';
+import { RECORDING_FINALIZER_STABILITY_DELAY_MS } from './recordingIntervalsPolicy.js';
 
 const execPromise = promisify(exec);
 
@@ -80,7 +81,7 @@ export function createRecordingSegmentFinalizer({
     recordingsBasePath = RECORDINGS_BASE_PATH,
     repository = recordingSegmentRepository,
     diagnosticsRepository = recordingRecoveryDiagnosticsRepository,
-    stabilityDelayMs = 10000,
+    stabilityDelayMs = RECORDING_FINALIZER_STABILITY_DELAY_MS,
 } = {}) {
     const inFlight = new Map();
 
@@ -242,12 +243,19 @@ export function createRecordingSegmentFinalizer({
         return promise;
     }
 
+    // Loop until the in-flight map is empty or the deadline passes. The snapshot
+    // approach would miss finalize jobs that begin after drain() is called (e.g.
+    // a late ffmpeg close handler firing during shutdown).
     async function drain(timeoutMs = 30000) {
-        const work = Promise.allSettled([...inFlight.values()]);
-        const timeout = sleep(timeoutMs).then(() => 'timeout');
-        const result = await Promise.race([work, timeout]);
+        const deadline = Date.now() + timeoutMs;
+        while (inFlight.size > 0 && Date.now() < deadline) {
+            await Promise.race([
+                Promise.allSettled([...inFlight.values()]),
+                sleep(50),
+            ]);
+        }
         return {
-            drained: result !== 'timeout',
+            drained: inFlight.size === 0,
             pending: inFlight.size,
         };
     }

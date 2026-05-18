@@ -7,9 +7,13 @@
 import { join } from 'path';
 import { canDeleteRecordingFile, computeRetentionWindow } from './recordingRetentionPolicy.js';
 import { isFinalSegmentFilename } from './recordingSegmentFilePolicy.js';
+import {
+    RECORDING_EMERGENCY_DISK_BATCH_LIMIT as EMERGENCY_DISK_BATCH_LIMIT,
+    RECORDING_EMERGENCY_DISK_TARGET_BYTES as EMERGENCY_DISK_TARGET_BYTES,
+    RECORDING_EMERGENCY_DISK_THRESHOLD_BYTES as EMERGENCY_DISK_THRESHOLD_BYTES,
+} from './recordingIntervalsPolicy.js';
 
-export const EMERGENCY_DISK_THRESHOLD_BYTES = 1 * 1024 * 1024 * 1024;
-export const EMERGENCY_DISK_TARGET_BYTES = 2 * 1024 * 1024 * 1024;
+export { EMERGENCY_DISK_THRESHOLD_BYTES, EMERGENCY_DISK_TARGET_BYTES };
 
 export function createRecordingEmergencyDiskService({
     recordingsBasePath,
@@ -22,7 +26,21 @@ export function createRecordingEmergencyDiskService({
     logger = console,
     now = Date.now,
 } = {}) {
+    let inFlight = false;
+
     async function runEmergencyCheck() {
+        if (inFlight) {
+            return { status: 'skipped_in_flight', deleted: 0, deletedBytes: 0 };
+        }
+        inFlight = true;
+        try {
+            return await runEmergencyCheckInner();
+        } finally {
+            inFlight = false;
+        }
+    }
+
+    async function runEmergencyCheckInner() {
         const freeBytes = await diskSpaceService.getFreeBytes(recordingsBasePath);
         if (!Number.isFinite(freeBytes)) {
             return { status: 'skipped_unknown_disk', deleted: 0, deletedBytes: 0 };
@@ -39,7 +57,7 @@ export function createRecordingEmergencyDiskService({
         const primaryResult = await cleanupService.emergencyCleanup({
             freeBytes,
             targetFreeBytes: EMERGENCY_DISK_TARGET_BYTES,
-            batchLimit: 200,
+            batchLimit: EMERGENCY_DISK_BATCH_LIMIT,
             allowRetentionBypass: true,
             getCameraRetentionHours,
         });
@@ -147,5 +165,13 @@ export function createRecordingEmergencyDiskService({
         return files.sort((a, b) => a.mtime - b.mtime);
     }
 
-    return { runEmergencyCheck };
+    async function drain(timeoutMs = 30000) {
+        const deadline = Date.now() + timeoutMs;
+        while (inFlight && Date.now() < deadline) {
+            await new Promise((resolve) => setTimeout(resolve, 25));
+        }
+        return { drained: !inFlight, pending: inFlight ? 1 : 0 };
+    }
+
+    return { runEmergencyCheck, drain };
 }

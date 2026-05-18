@@ -9,6 +9,10 @@ import { decideRecoveryRetry } from './recordingPartialRecoveryPolicy.js';
 import recordingRecoveryDiagnosticsRepository from './recordingRecoveryDiagnosticsRepository.js';
 import recordingSegmentFinalizer from './recordingSegmentFinalizer.js';
 import { toFinalSegmentFilename } from './recordingSegmentFilePolicy.js';
+import {
+    RECORDING_RECOVERY_MAX_ATTEMPTS,
+    RECORDING_RECOVERY_MAX_CONCURRENT,
+} from './recordingIntervalsPolicy.js';
 
 function sleep(ms) {
     return new Promise((resolve) => {
@@ -37,8 +41,8 @@ export function createRecordingRecoveryService({
     finalizer = recordingSegmentFinalizer,
     diagnosticsRepository = recordingRecoveryDiagnosticsRepository,
     fileOperations = recordingFileOperationService,
-    maxConcurrent = 3,
-    maxAttempts = 3,
+    maxConcurrent = RECORDING_RECOVERY_MAX_CONCURRENT,
+    maxAttempts = RECORDING_RECOVERY_MAX_ATTEMPTS,
     logger = console,
 } = {}) {
     const queue = [];

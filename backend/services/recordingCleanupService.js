@@ -20,11 +20,12 @@ import {
     isTempSegmentFilename,
     toFinalSegmentFilename,
 } from './recordingSegmentFilePolicy.js';
-
-const NORMAL_DELETE_BATCH_SIZE = 6;
-const TEMP_FILE_MIN_AGE_MS = 5 * 60 * 1000;
-const FINALIZED_PARTIAL_MIN_AGE_MS = 5 * 60 * 1000;
-const DEFAULT_MIN_CLEANUP_INTERVAL_MS = 60 * 1000;
+import {
+    RECORDING_CLEANUP_BATCH_SIZE as NORMAL_DELETE_BATCH_SIZE,
+    RECORDING_CLEANUP_MIN_INTERVAL_MS as DEFAULT_MIN_CLEANUP_INTERVAL_MS,
+    RECORDING_FINALIZED_PARTIAL_MIN_AGE_MS as FINALIZED_PARTIAL_MIN_AGE_MS,
+    RECORDING_TEMP_FILE_MIN_AGE_MS as TEMP_FILE_MIN_AGE_MS,
+} from './recordingIntervalsPolicy.js';
 
 function canDeleteTempFile({ filename, fileMtimeMs, nowMs }) {
     return isTempSegmentFilename(filename) && (nowMs - fileMtimeMs) > TEMP_FILE_MIN_AGE_MS;
@@ -448,5 +449,16 @@ export function createRecordingCleanupService({
         return result;
     }
 
-    return { cleanupCamera, emergencyCleanup };
+    async function drain(timeoutMs = 30000) {
+        const deadline = Date.now() + timeoutMs;
+        while (inFlightCameraIds.size > 0 && Date.now() < deadline) {
+            await new Promise((resolve) => setTimeout(resolve, 25));
+        }
+        return {
+            drained: inFlightCameraIds.size === 0,
+            pending: inFlightCameraIds.size,
+        };
+    }
+
+    return { cleanupCamera, emergencyCleanup, drain };
 }

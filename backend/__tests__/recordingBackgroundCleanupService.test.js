@@ -64,9 +64,8 @@ describe('recordingBackgroundCleanupService', () => {
         const { serviceOptions, scheduleTimeout, scheduledCallbacks, onSegmentCreated } = createService();
         const service = createRecordingBackgroundCleanupService(serviceOptions);
 
-        service.start(scheduleTimeout);
-        await scheduledCallbacks[0]();
-        await scheduledCallbacks[1]();
+        await service.buildQueue();
+        await service.processOneQueueItem();
 
         expect(onSegmentCreated).toHaveBeenCalledWith(7, '20260518_170000.mp4');
     });
@@ -78,9 +77,8 @@ describe('recordingBackgroundCleanupService', () => {
         });
         const service = createRecordingBackgroundCleanupService(serviceOptions);
 
-        service.start(scheduleTimeout);
-        await scheduledCallbacks[0]();
-        await scheduledCallbacks[1]();
+        await service.buildQueue();
+        await service.processOneQueueItem();
 
         expect(onSegmentCreated).not.toHaveBeenCalled();
     });
@@ -96,9 +94,8 @@ describe('recordingBackgroundCleanupService', () => {
         });
         const service = createRecordingBackgroundCleanupService(serviceOptions);
 
-        service.start(scheduleTimeout);
-        await scheduledCallbacks[0]();
-        await scheduledCallbacks[1]();
+        await service.buildQueue();
+        await service.processOneQueueItem();
 
         expect(ffprobe).toHaveBeenCalled();
         expect(onSegmentCreated).not.toHaveBeenCalled();

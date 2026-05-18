@@ -33,14 +33,19 @@ import {
     toFinalSegmentFilename,
 } from './recordingSegmentFilePolicy.js';
 import { RECORDINGS_BASE_PATH } from './recordingPaths.js';
+import {
+    RECORDING_HEALTH_TICK_INTERVAL_MS,
+    RECORDING_HEALTH_TIMEOUT_INTERNAL_MS,
+    RECORDING_HEALTH_TIMEOUT_TUNNEL_MS,
+    RECORDING_LIFECYCLE_RECONCILE_INTERVAL_MS,
+    RECORDING_OFFLINE_COOLDOWN_MS,
+    RECORDING_RETRY_BASE_COOLDOWN_MS,
+    RECORDING_RETRY_MAX_COOLDOWN_MS,
+    RECORDING_FAILURE_SUSPEND_THRESHOLD,
+    RECORDING_SCHEDULED_CLEANUP_INITIAL_DELAY_MS as SCHEDULED_CLEANUP_INITIAL_DELAY_MS,
+    RECORDING_SCHEDULED_CLEANUP_INTERVAL_MS as SCHEDULED_CLEANUP_INTERVAL_MS,
+} from './recordingIntervalsPolicy.js';
 const execPromise = promisify(exec);
-
-const RECORDING_RETENTION_GRACE_MS = 10 * 60 * 1000;
-const SCHEDULED_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
-// Shortened from 2min to 30s after removing boot-time cleanupTempFiles;
-// scheduled cleanup is now the single cleanup path.
-const SCHEDULED_CLEANUP_INITIAL_DELAY_MS = 30 * 1000;
-const RECORDING_LIFECYCLE_RECONCILE_INTERVAL_MS = 60 * 1000;
 
 // Stream health monitoring
 const streamHealthMap = new Map();
@@ -60,10 +65,6 @@ const cleanupService = createRecordingCleanupService({
 });
 
 const EXTERNAL_RECORDING_PROTOCOL_WHITELIST = 'file,http,https,tcp,tls,crypto';
-const RECORDING_RETRY_BASE_COOLDOWN_MS = 15000;
-const RECORDING_RETRY_MAX_COOLDOWN_MS = 5 * 60 * 1000;
-const RECORDING_OFFLINE_COOLDOWN_MS = 60 * 1000;
-const RECORDING_FAILURE_SUSPEND_THRESHOLD = 3;
 
 export function computeRecordingCooldownMs(consecutiveFailureCount = 0) {
     if (consecutiveFailureCount <= 1) {
@@ -621,7 +622,7 @@ class RecordingService {
             this.tickHealthMonitoring().catch((error) => {
                 console.error('[Recording Health] Error during monitor tick:', error);
             });
-        }, 5000); // Check every 5 seconds
+        }, RECORDING_HEALTH_TICK_INTERVAL_MS);
     }
 
     async tickHealthMonitoring(now = Date.now()) {
@@ -661,7 +662,9 @@ class RecordingService {
                 continue;
             }
 
-            const timeout = camera.is_tunnel === 1 ? 10000 : 30000;
+            const timeout = camera.is_tunnel === 1
+                ? RECORDING_HEALTH_TIMEOUT_TUNNEL_MS
+                : RECORDING_HEALTH_TIMEOUT_INTERNAL_MS;
             const timeSinceData = now - health.lastDataTime;
             if (timeSinceData <= timeout) {
                 continue;
@@ -702,22 +705,6 @@ class RecordingService {
         return this.lifecycleReconciler.reconcileAll(reason, now);
     }
 
-    startLifecycleReconciler(scheduleTimeout = setTimeout) {
-        const reconcileCycle = async () => {
-            try {
-                if (!this.isShuttingDown) {
-                    await this.reconcileRecordingLifecycleAll('periodic_safety_net');
-                }
-            } catch (error) {
-                console.error('[RecordingReconciler] Error during lifecycle reconciliation:', error.message);
-            } finally {
-                scheduleTimeout(reconcileCycle, RECORDING_LIFECYCLE_RECONCILE_INTERVAL_MS);
-            }
-        };
-
-        scheduleTimeout(reconcileCycle, RECORDING_LIFECYCLE_RECONCILE_INTERVAL_MS);
-    }
-
     async shutdown() {
         this.isShuttingDown = true;
         this.scheduler?.stop();
@@ -727,6 +714,16 @@ class RecordingService {
         if (!drainResult.drained) {
             console.warn(`[Shutdown] Recording finalizer drain timed out with ${drainResult.pending} pending file(s)`);
         }
+        const cleanupDrain = await cleanupService.drain(10000);
+        if (!cleanupDrain.drained) {
+            console.warn(`[Shutdown] Cleanup service drain timed out with ${cleanupDrain.pending} camera(s) still cleaning`);
+        }
+        if (this.backgroundCleanupService) {
+            await this.backgroundCleanupService.drain(10000);
+        }
+        if (this.emergencyDiskService) {
+            await this.emergencyDiskService.drain(10000);
+        }
         return results;
     }
 
@@ -735,28 +732,108 @@ class RecordingService {
     }
 
     initializeBackgroundWork() {
+        this._ensureRecoveryScanner();
+        this._ensureBackgroundCleanupService();
+
         if (!this.scheduler) {
-            this.startSegmentScanner();
-            this.startBackgroundCleanup();
-            this.startScheduledCleanup();
-            this.startLifecycleReconciler();
+            // Legacy fallback path: no scheduler attached, schedule manually with raw timers.
+            // Production goes through scheduler.register() below for telemetry.
+            this._startLegacyTimers();
             return;
         }
 
-        this.scheduler.start({
-            startSegmentScanner: (scheduleTimeout) => this.startSegmentScanner(scheduleTimeout),
-            startBackgroundCleanup: (scheduleTimeout) => this.startBackgroundCleanup(scheduleTimeout),
-            startScheduledCleanup: (scheduleTimeout) => this.startScheduledCleanup(scheduleTimeout),
-            startLifecycleReconciler: (scheduleTimeout) => this.startLifecycleReconciler(scheduleTimeout),
+        this.scheduler.register({
+            name: 'segment_scanner',
+            task: () => this.recoveryScanner.scanOnce(),
+            intervalMs: this.recoveryScanner.intervalMs,
+            initialDelayMs: this.recoveryScanner.intervalMs,
         });
+        this.scheduler.register({
+            name: 'bg_cleanup_build',
+            task: () => this.backgroundCleanupService.buildQueue(),
+            intervalMs: this.backgroundCleanupService.buildIntervalMs,
+            initialDelayMs: this.backgroundCleanupService.buildInitialDelayMs,
+        });
+        this.scheduler.register({
+            name: 'bg_cleanup_process',
+            task: () => this.backgroundCleanupService.processOneQueueItem(),
+            intervalMs: this.backgroundCleanupService.processIntervalMs,
+            initialDelayMs: this.backgroundCleanupService.processIntervalMs,
+        });
+        this.scheduler.register({
+            name: 'scheduled_cleanup',
+            task: () => this._runScheduledCleanup(),
+            intervalMs: SCHEDULED_CLEANUP_INTERVAL_MS,
+            initialDelayMs: SCHEDULED_CLEANUP_INITIAL_DELAY_MS,
+        });
+        this.scheduler.register({
+            name: 'lifecycle_reconciler',
+            task: async () => {
+                if (this.isShuttingDown) return;
+                await this.reconcileRecordingLifecycleAll('periodic_safety_net');
+            },
+            intervalMs: RECORDING_LIFECYCLE_RECONCILE_INTERVAL_MS,
+            initialDelayMs: RECORDING_LIFECYCLE_RECONCILE_INTERVAL_MS,
+        });
+        this.scheduler.start();
     }
 
-    /**
-     * Periodic segment scanner - fallback if FFmpeg output detection fails
-     * Scans recording folders every 60 seconds for new MP4 files
-     * FIX: Now scans ALL camera directories, not just active recordings
-     */
+    _startLegacyTimers(scheduleTimeout = setTimeout) {
+        this.startSegmentScanner(scheduleTimeout);
+        this.startBackgroundCleanup(scheduleTimeout);
+        this.startScheduledCleanup(scheduleTimeout);
+        this.startLifecycleReconciler(scheduleTimeout);
+    }
+
+    // Backwards-compatible timer entrypoints used by unit tests that simulate
+    // scheduling directly. Production code uses scheduler.register() above.
     startSegmentScanner(scheduleTimeout = setTimeout) {
+        this._ensureRecoveryScanner();
+        const cycle = async () => {
+            await this.recoveryScanner.scanOnce();
+            scheduleTimeout(cycle, this.recoveryScanner.intervalMs);
+        };
+        scheduleTimeout(cycle, this.recoveryScanner.intervalMs);
+    }
+
+    startBackgroundCleanup(scheduleTimeout = setTimeout) {
+        this._ensureBackgroundCleanupService();
+        const buildCycle = async () => {
+            await this.backgroundCleanupService.buildQueue();
+            scheduleTimeout(buildCycle, this.backgroundCleanupService.buildIntervalMs);
+        };
+        const processCycle = async () => {
+            await this.backgroundCleanupService.processOneQueueItem();
+            scheduleTimeout(processCycle, this.backgroundCleanupService.processIntervalMs);
+        };
+        scheduleTimeout(buildCycle, this.backgroundCleanupService.buildInitialDelayMs);
+        scheduleTimeout(processCycle, this.backgroundCleanupService.processIntervalMs);
+    }
+
+    startScheduledCleanup(scheduleTimeout = setTimeout) {
+        const cycle = async () => {
+            await this._runScheduledCleanup();
+            scheduleTimeout(cycle, SCHEDULED_CLEANUP_INTERVAL_MS);
+        };
+        scheduleTimeout(cycle, SCHEDULED_CLEANUP_INITIAL_DELAY_MS);
+    }
+
+    startLifecycleReconciler(scheduleTimeout = setTimeout) {
+        const cycle = async () => {
+            try {
+                if (!this.isShuttingDown) {
+                    await this.reconcileRecordingLifecycleAll('periodic_safety_net');
+                }
+            } catch (error) {
+                console.error('[RecordingReconciler] Error during lifecycle reconciliation:', error.message);
+            } finally {
+                scheduleTimeout(cycle, RECORDING_LIFECYCLE_RECONCILE_INTERVAL_MS);
+            }
+        };
+        scheduleTimeout(cycle, RECORDING_LIFECYCLE_RECONCILE_INTERVAL_MS);
+    }
+
+    _ensureRecoveryScanner() {
         if (!this.recoveryScanner) {
             this.recoveryScanner = createRecordingRecoveryScanner({
                 recordingsBasePath: RECORDINGS_BASE_PATH,
@@ -764,8 +841,46 @@ class RecordingService {
                 logger: console,
             });
         }
+    }
 
-        this.recoveryScanner.start(scheduleTimeout);
+    _ensureBackgroundCleanupService() {
+        if (!this.backgroundCleanupService) {
+            this.backgroundCleanupService = createRecordingBackgroundCleanupService({
+                recordingsBasePath: RECORDINGS_BASE_PATH,
+                fs: fsPromises,
+                query,
+                queryOne,
+                ffprobe: (filePath) => execPromise(`ffprobe -v error "${filePath}"`, { timeout: 3000 }),
+                onSegmentCreated: (cameraId, filename) => this.onSegmentCreated(cameraId, filename),
+                logger: console,
+            });
+        }
+    }
+
+    async _runScheduledCleanup() {
+        try {
+            const enabledCameras = query('SELECT id FROM cameras WHERE enable_recording = 1 AND enabled = 1');
+            const allCameraIds = new Set(enabledCameras.map((c) => c.id));
+
+            try {
+                await fsPromises.access(RECORDINGS_BASE_PATH);
+                const dirs = await fsPromises.readdir(RECORDINGS_BASE_PATH);
+                for (const d of dirs) {
+                    const match = d.match(/camera(\d+)/);
+                    if (match) allCameraIds.add(parseInt(match[1], 10));
+                }
+            } catch { /* recordings dir missing — OK */ }
+
+            console.log(`[Cleanup] Running scheduled cleanup for ${allCameraIds.size} cameras...`);
+            for (const cameraId of allCameraIds) {
+                await this.cleanupOldSegments(cameraId);
+            }
+
+            await this.emergencyDiskSpaceCheck();
+            console.log('[Cleanup] Scheduled cleanup complete');
+        } catch (error) {
+            console.error('[Cleanup] Scheduled cleanup error:', error);
+        }
     }
 
     /**
@@ -826,66 +941,6 @@ class RecordingService {
         }
     }
 
-    /**
-     * Background cleanup for corrupt/unregistered files
-     * Runs slowly (1 file per 10 seconds) to avoid CPU spike
-     * FIX: Now respects retention period - deletes old files instead of re-registering
-     * Only attempts registration for files within retention period
-     */
-    startBackgroundCleanup(scheduleTimeout = setTimeout) {
-        if (!this.backgroundCleanupService) {
-            this.backgroundCleanupService = createRecordingBackgroundCleanupService({
-                recordingsBasePath: RECORDINGS_BASE_PATH,
-                fs: fsPromises,
-                query,
-                queryOne,
-                ffprobe: (filePath) => execPromise(`ffprobe -v error "${filePath}"`, { timeout: 3000 }),
-                onSegmentCreated: (cameraId, filename) => this.onSegmentCreated(cameraId, filename),
-                logger: console,
-            });
-        }
-
-        this.backgroundCleanupService.start(scheduleTimeout);
-    }
-
-    /**
-     * Scheduled cleanup - runs every 5 minutes
-     * This is the PRIMARY cleanup mechanism (not per-segment cleanup)
-     * FIX: Also includes emergency disk space check
-     */
-    startScheduledCleanup(scheduleTimeout = setTimeout) {
-        console.log('[Cleanup] Starting scheduled cleanup service (every 5 minutes)');
-
-        const runScheduledClean = async () => {
-            try {
-                const enabledCameras = query('SELECT id FROM cameras WHERE enable_recording = 1 AND enabled = 1');
-                const allCameraIds = new Set(enabledCameras.map(c => c.id));
-
-                try {
-                    await fsPromises.access(RECORDINGS_BASE_PATH);
-                    const dirs = await fsPromises.readdir(RECORDINGS_BASE_PATH);
-                    for (const d of dirs) {
-                        const match = d.match(/camera(\d+)/);
-                        if (match) allCameraIds.add(parseInt(match[1]));
-                    }
-                } catch (e) { }
-
-                console.log(`[Cleanup] Running scheduled cleanup for ${allCameraIds.size} cameras...`);
-
-                for (const cameraId of allCameraIds) {
-                    await this.cleanupOldSegments(cameraId);
-                }
-
-                await this.emergencyDiskSpaceCheck();
-                console.log('[Cleanup] Scheduled cleanup complete');
-            } catch (error) {
-                console.error('[Cleanup] Scheduled cleanup error:', error);
-            }
-            scheduleTimeout(runScheduledClean, SCHEDULED_CLEANUP_INTERVAL_MS);
-        };
-
-        scheduleTimeout(runScheduledClean, SCHEDULED_CLEANUP_INITIAL_DELAY_MS);
-    }
 
     getEmergencyDiskService() {
         if (!this.emergencyDiskService) {

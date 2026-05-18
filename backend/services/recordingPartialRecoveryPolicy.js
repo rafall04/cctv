@@ -4,6 +4,12 @@
 // MainFuncs: decideRecoveryRetry, computeRetryDelayMs.
 // SideEffects: None.
 
+import {
+    RECORDING_RECOVERY_MAX_ATTEMPTS,
+    RECORDING_RECOVERY_RETRY_BASE_MS as RETRY_BASE_MS,
+    RECORDING_RECOVERY_RETRY_CAP_MS as RETRY_CAP_MS,
+} from './recordingIntervalsPolicy.js';
+
 const STILL_CHANGING_REASONS = new Set([
     'file_still_changing',
 ]);
@@ -14,9 +20,6 @@ const PARTIAL_RETRY_REASONS = new Set([
     'final_invalid_duration',
     'finalize_failed',
 ]);
-
-const RETRY_BASE_MS = 60 * 1000;
-const RETRY_CAP_MS = 30 * 60 * 1000;
 
 export function computeRetryDelayMs(attemptCount = 0) {
     const normalizedAttempt = Math.max(0, Number(attemptCount) || 0);
@@ -30,7 +33,7 @@ export function decideRecoveryRetry({
     attemptCount = 0,
     lastAttemptAtMs = null,
     retentionExpiresAtMs = null,
-    maxAttempts = 3,
+    maxAttempts = RECORDING_RECOVERY_MAX_ATTEMPTS,
     nowMs = Date.now(),
 } = {}) {
     if (STILL_CHANGING_REASONS.has(reason)) {

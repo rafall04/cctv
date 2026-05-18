@@ -998,6 +998,7 @@ describe('recordingService external recording support', () => {
     it('starts and stops the attached recording scheduler explicitly', async () => {
         const { recordingService } = await import('../services/recordingService.js');
         const scheduler = {
+            register: vi.fn(),
             start: vi.fn(),
             stop: vi.fn(),
         };
@@ -1006,6 +1007,7 @@ describe('recordingService external recording support', () => {
         recordingService.initializeBackgroundWork();
         await recordingService.shutdown();
 
+        expect(scheduler.register).toHaveBeenCalled();
         expect(scheduler.start).toHaveBeenCalledTimes(1);
         expect(scheduler.stop).toHaveBeenCalledTimes(1);
     });

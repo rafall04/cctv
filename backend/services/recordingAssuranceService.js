@@ -10,10 +10,11 @@ import { existsSync, statSync } from 'fs';
 import { query } from '../database/connectionPool.js';
 import { recordingService } from './recordingService.js';
 import recordingRecoveryDiagnosticsRepository from './recordingRecoveryDiagnosticsRepository.js';
-
-const DEFAULT_STALE_AFTER_MS = 15 * 60 * 1000;
-const DEFAULT_GAP_TOLERANCE_SECONDS = 180;
-const DEFAULT_RECENT_WINDOW_HOURS = 24;
+import {
+    RECORDING_ASSURANCE_GAP_TOLERANCE_S as DEFAULT_GAP_TOLERANCE_SECONDS,
+    RECORDING_ASSURANCE_RECENT_WINDOW_HOURS as DEFAULT_RECENT_WINDOW_HOURS,
+    RECORDING_ASSURANCE_STALE_AFTER_MS as DEFAULT_STALE_AFTER_MS,
+} from './recordingIntervalsPolicy.js';
 
 function parseDateMs(value) {
     const parsed = Date.parse(value || '');

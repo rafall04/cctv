@@ -7,9 +7,10 @@
 import { spawn } from 'child_process';
 import { RecordingRuntimeState } from './recordingRuntimeState.js';
 import { classifyRecordingExit } from './recordingFailureClassifier.js';
+import { RECORDING_PROCESS_GRACEFUL_STOP_MS } from './recordingIntervalsPolicy.js';
 
 export class RecordingProcessManager {
-    constructor({ gracefulStopTimeoutMs = 10000, binary = 'ffmpeg' } = {}) {
+    constructor({ gracefulStopTimeoutMs = RECORDING_PROCESS_GRACEFUL_STOP_MS, binary = 'ffmpeg' } = {}) {
         this.binary = binary;
         this.gracefulStopTimeoutMs = gracefulStopTimeoutMs;
         this.state = new RecordingRuntimeState();
