@@ -220,7 +220,7 @@ export function createRecordingHealthMonitor({
     function start() {
         if (tickHandle) return;
         tickHandle = setInterval(() => {
-            tick().catch((error) => logger.error?.('[Recording Health] Error during monitor tick:', error));
+            api.tick().catch((error) => logger.error?.('[Recording Health] Error during monitor tick:', error));
         }, tickIntervalMs);
     }
 
