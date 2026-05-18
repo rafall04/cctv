@@ -724,6 +724,38 @@ describe('recordingService external recording support', () => {
         expect(fsPromisesMock.unlink).not.toHaveBeenCalledWith(expect.stringContaining('20260502_000000.mp4'));
     });
 
+    it('keeps recording maintenance facade methods available during refactor', async () => {
+        const { recordingService } = await import('../services/recordingService.js');
+
+        expect(typeof recordingService.cleanupOldSegments).toBe('function');
+        expect(typeof recordingService.cleanupTempFiles).toBe('function');
+        expect(typeof recordingService.startBackgroundCleanup).toBe('function');
+        expect(typeof recordingService.startScheduledCleanup).toBe('function');
+        expect(typeof recordingService.emergencyDiskSpaceCheck).toBe('function');
+    });
+
+    it('scheduled cleanup still runs per-camera cleanup before emergency disk check', async () => {
+        const { recordingService } = await import('../services/recordingService.js');
+        const scheduledCallbacks = [];
+        const scheduleTimeout = vi.fn((callback) => {
+            scheduledCallbacks.push(callback);
+            return scheduledCallbacks.length;
+        });
+        const cleanupSpy = vi.spyOn(recordingService, 'cleanupOldSegments').mockResolvedValue({ deleted: 0 });
+        const emergencySpy = vi.spyOn(recordingService, 'emergencyDiskSpaceCheck').mockResolvedValue(undefined);
+
+        queryMock.mockReturnValue([{ id: 7 }, { id: 8 }]);
+        fsPromisesMock.access.mockRejectedValueOnce(new Error('no recordings dir'));
+
+        recordingService.startScheduledCleanup(scheduleTimeout);
+        await scheduledCallbacks[0]();
+
+        expect(cleanupSpy).toHaveBeenCalledWith(7);
+        expect(cleanupSpy).toHaveBeenCalledWith(8);
+        expect(emergencySpy).toHaveBeenCalledTimes(1);
+        expect(scheduleTimeout).toHaveBeenCalledTimes(2);
+    });
+
     it('does not emergency-delete recent filesystem orphan recordings', async () => {
         const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
         vi.setSystemTime(Date.parse('2026-05-02T10:00:00.000Z'));
