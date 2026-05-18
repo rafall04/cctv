@@ -53,6 +53,26 @@ export function toFinalSegmentFilename(filename) {
     return parsed?.finalFilename ?? null;
 }
 
+/**
+ * Resolve the (sourceType, sourcePath) tuple for a recording filename. Pure helper
+ * so the recording facade does not need to know that partial files live under
+ * pending/ while final orphans live in the camera root.
+ *   - partial filename → { sourceType: 'partial', sourcePath: pending/<filename>, finalFilename }
+ *   - final filename  → { sourceType: 'final_orphan', sourcePath: <finalPath>, finalFilename }
+ *   - unparseable     → null
+ */
+export function resolveSegmentSource(basePath, cameraId, filename) {
+    const finalFilename = toFinalSegmentFilename(filename);
+    if (!finalFilename) {
+        return null;
+    }
+    const sourceType = isPartialSegmentFilename(filename) ? 'partial' : 'final_orphan';
+    const sourcePath = sourceType === 'partial'
+        ? join(getPendingRecordingDir(basePath, cameraId), filename)
+        : getFinalRecordingPath(basePath, cameraId, finalFilename);
+    return { sourceType, sourcePath, finalFilename };
+}
+
 export function parseSegmentFilename(filename, timezone = undefined) {
     const text = String(filename || '');
     if (text.includes('/') || text.includes('\\')) {

@@ -10,11 +10,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const executeMock = vi.fn();
 const queryMock = vi.fn();
 const queryOneMock = vi.fn();
+// Tests don't exercise real SQLite transactions; just inline the callback.
+const transactionMock = vi.fn((callback) => callback);
 
 vi.mock('../database/connectionPool.js', () => ({
     execute: executeMock,
     query: queryMock,
     queryOne: queryOneMock,
+    transaction: transactionMock,
 }));
 
 describe('recordingRecoveryDiagnosticsRepository', () => {

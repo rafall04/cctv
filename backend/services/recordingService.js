@@ -6,7 +6,6 @@
 
 import { existsSync, mkdirSync } from 'fs';
 import { promises as fsPromises } from 'fs';
-import { join } from 'path';
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import { promisify } from 'util';
 import { exec } from 'child_process';
@@ -20,12 +19,7 @@ import { createRecordingLifecycleReconciler } from './recordingLifecycleReconcil
 import recordingDiskSpaceService from './recordingDiskSpaceService.js';
 import { createRecordingMaintenanceCoordinator } from './recordingMaintenanceCoordinator.js';
 import { createRecordingAutoStarter } from './recordingAutoStarter.js';
-import {
-    getFinalRecordingPath,
-    getPendingRecordingDir,
-    isPartialSegmentFilename,
-    toFinalSegmentFilename,
-} from './recordingSegmentFilePolicy.js';
+import { resolveSegmentSource } from './recordingSegmentFilePolicy.js';
 import { RECORDINGS_BASE_PATH } from './recordingPaths.js';
 import { createRecordingHealthMonitor, computeCooldownMs } from './recordingHealthMonitor.js';
 import {
@@ -118,6 +112,10 @@ class RecordingService {
 
     // Thin wrappers preserve the historical facade API used by tests and by
     // the lifecycle reconciler. All state lives in this.healthMonitor.
+    // Health state pass-through. External callers should prefer
+    // reconcileRecordingLifecycle(); these wrappers exist for the lifecycle
+    // reconciler (which deliberately decides start/stop transitions) and for
+    // existing unit tests.
     ensureRuntimeHealthState(cameraId) { return this.healthMonitor.ensureState(cameraId); }
     clearRuntimeHealthState(cameraId) { this.healthMonitor.clearState(cameraId); }
     markRecordingRecovered(cameraId, now = Date.now()) { return this.healthMonitor.markRecovered(cameraId, now); }
@@ -126,10 +124,12 @@ class RecordingService {
     async attemptRecordingRecovery(cameraId, reason, now = Date.now()) {
         return this.healthMonitor.attemptRecovery(cameraId, reason, now);
     }
+    /** @internal — call reconcileRecordingLifecycle from external services. */
     async handleCameraBecameOffline(cameraId, now = Date.now()) {
         await this.healthMonitor.handleCameraBecameOffline(cameraId, now);
         return this.getRecordingStatus(cameraId);
     }
+    /** @internal — call reconcileRecordingLifecycle from external services. */
     async handleCameraBecameOnline(cameraId, now = Date.now(), opts = {}) {
         const result = await this.healthMonitor.handleCameraBecameOnline(cameraId, now, opts);
         return result ?? this.getRecordingStatus(cameraId);
@@ -292,32 +292,24 @@ class RecordingService {
         this.logRestart(cameraId, 'process_crashed', false);
     }
 
-    /**
-     * Handle segment creation
-     */
     onSegmentCreated(cameraId, filename) {
-        const finalFilename = toFinalSegmentFilename(filename);
-        if (!finalFilename) {
+        const source = resolveSegmentSource(RECORDINGS_BASE_PATH, cameraId, filename);
+        if (!source) {
             console.warn(`[Segment] Invalid filename format: ${filename}`);
             return;
         }
 
-        if (recordingRecoveryService.isFileOwned(cameraId, finalFilename)) {
-            console.log(`[Segment] Already processing: ${finalFilename}, skipping duplicate`);
+        if (recordingRecoveryService.isFileOwned(cameraId, source.finalFilename)) {
+            console.log(`[Segment] Already processing: ${source.finalFilename}, skipping duplicate`);
             return;
         }
-
-        const sourceType = isPartialSegmentFilename(filename) ? 'partial' : 'final_orphan';
-        const sourcePath = sourceType === 'partial'
-            ? join(getPendingRecordingDir(RECORDINGS_BASE_PATH, cameraId), filename)
-            : getFinalRecordingPath(RECORDINGS_BASE_PATH, cameraId, finalFilename);
 
         console.log(`[Segment] Enqueue recovery: camera${cameraId}/${filename}`);
         recordingRecoveryService.enqueueRecovery({
             cameraId,
-            sourcePath,
             filename,
-            sourceType,
+            sourcePath: source.sourcePath,
+            sourceType: source.sourceType,
         });
     }
     async cleanupOldSegments(cameraId) {

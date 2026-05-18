@@ -995,7 +995,7 @@ describe('cameraHealthService status transitions', () => {
         vi.clearAllMocks();
     });
 
-    it('suspends recording when a camera transitions offline', async () => {
+    it('reconciles recording when a camera transitions offline', async () => {
         const service = new CameraHealthService();
 
         await service.handleCameraStatusTransition(
@@ -1005,7 +1005,8 @@ describe('cameraHealthService status transitions', () => {
             'http_404'
         );
 
-        expect(handleCameraBecameOfflineMock).toHaveBeenCalledWith(41);
+        expect(reconcileCameraLifecycleMock).toHaveBeenCalledWith(41, 'health_transition_offline');
+        expect(handleCameraBecameOfflineMock).not.toHaveBeenCalled();
         expect(handleCameraBecameOnlineMock).not.toHaveBeenCalled();
         expect(refreshCameraThumbnailMock).not.toHaveBeenCalled();
     });

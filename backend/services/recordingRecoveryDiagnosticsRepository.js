@@ -4,7 +4,7 @@
 // MainFuncs: upsertDiagnostic, clearDiagnostic, listActiveByCamera, summarizeActive.
 // SideEffects: Reads and writes recording_recovery_diagnostics rows.
 
-import { execute, query, queryOne } from '../database/connectionPool.js';
+import { execute, query, queryOne, transaction } from '../database/connectionPool.js';
 
 class RecordingRecoveryDiagnosticsRepository {
     upsertDiagnostic({
@@ -98,37 +98,43 @@ class RecordingRecoveryDiagnosticsRepository {
         reason,
         attemptedAt = new Date().toISOString(),
     }) {
-        execute(
-            `INSERT INTO recording_recovery_diagnostics
-            (camera_id, filename, file_path, state, reason, detected_at, last_seen_at, active, attempt_count)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1)
-            ON CONFLICT(camera_id, filename, active) DO UPDATE SET
-                file_path = excluded.file_path,
-                state = excluded.state,
-                reason = excluded.reason,
-                last_seen_at = excluded.last_seen_at,
-                attempt_count = attempt_count + 1,
-                updated_at = CURRENT_TIMESTAMP`,
-            [cameraId, filename, filePath, 'retryable_failed', reason, attemptedAt, attemptedAt]
-        );
+        // Atomic: UPSERT then SELECT inside one transaction so the returned
+        // attempt_count reflects this insertion even under concurrent recovery.
+        const run = transaction(() => {
+            execute(
+                `INSERT INTO recording_recovery_diagnostics
+                (camera_id, filename, file_path, state, reason, detected_at, last_seen_at, active, attempt_count)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1)
+                ON CONFLICT(camera_id, filename, active) DO UPDATE SET
+                    file_path = excluded.file_path,
+                    state = excluded.state,
+                    reason = excluded.reason,
+                    last_seen_at = excluded.last_seen_at,
+                    attempt_count = attempt_count + 1,
+                    updated_at = CURRENT_TIMESTAMP`,
+                [cameraId, filename, filePath, 'retryable_failed', reason, attemptedAt, attemptedAt]
+            );
 
-        return queryOne(
-            `SELECT
-                camera_id,
-                filename,
-                file_path,
-                state,
-                reason,
-                detected_at,
-                last_seen_at,
-                updated_at,
-                attempt_count,
-                terminal_state,
-                quarantined_path
-            FROM recording_recovery_diagnostics
-            WHERE camera_id = ? AND filename = ? AND active = 1`,
-            [cameraId, filename]
-        );
+            return queryOne(
+                `SELECT
+                    camera_id,
+                    filename,
+                    file_path,
+                    state,
+                    reason,
+                    detected_at,
+                    last_seen_at,
+                    updated_at,
+                    attempt_count,
+                    terminal_state,
+                    quarantined_path
+                FROM recording_recovery_diagnostics
+                WHERE camera_id = ? AND filename = ? AND active = 1`,
+                [cameraId, filename]
+            );
+        });
+
+        return run();
     }
 
     markTerminal({

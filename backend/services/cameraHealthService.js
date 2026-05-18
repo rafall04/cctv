@@ -1574,7 +1574,7 @@ class CameraHealthService {
         }
 
         try {
-            await recordingService.handleCameraBecameOffline(camera.id);
+            await recordingService.reconcileRecordingLifecycle(camera.id, 'health_transition_offline');
         } catch (error) {
             console.error(`[CameraHealth] Failed to suspend recording for camera ${camera.id}:`, error.message);
         }
