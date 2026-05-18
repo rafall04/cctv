@@ -24,12 +24,13 @@ import recordingFileOperationService from './recordingFileOperationService.js';
 import { buildRecordingProcessEnv, getRecordingProcessTimezone } from './recordingProcessTimePolicy.js';
 import { createRecordingRecoveryScanner } from './recordingRecoveryScanner.js';
 import { createRecordingLifecycleReconciler } from './recordingLifecycleReconciler.js';
+import recordingDiskSpaceService from './recordingDiskSpaceService.js';
+import { createRecordingEmergencyDiskService } from './recordingEmergencyDiskService.js';
 import {
     getCameraRecordingDir as getPolicyCameraRecordingDir,
     getFinalRecordingPath,
     getPendingRecordingDir,
     getPendingRecordingPattern,
-    isFinalSegmentFilename,
     isPartialSegmentFilename,
     toFinalSegmentFilename,
 } from './recordingSegmentFilePolicy.js';
@@ -322,6 +323,7 @@ class RecordingService {
     constructor() {
         this.isShuttingDown = false;
         this.scheduler = null;
+        this.emergencyDiskService = null;
 
         // Ensure recordings directory exists
         if (!existsSync(RECORDINGS_BASE_PATH)) {
@@ -1163,145 +1165,32 @@ class RecordingService {
         scheduleTimeout(runScheduledClean, SCHEDULED_CLEANUP_INITIAL_DELAY_MS);
     }
 
+    getEmergencyDiskService() {
+        if (!this.emergencyDiskService) {
+            this.emergencyDiskService = createRecordingEmergencyDiskService({
+                recordingsBasePath: RECORDINGS_BASE_PATH,
+                cleanupService,
+                diskSpaceService: recordingDiskSpaceService,
+                fs: fsPromises,
+                safeDelete: recordingFileOperationService.deleteFileSafely,
+                getCameraRetentionHours: (cameraId) => {
+                    const camera = queryOne('SELECT recording_duration_hours FROM cameras WHERE id = ?', [cameraId]);
+                    return camera?.recording_duration_hours;
+                },
+                onRecoverOrphan: ({ cameraId, filename }) => this.onSegmentCreated(cameraId, filename),
+                logger: console,
+            });
+        }
+
+        return this.emergencyDiskService;
+    }
+
     /**
      * Emergency disk space check
      * If available space is below 1GB, aggressively delete oldest files
      */
     async emergencyDiskSpaceCheck() {
-        try {
-            let freeBytes = 0;
-
-            try {
-                // Windows: use wmic or PowerShell
-                const drive = RECORDINGS_BASE_PATH.charAt(0);
-                const { stdout } = await execPromise(
-                    `powershell -Command "(Get-PSDrive ${drive}).Free"`,
-                    { encoding: 'utf8', timeout: 5000 }
-                );
-                freeBytes = parseInt(stdout.trim()) || 0;
-            } catch {
-                try {
-                    // Linux/Mac fallback: use df
-                    const { stdout } = await execPromise(
-                        `df -B1 "${RECORDINGS_BASE_PATH}" | tail -1 | awk '{print $4}'`,
-                        { encoding: 'utf8', timeout: 5000 }
-                    );
-                    freeBytes = parseInt(stdout.trim()) || 0;
-                } catch {
-                    // Can't determine free space, skip emergency check
-                    return;
-                }
-            }
-
-            const freeGB = (freeBytes / (1024 * 1024 * 1024)).toFixed(2);
-            console.log(`[DiskCheck] Free disk space: ${freeGB}GB`);
-
-            // Emergency threshold: 1GB
-            const EMERGENCY_THRESHOLD = 1 * 1024 * 1024 * 1024; // 1GB
-
-            if (freeBytes > EMERGENCY_THRESHOLD) {
-                return; // Enough space
-            }
-
-            console.warn(`[DiskCheck] ⚠️ LOW DISK SPACE: ${freeGB}GB free. Starting emergency cleanup...`);
-
-            // Fix OOM Issue: fetch chunks at a time into memory
-            let freedBytes = 0;
-            let deletedCount = 0;
-
-            const emergencyResult = await cleanupService.emergencyCleanup({
-                freeBytes,
-                targetFreeBytes: 2 * 1024 * 1024 * 1024,
-                batchLimit: 200,
-                allowRetentionBypass: true,
-                getCameraRetentionHours: (cameraId) => {
-                    const camera = queryOne('SELECT recording_duration_hours FROM cameras WHERE id = ?', [cameraId]);
-                    return camera?.recording_duration_hours;
-                },
-            });
-
-            freedBytes += emergencyResult.deletedBytes;
-            deletedCount += emergencyResult.deleted;
-
-            // Also scan for filesystem orphans
-            let baseDirExists = true;
-            try { await fsPromises.access(RECORDINGS_BASE_PATH); } catch { baseDirExists = false; }
-
-            if (baseDirExists && (freeBytes + freedBytes) < 2 * 1024 * 1024 * 1024) {
-                const cameraDirs = await fsPromises.readdir(RECORDINGS_BASE_PATH);
-                for (const dir of cameraDirs) {
-                    const fullDirPath = join(RECORDINGS_BASE_PATH, dir);
-                    try {
-                        const st = await fsPromises.stat(fullDirPath);
-                        if (!st.isDirectory()) continue;
-                    } catch { continue; }
-
-                    const allFiles = await fsPromises.readdir(fullDirPath);
-                    const files = [];
-
-                    for (const f of allFiles) {
-                        if (/^\d{8}_\d{6}\.mp4$/.test(f) || f.includes('.remux.mp4') || f.includes('.temp.mp4')) {
-                            const fp = join(fullDirPath, f);
-                            try {
-                                const st = await fsPromises.stat(fp);
-                                files.push({ name: f, path: fp, mtime: st.mtimeMs, size: st.size });
-                            } catch { }
-                        }
-                    }
-
-                    files.sort((a, b) => a.mtime - b.mtime);
-
-                    for (const file of files) {
-                        if ((freeBytes + freedBytes) > 2 * 1024 * 1024 * 1024) break;
-                        try {
-                            const cameraIdMatch = dir.match(/camera(\d+)/);
-                            const cameraId = cameraIdMatch ? parseInt(cameraIdMatch[1]) : null;
-                            const camera = cameraId
-                                ? queryOne('SELECT recording_duration_hours FROM cameras WHERE id = ?', [cameraId])
-                                : null;
-                            const nowMs = Date.now();
-                            const retentionWindow = computeRetentionWindow({
-                                retentionHours: camera?.recording_duration_hours,
-                                nowMs,
-                            });
-                            const deletePolicy = canDeleteRecordingFile({
-                                filename: file.name,
-                                fileMtimeMs: file.mtime,
-                                retentionWindow,
-                                nowMs,
-                            });
-
-                            if (!deletePolicy.allowed) {
-                                continue;
-                            }
-
-                            if (isFinalSegmentFilename(file.name)) {
-                                this.onSegmentCreated(cameraId, file.name);
-                                continue;
-                            }
-
-                            const deleteResult = await recordingFileOperationService.deleteFileSafely({
-                                cameraId,
-                                filename: file.name,
-                                filePath: file.path,
-                                reason: 'emergency_filesystem_cleanup',
-                            });
-                            if (deleteResult.success) {
-                                freedBytes += deleteResult.size;
-                                deletedCount++;
-                            }
-                        } catch { }
-                    }
-                }
-            }
-
-            if (deletedCount > 0) {
-                console.warn(`[DiskCheck] 🚨 Emergency cleanup: deleted ${deletedCount} files, freed ${(freedBytes / 1024 / 1024).toFixed(2)}MB`);
-            }
-
-        } catch (error) {
-            console.error('[DiskCheck] Error checking disk space:', error.message);
-        }
+        return this.getEmergencyDiskService().runEmergencyCheck();
     }
 
     /**

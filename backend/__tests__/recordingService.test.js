@@ -776,7 +776,7 @@ describe('recordingService external recording support', () => {
         await recordingService.emergencyDiskSpaceCheck();
 
         expect(fsPromisesMock.unlink).not.toHaveBeenCalledWith(expect.stringContaining('20260502_095800.mp4'));
-        expect(warnSpy).toHaveBeenCalledWith('[DiskCheck] ⚠️ LOW DISK SPACE: 0.00GB free. Starting emergency cleanup...');
+        expect(warnSpy).toHaveBeenCalledWith('[DiskCheck] LOW DISK SPACE: 0.00GB free. Starting emergency cleanup...');
     });
 
     it('emergency disk cleanup does not directly delete filesystem final orphans', async () => {
