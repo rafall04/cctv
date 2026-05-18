@@ -59,6 +59,7 @@ const MIGRATIONS = [
     'backfill_camera_delivery_types.js',
     'add_runtime_state_and_history_retention.js',
     'zz_20260507_add_area_slug_indexes.js',
+    'zz_20260518_add_recording_maintenance_state.js',
     'zz_20260518_repair_recording_segment_timezone.js'
 ];
 
