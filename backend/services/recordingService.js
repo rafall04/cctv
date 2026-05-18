@@ -26,6 +26,7 @@ import { createRecordingRecoveryScanner } from './recordingRecoveryScanner.js';
 import { createRecordingLifecycleReconciler } from './recordingLifecycleReconciler.js';
 import recordingDiskSpaceService from './recordingDiskSpaceService.js';
 import { createRecordingEmergencyDiskService } from './recordingEmergencyDiskService.js';
+import { createRecordingBackgroundCleanupService } from './recordingBackgroundCleanupService.js';
 import {
     getCameraRecordingDir as getPolicyCameraRecordingDir,
     getFinalRecordingPath,
@@ -324,6 +325,7 @@ class RecordingService {
         this.isShuttingDown = false;
         this.scheduler = null;
         this.emergencyDiskService = null;
+        this.backgroundCleanupService = null;
 
         // Ensure recordings directory exists
         if (!existsSync(RECORDINGS_BASE_PATH)) {
@@ -1005,125 +1007,20 @@ class RecordingService {
      * Only attempts registration for files within retention period
      */
     startBackgroundCleanup(scheduleTimeout = setTimeout) {
-        console.log('[Cleanup] Starting background cleanup service (1 file per 10s)');
+        if (!this.backgroundCleanupService) {
+            this.backgroundCleanupService = createRecordingBackgroundCleanupService({
+                recordingsBasePath: RECORDINGS_BASE_PATH,
+                fs: fsPromises,
+                query,
+                queryOne,
+                ffprobe: (filePath) => execPromise(`ffprobe -v error "${filePath}"`, { timeout: 3000 }),
+                isFileBeingProcessed: (cameraId, filename) => filesBeingProcessed.has(`${cameraId}:${filename}`),
+                onSegmentCreated: (cameraId, filename) => this.onSegmentCreated(cameraId, filename),
+                logger: console,
+            });
+        }
 
-        let cleanupQueue = [];
-        let isBuildingQueue = false;
-
-        // Build cleanup queue every 5 minutes
-        const buildQueue = async () => {
-            if (isBuildingQueue) return;
-            isBuildingQueue = true;
-            try {
-                try { await fsPromises.access(RECORDINGS_BASE_PATH); } catch { isBuildingQueue = false; return; }
-
-                const cameraDirs = await fsPromises.readdir(RECORDINGS_BASE_PATH);
-                const unregistered = [];
-
-                for (const dirName of cameraDirs) {
-                    const fullPath = join(RECORDINGS_BASE_PATH, dirName);
-                    try {
-                        const st = await fsPromises.stat(fullPath);
-                        if (!st.isDirectory()) continue;
-                    } catch { continue; }
-
-                    const cameraIdMatch = dirName.match(/camera(\d+)/);
-                    if (!cameraIdMatch) continue;
-                    const cameraId = parseInt(cameraIdMatch[1]);
-
-                    const camera = queryOne('SELECT recording_duration_hours FROM cameras WHERE id = ?', [cameraId]);
-                    const retentionMs = ((camera && camera.recording_duration_hours) ? camera.recording_duration_hours : 5) * 60 * 60 * 1000;
-                    const retentionWithGrace = retentionMs + Math.max(RECORDING_RETENTION_GRACE_MS, retentionMs * 0.1);
-
-                    const allFiles = await fsPromises.readdir(fullPath);
-                    const files = allFiles.filter(f => /^\d{8}_\d{6}\.mp4$/.test(f));
-
-                    const existingFilesSet = new Set(
-                        query('SELECT filename FROM recording_segments WHERE camera_id = ?', [cameraId])
-                            .map(row => row.filename)
-                    );
-
-                    for (const filename of files) {
-                        if (!existingFilesSet.has(filename)) {
-                            const filePath = join(fullPath, filename);
-                            try {
-                                const stats = await fsPromises.stat(filePath);
-                                const fileAge = Date.now() - stats.mtimeMs;
-
-                                const match = filename.match(/(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
-                                let ageToUse = fileAge;
-                                if (match) {
-                                    const [, year, month, day, hour, minute, second] = match;
-                                    const fileTimestamp = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`).getTime();
-                                    ageToUse = Math.max(fileAge, Date.now() - fileTimestamp);
-                                }
-
-                                if (ageToUse > 30 * 60 * 1000) {
-                                    unregistered.push({
-                                        cameraId, filename, path: filePath, age: ageToUse, fileSize: stats.size,
-                                        retentionMs, beyondRetention: ageToUse > retentionWithGrace
-                                    });
-                                }
-                            } catch { }
-                        }
-                    }
-                }
-
-                if (unregistered.length > 0) {
-                    console.log(`[BGCleanup] Found ${unregistered.length} old unregistered files (30+ min), adding to cleanup queue`);
-                    cleanupQueue = unregistered.sort((a, b) => {
-                        if (a.beyondRetention && !b.beyondRetention) return -1;
-                        if (!a.beyondRetention && b.beyondRetention) return 1;
-                        return b.age - a.age;
-                    });
-                }
-            } catch (error) {
-                console.error('[BGCleanup] Error building queue:', error);
-            } finally {
-                isBuildingQueue = false;
-            }
-        };
-
-        const processQueueCycle = async () => {
-            if (cleanupQueue.length > 0) {
-                try {
-                    const file = cleanupQueue.shift();
-
-                    let fileExists = true;
-                    try { await fsPromises.access(file.path); } catch { fileExists = false; }
-
-                    if (fileExists) {
-                        const fileKey = `${file.cameraId}:${file.filename}`;
-                        if (filesBeingProcessed.has(fileKey)) {
-                            console.log(`[BGCleanup] File being processed, skipping: ${file.filename}`);
-                        } else if (file.beyondRetention) {
-                            console.log(`[BGCleanup] Requeueing old unregistered final file for recovery before deletion: camera${file.cameraId}/${file.filename}`);
-                            this.onSegmentCreated(file.cameraId, file.filename);
-                        } else {
-                            try {
-                                await execPromise(`ffprobe -v error "${file.path}"`, { timeout: 3000 });
-                                console.log(`[BGCleanup] File valid but unregistered (age: ${Math.round(file.age / 60000)}min), triggering registration: ${file.filename}`);
-                                this.onSegmentCreated(file.cameraId, file.filename);
-                            } catch (error) {
-                                console.log(`[BGCleanup] Keeping corrupt/unplayable file until retention expiry: camera${file.cameraId}/${file.filename} (age: ${Math.round(file.age / 60000)}min)`);
-                            }
-                        }
-                    }
-                } catch (error) {
-                    console.error('[BGCleanup] Error processing file:', error);
-                }
-            }
-            scheduleTimeout(processQueueCycle, 10000);
-        };
-
-        const scheduledBuildQueue = async () => {
-            await buildQueue();
-            scheduleTimeout(scheduledBuildQueue, 5 * 60 * 1000);
-        };
-
-        // Start tasks
-        scheduleTimeout(scheduledBuildQueue, 30000);
-        scheduleTimeout(processQueueCycle, 10000);
+        this.backgroundCleanupService.start(scheduleTimeout);
     }
 
     /**
