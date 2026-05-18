@@ -1,48 +1,20 @@
-// Purpose: Orchestrate recording segment cleanup with bounded batches and per-camera locking.
-// Caller: recordingService scheduled cleanup and cleanup tests.
-// Deps: fs promises, path join, recording retention policy, segment repository, recovery service ownership.
-// MainFuncs: createRecordingCleanupService, cleanupCamera.
+// Purpose: Compose per-camera recording cleanup sub-routines + emergency cleanup behind one boundary.
+//          Owns per-camera in-flight lock, rate-limit, and drain.
+// Caller: recordingService maintenance coordinator, recordingEmergencyDiskService.
+// Deps: recovery service ownership check, repository, fs, safeDelete, onRecoverOrphan,
+//        + the 4 cleanup sub-modules.
+// MainFuncs: createRecordingCleanupService, cleanupCamera, emergencyCleanup, drain.
 // SideEffects: Deletes recording files through injected safeDelete and removes DB rows through repository.
 
 import { promises as defaultFs } from 'fs';
-import { join } from 'path';
 import recordingRecoveryService from './recordingRecoveryService.js';
-import {
-    canDeleteRecordingFile,
-    computeRetentionWindow,
-    describeRecordingRetentionDecision,
-    isSafeRecordingFilename,
-} from './recordingRetentionPolicy.js';
-import {
-    getPendingRecordingDir,
-    isFinalSegmentFilename,
-    isPartialSegmentFilename,
-    isTempSegmentFilename,
-    toFinalSegmentFilename,
-} from './recordingSegmentFilePolicy.js';
-import {
-    RECORDING_CLEANUP_BATCH_SIZE as NORMAL_DELETE_BATCH_SIZE,
-    RECORDING_CLEANUP_MIN_INTERVAL_MS as DEFAULT_MIN_CLEANUP_INTERVAL_MS,
-    RECORDING_FINALIZED_PARTIAL_MIN_AGE_MS as FINALIZED_PARTIAL_MIN_AGE_MS,
-    RECORDING_TEMP_FILE_MIN_AGE_MS as TEMP_FILE_MIN_AGE_MS,
-} from './recordingIntervalsPolicy.js';
-
-function canDeleteTempFile({ filename, fileMtimeMs, nowMs }) {
-    return isTempSegmentFilename(filename) && (nowMs - fileMtimeMs) > TEMP_FILE_MIN_AGE_MS;
-}
-
-function createEmptyResult() {
-    return {
-        deleted: 0,
-        deletedBytes: 0,
-        missingRowsDeleted: 0,
-        unsafeSkipped: 0,
-        processingSkipped: 0,
-        failed: 0,
-        orphanDeleted: 0,
-        skippedReason: null,
-    };
-}
+import { computeRetentionWindow } from './recordingRetentionPolicy.js';
+import { RECORDING_CLEANUP_MIN_INTERVAL_MS } from './recordingIntervalsPolicy.js';
+import { createEmptyResult } from './recordingCleanupShared.js';
+import { createExpiredDbSegmentCleanup } from './recordingExpiredDbSegmentCleanup.js';
+import { createFilesystemOrphanCleanup } from './recordingFilesystemOrphanCleanup.js';
+import { createPendingPartialCleanup } from './recordingPendingPartialCleanup.js';
+import { createEmergencyCleanup } from './recordingEmergencyCleanup.js';
 
 export function createRecordingCleanupService({
     repository,
@@ -51,7 +23,7 @@ export function createRecordingCleanupService({
     safeDelete,
     recoveryService = recordingRecoveryService,
     onRecoverOrphan,
-    minIntervalMs = DEFAULT_MIN_CLEANUP_INTERVAL_MS,
+    minIntervalMs = RECORDING_CLEANUP_MIN_INTERVAL_MS,
     logger = console,
 } = {}) {
     const inFlightCameraIds = new Set();
@@ -59,265 +31,18 @@ export function createRecordingCleanupService({
     const isFileBeingProcessed = (cameraId, filename) =>
         recoveryService?.isFileOwned?.(cameraId, filename) === true;
 
-    async function cleanupExpiredDbSegments({ cameraId, retentionWindow, result }) {
-        const segments = repository.findExpiredSegments({
-            cameraId,
-            cutoffIso: retentionWindow.cutoffIso,
-            limit: NORMAL_DELETE_BATCH_SIZE,
-        });
-
-        for (const segment of segments) {
-            if (isFileBeingProcessed(cameraId, segment.filename)) {
-                result.processingSkipped++;
-                continue;
-            }
-
-            let fileExists = true;
-            try {
-                await fs.access(segment.file_path);
-            } catch {
-                fileExists = false;
-            }
-
-            if (!fileExists) {
-                repository.deleteSegmentById(segment.id);
-                result.missingRowsDeleted++;
-                continue;
-            }
-
-            const deleteResult = await safeDelete({
-                cameraId,
-                filename: segment.filename,
-                filePath: segment.file_path,
-                reason: 'retention_expired',
-            });
-
-            if (!deleteResult.success) {
-                if (deleteResult.reason === 'unsafe_path') {
-                    result.unsafeSkipped++;
-                } else {
-                    result.failed++;
-                }
-                continue;
-            }
-
-            repository.deleteSegmentById(segment.id);
-            result.deleted++;
-            result.deletedBytes += deleteResult.size || 0;
-        }
-    }
-
-    async function cleanupFilesystemOrphans({ cameraId, retentionWindow, nowMs, result }) {
-        const cameraDir = join(recordingsBasePath, `camera${cameraId}`);
-        try {
-            await fs.access(cameraDir);
-        } catch {
-            return;
-        }
-
-        const filenames = (await fs.readdir(cameraDir))
-            .filter((filename) => isSafeRecordingFilename(filename));
-        const dbFilenames = new Set(repository.findExistingFilenames({
-            cameraId,
-            filenames,
-        }));
-
-        for (const filename of filenames) {
-            if (dbFilenames.has(filename)) {
-                continue;
-            }
-            if (isFileBeingProcessed(cameraId, filename)) {
-                result.processingSkipped++;
-                continue;
-            }
-
-            const filePath = join(cameraDir, filename);
-            let stats;
-            try {
-                stats = await fs.stat(filePath);
-            } catch {
-                result.failed++;
-                continue;
-            }
-
-            if (canDeleteTempFile({ filename, fileMtimeMs: stats.mtimeMs, nowMs })) {
-                const deleteResult = await safeDelete({
-                    cameraId,
-                    filename,
-                    filePath,
-                    reason: 'temp_file_expired',
-                });
-
-                if (!deleteResult.success) {
-                    if (deleteResult.reason === 'unsafe_path') {
-                        result.unsafeSkipped++;
-                    } else {
-                        result.failed++;
-                    }
-                    continue;
-                }
-
-                result.orphanDeleted++;
-                result.deletedBytes += deleteResult.size || 0;
-                continue;
-            }
-
-            if (isTempSegmentFilename(filename)) {
-                logger.log?.(`[Cleanup] Keeping recent temp recording: camera${cameraId}/${filename}`);
-                continue;
-            }
-
-            const deletePolicy = canDeleteRecordingFile({
-                filename,
-                fileMtimeMs: stats.mtimeMs,
-                retentionWindow,
-                nowMs,
-            });
-            if (!deletePolicy.allowed) {
-                logger.log?.(`[Cleanup] Keeping orphan recording: camera${cameraId}/${describeRecordingRetentionDecision({
-                    filename,
-                    decision: deletePolicy,
-                })}`);
-                continue;
-            }
-
-            if (isFinalSegmentFilename(filename) && onRecoverOrphan) {
-                await onRecoverOrphan({
-                    cameraId,
-                    filename,
-                    filePath,
-                    sourceType: 'final_orphan',
-                });
-                logger.log?.(`[Cleanup] Requeued final orphan for recovery before delete: camera${cameraId}/${filename}`);
-                continue;
-            }
-
-            const deleteResult = await safeDelete({
-                cameraId,
-                filename,
-                filePath,
-                reason: 'filesystem_orphan_retention_expired',
-            });
-
-            if (!deleteResult.success) {
-                if (deleteResult.reason === 'unsafe_path') {
-                    result.unsafeSkipped++;
-                } else {
-                    result.failed++;
-                }
-                continue;
-            }
-
-            result.orphanDeleted++;
-            result.deletedBytes += deleteResult.size || 0;
-        }
-    }
-
-    async function cleanupPendingPartials({ cameraId, retentionWindow, nowMs, result }) {
-        const pendingDir = getPendingRecordingDir(recordingsBasePath, cameraId);
-        let filenames;
-        try {
-            filenames = (await fs.readdir(pendingDir))
-                .filter((filename) => isPartialSegmentFilename(filename));
-        } catch {
-            return;
-        }
-
-        if (!filenames.length) {
-            return;
-        }
-
-        const finalFilenames = filenames
-            .map((filename) => toFinalSegmentFilename(filename))
-            .filter(Boolean);
-        const dbFilenames = new Set(repository.findExistingFilenames({
-            cameraId,
-            filenames: finalFilenames,
-        }));
-
-        for (const filename of filenames) {
-            const finalFilename = toFinalSegmentFilename(filename);
-            if (!finalFilename) {
-                result.unsafeSkipped++;
-                continue;
-            }
-
-            if (
-                isFileBeingProcessed(cameraId, filename)
-                || isFileBeingProcessed(cameraId, finalFilename)
-            ) {
-                result.processingSkipped++;
-                continue;
-            }
-
-            const filePath = join(pendingDir, filename);
-            let stats;
-            try {
-                stats = await fs.stat(filePath);
-            } catch {
-                result.failed++;
-                continue;
-            }
-
-            const fileAgeMs = nowMs - stats.mtimeMs;
-            const isFinalizedDuplicate = dbFilenames.has(finalFilename)
-                && fileAgeMs > FINALIZED_PARTIAL_MIN_AGE_MS;
-            if (isFinalizedDuplicate) {
-                const deleteResult = await safeDelete({
-                    cameraId,
-                    filename,
-                    filePath,
-                    reason: 'pending_partial_finalized_duplicate',
-                });
-
-                if (!deleteResult.success) {
-                    if (deleteResult.reason === 'unsafe_path') {
-                        result.unsafeSkipped++;
-                    } else {
-                        result.failed++;
-                    }
-                    continue;
-                }
-
-                result.orphanDeleted++;
-                result.deletedBytes += deleteResult.size || 0;
-                continue;
-            }
-
-            const deletePolicy = canDeleteRecordingFile({
-                filename,
-                fileMtimeMs: stats.mtimeMs,
-                retentionWindow,
-                nowMs,
-            });
-            if (!deletePolicy.allowed) {
-                logger.log?.(`[Cleanup] Keeping pending partial recording: camera${cameraId}/${describeRecordingRetentionDecision({
-                    filename,
-                    decision: deletePolicy,
-                })}`);
-                continue;
-            }
-
-            const deleteResult = await safeDelete({
-                cameraId,
-                filename,
-                filePath,
-                reason: 'pending_partial_retention_expired',
-            });
-
-            if (!deleteResult.success) {
-                if (deleteResult.reason === 'unsafe_path') {
-                    result.unsafeSkipped++;
-                } else {
-                    result.failed++;
-                }
-                continue;
-            }
-
-            result.orphanDeleted++;
-            result.deletedBytes += deleteResult.size || 0;
-        }
-    }
+    const cleanupExpiredDbSegments = createExpiredDbSegmentCleanup({
+        repository, fs, safeDelete, isFileBeingProcessed,
+    });
+    const cleanupFilesystemOrphans = createFilesystemOrphanCleanup({
+        repository, fs, recordingsBasePath, safeDelete, isFileBeingProcessed, onRecoverOrphan, logger,
+    });
+    const cleanupPendingPartials = createPendingPartialCleanup({
+        repository, fs, recordingsBasePath, safeDelete, isFileBeingProcessed, logger,
+    });
+    const runEmergencyCleanup = createEmergencyCleanup({
+        repository, fs, safeDelete, isFileBeingProcessed, logger,
+    });
 
     async function cleanupCamera({ cameraId, camera, nowMs = Date.now() }) {
         if (inFlightCameraIds.has(cameraId)) {
@@ -352,100 +77,9 @@ export function createRecordingCleanupService({
         }
     }
 
-    async function emergencyCleanup({
-        freeBytes,
-        targetFreeBytes,
-        batchLimit = 200,
-        nowMs = Date.now(),
-        getCameraRetentionHours = () => null,
-        allowRetentionBypass = false,
-    }) {
+    async function emergencyCleanup(options = {}) {
         const result = createEmptyResult();
-        let cursor = null;
-        let keepScanning = true;
-
-        while (keepScanning && (freeBytes + result.deletedBytes) <= targetFreeBytes) {
-            const segments = repository.findOldestSegmentsForEmergency({
-                afterStartTime: cursor?.start_time || null,
-                afterId: cursor?.id || 0,
-                limit: batchLimit,
-            });
-
-            if (!segments.length) {
-                break;
-            }
-
-            for (const segment of segments) {
-                cursor = { start_time: segment.start_time, id: segment.id };
-
-                if ((freeBytes + result.deletedBytes) > targetFreeBytes) {
-                    keepScanning = false;
-                    break;
-                }
-
-                if (isFileBeingProcessed(segment.camera_id, segment.filename)) {
-                    result.processingSkipped++;
-                    continue;
-                }
-
-                let fileMtimeMs = null;
-                try {
-                    const stats = await fs.stat(segment.file_path);
-                    fileMtimeMs = stats.mtimeMs;
-                } catch {
-                    fileMtimeMs = null;
-                }
-
-                const retentionWindow = computeRetentionWindow({
-                    retentionHours: getCameraRetentionHours(segment.camera_id),
-                    nowMs,
-                });
-                const deletePolicy = canDeleteRecordingFile({
-                    filename: segment.filename,
-                    startTime: segment.start_time,
-                    fileMtimeMs,
-                    retentionWindow,
-                    nowMs,
-                });
-                let deleteReason = 'emergency_disk_cleanup';
-                if (!deletePolicy.allowed && (!allowRetentionBypass || deletePolicy.reason === 'unsafe_filename')) {
-                    result.processingSkipped++;
-                    logger.log?.(`[Cleanup] Keeping emergency candidate: camera${segment.camera_id}/${describeRecordingRetentionDecision({
-                        filename: segment.filename,
-                        decision: deletePolicy,
-                    })}`);
-                    continue;
-                }
-                if (!deletePolicy.allowed && allowRetentionBypass) {
-                    deleteReason = 'emergency_disk_cleanup_retention_bypass';
-                    logger.warn?.(`[Cleanup] Emergency retention bypass: camera${segment.camera_id}/${describeRecordingRetentionDecision({
-                        filename: segment.filename,
-                        decision: deletePolicy,
-                    })}`);
-                }
-
-                const deleteResult = await safeDelete({
-                    cameraId: segment.camera_id,
-                    filename: segment.filename,
-                    filePath: segment.file_path,
-                    reason: deleteReason,
-                });
-
-                if (!deleteResult.success) {
-                    if (deleteResult.reason === 'unsafe_path') {
-                        result.unsafeSkipped++;
-                    } else {
-                        result.failed++;
-                    }
-                    continue;
-                }
-
-                repository.deleteSegmentById(segment.id);
-                result.deleted++;
-                result.deletedBytes += deleteResult.size || 0;
-            }
-        }
-
+        await runEmergencyCleanup({ ...options, result });
         return result;
     }
 
