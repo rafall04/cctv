@@ -735,8 +735,10 @@ describe('recordingService external recording support', () => {
             scheduledCallbacks.push(callback);
             return scheduledCallbacks.length;
         });
-        const cleanupSpy = vi.spyOn(recordingService, 'cleanupOldSegments').mockResolvedValue({ deleted: 0 });
-        const emergencySpy = vi.spyOn(recordingService, 'emergencyDiskSpaceCheck').mockResolvedValue(undefined);
+        const cleanupSpy = vi.spyOn(recordingService.maintenanceCoordinator, 'cleanupOldSegments')
+            .mockResolvedValue({ deleted: 0 });
+        const emergencySpy = vi.spyOn(recordingService.maintenanceCoordinator, 'runEmergencyDiskCheck')
+            .mockResolvedValue(undefined);
 
         queryMock.mockReturnValue([{ id: 7 }, { id: 8 }]);
         fsPromisesMock.access.mockRejectedValueOnce(new Error('no recordings dir'));

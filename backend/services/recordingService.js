@@ -10,30 +10,31 @@ import { join } from 'path';
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import { promisify } from 'util';
 import { exec } from 'child_process';
-import { getEffectiveDeliveryType, getPrimaryExternalStreamUrl } from '../utils/cameraDelivery.js';
-import { buildFfmpegRtspInputArgs, resolveInternalRtspTransport } from '../utils/internalRtspTransportPolicy.js';
 import recordingProcessManager from './recordingProcessManager.js';
 import { createRecordingCleanupService } from './recordingCleanupService.js';
 import recordingSegmentRepository from './recordingSegmentRepository.js';
 import recordingSegmentFinalizer from './recordingSegmentFinalizer.js';
 import recordingRecoveryService from './recordingRecoveryService.js';
 import recordingFileOperationService from './recordingFileOperationService.js';
-import { buildRecordingProcessEnv, getRecordingProcessTimezone } from './recordingProcessTimePolicy.js';
-import { createRecordingRecoveryScanner } from './recordingRecoveryScanner.js';
 import { createRecordingLifecycleReconciler } from './recordingLifecycleReconciler.js';
 import recordingDiskSpaceService from './recordingDiskSpaceService.js';
-import { createRecordingEmergencyDiskService } from './recordingEmergencyDiskService.js';
-import { createRecordingBackgroundCleanupService } from './recordingBackgroundCleanupService.js';
+import { createRecordingMaintenanceCoordinator } from './recordingMaintenanceCoordinator.js';
+import { createRecordingAutoStarter } from './recordingAutoStarter.js';
 import {
-    getCameraRecordingDir as getPolicyCameraRecordingDir,
     getFinalRecordingPath,
     getPendingRecordingDir,
-    getPendingRecordingPattern,
     isPartialSegmentFilename,
     toFinalSegmentFilename,
 } from './recordingSegmentFilePolicy.js';
 import { RECORDINGS_BASE_PATH } from './recordingPaths.js';
 import { createRecordingHealthMonitor, computeCooldownMs } from './recordingHealthMonitor.js';
+import {
+    buildRecordingFfmpegArgs,
+    getRecordingSourceConfig,
+    maskRecordingSourceForLog,
+    prepareRecordingStart,
+} from './recordingStarter.js';
+import { parseRecordingStderrLine } from './recordingStderrParser.js';
 import {
     RECORDING_LIFECYCLE_RECONCILE_INTERVAL_MS,
     RECORDING_SCHEDULED_CLEANUP_INITIAL_DELAY_MS as SCHEDULED_CLEANUP_INITIAL_DELAY_MS,
@@ -55,135 +56,9 @@ const cleanupService = createRecordingCleanupService({
     logger: console,
 });
 
-const EXTERNAL_RECORDING_PROTOCOL_WHITELIST = 'file,http,https,tcp,tls,crypto';
-
-// Re-export for callers/tests that imported the cooldown helper from the facade.
+// Re-exports preserve historical facade imports used by tests and external callers.
 export const computeRecordingCooldownMs = computeCooldownMs;
-
-export function maskRecordingSourceForLog(sourceUrl) {
-    if (!sourceUrl) return '';
-
-    try {
-        const url = new URL(sourceUrl);
-        if (url.username || url.password) {
-            url.username = '****';
-            url.password = '****';
-        }
-
-        if (url.search) {
-            for (const [key] of url.searchParams.entries()) {
-                url.searchParams.set(key, '***');
-            }
-        }
-
-        return url.toString();
-    } catch {
-        return sourceUrl.replace(/:[^:@]+@/, ':****@');
-    }
-}
-
-export function getRecordingSourceConfig(camera) {
-    const deliveryType = getEffectiveDeliveryType(camera);
-    const streamSource = deliveryType === 'internal_hls' ? 'internal' : 'external';
-
-    if (deliveryType === 'external_hls') {
-        const externalUrl = (getPrimaryExternalStreamUrl(camera) || '').trim();
-        if (!externalUrl) {
-            return {
-                success: false,
-                reason: 'invalid_source',
-                message: 'External HLS URL is required for external recording',
-            };
-        }
-
-        if (!/^https?:\/\//i.test(externalUrl)) {
-            return {
-                success: false,
-                reason: 'invalid_source',
-                message: 'Invalid external HLS URL',
-            };
-        }
-
-        return {
-            success: true,
-            streamSource,
-            inputUrl: externalUrl,
-            logSource: maskRecordingSourceForLog(externalUrl),
-        };
-    }
-
-    if (deliveryType !== 'internal_hls') {
-        return {
-            success: false,
-            reason: 'unsupported_source',
-            message: 'Playback recording only supports internal HLS or external HLS cameras',
-        };
-    }
-
-    const rtspUrl = (camera?.private_rtsp_url || '').trim();
-    if (!rtspUrl || !/^rtsp:\/\//i.test(rtspUrl)) {
-        return {
-            success: false,
-            reason: 'invalid_source',
-            message: 'Invalid RTSP URL',
-        };
-    }
-
-    return {
-        success: true,
-        streamSource,
-        inputUrl: rtspUrl,
-        logSource: maskRecordingSourceForLog(rtspUrl),
-        rtspTransport: resolveInternalRtspTransport(camera),
-    };
-}
-
-export function buildRecordingFfmpegArgs({ cameraDir, outputPattern, inputUrl, streamSource, rtspTransport = 'tcp' }) {
-    const resolvedOutputPattern = outputPattern || join(cameraDir, '%Y%m%d_%H%M%S.mp4');
-    const inputArgs = streamSource === 'external'
-        ? [
-            '-protocol_whitelist', EXTERNAL_RECORDING_PROTOCOL_WHITELIST,
-            '-i', inputUrl,
-        ]
-        : buildFfmpegRtspInputArgs(inputUrl, rtspTransport);
-
-    return [
-        ...inputArgs,
-        '-map', '0:v',
-        '-c:v', 'copy',
-        '-an',
-        '-f', 'segment',
-        '-segment_time', '600',
-        '-segment_format', 'mp4',
-        '-movflags', '+frag_keyframe+empty_moov+default_base_moof',
-        '-segment_atclocktime', '1',
-        '-reset_timestamps', '1',
-        '-strftime', '1',
-        resolvedOutputPattern
-    ];
-}
-
-export function classifyRecordingFailure(ffmpegOutput = '', streamSource = 'internal') {
-    const output = ffmpegOutput.toLowerCase();
-
-    if (output.includes('http error 403') || output.includes('forbidden') || output.includes('access denied')) {
-        return 'upstream_unreachable';
-    }
-    if (output.includes('404 not found') || output.includes('server returned 404')) {
-        return 'upstream_unreachable';
-    }
-    if (output.includes('connection refused') || output.includes('connection timed out') || output.includes('timed out')) {
-        return 'upstream_unreachable';
-    }
-    if (streamSource === 'external' && (output.includes('invalid data found') || output.includes('failed to open segment') || output.includes('error when loading first segment'))) {
-        return 'unsupported_playlist';
-    }
-    if (output.includes('invalid argument') || output.includes('protocol not found') || output.includes('no such file or directory')) {
-        return 'invalid_source';
-    }
-
-    return 'ffmpeg_failed';
-}
+export { buildRecordingFfmpegArgs, getRecordingSourceConfig, maskRecordingSourceForLog };
 
 /**
  * Recording Service
@@ -193,8 +68,6 @@ class RecordingService {
     constructor() {
         this.isShuttingDown = false;
         this.scheduler = null;
-        this.emergencyDiskService = null;
-        this.backgroundCleanupService = null;
 
         // Ensure recordings directory exists
         if (!existsSync(RECORDINGS_BASE_PATH)) {
@@ -219,6 +92,28 @@ class RecordingService {
             logger: console,
         });
         this.healthMonitor.start();
+
+        this.autoStarter = createRecordingAutoStarter({
+            query,
+            suspendOffline: (cameraId) => this.suspendRecordingForOffline(cameraId),
+            reconcileAll: (reason) => this.reconcileRecordingLifecycleAll(reason),
+            logger: console,
+        });
+
+        this.maintenanceCoordinator = createRecordingMaintenanceCoordinator({
+            recordingsBasePath: RECORDINGS_BASE_PATH,
+            cleanupService,
+            diskSpaceService: recordingDiskSpaceService,
+            safeDelete: recordingFileOperationService.deleteFileSafely,
+            query,
+            queryOne,
+            fs: fsPromises,
+            execPromise,
+            onSegmentCreated: (cameraId, filename) => this.onSegmentCreated(cameraId, filename),
+            reconcileAll: (reason) => this.reconcileRecordingLifecycleAll(reason),
+            isShuttingDown: () => this.isShuttingDown,
+            logger: console,
+        });
     }
 
     // Thin wrappers preserve the historical facade API used by tests and by
@@ -255,56 +150,26 @@ class RecordingService {
 
             // Get camera data
             const camera = queryOne('SELECT * FROM cameras WHERE id = ?', [cameraId]);
-            if (!camera) {
-                return { success: false, message: 'Camera not found' };
+            const prepared = prepareRecordingStart({ camera, recordingsBasePath: RECORDINGS_BASE_PATH });
+            if (!prepared.success) {
+                if (prepared.reason) {
+                    console.error(`[Recording] Invalid source for camera ${cameraId}: ${prepared.message}`);
+                }
+                return prepared;
             }
-
-            const sourceConfig = getRecordingSourceConfig(camera);
-            if (!sourceConfig.success) {
-                console.error(`[Recording] Invalid source for camera ${cameraId}: ${sourceConfig.message}`);
-                return { success: false, message: sourceConfig.message, reason: sourceConfig.reason };
-            }
-
-            // Check if camera is enabled
-            if (!camera.enabled) {
-                return { success: false, message: 'Camera is disabled' };
-            }
-
-            // Check if recording is enabled
-            if (!camera.enable_recording) {
-                return { success: false, message: 'Recording not enabled for this camera' };
-            }
-
-            // Create camera recording directory
-            const cameraDir = getPolicyCameraRecordingDir(RECORDINGS_BASE_PATH, cameraId);
-            const pendingDir = getPendingRecordingDir(RECORDINGS_BASE_PATH, cameraId);
-            mkdirSync(cameraDir, { recursive: true });
-            mkdirSync(pendingDir, { recursive: true });
+            const { sourceConfig, ffmpegArgs, spawnOptions, recordingTimezone } = prepared;
 
             console.log(`Starting recording for camera ${cameraId} (${camera.name})`);
             console.log(`[Recording] Source type: ${sourceConfig.streamSource}`);
             console.log(`[Recording] Input URL: ${sourceConfig.logSource}`);
-
-            // FFmpeg command - stream copy with optimized MP4 for seeking
-            const ffmpegArgs = buildRecordingFfmpegArgs({
-                cameraDir,
-                outputPattern: getPendingRecordingPattern(RECORDINGS_BASE_PATH, cameraId),
-                inputUrl: sourceConfig.inputUrl,
-                streamSource: sourceConfig.streamSource,
-                rtspTransport: sourceConfig.rtspTransport,
-            });
-
-            console.log(`FFmpeg recording: stream copy with web-compatible MP4 (0% CPU overhead)`);
-            const recordingTimezone = getRecordingProcessTimezone();
+            console.log('FFmpeg recording: stream copy with web-compatible MP4 (0% CPU overhead)');
             console.log(`[Recording] Segment filename timezone: ${recordingTimezone}`);
 
             const startResult = await recordingProcessManager.start(cameraId, {
                 ffmpegArgs,
                 camera,
                 streamSource: sourceConfig.streamSource,
-                spawnOptions: {
-                    env: buildRecordingProcessEnv(process.env, recordingTimezone),
-                },
+                spawnOptions,
                 onStdout: () => this.updateRecordingDataTime(cameraId),
                 onStderr: (output) => this.handleRecordingStderr(cameraId, output),
                 onError: (error) => {
@@ -402,23 +267,15 @@ class RecordingService {
 
     handleRecordingStderr(cameraId, output) {
         this.updateRecordingDataTime(cameraId);
+        const parsed = parseRecordingStderrLine(output);
 
-        // Detect segment completion only on "Closing" so remux never touches files still being written.
-        if (output.includes('Closing') && output.includes('.mp4')) {
-            const match = output.match(/(\d{8}_\d{6}\.mp4(?:\.partial)?)/);
-            if (match) {
-                const filename = match[1];
-                console.log(`[FFmpeg] Detected segment completion (CLOSING): ${filename}`);
-                this.onSegmentCreated(cameraId, filename);
-            }
-        }
-
-        if (output.includes('.mp4') && (output.includes('segment') || output.includes('Opening') || output.includes('Closing'))) {
-            console.log(`[FFmpeg Segment Debug] ${output.trim()}`);
-        }
-
-        if ((output.includes('error') || output.includes('Error') || output.includes('failed')) && !output.includes('Closing')) {
-            console.error(`[FFmpeg Camera ${cameraId}] ${output.trim()}`);
+        if (parsed.kind === 'segment_completed') {
+            console.log(`[FFmpeg] Detected segment completion (CLOSING): ${parsed.filename}`);
+            this.onSegmentCreated(cameraId, parsed.filename);
+        } else if (parsed.kind === 'segment_debug') {
+            console.log(`[FFmpeg Segment Debug] ${parsed.logLine}`);
+        } else if (parsed.kind === 'error') {
+            console.error(`[FFmpeg Camera ${cameraId}] ${parsed.logLine}`);
         }
     }
 
@@ -463,30 +320,8 @@ class RecordingService {
             sourceType,
         });
     }
-    /**
-     * Cleanup old segments - AGE-BASED (FINAL FIX)
-     * CRITICAL: Delete based on FILE AGE, not segment count
-     * This prevents premature deletion of recent files
-     * 
-     * ⚡ FIX 2: NON-BLOCKING CLEANUP - Uses async operations to prevent Event Loop freeze
-     * ⚡ FIX 6: Also cleans FILESYSTEM ORPHANS (files on disk but not in DB)
-     */
     async cleanupOldSegments(cameraId) {
-        try {
-            const camera = queryOne('SELECT recording_duration_hours, name FROM cameras WHERE id = ?', [cameraId]);
-            if (!camera) {
-                console.log(`[Cleanup] Camera ${cameraId} not found, skipping cleanup`);
-                return;
-            }
-
-            return await cleanupService.cleanupCamera({
-                cameraId,
-                camera,
-                nowMs: Date.now(),
-            });
-        } catch (error) {
-            console.error(`[Cleanup] Error cleaning up camera ${cameraId}:`, error);
-        }
+        return this.maintenanceCoordinator.cleanupOldSegments(cameraId);
     }
 
     /**
@@ -533,12 +368,7 @@ class RecordingService {
         if (!cleanupDrain.drained) {
             console.warn(`[Shutdown] Cleanup service drain timed out with ${cleanupDrain.pending} camera(s) still cleaning`);
         }
-        if (this.backgroundCleanupService) {
-            await this.backgroundCleanupService.drain(10000);
-        }
-        if (this.emergencyDiskService) {
-            await this.emergencyDiskService.drain(10000);
-        }
+        await this.maintenanceCoordinator.drainAll(10000);
         return results;
     }
 
@@ -547,87 +377,39 @@ class RecordingService {
     }
 
     initializeBackgroundWork() {
-        this._ensureRecoveryScanner();
-        this._ensureBackgroundCleanupService();
-
         if (!this.scheduler) {
             // Legacy fallback path: no scheduler attached, schedule manually with raw timers.
             // Production goes through scheduler.register() below for telemetry.
-            this._startLegacyTimers();
+            this.maintenanceCoordinator.startLegacyTimers();
             return;
         }
-
-        this.scheduler.register({
-            name: 'segment_scanner',
-            task: () => this.recoveryScanner.scanOnce(),
-            intervalMs: this.recoveryScanner.intervalMs,
-            initialDelayMs: this.recoveryScanner.intervalMs,
-        });
-        this.scheduler.register({
-            name: 'bg_cleanup_build',
-            task: () => this.backgroundCleanupService.buildQueue(),
-            intervalMs: this.backgroundCleanupService.buildIntervalMs,
-            initialDelayMs: this.backgroundCleanupService.buildInitialDelayMs,
-        });
-        this.scheduler.register({
-            name: 'bg_cleanup_process',
-            task: () => this.backgroundCleanupService.processOneQueueItem(),
-            intervalMs: this.backgroundCleanupService.processIntervalMs,
-            initialDelayMs: this.backgroundCleanupService.processIntervalMs,
-        });
-        this.scheduler.register({
-            name: 'scheduled_cleanup',
-            task: () => this._runScheduledCleanup(),
-            intervalMs: SCHEDULED_CLEANUP_INTERVAL_MS,
-            initialDelayMs: SCHEDULED_CLEANUP_INITIAL_DELAY_MS,
-        });
-        this.scheduler.register({
-            name: 'lifecycle_reconciler',
-            task: async () => {
-                if (this.isShuttingDown) return;
-                await this.reconcileRecordingLifecycleAll('periodic_safety_net');
-            },
-            intervalMs: RECORDING_LIFECYCLE_RECONCILE_INTERVAL_MS,
-            initialDelayMs: RECORDING_LIFECYCLE_RECONCILE_INTERVAL_MS,
-        });
+        this.maintenanceCoordinator.registerSchedulerTasks(this.scheduler);
         this.scheduler.start();
     }
 
-    _startLegacyTimers(scheduleTimeout = setTimeout) {
-        this.startSegmentScanner(scheduleTimeout);
-        this.startBackgroundCleanup(scheduleTimeout);
-        this.startScheduledCleanup(scheduleTimeout);
-        this.startLifecycleReconciler(scheduleTimeout);
-    }
-
-    // Backwards-compatible timer entrypoints used by unit tests that simulate
-    // scheduling directly. Production code uses scheduler.register() above.
+    // Backwards-compatible delegating wrappers. Production uses scheduler.register
+    // via initializeBackgroundWork; these are kept so existing tests can drive
+    // scheduling manually via scheduleTimeout.
     startSegmentScanner(scheduleTimeout = setTimeout) {
-        this._ensureRecoveryScanner();
+        const scanner = this.maintenanceCoordinator.ensureRecoveryScanner();
         const cycle = async () => {
-            await this.recoveryScanner.scanOnce();
-            scheduleTimeout(cycle, this.recoveryScanner.intervalMs);
+            await scanner.scanOnce();
+            scheduleTimeout(cycle, scanner.intervalMs);
         };
-        scheduleTimeout(cycle, this.recoveryScanner.intervalMs);
+        scheduleTimeout(cycle, scanner.intervalMs);
     }
 
     startBackgroundCleanup(scheduleTimeout = setTimeout) {
-        this._ensureBackgroundCleanupService();
-        const buildCycle = async () => {
-            await this.backgroundCleanupService.buildQueue();
-            scheduleTimeout(buildCycle, this.backgroundCleanupService.buildIntervalMs);
-        };
-        const processCycle = async () => {
-            await this.backgroundCleanupService.processOneQueueItem();
-            scheduleTimeout(processCycle, this.backgroundCleanupService.processIntervalMs);
-        };
-        scheduleTimeout(buildCycle, this.backgroundCleanupService.buildInitialDelayMs);
-        scheduleTimeout(processCycle, this.backgroundCleanupService.processIntervalMs);
+        const bg = this.maintenanceCoordinator.ensureBackgroundCleanupService();
+        const buildCycle = async () => { await bg.buildQueue(); scheduleTimeout(buildCycle, bg.buildIntervalMs); };
+        const processCycle = async () => { await bg.processOneQueueItem(); scheduleTimeout(processCycle, bg.processIntervalMs); };
+        scheduleTimeout(buildCycle, bg.buildInitialDelayMs);
+        scheduleTimeout(processCycle, bg.processIntervalMs);
     }
 
     startScheduledCleanup(scheduleTimeout = setTimeout) {
         const cycle = async () => {
-            await this._runScheduledCleanup();
+            await this.maintenanceCoordinator.runScheduledCleanup();
             scheduleTimeout(cycle, SCHEDULED_CLEANUP_INTERVAL_MS);
         };
         scheduleTimeout(cycle, SCHEDULED_CLEANUP_INITIAL_DELAY_MS);
@@ -646,56 +428,6 @@ class RecordingService {
             }
         };
         scheduleTimeout(cycle, RECORDING_LIFECYCLE_RECONCILE_INTERVAL_MS);
-    }
-
-    _ensureRecoveryScanner() {
-        if (!this.recoveryScanner) {
-            this.recoveryScanner = createRecordingRecoveryScanner({
-                recordingsBasePath: RECORDINGS_BASE_PATH,
-                onSegmentCreated: (cameraId, filename) => this.onSegmentCreated(cameraId, filename),
-                logger: console,
-            });
-        }
-    }
-
-    _ensureBackgroundCleanupService() {
-        if (!this.backgroundCleanupService) {
-            this.backgroundCleanupService = createRecordingBackgroundCleanupService({
-                recordingsBasePath: RECORDINGS_BASE_PATH,
-                fs: fsPromises,
-                query,
-                queryOne,
-                ffprobe: (filePath) => execPromise(`ffprobe -v error "${filePath}"`, { timeout: 3000 }),
-                onSegmentCreated: (cameraId, filename) => this.onSegmentCreated(cameraId, filename),
-                logger: console,
-            });
-        }
-    }
-
-    async _runScheduledCleanup() {
-        try {
-            const enabledCameras = query('SELECT id FROM cameras WHERE enable_recording = 1 AND enabled = 1');
-            const allCameraIds = new Set(enabledCameras.map((c) => c.id));
-
-            try {
-                await fsPromises.access(RECORDINGS_BASE_PATH);
-                const dirs = await fsPromises.readdir(RECORDINGS_BASE_PATH);
-                for (const d of dirs) {
-                    const match = d.match(/camera(\d+)/);
-                    if (match) allCameraIds.add(parseInt(match[1], 10));
-                }
-            } catch { /* recordings dir missing — OK */ }
-
-            console.log(`[Cleanup] Running scheduled cleanup for ${allCameraIds.size} cameras...`);
-            for (const cameraId of allCameraIds) {
-                await this.cleanupOldSegments(cameraId);
-            }
-
-            await this.emergencyDiskSpaceCheck();
-            console.log('[Cleanup] Scheduled cleanup complete');
-        } catch (error) {
-            console.error('[Cleanup] Scheduled cleanup error:', error);
-        }
     }
 
     /**
@@ -758,56 +490,15 @@ class RecordingService {
 
 
     getEmergencyDiskService() {
-        if (!this.emergencyDiskService) {
-            this.emergencyDiskService = createRecordingEmergencyDiskService({
-                recordingsBasePath: RECORDINGS_BASE_PATH,
-                cleanupService,
-                diskSpaceService: recordingDiskSpaceService,
-                fs: fsPromises,
-                safeDelete: recordingFileOperationService.deleteFileSafely,
-                getCameraRetentionHours: (cameraId) => {
-                    const camera = queryOne('SELECT recording_duration_hours FROM cameras WHERE id = ?', [cameraId]);
-                    return camera?.recording_duration_hours;
-                },
-                onRecoverOrphan: ({ cameraId, filename }) => this.onSegmentCreated(cameraId, filename),
-                logger: console,
-            });
-        }
-
-        return this.emergencyDiskService;
+        return this.maintenanceCoordinator.getEmergencyDiskService();
     }
 
-    /**
-     * Emergency disk space check
-     * If available space is below 1GB, aggressively delete oldest files
-     */
     async emergencyDiskSpaceCheck() {
-        return this.getEmergencyDiskService().runEmergencyCheck();
+        return this.maintenanceCoordinator.runEmergencyDiskCheck();
     }
 
-    /**
-     * Auto-start recordings on service init.
-     * Delegates to the lifecycle reconciler so policy (offline suspension, cooldown,
-     * delivery type, eligibility) lives in one place. The periodic reconciler will
-     * retry every 60s for cameras that failed first attempt. Offline cameras are
-     * pre-marked as suspended so the assurance UI reflects state immediately.
-     */
     async autoStartRecordings() {
-        try {
-            const offlineCameras = query(
-                'SELECT id FROM cameras WHERE enable_recording = 1 AND enabled = 1 AND COALESCE(is_online, 1) != 1'
-            );
-            for (const camera of offlineCameras) {
-                this.suspendRecordingForOffline(camera.id);
-            }
-
-            const result = await this.reconcileRecordingLifecycleAll('auto_start');
-            const started = result.results.filter((r) => r.action === 'start' && r.success).length;
-            const skipped = result.results.length - started;
-            console.log(`[Recording] Auto-start complete: ${started} started, ${skipped} skipped (offline/cooldown/disabled)`);
-        } catch (error) {
-            console.error('[Recording] Error in auto-starting recordings:', error);
-        }
+        return this.autoStarter.autoStart();
     }
 }
 
