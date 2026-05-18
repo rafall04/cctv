@@ -16,6 +16,10 @@ SideEffects: Documentation only.
 
 **Tech Stack:** Node.js 20 ES modules, Fastify service layer, better-sqlite3 migrations, Vitest.
 
+**Implementation Status:** Completed on 2026-05-18. Verified with `git diff --check`, `npm test`, and `npm run migrate`.
+
+**DB Cost Note:** The repair migration performs a one-time `recording_segments` scan with guarded file stat checks and updates only strongly evidenced rows; it adds no runtime query path or recurring lock pressure.
+
 ---
 
 ## File Structure
@@ -38,21 +42,21 @@ SideEffects: Documentation only.
 - Modify: `backend/__tests__/recordingRetentionPolicy.test.js`
 - Modify: `backend/__tests__/recordingSegmentFilePolicy.test.js`
 
-- [ ] **Step 1: Add failing tests**
+- [x] **Step 1: Add failing tests**
 
 Add tests proving `20260518_170000.mp4` in `Asia/Jakarta` resolves to `2026-05-18T10:00:00.000Z`, and retention can delete it after one hour plus grace.
 
-- [ ] **Step 2: Run tests to verify failure**
+- [x] **Step 2: Run tests to verify failure**
 
 Run: `npm test -- recordingRetentionPolicy.test.js recordingSegmentFilePolicy.test.js`
 
 Expected: FAIL because filename parsing currently treats the timestamp as UTC.
 
-- [ ] **Step 3: Implement minimal timezone parser**
+- [x] **Step 3: Implement minimal timezone parser**
 
 Update `recordingTimePolicy.js` to convert filename local date parts through `Intl.DateTimeFormat(..., { timeZone })`, defaulting to the configured timezone.
 
-- [ ] **Step 4: Run tests to verify pass**
+- [x] **Step 4: Run tests to verify pass**
 
 Run: `npm test -- recordingRetentionPolicy.test.js recordingSegmentFilePolicy.test.js`
 
@@ -67,21 +71,21 @@ Expected: PASS.
 - Test: `backend/__tests__/recordingProcessManager.test.js`
 - Test: `backend/__tests__/recordingProcessTimePolicy.test.js`
 
-- [ ] **Step 1: Add failing tests**
+- [x] **Step 1: Add failing tests**
 
 Assert the process-time policy sets `TZ` to the configured recording timezone and `RecordingProcessManager.start()` forwards spawn options to `spawn`.
 
-- [ ] **Step 2: Run tests to verify failure**
+- [x] **Step 2: Run tests to verify failure**
 
 Run: `npm test -- recordingProcessManager.test.js recordingProcessTimePolicy.test.js`
 
 Expected: FAIL because spawn options and the new policy do not exist yet.
 
-- [ ] **Step 3: Implement minimal process-time policy**
+- [x] **Step 3: Implement minimal process-time policy**
 
 Create a small helper that returns `{ ...baseEnv, TZ: timezone }`; wire `recordingService.startRecording()` to pass it into `recordingProcessManager.start()`.
 
-- [ ] **Step 4: Run tests to verify pass**
+- [x] **Step 4: Run tests to verify pass**
 
 Run: `npm test -- recordingProcessManager.test.js recordingProcessTimePolicy.test.js`
 
@@ -94,25 +98,25 @@ Expected: PASS.
 - Modify: `backend/services/recordingService.js`
 - Test: `backend/__tests__/recordingCleanupService.test.js`
 
-- [ ] **Step 1: Add failing emergency test**
+- [x] **Step 1: Add failing emergency test**
 
 Add a test where free disk is below target, the oldest registered segment is still inside retention, and `allowRetentionBypass: true` deletes it through `safeDelete`.
 
-- [ ] **Step 2: Run test to verify failure**
+- [x] **Step 2: Run test to verify failure**
 
 Run: `npm test -- recordingCleanupService.test.js`
 
 Expected: FAIL because current emergency cleanup skips not-expired files.
 
-- [ ] **Step 3: Implement minimal bypass**
+- [x] **Step 3: Implement minimal bypass**
 
 In `emergencyCleanup()`, keep unsafe filenames blocked, but allow DB-registered segment deletion before retention only when `allowRetentionBypass` is true. Use reason `emergency_disk_cleanup_retention_bypass`.
 
-- [ ] **Step 4: Wire emergency mode**
+- [x] **Step 4: Wire emergency mode**
 
 Pass `allowRetentionBypass: true` from `recordingService.emergencyDiskSpaceCheck()`.
 
-- [ ] **Step 5: Run test to verify pass**
+- [x] **Step 5: Run test to verify pass**
 
 Run: `npm test -- recordingCleanupService.test.js`
 
@@ -123,11 +127,11 @@ Expected: PASS.
 **Files:**
 - Create: `backend/database/migrations/zz_20260518_repair_recording_segment_timezone.js`
 
-- [ ] **Step 1: Add migration script**
+- [x] **Step 1: Add migration script**
 
 Repair rows only when the filename parsed in configured timezone is closer to actual file mtime than the existing DB timestamp, or when the existing DB timestamp is more than one hour in the future and the repaired timestamp is not.
 
-- [ ] **Step 2: Run migration**
+- [x] **Step 2: Run migration**
 
 Run: `npm run migrate`
 
@@ -138,23 +142,23 @@ Expected: migration completes and logs how many rows were repaired.
 **Files:**
 - Modify: `backend/services/.module_map.md`
 
-- [ ] **Step 1: Sync module map**
+- [x] **Step 1: Sync module map**
 
 Document that recording filename timestamps are app-timezone local labels converted to UTC ISO in DB, and emergency DB-segment cleanup can bypass retention under low disk pressure.
 
-- [ ] **Step 2: Run focused recording verification**
+- [x] **Step 2: Run focused recording verification**
 
 Run: `npm test -- recordingRetentionPolicy.test.js recordingSegmentFilePolicy.test.js recordingProcessTimePolicy.test.js recordingProcessManager.test.js recordingCleanupService.test.js recordingService.test.js recordingSegmentRepository.test.js recordingPlaybackService.test.js`
 
 Expected: PASS.
 
-- [ ] **Step 3: Run full backend gate**
+- [x] **Step 3: Run full backend gate**
 
 Run: `npm run migrate && npm test`
 
 Expected: PASS.
 
-- [ ] **Step 4: Commit and push**
+- [x] **Step 4: Commit and push**
 
 Run:
 
