@@ -343,6 +343,7 @@ export function createRecordingCleanupService({
         batchLimit = 200,
         nowMs = Date.now(),
         getCameraRetentionHours = () => null,
+        allowRetentionBypass = false,
     }) {
         const result = createEmptyResult();
         let cursor = null;
@@ -391,7 +392,8 @@ export function createRecordingCleanupService({
                     retentionWindow,
                     nowMs,
                 });
-                if (!deletePolicy.allowed) {
+                let deleteReason = 'emergency_disk_cleanup';
+                if (!deletePolicy.allowed && (!allowRetentionBypass || deletePolicy.reason === 'unsafe_filename')) {
                     result.processingSkipped++;
                     logger.log?.(`[Cleanup] Keeping emergency candidate: camera${segment.camera_id}/${describeRecordingRetentionDecision({
                         filename: segment.filename,
@@ -399,12 +401,19 @@ export function createRecordingCleanupService({
                     })}`);
                     continue;
                 }
+                if (!deletePolicy.allowed && allowRetentionBypass) {
+                    deleteReason = 'emergency_disk_cleanup_retention_bypass';
+                    logger.warn?.(`[Cleanup] Emergency retention bypass: camera${segment.camera_id}/${describeRecordingRetentionDecision({
+                        filename: segment.filename,
+                        decision: deletePolicy,
+                    })}`);
+                }
 
                 const deleteResult = await safeDelete({
                     cameraId: segment.camera_id,
                     filename: segment.filename,
                     filePath: segment.file_path,
-                    reason: 'emergency_disk_cleanup',
+                    reason: deleteReason,
                 });
 
                 if (!deleteResult.success) {

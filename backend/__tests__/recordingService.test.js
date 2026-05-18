@@ -215,9 +215,15 @@ describe('recordingService external recording support', () => {
         await recordingService.startRecording(33);
 
         expect(mkdirSyncMock).toHaveBeenCalledWith(join(recordingsBasePath, 'camera33', 'pending'), { recursive: true });
-        expect(spawnMock).toHaveBeenCalledWith('ffmpeg', expect.arrayContaining([
-            join(recordingsBasePath, 'camera33', 'pending', '%Y%m%d_%H%M%S.mp4.partial'),
-        ]));
+        expect(spawnMock).toHaveBeenCalledWith(
+            'ffmpeg',
+            expect.arrayContaining([
+                join(recordingsBasePath, 'camera33', 'pending', '%Y%m%d_%H%M%S.mp4.partial'),
+            ]),
+            expect.objectContaining({
+                env: expect.objectContaining({ TZ: 'Asia/Jakarta' }),
+            })
+        );
     });
 
     it('delegates partial segment closing to the finalizer', async () => {

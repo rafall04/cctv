@@ -43,8 +43,8 @@ export function computeRetentionWindow({ retentionHours, nowMs = Date.now() }) {
     };
 }
 
-export function parseSegmentFilenameTimeMs(filename) {
-    return parseRecordingFilenameTimestampMs(filename);
+export function parseSegmentFilenameTimeMs(filename, timezone = undefined) {
+    return parseRecordingFilenameTimestampMs(filename, timezone);
 }
 
 export function isSafeRecordingFilename(filename) {

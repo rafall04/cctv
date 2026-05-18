@@ -53,7 +53,7 @@ export function toFinalSegmentFilename(filename) {
     return parsed?.finalFilename ?? null;
 }
 
-export function parseSegmentFilename(filename) {
+export function parseSegmentFilename(filename, timezone = undefined) {
     const text = String(filename || '');
     if (text.includes('/') || text.includes('\\')) {
         return null;
@@ -66,7 +66,7 @@ export function parseSegmentFilename(filename) {
 
     const [, year, month, day, hour, minute, second] = match;
     const finalFilename = `${year}${month}${day}_${hour}${minute}${second}.mp4`;
-    const timestampMs = parseRecordingFilenameTimestampMs(finalFilename);
+    const timestampMs = parseRecordingFilenameTimestampMs(finalFilename, timezone);
     if (!Number.isFinite(timestampMs)) {
         return null;
     }

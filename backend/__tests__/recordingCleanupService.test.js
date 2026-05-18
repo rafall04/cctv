@@ -311,6 +311,39 @@ describe('recordingCleanupService', () => {
         expect(result.deleted).toBe(0);
     });
 
+    it('deletes recent registered segments when emergency retention bypass is enabled', async () => {
+        repositoryMock.findOldestSegmentsForEmergency = vi.fn()
+            .mockReturnValueOnce([
+                {
+                    id: 10,
+                    camera_id: 7,
+                    filename: '20260502_095800.mp4',
+                    start_time: '2026-05-02T09:58:00.000Z',
+                    file_path: join(recordingsBasePath, 'camera7', '20260502_095800.mp4'),
+                },
+            ])
+            .mockReturnValueOnce([]);
+        fsMock.stat.mockResolvedValue({ size: 4096, mtimeMs: Date.parse('2026-05-02T09:59:00.000Z') });
+
+        const service = createService();
+        const result = await service.emergencyCleanup({
+            freeBytes: 100,
+            targetFreeBytes: 2000,
+            nowMs: Date.parse('2026-05-02T10:00:00.000Z'),
+            getCameraRetentionHours: () => 5,
+            allowRetentionBypass: true,
+        });
+
+        expect(safeDeleteMock).toHaveBeenCalledWith({
+            cameraId: 7,
+            filename: '20260502_095800.mp4',
+            filePath: join(recordingsBasePath, 'camera7', '20260502_095800.mp4'),
+            reason: 'emergency_disk_cleanup_retention_bypass',
+        });
+        expect(repositoryMock.deleteSegmentById).toHaveBeenCalledWith(10);
+        expect(result.deleted).toBe(1);
+    });
+
     it('retains pending partial recovery files inside retention grace', async () => {
         fsMock.readdir.mockImplementation(async (targetPath) => {
             if (targetPath.endsWith('camera7')) return ['pending'];

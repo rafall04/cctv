@@ -31,13 +31,20 @@ describe('recordingSegmentFilePolicy', () => {
     it('parses timestamps from final and partial names into the same final filename', () => {
         expect(parseSegmentFilename('20260511_211000.mp4')).toMatchObject({
             finalFilename: '20260511_211000.mp4',
-            timestampIso: '2026-05-11T21:10:00.000Z',
+            timestampIso: '2026-05-11T14:10:00.000Z',
         });
         expect(parseSegmentFilename('20260511_211000.mp4.partial')).toMatchObject({
             finalFilename: '20260511_211000.mp4',
-            timestampIso: '2026-05-11T21:10:00.000Z',
+            timestampIso: '2026-05-11T14:10:00.000Z',
         });
         expect(toFinalSegmentFilename('20260511_211000.mp4.partial')).toBe('20260511_211000.mp4');
+    });
+
+    it('parses segment timestamps with the configured app timezone', () => {
+        expect(parseSegmentFilename('20260518_170000.mp4', 'Asia/Jakarta')).toMatchObject({
+            finalFilename: '20260518_170000.mp4',
+            timestampIso: '2026-05-18T10:00:00.000Z',
+        });
     });
 
     it('builds stable pending and final paths under the camera directory', () => {

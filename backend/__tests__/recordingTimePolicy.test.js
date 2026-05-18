@@ -1,9 +1,9 @@
 /**
- * Purpose: Validate one UTC-first recording timestamp and age policy.
+ * Purpose: Validate app-timezone-to-UTC recording timestamp and age policy.
  * Caller: Vitest backend test suite.
  * Deps: recordingTimePolicy.
  * MainFuncs: parseRecordingFilenameTimestampMs, parseRecordingDateMs, getRecordingAgeMs.
- * SideEffects: None.
+ * SideEffects: Reads configured timezone through recordingTimePolicy.
  */
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
@@ -14,9 +14,10 @@ import {
 } from '../services/recordingTimePolicy.js';
 
 describe('recordingTimePolicy', () => {
-    it('parses segment filenames as UTC timestamps', () => {
-        expect(parseRecordingFilenameTimestampMs('20260517_010203.mp4')).toBe(Date.UTC(2026, 4, 17, 1, 2, 3));
-        expect(parseRecordingFilenameTimestampMs('20260517_010203.mp4.partial')).toBe(Date.UTC(2026, 4, 17, 1, 2, 3));
+    it('parses segment filenames in the configured app timezone', () => {
+        expect(parseRecordingFilenameTimestampMs('20260517_010203.mp4')).toBe(Date.parse('2026-05-16T18:02:03.000Z'));
+        expect(parseRecordingFilenameTimestampMs('20260517_010203.mp4.partial')).toBe(Date.parse('2026-05-16T18:02:03.000Z'));
+        expect(parseRecordingFilenameTimestampMs('20260517_010203.mp4', 'UTC')).toBe(Date.UTC(2026, 4, 17, 1, 2, 3));
         expect(parseRecordingFilenameTimestampMs('../20260517_010203.mp4')).toBe(null);
     });
 

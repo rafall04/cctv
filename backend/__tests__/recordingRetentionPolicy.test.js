@@ -43,9 +43,15 @@ describe('recordingRetentionPolicy', () => {
         expect(result.retentionMs).toBe(5 * 60 * 60 * 1000);
     });
 
-    it('parses segment filenames deterministically as UTC timestamps', () => {
-        expect(parseSegmentFilenameTimeMs('20260502_174501.mp4')).toBe(
+    it('can parse segment filenames explicitly as UTC timestamps', () => {
+        expect(parseSegmentFilenameTimeMs('20260502_174501.mp4', 'UTC')).toBe(
             Date.UTC(2026, 4, 2, 17, 45, 1)
+        );
+    });
+
+    it('parses recording filenames in the configured app timezone', () => {
+        expect(parseSegmentFilenameTimeMs('20260518_170000.mp4', 'Asia/Jakarta')).toBe(
+            Date.parse('2026-05-18T10:00:00.000Z')
         );
     });
 
@@ -110,6 +116,23 @@ describe('recordingRetentionPolicy', () => {
 
         expect(result.allowed).toBe(true);
         expect(result.reason).toBe('retention_expired');
+    });
+
+    it('expires app-timezone filenames at the intended wall-clock retention boundary', () => {
+        const nowMs = Date.parse('2026-05-18T11:11:00.000Z');
+        const retentionWindow = computeRetentionWindow({ retentionHours: 1, nowMs });
+
+        const result = canDeleteRecordingFile({
+            filename: '20260518_170000.mp4',
+            fileMtimeMs: Date.parse('2026-05-18T10:00:00.000Z'),
+            retentionWindow,
+            nowMs,
+        });
+
+        expect(result).toMatchObject({
+            allowed: true,
+            reason: 'retention_expired',
+        });
     });
 
     it('allows deleting pending partial files only after retention plus grace', () => {

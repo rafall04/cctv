@@ -18,12 +18,12 @@ export class RecordingProcessManager {
         this.callbacks = new Map();
     }
 
-    async start(cameraId, { ffmpegArgs, camera, streamSource, onStdout, onStderr, onClose, onError }) {
+    async start(cameraId, { ffmpegArgs, camera, streamSource, spawnOptions, onStdout, onStderr, onClose, onError }) {
         if (this.state.has(cameraId)) {
             return { success: false, message: 'Already recording' };
         }
 
-        const child = spawn(this.binary, ffmpegArgs);
+        const child = spawn(this.binary, ffmpegArgs, spawnOptions);
         this.state.setActive(cameraId, { process: child, camera, streamSource });
         this.outputBuffers.set(cameraId, []);
         this.callbacks.set(cameraId, { onStdout, onStderr, onClose, onError });

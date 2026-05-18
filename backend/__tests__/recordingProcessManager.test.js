@@ -1,3 +1,10 @@
+/**
+ * Purpose: Verify FFmpeg recording process lifecycle and spawn configuration.
+ * Caller: Vitest backend test suite.
+ * Deps: mocked child_process spawn and recordingProcessManager.
+ * MainFuncs: RecordingProcessManager.start, stop, restart, shutdownAll.
+ * SideEffects: Child process spawning is mocked.
+ */
 import { EventEmitter } from 'events';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -112,5 +119,23 @@ describe('RecordingProcessManager', () => {
 
         await expect(shutdownPromise).resolves.toHaveLength(2);
         expect(manager.getActiveCameraIds()).toEqual([]);
+    });
+
+    it('passes explicit spawn options to FFmpeg', async () => {
+        const child = createProcess(777);
+        spawnMock.mockReturnValue(child);
+        const { RecordingProcessManager } = await import('../services/recordingProcessManager.js');
+        const manager = new RecordingProcessManager();
+
+        await manager.start(7, {
+            ffmpegArgs: ['-i', 'rtsp://camera'],
+            camera: { id: 7 },
+            streamSource: 'internal',
+            spawnOptions: { env: { TZ: 'Asia/Jakarta' } },
+        });
+
+        expect(spawnMock).toHaveBeenCalledWith('ffmpeg', ['-i', 'rtsp://camera'], {
+            env: { TZ: 'Asia/Jakarta' },
+        });
     });
 });

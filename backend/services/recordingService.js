@@ -21,6 +21,7 @@ import recordingSegmentRepository from './recordingSegmentRepository.js';
 import recordingSegmentFinalizer from './recordingSegmentFinalizer.js';
 import recordingRecoveryService from './recordingRecoveryService.js';
 import recordingFileOperationService from './recordingFileOperationService.js';
+import { buildRecordingProcessEnv, getRecordingProcessTimezone } from './recordingProcessTimePolicy.js';
 import { createRecordingRecoveryScanner } from './recordingRecoveryScanner.js';
 import { createRecordingLifecycleReconciler } from './recordingLifecycleReconciler.js';
 import {
@@ -501,11 +502,16 @@ class RecordingService {
             });
 
             console.log(`FFmpeg recording: stream copy with web-compatible MP4 (0% CPU overhead)`);
+            const recordingTimezone = getRecordingProcessTimezone();
+            console.log(`[Recording] Segment filename timezone: ${recordingTimezone}`);
 
             const startResult = await recordingProcessManager.start(cameraId, {
                 ffmpegArgs,
                 camera,
                 streamSource: sourceConfig.streamSource,
+                spawnOptions: {
+                    env: buildRecordingProcessEnv(process.env, recordingTimezone),
+                },
                 onStdout: () => this.updateRecordingDataTime(cameraId),
                 onStderr: (output) => this.handleRecordingStderr(cameraId, output),
                 onError: (error) => {
@@ -1207,6 +1213,7 @@ class RecordingService {
                 freeBytes,
                 targetFreeBytes: 2 * 1024 * 1024 * 1024,
                 batchLimit: 200,
+                allowRetentionBypass: true,
                 getCameraRetentionHours: (cameraId) => {
                     const camera = queryOne('SELECT recording_duration_hours FROM cameras WHERE id = ?', [cameraId]);
                     return camera?.recording_duration_hours;
