@@ -33,22 +33,13 @@ import {
     toFinalSegmentFilename,
 } from './recordingSegmentFilePolicy.js';
 import { RECORDINGS_BASE_PATH } from './recordingPaths.js';
+import { createRecordingHealthMonitor, computeCooldownMs } from './recordingHealthMonitor.js';
 import {
-    RECORDING_HEALTH_TICK_INTERVAL_MS,
-    RECORDING_HEALTH_TIMEOUT_INTERNAL_MS,
-    RECORDING_HEALTH_TIMEOUT_TUNNEL_MS,
     RECORDING_LIFECYCLE_RECONCILE_INTERVAL_MS,
-    RECORDING_OFFLINE_COOLDOWN_MS,
-    RECORDING_RETRY_BASE_COOLDOWN_MS,
-    RECORDING_RETRY_MAX_COOLDOWN_MS,
-    RECORDING_FAILURE_SUSPEND_THRESHOLD,
     RECORDING_SCHEDULED_CLEANUP_INITIAL_DELAY_MS as SCHEDULED_CLEANUP_INITIAL_DELAY_MS,
     RECORDING_SCHEDULED_CLEANUP_INTERVAL_MS as SCHEDULED_CLEANUP_INTERVAL_MS,
 } from './recordingIntervalsPolicy.js';
 const execPromise = promisify(exec);
-
-// Stream health monitoring
-const streamHealthMap = new Map();
 
 const cleanupService = createRecordingCleanupService({
     repository: recordingSegmentRepository,
@@ -66,17 +57,8 @@ const cleanupService = createRecordingCleanupService({
 
 const EXTERNAL_RECORDING_PROTOCOL_WHITELIST = 'file,http,https,tcp,tls,crypto';
 
-export function computeRecordingCooldownMs(consecutiveFailureCount = 0) {
-    if (consecutiveFailureCount <= 1) {
-        return RECORDING_RETRY_BASE_COOLDOWN_MS;
-    }
-
-    const exponent = Math.max(0, consecutiveFailureCount - 1);
-    return Math.min(
-        RECORDING_RETRY_BASE_COOLDOWN_MS * (2 ** exponent),
-        RECORDING_RETRY_MAX_COOLDOWN_MS
-    );
-}
+// Re-export for callers/tests that imported the cooldown helper from the facade.
+export const computeRecordingCooldownMs = computeCooldownMs;
 
 export function maskRecordingSourceForLog(sourceUrl) {
     if (!sourceUrl) return '';
@@ -227,116 +209,38 @@ class RecordingService {
             logger: console,
         });
 
-        // Start health monitoring
-        this.startHealthMonitoring();
+        this.healthMonitor = createRecordingHealthMonitor({
+            processManager: recordingProcessManager,
+            queryOne,
+            startRecording: (cameraId) => this.startRecording(cameraId),
+            stopRecording: (cameraId, opts) => this.stopRecording(cameraId, opts),
+            restartRecording: (cameraId, reason) => this.restartRecording(cameraId, reason),
+            isShuttingDown: () => this.isShuttingDown,
+            logger: console,
+        });
+        this.healthMonitor.start();
     }
 
-    ensureRuntimeHealthState(cameraId) {
-        const existingState = streamHealthMap.get(cameraId);
-        if (existingState) {
-            return existingState;
-        }
-
-        const nextState = {
-            lastDataTime: Date.now(),
-            restartCount: 0,
-            consecutiveFailureCount: 0,
-            cooldownUntil: 0,
-            suspendedReason: null,
-            lastRestartAt: null,
-            inFlightAction: false,
-        };
-
-        streamHealthMap.set(cameraId, nextState);
-        return nextState;
+    // Thin wrappers preserve the historical facade API used by tests and by
+    // the lifecycle reconciler. All state lives in this.healthMonitor.
+    ensureRuntimeHealthState(cameraId) { return this.healthMonitor.ensureState(cameraId); }
+    clearRuntimeHealthState(cameraId) { this.healthMonitor.clearState(cameraId); }
+    markRecordingRecovered(cameraId, now = Date.now()) { return this.healthMonitor.markRecovered(cameraId, now); }
+    markRecordingFailure(cameraId, reason, now = Date.now()) { return this.healthMonitor.markFailure(cameraId, reason, now); }
+    suspendRecordingForOffline(cameraId, now = Date.now()) { return this.healthMonitor.suspendOffline(cameraId, now); }
+    async attemptRecordingRecovery(cameraId, reason, now = Date.now()) {
+        return this.healthMonitor.attemptRecovery(cameraId, reason, now);
     }
-
-    clearRuntimeHealthState(cameraId) {
-        streamHealthMap.delete(cameraId);
-    }
-
-    markRecordingRecovered(cameraId, now = Date.now()) {
-        const health = this.ensureRuntimeHealthState(cameraId);
-        health.lastDataTime = now;
-        health.consecutiveFailureCount = 0;
-        health.cooldownUntil = 0;
-        health.suspendedReason = null;
-        health.inFlightAction = false;
-        return health;
-    }
-
-    markRecordingFailure(cameraId, reason = 'process_crashed', now = Date.now()) {
-        const health = this.ensureRuntimeHealthState(cameraId);
-        health.consecutiveFailureCount += 1;
-        health.lastRestartAt = now;
-        health.inFlightAction = false;
-
-        const cooldownMs = computeRecordingCooldownMs(health.consecutiveFailureCount);
-        health.cooldownUntil = now + cooldownMs;
-        health.suspendedReason = health.consecutiveFailureCount >= RECORDING_FAILURE_SUSPEND_THRESHOLD
-            ? 'waiting_retry'
-            : reason;
-
-        return health;
-    }
-
-    suspendRecordingForOffline(cameraId, now = Date.now()) {
-        const health = this.ensureRuntimeHealthState(cameraId);
-        health.cooldownUntil = Math.max(health.cooldownUntil || 0, now + RECORDING_OFFLINE_COOLDOWN_MS);
-        health.suspendedReason = 'camera_offline';
-        health.inFlightAction = false;
-        return health;
-    }
-
-    async attemptRecordingRecovery(cameraId, reason = 'waiting_retry', now = Date.now()) {
-        const health = this.ensureRuntimeHealthState(cameraId);
-        if (health.inFlightAction || now < (health.cooldownUntil || 0)) {
-            return { success: false, skipped: true, reason: 'cooldown_active' };
-        }
-
-        health.inFlightAction = true;
-
-        try {
-            const result = await this.startRecording(cameraId);
-            if (result.success) {
-                this.markRecordingRecovered(cameraId, now);
-            } else {
-                this.markRecordingFailure(cameraId, reason, now);
-            }
-            return result;
-        } finally {
-            const latestHealth = streamHealthMap.get(cameraId);
-            if (latestHealth) {
-                latestHealth.inFlightAction = false;
-            }
-        }
-    }
-
     async handleCameraBecameOffline(cameraId, now = Date.now()) {
-        this.suspendRecordingForOffline(cameraId, now);
-
-        if (recordingProcessManager.getStatus(cameraId).status !== 'stopped') {
-            await this.stopRecording(cameraId, { removeHealthState: false, reason: 'camera_offline' });
-        }
-
+        await this.healthMonitor.handleCameraBecameOffline(cameraId, now);
         return this.getRecordingStatus(cameraId);
     }
-
-    async handleCameraBecameOnline(cameraId, now = Date.now(), { clearCooldown = true } = {}) {
-        if (recordingProcessManager.getStatus(cameraId).status !== 'stopped') {
-            return this.getRecordingStatus(cameraId);
-        }
-
-        const health = this.ensureRuntimeHealthState(cameraId);
-        if (!health.suspendedReason) {
-            health.suspendedReason = 'waiting_retry';
-        }
-        if (clearCooldown) {
-            health.cooldownUntil = 0;
-        }
-
-        return this.attemptRecordingRecovery(cameraId, health.suspendedReason, now);
+    async handleCameraBecameOnline(cameraId, now = Date.now(), opts = {}) {
+        const result = await this.healthMonitor.handleCameraBecameOnline(cameraId, now, opts);
+        return result ?? this.getRecordingStatus(cameraId);
     }
+    async tickHealthMonitoring(now = Date.now()) { return this.healthMonitor.tick(now); }
+    updateRecordingDataTime(cameraId) { this.healthMonitor.updateLastDataAt(cameraId); }
 
     /**
      * Start recording untuk camera
@@ -496,13 +400,6 @@ class RecordingService {
         return result;
     }
 
-    updateRecordingDataTime(cameraId) {
-        const health = streamHealthMap.get(cameraId);
-        if (health) {
-            health.lastDataTime = Date.now();
-        }
-    }
-
     handleRecordingStderr(cameraId, output) {
         this.updateRecordingDataTime(cameraId);
 
@@ -614,89 +511,6 @@ class RecordingService {
         }
     }
 
-    /**
-     * Health monitoring - check stream health setiap 5 detik
-     */
-    startHealthMonitoring() {
-        setInterval(() => {
-            this.tickHealthMonitoring().catch((error) => {
-                console.error('[Recording Health] Error during monitor tick:', error);
-            });
-        }, RECORDING_HEALTH_TICK_INTERVAL_MS);
-    }
-
-    async tickHealthMonitoring(now = Date.now()) {
-        if (this.isShuttingDown) {
-            return;
-        }
-
-        for (const [cameraId, health] of streamHealthMap.entries()) {
-            const camera = queryOne(
-                'SELECT is_tunnel, is_online, enabled, enable_recording, recording_status FROM cameras WHERE id = ?',
-                [cameraId]
-            );
-
-            if (!camera) {
-                this.clearRuntimeHealthState(cameraId);
-                continue;
-            }
-
-            if (!camera.enabled || !camera.enable_recording) {
-                if (recordingProcessManager.getStatus(cameraId).status === 'stopped') {
-                    this.clearRuntimeHealthState(cameraId);
-                }
-                continue;
-            }
-
-            const activeRecording = recordingProcessManager.getStatus(cameraId);
-            if (activeRecording.status === 'stopped') {
-                if (camera.is_online === 1 && health.suspendedReason && now >= (health.cooldownUntil || 0)) {
-                    await this.attemptRecordingRecovery(cameraId, health.suspendedReason, now);
-                } else if (camera.is_online !== 1) {
-                    this.suspendRecordingForOffline(cameraId, now);
-                }
-                continue;
-            }
-
-            if (health.inFlightAction) {
-                continue;
-            }
-
-            const timeout = camera.is_tunnel === 1
-                ? RECORDING_HEALTH_TIMEOUT_TUNNEL_MS
-                : RECORDING_HEALTH_TIMEOUT_INTERNAL_MS;
-            const timeSinceData = now - health.lastDataTime;
-            if (timeSinceData <= timeout) {
-                continue;
-            }
-
-            if (camera.is_online !== 1) {
-                console.log(`[Recording Health] Camera ${cameraId} confirmed offline, suspending recording recovery`);
-                this.suspendRecordingForOffline(cameraId, now);
-                await this.stopRecording(cameraId, { removeHealthState: false });
-                continue;
-            }
-
-            if (now < (health.cooldownUntil || 0)) {
-                continue;
-            }
-
-            console.log(`⚠️ Camera ${cameraId} stream frozen (${timeSinceData}ms), restarting...`);
-            health.restartCount += 1;
-            health.lastRestartAt = now;
-            health.inFlightAction = true;
-
-            try {
-                await this.restartRecording(cameraId, 'stream_frozen');
-            } finally {
-                const latestHealth = streamHealthMap.get(cameraId);
-                if (latestHealth) {
-                    latestHealth.inFlightAction = false;
-                }
-            }
-        }
-    }
-
     async reconcileRecordingLifecycle(cameraId, reason = 'manual', now = Date.now()) {
         return this.lifecycleReconciler.reconcileCamera(cameraId, reason, now);
     }
@@ -707,6 +521,7 @@ class RecordingService {
 
     async shutdown() {
         this.isShuttingDown = true;
+        this.healthMonitor?.stop();
         this.scheduler?.stop();
         const results = await recordingProcessManager.shutdownAll('server_shutdown');
         await recordingRecoveryService.drain(30000);
@@ -888,7 +703,7 @@ class RecordingService {
      */
     getRecordingStatus(cameraId) {
         const recording = recordingProcessManager.getStatus(cameraId);
-        const health = streamHealthMap.get(cameraId);
+        const health = this.healthMonitor.getState(cameraId);
 
         if (recording.status === 'stopped') {
             if (health?.suspendedReason) {

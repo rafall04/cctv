@@ -458,7 +458,7 @@ describe('recordingService external recording support', () => {
         expect(recordingService.getRecordingStatus(13).status).toBe('suspended_offline');
 
         onlineState = 1;
-        const recoverySpy = vi.spyOn(recordingService, 'attemptRecordingRecovery');
+        const recoverySpy = vi.spyOn(recordingService.healthMonitor, 'attemptRecovery');
 
         await recordingService.tickHealthMonitoring(Date.now() + 1000);
         expect(recoverySpy).not.toHaveBeenCalled();
