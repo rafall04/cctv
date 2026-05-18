@@ -14,16 +14,12 @@ import { logAdminAction } from './securityAuditLogger.js';
 import settingsService from './settingsService.js';
 import playbackTokenService from './playbackTokenService.js';
 import { existsSync, statSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
 import { isSafeRecordingFilePath } from './recordingPathSafetyPolicy.js';
+import { RECORDINGS_BASE_PATH } from './recordingPaths.js';
 
 const PUBLIC_PLAYBACK_MODES = new Set(['inherit', 'disabled', 'preview_only', 'admin_only']);
 const VALID_PREVIEW_MINUTES = new Set([0, 10, 20, 30, 60]);
 const RECORDABLE_DELIVERY_TYPES = new Set(['internal_hls', 'external_hls']);
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const RECORDINGS_BASE_PATH = join(__dirname, '..', '..', 'recordings');
 
 function normalizePublicPlaybackMode(value) {
     return PUBLIC_PLAYBACK_MODES.has(value) ? value : 'inherit';

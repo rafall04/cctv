@@ -706,12 +706,7 @@ describe('recordingService external recording support', () => {
         finalizerMock.finalizeSegment.mockResolvedValue({ success: false, reason: 'invalid_duration' });
         const { recordingService } = await import('../services/recordingService.js');
 
-        queryOneMock.mockImplementation((sql) => {
-            if (sql.includes('SELECT fail_count FROM failed_remux_files')) {
-                return null;
-            }
-            return null;
-        });
+        queryOneMock.mockReturnValue(null);
 
         recordingService.onSegmentCreated(3, '20260502_000000.mp4');
         await Promise.resolve();
@@ -728,7 +723,6 @@ describe('recordingService external recording support', () => {
         const { recordingService } = await import('../services/recordingService.js');
 
         expect(typeof recordingService.cleanupOldSegments).toBe('function');
-        expect(typeof recordingService.cleanupTempFiles).toBe('function');
         expect(typeof recordingService.startBackgroundCleanup).toBe('function');
         expect(typeof recordingService.startScheduledCleanup).toBe('function');
         expect(typeof recordingService.emergencyDiskSpaceCheck).toBe('function');
@@ -811,10 +805,7 @@ describe('recordingService external recording support', () => {
         const { recordingService } = await import('../services/recordingService.js');
         const recordingsBasePath = join(process.cwd(), '..', 'recordings');
 
-        queryOneMock.mockImplementation((sql) => {
-            if (sql.includes('SELECT fail_count FROM failed_remux_files')) return null;
-            return null;
-        });
+        queryOneMock.mockReturnValue(null);
 
         recordingService.onSegmentCreated(3, '20260502_095800.mp4');
         await Promise.resolve();
@@ -825,40 +816,6 @@ describe('recordingService external recording support', () => {
             filename: '20260502_095800.mp4',
             sourceType: 'final_orphan',
         }));
-    });
-
-    it('keeps recent failed-remux segments in place until retention expiry', async () => {
-        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-        const { join } = await import('path');
-        vi.setSystemTime(Date.parse('2026-05-02T10:00:00.000Z'));
-        const { recordingService } = await import('../services/recordingService.js');
-        const recordingsBasePath = join(process.cwd(), '..', 'recordings');
-
-        queryOneMock.mockImplementation((sql) => {
-            if (sql.includes('SELECT fail_count FROM failed_remux_files')) return { fail_count: 3 };
-            if (sql.includes('SELECT recording_duration_hours FROM cameras')) return { recording_duration_hours: 5 };
-            return null;
-        });
-        fsPromisesMock.stat.mockResolvedValue({
-            size: 512,
-            mtimeMs: Date.parse('2026-05-02T09:59:30.000Z'),
-        });
-        executeMock.mockClear();
-
-        recordingService.onSegmentCreated(3, '20260502_095800.mp4');
-        await Promise.resolve();
-        await Promise.resolve();
-
-        expect(fsPromisesMock.rename).not.toHaveBeenCalledWith(
-            join(recordingsBasePath, 'camera3', '20260502_095800.mp4'),
-            expect.stringContaining('.quarantine')
-        );
-        expect(fsPromisesMock.unlink).not.toHaveBeenCalledWith(join(recordingsBasePath, 'camera3', '20260502_095800.mp4'));
-        expect(executeMock).not.toHaveBeenCalledWith(
-            'DELETE FROM failed_remux_files WHERE camera_id = ? AND filename = ?',
-            [3, '20260502_095800.mp4']
-        );
-        expect(warnSpy).toHaveBeenCalledWith('[Segment] Keeping failed remux segment until retention expiry: camera3/20260502_095800.mp4');
     });
 
     it('does not keep local recording delete or quarantine helpers in the facade', async () => {
@@ -874,13 +831,7 @@ describe('recordingService external recording support', () => {
         finalizerMock.finalizeSegment.mockResolvedValue({ success: true });
         const { recordingService } = await import('../services/recordingService.js');
 
-        queryOneMock.mockImplementation((sql) => {
-            if (sql.includes('SELECT fail_count FROM failed_remux_files')) {
-                return null;
-            }
-
-            return null;
-        });
+        queryOneMock.mockReturnValue(null);
         recordingService.onSegmentCreated(5, '20260503_020000.mp4');
         recordingService.onSegmentCreated(5, '20260503_020000.mp4');
         await Promise.resolve();

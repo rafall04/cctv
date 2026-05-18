@@ -4,11 +4,9 @@
 // MainFuncs: startRecording, stopRecording, restartRecording, shutdown, getRecordingStatus, reconcileRecordingLifecycleAll.
 // SideEffects: Starts/stops FFmpeg via process manager, updates DB state, remuxes segment files, quarantines expired invalid files.
 
-import { spawn } from 'child_process';
 import { existsSync, mkdirSync } from 'fs';
 import { promises as fsPromises } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { join } from 'path';
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import { promisify } from 'util';
 import { exec } from 'child_process';
@@ -16,7 +14,6 @@ import { getEffectiveDeliveryType, getPrimaryExternalStreamUrl } from '../utils/
 import { buildFfmpegRtspInputArgs, resolveInternalRtspTransport } from '../utils/internalRtspTransportPolicy.js';
 import recordingProcessManager from './recordingProcessManager.js';
 import { createRecordingCleanupService } from './recordingCleanupService.js';
-import { canDeleteRecordingFile, computeRetentionWindow } from './recordingRetentionPolicy.js';
 import recordingSegmentRepository from './recordingSegmentRepository.js';
 import recordingSegmentFinalizer from './recordingSegmentFinalizer.js';
 import recordingRecoveryService from './recordingRecoveryService.js';
@@ -35,128 +32,22 @@ import {
     isPartialSegmentFilename,
     toFinalSegmentFilename,
 } from './recordingSegmentFilePolicy.js';
+import { RECORDINGS_BASE_PATH } from './recordingPaths.js';
 const execPromise = promisify(exec);
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-// Base path untuk recordings
-const RECORDINGS_BASE_PATH = join(__dirname, '..', '..', 'recordings');
 const RECORDING_RETENTION_GRACE_MS = 10 * 60 * 1000;
 const SCHEDULED_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
-const SCHEDULED_CLEANUP_INITIAL_DELAY_MS = 2 * 60 * 1000;
+// Shortened from 2min to 30s after removing boot-time cleanupTempFiles;
+// scheduled cleanup is now the single cleanup path.
+const SCHEDULED_CLEANUP_INITIAL_DELAY_MS = 30 * 1000;
 const RECORDING_LIFECYCLE_RECONCILE_INTERVAL_MS = 60 * 1000;
 
 // Stream health monitoring
 const streamHealthMap = new Map();
 
-// CRITICAL: Track files being processed (prevent deletion during remux)
+// Track files being processed (prevent deletion during remux/finalize).
+// Tracked here so cleanup + scanner can short-circuit before touching a file.
 const filesBeingProcessed = new Set();
-
-// RAM FIX: Limit concurrent re-mux operations to prevent memory spike
-const MAX_CONCURRENT_REMUX = 3;
-let activeRemuxCount = 0;
-
-// Failed re-mux tracking (prevent infinite loop on corrupt files)
-// Using database for persistence across restarts
-const initFailedFilesTable = () => {
-    try {
-        execute(`
-            CREATE TABLE IF NOT EXISTS failed_remux_files (
-                camera_id INTEGER NOT NULL,
-                filename TEXT NOT NULL,
-                fail_count INTEGER DEFAULT 1,
-                last_attempt DATETIME DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (camera_id, filename)
-            )
-        `);
-    } catch (error) {
-        console.error('[FailedFiles] Error creating table:', error);
-    }
-};
-
-// Initialize table on module load
-initFailedFilesTable();
-
-// Helper functions for failed files tracking
-const isFileFailed = (cameraId, filename) => {
-    const result = queryOne(
-        'SELECT fail_count FROM failed_remux_files WHERE camera_id = ? AND filename = ?',
-        [cameraId, filename]
-    );
-    return result && result.fail_count >= 3;
-};
-
-const incrementFailCount = (cameraId, filename) => {
-    try {
-        // Try to insert or update
-        const existing = queryOne(
-            'SELECT fail_count FROM failed_remux_files WHERE camera_id = ? AND filename = ?',
-            [cameraId, filename]
-        );
-
-        if (existing) {
-            execute(
-                'UPDATE failed_remux_files SET fail_count = fail_count + 1, last_attempt = CURRENT_TIMESTAMP WHERE camera_id = ? AND filename = ?',
-                [cameraId, filename]
-            );
-        } else {
-            execute(
-                'INSERT INTO failed_remux_files (camera_id, filename, fail_count) VALUES (?, ?, 1)',
-                [cameraId, filename]
-            );
-        }
-    } catch (error) {
-        console.error('[FailedFiles] Error incrementing fail count:', error);
-    }
-};
-
-const removeFailedFile = (cameraId, filename) => {
-    try {
-        execute(
-            'DELETE FROM failed_remux_files WHERE camera_id = ? AND filename = ?',
-            [cameraId, filename]
-        );
-    } catch (error) {
-        console.error('[FailedFiles] Error removing failed file:', error);
-    }
-};
-
-async function quarantineFailedRemuxFileIfExpired(cameraId, filename, filePath, reason) {
-    let fileMtimeMs = null;
-    try {
-        const stats = await fsPromises.stat(filePath);
-        fileMtimeMs = stats.mtimeMs;
-    } catch {
-        fileMtimeMs = null;
-    }
-
-    const camera = queryOne('SELECT recording_duration_hours FROM cameras WHERE id = ?', [cameraId]);
-    const retentionWindow = computeRetentionWindow({
-        retentionHours: camera?.recording_duration_hours,
-    });
-    const deletePolicy = canDeleteRecordingFile({
-        filename,
-        fileMtimeMs,
-        retentionWindow,
-    });
-
-    if (!deletePolicy.allowed) {
-        console.warn(`[Segment] Keeping failed remux segment until retention expiry: camera${cameraId}/${filename}`);
-        return { success: true, retained: true };
-    }
-
-    const result = await recordingFileOperationService.quarantineFile({
-        cameraId,
-        filename,
-        filePath,
-        reason,
-    });
-    if (result.success) {
-        removeFailedFile(cameraId, filename);
-    }
-    return result;
-}
 
 const cleanupService = createRecordingCleanupService({
     repository: recordingSegmentRepository,
@@ -663,16 +554,6 @@ class RecordingService {
             return;
         }
 
-        if (isFileFailed(cameraId, finalFilename)) {
-            const failedPath = getFinalRecordingPath(RECORDINGS_BASE_PATH, cameraId, finalFilename);
-            if (existsSync(failedPath)) {
-                quarantineFailedRemuxFileIfExpired(cameraId, finalFilename, failedPath, 'remux_failed_3x').catch((err) => {
-                    console.error(`[Segment] Failed to process failed-remux file ${finalFilename}:`, err.message);
-                });
-            }
-            return;
-        }
-
         const fileKey = `${cameraId}:${finalFilename}`;
         if (filesBeingProcessed.has(fileKey)) {
             console.log(`[Segment] Already processing: ${finalFilename}, skipping duplicate`);
@@ -904,42 +785,16 @@ class RecordingService {
      * FIX: Now scans ALL camera directories, not just active recordings
      */
     startSegmentScanner(scheduleTimeout = setTimeout) {
-        this.cleanupTempFiles();
         if (!this.recoveryScanner) {
             this.recoveryScanner = createRecordingRecoveryScanner({
                 recordingsBasePath: RECORDINGS_BASE_PATH,
                 isFileBeingProcessed: (cameraId, filename) => filesBeingProcessed.has(`${cameraId}:${filename}`),
-                isFileFailed,
-                onFailedFileExpired: quarantineFailedRemuxFileIfExpired,
-                removeFailedFile,
                 onSegmentCreated: (cameraId, filename) => this.onSegmentCreated(cameraId, filename),
                 logger: console,
             });
         }
 
         this.recoveryScanner.start(scheduleTimeout);
-    }
-
-    /**
-     * Cleanup temp files from failed re-mux attempts
-     * CRITICAL FIX: Only delete .temp.mp4 and .remux.mp4 files
-     * NEVER delete actual recording files (.mp4) - let segment scanner handle registration
-     */
-    async cleanupTempFiles() {
-        try {
-            console.log('[Cleanup] Delegating temp cleanup to shared recording cleanup service...');
-
-            try { await fsPromises.access(RECORDINGS_BASE_PATH); } catch { return; }
-
-            const cameraDirs = await fsPromises.readdir(RECORDINGS_BASE_PATH);
-            for (const cameraDir of cameraDirs) {
-                const cameraIdMatch = cameraDir.match(/^camera(\d+)$/);
-                if (!cameraIdMatch) continue;
-                await this.cleanupOldSegments(parseInt(cameraIdMatch[1], 10));
-            }
-        } catch (error) {
-            console.error('[Cleanup] Error cleaning temp files:', error);
-        }
     }
 
     /**

@@ -5,18 +5,15 @@
 // SideEffects: Deletes, renames, copies, and quarantines recording files after safety checks.
 
 import { promises as defaultFs } from 'fs';
-import { basename, dirname, join } from 'path';
-import { fileURLToPath } from 'url';
+import { basename, join } from 'path';
 import { isSafeRecordingFilePath } from './recordingPathSafetyPolicy.js';
+import { RECORDINGS_BASE_PATH } from './recordingPaths.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const DEFAULT_RECORDINGS_BASE_PATH = join(__dirname, '..', '..', 'recordings');
 const QUARANTINE_DIR_NAME = '.quarantine';
 
 export function createRecordingFileOperationService({
     fs = defaultFs,
-    recordingsBasePath = DEFAULT_RECORDINGS_BASE_PATH,
+    recordingsBasePath = RECORDINGS_BASE_PATH,
     logger = console,
     now = Date.now,
 } = {}) {

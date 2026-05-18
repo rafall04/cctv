@@ -6,8 +6,6 @@
 
 import { exec, spawn } from 'child_process';
 import { promises as fsPromises } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
 import { promisify } from 'util';
 import recordingSegmentRepository from './recordingSegmentRepository.js';
 import recordingRecoveryDiagnosticsRepository from './recordingRecoveryDiagnosticsRepository.js';
@@ -17,11 +15,9 @@ import {
     parseSegmentFilename,
     toFinalSegmentFilename,
 } from './recordingSegmentFilePolicy.js';
+import { RECORDINGS_BASE_PATH } from './recordingPaths.js';
 
 const execPromise = promisify(exec);
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const DEFAULT_RECORDINGS_BASE_PATH = join(__dirname, '..', '..', 'recordings');
 
 function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -81,7 +77,7 @@ async function removeFileIfExists(filePath) {
 }
 
 export function createRecordingSegmentFinalizer({
-    recordingsBasePath = DEFAULT_RECORDINGS_BASE_PATH,
+    recordingsBasePath = RECORDINGS_BASE_PATH,
     repository = recordingSegmentRepository,
     diagnosticsRepository = recordingRecoveryDiagnosticsRepository,
     stabilityDelayMs = 10000,

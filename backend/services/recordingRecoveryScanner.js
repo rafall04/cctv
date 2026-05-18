@@ -32,9 +32,6 @@ export function createRecordingRecoveryScanner({
     fileOperations = recordingFileOperationService,
     recoveryService = recordingRecoveryService,
     isFileBeingProcessed = () => false,
-    isFileFailed = () => false,
-    onFailedFileExpired = async () => ({ retained: true }),
-    removeFailedFile = () => {},
     onSegmentCreated,
     nowMs = () => Date.now(),
     logger = console,
@@ -117,20 +114,6 @@ export function createRecordingRecoveryScanner({
 
     async function scanFinalFiles({ cameraId, cameraDir, finalFiles, existingFilesSet, result }) {
         for (const filename of finalFiles) {
-            if (isFileFailed(cameraId, filename)) {
-                const failedPath = join(cameraDir, filename);
-                try {
-                    await fs.access(failedPath);
-                    const quarantineResult = await onFailedFileExpired(cameraId, filename, failedPath, 'scanner_remux_failed_3x');
-                    if (!quarantineResult.retained) {
-                        logger.log?.(`[Scanner] Quarantined expired failed-remux file: ${filename}`);
-                    }
-                } catch {
-                    removeFailedFile(cameraId, filename);
-                }
-                continue;
-            }
-
             if (existingFilesSet.has(filename)) {
                 continue;
             }
