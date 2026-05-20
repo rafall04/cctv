@@ -63,7 +63,13 @@ import thumbnailService from './services/thumbnailService.js';
 recordingService.attachScheduler(recordingScheduler);
 
 const fastify = Fastify({
-    logger: config.server.env === 'production' 
+    // Behind a reverse proxy (Apache/Nginx) request.ip is the proxy IP unless
+    // trustProxy is set. The rate limiter buckets by request.ip — without this,
+    // every client collapses into one bucket and the whole API 429s at once.
+    // Trust only the configured proxy CIDRs so X-Forwarded-For cannot be spoofed
+    // by arbitrary clients.
+    trustProxy: config.security.trustedProxyCidrs,
+    logger: config.server.env === 'production'
         ? { level: 'info' }  // Simple JSON logging in production
         : {
             level: 'debug',
