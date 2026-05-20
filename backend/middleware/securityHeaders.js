@@ -12,6 +12,7 @@
  * Requirements: 8.1, 8.2, 8.3, 8.5, 8.6, 8.7
  */
 
+import fp from 'fastify-plugin';
 import { config } from '../config/config.js';
 
 const DEFAULT_AD_SCRIPT_SOURCES = [
@@ -118,31 +119,37 @@ export function getSecurityHeaders(url = '') {
 }
 
 /**
- * Security headers middleware for Fastify
- * Adds security headers to all responses and removes revealing headers
- * 
- * @param {FastifyInstance} fastify - Fastify instance
- * @param {Object} options - Plugin options
+ * Security headers middleware for Fastify.
+ * Adds security headers to all responses and removes revealing headers.
+ *
+ * Wrapped with fastify-plugin so the onSend hook is NOT encapsulated — without
+ * fp() the hook would only apply to routes registered inside this plugin's
+ * scope (i.e. none), silently disabling all security headers.
  */
-export async function securityHeadersMiddleware(fastify, options = {}) {
+async function securityHeadersPlugin(fastify) {
     // Add security headers to all responses
     fastify.addHook('onSend', async (request, reply, payload) => {
         const url = request.url || '';
         const headers = getSecurityHeaders(url);
-        
+
         // Set all security headers
         Object.entries(headers).forEach(([name, value]) => {
             reply.header(name, value);
         });
-        
+
         // Remove revealing headers
         SECURITY_HEADERS_CONFIG.headersToRemove.forEach(header => {
             reply.removeHeader(header);
         });
-        
+
         return payload;
     });
 }
+
+export const securityHeadersMiddleware = fp(securityHeadersPlugin, {
+    name: 'security-headers',
+    fastify: '4.x',
+});
 
 /**
  * Validate that a response has all required security headers

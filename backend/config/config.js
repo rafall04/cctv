@@ -186,4 +186,50 @@ export const config = {
   },
 };
 
+const INSECURE_JWT_SECRET_DEFAULT = 'default-secret-change-in-production';
+const MIN_SECRET_LENGTH = 32;
+
+/**
+ * Fail-fast guard against booting production with insecure secrets.
+ * Call once during server startup (before binding the port).
+ * In non-production environments this only warns so local/dev/test stay frictionless.
+ *
+ * @returns {{ ok: boolean, errors: string[], warnings: string[] }}
+ * @throws {Error} when running in production with a fatal misconfiguration
+ */
+export function assertSecureConfig() {
+  const isProduction = config.server.env === 'production';
+  const errors = [];
+  const warnings = [];
+
+  const jwtSecret = config.jwt.secret || '';
+  if (!jwtSecret || jwtSecret === INSECURE_JWT_SECRET_DEFAULT) {
+    errors.push('JWT_SECRET is missing or still set to the built-in default. Set a unique random JWT_SECRET.');
+  } else if (jwtSecret.length < MIN_SECRET_LENGTH) {
+    warnings.push(`JWT_SECRET is shorter than ${MIN_SECRET_LENGTH} characters; use a longer random value.`);
+  }
+
+  if (config.security.csrfEnabled && !config.security.csrfSecret) {
+    warnings.push('CSRF protection is enabled but CSRF_SECRET is empty; set a unique random CSRF_SECRET.');
+  }
+
+  if (config.security.apiKeyValidationEnabled && !config.security.apiKeySecret) {
+    warnings.push('API key validation is enabled but API_KEY_SECRET is empty; set a unique random API_KEY_SECRET.');
+  }
+
+  for (const warning of warnings) {
+    console.warn(`[Config] WARNING: ${warning}`);
+  }
+
+  if (errors.length > 0) {
+    const detail = errors.map((e) => `  - ${e}`).join('\n');
+    if (isProduction) {
+      throw new Error(`[Config] Refusing to start in production with insecure configuration:\n${detail}`);
+    }
+    console.warn(`[Config] WARNING: insecure configuration detected (allowed in ${config.server.env}):\n${detail}`);
+  }
+
+  return { ok: errors.length === 0, errors, warnings };
+}
+
 export default config;

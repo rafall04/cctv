@@ -9,7 +9,7 @@ import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import cookie from '@fastify/cookie';
 import fastifyStatic from '@fastify/static';
-import { config } from './config/config.js';
+import { config, assertSecureConfig } from './config/config.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -310,6 +310,9 @@ fastify.setErrorHandler((error, request, reply) => {
 // ============================================
 const start = async () => {
     try {
+        // Fail-fast: refuse to boot production with insecure secrets (default JWT secret, etc.)
+        assertSecureConfig();
+
         await fastify.listen({
             port: config.server.port,
             host: config.server.host,
