@@ -324,6 +324,13 @@ const start = async () => {
             host: config.server.host,
         });
 
+        // Signal PM2 that the HTTP server is accepting connections.
+        // ecosystem.config.cjs sets wait_ready:true — without this signal PM2
+        // would hit listen_timeout and treat the (healthy) process as failed.
+        if (typeof process.send === 'function') {
+            process.send('ready');
+        }
+
         console.log('');
         console.log('🚀 RAF NET CCTV Backend Server Started');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');

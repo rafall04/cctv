@@ -189,6 +189,25 @@ export const config = {
 const INSECURE_JWT_SECRET_DEFAULT = 'default-secret-change-in-production';
 const MIN_SECRET_LENGTH = 32;
 
+// Secrets that look "set" but are actually committed templates / placeholders.
+// Matched case-insensitively as a substring so variants are caught too.
+const PLACEHOLDER_SECRET_MARKERS = [
+  'change_this',
+  'change-this',
+  'changeme',
+  'your-secret',
+  'your_secret',
+  'raf_net_secure_cctv_2025_prod', // weak value shipped in deployment/backend.env.prod
+  'secret-here',
+  'replace-me',
+  'example',
+];
+
+function looksLikePlaceholderSecret(value) {
+  const lowered = String(value || '').toLowerCase();
+  return PLACEHOLDER_SECRET_MARKERS.some((marker) => lowered.includes(marker));
+}
+
 /**
  * Fail-fast guard against booting production with insecure secrets.
  * Call once during server startup (before binding the port).
@@ -205,16 +224,29 @@ export function assertSecureConfig() {
   const jwtSecret = config.jwt.secret || '';
   if (!jwtSecret || jwtSecret === INSECURE_JWT_SECRET_DEFAULT) {
     errors.push('JWT_SECRET is missing or still set to the built-in default. Set a unique random JWT_SECRET.');
+  } else if (looksLikePlaceholderSecret(jwtSecret)) {
+    errors.push('JWT_SECRET still looks like a committed template/placeholder value. Set a unique random JWT_SECRET.');
   } else if (jwtSecret.length < MIN_SECRET_LENGTH) {
-    warnings.push(`JWT_SECRET is shorter than ${MIN_SECRET_LENGTH} characters; use a longer random value.`);
+    // Too short to be safe in production — hard error there, warning elsewhere.
+    (isProduction ? errors : warnings).push(
+      `JWT_SECRET is shorter than ${MIN_SECRET_LENGTH} characters; use a longer random value.`
+    );
   }
 
-  if (config.security.csrfEnabled && !config.security.csrfSecret) {
-    warnings.push('CSRF protection is enabled but CSRF_SECRET is empty; set a unique random CSRF_SECRET.');
+  if (config.security.csrfEnabled) {
+    if (!config.security.csrfSecret) {
+      warnings.push('CSRF protection is enabled but CSRF_SECRET is empty; set a unique random CSRF_SECRET.');
+    } else if (looksLikePlaceholderSecret(config.security.csrfSecret)) {
+      errors.push('CSRF_SECRET still looks like a committed template/placeholder value. Set a unique random CSRF_SECRET.');
+    }
   }
 
-  if (config.security.apiKeyValidationEnabled && !config.security.apiKeySecret) {
-    warnings.push('API key validation is enabled but API_KEY_SECRET is empty; set a unique random API_KEY_SECRET.');
+  if (config.security.apiKeyValidationEnabled) {
+    if (!config.security.apiKeySecret) {
+      warnings.push('API key validation is enabled but API_KEY_SECRET is empty; set a unique random API_KEY_SECRET.');
+    } else if (looksLikePlaceholderSecret(config.security.apiKeySecret)) {
+      errors.push('API_KEY_SECRET still looks like a committed template/placeholder value. Set a unique random API_KEY_SECRET.');
+    }
   }
 
   for (const warning of warnings) {
