@@ -7,6 +7,7 @@
  * Requirements: 1.4, 1.5
  */
 
+import fp from 'fastify-plugin';
 import { logSecurityEvent, SECURITY_EVENTS } from '../services/securityAuditLogger.js';
 import { config } from '../config/config.js';
 
@@ -99,9 +100,11 @@ export function isBrowserRequest(request) {
 }
 
 /**
- * Origin Validation Middleware Plugin
+ * Origin Validation Middleware Plugin.
+ * Wrapped with fastify-plugin so the onRequest hook applies to every route
+ * (without fp() the hook is encapsulated and origin validation never runs).
  */
-export async function originValidatorMiddleware(fastify, _options) {
+async function originValidatorPlugin(fastify, _options) {
     // Skip origin validation for certain paths
     const skipPaths = [
         '/health',
@@ -160,6 +163,11 @@ export async function originValidatorMiddleware(fastify, _options) {
         }
     });
 }
+
+export const originValidatorMiddleware = fp(originValidatorPlugin, {
+    name: 'origin-validator',
+    fastify: '4.x',
+});
 
 // Export configuration for testing
 export const ORIGIN_VALIDATOR_CONFIG = {

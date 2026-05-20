@@ -6,6 +6,7 @@
  * SideEffects: Rejects protected requests without valid API keys and logs validation failures.
  */
 
+import fp from 'fastify-plugin';
 import { validateApiKey, API_KEY_CONFIG, hasActiveApiKeys } from '../services/apiKeyService.js';
 import { logApiKeyFailure } from '../services/securityAuditLogger.js';
 
@@ -69,11 +70,11 @@ export function extractApiKey(request) {
 }
 
 /**
- * API Key validation middleware for Fastify
- * @param {Object} fastify - Fastify instance
- * @param {Object} options - Plugin options
+ * API Key validation middleware for Fastify.
+ * Wrapped with fastify-plugin so the onRequest hook applies to every route
+ * (without fp() the hook is encapsulated and validation never runs).
  */
-export async function apiKeyValidatorMiddleware(fastify, options) {
+async function apiKeyValidatorPlugin(fastify, options) {
     fastify.addHook('onRequest', async (request, reply) => {
         // Skip if API key validation is disabled
         if (!API_KEY_VALIDATOR_CONFIG.enabled) {
@@ -130,6 +131,11 @@ export async function apiKeyValidatorMiddleware(fastify, options) {
         };
     });
 }
+
+export const apiKeyValidatorMiddleware = fp(apiKeyValidatorPlugin, {
+    name: 'api-key-validator',
+    fastify: '4.x',
+});
 
 /**
  * Standalone API key validation function for use in specific routes

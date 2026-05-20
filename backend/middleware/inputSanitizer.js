@@ -7,6 +7,7 @@
  * Requirements: 7.1, 7.2, 7.3, 7.5, 7.6, 7.7
  */
 
+import fp from 'fastify-plugin';
 import { logSecurityEvent, SECURITY_EVENTS } from '../services/securityAuditLogger.js';
 
 // Maximum request body size (1MB)
@@ -19,9 +20,19 @@ const ALLOWED_CONTENT_TYPES = [
     'multipart/form-data'
 ];
 
+// Matches HTML-tag-like spans: <tag ...>, </tag>. Requires a letter right after
+// `<` (or `</`) so bare comparisons ("a < b"), RTSP/HTTP URLs, passwords, and
+// JSON survive untouched.
+const HTML_TAG_RE = /<\/?[a-zA-Z][^>]*>/g;
+// Defensive: also drop the dangerous `javascript:` / `data:text/html` scheme prefixes.
+const DANGEROUS_SCHEME_RE = /\b(javascript|vbscript)\s*:/gi;
+
 /**
- * Sanitize a string to prevent XSS attacks
- * Escapes HTML special characters
+ * Sanitize a string against stored XSS by removing HTML-tag-like spans and
+ * dangerous URI schemes. Unlike full HTML-entity encoding, this does NOT
+ * corrupt URLs, passwords, query strings, or JSON — it only strips markup.
+ * Output escaping is still the renderer's job (React escapes by default).
+ *
  * @param {string} str - String to sanitize
  * @returns {string} - Sanitized string
  */
@@ -29,16 +40,10 @@ export function sanitizeString(str) {
     if (typeof str !== 'string') {
         return str;
     }
-    
+
     return str
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#x27;')
-        .replace(/\//g, '&#x2F;')
-        .replace(/`/g, '&#x60;')
-        .replace(/=/g, '&#x3D;');
+        .replace(HTML_TAG_RE, '')
+        .replace(DANGEROUS_SCHEME_RE, '');
 }
 
 /**
@@ -147,9 +152,12 @@ export function sanitizeQueryParams(query) {
 }
 
 /**
- * Input Sanitizer Middleware Plugin
+ * Input Sanitizer Middleware Plugin.
+ * Wrapped with fastify-plugin so the onRequest/preValidation/preHandler hooks
+ * apply to every route (without fp() they are encapsulated and body-size limit,
+ * content-type validation, and sanitization never run).
  */
-export async function inputSanitizerMiddleware(fastify, _options) {
+async function inputSanitizerPlugin(fastify, _options) {
     // Add body size limit hook
     fastify.addHook('onRequest', async (request, reply) => {
         const contentLength = parseInt(request.headers['content-length'] || '0', 10);
@@ -213,6 +221,11 @@ export async function inputSanitizerMiddleware(fastify, _options) {
         }
     });
 }
+
+export const inputSanitizerMiddleware = fp(inputSanitizerPlugin, {
+    name: 'input-sanitizer',
+    fastify: '4.x',
+});
 
 // Export constants for testing
 export const INPUT_SANITIZER_CONFIG = {

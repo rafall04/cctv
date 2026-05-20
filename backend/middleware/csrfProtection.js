@@ -8,6 +8,7 @@
  */
 
 import crypto from 'crypto';
+import fp from 'fastify-plugin';
 import { logCsrfFailure } from '../services/securityAuditLogger.js';
 
 /**
@@ -160,15 +161,14 @@ export function clearCsrfCookie(reply) {
 
 
 /**
- * CSRF Protection Middleware for Fastify
- * 
+ * CSRF Protection Middleware for Fastify.
+ *
  * Validates CSRF tokens for state-changing requests (POST, PUT, DELETE, PATCH).
  * Skips validation for API key-only endpoints and non-state-changing methods.
- * 
- * @param {FastifyInstance} fastify - Fastify instance
- * @param {Object} options - Plugin options
+ * Wrapped with fastify-plugin so the preHandler hook applies to every route
+ * (without fp() the hook is encapsulated and CSRF protection never runs).
  */
-export async function csrfMiddleware(fastify, options = {}) {
+async function csrfPlugin(fastify, options = {}) {
     fastify.addHook('preHandler', async (request, reply) => {
         const method = request.method?.toUpperCase();
         const url = request.url || '';
@@ -210,6 +210,11 @@ export async function csrfMiddleware(fastify, options = {}) {
         }
     });
 }
+
+export const csrfMiddleware = fp(csrfPlugin, {
+    name: 'csrf-protection',
+    fastify: '4.x',
+});
 
 /**
  * Create a standalone CSRF validation function for use in specific routes

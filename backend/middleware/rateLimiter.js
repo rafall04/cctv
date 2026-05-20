@@ -13,6 +13,7 @@
  * Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8
  */
 
+import fp from 'fastify-plugin';
 import { logRateLimitViolation as auditLogRateLimitViolation } from '../services/securityAuditLogger.js';
 
 /**
@@ -289,14 +290,14 @@ export function logRateLimitViolation(details, request = null) {
 }
 
 /**
- * Rate limiter middleware for Fastify
- * 
+ * Rate limiter middleware for Fastify.
+ *
  * Implements sliding window rate limiting with different limits per endpoint type.
- * 
- * @param {FastifyInstance} fastify - Fastify instance
- * @param {Object} options - Plugin options
+ * Wrapped with fastify-plugin so the onRequest hook is NOT encapsulated — without
+ * fp() the hook only applies to routes inside this plugin's scope (none), which
+ * silently disables rate limiting for the whole API.
  */
-export async function rateLimiterMiddleware(fastify, options = {}) {
+async function rateLimiterPlugin(fastify, options = {}) {
     // Start cleanup interval
     startCleanupInterval();
     
@@ -357,5 +358,10 @@ export async function rateLimiterMiddleware(fastify, options = {}) {
         stopCleanupInterval();
     });
 }
+
+export const rateLimiterMiddleware = fp(rateLimiterPlugin, {
+    name: 'rate-limiter',
+    fastify: '4.x',
+});
 
 export default rateLimiterMiddleware;

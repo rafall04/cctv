@@ -56,9 +56,11 @@ frontend/build/
 .DS_Store
 Thumbs.db
 
-# MediaMTX
+# MediaMTX (binaries are downloaded by deployment/download-mediamtx-linux.sh — keep only config)
 mediamtx/recordings/
 mediamtx/logs/
+mediamtx/mediamtx
+mediamtx/mediamtx.exe
 
 # Temporary files
 tmp/
