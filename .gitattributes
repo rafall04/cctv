@@ -1,0 +1,12 @@
+# Purpose: Force shell scripts to LF so deploy scripts run on Linux servers
+#          even when edited/committed from Windows.
+# Caller: Git checkout/commit normalization.
+
+# Shell scripts MUST be LF — CRLF breaks the shebang on Linux.
+*.sh text eol=lf
+
+# MediaMTX / yml configs and env templates: keep LF for Linux consistency.
+*.yml text eol=lf
+*.yaml text eol=lf
+*.env text eol=lf
+deployment/*.conf text eol=lf
