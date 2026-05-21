@@ -19,11 +19,24 @@ const DEFAULT_ALLOWED_ORIGINS = [
 ];
 
 /**
- * Get allowed origins from config or use defaults
+ * Get allowed origins from config or use defaults.
+ *
+ * The canonical list lives at config.security.allowedOrigins — parsed from the
+ * ALLOWED_ORIGINS env, or auto-generated from FRONTEND_DOMAIN / SERVER_IP /
+ * PORT_PUBLIC. The old code read config.cors.allowedOrigins, which does not
+ * exist (config.cors only has { origin, credentials }), so it ALWAYS fell back
+ * to the localhost-only defaults and 403'd every production origin once the
+ * middleware was active.
+ *
  * @returns {string[]} - List of allowed origins
  */
 export function getAllowedOrigins() {
-    if (config.cors && config.cors.allowedOrigins) {
+    const fromSecurity = config.security && config.security.allowedOrigins;
+    if (Array.isArray(fromSecurity) && fromSecurity.length > 0) {
+        return fromSecurity;
+    }
+    // Legacy fallback (kept for safety; config.cors.allowedOrigins is normally absent).
+    if (config.cors && Array.isArray(config.cors.allowedOrigins) && config.cors.allowedOrigins.length > 0) {
         return config.cors.allowedOrigins;
     }
     return DEFAULT_ALLOWED_ORIGINS;
