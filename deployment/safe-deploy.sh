@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# Purpose: Safe, staged production deploy for RAF NET CCTV.
-#          Repairs incomplete .env files (keeps strong existing secrets, fills
-#          missing keys, generates missing secrets), then deploys with the 5
-#          newly-activated security middlewares set to a safe staged state.
+# Purpose: Safe, repeatable production deploy for RAF NET CCTV.
+#          Repairs incomplete .env files (keeps strong existing secrets and any
+#          existing flag values, fills only missing keys), backs up the DB, then
+#          fast-forwards + installs + migrates + builds + restarts.
 # Caller:  Operator on the production server: bash deployment/safe-deploy.sh [check|deploy]
 # Deps:    bash, git, node, npm, pm2, curl.
 # MainFuncs: preflight, prepare backend/frontend .env, backup, pull+install+migrate+build,
-#            pm2 restart, health verify, print staged-activation + rollback steps.
+#            pm2 restart, health verify, print rollback steps.
+# Note:    Security flags (RATE_LIMIT/CSRF/API_KEY) are PRESERVED if already set —
+#          the script never overwrites an operator's chosen value.
 # SideEffects: Edits backend/.env and frontend/.env (gitignored), backs up the SQLite DB,
 #              fast-forwards the repo to origin/main, restarts PM2 processes.
 
@@ -154,12 +156,13 @@ ensure_secret "$BACKEND_ENV" "API_KEY_SECRET" 32
 env_ensure "$BACKEND_ENV" "ALLOWED_ORIGINS"     ""
 env_ensure "$BACKEND_ENV" "TRUSTED_PROXY_CIDRS" "127.0.0.1/32,::1/128"
 
-# Staged rollout: force the 3 risky middlewares OFF for the deploy itself.
-# They are enabled one-by-one afterwards (see the printed steps).
-env_set "$BACKEND_ENV" "RATE_LIMIT_ENABLED"        "false"
-env_set "$BACKEND_ENV" "CSRF_ENABLED"              "false"
-env_set "$BACKEND_ENV" "API_KEY_VALIDATION_ENABLED" "false"
-echo "    = staged  RATE_LIMIT_ENABLED / CSRF_ENABLED / API_KEY_VALIDATION_ENABLED -> false"
+# Security flags — only add when missing; an operator's existing value is kept.
+# The one-time staged rollout is done; these now default ON (matches config.js).
+env_ensure "$BACKEND_ENV" "RATE_LIMIT_ENABLED"          "true"
+env_ensure "$BACKEND_ENV" "CSRF_ENABLED"                "true"
+env_ensure "$BACKEND_ENV" "API_KEY_VALIDATION_ENABLED"  "true"
+# Proactive recording-health Telegram alerts (no-op unless Telegram is configured).
+env_ensure "$BACKEND_ENV" "RECORDING_HEALTH_ALERTS_ENABLED" "true"
 
 if [ -z "$(env_get "$BACKEND_ENV" "ALLOWED_ORIGINS")" ]; then
     warn "ALLOWED_ORIGINS is empty. Set it to your production origin(s), e.g.:"
@@ -215,7 +218,7 @@ echo "  • npm install (backend + frontend)"
 echo "  • run database migrations"
 echo "  • build frontend"
 echo "  • pm2 restart ${BACKEND_PM2}"
-echo "  • the 3 risky middlewares stay OFF (staged) — you enable them after."
+echo "  • existing security-flag values in backend/.env are preserved as-is."
 echo ""
 CONFIRM=""
 read -r -p "Proceed? [y/N]: " CONFIRM || true
@@ -304,24 +307,16 @@ fi
 # PHASE 8 — Next steps
 # ===========================================================================
 hr
-ok "DEPLOY COMPLETE — staged mode."
+ok "DEPLOY COMPLETE."
 echo ""
-echo "The 3 risky middlewares are still OFF. Enable them ONE AT A TIME,"
-echo "watching the dashboard for a few minutes between each:"
+echo "Verify in a browser:"
+echo "  • Public landing page loads with cameras."
+echo "  • Admin login works; Dashboard + Recording Dashboard load."
+echo "  • Admin → Security Activity shows recent events."
+echo "  • Create/edit a camera, then change a setting (exercises CSRF)."
 echo ""
-echo "  4a. Rate limiter:"
-echo "      edit ${BACKEND_ENV}:  RATE_LIMIT_ENABLED=true"
-echo "      pm2 restart ${BACKEND_PM2} --update-env"
-echo "      → if users get HTTP 429: set it back to false, raise RATE_LIMIT_PUBLIC."
-echo ""
-echo "  4b. API key (first put a real VITE_API_KEY in frontend/.env + rebuild):"
-echo "      edit ${BACKEND_ENV}:  API_KEY_VALIDATION_ENABLED=true"
-echo "      pm2 restart ${BACKEND_PM2} --update-env"
-echo ""
-echo "  4c. CSRF:"
-echo "      edit ${BACKEND_ENV}:  CSRF_ENABLED=true"
-echo "      pm2 restart ${BACKEND_PM2} --update-env"
-echo "      → test create/edit camera + change settings."
+echo "Watch the logs for a few minutes:"
+echo "  pm2 logs ${BACKEND_PM2} --lines 50"
 echo ""
 echo "Rollback (if anything breaks):"
 echo "  git -C ${APP_DIR} reset --hard ${ROLLBACK_COMMIT}"
