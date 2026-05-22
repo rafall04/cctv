@@ -26,6 +26,7 @@ vi.mock('../controllers/areaController.js', () => ({
 
 vi.mock('../middleware/authMiddleware.js', () => ({
     authMiddleware: vi.fn(async () => {}),
+    requireAdmin: vi.fn(async () => {}),
 }));
 
 vi.mock('../middleware/schemaValidators.js', () => ({

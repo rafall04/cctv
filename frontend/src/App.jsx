@@ -42,9 +42,9 @@ const SponsorManagement = lazyWithRetry(() => import('./pages/SponsorManagement'
 const RecordingDashboard = lazyWithRetry(() => import('./pages/RecordingDashboard'), 'recording-dashboard');
 const AreaPublicPage = lazyWithRetry(() => import('./pages/AreaPublicPage'), 'area-public-page');
 
-function AdminPageRoute({ children }) {
+function AdminPageRoute({ children, adminOnly = false }) {
     return (
-        <ProtectedRoute>
+        <ProtectedRoute adminOnly={adminOnly}>
             <AdminLayout>
                 <ErrorBoundary>
                     <Suspense fallback={<div className="p-6">Loading...</div>}>
@@ -119,7 +119,7 @@ function App() {
                 <Route
                     path="/admin/import-export"
                     element={
-                        <AdminPageRoute>
+                        <AdminPageRoute adminOnly>
                             <ImportExport />
                         </AdminPageRoute>
                     }
@@ -127,7 +127,7 @@ function App() {
                 <Route
                     path="/admin/backup-restore"
                     element={
-                        <AdminPageRoute>
+                        <AdminPageRoute adminOnly>
                             <BackupRestore />
                         </AdminPageRoute>
                     }
@@ -143,7 +143,7 @@ function App() {
                 <Route
                     path="/admin/users"
                     element={
-                        <AdminPageRoute>
+                        <AdminPageRoute adminOnly>
                             <UserManagement />
                         </AdminPageRoute>
                     }
@@ -175,7 +175,7 @@ function App() {
                 <Route
                     path="/admin/playback-tokens"
                     element={
-                        <AdminPageRoute>
+                        <AdminPageRoute adminOnly>
                             <PlaybackTokenManagement />
                         </AdminPageRoute>
                     }
@@ -183,7 +183,7 @@ function App() {
                 <Route
                     path="/admin/notification-diagnostics"
                     element={
-                        <AdminPageRoute>
+                        <AdminPageRoute adminOnly>
                             <NotificationDiagnostics />
                         </AdminPageRoute>
                     }
@@ -191,7 +191,7 @@ function App() {
                 <Route
                     path="/admin/settings"
                     element={
-                        <AdminPageRoute>
+                        <AdminPageRoute adminOnly>
                             <UnifiedSettings />
                         </AdminPageRoute>
                     }
@@ -199,7 +199,7 @@ function App() {
                 <Route
                     path="/admin/sponsors"
                     element={
-                        <AdminPageRoute>
+                        <AdminPageRoute adminOnly>
                             <SponsorManagement />
                         </AdminPageRoute>
                     }

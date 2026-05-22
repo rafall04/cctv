@@ -3,7 +3,7 @@ import {
     updateSaweriaSettingsHandler,
     getPublicSaweriaConfigHandler
 } from '../controllers/saweriaController.js';
-import { authMiddleware } from '../middleware/authMiddleware.js';
+import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 import { validateSaweriaSettings } from '../middleware/schemaValidators.js';
 
 export default async function saweriaRoutes(fastify, options) {
@@ -15,7 +15,7 @@ export default async function saweriaRoutes(fastify, options) {
         preHandler: [authMiddleware] 
     }, getSaweriaSettingsHandler);
 
-    fastify.put('/settings', { 
-        preHandler: [authMiddleware, validateSaweriaSettings] 
+    fastify.put('/settings', {
+        preHandler: [authMiddleware, requireAdmin, validateSaweriaSettings]
     }, updateSaweriaSettingsHandler);
 }

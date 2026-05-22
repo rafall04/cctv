@@ -33,12 +33,14 @@ const Icons = {
     ChevronRight: () => <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>,
 };
 
-function AdminPwaQuickActions({ activePath }) {
+function AdminPwaQuickActions({ activePath, isAdmin }) {
     const actions = [
         { label: 'Dashboard', path: '/admin/dashboard', icon: <Icons.Dashboard /> },
         { label: 'Kamera', path: '/admin/cameras', icon: <Icons.Camera /> },
         { label: 'Health', path: '/admin/health-debug', icon: <Icons.Analytics /> },
-        { label: 'Token', path: '/admin/playback-tokens', icon: <Icons.Playback /> },
+        isAdmin
+            ? { label: 'Token', path: '/admin/playback-tokens', icon: <Icons.Playback /> }
+            : { label: 'Rekaman', path: '/admin/recordings', icon: <Icons.Camera /> },
         { label: 'Publik', path: '/', icon: <Icons.Home /> },
     ];
 
@@ -110,24 +112,28 @@ export default function AdminLayout({ children }) {
         navigate('/admin/login');
     };
 
+    const isAdmin = user?.role === 'admin';
+
+    // `adminOnly` items are hidden from viewer accounts. The route guard and
+    // backend enforce this too — hiding them just keeps the nav honest.
     const navItems = [
         { label: 'Dashboard', path: '/admin/dashboard', icon: <Icons.Dashboard /> },
         { label: 'Analytics', path: '/admin/analytics', icon: <Icons.Analytics /> },
         { label: 'Cameras', path: '/admin/cameras', icon: <Icons.Camera /> },
         { label: 'Health Debug', path: '/admin/health-debug', icon: <Icons.Analytics /> },
-        { label: 'Import/Export', path: '/admin/import-export', icon: <Icons.Analytics /> },
-        { label: 'Backup Restore', path: '/admin/backup-restore', icon: <Icons.Settings /> },
+        { label: 'Import/Export', path: '/admin/import-export', icon: <Icons.Analytics />, adminOnly: true },
+        { label: 'Backup Restore', path: '/admin/backup-restore', icon: <Icons.Settings />, adminOnly: true },
         { label: 'Recordings', path: '/admin/recordings', icon: <Icons.Camera /> },
         { label: 'Playback', path: '/admin/playback', icon: <Icons.Playback /> },
         { label: 'Playback Analytics', path: '/admin/playback-analytics', icon: <Icons.Analytics /> },
-        { label: 'Playback Tokens', path: '/admin/playback-tokens', icon: <Icons.Playback /> },
-        { label: 'Notification Diagnostics', path: '/admin/notification-diagnostics', icon: <Icons.Bell /> },
+        { label: 'Playback Tokens', path: '/admin/playback-tokens', icon: <Icons.Playback />, adminOnly: true },
+        { label: 'Notification Diagnostics', path: '/admin/notification-diagnostics', icon: <Icons.Bell />, adminOnly: true },
         { label: 'Areas', path: '/admin/areas', icon: <Icons.MapPin /> },
-        { label: 'Sponsors', path: '/admin/sponsors', icon: <Icons.Feedback /> },
-        { label: 'Users', path: '/admin/users', icon: <Icons.Users /> },
+        { label: 'Sponsors', path: '/admin/sponsors', icon: <Icons.Feedback />, adminOnly: true },
+        { label: 'Users', path: '/admin/users', icon: <Icons.Users />, adminOnly: true },
         { label: 'Feedback', path: '/admin/feedback', icon: <Icons.Feedback /> },
-        { label: 'Settings', path: '/admin/settings', icon: <Icons.Settings /> },
-    ];
+        { label: 'Settings', path: '/admin/settings', icon: <Icons.Settings />, adminOnly: true },
+    ].filter((item) => isAdmin || !item.adminOnly);
 
     const isActive = (path) => location.pathname === path;
 
@@ -246,7 +252,7 @@ export default function AdminLayout({ children }) {
                             <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
                                 {user?.username || 'Admin'}
                             </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Administrator</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">{isAdmin ? 'Administrator' : 'Viewer'}</p>
                         </div>
                     </div>
 
@@ -275,7 +281,7 @@ export default function AdminLayout({ children }) {
                     </div>
                 </div>
             </main>
-            {!isMobileMenuOpen && <AdminPwaQuickActions activePath={location.pathname} />}
+            {!isMobileMenuOpen && <AdminPwaQuickActions activePath={location.pathname} isAdmin={isAdmin} />}
         </div>
     );
 }

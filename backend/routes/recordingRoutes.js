@@ -18,7 +18,7 @@ import {
     getRestartLogs,
     updateRecordingSettings
 } from '../controllers/recordingController.js';
-import { authMiddleware, optionalAuthMiddleware } from '../middleware/authMiddleware.js';
+import { authMiddleware, optionalAuthMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 
 /**
  * Recording Routes
@@ -49,12 +49,12 @@ export default async function recordingRoutes(fastify) {
 
     // Start recording
     fastify.post('/recordings/:cameraId/start', {
-        onRequest: [authMiddleware]
+        onRequest: [authMiddleware, requireAdmin]
     }, startRecording);
 
     // Stop recording
     fastify.post('/recordings/:cameraId/stop', {
-        onRequest: [authMiddleware]
+        onRequest: [authMiddleware, requireAdmin]
     }, stopRecording);
 
     // Get recording status
@@ -64,7 +64,7 @@ export default async function recordingRoutes(fastify) {
 
     // Update recording settings
     fastify.put('/recordings/:cameraId/settings', {
-        onRequest: [authMiddleware]
+        onRequest: [authMiddleware, requireAdmin]
     }, updateRecordingSettings);
 
     // Get restart logs for specific camera

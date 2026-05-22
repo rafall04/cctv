@@ -166,6 +166,15 @@ export const authService = {
     },
 
     /**
+     * Check if the current user has the admin role.
+     * The backend enforces this independently; this is for UI gating only.
+     * @returns {boolean}
+     */
+    isAdmin() {
+        return this.getCurrentUser()?.role === 'admin';
+    },
+
+    /**
      * Check if user has refresh token (always true if authenticated with cookies)
      * @returns {boolean}
      */

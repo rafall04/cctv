@@ -23,7 +23,7 @@ import {
     bulkUpdateByArea,
     bulkDeleteByArea,
 } from '../controllers/cameraController.js';
-import { authMiddleware } from '../middleware/authMiddleware.js';
+import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 import { 
     createCameraSchema, 
     updateCameraSchema, 
@@ -52,19 +52,19 @@ export default async function cameraRoutes(fastify, options) {
 
     fastify.post('/', {
         schema: createCameraSchema,
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: createCamera,
     });
 
     fastify.put('/:id', {
         schema: updateCameraSchema,
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: updateCamera,
     });
 
     fastify.post('/:id/stream/refresh', {
         schema: cameraIdParamSchema,
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: refreshCameraStream,
     });
 
@@ -76,46 +76,46 @@ export default async function cameraRoutes(fastify, options) {
 
     fastify.delete('/:id', {
         schema: cameraIdParamSchema,
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: deleteCamera,
     });
-    
+
     // Bulk Export
     fastify.get('/export', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: exportCameras,
     });
 
     // Bulk Import
     fastify.post('/import', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: importCameras,
     });
 
     fastify.post('/import/preview', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: previewImportCameras,
     });
 
     fastify.post('/restore/preview', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: previewCameraRestore,
     });
 
     fastify.post('/restore/apply', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: applyCameraRestore,
     });
 
     // Bulk Update By Area
     fastify.patch('/bulk/area', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: bulkUpdateByArea,
     });
 
     // Bulk Delete By Area
     fastify.delete('/bulk/area/:areaId', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: bulkDeleteByArea,
     });
 }

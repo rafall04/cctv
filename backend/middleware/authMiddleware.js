@@ -25,6 +25,21 @@ export async function authMiddleware(request, reply) {
     }
 }
 
+/**
+ * Role guard — requires the authenticated user to have the `admin` role.
+ * MUST be chained AFTER authMiddleware (it relies on request.user being set),
+ * e.g. `onRequest: [authMiddleware, requireAdmin]`. A non-admin (e.g. `viewer`)
+ * authenticated user is rejected with 403 so the role is actually enforced.
+ */
+export async function requireAdmin(request, reply) {
+    if (request.user?.role !== 'admin') {
+        return reply.code(403).send({
+            success: false,
+            message: 'Forbidden - admin access required',
+        });
+    }
+}
+
 export async function optionalAuthMiddleware(request, reply) {
     try {
         await request.jwtVerify();

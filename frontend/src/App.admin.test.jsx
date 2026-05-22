@@ -104,7 +104,7 @@ describe('App admin routing', () => {
             removeListener: vi.fn(),
             dispatchEvent: vi.fn(),
         }));
-        localStorage.setItem('user', JSON.stringify({ id: 1, username: 'admin' }));
+        localStorage.setItem('user', JSON.stringify({ id: 1, username: 'admin', role: 'admin' }));
         window.history.pushState({}, '', '/admin/dashboard');
     });
 

@@ -15,7 +15,7 @@ import {
     getPublicAdsSettings,
     getPublicTimezone,
 } from '../controllers/settingsController.js';
-import { authMiddleware } from '../middleware/authMiddleware.js';
+import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 
 export default async function settingsRoutes(fastify, options) {
     // Public routes
@@ -27,5 +27,5 @@ export default async function settingsRoutes(fastify, options) {
     // Protected routes - require authentication
     fastify.get('/api/settings', { onRequest: [authMiddleware] }, getAllSettings);
     fastify.get('/api/settings/:key', { onRequest: [authMiddleware] }, getSetting);
-    fastify.put('/api/settings/:key', { onRequest: [authMiddleware] }, updateSetting);
+    fastify.put('/api/settings/:key', { onRequest: [authMiddleware, requireAdmin] }, updateSetting);
 }

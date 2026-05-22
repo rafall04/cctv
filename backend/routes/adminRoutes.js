@@ -9,7 +9,7 @@
 import { getDashboardStats, getTodayStats, testTelegramNotification, getTelegramConfig, updateTelegramConfig, previewNotificationDiagnostics, runNotificationDiagnosticsDrill, listNotificationDiagnosticsRuns, getViewerAnalytics, getViewerHistoryPage, getRealTimeViewers, getCameraHealthDebug, getRecordingHealth, getCacheStats, clearCache, getTimezoneConfig, updateTimezoneConfig, exportDatabaseBackup, importDatabaseBackup, getBackupPreview } from '../controllers/adminController.js';
 import { generateApiKey, listApiKeys, deleteApiKey } from '../controllers/apiKeyController.js';
 import { clearPlaybackTokenSessions, createPlaybackToken, listPlaybackTokenAuditLogs, listPlaybackTokens, revokePlaybackToken, sharePlaybackToken, updatePlaybackToken } from '../controllers/playbackTokenController.js';
-import { authMiddleware } from '../middleware/authMiddleware.js';
+import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 import { createApiKeySchema, apiKeyIdParamSchema } from '../middleware/schemaValidators.js';
 import mediaMtxService from '../services/mediaMtxService.js';
 
@@ -55,73 +55,73 @@ export default async function adminRoutes(fastify, options) {
 
     // Telegram notification endpoints
     fastify.post('/telegram/test', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: testTelegramNotification,
     });
 
     fastify.get('/telegram/status', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: getTelegramConfig,
     });
 
     fastify.put('/telegram/config', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: updateTelegramConfig,
     });
 
     fastify.post('/notification-diagnostics/preview', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: previewNotificationDiagnostics,
     });
 
     fastify.post('/notification-diagnostics/drill', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: runNotificationDiagnosticsDrill,
     });
 
     fastify.get('/notification-diagnostics/runs', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: listNotificationDiagnosticsRuns,
     });
 
     fastify.get('/playback-tokens', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: listPlaybackTokens,
     });
 
     fastify.get('/playback-tokens/audit', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: listPlaybackTokenAuditLogs,
     });
 
     fastify.post('/playback-tokens', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: createPlaybackToken,
     });
 
     fastify.put('/playback-tokens/:id', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: updatePlaybackToken,
     });
 
     fastify.post('/playback-tokens/:id/share', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: sharePlaybackToken,
     });
 
     fastify.post('/playback-tokens/:id/sessions/clear', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: clearPlaybackTokenSessions,
     });
 
     fastify.post('/playback-tokens/:id/revoke', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: revokePlaybackToken,
     });
 
     // Debug endpoint - raw MediaMTX data (for troubleshooting viewer count)
     fastify.get('/debug/mediamtx-readers', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: async (request, reply) => {
             try {
                 const axios = (await import('axios')).default;
@@ -164,7 +164,7 @@ export default async function adminRoutes(fastify, options) {
 
     // Debug endpoint - MediaMTX path configurations
     fastify.get('/debug/mediamtx-paths', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: async (request, reply) => {
             try {
                 const axios = (await import('axios')).default;
@@ -217,7 +217,7 @@ export default async function adminRoutes(fastify, options) {
 
     // Force sync MediaMTX paths with database
     fastify.post('/mediamtx/sync', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: async (request, reply) => {
             try {
                 const { forceUpdate } = request.body || {};
@@ -244,46 +244,46 @@ export default async function adminRoutes(fastify, options) {
     // POST /api/admin/api-keys - Generate new API key
     fastify.post('/api-keys', {
         schema: createApiKeySchema,
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: generateApiKey,
     });
 
     // GET /api/admin/api-keys - List active API keys
     fastify.get('/api-keys', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: listApiKeys,
     });
 
     // DELETE /api/admin/api-keys/:id - Revoke API key
     fastify.delete('/api-keys/:id', {
         schema: apiKeyIdParamSchema,
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: deleteApiKey,
     });
 
     // Cache Management Endpoints
     // GET /api/admin/cache/stats - Get cache statistics
     fastify.get('/cache/stats', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: getCacheStats,
     });
 
     // POST /api/admin/cache/clear - Clear all cache
     fastify.post('/cache/clear', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: clearCache,
     });
 
     // Timezone Configuration Endpoints
     // GET /api/admin/settings/timezone - Get timezone configuration
     fastify.get('/settings/timezone', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: getTimezoneConfig,
     });
 
     // PUT /api/admin/settings/timezone - Update timezone configuration
     fastify.put('/settings/timezone', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         schema: {
             body: {
                 type: 'object',
@@ -302,19 +302,19 @@ export default async function adminRoutes(fastify, options) {
     // Backup/Restore Endpoints
     // GET /api/admin/backup/export - Export database backup
     fastify.get('/backup/export', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: exportDatabaseBackup,
     });
 
     // POST /api/admin/backup/import - Import database backup
     fastify.post('/backup/import', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: importDatabaseBackup,
     });
 
     // POST /api/admin/backup/preview - Preview backup stats
     fastify.post('/backup/preview', {
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: getBackupPreview,
     });
 }

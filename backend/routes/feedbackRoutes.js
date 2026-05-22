@@ -5,7 +5,7 @@ import {
     deleteFeedback,
     getFeedbackStats 
 } from '../controllers/feedbackController.js';
-import authMiddleware from '../middleware/authMiddleware.js';
+import authMiddleware, { requireAdmin } from '../middleware/authMiddleware.js';
 
 export default async function feedbackRoutes(fastify) {
     // Public endpoint - submit feedback
@@ -26,6 +26,6 @@ export default async function feedbackRoutes(fastify) {
     // Admin endpoints
     fastify.get('/', { preHandler: [authMiddleware] }, getAllFeedbacks);
     fastify.get('/stats', { preHandler: [authMiddleware] }, getFeedbackStats);
-    fastify.patch('/:id/status', { preHandler: [authMiddleware] }, updateFeedbackStatus);
-    fastify.delete('/:id', { preHandler: [authMiddleware] }, deleteFeedback);
+    fastify.patch('/:id/status', { preHandler: [authMiddleware, requireAdmin] }, updateFeedbackStatus);
+    fastify.delete('/:id', { preHandler: [authMiddleware, requireAdmin] }, deleteFeedback);
 }

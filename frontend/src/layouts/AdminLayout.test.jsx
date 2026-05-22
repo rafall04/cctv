@@ -15,7 +15,7 @@ import { TestRouter } from '../test/renderWithRouter';
 
 vi.mock('../services/authService', () => ({
     authService: {
-        getCurrentUser: () => ({ id: 1, username: 'admin' }),
+        getCurrentUser: () => ({ id: 1, username: 'admin', role: 'admin' }),
         logout: vi.fn(),
     },
 }));

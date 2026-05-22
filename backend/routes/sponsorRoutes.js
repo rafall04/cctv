@@ -15,7 +15,7 @@ import {
     removeSponsorFromCamera,
     getCamerasWithSponsors
 } from '../controllers/sponsorController.js';
-import { authMiddleware } from '../middleware/authMiddleware.js';
+import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 
 export default async function sponsorRoutes(fastify, options) {
     // Public routes
@@ -36,23 +36,23 @@ export default async function sponsorRoutes(fastify, options) {
     }, getSponsorById);
 
     fastify.post('/', {
-        preHandler: authMiddleware
+        preHandler: [authMiddleware, requireAdmin]
     }, createSponsor);
 
     fastify.put('/:id', {
-        preHandler: authMiddleware
+        preHandler: [authMiddleware, requireAdmin]
     }, updateSponsor);
 
     fastify.delete('/:id', {
-        preHandler: authMiddleware
+        preHandler: [authMiddleware, requireAdmin]
     }, deleteSponsor);
 
     // Camera-sponsor assignment
     fastify.post('/camera/:cameraId/assign', {
-        preHandler: authMiddleware
+        preHandler: [authMiddleware, requireAdmin]
     }, assignSponsorToCamera);
 
     fastify.delete('/camera/:cameraId/remove', {
-        preHandler: authMiddleware
+        preHandler: [authMiddleware, requireAdmin]
     }, removeSponsorFromCamera);
 }

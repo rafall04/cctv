@@ -16,7 +16,7 @@ import {
     getAreaAdminOverview,
     getAreaSummary,
 } from '../controllers/areaController.js';
-import { authMiddleware } from '../middleware/authMiddleware.js';
+import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 import {
     createAreaSchema,
     updateAreaSchema,
@@ -59,19 +59,19 @@ export default async function areaRoutes(fastify, options) {
 
     fastify.post('/', {
         schema: createAreaSchema,
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: createArea,
     });
 
     fastify.put('/:id', {
         schema: updateAreaSchema,
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: updateArea,
     });
 
     fastify.delete('/:id', {
         schema: areaIdParamSchema,
-        onRequest: [authMiddleware],
+        onRequest: [authMiddleware, requireAdmin],
         handler: deleteArea,
     });
 }

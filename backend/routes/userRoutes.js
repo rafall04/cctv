@@ -10,7 +10,7 @@ import {
     changeOwnPassword,
     getPasswordPolicyRequirements,
 } from '../controllers/userController.js';
-import { authMiddleware } from '../middleware/authMiddleware.js';
+import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 import {
     createUserSchema,
     updateUserSchema,
@@ -41,31 +41,36 @@ export default async function userRoutes(fastify, options) {
             handler: changeOwnPassword,
         });
 
-        // User management routes (admin)
-        fastify.get('/', getAllUsers);
-        
+        // User management routes (admin role required — not just any logged-in user)
+        fastify.get('/', { onRequest: [requireAdmin], handler: getAllUsers });
+
         fastify.get('/:id', {
             schema: userIdParamSchema,
+            onRequest: [requireAdmin],
             handler: getUserById,
         });
-        
+
         fastify.post('/', {
             schema: createUserSchema,
+            onRequest: [requireAdmin],
             handler: createUser,
         });
-        
+
         fastify.put('/:id', {
             schema: updateUserSchema,
+            onRequest: [requireAdmin],
             handler: updateUser,
         });
-        
+
         fastify.put('/:id/password', {
             schema: changePasswordSchema,
+            onRequest: [requireAdmin],
             handler: changePassword,
         });
-        
+
         fastify.delete('/:id', {
             schema: userIdParamSchema,
+            onRequest: [requireAdmin],
             handler: deleteUser,
         });
     });
