@@ -9,7 +9,7 @@
 
 import { config } from '../config/config.js';
 import recordingHealthDashboardService from './recordingHealthDashboardService.js';
-import { sendMonitoringMessage, isTelegramConfigured } from './telegramService.js';
+import { sendHealthAlertMessage, isTelegramConfigured } from './telegramService.js';
 
 const LEVEL_LABEL = {
     ok: 'Sehat',
@@ -31,7 +31,7 @@ function escapeHtml(value) {
 
 export function createRecordingHealthAlertService({
     healthService = recordingHealthDashboardService,
-    sendMessage = sendMonitoringMessage,
+    sendMessage = sendHealthAlertMessage,
     telegramConfigured = isTelegramConfigured,
     isEnabled = () => config.telegram?.healthAlertsEnabled !== false,
     logger = console,

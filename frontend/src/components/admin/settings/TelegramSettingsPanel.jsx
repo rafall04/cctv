@@ -88,6 +88,7 @@ export default function TelegramSettingsPanel() {
         feedbackChatId: '',
         notificationTargets: [],
         notificationRules: [],
+        healthAlertTargetId: '',
     });
 
     const loadTelegramStatus = useCallback(async () => {
@@ -112,6 +113,7 @@ export default function TelegramSettingsPanel() {
                 feedbackChatId: response.data.feedbackChatId || '',
                 notificationTargets: response.data.notificationTargets || [],
                 notificationRules: response.data.notificationRules || [],
+                healthAlertTargetId: response.data.healthAlertTargetId || '',
             });
             setError(null);
         } catch (requestError) {
@@ -172,6 +174,7 @@ export default function TelegramSettingsPanel() {
             feedbackChatId: telegramStatus?.feedbackChatId || '',
             notificationTargets: telegramStatus?.notificationTargets || [],
             notificationRules: telegramStatus?.notificationRules || [],
+            healthAlertTargetId: telegramStatus?.healthAlertTargetId || '',
         });
         setError(null);
         setIsEditing(false);
@@ -257,6 +260,13 @@ export default function TelegramSettingsPanel() {
             notificationRules: (prev.notificationRules || []).filter((_, ruleIndex) => ruleIndex !== index),
         }));
     };
+
+    const healthAlertTargetName = (() => {
+        const id = telegramStatus?.healthAlertTargetId;
+        if (!id) return 'Monitoring Utama (default)';
+        const target = (telegramStatus?.notificationTargets || []).find((item) => item.id === id);
+        return target ? target.name : 'Monitoring Utama (default)';
+    })();
 
     if (loading) {
         return (
@@ -402,6 +412,24 @@ export default function TelegramSettingsPanel() {
                                         <p className="text-sm text-gray-500 dark:text-gray-400">Belum ada grup tambahan. Chat ID monitoring utama tetap menjadi fallback.</p>
                                     )}
                                 </div>
+                            </div>
+
+                            <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-3">
+                                <div>
+                                    <h3 className="font-semibold text-gray-900 dark:text-white">Alert Kesehatan Recording</h3>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">Grup tujuan alert pipeline recording (scheduler / recovery). Sinyal ini global, bukan per-area.</p>
+                                </div>
+                                <select
+                                    aria-label="Grup Alert Kesehatan Recording"
+                                    value={formData.healthAlertTargetId || ''}
+                                    onChange={(event) => setFormData((prev) => ({ ...prev, healthAlertTargetId: event.target.value }))}
+                                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white"
+                                >
+                                    <option value="">Default — Monitoring Utama</option>
+                                    {(formData.notificationTargets || []).map((target) => (
+                                        <option key={target.id} value={target.id}>{formatTargetOptionLabel(target)}</option>
+                                    ))}
+                                </select>
                             </div>
 
                             <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-4">
@@ -599,6 +627,13 @@ export default function TelegramSettingsPanel() {
                                     </div>
                                 </div>
                             )}
+                            <div className="mt-6 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                                <h3 className="font-semibold text-gray-900 dark:text-white">Alert Kesehatan Recording</h3>
+                                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                                    Alert pipeline recording dikirim ke:{' '}
+                                    <span className="font-medium text-gray-900 dark:text-white">{healthAlertTargetName}</span>
+                                </p>
+                            </div>
                         </>
                     )}
 

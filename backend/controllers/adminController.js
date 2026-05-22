@@ -135,6 +135,7 @@ export async function updateTelegramConfig(request, reply) {
             feedbackChatId,
             notificationTargets = [],
             notificationRules = [],
+            healthAlertTargetId = '',
         } = request.body;
 
         const settings = {
@@ -143,6 +144,7 @@ export async function updateTelegramConfig(request, reply) {
             feedbackChatId: feedbackChatId || '',
             notificationTargets: Array.isArray(notificationTargets) ? notificationTargets : [],
             notificationRules: Array.isArray(notificationRules) ? notificationRules : [],
+            healthAlertTargetId: healthAlertTargetId || '',
             enabled: !!(botToken && (monitoringChatId || feedbackChatId || notificationTargets.length > 0))
         };
 

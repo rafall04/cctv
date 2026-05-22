@@ -136,6 +136,9 @@ function normalizeTelegramSettings(settings = {}) {
         ...settings,
         notificationTargets: Array.from(targetByChatId.values()),
         notificationRules: rules,
+        // Which target receives recording-pipeline health alerts. Empty = fall
+        // back to the monitoring chat.
+        healthAlertTargetId: String(settings.healthAlertTargetId || '').trim(),
     };
 }
 
@@ -547,6 +550,26 @@ export async function sendMonitoringMessage(message) {
     return sendToTelegram(message, settings.monitoringChatId);
 }
 
+/**
+ * Send a recording-pipeline health alert to the operator-chosen target group.
+ * Falls back to the monitoring chat when no target is set, or when the chosen
+ * target was deleted/disabled.
+ */
+export async function sendHealthAlertMessage(message) {
+    const settings = getTelegramSettings();
+    const targetId = String(settings.healthAlertTargetId || '').trim();
+
+    let chatId = settings.monitoringChatId;
+    if (targetId) {
+        const target = (settings.notificationTargets || [])
+            .find((candidate) => candidate.id === targetId && candidate.enabled);
+        if (target?.chatId) {
+            chatId = target.chatId;
+        }
+    }
+    return sendToTelegram(message, chatId);
+}
+
 export async function sendFeedbackMessage(message) {
     const settings = getTelegramSettings();
     return sendToTelegram(message, settings.feedbackChatId);
@@ -732,11 +755,13 @@ export function getTelegramStatus() {
         notificationTargets: settings.notificationTargets || [],
         notificationRules: settings.notificationRules || [],
         notificationRuleIssues,
+        healthAlertTargetId: settings.healthAlertTargetId || '',
     };
 }
 
 export default {
     sendMonitoringMessage,
+    sendHealthAlertMessage,
     sendFeedbackMessage,
     sendTargetTestMessage,
     inspectCameraNotificationRouting,

@@ -448,4 +448,48 @@ describe('telegramService notification routing', () => {
         expect(status.cameraMonitoringConfigured).toBe(true);
         expect(status.monitoringChatId).toBe('-100-db-monitoring');
     });
+
+    it('sendHealthAlertMessage routes to the chosen target group', async () => {
+        const telegram = await loadTelegramService({
+            botToken: '123456789:test',
+            monitoringChatId: '-100-main',
+            notificationTargets: [
+                { id: 'noc-team', name: 'NOC Team', chatId: '-100-noc' },
+            ],
+            healthAlertTargetId: 'noc-team',
+        });
+
+        await telegram.sendHealthAlertMessage('pipeline critical');
+
+        expect(global.fetch).toHaveBeenCalledTimes(1);
+        const payload = JSON.parse(global.fetch.mock.calls[0][1].body);
+        expect(payload.chat_id).toBe('-100-noc');
+    });
+
+    it('sendHealthAlertMessage falls back to the monitoring chat when no target is set', async () => {
+        const telegram = await loadTelegramService({
+            botToken: '123456789:test',
+            monitoringChatId: '-100-main',
+            notificationTargets: [{ id: 'noc-team', name: 'NOC Team', chatId: '-100-noc' }],
+        });
+
+        await telegram.sendHealthAlertMessage('pipeline ok');
+
+        const payload = JSON.parse(global.fetch.mock.calls[0][1].body);
+        expect(payload.chat_id).toBe('-100-main');
+    });
+
+    it('sendHealthAlertMessage falls back to monitoring when the chosen target no longer exists', async () => {
+        const telegram = await loadTelegramService({
+            botToken: '123456789:test',
+            monitoringChatId: '-100-main',
+            notificationTargets: [],
+            healthAlertTargetId: 'deleted-target',
+        });
+
+        await telegram.sendHealthAlertMessage('pipeline warning');
+
+        const payload = JSON.parse(global.fetch.mock.calls[0][1].body);
+        expect(payload.chat_id).toBe('-100-main');
+    });
 });
