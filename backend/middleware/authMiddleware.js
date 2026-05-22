@@ -1,3 +1,5 @@
+import { logAuthorizationFailure } from '../services/securityAuditLogger.js';
+
 export async function authMiddleware(request, reply) {
     try {
         // Try to verify from header first
@@ -33,6 +35,14 @@ export async function authMiddleware(request, reply) {
  */
 export async function requireAdmin(request, reply) {
     if (request.user?.role !== 'admin') {
+        // Record the denial so it shows up on the Security Activity page.
+        logAuthorizationFailure({
+            reason: 'admin_role_required',
+            requiredRole: 'admin',
+            actualRole: request.user?.role || 'none',
+            username: request.user?.username || null,
+            endpoint: request.url,
+        }, request);
         return reply.code(403).send({
             success: false,
             message: 'Forbidden - admin access required',

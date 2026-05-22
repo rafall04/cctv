@@ -29,6 +29,7 @@ const CameraManagement = lazyWithRetry(() => import('./pages/CameraManagement'),
 const ImportExport = lazyWithRetry(() => import('./pages/admin/ImportExport'), 'import-export');
 const BackupRestore = lazyWithRetry(() => import('./pages/admin/BackupRestore'), 'backup-restore');
 const HealthDebug = lazyWithRetry(() => import('./pages/admin/HealthDebug'), 'health-debug');
+const SecurityActivity = lazyWithRetry(() => import('./pages/admin/SecurityActivity'), 'security-activity');
 const AreaManagement = lazyWithRetry(() => import('./pages/AreaManagement'), 'area-management');
 const UserManagement = lazyWithRetry(() => import('./pages/UserManagement'), 'user-management');
 const FeedbackManagement = lazyWithRetry(() => import('./pages/FeedbackManagement'), 'feedback-management');
@@ -113,6 +114,14 @@ function App() {
                     element={
                         <AdminPageRoute>
                             <HealthDebug />
+                        </AdminPageRoute>
+                    }
+                />
+                <Route
+                    path="/admin/security"
+                    element={
+                        <AdminPageRoute adminOnly>
+                            <SecurityActivity />
                         </AdminPageRoute>
                     }
                 />

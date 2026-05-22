@@ -24,6 +24,7 @@ import backupService from '../services/backupService.js';
 import cameraHealthService from '../services/cameraHealthService.js';
 import notificationDiagnosticsService from '../services/notificationDiagnosticsService.js';
 import recordingHealthDashboardService from '../services/recordingHealthDashboardService.js';
+import securityAuditLogger from '../services/securityAuditLogger.js';
 
 export async function getDashboardStats(request, reply) {
     try {
@@ -327,6 +328,46 @@ export async function getRecordingHealth(request, reply) {
             success: false,
             message: 'Internal server error',
         });
+    }
+}
+
+/**
+ * Get a paginated page of security audit events (admin only).
+ * Supports ?eventType=, ?search=, ?page=, ?limit=.
+ */
+export async function getSecurityLogs(request, reply) {
+    try {
+        const { eventType, search, page, limit } = request.query || {};
+        const result = securityAuditLogger.getSecurityLogsPage({
+            eventType: eventType || null,
+            search: search || null,
+            page,
+            limit,
+        });
+        return reply.send({
+            success: true,
+            data: result.logs,
+            pagination: result.pagination,
+        });
+    } catch (error) {
+        console.error('Get security logs error:', error);
+        return reply.code(500).send({ success: false, message: 'Internal server error' });
+    }
+}
+
+/**
+ * Get security event statistics for the last N days (admin only).
+ */
+export async function getSecurityStats(request, reply) {
+    try {
+        const days = Number.parseInt(request.query?.days, 10) || 7;
+        return reply.send({
+            success: true,
+            data: securityAuditLogger.getLogStatistics(days),
+        });
+    } catch (error) {
+        console.error('Get security stats error:', error);
+        return reply.code(500).send({ success: false, message: 'Internal server error' });
     }
 }
 

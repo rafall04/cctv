@@ -200,6 +200,45 @@ export const adminService = {
         }
     },
 
+    async getSecurityLogs(params = {}, policy = REQUEST_POLICY.BLOCKING, config = {}) {
+        try {
+            const searchParams = new URLSearchParams();
+            Object.entries(params || {}).forEach(([key, value]) => {
+                if (value !== undefined && value !== null && value !== '') {
+                    searchParams.set(key, String(value));
+                }
+            });
+            const queryString = searchParams.toString();
+            const response = await apiClient.get(
+                `/api/admin/security/logs${queryString ? `?${queryString}` : ''}`,
+                getRequestPolicyConfig(policy, config)
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Get security logs error:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to fetch security logs'
+            };
+        }
+    },
+
+    async getSecurityStats(days = 7, policy = REQUEST_POLICY.BLOCKING, config = {}) {
+        try {
+            const response = await apiClient.get(
+                `/api/admin/security/stats?days=${days}`,
+                getRequestPolicyConfig(policy, config)
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Get security stats error:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to fetch security stats'
+            };
+        }
+    },
+
     async getTelegramStatus() {
         try {
             const response = await apiClient.get('/api/admin/telegram/status');

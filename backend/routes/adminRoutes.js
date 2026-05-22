@@ -6,7 +6,7 @@
  * SideEffects: Adds authenticated admin routes to Fastify.
  */
 
-import { getDashboardStats, getTodayStats, testTelegramNotification, getTelegramConfig, updateTelegramConfig, previewNotificationDiagnostics, runNotificationDiagnosticsDrill, listNotificationDiagnosticsRuns, getViewerAnalytics, getViewerHistoryPage, getRealTimeViewers, getCameraHealthDebug, getRecordingHealth, getCacheStats, clearCache, getTimezoneConfig, updateTimezoneConfig, exportDatabaseBackup, importDatabaseBackup, getBackupPreview } from '../controllers/adminController.js';
+import { getDashboardStats, getTodayStats, testTelegramNotification, getTelegramConfig, updateTelegramConfig, previewNotificationDiagnostics, runNotificationDiagnosticsDrill, listNotificationDiagnosticsRuns, getViewerAnalytics, getViewerHistoryPage, getRealTimeViewers, getCameraHealthDebug, getRecordingHealth, getSecurityLogs, getSecurityStats, getCacheStats, clearCache, getTimezoneConfig, updateTimezoneConfig, exportDatabaseBackup, importDatabaseBackup, getBackupPreview } from '../controllers/adminController.js';
 import { generateApiKey, listApiKeys, deleteApiKey } from '../controllers/apiKeyController.js';
 import { clearPlaybackTokenSessions, createPlaybackToken, listPlaybackTokenAuditLogs, listPlaybackTokens, revokePlaybackToken, sharePlaybackToken, updatePlaybackToken } from '../controllers/playbackTokenController.js';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
@@ -51,6 +51,17 @@ export default async function adminRoutes(fastify, options) {
     fastify.get('/recording-health', {
         onRequest: [authMiddleware],
         handler: getRecordingHealth,
+    });
+
+    // Security activity — audit log viewer (admin only)
+    fastify.get('/security/logs', {
+        onRequest: [authMiddleware, requireAdmin],
+        handler: getSecurityLogs,
+    });
+
+    fastify.get('/security/stats', {
+        onRequest: [authMiddleware, requireAdmin],
+        handler: getSecurityStats,
     });
 
     // Telegram notification endpoints

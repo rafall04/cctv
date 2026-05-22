@@ -17,7 +17,7 @@
  */
 
 import crypto from 'crypto';
-import { execute, query } from '../database/connectionPool.js';
+import { execute, query, queryOne } from '../database/connectionPool.js';
 
 /**
  * Security event types
@@ -40,6 +40,7 @@ export const SECURITY_EVENTS = {
     PASSWORD_CHANGED: 'PASSWORD_CHANGED',
     PASSWORD_VALIDATION_FAILED: 'PASSWORD_VALIDATION_FAILED',
     VALIDATION_FAILURE: 'VALIDATION_FAILURE',
+    AUTHZ_FAILURE: 'AUTHZ_FAILURE',
     ADMIN_ACTION: 'ADMIN_ACTION',
     USER_CREATED: 'USER_CREATED',
     USER_UPDATED: 'USER_UPDATED',
@@ -334,6 +335,24 @@ export function logPasswordValidationFailed(details, request = null) {
 
 
 /**
+ * Log an authorization failure — an authenticated user tried to reach a
+ * resource their role does not allow (e.g. a `viewer` hitting an admin route).
+ * @param {Object} details - { reason, requiredRole, actualRole, username, endpoint }
+ * @param {Object} request - Fastify request object (optional)
+ * @returns {Object} Log entry
+ */
+export function logAuthorizationFailure(details, request = null) {
+    return logSecurityEvent(SECURITY_EVENTS.AUTHZ_FAILURE, {
+        reason: details.reason,
+        required_role: details.requiredRole,
+        actual_role: details.actualRole,
+        username: details.username,
+        endpoint: details.endpoint,
+        ...details
+    }, request);
+}
+
+/**
  * Log admin action (generic admin operations)
  * @param {Object} details - Action details (action, targetType, targetId, etc.)
  * @param {Object} request - Fastify request object (optional)
@@ -584,6 +603,52 @@ export function getLogStatistics(days = 7) {
 
 
 /**
+ * Get a paginated, filterable page of security logs for the admin viewer.
+ * @param {Object} options - { eventType, search, page, limit }
+ * @returns {{ logs: Array, pagination: { page, limit, total, totalPages } }}
+ */
+export function getSecurityLogsPage({ eventType = null, search = null, page = 1, limit = 50 } = {}) {
+    const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+    const safePage = Math.max(parseInt(page, 10) || 1, 1);
+    const offset = (safePage - 1) * safeLimit;
+
+    try {
+        const where = [];
+        const params = [];
+        if (eventType) {
+            where.push('event_type = ?');
+            params.push(eventType);
+        }
+        if (search) {
+            where.push('(ip_address LIKE ? OR username LIKE ? OR endpoint LIKE ? OR details LIKE ?)');
+            const like = `%${search}%`;
+            params.push(like, like, like, like);
+        }
+        const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+        const totalRow = queryOne(`SELECT COUNT(*) AS count FROM security_logs ${whereSql}`, params);
+        const total = totalRow?.count || 0;
+        const logs = query(
+            `SELECT * FROM security_logs ${whereSql} ORDER BY timestamp DESC LIMIT ? OFFSET ?`,
+            [...params, safeLimit, offset]
+        );
+
+        return {
+            logs,
+            pagination: {
+                page: safePage,
+                limit: safeLimit,
+                total,
+                totalPages: Math.ceil(total / safeLimit),
+            },
+        };
+    } catch (error) {
+        console.warn('[SECURITY_AUDIT] Failed to get logs page:', error.message);
+        return { logs: [], pagination: { page: safePage, limit: safeLimit, total: 0, totalPages: 0 } };
+    }
+}
+
+/**
  * Cleanup old logs (retention: 90 days)
  * Should be called periodically (e.g., daily via cron or scheduled task)
  * @returns {number} Number of deleted logs
@@ -664,6 +729,7 @@ export default {
     logApiKeyCreated,
     logApiKeyRevoked,
     logCsrfFailure,
+    logAuthorizationFailure,
     logAccountLockout,
     logSessionCreated,
     logSessionRefreshed,
@@ -680,6 +746,7 @@ export default {
     logCameraUpdated,
     logCameraDeleted,
     getRecentLogs,
+    getSecurityLogsPage,
     getLogsByIp,
     getLogsByUsername,
     getLogsByDateRange,
