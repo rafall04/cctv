@@ -72,6 +72,11 @@ export async function updateSetting(request, reply) {
             data,
         });
     } catch (error) {
+        // Surface validation failures as 400 instead of masking them as a
+        // generic 500 (consistent with the other admin controllers).
+        if (error.statusCode === 400) {
+            return reply.code(400).send({ success: false, message: error.message });
+        }
         console.error('Update setting error:', error);
         return reply.code(500).send({
             success: false,

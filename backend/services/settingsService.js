@@ -355,18 +355,28 @@ class SettingsService {
     }
 
     getMapDefaultCenter() {
-        const setting = queryOne('SELECT value FROM settings WHERE key = ?', ['map_default_center']);
+        const fallback = {
+            latitude: -7.1507,
+            longitude: 111.8815,
+            zoom: 13,
+            name: 'Bojonegoro'
+        };
 
+        const setting = queryOne('SELECT value FROM settings WHERE key = ?', ['map_default_center']);
         if (!setting) {
-            return {
-                latitude: -7.1507,
-                longitude: 111.8815,
-                zoom: 13,
-                name: 'Bojonegoro'
-            };
+            return fallback;
         }
 
-        return JSON.parse(setting.value);
+        // The value is operator-editable via PUT /api/settings/:key, so a
+        // malformed string must not crash the PUBLIC /api/settings/map-center
+        // endpoint — fall back to the default center instead.
+        try {
+            const parsed = JSON.parse(setting.value);
+            return (parsed && typeof parsed === 'object') ? parsed : fallback;
+        } catch {
+            console.warn('[Settings] map_default_center has an invalid JSON value; using default center.');
+            return fallback;
+        }
     }
 
     getLandingPageSettings() {

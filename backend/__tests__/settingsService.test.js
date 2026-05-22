@@ -91,6 +91,43 @@ describe('settingsService.getLandingPageSettings', () => {
     });
 });
 
+describe('settingsService.getMapDefaultCenter', () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it('returns the default center when the setting row is missing', () => {
+        vi.spyOn(database, 'queryOne').mockReturnValue(undefined);
+
+        expect(settingsService.getMapDefaultCenter()).toEqual(
+            expect.objectContaining({ name: 'Bojonegoro' })
+        );
+    });
+
+    it('falls back to the default center when the stored value is not valid JSON', () => {
+        // An operator can PUT any string for this key — a malformed value
+        // must not crash the public /api/settings/map-center endpoint.
+        vi.spyOn(database, 'queryOne').mockReturnValue({ value: 'not-json{' });
+
+        expect(settingsService.getMapDefaultCenter()).toEqual(
+            expect.objectContaining({ name: 'Bojonegoro' })
+        );
+    });
+
+    it('returns the parsed object for a valid stored value', () => {
+        vi.spyOn(database, 'queryOne').mockReturnValue({
+            value: JSON.stringify({ latitude: 1, longitude: 2, zoom: 14, name: 'Custom' }),
+        });
+
+        expect(settingsService.getMapDefaultCenter()).toEqual({
+            latitude: 1,
+            longitude: 2,
+            zoom: 14,
+            name: 'Custom',
+        });
+    });
+});
+
 describe('settingsService.getPublicAdsSettings', () => {
     afterEach(() => {
         vi.restoreAllMocks();
