@@ -28,10 +28,6 @@ vi.mock('../components/DateRangeSelector', () => ({
     ),
 }));
 
-vi.mock('../components/CameraStatusOverview', () => ({
-    CameraStatusOverview: () => <div>camera-overview</div>,
-}));
-
 vi.mock('../components/TopCamerasWidget', () => ({
     TopCamerasWidget: () => <div>top-cameras</div>,
 }));

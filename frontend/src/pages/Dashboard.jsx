@@ -9,7 +9,6 @@ SideEffects: Fetches dashboard stats through useDashboardData and navigates to a
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Alert } from '../components/ui/Alert';
-import { CameraStatusOverview } from '../components/CameraStatusOverview';
 import { QuickStatsCards } from '../components/QuickStatsCards';
 import { DateRangeSelector } from '../components/DateRangeSelector';
 import { DashboardInitialSkeleton } from '../components/admin/dashboard/DashboardSkeletons';
@@ -19,7 +18,7 @@ import {
     StreamsDrawer,
     ViewerSessionsModal,
 } from '../components/admin/dashboard/DashboardStreams';
-import { DashboardAttentionItems, DashboardSummaryCards } from '../components/admin/dashboard/DashboardSummaryCards';
+import { DashboardAttentionItems, DashboardStatsOverview } from '../components/admin/dashboard/DashboardSummaryCards';
 import { DashboardSidebar } from '../components/admin/dashboard/DashboardSidebar';
 import { useDashboardData } from '../hooks/admin/useDashboardData';
 
@@ -250,11 +249,9 @@ export default function Dashboard() {
                 onNavigate={navigate}
             />
 
-            <DateRangeSelector value={dateRange} onChange={setDateRange} />
-            <QuickStatsCards dateRange={dateRange} />
             <DashboardAttentionItems items={attentionItems} />
 
-            <DashboardSummaryCards
+            <DashboardStatsOverview
                 stats={stats}
                 cpuLoad={cpuLoad}
                 memUsed={memUsed}
@@ -263,10 +260,10 @@ export default function Dashboard() {
                 onOpenViewer={setViewerModal}
             />
 
-            <CameraStatusOverview
-                breakdown={stats?.cameraStatusBreakdown}
-                totalCameras={stats?.summary.totalCameras || 0}
-            />
+            <div className="space-y-4">
+                <DateRangeSelector value={dateRange} onChange={setDateRange} />
+                <QuickStatsCards dateRange={dateRange} />
+            </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                 <DashboardStreamsPanel

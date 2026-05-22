@@ -184,6 +184,22 @@ export const adminService = {
         }
     },
 
+    async getRecordingHealth(policy = REQUEST_POLICY.BLOCKING, config = {}) {
+        try {
+            const response = await apiClient.get(
+                '/api/admin/recording-health',
+                getRequestPolicyConfig(policy, config)
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Get recording health error:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to fetch recording health'
+            };
+        }
+    },
+
     async getTelegramStatus() {
         try {
             const response = await apiClient.get('/api/admin/telegram/status');

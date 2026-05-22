@@ -31,6 +31,23 @@ vi.mock('../services/recordingService', () => ({
     },
 }));
 
+vi.mock('../services/adminService', () => ({
+    adminService: {
+        getRecordingHealth: vi.fn().mockResolvedValue({
+            success: true,
+            data: {
+                generatedAt: new Date().toISOString(),
+                status: { level: 'ok', reasons: [] },
+                scheduler: { running: true, taskCount: 0, tasks: [] },
+                recovery: { queue: {}, diagnostics: {} },
+                recordingProcesses: { byStatus: {}, recording: 0, stopped: 0 },
+                restarts: { last24h: { total: 0, succeeded: 0, failed: 0 }, recent: [] },
+                storage: { totalSegments: 0, totalSizeBytes: 0, totalSizeGB: 0 },
+            },
+        }),
+    },
+}));
+
 vi.mock('../hooks/admin/useRecordingDashboardData', () => ({
     useRecordingDashboardData: () => ({
         recordings: [
