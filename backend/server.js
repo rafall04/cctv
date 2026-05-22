@@ -58,6 +58,7 @@ import viewerSessionService from './services/viewerSessionService.js';
 import playbackViewerSessionService from './services/playbackViewerSessionService.js';
 import { recordingService } from './services/recordingService.js';
 import recordingScheduler from './services/recordingScheduler.js';
+import recordingHealthAlertService from './services/recordingHealthAlertService.js';
 import thumbnailService from './services/thumbnailService.js';
 
 recordingService.attachScheduler(recordingScheduler);
@@ -429,6 +430,16 @@ const start = async () => {
         await recordingService.autoStartRecordings();
         recordingService.initializeBackgroundWork();
         console.log('[Recording] Background scheduler initialized');
+
+        // Proactive recording-pipeline health alerts — edge-triggered Telegram
+        // notifications when the health level changes (ok ⇄ warning ⇄ critical).
+        recordingScheduler.register({
+            name: 'recording-health-alert',
+            task: () => recordingHealthAlertService.checkAndAlert(),
+            intervalMs: 60000,
+            initialDelayMs: 60000,
+        });
+        console.log('[Recording] Health-alert watcher registered');
         console.log('[Recording] Recording service initialized');
         
         // Start thumbnail generation service

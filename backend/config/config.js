@@ -183,6 +183,9 @@ export const config = {
         || process.env.TELEGRAM_FEEDBACK_CHAT_ID
       )
     ),
+    // Proactive recording-pipeline health alerts to the monitoring chat.
+    // On by default; set RECORDING_HEALTH_ALERTS_ENABLED=false to silence them.
+    healthAlertsEnabled: process.env.RECORDING_HEALTH_ALERTS_ENABLED !== 'false',
   },
 };
 
