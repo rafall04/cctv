@@ -39,9 +39,11 @@ export default function FeedbackManagement() {
             return;
         }
         refreshAll();
-        if (selectedFeedback?.id === id) {
-            setSelectedFeedback((previous) => ({ ...previous, status: newStatus }));
-        }
+        // Use the functional updater so the optimistic detail update also lands
+        // when the row was selected in the same tick (stale-closure safe).
+        setSelectedFeedback((previous) => (
+            previous?.id === id ? { ...previous, status: newStatus } : previous
+        ));
     };
 
     const handleDelete = async (id) => {

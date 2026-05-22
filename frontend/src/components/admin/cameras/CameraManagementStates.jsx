@@ -56,3 +56,28 @@ export function CameraManagementEmptyState({ onAddCamera }) {
         </div>
     );
 }
+
+/**
+ * Shown when cameras exist but the active filters match none of them.
+ * Distinct from the "no cameras at all" state so an operator is not told
+ * to "add a camera" when the real fix is to clear a filter.
+ */
+export function CameraManagementNoMatchState({ onResetFilters }) {
+    return (
+        <div className="text-center py-20 bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-2xl">
+            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700/50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-gray-400 dark:text-gray-500">
+                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Tidak Ada Kamera yang Cocok</h3>
+            <p className="text-gray-500 dark:text-gray-400 mb-6">Tidak ada kamera yang sesuai dengan filter aktif.</p>
+            <button
+                onClick={onResetFilters}
+                className="px-6 py-2.5 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-blue-700 text-white font-semibold rounded-xl shadow-lg shadow-primary/25 transition-all"
+            >
+                Reset Filter
+            </button>
+        </div>
+    );
+}

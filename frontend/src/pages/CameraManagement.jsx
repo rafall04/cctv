@@ -13,7 +13,17 @@ import {
     CameraManagementEmptyState,
     CameraManagementErrorState,
     CameraManagementLoadingState,
+    CameraManagementNoMatchState,
 } from '../components/admin/cameras/CameraManagementStates';
+
+const EMPTY_CAMERA_FILTERS = {
+    search: '',
+    areaId: 'all',
+    deliveryType: 'all',
+    healthMode: 'all',
+    availabilityState: 'all',
+    monitoringState: 'all',
+};
 import { useCameraManagementPage } from '../hooks/admin/useCameraManagementPage';
 
 export default function CameraManagement() {
@@ -138,7 +148,7 @@ export default function CameraManagement() {
             ) : cameras.length === 0 ? (
                 <CameraManagementEmptyState onAddCamera={openAddModal} />
             ) : filteredCameras.length === 0 ? (
-                <CameraManagementEmptyState onAddCamera={openAddModal} />
+                <CameraManagementNoMatchState onResetFilters={() => setFilters(EMPTY_CAMERA_FILTERS)} />
             ) : (
                 <CameraGrid
                     cameras={filteredCameras}
