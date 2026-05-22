@@ -9,6 +9,7 @@
 
 import crypto from 'crypto';
 import fp from 'fastify-plugin';
+import { config } from '../config/config.js';
 import { logCsrfFailure } from '../services/securityAuditLogger.js';
 
 /**
@@ -170,9 +171,15 @@ export function clearCsrfCookie(reply) {
  */
 async function csrfPlugin(fastify, options = {}) {
     fastify.addHook('preHandler', async (request, reply) => {
+        // Honor the CSRF_ENABLED kill-switch so operators can disable it
+        // without a code change or redeploy.
+        if (config.security?.csrfEnabled === false) {
+            return;
+        }
+
         const method = request.method?.toUpperCase();
         const url = request.url || '';
-        
+
         // Skip CSRF validation for non-state-changing methods
         if (!isStateChangingMethod(method)) {
             return;
@@ -223,9 +230,14 @@ export const csrfMiddleware = fp(csrfPlugin, {
  * @returns {boolean} True if validation passed, false if response was sent
  */
 export async function validateCsrfMiddleware(request, reply) {
+    // Honor the CSRF_ENABLED kill-switch (same as the global hook).
+    if (config.security?.csrfEnabled === false) {
+        return true;
+    }
+
     const method = request.method?.toUpperCase();
     const url = request.url || '';
-    
+
     // Skip for non-state-changing methods
     if (!isStateChangingMethod(method)) {
         return true;

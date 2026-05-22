@@ -14,6 +14,7 @@
  */
 
 import fp from 'fastify-plugin';
+import { config } from '../config/config.js';
 import { logRateLimitViolation as auditLogRateLimitViolation } from '../services/securityAuditLogger.js';
 
 /**
@@ -101,7 +102,9 @@ export function getEndpointType(url) {
 }
 
 /**
- * Get rate limit configuration for endpoint type
+ * Get rate limit configuration for endpoint type.
+ * The per-type `max` is read from config (RATE_LIMIT_PUBLIC/AUTH/ADMIN env)
+ * so operators can tune limits; RATE_LIMIT_CONFIG provides the fallback.
  * @param {string} endpointType - Endpoint type
  * @returns {{ max: number, window: number } | null} Rate limit config or null for whitelist
  */
@@ -109,7 +112,16 @@ export function getRateLimitForType(endpointType) {
     if (endpointType === 'whitelist') {
         return null;
     }
-    return RATE_LIMIT_CONFIG[endpointType] || RATE_LIMIT_CONFIG.public;
+    const base = RATE_LIMIT_CONFIG[endpointType] || RATE_LIMIT_CONFIG.public;
+    const envMax = {
+        public: config.security?.rateLimitPublic,
+        auth: config.security?.rateLimitAuth,
+        admin: config.security?.rateLimitAdmin,
+    }[endpointType];
+    return {
+        max: Number.isFinite(envMax) && envMax > 0 ? envMax : base.max,
+        window: base.window,
+    };
 }
 
 /**
@@ -303,9 +315,15 @@ async function rateLimiterPlugin(fastify, options = {}) {
     
     // Add rate limiting hook
     fastify.addHook('onRequest', async (request, reply) => {
+        // Honor the RATE_LIMIT_ENABLED kill-switch so operators can disable it
+        // without a code change or redeploy.
+        if (config.security?.rateLimitEnabled === false) {
+            return;
+        }
+
         const url = request.url || '';
         const ip = request.ip || request.headers['x-forwarded-for'] || 'unknown';
-        
+
         // Get endpoint type
         const endpointType = getEndpointType(url);
         
@@ -314,23 +332,26 @@ async function rateLimiterPlugin(fastify, options = {}) {
             return;
         }
         
-        // Get rate limit config for this endpoint type
-        const config = getRateLimitForType(endpointType);
-        if (!config) {
+        // Get rate limit config for this endpoint type.
+        // NOTE: must NOT be named `config` — that would shadow the imported
+        // module-level `config` for the whole hook scope (TDZ) and crash the
+        // RATE_LIMIT_ENABLED check above with "Cannot access 'config'...".
+        const limitConfig = getRateLimitForType(endpointType);
+        if (!limitConfig) {
             return;
         }
-        
+
         // Generate rate limit key
         const key = generateRateLimitKey(ip, endpointType);
-        
+
         // Check rate limit
-        const result = checkRateLimit(key, config.max, config.window);
-        
+        const result = checkRateLimit(key, limitConfig.max, limitConfig.window);
+
         // Add rate limit headers to response
-        reply.header('X-RateLimit-Limit', config.max);
+        reply.header('X-RateLimit-Limit', limitConfig.max);
         reply.header('X-RateLimit-Remaining', result.remaining);
         reply.header('X-RateLimit-Reset', Math.ceil(result.resetAt / 1000));
-        
+
         // If rate limit exceeded, return 429
         if (!result.allowed) {
             // Log the violation with request object for fingerprinting
@@ -338,8 +359,8 @@ async function rateLimiterPlugin(fastify, options = {}) {
                 ip,
                 url,
                 endpointType,
-                limit: config.max,
-                windowSeconds: config.window / 1000,
+                limit: limitConfig.max,
+                windowSeconds: limitConfig.window / 1000,
                 retryAfter: result.retryAfter
             }, request);
             
