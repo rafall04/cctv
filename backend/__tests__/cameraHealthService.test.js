@@ -22,6 +22,8 @@ const {
     executeMock,
     transactionMock,
     upsertRuntimeStateMock,
+    getAlertStateMapMock,
+    upsertAlertStatesMock,
 } = vi.hoisted(() => ({
     handleCameraBecameOnlineMock: vi.fn(),
     handleCameraBecameOfflineMock: vi.fn(),
@@ -32,6 +34,8 @@ const {
     executeMock: vi.fn(),
     transactionMock: vi.fn((fn) => (...args) => fn(...args)),
     upsertRuntimeStateMock: vi.fn(),
+    getAlertStateMapMock: vi.fn(() => new Map()),
+    upsertAlertStatesMock: vi.fn(),
 }));
 
 vi.mock('../services/recordingService.js', () => ({
@@ -75,6 +79,13 @@ vi.mock('../services/timezoneService.js', () => ({
 vi.mock('../services/cameraRuntimeStateService.js', () => ({
     default: {
         upsertRuntimeState: upsertRuntimeStateMock,
+    },
+}));
+
+vi.mock('../services/cameraTelegramAlertStateRepository.js', () => ({
+    default: {
+        getStateMap: getAlertStateMapMock,
+        upsertStates: upsertAlertStatesMock,
     },
 }));
 
@@ -1482,6 +1493,68 @@ describe('cameraHealthService check loop', () => {
         expect(telegram.sendCameraStatusNotifications).toHaveBeenCalledWith('offline', [
             expect.objectContaining({ id: 67, alertDetectedAt: 1_000 }),
         ]);
+    });
+
+    it('restores a persisted pending DOWN after a restart and still sends the alert', async () => {
+        // Simulates a backend restart: in-memory telegramAlertState is empty,
+        // but the persisted store still holds the in-flight pending DOWN.
+        // Without hydration the DOWN alert is silently dropped.
+        const telegram = await import('../services/telegramService.js');
+        telegram.isTelegramConfigured.mockReturnValue(true);
+
+        getAlertStateMapMock.mockReturnValueOnce(new Map([
+            [68, {
+                confirmedState: 'online',
+                pendingTransition: 'offline',
+                pendingSince: 1_000,
+                lastObservedState: 'offline',
+                lastUpdatedAt: 1_000,
+            }],
+        ]));
+
+        const service = new CameraHealthService();
+        service.telegramAlertConfirmationMs = { down: 120_000, up: 60_000 };
+        // telegramAlertState left empty on purpose — the restart lost it.
+
+        const camera = {
+            id: 68,
+            name: 'Restarted Camera',
+            enabled: 1,
+            is_online: 0,
+            monitoring_state: 'offline',
+            stream_source: 'external',
+            delivery_type: 'external_hls',
+            stream_key: 'camera-68',
+        };
+
+        vi.spyOn(Date, 'now').mockReturnValue(121_000);
+        vi.spyOn(service, 'getActivePaths').mockResolvedValue(new Map());
+        vi.spyOn(service, 'evaluateCameraStatus').mockResolvedValue({
+            camera,
+            isOnline: 0,
+            rawReason: 'stream_offline',
+            rawDetails: null,
+        });
+        vi.spyOn(service, 'evaluateCameraMonitoringStatus').mockResolvedValue({
+            camera,
+            isOnline: 0,
+            monitoring_state: 'offline',
+            monitoring_reason: 'still down',
+        });
+
+        queryMock
+            .mockReturnValueOnce([{ id: 68, is_online: 0, monitoring_state: 'offline' }])
+            .mockReturnValueOnce([camera]);
+        executeMock.mockReturnValue({ changes: 1 });
+        upsertRuntimeStateMock.mockImplementation(() => {});
+
+        await service.checkAllCameras();
+
+        expect(getAlertStateMapMock).toHaveBeenCalledWith([68]);
+        expect(telegram.sendCameraStatusNotifications).toHaveBeenCalledWith('offline', [
+            expect.objectContaining({ id: 68, alertDetectedAt: 1_000 }),
+        ]);
+        expect(upsertAlertStatesMock).toHaveBeenCalled();
     });
 
     it('sends Telegram UP with the original recovery detected time after confirmation', async () => {

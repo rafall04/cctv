@@ -21,6 +21,7 @@ import { recordingService } from './recordingService.js';
 import thumbnailService from './thumbnailService.js';
 import settingsService from './settingsService.js';
 import cameraRuntimeStateService from './cameraRuntimeStateService.js';
+import cameraTelegramAlertStateRepository from './cameraTelegramAlertStateRepository.js';
 import mediaMtxService from './mediaMtxService.js';
 import {
     getCameraDeliveryProfile,
@@ -2606,6 +2607,21 @@ class CameraHealthService {
             const wentOnline = [];
 
             const processedIds = new Set();
+
+            // Restore alert-confirmation state for cameras whose in-memory
+            // state was lost (process restart, stream refresh) so an in-flight
+            // DOWN alert is not silently dropped.
+            const fulfilledCameraIds = probeResults
+                .filter((probe) => probe.result.status === 'fulfilled')
+                .map((probe) => probe.result.value.camera.id);
+            const alertStateToHydrate = fulfilledCameraIds.filter((id) => !this.telegramAlertState.has(id));
+            if (alertStateToHydrate.length > 0) {
+                for (const [cameraId, state] of cameraTelegramAlertStateRepository.getStateMap(alertStateToHydrate)) {
+                    this.telegramAlertState.set(cameraId, state);
+                }
+            }
+            const alertStatePersistQueue = [];
+
             for (const { result, camera: probedCamera } of probeResults) {
                 if (result.status !== 'fulfilled') {
                     console.error(`[CameraHealth] Camera ${probedCamera.id} (${probedCamera.name}) probe failed:`, result.reason?.message || result.reason);
@@ -2635,6 +2651,7 @@ class CameraHealthService {
                     upConfirmationMs: this.telegramAlertConfirmationMs.up,
                 });
                 this.telegramAlertState.set(camera.id, confirmedAlert.state);
+                alertStatePersistQueue.push({ cameraId: camera.id, state: confirmedAlert.state });
                 const alertTransition = confirmedAlert.transitionToSend;
 
                 if (statusChanged) {
@@ -2651,6 +2668,10 @@ class CameraHealthService {
                     console.warn(`[CameraHealth] Camera ${camera.id} (${camera.name}) offline reason: ${rawReason}`);
                 }
             }
+
+            // Persist alert-confirmation state so a restart/refresh keeps any
+            // in-flight DOWN/UP debounce instead of re-seeding from scratch.
+            cameraTelegramAlertStateRepository.upsertStates(alertStatePersistQueue);
 
             for (const camera of candidateCameras) {
                 if (processedIds.has(camera.id)) {
