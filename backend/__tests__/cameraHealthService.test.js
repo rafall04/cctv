@@ -1428,6 +1428,62 @@ describe('cameraHealthService check loop', () => {
         ]);
     });
 
+    it('sends Telegram DOWN when monitoring resolves to a non-literal offline state (probe_failed)', async () => {
+        // Regression: the confirmation policy only understands online/offline.
+        // A monitoring state of probe_failed used to be passed through raw and
+        // treated as "unknown" — the offline alert silently never fired.
+        const telegram = await import('../services/telegramService.js');
+        telegram.isTelegramConfigured.mockReturnValue(true);
+
+        const service = new CameraHealthService();
+        service.telegramAlertConfirmationMs = { down: 120_000, up: 60_000 };
+        service.telegramAlertState.set(67, {
+            confirmedState: 'online',
+            pendingTransition: 'offline',
+            pendingSince: 1_000,
+            lastObservedState: 'offline',
+            lastUpdatedAt: 1_000,
+        });
+
+        const camera = {
+            id: 67,
+            name: 'Probe Failed Camera',
+            enabled: 1,
+            is_online: 1,
+            monitoring_state: 'online',
+            stream_source: 'external',
+            delivery_type: 'external_hls',
+            stream_key: 'camera-67',
+        };
+
+        vi.spyOn(Date, 'now').mockReturnValue(121_000);
+        vi.spyOn(service, 'getActivePaths').mockResolvedValue(new Map());
+        vi.spyOn(service, 'evaluateCameraStatus').mockResolvedValue({
+            camera,
+            isOnline: 1,
+            rawReason: 'stream_online',
+            rawDetails: null,
+        });
+        vi.spyOn(service, 'evaluateCameraMonitoringStatus').mockResolvedValue({
+            camera,
+            isOnline: 0,
+            monitoring_state: 'probe_failed',
+            monitoring_reason: 'probe failed three times',
+        });
+
+        queryMock
+            .mockReturnValueOnce([{ id: 67, is_online: 1, monitoring_state: 'online' }])
+            .mockReturnValueOnce([camera]);
+        executeMock.mockReturnValue({ changes: 1 });
+        upsertRuntimeStateMock.mockImplementation(() => {});
+
+        await service.checkAllCameras();
+
+        expect(telegram.sendCameraStatusNotifications).toHaveBeenCalledWith('offline', [
+            expect.objectContaining({ id: 67, alertDetectedAt: 1_000 }),
+        ]);
+    });
+
     it('sends Telegram UP with the original recovery detected time after confirmation', async () => {
         const telegram = await import('../services/telegramService.js');
         telegram.isTelegramConfigured.mockReturnValue(true);

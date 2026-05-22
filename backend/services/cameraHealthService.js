@@ -37,7 +37,7 @@ import {
 } from '../utils/internalIngestPolicy.js';
 import { resolveExternalHealthMode as resolveExternalHealthModePolicy } from './cameraHealthPolicy.js';
 import {
-    getMonitoringAlertTransition,
+    normalizeMonitoringOnline,
     shouldUseStrictInternalMonitoring,
 } from './cameraMonitoringAlertPolicy.js';
 import {
@@ -147,6 +147,19 @@ function getTimestamp() {
 
 function deriveMonitoringStateFromOnline(isOnline) {
     return isOnline ? 'online' : 'offline';
+}
+
+/**
+ * Map a monitoring state to the plain alert direction the Telegram
+ * confirmation policy understands. The richer states (passive / stale /
+ * probe_failed / unresolved / ...) must be collapsed to 'online' / 'offline'
+ * here — the policy treats anything else as "unknown" and never alerts.
+ */
+function monitoringStateToAlertState(monitoringState) {
+    const online = normalizeMonitoringOnline(monitoringState);
+    if (online === 1) return 'online';
+    if (online === 0) return 'offline';
+    return null;
 }
 
 function isStrictInternalRtspHealthCamera(camera) {
@@ -2605,13 +2618,12 @@ class CameraHealthService {
                 const statusChanged = camera.is_online !== isOnline;
                 const previousMonitoringState = camera.monitoring_state || deriveMonitoringStateFromOnline(camera.is_online);
                 const nextMonitoringState = finalResult?.monitoringState || deriveMonitoringStateFromOnline(isOnline);
-                const rawAlertTransition = getMonitoringAlertTransition(previousMonitoringState, nextMonitoringState);
                 const now = Date.now();
+                // Collapse the monitoring state to an online/offline alert
+                // direction; the confirmation policy debounces from there.
+                const nextAlertState = monitoringStateToAlertState(nextMonitoringState);
                 const currentAlertState = this.telegramAlertState.get(camera.id)
-                    || createTelegramAlertConfirmationState(previousMonitoringState, now);
-                const nextAlertState = rawAlertTransition
-                    ? nextMonitoringState
-                    : previousMonitoringState === nextMonitoringState ? nextMonitoringState : null;
+                    || createTelegramAlertConfirmationState(monitoringStateToAlertState(previousMonitoringState), now);
                 const alertDetectedAt = currentAlertState.pendingTransition === nextAlertState
                     && Number.isFinite(currentAlertState.pendingSince)
                     ? currentAlertState.pendingSince
