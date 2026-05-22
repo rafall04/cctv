@@ -39,9 +39,12 @@ export const STATE_CHANGING_METHODS = ['POST', 'PUT', 'DELETE', 'PATCH'];
  */
 export const CSRF_SKIP_ENDPOINTS = [
     '/api/stream',                      // Stream endpoints use API key only
-    '/api/viewer/start',                // Viewer tracking - public endpoint
-    '/api/viewer/heartbeat',            // Viewer tracking - public endpoint
-    '/api/viewer/stop',                 // Viewer tracking - public endpoint
+    // Public viewer-tracking POSTs (start/heartbeat/stop/runtime-signal) are
+    // called by anonymous visitors who have no CSRF token. Skipped by prefix
+    // so a newly added tracking endpoint cannot be missed.
+    '/api/viewer/',                     // Live viewer tracking
+    '/api/playback-viewer/',            // Playback viewer tracking
+    '/api/auth/refresh',                // Token rotation via httpOnly cookie; CSRF cookie can expire first
     '/health',                          // Health check endpoint
     '/hls'                              // HLS proxy - public streaming endpoint
 ];
