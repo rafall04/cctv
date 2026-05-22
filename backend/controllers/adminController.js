@@ -23,6 +23,7 @@ import { logAdminAction } from '../services/securityAuditLogger.js';
 import backupService from '../services/backupService.js';
 import cameraHealthService from '../services/cameraHealthService.js';
 import notificationDiagnosticsService from '../services/notificationDiagnosticsService.js';
+import recordingHealthDashboardService from '../services/recordingHealthDashboardService.js';
 
 export async function getDashboardStats(request, reply) {
     try {
@@ -308,6 +309,26 @@ export async function getCameraHealthDebug(request, reply) {
     }
 }
 
+
+/**
+ * Get recording-pipeline health snapshot (admin only).
+ * Surfaces scheduler telemetry, recovery queue/diagnostics, recording process
+ * counts, restart history, and storage in one observability payload.
+ */
+export async function getRecordingHealth(request, reply) {
+    try {
+        return reply.send({
+            success: true,
+            data: recordingHealthDashboardService.getSnapshot(),
+        });
+    } catch (error) {
+        console.error('Get recording health error:', error);
+        return reply.code(500).send({
+            success: false,
+            message: 'Internal server error',
+        });
+    }
+}
 
 /**
  * Get cache statistics (admin only)
