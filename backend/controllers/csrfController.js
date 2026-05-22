@@ -26,8 +26,8 @@ export async function getCsrfToken(request, reply) {
     // Generate new CSRF token
     const token = generateCsrfToken();
     
-    // Set token in httpOnly cookie
-    setCsrfCookie(reply, token);
+    // Set token in httpOnly cookie (Secure flag derived from request protocol)
+    setCsrfCookie(reply, token, request);
     
     // Return token in response body
     // Frontend will use this to set the X-CSRF-Token header

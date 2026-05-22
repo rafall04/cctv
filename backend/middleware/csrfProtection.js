@@ -11,6 +11,7 @@ import crypto from 'crypto';
 import fp from 'fastify-plugin';
 import { config } from '../config/config.js';
 import { logCsrfFailure } from '../services/securityAuditLogger.js';
+import { isHttpsRequest } from '../utils/authCookieOptions.js';
 
 /**
  * CSRF token configuration
@@ -142,13 +143,19 @@ export function validateCsrfToken(request) {
 }
 
 /**
- * Set CSRF token cookie on response
+ * Set CSRF token cookie on response.
+ * `secure` is derived from the actual request protocol (like the auth
+ * cookies) — a hardcoded Secure cookie is silently dropped by the browser
+ * over plain HTTP (LAN / direct-IP deployments), leaving csrf_token unset
+ * and 403-ing every CSRF-protected POST.
  * @param {Object} reply - Fastify reply object
  * @param {string} token - CSRF token
+ * @param {Object} [request] - Fastify request, used to decide the Secure flag
  */
-export function setCsrfCookie(reply, token) {
+export function setCsrfCookie(reply, token, request = null) {
     reply.setCookie(CSRF_CONFIG.cookieName, token, {
         ...CSRF_CONFIG.cookieOptions,
+        secure: request ? isHttpsRequest(request) : CSRF_CONFIG.cookieOptions.secure,
         maxAge: CSRF_CONFIG.expirationMinutes * 60 // Convert to seconds
     });
 }
