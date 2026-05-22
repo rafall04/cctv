@@ -80,14 +80,19 @@ export default function StreamHealthSettingsPanel() {
         event.preventDefault();
         try {
             setSaving(true);
-            await Promise.all(HEALTH_SETTING_FIELDS.map((field) => (
+            const results = await Promise.all(HEALTH_SETTING_FIELDS.map((field) => (
                 settingsService.updateSetting(
                     field.key,
                     form[field.key],
                     `Stream health default for ${field.label.toLowerCase()}`
                 )
             )));
-            success('Default Tersimpan', 'Default stream health berhasil diperbarui.');
+            const failed = results.find((result) => !result.success);
+            if (failed) {
+                showError('Gagal Menyimpan', failed.message || 'Tidak bisa menyimpan default health monitoring.');
+            } else {
+                success('Default Tersimpan', 'Default stream health berhasil diperbarui.');
+            }
         } catch (error) {
             console.error('Save stream health defaults error:', error);
             showError('Gagal Menyimpan', 'Tidak bisa menyimpan default health monitoring.');

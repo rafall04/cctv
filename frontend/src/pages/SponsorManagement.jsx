@@ -55,19 +55,18 @@ function SponsorManagement() {
     };
 
     const loadData = useCallback(async () => {
-        try {
-            setLoading(true);
-            const [sponsorsRes, statsRes] = await Promise.all([
-                sponsorService.getAllSponsors(),
-                sponsorService.getSponsorStats()
-            ]);
+        setLoading(true);
+        const [sponsorsRes, statsRes] = await Promise.all([
+            sponsorService.getAllSponsors(),
+            sponsorService.getSponsorStats()
+        ]);
+        if (sponsorsRes.success && statsRes.success) {
             setSponsors(sponsorsRes.data);
             setStats(statsRes.data);
-        } catch (error) {
-            showNotification('Gagal memuat data sponsor', 'error');
-        } finally {
-            setLoading(false);
+        } else {
+            showNotification(sponsorsRes.message || statsRes.message || 'Gagal memuat data sponsor', 'error');
         }
+        setLoading(false);
     }, [showNotification]);
 
     useEffect(() => {
@@ -76,20 +75,19 @@ function SponsorManagement() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        try {
-            if (editingId) {
-                await sponsorService.updateSponsor(editingId, formData);
-                showNotification('Sponsor berhasil diperbarui', 'success');
-            } else {
-                await sponsorService.createSponsor(formData);
-                showNotification('Sponsor berhasil ditambahkan', 'success');
-            }
-            setShowModal(false);
-            resetForm();
-            loadData();
-        } catch (error) {
-            showNotification(error.response?.data?.message || 'Gagal menyimpan sponsor', 'error');
+        const result = editingId
+            ? await sponsorService.updateSponsor(editingId, formData)
+            : await sponsorService.createSponsor(formData);
+
+        if (!result.success) {
+            showNotification(result.message || 'Gagal menyimpan sponsor', 'error');
+            return;
         }
+
+        showNotification(editingId ? 'Sponsor berhasil diperbarui' : 'Sponsor berhasil ditambahkan', 'success');
+        setShowModal(false);
+        resetForm();
+        loadData();
     };
 
     const handleEdit = (sponsor) => {
@@ -113,14 +111,14 @@ function SponsorManagement() {
 
     const handleDelete = async (id, name) => {
         if (!confirm(`Hapus sponsor "${name}"?`)) return;
-        
-        try {
-            await sponsorService.deleteSponsor(id);
-            showNotification('Sponsor berhasil dihapus', 'success');
-            loadData();
-        } catch (error) {
-            showNotification('Gagal menghapus sponsor', 'error');
+
+        const result = await sponsorService.deleteSponsor(id);
+        if (!result.success) {
+            showNotification(result.message || 'Gagal menghapus sponsor', 'error');
+            return;
         }
+        showNotification('Sponsor berhasil dihapus', 'success');
+        loadData();
     };
 
     const resetForm = () => {

@@ -33,6 +33,7 @@ describe('AdsSettingsPanel', () => {
         errorMock.mockReset();
 
         getAllSettingsMock.mockResolvedValue({
+            success: true,
             data: {
                 ads_enabled: 'true',
                 ads_provider: 'adsterra',

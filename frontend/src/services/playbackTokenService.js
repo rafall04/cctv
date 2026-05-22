@@ -8,6 +8,19 @@
 
 import apiClient from './apiClient';
 
+/**
+ * Admin token-management methods follow the shared catch-and-return contract:
+ * they never throw and return `{ success: false, message }` on error.
+ * The public playback methods (activate/heartbeat/clear) keep throwing — that
+ * flow is driven by usePlaybackTokenAccess and is out of the admin scope.
+ */
+function failure(error, fallback) {
+    return {
+        success: false,
+        message: error.response?.data?.message || error.message || fallback,
+    };
+}
+
 export const playbackTokenService = {
     async activateToken(token, cameraId = null, clientId = '') {
         const response = await apiClient.post('/api/playback-token/activate', {
@@ -40,38 +53,73 @@ export const playbackTokenService = {
     },
 
     async listTokens() {
-        const response = await apiClient.get('/api/admin/playback-tokens');
-        return response.data;
+        try {
+            const response = await apiClient.get('/api/admin/playback-tokens');
+            return response.data;
+        } catch (error) {
+            console.error('List playback tokens error:', error);
+            return failure(error, 'Gagal memuat token playback');
+        }
     },
 
     async listAuditLogs(limit = 50) {
-        const response = await apiClient.get(`/api/admin/playback-tokens/audit?limit=${limit}`);
-        return response.data;
+        try {
+            const response = await apiClient.get(`/api/admin/playback-tokens/audit?limit=${limit}`);
+            return response.data;
+        } catch (error) {
+            console.error('List playback token audit logs error:', error);
+            return failure(error, 'Gagal memuat log token');
+        }
     },
 
     async createToken(payload) {
-        const response = await apiClient.post('/api/admin/playback-tokens', payload);
-        return response.data;
+        try {
+            const response = await apiClient.post('/api/admin/playback-tokens', payload);
+            return response.data;
+        } catch (error) {
+            console.error('Create playback token error:', error);
+            return failure(error, 'Gagal membuat token');
+        }
     },
 
     async updateToken(id, payload) {
-        const response = await apiClient.put(`/api/admin/playback-tokens/${id}`, payload);
-        return response.data;
+        try {
+            const response = await apiClient.put(`/api/admin/playback-tokens/${id}`, payload);
+            return response.data;
+        } catch (error) {
+            console.error('Update playback token error:', error);
+            return failure(error, 'Gagal memperbarui token');
+        }
     },
 
     async shareToken(id) {
-        const response = await apiClient.post(`/api/admin/playback-tokens/${id}/share`);
-        return response.data;
+        try {
+            const response = await apiClient.post(`/api/admin/playback-tokens/${id}/share`);
+            return response.data;
+        } catch (error) {
+            console.error('Share playback token error:', error);
+            return failure(error, 'Gagal membuat tautan share token');
+        }
     },
 
     async clearSessions(id) {
-        const response = await apiClient.post(`/api/admin/playback-tokens/${id}/sessions/clear`);
-        return response.data;
+        try {
+            const response = await apiClient.post(`/api/admin/playback-tokens/${id}/sessions/clear`);
+            return response.data;
+        } catch (error) {
+            console.error('Clear playback token sessions error:', error);
+            return failure(error, 'Gagal mereset sesi token');
+        }
     },
 
     async revokeToken(id) {
-        const response = await apiClient.post(`/api/admin/playback-tokens/${id}/revoke`);
-        return response.data;
+        try {
+            const response = await apiClient.post(`/api/admin/playback-tokens/${id}/revoke`);
+            return response.data;
+        } catch (error) {
+            console.error('Revoke playback token error:', error);
+            return failure(error, 'Gagal mencabut token');
+        }
     },
 };
 

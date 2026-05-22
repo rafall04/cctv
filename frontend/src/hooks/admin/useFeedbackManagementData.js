@@ -35,8 +35,12 @@ export function useFeedbackManagementData() {
                 return;
             }
 
-            setFeedbacks(response.data);
-            setPagination((previous) => ({ ...previous, ...response.pagination }));
+            if (response.success) {
+                setFeedbacks(response.data || []);
+                setPagination((previous) => ({ ...previous, ...response.pagination }));
+            } else {
+                console.error('Failed to fetch feedbacks:', response.message);
+            }
         } catch (error) {
             if (requestId === requestIdRef.current) {
                 console.error('Failed to fetch feedbacks:', error);
@@ -55,7 +59,9 @@ export function useFeedbackManagementData() {
                     ? REQUEST_POLICY.BACKGROUND
                     : REQUEST_POLICY.BLOCKING
             );
-            setStats(response.data);
+            if (response.success && response.data) {
+                setStats(response.data);
+            }
         } catch (error) {
             console.error('Failed to fetch stats:', error);
         }

@@ -50,6 +50,10 @@ export default function PlaybackSettingsPanel() {
         try {
             setLoading(true);
             const response = await settingsService.getAllSettings();
+            if (!response.success) {
+                showError('Gagal Memuat', response.message || 'Gagal memuat pengaturan playback.');
+                return;
+            }
             const data = response?.data || {};
             setSettings({
                 public_playback_enabled: parseBoolean(data.public_playback_enabled, true),
@@ -85,7 +89,7 @@ export default function PlaybackSettingsPanel() {
         event.preventDefault();
         try {
             setSaving(true);
-            await Promise.all(
+            const results = await Promise.all(
                 Object.entries(settings).map(([key, value]) => (
                     settingsService.updateSetting(
                         key,
@@ -94,7 +98,12 @@ export default function PlaybackSettingsPanel() {
                     )
                 ))
             );
-            success('Pengaturan Tersimpan', 'Pengaturan playback berhasil diperbarui.');
+            const failed = results.find((result) => !result.success);
+            if (failed) {
+                showError('Gagal Menyimpan', failed.message || 'Gagal menyimpan pengaturan playback.');
+            } else {
+                success('Pengaturan Tersimpan', 'Pengaturan playback berhasil diperbarui.');
+            }
         } catch (requestError) {
             console.error('Failed to save playback settings:', requestError);
             showError('Gagal Menyimpan', 'Gagal menyimpan pengaturan playback.');

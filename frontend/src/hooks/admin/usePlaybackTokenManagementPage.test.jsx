@@ -60,9 +60,9 @@ describe('usePlaybackTokenManagementPage', () => {
     beforeEach(async () => {
         vi.clearAllMocks();
         const { cameraService } = await import('../../services/cameraService');
-        playbackTokenService.listTokens.mockResolvedValue({ data: [] });
-        playbackTokenService.listAuditLogs.mockResolvedValue({ data: [] });
-        playbackTokenService.createToken.mockResolvedValue({ share_text: 'share text' });
+        playbackTokenService.listTokens.mockResolvedValue({ success: true, data: [] });
+        playbackTokenService.listAuditLogs.mockResolvedValue({ success: true, data: [] });
+        playbackTokenService.createToken.mockResolvedValue({ success: true, share_text: 'share text' });
         playbackTokenService.updateToken.mockResolvedValue({ success: true });
         cameraService.getAllCameras.mockResolvedValue({ data: [{ id: 3, name: 'CCTV Gate' }] });
     });
@@ -90,6 +90,7 @@ describe('usePlaybackTokenManagementPage', () => {
 
     it('updates token scope and camera rules from edit form', async () => {
         playbackTokenService.listTokens.mockResolvedValue({
+            success: true,
             data: [{
                 id: 9,
                 label: 'Client Lama',
@@ -155,6 +156,7 @@ describe('usePlaybackTokenManagementPage', () => {
 
     it('stores share text from nested create response data', async () => {
         playbackTokenService.createToken.mockResolvedValue({
+            success: true,
             data: {
                 share_text: 'Halo token nested',
             },

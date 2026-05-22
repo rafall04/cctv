@@ -257,7 +257,11 @@ export default function AdsSettingsPanel() {
         try {
             setLoading(true);
             const response = await settingsService.getAllSettings();
-            setSettings(mapSettingsResponse(response.data));
+            if (response.success) {
+                setSettings(mapSettingsResponse(response.data));
+            } else {
+                showError('Gagal Memuat', response.message || 'Gagal memuat pengaturan iklan.');
+            }
         } catch (requestError) {
             console.error('Error fetching ads settings:', requestError);
             showError('Gagal Memuat', 'Gagal memuat pengaturan iklan.');
@@ -282,7 +286,7 @@ export default function AdsSettingsPanel() {
         event.preventDefault();
         try {
             setSaving(true);
-            await Promise.all(
+            const results = await Promise.all(
                 Object.entries(settings).map(([key, value]) =>
                     settingsService.updateSetting(
                         key,
@@ -291,7 +295,12 @@ export default function AdsSettingsPanel() {
                     )
                 )
             );
-            success('Pengaturan Tersimpan', 'Pengaturan iklan berhasil diperbarui.');
+            const failed = results.find((result) => !result.success);
+            if (failed) {
+                showError('Gagal Menyimpan', failed.message || 'Gagal menyimpan pengaturan iklan.');
+            } else {
+                success('Pengaturan Tersimpan', 'Pengaturan iklan berhasil diperbarui.');
+            }
         } catch (requestError) {
             console.error('Error saving ads settings:', requestError);
             showError('Gagal Menyimpan', 'Gagal menyimpan pengaturan iklan.');

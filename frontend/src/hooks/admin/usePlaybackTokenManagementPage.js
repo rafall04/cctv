@@ -226,6 +226,9 @@ export function usePlaybackTokenManagementPage() {
             setTokens(Array.isArray(tokenResponse?.data) ? tokenResponse.data : []);
             setAuditLogs(Array.isArray(auditResponse?.data) ? auditResponse.data : []);
             setCameras(normalizeCameraRows(cameraResponse));
+            if (!tokenResponse?.success) {
+                showError('Gagal memuat token playback', tokenResponse?.message || 'Daftar token tidak bisa dimuat.');
+            }
         } catch (error) {
             showError('Gagal memuat token playback', error?.response?.data?.message || error.message);
         } finally {
@@ -383,6 +386,10 @@ export function usePlaybackTokenManagementPage() {
                 expires_at: form.expires_at || null,
             };
             const response = await playbackTokenService.createToken(payload);
+            if (!response.success) {
+                showError('Gagal membuat token', response.message || 'Token gagal dibuat.');
+                return;
+            }
             const shareText = extractPlaybackTokenShareText(response);
             if (shareText) {
                 setCreatedShare({ shareText });
@@ -431,6 +438,10 @@ export function usePlaybackTokenManagementPage() {
         setSharingTokenId(tokenId);
         try {
             const response = await playbackTokenService.shareToken(tokenId);
+            if (!response.success) {
+                showError('Gagal membuat share ulang', response.message || 'Teks share gagal dibuat.');
+                return;
+            }
             const shareText = extractPlaybackTokenShareText(response);
             if (shareText) {
                 setCreatedShare({ shareText });
@@ -449,6 +460,10 @@ export function usePlaybackTokenManagementPage() {
     const handleClearSessions = async (tokenId) => {
         try {
             const response = await playbackTokenService.clearSessions(tokenId);
+            if (!response.success) {
+                showError('Gagal membersihkan session', response.message || 'Session token gagal direset.');
+                return;
+            }
             showSuccess('Session dibersihkan', `${response?.data?.cleared || 0} session aktif dihentikan.`);
             await loadData();
         } catch (error) {
@@ -460,7 +475,7 @@ export function usePlaybackTokenManagementPage() {
         setUpdatingTokenId(tokenId);
         try {
             const cameraRules = buildTokenCameraRulesPayload(editForm.camera_rules);
-            await playbackTokenService.updateToken(tokenId, {
+            const response = await playbackTokenService.updateToken(tokenId, {
                 label: editForm.label,
                 scope_type: editForm.scope_type,
                 camera_ids: cameraRules.map((rule) => rule.camera_id),
@@ -473,6 +488,10 @@ export function usePlaybackTokenManagementPage() {
                 client_note: editForm.client_note,
                 share_template: editForm.share_template,
             });
+            if (!response.success) {
+                showError('Gagal memperbarui token', response.message || 'Policy token gagal disimpan.');
+                return;
+            }
             showSuccess('Token diperbarui', 'Policy token aktif sudah disimpan.');
             setEditingTokenId(null);
             setEditCameraSearch('');
@@ -486,7 +505,11 @@ export function usePlaybackTokenManagementPage() {
 
     const handleRevoke = async (tokenId) => {
         try {
-            await playbackTokenService.revokeToken(tokenId);
+            const response = await playbackTokenService.revokeToken(tokenId);
+            if (!response.success) {
+                showError('Gagal mencabut token', response.message || 'Token gagal dicabut.');
+                return;
+            }
             showSuccess('Token dicabut', 'Token tidak bisa digunakan lagi.');
             await loadData();
         } catch (error) {

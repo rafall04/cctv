@@ -69,32 +69,26 @@ export default function AreaManagement() {
 
     const loadAreas = useCallback(async () => {
         const requestId = ++loadRequestRef.current;
-        try {
-            if (!hasLoadedAreasRef.current) {
-                setLoading(true);
-                setLoadError(null);
-            }
-            const overviewResponse = await areaService.getAdminOverview();
-            if (requestId !== loadRequestRef.current) {
-                return;
-            }
-            if (overviewResponse.success) {
-                setAreas(overviewResponse.data);
-                hasLoadedAreasRef.current = true;
-                setLoadError(null);
-            }
-        } catch (err) {
-            console.error('Load areas error:', err);
-            if (!hasLoadedAreasRef.current) {
-                setLoadError('Gagal memuat data area.');
-            } else if (requestId === loadRequestRef.current) {
-                showError('Sinkronisasi Area Gagal', 'Menampilkan data area terakhir yang berhasil dimuat.');
-            }
-        } finally {
-            if (requestId === loadRequestRef.current) {
-                setLoading(false);
-            }
+        if (!hasLoadedAreasRef.current) {
+            setLoading(true);
+            setLoadError(null);
         }
+        const overviewResponse = await areaService.getAdminOverview();
+        if (requestId !== loadRequestRef.current) {
+            return;
+        }
+        if (overviewResponse.success) {
+            setAreas(overviewResponse.data);
+            hasLoadedAreasRef.current = true;
+            setLoadError(null);
+        } else if (!hasLoadedAreasRef.current) {
+            // First load failed — show the blocking error state.
+            setLoadError(overviewResponse.message || 'Gagal memuat data area.');
+        } else {
+            // Background refresh failed — keep the last good data, just warn.
+            showError('Sinkronisasi Area Gagal', 'Menampilkan data area terakhir yang berhasil dimuat.');
+        }
+        setLoading(false);
     }, [showError]);
 
     const loadMapCenter = useCallback(async () => {
@@ -292,15 +286,16 @@ export default function AreaManagement() {
 
     const saveMapCenter = async () => {
         setSavingMapCenter(true);
-        try {
-            await settingsService.updateMapCenter(mapCenter.latitude, mapCenter.longitude, mapCenter.zoom, mapCenter.name);
-            success('Berhasil', 'Lokasi default peta berhasil disimpan');
-            setShowMapCenterModal(false);
-        } catch (err) {
-            showError('Gagal', 'Gagal menyimpan lokasi default');
-        } finally {
-            setSavingMapCenter(false);
+        const result = await settingsService.updateMapCenter(
+            mapCenter.latitude, mapCenter.longitude, mapCenter.zoom, mapCenter.name
+        );
+        setSavingMapCenter(false);
+        if (!result.success) {
+            showError('Gagal', result.message || 'Gagal menyimpan lokasi default');
+            return;
         }
+        success('Berhasil', 'Lokasi default peta berhasil disimpan');
+        setShowMapCenterModal(false);
     };
 
     const kecamatans = [...new Set(areas.map(a => a.kecamatan).filter(Boolean))].sort();

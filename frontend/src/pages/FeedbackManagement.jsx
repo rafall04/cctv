@@ -7,6 +7,7 @@
  */
 
 import { feedbackService } from '../services/feedbackService';
+import { useNotification } from '../contexts/NotificationContext';
 import { FeedbackIcons } from '../components/admin/feedback/feedbackConstants.jsx';
 import { useFeedbackManagementData } from '../hooks/admin/useFeedbackManagementData';
 import FeedbackStatsGrid from '../components/admin/feedback/FeedbackStatsGrid';
@@ -17,6 +18,7 @@ import { TIMESTAMP_STORAGE, useTimezone } from '../contexts/TimezoneContext';
 
 export default function FeedbackManagement() {
     const { formatDateTime } = useTimezone();
+    const { success: notifySuccess, error: notifyError } = useNotification();
     const {
         feedbacks,
         stats,
@@ -31,14 +33,14 @@ export default function FeedbackManagement() {
     } = useFeedbackManagementData();
 
     const handleStatusChange = async (id, newStatus) => {
-        try {
-            await feedbackService.updateStatus(id, newStatus);
-            refreshAll();
-            if (selectedFeedback?.id === id) {
-                setSelectedFeedback((previous) => ({ ...previous, status: newStatus }));
-            }
-        } catch (error) {
-            console.error('Failed to update status:', error);
+        const result = await feedbackService.updateStatus(id, newStatus);
+        if (!result.success) {
+            notifyError('Gagal Mengubah Status', result.message || 'Status feedback gagal diperbarui.');
+            return;
+        }
+        refreshAll();
+        if (selectedFeedback?.id === id) {
+            setSelectedFeedback((previous) => ({ ...previous, status: newStatus }));
         }
     };
 
@@ -47,14 +49,15 @@ export default function FeedbackManagement() {
             return;
         }
 
-        try {
-            await feedbackService.delete(id);
-            refreshAll();
-            if (selectedFeedback?.id === id) {
-                setSelectedFeedback(null);
-            }
-        } catch (error) {
-            console.error('Failed to delete feedback:', error);
+        const result = await feedbackService.delete(id);
+        if (!result.success) {
+            notifyError('Gagal Menghapus', result.message || 'Feedback gagal dihapus.');
+            return;
+        }
+        notifySuccess('Feedback Dihapus', 'Feedback berhasil dihapus.');
+        refreshAll();
+        if (selectedFeedback?.id === id) {
+            setSelectedFeedback(null);
         }
     };
 

@@ -135,6 +135,8 @@ export default function BackupRestore() {
             if (response.success) {
                 setPreview(response.data);
                 success('Preview Restore Siap', `Terdapat ${response.data?.counts?.matched_repairable || 0} kamera yang bisa dipulihkan.`);
+            } else {
+                showError('Preview Restore Gagal', response.message || 'Gagal membuat preview restore.');
             }
         } catch (error) {
             showError('Preview Restore Gagal', error.response?.data?.message || error.message || 'Gagal membuat preview restore.');
@@ -155,6 +157,8 @@ export default function BackupRestore() {
             if (response.success) {
                 success('Backup Restore Berhasil', `Berhasil memulihkan ${response.data?.repaired || 0} kamera dari backup.`);
                 setPreview(null);
+            } else {
+                showError('Backup Restore Gagal', response.message || 'Gagal menerapkan restore backup.');
             }
         } catch (error) {
             showError('Backup Restore Gagal', error.response?.data?.message || error.message || 'Gagal menerapkan restore backup.');

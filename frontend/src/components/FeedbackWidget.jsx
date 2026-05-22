@@ -55,11 +55,16 @@ export default function FeedbackWidget() {
         setIsSubmitting(true);
 
         try {
-            await feedbackService.submit({
+            const result = await feedbackService.submit({
                 name: form.name || undefined,
                 email: form.email || undefined,
                 message: form.message,
             });
+
+            if (!result.success) {
+                setError(result.message || 'Gagal mengirim feedback');
+                return;
+            }
 
             setIsSuccess(true);
             setForm({ name: '', email: '', message: '' });
