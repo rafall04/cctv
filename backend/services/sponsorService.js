@@ -6,25 +6,32 @@ MainFuncs: getAllSponsors, getActiveSponsors, getSponsorById, createSponsor, upd
 SideEffects: Reads/writes the sponsors table and sponsor_* columns on cameras.
 */
 
-import { query, execute } from '../database/connectionPool.js';
+import { query, queryOne, execute } from '../database/connectionPool.js';
 
-// Tiered display order. ORDER BY package DESC on a TEXT column sorts
-// alphabetically (silver > gold > bronze) which puts silver first — wrong.
-// CASE expression makes the priority explicit and stable.
+// Display order is now driven by sponsor_packages.sort_order (admin-editable
+// in the catalog). The LEFT JOIN keeps legacy/orphan sponsor rows visible —
+// e.g. a sponsor whose package key no longer matches any catalog entry —
+// they just sort to the end of the list instead of disappearing.
+const SPONSOR_SELECT_WITH_PACKAGE = `
+    SELECT s.*,
+        sp.name AS package_name,
+        sp.color AS package_color,
+        sp.sort_order AS package_sort_order,
+        sp.default_camera_limit AS package_default_camera_limit
+    FROM sponsors s
+    LEFT JOIN sponsor_packages sp ON sp.key = s.package
+`;
+
 const PACKAGE_ORDER_SQL = `
-    CASE package
-        WHEN 'gold' THEN 1
-        WHEN 'silver' THEN 2
-        WHEN 'bronze' THEN 3
-        ELSE 4
-    END
+    COALESCE(sp.sort_order, 9999),
+    s.created_at DESC
 `;
 
 /**
  * Get all sponsors
  */
 export function getAllSponsors() {
-    return query('SELECT * FROM sponsors ORDER BY created_at DESC');
+    return query(`${SPONSOR_SELECT_WITH_PACKAGE} ORDER BY ${PACKAGE_ORDER_SQL}`);
 }
 
 /**
@@ -32,10 +39,10 @@ export function getAllSponsors() {
  */
 export function getActiveSponsors() {
     return query(`
-        SELECT * FROM sponsors
-        WHERE active = 1
-        AND (end_date IS NULL OR end_date >= DATE('now'))
-        ORDER BY ${PACKAGE_ORDER_SQL}, created_at DESC
+        ${SPONSOR_SELECT_WITH_PACKAGE}
+        WHERE s.active = 1
+        AND (s.end_date IS NULL OR s.end_date >= DATE('now'))
+        ORDER BY ${PACKAGE_ORDER_SQL}
     `);
 }
 
@@ -43,7 +50,7 @@ export function getActiveSponsors() {
  * Get sponsor by ID
  */
 export function getSponsorById(id) {
-    const sponsors = query('SELECT * FROM sponsors WHERE id = ?', [id]);
+    const sponsors = query(`${SPONSOR_SELECT_WITH_PACKAGE} WHERE s.id = ?`, [id]);
     return sponsors.length > 0 ? sponsors[0] : null;
 }
 
@@ -57,6 +64,7 @@ export function createSponsor(sponsorData) {
         url,
         package: pkg,
         price,
+        camera_limit,
         active = 1,
         start_date,
         end_date,
@@ -66,14 +74,21 @@ export function createSponsor(sponsorData) {
         notes
     } = sponsorData;
 
+    // camera_limit: null/'' = unlimited (the Gold default). The schema
+    // validator already enforces integer >= 0 or null; this just normalises
+    // empty-string from older clients.
+    const normalizedCameraLimit = camera_limit === null || camera_limit === undefined || camera_limit === ''
+        ? null
+        : Number(camera_limit);
+
     return execute(`
         INSERT INTO sponsors (
-            name, logo, url, package, price, active,
+            name, logo, url, package, price, camera_limit, active,
             start_date, end_date, contact_name, contact_email,
             contact_phone, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
-        name, logo, url, pkg, price, active,
+        name, logo, url, pkg, price, normalizedCameraLimit, active,
         start_date, end_date, contact_name, contact_email,
         contact_phone, notes
     ]);
@@ -120,6 +135,15 @@ export function updateSponsor(id, sponsorData) {
     if (price !== undefined) {
         updates.push('price = ?');
         values.push(price);
+    }
+    if (Object.prototype.hasOwnProperty.call(sponsorData, 'camera_limit')) {
+        // Per-sponsor camera cap. null = unlimited; same normalisation as create.
+        updates.push('camera_limit = ?');
+        values.push(
+            sponsorData.camera_limit === null || sponsorData.camera_limit === ''
+                ? null
+                : Number(sponsorData.camera_limit)
+        );
     }
     if (active !== undefined) {
         updates.push('active = ?');
@@ -214,13 +238,45 @@ export function getExpiringSponsorships() {
 }
 
 /**
- * Assign sponsor to camera
+ * Assign sponsor to a single camera. Enforces the sponsor's `camera_limit`
+ * if set (null = unlimited). Throws 409 with a clear message when adding
+ * this camera would put the sponsor over its own cap, so admins see exactly
+ * why the click was rejected instead of getting a silent overwrite.
+ *
+ * The camera being assigned is excluded from the cap check — re-applying
+ * the same sponsor to a camera it already covers must always succeed
+ * (idempotent), and so must swapping the sponsor on a camera (the slot is
+ * being freed and reused).
  */
 export function assignSponsorToCamera(cameraId, sponsorData) {
     const { sponsor_name, sponsor_logo, sponsor_url, sponsor_package } = sponsorData;
-    
+
+    if (sponsor_name) {
+        const sponsorRow = queryOne(
+            'SELECT id, camera_limit FROM sponsors WHERE name = ?',
+            [sponsor_name]
+        );
+        if (sponsorRow && sponsorRow.camera_limit !== null && sponsorRow.camera_limit !== undefined) {
+            const limit = Number(sponsorRow.camera_limit);
+            const currentRow = queryOne(
+                `SELECT COUNT(*) AS n FROM cameras
+                 WHERE sponsor_name = ? AND id != ?`,
+                [sponsor_name, cameraId]
+            );
+            const occupiedExcludingThis = Number(currentRow?.n || 0);
+            if (occupiedExcludingThis + 1 > limit) {
+                const err = new Error(
+                    `Sponsor "${sponsor_name}" sudah mencapai batas ${limit} kamera. ` +
+                    `Naikkan camera_limit-nya atau lepas kamera lain dulu.`
+                );
+                err.statusCode = 409;
+                throw err;
+            }
+        }
+    }
+
     return execute(`
-        UPDATE cameras 
+        UPDATE cameras
         SET sponsor_name = ?,
             sponsor_logo = ?,
             sponsor_url = ?,

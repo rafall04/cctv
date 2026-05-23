@@ -795,14 +795,22 @@ export async function validateSaweriaSettings(request, reply) {
 // ads-network feature (AdSense / Adsterra etc.) that lives under
 // components/ads/. Keep the two domains separated in schema and code.
 
-const SPONSOR_PACKAGE_VALUES = ['bronze', 'silver', 'gold'];
+// Package keys are now admin-defined via the sponsor_packages table, so we
+// validate format (lowercase, alphanumeric + _-) instead of pinning to a
+// fixed enum. The CHECK constraint on the sponsors table is dropped in the
+// matching migration (zz_20260523_add_sponsor_packages_and_camera_limit.js).
+const SPONSOR_PACKAGE_KEY_PATTERN = '^[a-z0-9_-]{1,40}$';
 
 const sponsorBodyProperties = {
     name: { type: 'string', minLength: 1, maxLength: 100 },
     logo: { anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }] },
     url: { anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }] },
-    package: { type: 'string', enum: SPONSOR_PACKAGE_VALUES },
+    package: { type: 'string', pattern: SPONSOR_PACKAGE_KEY_PATTERN },
     price: { anyOf: [{ type: 'number', minimum: 0 }, { type: 'null' }] },
+    // camera_limit: per-sponsor cap on how many cameras can be linked.
+    // null = unlimited (the Gold-tier default). 0 effectively disables the
+    // sponsor from showing on any camera.
+    camera_limit: { anyOf: [{ type: 'integer', minimum: 0 }, { type: 'null' }] },
     active: { anyOf: [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }] },
     start_date: { anyOf: [{ type: 'string', maxLength: 20 }, { type: 'null' }] },
     end_date: { anyOf: [{ type: 'string', maxLength: 20 }, { type: 'null' }] },
@@ -837,7 +845,50 @@ export const assignSponsorToCameraSchema = {
             sponsor_name: { type: 'string', minLength: 1, maxLength: 100 },
             sponsor_logo: { anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }] },
             sponsor_url: { anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }] },
-            sponsor_package: { anyOf: [{ type: 'string', enum: SPONSOR_PACKAGE_VALUES }, { type: 'null' }] },
+            sponsor_package: { anyOf: [{ type: 'string', pattern: SPONSOR_PACKAGE_KEY_PATTERN }, { type: 'null' }] },
+        },
+        additionalProperties: false,
+    },
+};
+
+// ============================================
+// Sponsor Package Schemas (catalog)
+// ============================================
+
+const sponsorPackageProperties = {
+    key: { type: 'string', pattern: SPONSOR_PACKAGE_KEY_PATTERN },
+    name: { type: 'string', minLength: 1, maxLength: 80 },
+    color: { type: 'string', minLength: 1, maxLength: 32 },
+    default_price: { type: 'number', minimum: 0 },
+    default_camera_limit: { anyOf: [{ type: 'integer', minimum: 0 }, { type: 'null' }] },
+    features: {
+        type: 'array',
+        maxItems: 20,
+        items: { type: 'string', maxLength: 200 },
+    },
+    sort_order: { type: 'integer', minimum: 0, maximum: 9999 },
+};
+
+export const createSponsorPackageSchema = {
+    body: {
+        type: 'object',
+        required: ['key', 'name'],
+        properties: sponsorPackageProperties,
+        additionalProperties: false,
+    },
+};
+
+export const updateSponsorPackageSchema = {
+    body: {
+        type: 'object',
+        // `key` intentionally NOT allowed on update — see service comment.
+        properties: {
+            name: sponsorPackageProperties.name,
+            color: sponsorPackageProperties.color,
+            default_price: sponsorPackageProperties.default_price,
+            default_camera_limit: sponsorPackageProperties.default_camera_limit,
+            features: sponsorPackageProperties.features,
+            sort_order: sponsorPackageProperties.sort_order,
         },
         additionalProperties: false,
     },
