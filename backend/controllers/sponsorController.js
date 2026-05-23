@@ -7,15 +7,23 @@ import sponsorService from '../services/sponsorService.js';
 import { logAdminAction } from '../services/securityAuditLogger.js';
 
 /**
- * Get all sponsors (admin only)
+ * Get all sponsors (admin only). Each row is enriched with `camera_count`
+ * so the admin list shows how many cameras a sponsor is currently linked
+ * to — the link is denormalized via `sponsor_name` on the cameras table,
+ * matched by name. Done in one extra grouped query, not N+1.
  */
 export async function getAllSponsors(request, reply) {
     try {
         const sponsors = sponsorService.getAllSponsors();
-        
+        const cameraCounts = sponsorService.countCamerasPerSponsor();
+        const enriched = sponsors.map((sponsor) => ({
+            ...sponsor,
+            camera_count: cameraCounts[sponsor.name] || 0,
+        }));
+
         return reply.send({
             success: true,
-            data: sponsors
+            data: enriched
         });
     } catch (error) {
         console.error('Get sponsors error:', error);

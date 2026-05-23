@@ -54,22 +54,14 @@ try {
     `);
     console.log('✅ Sponsors table created/verified');
 
-    // Create banner_ads table for managing banner advertisements
-    db.exec(`
-        CREATE TABLE IF NOT EXISTS banner_ads (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            position TEXT CHECK(position IN ('top', 'bottom', 'sidebar', 'inline')),
-            size TEXT CHECK(size IN ('leaderboard', 'rectangle', 'skyscraper', 'mobile')),
-            network TEXT CHECK(network IN ('medianet', 'adsterra', 'propellerads', 'custom')),
-            code TEXT,
-            active INTEGER DEFAULT 1,
-            priority INTEGER DEFAULT 0,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        );
-    `);
-    console.log('✅ Banner ads table created/verified');
+    // banner_ads table intentionally NOT created here. Sponsors and ads are
+    // two different domains: sponsors are local entities we render ourselves
+    // (logos on cameras, footer strip); ads are external network scripts
+    // (AdSense, Adsterra, etc.) rendered through components/ads/. Mixing
+    // them in the same migration confuses ownership and review. Existing
+    // deployments that already have a banner_ads table from earlier runs
+    // keep it (this is forward-only, idempotent migrations), but new
+    // deployments do not create the empty unused table.
 
     console.log('');
     console.log('✨ Migration completed successfully!');

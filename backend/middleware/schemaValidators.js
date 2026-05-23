@@ -787,3 +787,58 @@ export async function validateSaweriaSettings(request, reply) {
         throw error;
     }
 }
+
+// ============================================
+// Sponsor Schemas
+// ============================================
+// Sponsors are local entities (logos rendered by us) — distinct from the
+// ads-network feature (AdSense / Adsterra etc.) that lives under
+// components/ads/. Keep the two domains separated in schema and code.
+
+const SPONSOR_PACKAGE_VALUES = ['bronze', 'silver', 'gold'];
+
+const sponsorBodyProperties = {
+    name: { type: 'string', minLength: 1, maxLength: 100 },
+    logo: { anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }] },
+    url: { anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }] },
+    package: { type: 'string', enum: SPONSOR_PACKAGE_VALUES },
+    price: { anyOf: [{ type: 'number', minimum: 0 }, { type: 'null' }] },
+    active: { anyOf: [{ type: 'boolean' }, { type: 'integer', enum: [0, 1] }] },
+    start_date: { anyOf: [{ type: 'string', maxLength: 20 }, { type: 'null' }] },
+    end_date: { anyOf: [{ type: 'string', maxLength: 20 }, { type: 'null' }] },
+    contact_name: { anyOf: [{ type: 'string', maxLength: 100 }, { type: 'null' }] },
+    contact_email: { anyOf: [{ type: 'string', maxLength: 200 }, { type: 'null' }] },
+    contact_phone: { anyOf: [{ type: 'string', maxLength: 50 }, { type: 'null' }] },
+    notes: { anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }] },
+};
+
+export const createSponsorSchema = {
+    body: {
+        type: 'object',
+        required: ['name', 'package'],
+        properties: sponsorBodyProperties,
+        additionalProperties: false,
+    },
+};
+
+export const updateSponsorSchema = {
+    body: {
+        type: 'object',
+        properties: sponsorBodyProperties,
+        additionalProperties: false,
+    },
+};
+
+export const assignSponsorToCameraSchema = {
+    body: {
+        type: 'object',
+        required: ['sponsor_name'],
+        properties: {
+            sponsor_name: { type: 'string', minLength: 1, maxLength: 100 },
+            sponsor_logo: { anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }] },
+            sponsor_url: { anyOf: [{ type: 'string', maxLength: 1000 }, { type: 'null' }] },
+            sponsor_package: { anyOf: [{ type: 'string', enum: SPONSOR_PACKAGE_VALUES }, { type: 'null' }] },
+        },
+        additionalProperties: false,
+    },
+};

@@ -1,9 +1,24 @@
-/**
- * Sponsor Service
- * Mengelola sponsor dan sponsorship packages
- */
+/*
+Purpose: Manage local sponsor records, package assignments, and camera-sponsor links.
+Caller: sponsorController (admin CRUD) and public sponsor endpoints (active list, cameras).
+Deps: connectionPool (shared DB pool used by the rest of the backend).
+MainFuncs: getAllSponsors, getActiveSponsors, getSponsorById, createSponsor, updateSponsor, deleteSponsor, assignSponsorToCamera, removeSponsorFromCamera, getCamerasWithSponsors, getSponsorStats, getExpiringSponsorships, countCamerasPerSponsor.
+SideEffects: Reads/writes the sponsors table and sponsor_* columns on cameras.
+*/
 
-import { query, execute } from '../database/database.js';
+import { query, execute } from '../database/connectionPool.js';
+
+// Tiered display order. ORDER BY package DESC on a TEXT column sorts
+// alphabetically (silver > gold > bronze) which puts silver first — wrong.
+// CASE expression makes the priority explicit and stable.
+const PACKAGE_ORDER_SQL = `
+    CASE package
+        WHEN 'gold' THEN 1
+        WHEN 'silver' THEN 2
+        WHEN 'bronze' THEN 3
+        ELSE 4
+    END
+`;
 
 /**
  * Get all sponsors
@@ -17,10 +32,10 @@ export function getAllSponsors() {
  */
 export function getActiveSponsors() {
     return query(`
-        SELECT * FROM sponsors 
-        WHERE active = 1 
+        SELECT * FROM sponsors
+        WHERE active = 1
         AND (end_date IS NULL OR end_date >= DATE('now'))
-        ORDER BY package DESC, created_at DESC
+        ORDER BY ${PACKAGE_ORDER_SQL}, created_at DESC
     `);
 }
 
@@ -238,8 +253,37 @@ export function getCamerasWithSponsors() {
         SELECT * FROM cameras
         WHERE sponsor_name IS NOT NULL
         AND enabled = 1
-        ORDER BY sponsor_package DESC, id ASC
+        ORDER BY
+            CASE sponsor_package
+                WHEN 'gold' THEN 1
+                WHEN 'silver' THEN 2
+                WHEN 'bronze' THEN 3
+                ELSE 4
+            END,
+            id ASC
     `);
+}
+
+/**
+ * Count cameras currently linked to each sponsor (matched by sponsor name
+ * because cameras carry denormalized sponsor_* columns). Returns a map
+ * { [sponsorName]: cameraCount } that the controller folds into the
+ * sponsor list response so the admin sees coverage at a glance.
+ */
+export function countCamerasPerSponsor() {
+    const rows = query(`
+        SELECT sponsor_name AS name, COUNT(*) AS camera_count
+        FROM cameras
+        WHERE sponsor_name IS NOT NULL AND enabled = 1
+        GROUP BY sponsor_name
+    `);
+    const counts = {};
+    for (const row of rows) {
+        if (row?.name) {
+            counts[row.name] = row.camera_count;
+        }
+    }
+    return counts;
 }
 
 export default {
@@ -254,5 +298,6 @@ export default {
     getExpiringSponsorships,
     assignSponsorToCamera,
     removeSponsorFromCamera,
-    getCamerasWithSponsors
+    getCamerasWithSponsors,
+    countCamerasPerSponsor,
 };
