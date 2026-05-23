@@ -21,6 +21,24 @@ const PUBLIC_PLAYBACK_MODES = new Set(['inherit', 'disabled', 'preview_only', 'a
 const VALID_PREVIEW_MINUTES = new Set([0, 10, 20, 30, 60]);
 const RECORDABLE_DELIVERY_TYPES = new Set(['internal_hls', 'external_hls']);
 
+/**
+ * Strip server-internal fields before sending a segment row over HTTP.
+ *
+ * `file_path` is the absolute filesystem path on the server (e.g.
+ * `/var/www/rafnet-cctv/recordings/cameraN/20260517_010000.mp4`).
+ * Leaking that to a browser exposes our deployment layout and the
+ * recordings directory tree, which is a stepping stone for any further
+ * path-traversal or filesystem probing. The repository still SELECTs the
+ * column because the streaming path (`getStreamSegment`) needs it server
+ * side; we just don't ship it back to the client.
+ */
+function toPublicSegment(segment) {
+    if (!segment) return segment;
+    // eslint-disable-next-line no-unused-vars
+    const { file_path, ...publicSegment } = segment;
+    return publicSegment;
+}
+
 function normalizePublicPlaybackMode(value) {
     return PUBLIC_PLAYBACK_MODES.has(value) ? value : 'inherit';
 }
@@ -431,7 +449,7 @@ class RecordingPlaybackService {
         return {
             camera_id: camera.id,
             camera_name: camera.name,
-            segments: segmentsDescending,
+            segments: segmentsDescending.map(toPublicSegment),
             total_segments: segmentsDescending.length,
             playback_policy: this.buildPlaybackPolicy(access, camera, segmentsAscending),
         };

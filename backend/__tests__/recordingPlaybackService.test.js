@@ -212,6 +212,47 @@ describe('recordingPlaybackService', () => {
         expect(queryMock.mock.calls[0][0]).toContain('LIMIT ?');
     });
 
+    it('strips file_path from segment rows before returning them to a client', () => {
+        // The repository SELECT still includes file_path because the
+        // server-side streaming path needs it, but exposing the absolute
+        // filesystem path to a browser leaks the deployment layout. The
+        // service must sanitize it from every segment in the response.
+        queryOneMock
+            .mockReturnValueOnce({
+                id: 9,
+                name: 'CCTV TAMAN',
+                public_playback_mode: 'inherit',
+                public_playback_preview_minutes: null,
+            })
+            .mockReturnValueOnce({ value: '628111111111' });
+        queryMock.mockReturnValueOnce([
+            {
+                id: 2,
+                filename: 'second.mp4',
+                start_time: '2026-03-20T10:10:00.000Z',
+                end_time: '2026-03-20T10:20:00.000Z',
+                duration: 600,
+                file_path: '/var/www/rafnet-cctv/recordings/camera9/second.mp4',
+                file_size: 100,
+                created_at: '2026-03-20T10:10:00.000Z',
+            },
+        ]);
+
+        const result = recordingPlaybackService.getSegments(9, { query: {} });
+
+        expect(result.segments).toHaveLength(1);
+        expect(result.segments[0]).not.toHaveProperty('file_path');
+        // Other fields the client legitimately needs must still survive.
+        expect(result.segments[0]).toMatchObject({
+            id: 2,
+            filename: 'second.mp4',
+            start_time: '2026-03-20T10:10:00.000Z',
+            end_time: '2026-03-20T10:20:00.000Z',
+            duration: 600,
+            file_size: 100,
+        });
+    });
+
     it('allows admin full playback when admin scope is requested by authenticated user', () => {
         queryOneMock.mockReturnValueOnce({
             id: 10,

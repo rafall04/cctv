@@ -75,14 +75,18 @@ self.addEventListener('fetch', (event) => {
     );
 });
 
-self.options = {
-    domain: '3nbf4.com',
-    zoneId: 10528727,
-};
-self.lary = '';
-
-try {
-    importScripts('https://3nbf4.com/act/files/service-worker.min.js?r=sw');
-} catch (error) {
-    console.warn('[PWA] Optional ad service worker failed to load', error);
-}
+// Third-party ad service worker import REMOVED.
+//
+// The previous block called importScripts('https://3nbf4.com/...service-worker.min.js'),
+// which gave that remote origin the ability to install its own fetch
+// handler on OUR origin's service worker. Any subsequent fetch from our
+// site — including authenticated /api/* calls, /hls/* segments, and the
+// CSRF / playback cookies riding along with them — would have been
+// observable (and modifiable) by that external script. There is no
+// configuration knob that makes that safe; the only correct action is
+// to not load remote code into our SW at all.
+//
+// Network-side ads (AdSense, Adsterra, etc.) continue to load through the
+// per-page ad slots in components/ads/* which run in normal page scope,
+// not in the service worker. Service worker stays scoped to its actual
+// job: app-shell caching and the offline fallback above.
