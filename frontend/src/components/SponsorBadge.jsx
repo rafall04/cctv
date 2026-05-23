@@ -5,7 +5,7 @@
  * Props:
  * - sponsor: { name, logo, url, package }
  * - size: 'small' | 'medium' | 'large'
- * - position: 'top-right' | 'bottom-right' | 'bottom-left'
+ * - position: 'top-left' | 'top-right' | 'bottom-right' | 'bottom-left'
  */
 function SponsorBadge({ sponsor, size = 'small', position = 'bottom-right' }) {
     if (!sponsor) return null;
@@ -17,6 +17,7 @@ function SponsorBadge({ sponsor, size = 'small', position = 'bottom-right' }) {
     };
 
     const positionClasses = {
+        'top-left': 'top-2 left-2',
         'top-right': 'top-2 right-2',
         'bottom-right': 'bottom-2 right-2',
         'bottom-left': 'bottom-2 left-2'

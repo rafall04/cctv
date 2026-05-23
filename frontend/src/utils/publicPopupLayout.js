@@ -35,8 +35,6 @@ export function getPublicPopupModalStyle({
     viewportHeight,
     headerHeight,
     footerHeight,
-    topAdHeight = 0,
-    bottomAdHeight = 0,
     maxDesktopWidth,
     viewportVerticalPadding = DEFAULT_PUBLIC_POPUP_VIEWPORT_VERTICAL_PADDING,
     viewportHorizontalPadding = DEFAULT_PUBLIC_POPUP_VIEWPORT_HORIZONTAL_PADDING,
@@ -60,14 +58,18 @@ export function getPublicPopupModalStyle({
     const nextAspectRatio = Number(videoAspectRatio) || DEFAULT_PUBLIC_POPUP_LIVE_ASPECT_RATIO;
     const nextHeaderHeight = Number(headerHeight) || DEFAULT_PUBLIC_POPUP_HEADER_HEIGHT;
     const nextFooterHeight = Number(footerHeight) || DEFAULT_PUBLIC_POPUP_FOOTER_HEIGHT;
-    const nextTopAdHeight = Math.max(0, Number(topAdHeight) || 0);
-    const nextBottomAdHeight = Math.max(0, Number(bottomAdHeight) || 0);
+    // Ad slot heights are intentionally NOT subtracted here anymore. Before
+    // this fix, an ad reporting a height back via InlineAdSlot's
+    // ResizeObserver shrank `availableBodyHeight`, which shrank the modal
+    // width via `bodyHeight * aspectRatio`, which — combined with the
+    // body's `aspect-ratio` CSS — caused the live CCTV to visibly shrink
+    // every time the ad creative reloaded. The modal already has
+    // `overflow-y-auto`, so when total content exceeds viewport, it scrolls
+    // naturally instead of squishing the video.
     const availableBodyHeight = nextViewportHeight
         - viewportVerticalPadding
         - nextHeaderHeight
-        - nextFooterHeight
-        - nextTopAdHeight
-        - nextBottomAdHeight;
+        - nextFooterHeight;
     const availableViewportWidth = nextViewportWidth - viewportHorizontalPadding;
 
     if (availableBodyHeight <= 0 || availableViewportWidth <= 0) {

@@ -98,5 +98,31 @@ describe('publicPopupLayout', () => {
             maxHeight: 'calc(100vh - 16px)',
         });
     });
+
+    it('mengabaikan tinggi ads — video tidak boleh mengecil saat slot iklan load', () => {
+        // Regresi: dulu topAdHeight + bottomAdHeight ikut dikurangkan dari
+        // availableBodyHeight, dan body memakai `aspect-ratio: 16/9`, jadi
+        // setiap kali ResizeObserver di InlineAdSlot meneruskan tinggi baru,
+        // modal menyusut dan CCTV ikut menyusut. Fungsi ini sekarang tidak
+        // boleh menerima/memakai field ad-height — kalau pun nilai dikirim
+        // (compat lama), output harus identik dengan tanpa ads.
+        const baseArgs = {
+            isFullscreen: false,
+            isPlaybackLocked: false,
+            videoAspectRatio: 16 / 9,
+            viewportWidth: 1366,
+            viewportHeight: 768,
+            headerHeight: 88,
+            footerHeight: 64,
+            maxDesktopWidth: 1024,
+        };
+        const without = getPublicPopupModalStyle(baseArgs);
+        const withAdNoise = getPublicPopupModalStyle({
+            ...baseArgs,
+            topAdHeight: 120,
+            bottomAdHeight: 220,
+        });
+        expect(withAdNoise).toEqual(without);
+    });
 });
 

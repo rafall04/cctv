@@ -634,7 +634,13 @@ describe('VideoPopup non-live states', () => {
         ).toBeTruthy();
     });
 
-    it('mengizinkan kedua slot popup tampil pada viewport mobile', async () => {
+    it('hanya merender satu slot popup di mobile — bottom-native prioritas', async () => {
+        // Earlier the mobile viewport was allowed to render BOTH top-banner
+        // and bottom-native at once. On a 375-wide screen that left almost
+        // no room for the actual video and looked cramped. The new rule:
+        // pick exactly one, with bottom-native winning when both are
+        // configured because it sits below the player and feels less
+        // intrusive than a top banner.
         Object.defineProperty(window, 'innerWidth', { configurable: true, value: 375 });
 
         render(
@@ -667,10 +673,11 @@ describe('VideoPopup non-live states', () => {
         );
 
         await waitFor(() => {
-            expect(screen.getByText('popup top ad mobile')).toBeTruthy();
+            expect(screen.getByText('popup bottom ad mobile')).toBeTruthy();
         });
 
-        expect(screen.getByText('popup bottom ad mobile')).toBeTruthy();
+        // Top banner must be suppressed since bottom is eligible.
+        expect(screen.queryByText('popup top ad mobile')).toBeNull();
     });
 
     it('merender body MJPEG eksternal tanpa memulai HLS internal', async () => {

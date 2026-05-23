@@ -161,8 +161,11 @@ function VideoPopup({
     const [flvPlaybackSupported, setFlvPlaybackSupported] = useState(() => (
         typeof window !== 'undefined' ? flvjs.isSupported() : false
     ));
-    const [popupTopAdHeight, setPopupTopAdHeight] = useState(0);
-    const [popupBottomAdHeight, setPopupBottomAdHeight] = useState(0);
+    // Ad-height state used to feed back into the modal sizing math which
+    // caused the live CCTV to shrink every time an ad creative loaded.
+    // The math no longer reads these values (publicPopupLayout.js), so we
+    // dropped the state entirely — InlineAdSlot still measures itself for
+    // its own oversize-suppression logic, but doesn't push a height up.
     const [layoutMetrics, setLayoutMetrics] = useState(() => ({
         viewportWidth: typeof window !== 'undefined' ? window.innerWidth : 0,
         viewportHeight: typeof window !== 'undefined' ? window.innerHeight : 0,
@@ -1003,8 +1006,13 @@ function VideoPopup({
         popupAdsEnabled &&
         !isFullscreen &&
         shouldRenderAdSlot(adsConfig, 'popupBottomNative', isMobileAdsViewport);
+    // Only one popup ad slot at a time — even on mobile. The previous
+    // "mobile gets both" allowance produced an extremely cramped popup
+    // (video + 2 ads inside a 390-wide viewport). Bottom-native takes
+    // priority because it sits below the player and feels less intrusive;
+    // top-banner only renders when bottom isn't eligible.
     const showPopupBottomNative = popupBottomEligible;
-    const showPopupTopBanner = popupTopEligible && (isMobileAdsViewport || !showPopupBottomNative);
+    const showPopupTopBanner = popupTopEligible && !showPopupBottomNative;
     const bodyMinHeightClass = showPopupBottomNative
         ? 'min-h-[180px] sm:min-h-[220px] md:min-h-[280px]'
         : 'min-h-[220px] sm:min-h-[280px] md:min-h-[340px]';
@@ -1021,8 +1029,6 @@ function VideoPopup({
         viewportHeight: layoutMetrics.viewportHeight,
         headerHeight: layoutMetrics.headerHeight,
         footerHeight: layoutMetrics.footerHeight,
-        topAdHeight: popupTopAdHeight,
-        bottomAdHeight: popupBottomAdHeight,
         maxDesktopWidth: 1024,
     });
 
@@ -1053,8 +1059,6 @@ function VideoPopup({
         loadingStage,
         errorType,
         videoAspectRatio,
-        popupTopAdHeight,
-        popupBottomAdHeight,
     ]);
 
     return (
@@ -1070,7 +1074,6 @@ function VideoPopup({
                         className="border-b border-gray-200 bg-white/90 px-3 py-3 dark:border-gray-800 dark:bg-gray-900/90"
                         minHeightClassName="min-h-[96px]"
                         maxHeight={popupMaxHeight}
-                        onHeightChange={setPopupTopAdHeight}
                     />
                 )}
 
@@ -1142,7 +1145,13 @@ function VideoPopup({
                         Only renders when this camera has an assigned sponsor
                         (denormalized sponsor_* columns), so the surface is
                         invisible until an admin actually links a sponsor in
-                        Sponsor → Penugasan Kamera. */}
+                        Sponsor → Penugasan Kamera.
+
+                        Position: top-left. bottom-right collides with the
+                        native fullscreen / volume controls some browsers
+                        overlay on top of the <video> element; top-left
+                        keeps the sponsor logo readable without obscuring
+                        playback UI on either desktop or mobile. */}
                     {camera?.sponsor_name && (
                         <SponsorBadge
                             sponsor={{
@@ -1152,7 +1161,7 @@ function VideoPopup({
                                 package: camera.sponsor_package,
                             }}
                             size="medium"
-                            position="bottom-right"
+                            position="top-left"
                         />
                     )}
                     {isHlsCamera || (deliveryType === 'external_flv' && flvPlaybackSupported) ? (
@@ -1401,7 +1410,6 @@ function VideoPopup({
                         className="border-t border-gray-200 bg-white/90 px-3 py-3 dark:border-gray-800 dark:bg-gray-900/90"
                         minHeightClassName="min-h-[96px]"
                         maxHeight={popupMaxHeight}
-                        onHeightChange={setPopupBottomAdHeight}
                         suppressWhenOversize={false}
                     />
                 )}
