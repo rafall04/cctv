@@ -9,7 +9,7 @@ import { shouldDisableAnimations } from '../../utils/animationControl';
 export function Skeleton({ className = '', variant = 'default', ...props }) {
     const disableAnimations = shouldDisableAnimations();
     const pulseClass = disableAnimations ? 'opacity-75' : 'animate-pulse';
-    const baseClasses = `${pulseClass} bg-gray-700/50 rounded`;
+    const baseClasses = `${pulseClass} bg-gray-200 dark:bg-gray-700/50 rounded`;
 
     const variants = {
         default: '',
@@ -34,7 +34,7 @@ export function Skeleton({ className = '', variant = 'default', ...props }) {
  */
 export function CameraCardSkeleton() {
     return (
-        <div className="bg-dark-800/50 backdrop-blur-sm border border-dark-700/50 rounded-xl overflow-hidden">
+        <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200 dark:border-gray-700/50 rounded-xl overflow-hidden">
             {/* Video thumbnail skeleton */}
             <Skeleton variant="thumbnail" className="rounded-none" />
 
@@ -67,7 +67,7 @@ export function CameraCardSkeleton() {
  */
 export function TableRowSkeleton({ columns = 5 }) {
     return (
-        <tr className="border-b border-dark-700/50">
+        <tr className="border-b border-gray-200 dark:border-gray-700/50">
             {Array.from({ length: columns }).map((_, index) => (
                 <td key={index} className="px-4 py-3">
                     <Skeleton variant="text" />
@@ -84,7 +84,7 @@ export function TableSkeleton({ rows = 5, columns = 5 }) {
     return (
         <div className="overflow-x-auto">
             <table className="w-full">
-                <thead className="bg-dark-800/50 border-b border-dark-700">
+                <thead className="bg-white dark:bg-gray-800/50 border-b border-gray-300 dark:border-gray-700">
                     <tr>
                         {Array.from({ length: columns }).map((_, index) => (
                             <th key={index} className="px-4 py-3 text-left">
@@ -108,7 +108,7 @@ export function TableSkeleton({ rows = 5, columns = 5 }) {
  */
 export function StatCardSkeleton() {
     return (
-        <div className="bg-dark-800/50 backdrop-blur-sm border border-dark-700/50 rounded-xl p-6">
+        <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200 dark:border-gray-700/50 rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
                 <Skeleton className="h-8 w-8 rounded-lg" />
                 <Skeleton className="h-4 w-16" />
@@ -124,7 +124,7 @@ export function StatCardSkeleton() {
  */
 export function ListItemSkeleton() {
     return (
-        <div className="flex items-center gap-4 p-4 border-b border-dark-700/50">
+        <div className="flex items-center gap-4 p-4 border-b border-gray-200 dark:border-gray-700/50">
             <Skeleton variant="avatar" />
             <div className="flex-1 space-y-2">
                 <Skeleton variant="title" />
@@ -194,7 +194,7 @@ export function DashboardSkeleton() {
 
             {/* Content Area */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-dark-800/50 backdrop-blur-sm border border-dark-700/50 rounded-xl p-6">
+                <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200 dark:border-gray-700/50 rounded-xl p-6">
                     <Skeleton variant="title" className="mb-4" />
                     <div className="space-y-3">
                         {Array.from({ length: 5 }).map((_, index) => (
@@ -203,7 +203,7 @@ export function DashboardSkeleton() {
                     </div>
                 </div>
 
-                <div className="bg-dark-800/50 backdrop-blur-sm border border-dark-700/50 rounded-xl p-6">
+                <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200 dark:border-gray-700/50 rounded-xl p-6">
                     <Skeleton variant="title" className="mb-4" />
                     <Skeleton className="h-64 w-full" />
                 </div>

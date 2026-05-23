@@ -20,13 +20,13 @@ import SponsorPackagePanel from '../components/admin/sponsors/SponsorPackagePane
 function badgeClass(color) {
     switch (color) {
         case 'yellow': return 'bg-yellow-500/20 text-yellow-400';
-        case 'gray': return 'bg-gray-400/20 text-gray-300';
+        case 'gray': return 'bg-gray-400/20 text-gray-700 dark:text-gray-300';
         case 'orange': return 'bg-orange-500/20 text-orange-400';
         case 'sky': return 'bg-sky-500/20 text-sky-400';
         case 'emerald': return 'bg-emerald-500/20 text-emerald-400';
         case 'rose': return 'bg-rose-500/20 text-rose-400';
         case 'purple': return 'bg-purple-500/20 text-purple-400';
-        default: return 'bg-dark-700/40 text-gray-400';
+        default: return 'bg-gray-100 dark:bg-gray-700/40 text-gray-600 dark:text-gray-400';
     }
 }
 
@@ -344,8 +344,8 @@ function SponsorManagement() {
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">Manajemen Sponsor</h1>
-                    <p className="text-gray-400 text-sm mt-1">
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Manajemen Sponsor</h1>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
                         Kelola profil paket, sponsor lokal, & penugasan kamera-nya.
                         <span className="ml-1 text-gray-500">(Ads-network di halaman Ads, terpisah.)</span>
                     </p>
@@ -364,22 +364,22 @@ function SponsorManagement() {
             {/* Stats */}
             {stats && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="bg-dark-800/90 rounded-xl p-4 border border-dark-700/50">
-                        <p className="text-gray-400 text-sm">Total Sponsor</p>
-                        <p className="text-2xl font-bold text-white mt-1">{stats.total_sponsors}</p>
+                    <div className="bg-white dark:bg-gray-800/90 rounded-xl p-4 border border-gray-200 dark:border-gray-700/50">
+                        <p className="text-gray-600 dark:text-gray-400 text-sm">Total Sponsor</p>
+                        <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{stats.total_sponsors}</p>
                     </div>
-                    <div className="bg-dark-800/90 rounded-xl p-4 border border-dark-700/50">
-                        <p className="text-gray-400 text-sm">Sponsor Aktif</p>
+                    <div className="bg-white dark:bg-gray-800/90 rounded-xl p-4 border border-gray-200 dark:border-gray-700/50">
+                        <p className="text-gray-600 dark:text-gray-400 text-sm">Sponsor Aktif</p>
                         <p className="text-2xl font-bold text-green-400 mt-1">{stats.active_sponsors}</p>
                     </div>
-                    <div className="bg-dark-800/90 rounded-xl p-4 border border-dark-700/50">
-                        <p className="text-gray-400 text-sm">Pendapatan/Bulan</p>
+                    <div className="bg-white dark:bg-gray-800/90 rounded-xl p-4 border border-gray-200 dark:border-gray-700/50">
+                        <p className="text-gray-600 dark:text-gray-400 text-sm">Pendapatan/Bulan</p>
                         <p className="text-2xl font-bold text-primary-400 mt-1">
                             Rp {(stats.monthly_revenue || 0).toLocaleString('id-ID')}
                         </p>
                     </div>
-                    <div className="bg-dark-800/90 rounded-xl p-4 border border-dark-700/50">
-                        <p className="text-gray-400 text-sm">Akan Berakhir</p>
+                    <div className="bg-white dark:bg-gray-800/90 rounded-xl p-4 border border-gray-200 dark:border-gray-700/50">
+                        <p className="text-gray-600 dark:text-gray-400 text-sm">Akan Berakhir</p>
                         <p className="text-2xl font-bold text-yellow-400 mt-1">{stats.expiring_soon?.length || 0}</p>
                     </div>
                 </div>
@@ -389,12 +389,12 @@ function SponsorManagement() {
             <SponsorPackagePanel packages={packages} onChanged={loadData} />
 
             {/* Sponsor list */}
-            <div className="bg-dark-800/90 rounded-xl border border-dark-700/50 overflow-hidden">
-                <div className="p-4 border-b border-dark-700/50">
-                    <h2 className="text-lg font-semibold text-white">Daftar Sponsor</h2>
+            <div className="bg-white dark:bg-gray-800/90 rounded-xl border border-gray-200 dark:border-gray-700/50 overflow-hidden">
+                <div className="p-4 border-b border-gray-200 dark:border-gray-700/50">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Daftar Sponsor</h2>
                 </div>
                 {sponsors.length === 0 ? (
-                    <div className="p-8 text-center text-gray-400">
+                    <div className="p-8 text-center text-gray-600 dark:text-gray-400">
                         <p>Belum ada sponsor</p>
                         <button onClick={openCreate} disabled={packages.length === 0}
                             className="mt-4 text-primary-400 hover:text-primary-300 disabled:opacity-50">
@@ -404,37 +404,37 @@ function SponsorManagement() {
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full">
-                            <thead className="bg-dark-900/50">
+                            <thead className="bg-gray-100 dark:bg-gray-900/50">
                                 <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Sponsor</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Paket</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Harga</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Periode</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Kamera</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Kontak</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
-                                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Aksi</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Sponsor</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Paket</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Harga</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Periode</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Kamera</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Kontak</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Status</th>
+                                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Aksi</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-dark-700/50">
+                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700/50">
                                 {sponsors.map((sponsor) => {
                                     const limit = sponsor.camera_limit;
                                     const used = sponsor.camera_count || 0;
                                     const cap = limit === null || limit === undefined ? '∞' : limit;
                                     const over = typeof limit === 'number' && used > limit;
                                     return (
-                                        <tr key={sponsor.id} className="hover:bg-dark-700/30 transition-colors">
+                                        <tr key={sponsor.id} className="hover:bg-gray-50 dark:bg-gray-700/30 transition-colors">
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-3">
                                                     {sponsor.logo ? (
                                                         <img src={sponsor.logo} alt={sponsor.name} className="w-12 h-12 object-contain bg-white rounded" />
                                                     ) : (
-                                                        <div className="w-12 h-12 bg-dark-700 rounded flex items-center justify-center">
+                                                        <div className="w-12 h-12 bg-white dark:bg-gray-700 rounded flex items-center justify-center">
                                                             <span className="text-gray-500 text-xs">No Logo</span>
                                                         </div>
                                                     )}
                                                     <div>
-                                                        <p className="text-white font-medium">{sponsor.name}</p>
+                                                        <p className="text-gray-900 dark:text-white font-medium">{sponsor.name}</p>
                                                         {sponsor.url && (
                                                             <a href={sponsor.url} target="_blank" rel="noopener noreferrer"
                                                                 className="text-xs text-primary-400 hover:text-primary-300">
@@ -449,8 +449,8 @@ function SponsorManagement() {
                                                     {sponsor.package_name || packagesByKey[sponsor.package]?.name || sponsor.package || '—'}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-3 text-white">Rp {(sponsor.price || 0).toLocaleString('id-ID')}</td>
-                                            <td className="px-4 py-3 text-gray-400 text-sm">
+                                            <td className="px-4 py-3 text-gray-900 dark:text-white">Rp {(sponsor.price || 0).toLocaleString('id-ID')}</td>
+                                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-sm">
                                                 {sponsor.start_date && (
                                                     <div>
                                                         <p>{new Date(sponsor.start_date).toLocaleDateString('id-ID')}</p>
@@ -463,12 +463,12 @@ function SponsorManagement() {
                                                     ? 'bg-red-500/20 text-red-400'
                                                     : used > 0
                                                         ? 'bg-primary-500/15 text-primary-300'
-                                                        : 'bg-dark-700/40 text-gray-500'
+                                                        : 'bg-gray-100 dark:bg-gray-700/40 text-gray-500'
                                                     }`}>
                                                     {used}/{cap}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-3 text-gray-400 text-sm">
+                                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-sm">
                                                 {sponsor.contact_name && <p>{sponsor.contact_name}</p>}
                                                 {sponsor.contact_email && <p className="text-xs">{sponsor.contact_email}</p>}
                                                 {sponsor.contact_phone && <p className="text-xs">{sponsor.contact_phone}</p>}
@@ -497,11 +497,11 @@ function SponsorManagement() {
             </div>
 
             {/* Penugasan Kamera quick swap */}
-            <div className="bg-dark-800/90 rounded-xl border border-dark-700/50 overflow-hidden">
-                <div className="p-4 border-b border-dark-700/50 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="bg-white dark:bg-gray-800/90 rounded-xl border border-gray-200 dark:border-gray-700/50 overflow-hidden">
+                <div className="p-4 border-b border-gray-200 dark:border-gray-700/50 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div>
-                        <h2 className="text-lg font-semibold text-white">Penugasan Kamera (Quick Swap)</h2>
-                        <p className="text-xs text-gray-400 mt-1">
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Penugasan Kamera (Quick Swap)</h2>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
                             Mode cepat untuk ganti / lepas sponsor per kamera. Penugasan utama disarankan lewat form sponsor (centang banyak kamera sekaligus).
                         </p>
                     </div>
@@ -510,38 +510,38 @@ function SponsorManagement() {
                         value={assignmentSearch}
                         onChange={(e) => setAssignmentSearch(e.target.value)}
                         placeholder="Cari kamera / area / sponsor"
-                        className="bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary-500 md:w-72"
+                        className="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-primary-500 md:w-72"
                     />
                 </div>
                 {recordingCameras.length === 0 ? (
-                    <div className="p-8 text-center text-gray-400 text-sm">Belum ada kamera ber-recording.</div>
+                    <div className="p-8 text-center text-gray-600 dark:text-gray-400 text-sm">Belum ada kamera ber-recording.</div>
                 ) : filteredCamerasForAssignment.length === 0 ? (
-                    <div className="p-8 text-center text-gray-400 text-sm">Tidak ada kamera cocok dengan filter.</div>
+                    <div className="p-8 text-center text-gray-600 dark:text-gray-400 text-sm">Tidak ada kamera cocok dengan filter.</div>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full">
-                            <thead className="bg-dark-900/50">
+                            <thead className="bg-gray-100 dark:bg-gray-900/50">
                                 <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Kamera</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Lokasi</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Sponsor Saat Ini</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Ganti</th>
-                                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Aksi</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Kamera</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Lokasi</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Sponsor Saat Ini</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Ganti</th>
+                                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Aksi</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-dark-700/50">
+                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700/50">
                                 {filteredCamerasForAssignment.map((camera) => {
                                     const isBusy = pendingCameraId === camera.id;
                                     return (
-                                        <tr key={camera.id} className="hover:bg-dark-700/30 transition-colors">
-                                            <td className="px-4 py-3 text-white text-sm">
+                                        <tr key={camera.id} className="hover:bg-gray-50 dark:bg-gray-700/30 transition-colors">
+                                            <td className="px-4 py-3 text-gray-900 dark:text-white text-sm">
                                                 <p className="font-medium">{camera.name || `Kamera ${camera.id}`}</p>
                                                 <p className="text-xs text-gray-500">#{camera.id}</p>
                                             </td>
-                                            <td className="px-4 py-3 text-gray-400 text-sm">{camera.location || camera.area_name || '—'}</td>
+                                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-sm">{camera.location || camera.area_name || '—'}</td>
                                             <td className="px-4 py-3 text-sm">
                                                 {camera.sponsor_name ? (
-                                                    <span className="text-white">{camera.sponsor_name}</span>
+                                                    <span className="text-gray-900 dark:text-white">{camera.sponsor_name}</span>
                                                 ) : (
                                                     <span className="text-gray-500">—</span>
                                                 )}
@@ -559,7 +559,7 @@ function SponsorManagement() {
                                                         if (target === camera.sponsor_name) return;
                                                         handleQuickAssign(camera.id, target);
                                                     }}
-                                                    className="bg-dark-700 border border-dark-600 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-primary-500 disabled:opacity-50"
+                                                    className="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-primary-500 disabled:opacity-50"
                                                 >
                                                     <option value="">— Tanpa sponsor —</option>
                                                     {activeSponsorOptions.map((sponsor) => (
@@ -590,41 +590,41 @@ function SponsorManagement() {
             {/* Sponsor Modal */}
             {showModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-dark-800 rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="p-5 border-b border-dark-700/50">
-                            <h2 className="text-xl font-bold text-white">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="p-5 border-b border-gray-200 dark:border-gray-700/50">
+                            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                                 {editingId ? 'Edit Sponsor' : 'Tambah Sponsor Baru'}
                             </h2>
                         </div>
                         <form onSubmit={handleSubmit} className="p-5 space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">Nama Sponsor *</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nama Sponsor *</label>
                                     <input type="text" value={form.name}
                                         onChange={(e) => setForm({ ...form, name: e.target.value })}
-                                        className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-primary-500"
+                                        className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-primary-500"
                                         required />
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">URL Logo</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">URL Logo</label>
                                     <input type="url" value={form.logo}
                                         onChange={(e) => setForm({ ...form, logo: e.target.value })}
                                         placeholder="https://example.com/logo.png"
-                                        className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-primary-500" />
+                                        className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-primary-500" />
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">Website URL</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Website URL</label>
                                     <input type="url" value={form.url}
                                         onChange={(e) => setForm({ ...form, url: e.target.value })}
                                         placeholder="https://example.com"
-                                        className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-primary-500" />
+                                        className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-primary-500" />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">Paket *</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Paket *</label>
                                     <select
                                         value={form.package}
                                         onChange={(e) => handlePackageChange(e.target.value)}
-                                        className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-primary-500"
+                                        className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-primary-500"
                                         required
                                     >
                                         <option value="" disabled>Pilih paket</option>
@@ -636,72 +636,72 @@ function SponsorManagement() {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">Harga (Rp) *</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Harga (Rp) *</label>
                                     <input type="number" min="0" value={form.price}
                                         onChange={(e) => setForm({ ...form, price: e.target.value })}
-                                        className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-primary-500"
+                                        className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-primary-500"
                                         required />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                         Limit Kamera <span className="text-xs text-gray-500">(kosong = tanpa batas)</span>
                                     </label>
                                     <input type="number" min="0" value={form.camera_limit}
                                         onChange={(e) => setForm({ ...form, camera_limit: e.target.value })}
-                                        className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-primary-500" />
+                                        className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-primary-500" />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">Tanggal Mulai</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tanggal Mulai</label>
                                     <input type="date" value={form.start_date}
                                         onChange={(e) => setForm({ ...form, start_date: e.target.value })}
-                                        className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-primary-500" />
+                                        className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-primary-500" />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">Tanggal Berakhir</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tanggal Berakhir</label>
                                     <input type="date" value={form.end_date}
                                         onChange={(e) => setForm({ ...form, end_date: e.target.value })}
-                                        className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-primary-500" />
+                                        className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-primary-500" />
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">Nama Kontak</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nama Kontak</label>
                                     <input type="text" value={form.contact_name}
                                         onChange={(e) => setForm({ ...form, contact_name: e.target.value })}
-                                        className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-primary-500" />
+                                        className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-primary-500" />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">Email Kontak</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email Kontak</label>
                                     <input type="email" value={form.contact_email}
                                         onChange={(e) => setForm({ ...form, contact_email: e.target.value })}
-                                        className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-primary-500" />
+                                        className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-primary-500" />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">Telepon Kontak</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Telepon Kontak</label>
                                     <input type="tel" value={form.contact_phone}
                                         onChange={(e) => setForm({ ...form, contact_phone: e.target.value })}
-                                        className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-primary-500" />
+                                        className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-primary-500" />
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">Catatan</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Catatan</label>
                                     <textarea value={form.notes}
                                         onChange={(e) => setForm({ ...form, notes: e.target.value })}
                                         rows="3"
-                                        className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-primary-500" />
+                                        className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-primary-500" />
                                 </div>
                                 <div className="md:col-span-2">
                                     <label className="flex items-center gap-2 cursor-pointer">
                                         <input type="checkbox" checked={form.active}
                                             onChange={(e) => setForm({ ...form, active: e.target.checked })}
-                                            className="w-4 h-4 text-primary-600 bg-dark-700 border-dark-600 rounded focus:ring-primary-500" />
-                                        <span className="text-sm text-gray-300">Sponsor Aktif</span>
+                                            className="w-4 h-4 text-primary-600 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500" />
+                                        <span className="text-sm text-gray-700 dark:text-gray-300">Sponsor Aktif</span>
                                     </label>
                                 </div>
                             </div>
 
                             {/* Camera picker */}
-                            <div className="bg-dark-900/40 rounded-lg p-4 space-y-3">
+                            <div className="bg-gray-50 dark:bg-gray-900/40 rounded-lg p-4 space-y-3">
                                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                                     <div>
-                                        <p className="text-sm font-medium text-gray-200">Tugaskan ke Kamera</p>
+                                        <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Tugaskan ke Kamera</p>
                                         <p className="text-xs text-gray-500">
                                             Pilih kamera yang akan menampilkan logo sponsor ini.{' '}
                                             <span className={overCameraLimit ? 'text-red-400' : 'text-gray-500'}>
@@ -714,7 +714,7 @@ function SponsorManagement() {
                                         value={cameraSearch}
                                         onChange={(e) => setCameraSearch(e.target.value)}
                                         placeholder="Cari kamera"
-                                        className="bg-dark-700 border border-dark-600 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-primary-500 md:w-60"
+                                        className="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-primary-500 md:w-60"
                                     />
                                 </div>
                                 {overCameraLimit && (
@@ -722,7 +722,7 @@ function SponsorManagement() {
                                         Melebihi limit paket. Naikkan limit kamera atau hapus pilihan.
                                     </p>
                                 )}
-                                <div className="max-h-64 overflow-y-auto border border-dark-700/40 rounded-lg divide-y divide-dark-700/40">
+                                <div className="max-h-64 overflow-y-auto border border-gray-200 dark:border-gray-700/40 rounded-lg divide-y divide-gray-200 dark:divide-gray-700/40">
                                     {camerasForModal.length === 0 ? (
                                         <p className="text-xs text-gray-500 p-3">Tidak ada kamera cocok.</p>
                                     ) : (
@@ -733,16 +733,16 @@ function SponsorManagement() {
                                             return (
                                                 <label
                                                     key={camera.id}
-                                                    className="flex items-center gap-3 px-3 py-2 hover:bg-dark-700/30 cursor-pointer"
+                                                    className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 dark:bg-gray-700/30 cursor-pointer"
                                                 >
                                                     <input
                                                         type="checkbox"
                                                         checked={isSelected}
                                                         onChange={() => toggleCameraInModal(camera.id)}
-                                                        className="w-4 h-4 text-primary-600 bg-dark-700 border-dark-600 rounded focus:ring-primary-500"
+                                                        className="w-4 h-4 text-primary-600 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-primary-500"
                                                     />
                                                     <div className="flex-1 min-w-0">
-                                                        <p className="text-sm text-white truncate">{camera.name || `Kamera #${camera.id}`}</p>
+                                                        <p className="text-sm text-gray-900 dark:text-white truncate">{camera.name || `Kamera #${camera.id}`}</p>
                                                         <p className="text-xs text-gray-500 truncate">
                                                             {camera.location || camera.area_name || `#${camera.id}`}
                                                             {heldByOtherSponsor && (
@@ -763,7 +763,7 @@ function SponsorManagement() {
                                 <button
                                     type="button"
                                     onClick={() => { setShowModal(false); resetForm(); }}
-                                    className="flex-1 bg-dark-700 hover:bg-dark-600 text-white px-4 py-2 rounded-lg transition-colors"
+                                    className="flex-1 bg-white dark:bg-gray-700 hover:bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-white px-4 py-2 rounded-lg transition-colors"
                                 >
                                     Batal
                                 </button>
