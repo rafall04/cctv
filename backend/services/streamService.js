@@ -29,7 +29,12 @@ class StreamService {
         const capabilities = getStreamCapabilities(deliveryType);
         const isExternalHls = deliveryType === 'external_hls';
         const availability = cameraHealthService.enrichCameraAvailability(camera);
-        const { private_rtsp_url, ...publicAvailability } = availability;
+        // F4: also strip `stream_key` from the public payload. The HLS URL
+        // itself (streams.hls = /hls/{stream_key}/index.m3u8) still embeds
+        // the value, so this is mostly cosmetic — but it removes one extra
+        // place where scrapers can pluck the path identifier without
+        // parsing URLs. private_rtsp_url stays stripped as before.
+        const { private_rtsp_url, stream_key, ...publicAvailability } = availability;
 
         // For external_hls cameras with proxying enabled (the default), the
         // response's `streams.hls` is now an opaque /api/stream/:id/external.m3u8

@@ -118,6 +118,24 @@ describe('streamService camera response routing', () => {
         expect(response.external_stream_url).toBe('https://example.com/live/index.m3u8');
     });
 
+    it('does not expose stream_key on the public response payload', () => {
+        // F4: stream_key is still used internally to compose streams.hls
+        // (/hls/{stream_key}/index.m3u8), but it must not be its own
+        // separate field on the public response — that gives scrapers
+        // a stable identifier without parsing the URL.
+        const response = streamService.buildCameraResponse({
+            id: 99,
+            stream_key: 'abc-uuid-1234',
+            stream_source: 'internal',
+            delivery_type: 'internal_hls',
+        });
+
+        expect(response).not.toHaveProperty('stream_key');
+        // The URL is still constructed from the value, just not exposed
+        // as its own field. Sanity: the streams.hls path uses it.
+        expect(response.streams.hls).toContain('abc-uuid-1234');
+    });
+
     it('does not affect external_embed_url / external_snapshot_url on proxied external_hls', () => {
         // Those fields belong to other delivery types (iframe embed,
         // separate snapshot). G4 only sanitizes the HLS-source fields.
