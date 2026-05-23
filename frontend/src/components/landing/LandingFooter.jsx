@@ -1,12 +1,15 @@
 import { useCameras } from '../../contexts/CameraContext';
 import SponsorStrip from './SponsorStrip.jsx';
+import { buildWhatsappLink } from '../../utils/whatsappLink.js';
 
 export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
     const { cameras, areas } = useCameras();
     const cameraCount = cameras?.length || 0;
     const areaCount = areas?.length || 0;
-    const whatsappNumber = branding.whatsapp_number || '6289685645956';
-    const whatsappLink = `https://wa.me/${whatsappNumber}?text=Halo%20Admin%20${encodeURIComponent(branding.company_name)}`;
+    // Admin-editable pre-fill message lives in branding.whatsapp_message_template
+    // (F6). Fall back is handled inside the helper, so a fresh deployment
+    // still produces a sensible "Halo Admin {{company_name}}, ..." text.
+    const whatsappLink = buildWhatsappLink(branding, { page: 'Beranda' });
 
     return (
         <footer className="border-t border-gray-200 bg-white py-12 dark:border-gray-800 dark:bg-gray-900">

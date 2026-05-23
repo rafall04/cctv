@@ -86,6 +86,10 @@ class BrandingService {
             primary_color: '#0ea5e9',
             show_powered_by: 'true',
             whatsapp_number: '6289685645956',
+            // Default WA contact text. Admins can override per-deployment;
+            // placeholders are substituted client-side by buildWhatsappLink
+            // ({{company_name}}, {{city_name}}, {{page}}, {{camera_name}}).
+            whatsapp_message_template: 'Halo Admin {{company_name}}, saya ingin tanya soal {{page}}.',
         };
 
         for (const [key, value] of Object.entries(defaultBranding)) {

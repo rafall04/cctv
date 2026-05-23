@@ -32,6 +32,7 @@ import PlaybackUsageGuide from '../components/playback/PlaybackUsageGuide';
 import PlaybackTokenAccess from '../components/playback/PlaybackTokenAccess.jsx';
 import LandingMobileDock from '../components/landing/LandingMobileDock.jsx';
 import { useAdminReconnectRefresh } from '../hooks/admin/useAdminReconnectRefresh';
+import { buildWhatsappLink } from '../utils/whatsappLink.js';
 import { usePlaybackMediaSource } from '../hooks/playback/usePlaybackMediaSource.js';
 import { usePlaybackSelectionActions } from '../hooks/playback/usePlaybackSelectionActions.js';
 import { usePlaybackSegments } from '../hooks/playback/usePlaybackSegments.js';
@@ -1010,7 +1011,11 @@ function Playback({
                     </p>
                     {branding?.whatsapp_number && (
                         <a
-                            href={`https://wa.me/${branding.whatsapp_number}?text=${encodeURIComponent('Halo Admin, saya ingin informasi lebih lanjut tentang akses playback CCTV.')}`}
+                            // Admin-editable WA template (F6). Helper falls
+                            // back to a sensible default when the template
+                            // is empty, so this surface keeps working even
+                            // before the matching migration is applied.
+                            href={buildWhatsappLink(branding, { page: 'Playback CCTV' })}
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-600"

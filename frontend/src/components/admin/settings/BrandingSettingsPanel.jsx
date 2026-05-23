@@ -95,7 +95,7 @@ export default function BrandingSettingsPanel() {
     }
 
     const groupedSettings = {
-        'Company Information': ['company_name', 'company_tagline', 'company_description', 'city_name', 'province_name', 'whatsapp_number'],
+        'Company Information': ['company_name', 'company_tagline', 'company_description', 'city_name', 'province_name', 'whatsapp_number', 'whatsapp_message_template'],
         'Hero Section': ['hero_title', 'hero_subtitle'],
         Footer: ['footer_text', 'copyright_text'],
         'SEO Meta Tags': ['meta_title', 'meta_description', 'meta_keywords'],
@@ -139,15 +139,24 @@ export default function BrandingSettingsPanel() {
                                     return null;
                                 }
 
-                                const isTextarea = ['company_description', 'hero_subtitle', 'footer_text', 'meta_description', 'meta_keywords'].includes(key);
+                                const isTextarea = ['company_description', 'hero_subtitle', 'footer_text', 'meta_description', 'meta_keywords', 'whatsapp_message_template'].includes(key);
                                 const isColor = key === 'primary_color';
                                 const isBoolean = ['show_powered_by', 'watermark_enabled'].includes(key);
                                 const isSelect = key === 'watermark_position';
                                 const isNumber = key === 'watermark_opacity';
+                                // F6: template field gets a placeholder hint
+                                // listing every supported substitution so admins
+                                // discover them without reading docs.
+                                const placeholderHint = key === 'whatsapp_message_template'
+                                    ? 'Placeholder yang didukung: {{company_name}}, {{city_name}}, {{page}}, {{camera_name}}'
+                                    : null;
 
                                 return (
                                     <div key={key}>
                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{setting.description || key}</label>
+                                        {placeholderHint && (
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{placeholderHint}</p>
+                                        )}
                                         {isTextarea ? (
                                             <textarea
                                                 value={formData[key] || ''}
