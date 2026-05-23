@@ -33,7 +33,15 @@ export const API_KEY_VALIDATOR_CONFIG = {
         '/hls/'                 // HLS proxy - public streaming endpoint
     ],
     // Whether to enforce API key validation (can be disabled for development)
-    enabled: process.env.API_KEY_VALIDATION_ENABLED !== 'false'
+    enabled: process.env.API_KEY_VALIDATION_ENABLED !== 'false',
+    // Production safety knob. When set to 'true', a request that arrives
+    // BEFORE any active API key exists in the database is rejected with
+    // 403 instead of silently passing through. The historic behavior
+    // (silent pass when api_keys is empty) is fine for first-time setup
+    // on a developer's laptop, but it's a sharp edge in production —
+    // forgetting to seed an API key would leave protected endpoints
+    // wide open until someone noticed.
+    requireKeys: process.env.API_KEY_REQUIRE_KEYS === 'true'
 };
 
 /**
@@ -86,8 +94,23 @@ async function apiKeyValidatorPlugin(fastify, options) {
             return;
         }
         
-        // Skip if no API keys have been created yet (initial setup)
+        // Setup-mode bypass: when no API keys exist yet we historically
+        // let the request through so an operator can bootstrap the
+        // system. In production that's a footgun — forgetting to seed
+        // a key leaves protected endpoints open. The requireKeys flag
+        // (env: API_KEY_REQUIRE_KEYS=true) flips this into a hard 403.
         if (!hasActiveApiKeys()) {
+            if (API_KEY_VALIDATOR_CONFIG.requireKeys) {
+                logApiKeyFailure({
+                    reason: 'no_active_keys',
+                    endpoint: request.url,
+                    method: request.method,
+                }, request);
+                return reply.code(403).send({
+                    success: false,
+                    message: 'API keys not configured on server',
+                });
+            }
             return;
         }
         
