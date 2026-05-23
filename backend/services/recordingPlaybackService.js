@@ -236,11 +236,29 @@ class RecordingPlaybackService {
 
         const isPlaylistRequest = request?.url?.includes('/playlist.m3u8');
         const shouldTouchToken = request?.url?.includes('/segments') || isPlaylistRequest;
-        const tokenAccess = playbackTokenService.validateRequestForCamera(request, camera.id, {
-            touch: shouldTouchToken,
-            eventType: isPlaylistRequest ? 'access_playlist' : 'access_segments',
-            camera,
-        });
+        // Cookie-based validation: a stale/revoked/out-of-scope playback
+        // cookie must NOT lock the visitor out of public preview. The
+        // explicit /activate path already returns the 401/403 properly; here
+        // (per-segment cookie sniff) those errors mean "ignore the cookie"
+        // and fall through to the public-preview logic — otherwise having
+        // an old cookie is strictly worse than having no cookie at all,
+        // which is what produced the "page replaced by denial placeholder,
+        // camera picker gone" bug.
+        let tokenAccess = null;
+        try {
+            tokenAccess = playbackTokenService.validateRequestForCamera(request, camera.id, {
+                touch: shouldTouchToken,
+                eventType: isPlaylistRequest ? 'access_playlist' : 'access_segments',
+                camera,
+            });
+        } catch (error) {
+            const statusCode = error?.statusCode;
+            if (statusCode !== 401 && statusCode !== 403) {
+                throw error;
+            }
+            // tokenAccess stays null → falls through to the public-preview
+            // resolution below, exactly as if no cookie were attached.
+        }
         if (tokenAccess) {
             return {
                 accessMode: 'token_full',

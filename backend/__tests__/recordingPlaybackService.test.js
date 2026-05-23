@@ -271,19 +271,72 @@ describe('recordingPlaybackService', () => {
         });
     });
 
-    it('denies all-scope token for admin_only camera when token service rejects it', () => {
+    it('falls back to public-preview resolution when cookie token is rejected for the camera', () => {
+        // Cookie-based 401/403 from validateRequestForCamera must NOT
+        // propagate as a hard deny — having a stale/out-of-scope cookie
+        // used to be strictly worse than having no cookie at all, hiding
+        // the camera picker behind a full-page denial placeholder. After
+        // the fix, the error is swallowed and the access mode is resolved
+        // against the public preview policy. For an admin_only camera
+        // that still ends in a denial (the camera itself is not public),
+        // but via the public-preview path, not via the throw.
         validateRequestForCameraMock.mockImplementation(() => {
             const err = new Error('Token playback tidak mencakup kamera ini');
             err.statusCode = 403;
             throw err;
         });
 
-        expect(() => recordingPlaybackService.resolvePlaybackAccess({
+        const access = recordingPlaybackService.resolvePlaybackAccess({
             id: 4,
             public_playback_mode: 'admin_only',
             public_playback_preview_minutes: 10,
-        }, { query: {}, url: '/api/recordings/4/segments', cookies: { raf_playback_token: 'token' } }))
-            .toThrow('Token playback tidak mencakup kamera ini');
+        }, { query: {}, url: '/api/recordings/4/segments', cookies: { raf_playback_token: 'stale' } });
+
+        expect(access).toMatchObject({
+            accessMode: 'public_denied',
+            deniedReason: 'camera_admin_only',
+        });
+    });
+
+    it('restores public preview when a stale playback cookie throws 401', () => {
+        // A cookie pointing at a revoked/expired token must NOT lock a
+        // public visitor out of preview access for a camera that supports
+        // it. Before this fix, validateRequestForCamera's 401 propagated
+        // up, the controller returned 401, and the frontend replaced the
+        // entire page with the "Playback Publik Tidak Tersedia"
+        // placeholder — covering the camera picker.
+        validateRequestForCameraMock.mockImplementation(() => {
+            const err = new Error('Token playback sudah dicabut');
+            err.statusCode = 401;
+            throw err;
+        });
+
+        const access = recordingPlaybackService.resolvePlaybackAccess({
+            id: 8,
+            public_playback_mode: 'inherit',
+            public_playback_preview_minutes: 30,
+        }, { query: {}, url: '/api/recordings/8/segments', cookies: { raf_playback_token: 'revoked' } });
+
+        expect(access).toMatchObject({
+            accessMode: 'public_preview',
+            previewMinutes: 30,
+            isPublicPreview: true,
+        });
+    });
+
+    it('rethrows unexpected errors from validateRequestForCamera', () => {
+        // Non-credential errors (e.g. unexpected service failure) still
+        // bubble up — we only swallow the 401/403 credential class.
+        validateRequestForCameraMock.mockImplementation(() => {
+            throw new Error('database is locked');
+        });
+
+        expect(() => recordingPlaybackService.resolvePlaybackAccess({
+            id: 8,
+            public_playback_mode: 'inherit',
+            public_playback_preview_minutes: 30,
+        }, { query: {}, url: '/api/recordings/8/segments', cookies: { raf_playback_token: 'x' } }))
+            .toThrow('database is locked');
     });
 
     it('streams by filename without loading every segment for the camera', () => {
