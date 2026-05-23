@@ -867,6 +867,13 @@ class CameraHealthService {
         this.probeCache = new Map();
         this.internalPathRepairBackoff = new Map();
         this.lastActivePathMap = new Map();
+        // Per-camera RTSP DESCRIBE verification cache for the non-strict
+        // path. Used to confirm that a "configured but idle" MediaMTX path
+        // actually has a reachable source — otherwise UDP-transport
+        // cameras (and TCP idle paths) get reported online forever after
+        // their source dies. TTL is tracked inside the entry, not by Map
+        // eviction, so a stale entry is naturally re-fetched on next tick.
+        this.internalRtspProbeCache = new Map();
     }
 
     clearCameraRuntimeState(cameraId, pathName = null) {
@@ -874,6 +881,7 @@ class CameraHealthService {
         this.healthState.delete(normalizedCameraId);
         this.offlineSince.delete(normalizedCameraId);
         this.telegramAlertState.delete(normalizedCameraId);
+        this.internalRtspProbeCache.delete(normalizedCameraId);
 
         const cameraToken = `camera:${normalizedCameraId}`;
         for (const key of this.probeCache.keys()) {
@@ -890,6 +898,79 @@ class CameraHealthService {
 
     async probeInternalRtspSource(rtspUrl, timeoutMs = 4000) {
         return probeRtspSource(rtspUrl, timeoutMs);
+    }
+
+    /**
+     * Confirm whether the actual RTSP source is reachable when MediaMTX
+     * cannot give us a strong positive signal (path repaired-but-untested,
+     * configured-but-idle, or sourceReady=true with zero readers — the
+     * UDP-binding false positive). Cached per cameraId because every
+     * non-strict camera would otherwise re-probe every tick.
+     *
+     * Returns `null` when we have nothing to verify (no private_rtsp_url),
+     * otherwise `{ online: boolean, reason: string, details: object }`
+     * suitable for substituting into evaluateCameraRaw's return value.
+     *
+     * Cache semantics:
+     *   - `online` results cached for 5 min — a real source rarely flips
+     *     up→down within that window without the next tick noticing.
+     *   - `offline` results cached for 30s — short enough to pick up a
+     *     recovery quickly, long enough to avoid hammering a dead host.
+     */
+    async verifyInternalRtspIfUncertain(camera, baseDetails, mediamtxReason) {
+        if (!camera?.private_rtsp_url) {
+            return null;
+        }
+
+        const now = Date.now();
+        const cacheKey = camera.id;
+        const cached = this.internalRtspProbeCache.get(cacheKey);
+        const cacheTtlMs = cached?.online ? 5 * 60 * 1000 : 30 * 1000;
+        const useCached = cached && (now - cached.timestamp) < cacheTtlMs;
+
+        let probeResult;
+        if (useCached) {
+            probeResult = cached.result;
+        } else {
+            try {
+                probeResult = await this.probeInternalRtspSource(camera.private_rtsp_url);
+            } catch (error) {
+                probeResult = {
+                    online: false,
+                    reason: 'rtsp_probe_threw',
+                    details: { error: error?.message || String(error) },
+                };
+            }
+            this.internalRtspProbeCache.set(cacheKey, {
+                result: probeResult,
+                online: probeResult.online,
+                timestamp: now,
+            });
+        }
+
+        const verificationDetails = withProbeDetails(baseDetails, {
+            ...(probeResult.details || {}),
+            mediamtx_mediated_reason: mediamtxReason,
+            rtsp_verification_cached: useCached,
+        });
+
+        if (probeResult.online) {
+            return {
+                online: true,
+                // Surface BOTH signals: MediaMTX-side reason that originally
+                // triggered the verification, and the RTSP probe that
+                // confirmed it. Helps debugging without losing the path
+                // health information.
+                reason: `${mediamtxReason}+rtsp_verified`,
+                details: verificationDetails,
+            };
+        }
+
+        return {
+            online: false,
+            reason: probeResult.reason || 'internal_rtsp_unreachable',
+            details: verificationDetails,
+        };
     }
 
     async ensureInternalCameraPath(camera) {
@@ -2314,6 +2395,29 @@ class CameraHealthService {
         baseDetails.has_internal_reader_only = Boolean(pathInfo?.hasInternalReaderOnly);
 
         if (pathInfo && (pathInfo.ready || pathInfo.sourceReady || pathInfo.readers > 0)) {
+            // Strong positive signal — at least one real viewer is pulling
+            // bytes, OR the source is genuinely connected and active. Trust
+            // it. The UDP false-positive case is `sourceReady=true` with
+            // zero readers (the port is bound but no media is flowing);
+            // fall through to verification in that case via the gate below.
+            if (pathInfo.readers > 0 || pathInfo.ready) {
+                return {
+                    online: true,
+                    reason: 'mediamtx_path_ready',
+                    details: withProbeDetails(baseDetails),
+                };
+            }
+
+            // sourceReady=true but readers === 0 — could be a real idle
+            // path, or could be the UDP "bound port, no packets" trap.
+            // Verify against the RTSP source itself.
+            const verified = await this.verifyInternalRtspIfUncertain(
+                camera, baseDetails, 'mediamtx_path_source_ready_idle'
+            );
+            if (verified) {
+                return verified;
+            }
+            // No private_rtsp_url to verify against — trust MediaMTX.
             return {
                 online: true,
                 reason: 'mediamtx_path_ready',
@@ -2324,6 +2428,21 @@ class CameraHealthService {
         if (!pathInfo?.configured && camera.private_rtsp_url) {
             const repairResult = await this.ensureInternalCameraPath(camera);
             if (repairResult.success && !strictRtspHealth) {
+                // Registering a path with MediaMTX is just a config write —
+                // it does NOT confirm the upstream RTSP source is alive.
+                // For UDP-only or otherwise-quiet sources this used to
+                // return online forever. Verify via RTSP DESCRIBE.
+                const verified = await this.verifyInternalRtspIfUncertain(
+                    camera,
+                    withProbeDetails(baseDetails, {
+                        repairedPathName: repairResult.pathName,
+                        repairedPathAction: repairResult.action || null,
+                    }),
+                    'mediamtx_path_repaired'
+                );
+                if (verified) {
+                    return verified;
+                }
                 return {
                     online: true,
                     reason: 'mediamtx_path_repaired',
@@ -2345,6 +2464,15 @@ class CameraHealthService {
         }
 
         if (pathInfo?.configured) {
+            // Path exists in MediaMTX but neither source nor readers are
+            // active. Before the fix, this returned online unconditionally
+            // — the same trap that hid dead cameras. Now verify the source.
+            const verified = await this.verifyInternalRtspIfUncertain(
+                camera, baseDetails, 'mediamtx_path_configured_idle'
+            );
+            if (verified) {
+                return verified;
+            }
             return {
                 online: true,
                 reason: 'mediamtx_path_configured_idle',
@@ -2353,6 +2481,14 @@ class CameraHealthService {
         }
 
         if (camera.private_rtsp_url) {
+            // Catch-all when we have no MediaMTX path info and no repair
+            // attempt happened. Verify the source instead of assuming up.
+            const verified = await this.verifyInternalRtspIfUncertain(
+                camera, baseDetails, 'internal_source_unverified_assumed_online'
+            );
+            if (verified) {
+                return verified;
+            }
             return {
                 online: camera.enabled === 1,
                 reason: 'internal_source_unverified_assumed_online',

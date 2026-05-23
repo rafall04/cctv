@@ -539,9 +539,19 @@ describe('cameraHealthService external TLS policy', () => {
         expect(probeSpy).not.toHaveBeenCalled();
     });
 
-    it('keeps local internal cameras online when MediaMTX path is configured but idle', async () => {
+    it('verifies RTSP source for non-strict internal cameras when MediaMTX path is configured but idle (probe online → stays online)', async () => {
+        // Before the Opsi B fix, "path configured but idle" was treated as
+        // online unconditionally — that masked dead RTSP sources (UDP
+        // especially, where MediaMTX never sees a connection drop). The
+        // probe is now called to confirm. When the probe says the source
+        // is reachable, we stay online but mark the reason so debug logs
+        // show both signals.
         const service = new CameraHealthService();
-        const probeSpy = vi.spyOn(service, 'probeInternalRtspSource');
+        const probeSpy = vi.spyOn(service, 'probeInternalRtspSource').mockResolvedValue({
+            online: true,
+            reason: 'rtsp_describe_ok',
+            details: {},
+        });
 
         const result = await service.evaluateCameraRaw({
             id: 131,
@@ -558,13 +568,46 @@ describe('cameraHealthService external TLS policy', () => {
         ]));
 
         expect(result.online).toBe(true);
-        expect(result.reason).toBe('mediamtx_path_configured_idle');
-        expect(probeSpy).not.toHaveBeenCalled();
+        expect(result.reason).toBe('mediamtx_path_configured_idle+rtsp_verified');
+        expect(probeSpy).toHaveBeenCalledWith('rtsp://admin:secret@10.0.0.5:554/live');
     });
 
-    it('keeps local internal cameras online when MediaMTX path is missing but source is non-strict internal RTSP', async () => {
+    it('marks non-strict internal cameras OFFLINE when MediaMTX path is configured-idle but RTSP source is dead (UDP / TCP both)', async () => {
+        // The actual bug from the field: a UDP-only camera went down,
+        // MediaMTX kept the path configured, and the dashboard reported
+        // it online forever. The verification probe must override the
+        // MediaMTX-optimistic state.
         const service = new CameraHealthService();
-        const probeSpy = vi.spyOn(service, 'probeInternalRtspSource');
+        vi.spyOn(service, 'probeInternalRtspSource').mockResolvedValue({
+            online: false,
+            reason: 'internal_stream_unreachable',
+            details: { rtspHost: '10.0.0.5', rtspPort: 554 },
+        });
+
+        const result = await service.evaluateCameraRaw({
+            id: 131,
+            enabled: 1,
+            is_online: 1,
+            delivery_type: 'internal_hls',
+            stream_source: 'internal',
+            stream_key: 'local-131',
+            private_rtsp_url: 'rtsp://admin:secret@10.0.0.5:554/live',
+            enable_recording: 1,
+        }, new Map([
+            ['local-131', { configured: true, ready: false, sourceReady: false, readers: 0 }],
+        ]));
+
+        expect(result.online).toBe(false);
+        expect(result.reason).toBe('internal_stream_unreachable');
+    });
+
+    it('verifies RTSP source after MediaMTX path repair (probe online → stays online with verified reason)', async () => {
+        const service = new CameraHealthService();
+        const probeSpy = vi.spyOn(service, 'probeInternalRtspSource').mockResolvedValue({
+            online: true,
+            reason: 'rtsp_describe_ok',
+            details: {},
+        });
 
         const result = await service.evaluateCameraRaw({
             id: 132,
@@ -579,13 +622,101 @@ describe('cameraHealthService external TLS policy', () => {
         }, new Map());
 
         expect(result.online).toBe(true);
-        expect(result.reason).toBe('mediamtx_path_repaired');
+        expect(result.reason).toBe('mediamtx_path_repaired+rtsp_verified');
         expect(updateCameraPathMock).toHaveBeenCalledWith(
             'local-132',
             'rtsp://admin:secret@10.0.0.6:554/live',
             expect.objectContaining({ id: 132 })
         );
-        expect(probeSpy).not.toHaveBeenCalled();
+        expect(probeSpy).toHaveBeenCalled();
+    });
+
+    it('marks non-strict internal cameras OFFLINE after MediaMTX path repair when RTSP source is unreachable', async () => {
+        // Registering a path with MediaMTX is just a config write — it
+        // doesn't confirm the upstream RTSP is alive. The verifier must
+        // catch this case too.
+        const service = new CameraHealthService();
+        vi.spyOn(service, 'probeInternalRtspSource').mockResolvedValue({
+            online: false,
+            reason: 'internal_stream_unreachable',
+            details: {},
+        });
+
+        const result = await service.evaluateCameraRaw({
+            id: 132,
+            enabled: 1,
+            is_online: 1,
+            delivery_type: 'internal_hls',
+            stream_source: 'internal',
+            stream_key: 'local-132',
+            private_rtsp_url: 'rtsp://admin:secret@10.0.0.6:554/live',
+            enable_recording: 1,
+        }, new Map());
+
+        expect(result.online).toBe(false);
+        expect(result.reason).toBe('internal_stream_unreachable');
+    });
+
+    it('verifies RTSP source for the UDP sourceReady-true-but-no-readers trap', async () => {
+        // UDP-only camera: MediaMTX bound the port and reports
+        // sourceReady=true, but no media is actually flowing and zero
+        // viewers are pulling. This used to short-circuit at the
+        // pathInfo.sourceReady check and report online. The fix triggers
+        // a real RTSP DESCRIBE to disambiguate.
+        const service = new CameraHealthService();
+        vi.spyOn(service, 'probeInternalRtspSource').mockResolvedValue({
+            online: false,
+            reason: 'internal_stream_unreachable',
+            details: {},
+        });
+
+        const result = await service.evaluateCameraRaw({
+            id: 140,
+            enabled: 1,
+            is_online: 1,
+            delivery_type: 'internal_hls',
+            stream_source: 'internal',
+            stream_key: 'udp-140',
+            private_rtsp_url: 'rtsp://admin:secret@10.0.0.7:554/live',
+            enable_recording: 1,
+        }, new Map([
+            ['udp-140', { configured: true, ready: false, sourceReady: true, readers: 0 }],
+        ]));
+
+        expect(result.online).toBe(false);
+        expect(result.reason).toBe('internal_stream_unreachable');
+    });
+
+    it('reuses the per-camera RTSP probe cache within the TTL window', async () => {
+        // Probe is expensive; verify the cache works so we don't hammer
+        // a dead source every tick.
+        const service = new CameraHealthService();
+        const probeSpy = vi.spyOn(service, 'probeInternalRtspSource').mockResolvedValue({
+            online: true,
+            reason: 'rtsp_describe_ok',
+            details: {},
+        });
+
+        const cameraInput = {
+            id: 141,
+            enabled: 1,
+            is_online: 1,
+            delivery_type: 'internal_hls',
+            stream_source: 'internal',
+            stream_key: 'cache-141',
+            private_rtsp_url: 'rtsp://admin:secret@10.0.0.8:554/live',
+            enable_recording: 1,
+        };
+        const activePaths = new Map([
+            ['cache-141', { configured: true, ready: false, sourceReady: false, readers: 0 }],
+        ]);
+
+        await service.evaluateCameraRaw(cameraInput, activePaths);
+        await service.evaluateCameraRaw(cameraInput, activePaths);
+        await service.evaluateCameraRaw(cameraInput, activePaths);
+
+        // First call probes; the next two come from cache.
+        expect(probeSpy).toHaveBeenCalledTimes(1);
     });
 
     it('marks private RTSP live-only cameras offline when RTSP auth fails and MediaMTX path is idle', async () => {
