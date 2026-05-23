@@ -901,15 +901,15 @@ class CameraHealthService {
     }
 
     /**
-     * Confirm whether the actual RTSP source is reachable when MediaMTX
-     * cannot give us a strong positive signal (path repaired-but-untested,
-     * configured-but-idle, or sourceReady=true with zero readers — the
-     * UDP-binding false positive). Cached per cameraId because every
-     * non-strict camera would otherwise re-probe every tick.
+     * Internal cache-or-probe primitive for an RTSP source.
      *
-     * Returns `null` when we have nothing to verify (no private_rtsp_url),
-     * otherwise `{ online: boolean, reason: string, details: object }`
-     * suitable for substituting into evaluateCameraRaw's return value.
+     * Both the non-strict verifier (verifyInternalRtspIfUncertain) and the
+     * strict-monitoring branch in evaluateCameraMonitoringStatus call
+     * through here so that for always_on cameras (the case the user
+     * raised) we don't end up doing TWO RTSP DESCRIBEs per tick — one
+     * from evaluateCameraRaw and another from the strict-monitoring
+     * branch. Within-tick reuse is the primary benefit; cross-tick reuse
+     * is a bonus when the camera is stably online (5 min TTL).
      *
      * Cache semantics:
      *   - `online` results cached for 5 min — a real source rarely flips
@@ -917,7 +917,7 @@ class CameraHealthService {
      *   - `offline` results cached for 30s — short enough to pick up a
      *     recovery quickly, long enough to avoid hammering a dead host.
      */
-    async verifyInternalRtspIfUncertain(camera, baseDetails, mediamtxReason) {
+    async getOrProbeInternalRtsp(camera) {
         if (!camera?.private_rtsp_url) {
             return null;
         }
@@ -928,30 +928,48 @@ class CameraHealthService {
         const cacheTtlMs = cached?.online ? 5 * 60 * 1000 : 30 * 1000;
         const useCached = cached && (now - cached.timestamp) < cacheTtlMs;
 
-        let probeResult;
         if (useCached) {
-            probeResult = cached.result;
-        } else {
-            try {
-                probeResult = await this.probeInternalRtspSource(camera.private_rtsp_url);
-            } catch (error) {
-                probeResult = {
-                    online: false,
-                    reason: 'rtsp_probe_threw',
-                    details: { error: error?.message || String(error) },
-                };
-            }
-            this.internalRtspProbeCache.set(cacheKey, {
-                result: probeResult,
-                online: probeResult.online,
-                timestamp: now,
-            });
+            return { ...cached.result, cached: true };
+        }
+
+        let probeResult;
+        try {
+            probeResult = await this.probeInternalRtspSource(camera.private_rtsp_url);
+        } catch (error) {
+            probeResult = {
+                online: false,
+                reason: 'rtsp_probe_threw',
+                details: { error: error?.message || String(error) },
+            };
+        }
+        this.internalRtspProbeCache.set(cacheKey, {
+            result: probeResult,
+            online: probeResult.online,
+            timestamp: now,
+        });
+        return { ...probeResult, cached: false };
+    }
+
+    /**
+     * Confirm whether the actual RTSP source is reachable when MediaMTX
+     * cannot give us a strong positive signal (path repaired-but-untested,
+     * configured-but-idle, or sourceReady=true with zero readers — the
+     * UDP-binding false positive).
+     *
+     * Returns `null` when we have nothing to verify (no private_rtsp_url),
+     * otherwise `{ online: boolean, reason: string, details: object }`
+     * suitable for substituting into evaluateCameraRaw's return value.
+     */
+    async verifyInternalRtspIfUncertain(camera, baseDetails, mediamtxReason) {
+        const probeResult = await this.getOrProbeInternalRtsp(camera);
+        if (!probeResult) {
+            return null;
         }
 
         const verificationDetails = withProbeDetails(baseDetails, {
             ...(probeResult.details || {}),
             mediamtx_mediated_reason: mediamtxReason,
-            rtsp_verification_cached: useCached,
+            rtsp_verification_cached: probeResult.cached === true,
         });
 
         if (probeResult.online) {
@@ -2658,7 +2676,15 @@ class CameraHealthService {
 
     async evaluateCameraMonitoringStatus(camera, activePaths, streamResult) {
         if (shouldUseStrictInternalMonitoring(camera)) {
-            const rtspResult = await this.probeInternalRtspSource(camera.private_rtsp_url);
+            // Strict cameras (always_on / surabaya_private_rtsp) used to
+            // probe RTSP directly here, in addition to whatever
+            // verifyInternalRtspIfUncertain ran from evaluateCameraRaw a
+            // few microseconds earlier — two DESCRIBEs per tick to the
+            // same upstream. Routing through getOrProbeInternalRtsp keeps
+            // the strict semantics (probe each tick) but the within-tick
+            // double call collapses to a single network round-trip via
+            // the shared cache.
+            const rtspResult = await this.getOrProbeInternalRtsp(camera);
             return {
                 isOnline: rtspResult.online ? 1 : 0,
                 monitoring_state: rtspResult.online ? 'online' : 'offline',

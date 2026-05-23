@@ -719,6 +719,91 @@ describe('cameraHealthService external TLS policy', () => {
         expect(probeSpy).toHaveBeenCalledTimes(1);
     });
 
+    it('always_on cameras share the RTSP probe between evaluateCameraRaw and evaluateCameraMonitoringStatus (no double DESCRIBE)', async () => {
+        // The user pointed out that always_on cameras would otherwise get
+        // probed TWICE per tick: once by the non-strict verifier inside
+        // evaluateCameraRaw (mediamtx_path_configured_idle path) and again
+        // by the strict branch in evaluateCameraMonitoringStatus. Both now
+        // route through getOrProbeInternalRtsp which dedupes via the same
+        // per-camera cache, so a single tick = a single DESCRIBE.
+        const service = new CameraHealthService();
+        const probeSpy = vi.spyOn(service, 'probeInternalRtspSource').mockResolvedValue({
+            online: true,
+            reason: 'rtsp_describe_ok',
+            details: {},
+        });
+
+        const cameraInput = {
+            id: 142,
+            enabled: 1,
+            is_online: 1,
+            delivery_type: 'internal_hls',
+            stream_source: 'internal',
+            stream_key: 'always-on-142',
+            private_rtsp_url: 'rtsp://admin:secret@10.0.0.9:554/live',
+            enable_recording: 1,
+            // The flag that makes shouldUseStrictInternalMonitoring=true
+            // and also keeps MediaMTX trying to hold the source open.
+            internal_ingest_policy_override: 'always_on',
+        };
+        const activePaths = new Map([
+            ['always-on-142', { configured: true, ready: false, sourceReady: false, readers: 0 }],
+        ]);
+
+        const streamResult = await service.evaluateCameraRaw(cameraInput, activePaths);
+        const monitoringResult = await service.evaluateCameraMonitoringStatus(
+            cameraInput,
+            activePaths,
+            { isOnline: streamResult.online ? 1 : 0, rawReason: streamResult.reason }
+        );
+
+        // Single network probe across both calls.
+        expect(probeSpy).toHaveBeenCalledTimes(1);
+        // Strict monitoring uses the probe outcome.
+        expect(monitoringResult.isOnline).toBe(1);
+        expect(monitoringResult.monitoring_state).toBe('online');
+    });
+
+    it('always_on camera with dead source: single probe, strict monitoring sees offline', async () => {
+        // The exact scenario the user asked about. Source is dead;
+        // MediaMTX keeps trying to reconnect (sourceReady=false). The
+        // health system must report offline, and must do it with one
+        // RTSP probe per tick, not two.
+        const service = new CameraHealthService();
+        const probeSpy = vi.spyOn(service, 'probeInternalRtspSource').mockResolvedValue({
+            online: false,
+            reason: 'internal_stream_unreachable',
+            details: {},
+        });
+
+        const cameraInput = {
+            id: 143,
+            enabled: 1,
+            is_online: 1,
+            delivery_type: 'internal_hls',
+            stream_source: 'internal',
+            stream_key: 'always-on-dead-143',
+            private_rtsp_url: 'rtsp://admin:secret@10.0.0.10:554/live',
+            enable_recording: 1,
+            internal_ingest_policy_override: 'always_on',
+        };
+        const activePaths = new Map([
+            ['always-on-dead-143', { configured: true, ready: false, sourceReady: false, readers: 0 }],
+        ]);
+
+        const streamResult = await service.evaluateCameraRaw(cameraInput, activePaths);
+        const monitoringResult = await service.evaluateCameraMonitoringStatus(
+            cameraInput,
+            activePaths,
+            { isOnline: streamResult.online ? 1 : 0, rawReason: streamResult.reason }
+        );
+
+        expect(probeSpy).toHaveBeenCalledTimes(1);
+        expect(streamResult.online).toBe(false);
+        expect(monitoringResult.isOnline).toBe(0);
+        expect(monitoringResult.monitoring_state).toBe('offline');
+    });
+
     it('marks private RTSP live-only cameras offline when RTSP auth fails and MediaMTX path is idle', async () => {
         const service = new CameraHealthService();
         vi.spyOn(service, 'probeInternalRtspSource').mockResolvedValue({
