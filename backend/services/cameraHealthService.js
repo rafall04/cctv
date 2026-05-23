@@ -1572,7 +1572,36 @@ class CameraHealthService {
     }
 
     scheduleNextCameraCheck(camera, state, rawResult = null) {
-        state.nextCheckAt = Date.now() + this.getNextCadenceMs(camera, state, rawResult);
+        const cadenceMs = this.getNextCadenceMs(camera, state, rawResult);
+        let nextCheckAt = Date.now() + cadenceMs;
+
+        // Provider-backoff recovery boost. When a probe just returned
+        // `provider_backoff_active`, the upstream domain has been declared
+        // sick by updateDomainHealth and ALL cameras on that domain will
+        // keep returning this same result until backoffUntil expires. If
+        // we let the normal tier cadence run (cold = 5 min, warm = 90 s),
+        // a domain that recovers DURING that window would not be picked
+        // up until the regular cadence wakes the camera — adding up to
+        // 5 min of recovery latency.
+        //
+        // Instead, schedule the next attempt for just after the backoff
+        // window closes (+ small jitter so multiple cameras on the same
+        // domain do not all probe at the exact same millisecond).
+        if (rawResult?.reason === 'provider_backoff_active') {
+            const backoffUntilIso = rawResult.details?.domainBackoffUntil;
+            if (backoffUntilIso) {
+                const backoffUntilMs = Number.isFinite(Number(backoffUntilIso))
+                    ? Number(backoffUntilIso)
+                    : new Date(backoffUntilIso).getTime();
+                if (Number.isFinite(backoffUntilMs) && backoffUntilMs > Date.now()) {
+                    const jitterMs = Math.floor(Math.random() * 4000);
+                    const wakeAfterBackoff = backoffUntilMs + jitterMs;
+                    nextCheckAt = Math.min(nextCheckAt, wakeAfterBackoff);
+                }
+            }
+        }
+
+        state.nextCheckAt = nextCheckAt;
         return state.nextCheckAt;
     }
 

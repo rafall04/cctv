@@ -123,6 +123,64 @@ describe('CameraHealthService runtime reset', () => {
         expect(service.internalPathRepairBackoff.has('stream-key-7')).toBe(false);
         expect(service.lastActivePathMap.has('stream-key-7')).toBe(false);
     });
+
+    it('schedules the next check around the backoff expiry when a probe returns provider_backoff_active', () => {
+        // Without this nudge, a cold-tier camera (5 min cadence) on a
+        // briefly-backed-off provider would not be re-probed until the
+        // regular cadence wakes it — adding up to ~5 min to recovery
+        // latency. The scheduler should aim for backoffUntil + jitter
+        // instead, so a recovered upstream is picked up promptly.
+        const service = new CameraHealthService();
+        const camera = {
+            id: 8,
+            stream_source: 'external',
+            delivery_type: 'external_hls',
+            external_hls_url: 'https://cctv.example.gov.id/live.m3u8',
+        };
+        const state = service.ensureCameraState(camera.id, 1);
+        // Force a slow cadence (cold tier).
+        state.stableFailureCount = 10;
+
+        const before = Date.now();
+        const backoffUntilMs = before + 60_000; // 60s from now
+        const rawResult = {
+            online: false,
+            reason: 'provider_backoff_active',
+            details: { domainBackoffUntil: new Date(backoffUntilMs).toISOString() },
+        };
+
+        service.scheduleNextCameraCheck(camera, state, rawResult);
+
+        // Should wake within the small jitter window after the backoff
+        // expires, NOT 5 min later via the cold cadence.
+        expect(state.nextCheckAt).toBeGreaterThanOrEqual(backoffUntilMs);
+        expect(state.nextCheckAt).toBeLessThanOrEqual(backoffUntilMs + 4000);
+    });
+
+    it('keeps the normal cadence when the rawResult has no backoff signal', () => {
+        // Regression: the backoff-aware branch must not interfere with
+        // non-backoff scheduling — the cold cadence remains the source
+        // of truth when the probe didn't come back with
+        // provider_backoff_active.
+        const service = new CameraHealthService();
+        const camera = {
+            id: 9,
+            stream_source: 'external',
+            delivery_type: 'external_hls',
+            external_hls_url: 'https://cctv.example.gov.id/live.m3u8',
+        };
+        const state = service.ensureCameraState(camera.id, 0);
+        state.stableFailureCount = 10; // cold tier
+
+        const before = Date.now();
+        const rawResult = { online: false, reason: 'http_502', details: {} };
+
+        service.scheduleNextCameraCheck(camera, state, rawResult);
+
+        // Cold cadence = 5 min. Should land roughly there, not within
+        // the next few seconds.
+        expect(state.nextCheckAt - before).toBeGreaterThan(60_000);
+    });
 });
 
 function createReadableStream() {
