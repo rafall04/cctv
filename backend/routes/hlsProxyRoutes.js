@@ -15,6 +15,11 @@ import { config } from '../config/config.js';
 import viewerSessionService from '../services/viewerSessionService.js';
 import cameraHealthService from '../services/cameraHealthService.js';
 import { queryOne } from '../database/connectionPool.js';
+import {
+    createPlaylistCache,
+    createSegmentCache,
+    TTL as EXTERNAL_CACHE_TTL,
+} from '../services/externalStreamCache.js';
 
 const IPV4_MAPPED_PREFIX = '::ffff:';
 const DEFAULT_HLS_CONFIG = {
@@ -941,6 +946,15 @@ export function createHlsRouteState(options = {}) {
 
     const store = new HlsSessionStore(hlsOptions);
     const httpClient = createHlsHttpClient(hlsOptions.externalProxyTimeoutMs);
+    // External-stream response caches. Two are used because playlists and
+    // segments have very different size + freshness characteristics:
+    //   - playlistCache: small bodies, short TTL — the playlist itself
+    //     must stay reasonably fresh or new segments are missed.
+    //   - segmentCache:  large bodies, longer TTL — published segments
+    //     are immutable, so caching them aggressively is safe.
+    // Tests can swap the caches via `options.playlistCache` / `segmentCache`.
+    const playlistCache = options.playlistCache || createPlaylistCache();
+    const segmentCache = options.segmentCache || createSegmentCache();
     let cleanupInterval = null;
     let sessionCleanupQueue = Promise.resolve();
     const cleanupMetrics = {
@@ -974,6 +988,8 @@ export function createHlsRouteState(options = {}) {
         options: hlsOptions,
         store,
         httpClient,
+        playlistCache,
+        segmentCache,
         trustedProxyCidrs: options.trustedProxyCidrs || config.security?.trustedProxyCidrs || [],
         start() {
             if (cleanupInterval) {
@@ -984,6 +1000,11 @@ export function createHlsRouteState(options = {}) {
                 runSessionCleanup(() => store.cleanupExpired(endSession)).catch((error) => {
                     console.error('[HLSProxy] Session cleanup error:', error.message);
                 });
+                // Lazy cache GC: get() also drops on read, but expired
+                // entries that are never read again would sit forever
+                // without this sweep.
+                playlistCache.sweepExpired();
+                segmentCache.sweepExpired();
             }, hlsOptions.sessionCleanupIntervalMs);
         },
         async stop() {
@@ -996,6 +1017,8 @@ export function createHlsRouteState(options = {}) {
                 await store.cleanupAll(endSession);
             });
             store.clear();
+            playlistCache.clear();
+            segmentCache.clear();
         },
         flushPendingSessionCloses() {
             return runSessionCleanup(() => store.drainPendingSessionCloses(endSession));
@@ -1006,6 +1029,8 @@ export function createHlsRouteState(options = {}) {
                 pendingSessionCloses: store.pendingSessionCloses.size,
                 sessionCleanupQueueDepth: cleanupMetrics.queueDepth,
                 lastCleanupDurationMs: cleanupMetrics.lastCleanupDurationMs,
+                playlistCache: playlistCache.getStats(),
+                segmentCache: segmentCache.getStats(),
             };
         },
         getViewerIdentity(request) {
@@ -1138,6 +1163,13 @@ function verifyStreamToken(request, reply, done) {
     }
 }
 
+function buildExternalCacheKey(url, cameraId) {
+    // cameraId is stamped into the rewritten playlist body, so two cameras
+    // pointing at the same upstream URL must not share a playlist cache
+    // entry — they would get each other's cameraId in the response.
+    return `${cameraId == null ? '_' : cameraId}|${url}`;
+}
+
 async function handleExternalStreamProxy(state, request, reply) {
     applyHlsCorsHeaders(request, reply);
     const { url, cameraId } = request.query;
@@ -1160,14 +1192,36 @@ async function handleExternalStreamProxy(state, request, reply) {
             return reply.code(400).send('Invalid cameraId parameter');
         }
 
+        const isTextFile = url.includes('.m3u8');
+        const cacheKey = buildExternalCacheKey(url, externalCameraConfig?.cameraId ?? null);
+        const cache = isTextFile ? state.playlistCache : state.segmentCache;
+
+        // Fast path: serve from cache if a fresh entry exists. Cached entries
+        // are always 200 (the cache module refuses to store anything else),
+        // so this skips upstream entirely.
+        const cached = cache.get(cacheKey);
+        if (cached) {
+            reply.header('Content-Type', cached.contentType);
+            reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+            reply.header('Pragma', 'no-cache');
+            reply.header('Expires', '0');
+            reply.header('X-RAFNET-Proxy-Cache', 'HIT');
+            if (!isTextFile) {
+                reply.header('Content-Length', String(cached.byteSize));
+            }
+            // Note: we intentionally don't re-record a runtime signal on
+            // cache hit — the upstream wasn't actually contacted, so
+            // counting it as a successful probe would bias the health view.
+            return reply.send(cached.body);
+        }
+
         const externalTlsMode = externalCameraConfig?.externalTlsMode || 'strict';
         const requestHttpClient = externalTlsMode === 'insecure'
             ? createHlsHttpClient(state.options.externalProxyTimeoutMs, {
                 httpsAgent: new https.Agent({ rejectUnauthorized: false }),
             })
             : state.httpClient;
-        const isTextFile = url.includes('.m3u8');
-        
+
         const headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept-Encoding': 'identity',
@@ -1188,10 +1242,18 @@ async function handleExternalStreamProxy(state, request, reply) {
                 return reply.code(response.status).send('');
             }
 
-            reply.header('Content-Type', 'application/vnd.apple.mpegurl');
+            const rewritten = rewriteExternalPlaylist(response.data, url, externalCameraConfig?.cameraId ?? null);
+            const contentType = 'application/vnd.apple.mpegurl';
+            // Store the REWRITTEN body so a cache hit can serve a ready-
+            // to-send response directly. TTL stays at the cache default
+            // (playlistCache = 3s).
+            cache.set(cacheKey, { statusCode: 200, contentType, body: rewritten }, EXTERNAL_CACHE_TTL.PLAYLIST_MS);
+
+            reply.header('Content-Type', contentType);
             reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
             reply.header('Pragma', 'no-cache');
             reply.header('Expires', '0');
+            reply.header('X-RAFNET-Proxy-Cache', 'MISS');
             if (externalCameraConfig?.cameraId) {
                 cameraHealthService.recordRuntimeSignal(externalCameraConfig.cameraId, {
                     targetUrl: url,
@@ -1199,7 +1261,7 @@ async function handleExternalStreamProxy(state, request, reply) {
                     success: true,
                 });
             }
-            return reply.send(rewriteExternalPlaylist(response.data, url, externalCameraConfig?.cameraId ?? null));
+            return reply.send(rewritten);
         }
 
         const { controller, response, data } = await fetchBufferedBinaryUpstream({
@@ -1223,11 +1285,16 @@ async function handleExternalStreamProxy(state, request, reply) {
             contentType = 'video/mp4';
         }
 
+        // Segments are immutable once published — safe to cache the
+        // body bytes for the full segmentCache TTL (default 60s).
+        cache.set(cacheKey, { statusCode: 200, contentType, body: data }, EXTERNAL_CACHE_TTL.SEGMENT_MS);
+
         reply.header('Content-Type', contentType);
         reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
         reply.header('Pragma', 'no-cache');
         reply.header('Expires', '0');
         reply.header('Content-Length', String(data.length));
+        reply.header('X-RAFNET-Proxy-Cache', 'MISS');
         safeAbort(controller);
         if (externalCameraConfig?.cameraId) {
             cameraHealthService.recordRuntimeSignal(externalCameraConfig.cameraId, {
