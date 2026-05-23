@@ -58,6 +58,12 @@ const DEFAULT_SESSION_TIMEOUT_SECONDS = 60;
 const MIN_SESSION_TIMEOUT_SECONDS = 30;
 const MAX_SESSION_TIMEOUT_SECONDS = 3600;
 const SESSION_TOUCH_THROTTLE_SECONDS = 30;
+// Token-level touch throttle: keeps use_count + audit log from being hammered
+// by every HLS segment GET. Audit-noisy events (segment/playlist GETs that
+// hit the same token within this window) are skipped; activation, share,
+// playlist, and admin events bypass the throttle so they always record.
+const TOKEN_TOUCH_THROTTLE_SECONDS = 60;
+const TOKEN_TOUCH_THROTTLED_EVENTS = new Set(['access', 'access_segments']);
 const DEFAULT_SESSION_RETENTION_DAYS = 7;
 const DEFAULT_AUDIT_RETENTION_DAYS = 90;
 const DEFAULT_MAINTENANCE_LIMIT = 1000;
@@ -207,6 +213,19 @@ function shouldTouchSession(row, now = new Date()) {
     }
 
     return (now.getTime() - lastSeenAt.getTime()) >= SESSION_TOUCH_THROTTLE_SECONDS * 1000;
+}
+
+function shouldThrottleTokenTouch(token, eventType, now = new Date()) {
+    if (!TOKEN_TOUCH_THROTTLED_EVENTS.has(eventType)) {
+        return false;
+    }
+
+    const lastUsedAt = parseUtcSql(token?.last_used_at);
+    if (!lastUsedAt) {
+        return false;
+    }
+
+    return (now.getTime() - lastUsedAt.getTime()) < TOKEN_TOUCH_THROTTLE_SECONDS * 1000;
 }
 
 function parseCameraIdsJson(value) {
@@ -420,6 +439,56 @@ class PlaybackTokenService {
             }
 
             throw error;
+        }
+    }
+
+    /**
+     * Touch a token's usage stats and write an audit row, with throttling for
+     * the noisy per-segment events so HLS playback does not flood the audit log
+     * or hammer `use_count`. Events not in `TOKEN_TOUCH_THROTTLED_EVENTS`
+     * (activation, share, playlist, admin) always write through.
+     */
+    touchTokenUsage(token, { eventType = 'access', cameraId = null, request = {}, detail = null } = {}) {
+        if (!token?.id) {
+            return { recorded: false, throttled: false };
+        }
+
+        if (shouldThrottleTokenTouch(token, eventType)) {
+            return { recorded: false, throttled: true };
+        }
+
+        execute(
+            `UPDATE playback_tokens
+            SET last_used_at = CURRENT_TIMESTAMP, use_count = use_count + 1, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?`,
+            [token.id]
+        );
+        this.recordAudit({
+            tokenId: token.id,
+            eventType,
+            cameraId: Number.isInteger(cameraId) && cameraId > 0 ? cameraId : null,
+            request,
+            detail: detail || { scope_type: token.scope_type },
+        });
+        return { recorded: true, throttled: false };
+    }
+
+    /**
+     * Record an audit row for a failed public activation attempt. token_id
+     * stays null (we don't know which token was being guessed); IP/UA come
+     * from the request so brute-force attempts become visible in the audit
+     * log instead of disappearing into thrown 401s.
+     */
+    logFailedActivation({ request = {}, reason = 'invalid', mode = 'token' } = {}) {
+        try {
+            this.recordAudit({
+                tokenId: null,
+                eventType: 'activation_failed',
+                request,
+                detail: { reason, mode },
+            });
+        } catch (error) {
+            console.warn('[PlaybackToken] failed-activation audit write failed:', error.message);
         }
     }
 
@@ -936,12 +1005,23 @@ class PlaybackTokenService {
             return null;
         }
 
-        return execute(
-            `UPDATE playback_token_sessions
-            SET ended_at = CURRENT_TIMESTAMP, end_reason = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE session_id_hash = ? AND ended_at IS NULL`,
-            [reason, hashToken(sessionId)]
-        );
+        try {
+            return execute(
+                `UPDATE playback_token_sessions
+                SET ended_at = CURRENT_TIMESTAMP, end_reason = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE session_id_hash = ? AND ended_at IS NULL`,
+                [reason, hashToken(sessionId)]
+            );
+        } catch (error) {
+            // Same graceful-degradation contract as the rest of the file: if
+            // the session table or columns are absent (fresh DB without the
+            // session-policy migration), best-effort stop is a no-op rather
+            // than a 500.
+            if (isMissingSessionSchemaError(error)) {
+                return null;
+            }
+            throw error;
+        }
     }
 
     clearTokenSessions(tokenId, request = {}) {
@@ -1223,18 +1303,10 @@ class PlaybackTokenService {
         }
 
         if (touch) {
-            execute(
-                `UPDATE playback_tokens
-                SET last_used_at = CURRENT_TIMESTAMP, use_count = use_count + 1, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?`,
-                [token.id]
-            );
-            this.recordAudit({
-                tokenId: token.id,
+            this.touchTokenUsage(token, {
                 eventType: options.eventType || 'access',
                 cameraId: normalizedCameraId > 0 ? normalizedCameraId : null,
                 request: options.request || {},
-                detail: { scope_type: token.scope_type },
             });
         }
 

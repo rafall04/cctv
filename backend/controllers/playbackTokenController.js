@@ -36,6 +36,64 @@ function resolveCookieMaxAge(tokenData) {
     return Math.max(60, Math.min(remainingSeconds, 30 * 24 * 60 * 60));
 }
 
+// In-memory per-IP throttle for failed public activation attempts. Cheap
+// defence against brute-forcing the share-key namespace; combined with the
+// `activation_failed` audit row this turns silent guessing into both visible
+// and rate-limited behavior. The map is process-local — good enough for a
+// single-process backend; multi-instance deployments would need Redis.
+const ACTIVATION_FAILURE_WINDOW_MS = 60_000;
+const ACTIVATION_FAILURE_LIMIT = 10;
+const ACTIVATION_BUCKET_GC_THRESHOLD = 1000;
+const activationFailureBuckets = new Map();
+
+function getRequestClientIp(request) {
+    const forwardedFor = request?.headers?.['x-forwarded-for'];
+    if (typeof forwardedFor === 'string' && forwardedFor.trim()) {
+        return forwardedFor.split(',')[0].trim();
+    }
+    return request?.ip || request?.socket?.remoteAddress || '';
+}
+
+function checkActivationThrottle(ip) {
+    if (!ip) {
+        return { allowed: true, retryInSeconds: 0 };
+    }
+    const now = Date.now();
+    const bucket = activationFailureBuckets.get(ip);
+    if (!bucket || (now - bucket.windowStart) > ACTIVATION_FAILURE_WINDOW_MS) {
+        return { allowed: true, retryInSeconds: 0 };
+    }
+    if (bucket.count >= ACTIVATION_FAILURE_LIMIT) {
+        return {
+            allowed: false,
+            retryInSeconds: Math.max(1, Math.ceil((bucket.windowStart + ACTIVATION_FAILURE_WINDOW_MS - now) / 1000)),
+        };
+    }
+    return { allowed: true, retryInSeconds: 0 };
+}
+
+function recordActivationFailure(ip) {
+    if (!ip) {
+        return;
+    }
+    const now = Date.now();
+    const bucket = activationFailureBuckets.get(ip);
+    if (!bucket || (now - bucket.windowStart) > ACTIVATION_FAILURE_WINDOW_MS) {
+        activationFailureBuckets.set(ip, { count: 1, windowStart: now });
+    } else {
+        bucket.count += 1;
+    }
+
+    // Lazy GC so the Map can't grow without bound under sustained attack.
+    if (activationFailureBuckets.size > ACTIVATION_BUCKET_GC_THRESHOLD) {
+        for (const [key, value] of activationFailureBuckets) {
+            if ((now - value.windowStart) > ACTIVATION_FAILURE_WINDOW_MS) {
+                activationFailureBuckets.delete(key);
+            }
+        }
+    }
+}
+
 export async function listPlaybackTokens(request, reply) {
     try {
         return reply.send({ success: true, data: playbackTokenService.listTokens() });
@@ -120,6 +178,21 @@ export async function revokePlaybackToken(request, reply) {
 }
 
 export async function activatePlaybackToken(request, reply) {
+    const clientIp = getRequestClientIp(request);
+    const mode = request.body?.share_key ? 'activated_share' : 'activated_token';
+
+    // Reject before validation when this IP has burned its failure budget.
+    // Both prevents wall-clock brute force and keeps the audit log from being
+    // flooded by a single attacker.
+    const throttle = checkActivationThrottle(clientIp);
+    if (!throttle.allowed) {
+        return reply.code(429).send({
+            success: false,
+            message: `Terlalu banyak percobaan gagal. Coba lagi dalam ${throttle.retryInSeconds} detik.`,
+            retry_after_seconds: throttle.retryInSeconds,
+        });
+    }
+
     try {
         const token = String(request.body?.token || request.body?.share_key || '').trim();
         if (!token) {
@@ -127,16 +200,46 @@ export async function activatePlaybackToken(request, reply) {
         }
 
         const cameraId = request.body?.camera_id || request.query?.cameraId || 0;
-        const data = playbackTokenService.validateRawTokenForCamera(token, cameraId || 0, {
-            touch: true,
-            eventType: request.body?.share_key ? 'activated_share' : 'activated_token',
-            request,
-            requireSession: false,
-        });
+
+        // Validate first WITHOUT touching usage/audit. We don't want a token
+        // to look "used" in the audit/use_count when activation actually
+        // fails later (e.g. device-limit 429 from createPlaybackSession).
+        let data;
+        try {
+            data = playbackTokenService.validateRawTokenForCamera(token, cameraId || 0, {
+                touch: false,
+                request,
+                requireSession: false,
+            });
+        } catch (validationError) {
+            // Credential-class errors (invalid/revoked/expired/out-of-scope)
+            // get audited + counted against the throttle. Anything else is a
+            // server fault and shouldn't punish the client IP.
+            const statusCode = validationError?.statusCode;
+            if (statusCode === 401 || statusCode === 403) {
+                playbackTokenService.logFailedActivation({
+                    request,
+                    reason: validationError.message,
+                    mode,
+                });
+                recordActivationFailure(clientIp);
+            }
+            throw validationError;
+        }
+
         const session = playbackTokenService.createPlaybackSession({
             token: data,
             clientId: request.body?.client_id || '',
             request,
+        });
+
+        // Only record activation success after session creation succeeds, so
+        // the audit log + use_count match reality (cookies set below).
+        playbackTokenService.touchTokenUsage(data, {
+            eventType: mode,
+            cameraId: Number.parseInt(cameraId, 10) > 0 ? Number.parseInt(cameraId, 10) : null,
+            request,
+            detail: { scope_type: data.scope_type, mode },
         });
 
         reply.setCookie(
@@ -192,7 +295,15 @@ export async function heartbeatPlaybackToken(request, reply) {
 }
 
 export async function clearPlaybackToken(request, reply) {
-    playbackTokenService.stopPlaybackSession(request, 'stopped');
+    // Match the catch-and-return contract used by every other handler in this
+    // file. `stopPlaybackSession` already swallows the missing-schema case,
+    // but anything else (locked DB, IO error) should not 500 raw — clearing
+    // cookies is best-effort and must always respond cleanly.
+    try {
+        playbackTokenService.stopPlaybackSession(request, 'stopped');
+    } catch (error) {
+        console.warn('Clear playback token: stopPlaybackSession failed:', error.message);
+    }
     reply.clearCookie(PLAYBACK_TOKEN_COOKIE, { path: '/' });
     reply.clearCookie(PLAYBACK_TOKEN_SESSION_COOKIE, { path: '/' });
     return reply.send({ success: true, message: 'Token playback dibersihkan' });
