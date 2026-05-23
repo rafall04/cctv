@@ -37,9 +37,14 @@ import {
 import { config } from '../config/config.js';
 
 const DEFAULT_TIMEOUT_MS = 30000;
-// Whitelist: only segment-like filenames the HLS standard actually uses.
-// Path traversal (`..`) and absolute paths are rejected separately below.
-const SEGMENT_FILENAME_PATTERN = /^[A-Za-z0-9_./-]+\.(ts|m4s|mp4)$/;
+// Whitelist of file extensions allowed in the opaque `/external-segment`
+// path. `.m3u8` is included because a master playlist's entries are
+// themselves CHILD playlists (variant streams) — those URLs flow through
+// the same opaque-segment endpoint after rewriteOpaquePlaylist rewrites
+// them. The handler branches on extension below: `.m3u8` is fetched and
+// rewritten as text; the rest are streamed as binary media. Path
+// traversal (`..`) and absolute paths are rejected separately.
+const SEGMENT_FILENAME_PATTERN = /^[A-Za-z0-9_./-]+\.(ts|m4s|mp4|m3u8)$/;
 
 function lookupExternalCamera(cameraId) {
     const parsed = Number.parseInt(cameraId, 10);
@@ -315,6 +320,72 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
         const targetUrl = resolveSegmentTargetUrl(camera, request.params.filename, allowOptions);
         if (!targetUrl) {
             return reply.code(400).send('Invalid segment filename');
+        }
+
+        // Master playlists reference variant CHILD playlists by URL —
+        // those flow back through this same endpoint after rewriting.
+        // When the resolved target is itself an .m3u8, fetch as text,
+        // rewrite its segment lines (which use this same opaque scheme),
+        // and serve as a playlist. The body is cached in playlistCache
+        // with a short TTL so live playlists stay fresh.
+        const isPlaylistTarget = targetUrl.toLowerCase().endsWith('.m3u8');
+        if (isPlaylistTarget) {
+            const playlistCacheKey = `${camera.id}|nested|${targetUrl}`;
+            const cachedPlaylist = playlistCache.get(playlistCacheKey);
+            if (cachedPlaylist) {
+                return sendCachedResponse(reply, cachedPlaylist);
+            }
+
+            try {
+                const httpClient = pickHttpClient({
+                    tlsMode: camera.external_tls_mode,
+                    baseClient,
+                    timeout,
+                });
+                const response = await fetchTextUpstream({
+                    httpClient,
+                    targetUrl,
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Accept-Encoding': 'identity',
+                    },
+                    maxContentLength: hlsConfig.maxExternalPlaylistBytes,
+                    maxBodyLength: hlsConfig.maxExternalPlaylistBytes,
+                });
+
+                if (response.status !== 200) {
+                    reply.header('Content-Type', 'text/plain');
+                    reply.header('Cache-Control', 'no-cache');
+                    return reply.code(response.status).send('');
+                }
+
+                // Pass the CHILD playlist's URL as sourceUrl so segment
+                // entries inside resolve relative to the child's directory
+                // (which may differ from the master's).
+                const rewritten = rewriteOpaquePlaylist(response.data, targetUrl, camera.id);
+                const contentType = 'application/vnd.apple.mpegurl';
+                playlistCache.set(
+                    playlistCacheKey,
+                    { statusCode: 200, contentType, body: rewritten },
+                    EXTERNAL_CACHE_TTL.PLAYLIST_MS
+                );
+
+                cameraHealthService.recordRuntimeSignal(camera.id, {
+                    targetUrl,
+                    signalType: 'external_hls_playlist_proxy',
+                    success: true,
+                });
+
+                reply.header('Content-Type', contentType);
+                reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+                reply.header('Pragma', 'no-cache');
+                reply.header('Expires', '0');
+                reply.header('X-RAFNET-Proxy-Cache', 'MISS');
+                return reply.send(rewritten);
+            } catch (error) {
+                console.error(`[ExternalStreamProxy] child playlist error camera=${camera.id} url=${targetUrl}:`, error.message);
+                return reply.code(502).send('');
+            }
         }
 
         const cacheKey = `${camera.id}|seg|${targetUrl}`;

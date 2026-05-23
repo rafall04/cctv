@@ -105,6 +105,21 @@ describe('externalStreamProxyRoutes — resolveSegmentTargetUrl', () => {
         expect(resolveSegmentTargetUrl(camera, 'index.html', allowOptions)).toBeNull();
     });
 
+    it('accepts .m3u8 filenames so master-playlist child references flow through', () => {
+        // Regression — a master playlist's entries are themselves child
+        // playlists, e.g. `05dfbeca-..._output_0.m3u8`. The rewriter sends
+        // those through the same /external-segment endpoint. Previously
+        // the regex only accepted .ts/.m4s/.mp4 and returned 400 here.
+        const result = resolveSegmentTargetUrl(
+            camera,
+            '05dfbeca-138c-4e12-a89a-c7b4f08375e7_output_0.m3u8',
+            allowOptions,
+        );
+        expect(result).toBe(
+            'https://cctv.example.gov.id/live/cam7/05dfbeca-138c-4e12-a89a-c7b4f08375e7_output_0.m3u8',
+        );
+    });
+
     it('rejects path traversal attempts', () => {
         expect(resolveSegmentTargetUrl(camera, '../../etc/passwd.ts', allowOptions)).toBeNull();
         expect(resolveSegmentTargetUrl(camera, encodeURIComponent('../escape.ts'), allowOptions)).toBeNull();
