@@ -511,7 +511,7 @@ export class HlsSessionStore {
 const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 50 });
 const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 50 });
 
-function createHlsHttpClient(timeout = DEFAULT_HLS_CONFIG.externalProxyTimeoutMs, extraConfig = {}) {
+export function createHlsHttpClient(timeout = DEFAULT_HLS_CONFIG.externalProxyTimeoutMs, extraConfig = {}) {
     return axios.create({
         timeout,
         validateStatus: () => true,
@@ -526,7 +526,7 @@ function normalizeExternalTlsMode(value) {
     return value === 'insecure' ? 'insecure' : 'strict';
 }
 
-function safeAbort(controller) {
+export function safeAbort(controller) {
     if (!controller || controller.signal?.aborted) {
         return;
     }

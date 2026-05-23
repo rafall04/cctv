@@ -44,6 +44,7 @@ import settingsRoutes from './routes/settingsRoutes.js';
 import viewerRoutes from './routes/viewerRoutes.js';
 import playbackViewerRoutes from './routes/playbackViewerRoutes.js';
 import hlsProxyRoutes from './routes/hlsProxyRoutes.js';
+import externalStreamProxyRoutes from './routes/externalStreamProxyRoutes.js';
 import sponsorRoutes from './routes/sponsorRoutes.js';
 import sponsorPackageRoutes from './routes/sponsorPackageRoutes.js';
 import saweriaRoutes from './routes/saweriaRoutes.js';
@@ -267,6 +268,11 @@ await fastify.register(authRoutes, { prefix: '/api/auth' });
 await fastify.register(cameraRoutes, { prefix: '/api/cameras' });
 await fastify.register(areaRoutes, { prefix: '/api/areas' });
 await fastify.register(streamRoutes, { prefix: '/api/stream' });
+// New opaque proxy endpoints — /api/stream/:id/external.m3u8 and
+// /api/stream/:id/external-segment/:filename. Sits at the same prefix as
+// streamRoutes; Fastify allows multiple plugins to share a prefix as long
+// as path patterns don't collide.
+await fastify.register(externalStreamProxyRoutes, { prefix: '/api/stream' });
 await fastify.register(adminRoutes, { prefix: '/api/admin' });
 await fastify.register(userRoutes, { prefix: '/api/users' });
 await fastify.register(feedbackRoutes, { prefix: '/api/feedback' });
