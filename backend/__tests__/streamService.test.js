@@ -83,6 +83,59 @@ describe('streamService camera response routing', () => {
         });
     });
 
+    it('strips external_hls_url + external_stream_url from public response when proxy is enabled', () => {
+        // G4: with proxy enabled (default), the upstream URL must NOT
+        // ride along on the response. The opaque streams.hls path is
+        // the only thing the client needs.
+        const response = streamService.buildCameraResponse({
+            id: 11,
+            stream_key: 'camera11',
+            stream_source: 'internal',
+            external_stream_url: 'https://example.com/live/index.m3u8',
+            external_hls_url: 'https://example.com/live/index.m3u8',
+        });
+
+        expect(response.streams.hls).toBe('/api/stream/11/external.m3u8');
+        expect(response.external_hls_url).toBeNull();
+        expect(response.external_stream_url).toBeNull();
+    });
+
+    it('keeps external_hls_url + external_stream_url when proxy is disabled (direct-stream mode)', () => {
+        // Admin opt-in: external_use_proxy=0 means "give the browser the
+        // raw URL so it can stream directly". The raw fields must remain
+        // populated for that flow to work.
+        const response = streamService.buildCameraResponse({
+            id: 12,
+            stream_key: 'camera12',
+            stream_source: 'internal',
+            external_stream_url: 'https://example.com/live/index.m3u8',
+            external_hls_url: 'https://example.com/live/index.m3u8',
+            external_use_proxy: 0,
+        });
+
+        expect(response.streams.hls).toBe('https://example.com/live/index.m3u8');
+        expect(response.external_hls_url).toBe('https://example.com/live/index.m3u8');
+        expect(response.external_stream_url).toBe('https://example.com/live/index.m3u8');
+    });
+
+    it('does not affect external_embed_url / external_snapshot_url on proxied external_hls', () => {
+        // Those fields belong to other delivery types (iframe embed,
+        // separate snapshot). G4 only sanitizes the HLS-source fields.
+        const response = streamService.buildCameraResponse({
+            id: 13,
+            stream_key: 'camera13',
+            stream_source: 'internal',
+            external_stream_url: 'https://example.com/live/index.m3u8',
+            external_embed_url: 'https://example.com/embed/13',
+            external_snapshot_url: 'https://example.com/snap/13.jpg',
+        });
+
+        expect(response.delivery_type).toBe('external_hls');
+        expect(response.external_hls_url).toBeNull();
+        expect(response.external_embed_url).toBe('https://example.com/embed/13');
+        expect(response.external_snapshot_url).toBe('https://example.com/snap/13.jpg');
+    });
+
     it('never builds internal hls urls for non-hls external cameras', () => {
         const response = streamService.buildCameraResponse({
             id: 12,

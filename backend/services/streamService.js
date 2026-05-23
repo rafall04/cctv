@@ -54,6 +54,25 @@ class StreamService {
             }
             : null;
 
+        // G4: when external_hls is being served through the opaque /api/stream
+        // proxy (the default), the raw external_hls_url / external_stream_url
+        // values are no longer needed by the public client — the player only
+        // consumes streams.hls. Strip those fields from the response so the
+        // government / pemda URL never ships to the browser at all.
+        //
+        // Other delivery types are NOT sanitized here:
+        //   - direct-stream mode (external_use_proxy off) still needs the
+        //     raw URL on the client to play directly,
+        //   - external_embed / external_mjpeg / external_jsmpeg use their own
+        //     dedicated URL fields and are out of scope for HLS proxying.
+        const stripExternalHlsUrls = isExternalHls && externalProxyEnabled;
+        const sanitizedExternalHlsUrl = stripExternalHlsUrls
+            ? null
+            : (camera.external_hls_url || (deliveryType === 'external_hls' ? camera.external_stream_url || null : null));
+        const sanitizedExternalStreamUrl = stripExternalHlsUrls
+            ? null
+            : (camera.external_stream_url || (deliveryType === 'external_hls' ? camera.external_hls_url || null : null));
+
         return {
             ...publicAvailability,
             delivery_type: deliveryType,
@@ -62,8 +81,8 @@ class StreamService {
                 ? externalStreams
                 : (deliveryType === 'internal_hls' ? this.buildStreamUrls(streamPath, camera._requestHost) : {}),
             stream_source: camera.stream_source || (deliveryType === 'internal_hls' ? 'internal' : 'external'),
-            external_hls_url: camera.external_hls_url || (deliveryType === 'external_hls' ? camera.external_stream_url || null : null),
-            external_stream_url: camera.external_stream_url || (deliveryType === 'external_hls' ? camera.external_hls_url || null : null),
+            external_hls_url: sanitizedExternalHlsUrl,
+            external_stream_url: sanitizedExternalStreamUrl,
             external_embed_url: camera.external_embed_url || null,
             external_snapshot_url: camera.external_snapshot_url || null,
             external_origin_mode: camera.external_origin_mode || 'direct',
