@@ -31,12 +31,35 @@ class StreamService {
         const availability = cameraHealthService.enrichCameraAvailability(camera);
         const { private_rtsp_url, ...publicAvailability } = availability;
 
+        // For external_hls cameras with proxying enabled (the default), the
+        // response's `streams.hls` is now an opaque /api/stream/:id/external.m3u8
+        // path served by externalStreamProxyRoutes (G2). The actual government /
+        // pemda upstream URL no longer needs to leave the backend at this
+        // step. Only when an admin explicitly turns `external_use_proxy` off
+        // do we hand the browser the raw URL, matching the existing
+        // "direct-stream" mode.
+        const externalProxyEnabled = isExternalHls && (
+            camera.external_use_proxy === undefined
+            || camera.external_use_proxy === null
+            || camera.external_use_proxy === 1
+            || camera.external_use_proxy === true
+        );
+        const externalRawUrl = camera.external_stream_url || camera.external_hls_url || null;
+        const externalStreams = isExternalHls
+            ? {
+                hls: externalProxyEnabled
+                    ? `/api/stream/${camera.id}/external.m3u8`
+                    : externalRawUrl,
+                webrtc: null,
+            }
+            : null;
+
         return {
             ...publicAvailability,
             delivery_type: deliveryType,
             stream_capabilities: capabilities,
             streams: isExternalHls
-                ? { hls: camera.external_stream_url || camera.external_hls_url, webrtc: null }
+                ? externalStreams
                 : (deliveryType === 'internal_hls' ? this.buildStreamUrls(streamPath, camera._requestHost) : {}),
             stream_source: camera.stream_source || (deliveryType === 'internal_hls' ? 'internal' : 'external'),
             external_hls_url: camera.external_hls_url || (deliveryType === 'external_hls' ? camera.external_stream_url || null : null),

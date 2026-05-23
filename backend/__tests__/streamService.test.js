@@ -47,12 +47,33 @@ describe('streamService camera response routing', () => {
         viewStatsMock.mockReturnValue({});
     });
 
-    it('keeps dirty legacy external URLs on the external_hls path', () => {
+    it('routes external_hls streams.hls through the opaque /api/stream proxy when external_use_proxy is enabled (default)', () => {
+        // G3 change: instead of putting the raw external URL into
+        // streams.hls (which leaked it to the browser), the response
+        // now carries the opaque per-camera proxy path. The raw URL
+        // continues to be exposed on the response's external_*_url
+        // fields for now — that field-level sanitization is G4.
         const response = streamService.buildCameraResponse({
             id: 11,
             stream_key: 'camera11',
             stream_source: 'internal',
             external_stream_url: 'https://example.com/live/index.m3u8',
+        });
+
+        expect(response.delivery_type).toBe('external_hls');
+        expect(response.streams).toEqual({
+            hls: '/api/stream/11/external.m3u8',
+            webrtc: null,
+        });
+    });
+
+    it('falls back to the raw external URL in streams.hls when external_use_proxy is disabled', () => {
+        const response = streamService.buildCameraResponse({
+            id: 11,
+            stream_key: 'camera11',
+            stream_source: 'internal',
+            external_stream_url: 'https://example.com/live/index.m3u8',
+            external_use_proxy: 0,
         });
 
         expect(response.delivery_type).toBe('external_hls');
