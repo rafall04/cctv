@@ -132,6 +132,7 @@ export default function AdminLayout({ children }) {
         { label: 'Notification Diagnostics', path: '/admin/notification-diagnostics', icon: <Icons.Bell />, adminOnly: true },
         { label: 'Areas', path: '/admin/areas', icon: <Icons.MapPin /> },
         { label: 'Sponsors', path: '/admin/sponsors', icon: <Icons.Feedback />, adminOnly: true },
+        { label: 'Ads', path: '/admin/ads', icon: <Icons.Settings />, adminOnly: true },
         { label: 'Users', path: '/admin/users', icon: <Icons.Users />, adminOnly: true },
         { label: 'Feedback', path: '/admin/feedback', icon: <Icons.Feedback /> },
         { label: 'Settings', path: '/admin/settings', icon: <Icons.Settings />, adminOnly: true },

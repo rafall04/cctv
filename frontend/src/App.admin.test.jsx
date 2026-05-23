@@ -86,6 +86,10 @@ vi.mock('./pages/SponsorManagement', () => ({
     default: () => <div>sponsor-page</div>,
 }));
 
+vi.mock('./pages/AdsManagement', () => ({
+    default: () => <div>ads-page</div>,
+}));
+
 vi.mock('./pages/RecordingDashboard', () => ({
     default: () => <div>recording-page</div>,
 }));

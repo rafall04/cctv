@@ -16,9 +16,8 @@ vi.mock('../components/admin/settings/SaweriaSettingsPanel', () => ({
     default: () => <div>saweria-panel</div>,
 }));
 
-vi.mock('../components/admin/settings/AdsSettingsPanel', () => ({
-    default: () => <div>ads-panel</div>,
-}));
+// AdsSettingsPanel intentionally not mocked here — Ads moved to its own
+// admin page (/admin/ads) so UnifiedSettings no longer mounts it.
 
 vi.mock('../components/admin/settings/BrandingSettingsPanel', () => ({
     default: () => <div>branding-panel</div>,
@@ -53,8 +52,8 @@ describe('UnifiedSettings', () => {
         fireEvent.click(screen.getByText('Telegram Bot'));
         expect(screen.getByText('telegram-panel')).toBeTruthy();
 
-        fireEvent.click(screen.getByText('Ads'));
-        expect(screen.getByText('ads-panel')).toBeTruthy();
+        // Ads tab removed from UnifiedSettings — it now lives at /admin/ads.
+        expect(screen.queryByText('Ads')).toBeNull();
 
         fireEvent.click(screen.getByText('Health'));
         expect(screen.getByText('health-panel')).toBeTruthy();
