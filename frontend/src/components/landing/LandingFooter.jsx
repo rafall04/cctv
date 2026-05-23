@@ -1,4 +1,5 @@
 import { useCameras } from '../../contexts/CameraContext';
+import SponsorStrip from './SponsorStrip.jsx';
 
 export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
     const { cameras, areas } = useCameras();
@@ -96,6 +97,13 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                         </p>
                     </div>
                 )}
+
+                {/* Sponsor strip — hides itself when there are no active local
+                    sponsors, so footer layout is unchanged on a fresh
+                    deployment. Distinct from the ads slot rendered above
+                    (footer-banner GlobalAdScript) which carries external
+                    network code. */}
+                <SponsorStrip />
 
                 <div className="border-t border-gray-100 pt-4 dark:border-gray-800">
                     <p className="text-center text-xs text-gray-400 dark:text-gray-500">

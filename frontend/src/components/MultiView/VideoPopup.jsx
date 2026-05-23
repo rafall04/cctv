@@ -32,6 +32,7 @@ import PublicStreamStatusOverlay from '../PublicStreamStatusOverlay.jsx';
 import InlineAdSlot from '../ads/InlineAdSlot.jsx';
 import CameraDetailPanel from './CameraDetailPanel.jsx';
 import RelatedCamerasStrip from './RelatedCamerasStrip.jsx';
+import SponsorBadge from '../SponsorBadge.jsx';
 import { isAdsMobileViewport, shouldRenderAdSlot } from '../ads/adsConfig.js';
 import {
     getPublicPopupBodyStyle,
@@ -1137,6 +1138,23 @@ function VideoPopup({
                     style={bodyStyle}
                     onDoubleClick={toggleFS}
                 >
+                    {/* Local-sponsor badge — separate from the ad slot system.
+                        Only renders when this camera has an assigned sponsor
+                        (denormalized sponsor_* columns), so the surface is
+                        invisible until an admin actually links a sponsor in
+                        Sponsor → Penugasan Kamera. */}
+                    {camera?.sponsor_name && (
+                        <SponsorBadge
+                            sponsor={{
+                                name: camera.sponsor_name,
+                                logo: camera.sponsor_logo,
+                                url: camera.sponsor_url,
+                                package: camera.sponsor_package,
+                            }}
+                            size="medium"
+                            position="bottom-right"
+                        />
+                    )}
                     {isHlsCamera || (deliveryType === 'external_flv' && flvPlaybackSupported) ? (
                         <ZoomableVideo key={`video-${camera.id}`} videoRef={videoRef} maxZoom={4} onZoomChange={setZoom} isFullscreen={isFullscreen} />
                     ) : deliveryType === 'external_mjpeg' && effectiveUrl ? (
