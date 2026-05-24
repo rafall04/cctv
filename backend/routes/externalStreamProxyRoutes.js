@@ -292,11 +292,41 @@ function pickHttpClient({ tlsMode, baseClient, timeout }) {
     });
 }
 
+// HLS playlist content type — used to distinguish a small frequently-
+// changing m3u8 body (must NOT be edge-cached, even if it cost a few
+// extra origin hits) from an immutable media segment that SHOULD be
+// edge-cached so a popular camera doesn't bombard the origin.
+const PLAYLIST_CONTENT_TYPE = 'application/vnd.apple.mpegurl';
+
+// Edge cache window for IMMUTABLE media segments. HLS segments never
+// change content once published — same opaque URL ⇒ same bytes — so
+// caching aggressively at Cloudflare's edge is safe and removes the
+// origin from the hot path for popular cameras. 60s matches the
+// in-memory segmentCache TTL above; longer doesn't help because the
+// upstream playlist sliding window will have rotated the segment out
+// of the live edge by then anyway.
+const SEGMENT_EDGE_TTL_SECONDS = 60;
+const SEGMENT_CACHE_CONTROL = `public, max-age=${SEGMENT_EDGE_TTL_SECONDS}, s-maxage=${SEGMENT_EDGE_TTL_SECONDS}, immutable`;
+// Playlists rotate every few seconds — keep them per-viewer fresh.
+const PLAYLIST_CACHE_CONTROL = 'no-cache, no-store, must-revalidate';
+
+function applyResponseCacheHeaders(reply, contentType) {
+    reply.header('Content-Type', contentType);
+    if (contentType === PLAYLIST_CONTENT_TYPE) {
+        reply.header('Cache-Control', PLAYLIST_CACHE_CONTROL);
+        reply.header('Pragma', 'no-cache');
+        reply.header('Expires', '0');
+    } else {
+        // Edge-cacheable: Cloudflare honors `s-maxage` regardless of the
+        // surrounding `no-store`-leaning cache rules we set on auth
+        // endpoints. Browser also caches for the same window so an
+        // individual viewer never refetches the same chunk twice.
+        reply.header('Cache-Control', SEGMENT_CACHE_CONTROL);
+    }
+}
+
 function sendCachedResponse(reply, cached) {
-    reply.header('Content-Type', cached.contentType);
-    reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
-    reply.header('Pragma', 'no-cache');
-    reply.header('Expires', '0');
+    applyResponseCacheHeaders(reply, cached.contentType);
     reply.header('X-RAFNET-Proxy-Cache', 'HIT');
     if (Buffer.isBuffer(cached.body)) {
         reply.header('Content-Length', String(cached.byteSize));
@@ -375,8 +405,7 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
                 // the player walks through it.
                 const stale = playlistCache.getStale(cacheKey);
                 if (stale) {
-                    reply.header('Content-Type', stale.contentType);
-                    reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+                    applyResponseCacheHeaders(reply, stale.contentType);
                     reply.header('X-RAFNET-Proxy-Cache', 'STALE');
                     cameraHealthService.recordRuntimeSignal(camera.id, {
                         targetUrl: camera.external_hls_url,
@@ -391,7 +420,7 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
             }
 
             const rewritten = rewriteOpaquePlaylist(response.data, camera.external_hls_url, camera.id);
-            const contentType = 'application/vnd.apple.mpegurl';
+            const contentType = PLAYLIST_CONTENT_TYPE;
 
             playlistCache.set(
                 cacheKey,
@@ -405,10 +434,7 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
                 success: true,
             });
 
-            reply.header('Content-Type', contentType);
-            reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
-            reply.header('Pragma', 'no-cache');
-            reply.header('Expires', '0');
+            applyResponseCacheHeaders(reply, contentType);
             reply.header('X-RAFNET-Proxy-Cache', 'MISS');
             return reply.send(rewritten);
         } catch (error) {
@@ -417,8 +443,7 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
             // these are even more transient than the 5xx case above.
             const stale = playlistCache.getStale(cacheKey);
             if (stale) {
-                reply.header('Content-Type', stale.contentType);
-                reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+                applyResponseCacheHeaders(reply, stale.contentType);
                 reply.header('X-RAFNET-Proxy-Cache', 'STALE');
                 return reply.send(stale.body);
             }
@@ -479,8 +504,7 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
                     // hurt the most (5x retries each → 5x upstream hits).
                     const stalePlaylist = playlistCache.getStale(playlistCacheKey);
                     if (stalePlaylist) {
-                        reply.header('Content-Type', stalePlaylist.contentType);
-                        reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+                        applyResponseCacheHeaders(reply, stalePlaylist.contentType);
                         reply.header('X-RAFNET-Proxy-Cache', 'STALE');
                         cameraHealthService.recordRuntimeSignal(camera.id, {
                             targetUrl,
@@ -498,7 +522,7 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
                 // entries inside resolve relative to the child's directory
                 // (which may differ from the master's).
                 const rewritten = rewriteOpaquePlaylist(response.data, targetUrl, camera.id);
-                const contentType = 'application/vnd.apple.mpegurl';
+                const contentType = PLAYLIST_CONTENT_TYPE;
                 playlistCache.set(
                     playlistCacheKey,
                     { statusCode: 200, contentType, body: rewritten },
@@ -511,10 +535,7 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
                     success: true,
                 });
 
-                reply.header('Content-Type', contentType);
-                reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
-                reply.header('Pragma', 'no-cache');
-                reply.header('Expires', '0');
+                applyResponseCacheHeaders(reply, contentType);
                 reply.header('X-RAFNET-Proxy-Cache', 'MISS');
                 return reply.send(rewritten);
             } catch (error) {
@@ -522,8 +543,7 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
                 // Network / timeout fallback for the child playlist.
                 const stalePlaylist = playlistCache.getStale(playlistCacheKey);
                 if (stalePlaylist) {
-                    reply.header('Content-Type', stalePlaylist.contentType);
-                    reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+                    applyResponseCacheHeaders(reply, stalePlaylist.contentType);
                     reply.header('X-RAFNET-Proxy-Cache', 'STALE');
                     return reply.send(stalePlaylist.body);
                 }
@@ -585,10 +605,15 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
                 success: true,
             });
 
-            reply.header('Content-Type', contentType);
-            reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
-            reply.header('Pragma', 'no-cache');
-            reply.header('Expires', '0');
+            // Segment responses get edge-cacheable Cache-Control headers
+            // via applyResponseCacheHeaders. Opaque URL is deterministic
+            // per upstream segment, so Cloudflare caches by URL → with N
+            // concurrent viewers of the same camera the origin only sees
+            // the FIRST hit per segment; the remaining (N-1) viewers get
+            // served straight from Cloudflare's edge. For an HLS camera
+            // with ~10 viewers and 6s segments, this drops origin egress
+            // bandwidth by ~10x.
+            applyResponseCacheHeaders(reply, contentType);
             reply.header('Content-Length', String(data.length));
             reply.header('X-RAFNET-Proxy-Cache', 'MISS');
             safeAbort(controller);

@@ -1192,6 +1192,27 @@ function buildExternalCacheKey(url, cameraId) {
     return `${cameraId == null ? '_' : cameraId}|${url}`;
 }
 
+// Mirror of externalStreamProxyRoutes' cache header strategy: HLS
+// segments are immutable once published, so they get aggressive edge
+// cache headers; m3u8 playlists rotate every few seconds and must stay
+// no-cache so each viewer pulls the live edge. Cloudflare honors
+// `s-maxage` and absorbs the segment traffic — popular cameras stop
+// re-hitting the origin once a single viewer warms the edge cache.
+const LEGACY_PLAYLIST_CONTENT_TYPE = 'application/vnd.apple.mpegurl';
+const LEGACY_SEGMENT_EDGE_TTL_SECONDS = 60;
+const LEGACY_SEGMENT_CACHE_CONTROL = `public, max-age=${LEGACY_SEGMENT_EDGE_TTL_SECONDS}, s-maxage=${LEGACY_SEGMENT_EDGE_TTL_SECONDS}, immutable`;
+
+function applyLegacyCacheHeaders(reply, contentType) {
+    reply.header('Content-Type', contentType);
+    if (contentType === LEGACY_PLAYLIST_CONTENT_TYPE) {
+        reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+        reply.header('Pragma', 'no-cache');
+        reply.header('Expires', '0');
+    } else {
+        reply.header('Cache-Control', LEGACY_SEGMENT_CACHE_CONTROL);
+    }
+}
+
 async function handleExternalStreamProxy(state, request, reply) {
     applyHlsCorsHeaders(request, reply);
     const { url, cameraId } = request.query;
@@ -1223,10 +1244,7 @@ async function handleExternalStreamProxy(state, request, reply) {
         // so this skips upstream entirely.
         const cached = cache.get(cacheKey);
         if (cached) {
-            reply.header('Content-Type', cached.contentType);
-            reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
-            reply.header('Pragma', 'no-cache');
-            reply.header('Expires', '0');
+            applyLegacyCacheHeaders(reply, cached.contentType);
             reply.header('X-RAFNET-Proxy-Cache', 'HIT');
             if (!isTextFile) {
                 reply.header('Content-Length', String(cached.byteSize));
@@ -1265,16 +1283,13 @@ async function handleExternalStreamProxy(state, request, reply) {
             }
 
             const rewritten = rewriteExternalPlaylist(response.data, url, externalCameraConfig?.cameraId ?? null);
-            const contentType = 'application/vnd.apple.mpegurl';
+            const contentType = LEGACY_PLAYLIST_CONTENT_TYPE;
             // Store the REWRITTEN body so a cache hit can serve a ready-
             // to-send response directly. TTL stays at the cache default
             // (playlistCache = 3s).
             cache.set(cacheKey, { statusCode: 200, contentType, body: rewritten }, EXTERNAL_CACHE_TTL.PLAYLIST_MS);
 
-            reply.header('Content-Type', contentType);
-            reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
-            reply.header('Pragma', 'no-cache');
-            reply.header('Expires', '0');
+            applyLegacyCacheHeaders(reply, contentType);
             reply.header('X-RAFNET-Proxy-Cache', 'MISS');
             if (externalCameraConfig?.cameraId) {
                 cameraHealthService.recordRuntimeSignal(externalCameraConfig.cameraId, {
@@ -1311,10 +1326,10 @@ async function handleExternalStreamProxy(state, request, reply) {
         // body bytes for the full segmentCache TTL (default 60s).
         cache.set(cacheKey, { statusCode: 200, contentType, body: data }, EXTERNAL_CACHE_TTL.SEGMENT_MS);
 
-        reply.header('Content-Type', contentType);
-        reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
-        reply.header('Pragma', 'no-cache');
-        reply.header('Expires', '0');
+        // Edge-cacheable so Cloudflare can absorb the bulk of segment
+        // traffic for popular cameras — same opaque-URL ⇒ same bytes,
+        // so cache hits at the edge don't even touch the origin.
+        applyLegacyCacheHeaders(reply, contentType);
         reply.header('Content-Length', String(data.length));
         reply.header('X-RAFNET-Proxy-Cache', 'MISS');
         safeAbort(controller);
@@ -1403,10 +1418,12 @@ export default async function hlsProxyRoutes(fastify, _options) {
                     return reply.code(response.status).send('');
                 }
 
-                reply.header('Content-Type', contentType);
-                reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
-                reply.header('Pragma', 'no-cache');
-                reply.header('Expires', '0');
+                // Playlist stays no-cache — it carries the live edge and
+                // rotates every few seconds, plus each playlist fetch
+                // re-arms the viewer session (recordSegmentAccess on
+                // segments is just a heartbeat optimisation, the
+                // playlist fetch is what creates/keeps the session).
+                applyLegacyCacheHeaders(reply, contentType);
                 if (cameraId) {
                     cameraHealthService.recordRuntimeSignal(cameraId, {
                         targetUrl,
@@ -1431,10 +1448,13 @@ export default async function hlsProxyRoutes(fastify, _options) {
                 return reply.code(response.status).send('');
             }
 
-            reply.header('Content-Type', contentType);
-            reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
-            reply.header('Pragma', 'no-cache');
-            reply.header('Expires', '0');
+            // Edge-cacheable internal segments. MediaMTX hands us the
+            // same bytes for the same stream_key + segment name, so CF
+            // can cache by URL safely. Trade-off: per-segment heartbeats
+            // (recordSegmentAccess) will stop firing for cache hits,
+            // but the playlist refresh every ~3s already keeps the
+            // viewer session warm well inside its 25s TTL.
+            applyLegacyCacheHeaders(reply, contentType);
 
             attachAbortCleanup({
                 request,
