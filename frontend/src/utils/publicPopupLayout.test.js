@@ -100,10 +100,12 @@ describe('publicPopupLayout — aspect normalisation', () => {
     });
 });
 
-describe('publicPopupLayout — desktop modal sizing (v4 aspect-ratio fit)', () => {
-    it('sizes a 16:9 camera in a 16:9 viewport to the full viewport width', () => {
+describe('publicPopupLayout — desktop modal sizing (v6 aspect-fit + backdrop-scroll)', () => {
+    it('sizes a 16:9 camera in a 16:9 viewport to the full viewport width, NO maxHeight', () => {
         // 1366×768 viewport, 16:9 camera. width-bound = 1366,
         // height-bound = 768 * 16/9 = 1365.33. Tied at 1365.
+        // CRITICAL v6: no maxHeight on the modal — the backdrop owns
+        // the scroll now, not the modal.
         const style = getPublicPopupModalStyle({
             isFullscreen: false,
             isPlaybackLocked: false,
@@ -111,7 +113,7 @@ describe('publicPopupLayout — desktop modal sizing (v4 aspect-ratio fit)', () 
             viewportWidth: 1366,
             viewportHeight: 768,
         });
-        expect(style.width).toBe('1365px');
+        expect(style).toEqual({ width: '1365px' });
     });
 
     it('shrinks the modal for a 4:3 camera so the sides match the cameras native aspect', () => {
@@ -124,12 +126,10 @@ describe('publicPopupLayout — desktop modal sizing (v4 aspect-ratio fit)', () 
             viewportWidth: 1366,
             viewportHeight: 768,
         });
-        expect(style.width).toBe('1024px');
+        expect(style).toEqual({ width: '1024px' });
     });
 
     it('applies the portrait min-width so chrome stays readable on a 9:16 source', () => {
-        // 1366×768, 9:16 camera. height-bound = 768 * 9/16 = 432.
-        // Above the 400 minimum, so it stays at 432.
         const portraitTall = getPublicPopupModalStyle({
             isFullscreen: false,
             isPlaybackLocked: false,
@@ -137,10 +137,8 @@ describe('publicPopupLayout — desktop modal sizing (v4 aspect-ratio fit)', () 
             viewportWidth: 1366,
             viewportHeight: 768,
         });
-        expect(portraitTall.width).toBe('432px');
+        expect(portraitTall).toEqual({ width: '432px' });
 
-        // Same camera in a SHORTER viewport (480px tall): height-bound
-        // = 480 * 9/16 = 270. Below the 400 min, floor kicks in.
         const portraitShort = getPublicPopupModalStyle({
             isFullscreen: false,
             isPlaybackLocked: false,
@@ -148,12 +146,10 @@ describe('publicPopupLayout — desktop modal sizing (v4 aspect-ratio fit)', () 
             viewportWidth: 1366,
             viewportHeight: 480,
         });
-        expect(portraitShort.width).toBe(`${PUBLIC_POPUP_MIN_DESKTOP_WIDTH}px`);
+        expect(portraitShort).toEqual({ width: `${PUBLIC_POPUP_MIN_DESKTOP_WIDTH}px` });
     });
 
     it('scales linearly with viewport — no hard cap on desktop', () => {
-        // 1920×1080, 16:9 camera. height-bound = 1080 * 16/9 = 1920.
-        // Width-bound = 1920. Tied at 1920.
         const style = getPublicPopupModalStyle({
             isFullscreen: false,
             isPlaybackLocked: false,
@@ -161,11 +157,10 @@ describe('publicPopupLayout — desktop modal sizing (v4 aspect-ratio fit)', () 
             viewportWidth: 1920,
             viewportHeight: 1080,
         });
-        expect(style.width).toBe('1920px');
+        expect(style).toEqual({ width: '1920px' });
     });
 
     it('lets a 4K monitor render a 4K-wide modal — Fullscreen is for "I want even bigger"', () => {
-        // 3840×2160, 16:9 camera. Both bounds = 3840. Modal fills.
         const style = getPublicPopupModalStyle({
             isFullscreen: false,
             isPlaybackLocked: false,
@@ -173,10 +168,10 @@ describe('publicPopupLayout — desktop modal sizing (v4 aspect-ratio fit)', () 
             viewportWidth: 3840,
             viewportHeight: 2160,
         });
-        expect(style.width).toBe('3840px');
+        expect(style).toEqual({ width: '3840px' });
     });
 
-    it('does not impose a JS width on mobile viewports — lets Tailwind w-full take over', () => {
+    it('does not impose a JS style on mobile viewports — lets Tailwind w-full + backdrop scroll take over', () => {
         const style = getPublicPopupModalStyle({
             isFullscreen: false,
             isPlaybackLocked: false,
@@ -184,13 +179,16 @@ describe('publicPopupLayout — desktop modal sizing (v4 aspect-ratio fit)', () 
             viewportWidth: 390,
             viewportHeight: 844,
         });
-        expect(style.width).toBeUndefined();
-        expect(style.maxHeight).toBe('100vh');
+        // v6: empty style on mobile, NO maxHeight (backdrop handles
+        // scroll). w-full on the CSS class controls width.
+        expect(style).toEqual({});
     });
 
-    it('returns the bare maxHeight only when playback is locked, regardless of viewport', () => {
-        // Non-live state: stable rectangular shell, no aspect-fit
-        // sizing (full-bleed-feel reads wrong for an error screen).
+    it('keeps a maxHeight cap ONLY when playback is locked — error card stays sensibly sized', () => {
+        // Non-live state (CORS-blocked, codec-incompatible, offline)
+        // is the one path that still wants a `maxHeight` cap — a
+        // full-bleed aspect-fit error card reads as panic; a stable
+        // rectangle reads as "this thing failed".
         const style = getPublicPopupModalStyle({
             isFullscreen: false,
             isPlaybackLocked: true,
@@ -212,7 +210,7 @@ describe('publicPopupLayout — desktop modal sizing (v4 aspect-ratio fit)', () 
         })).toEqual({});
     });
 
-    it('ignores legacy headerHeight/footerHeight/maxDesktopWidth/ad-height args (v1+v2+v3 compat)', () => {
+    it('ignores legacy headerHeight/footerHeight/maxDesktopWidth/ad-height args (v1..v5 compat)', () => {
         const baseArgs = {
             isFullscreen: false,
             isPlaybackLocked: false,
@@ -241,14 +239,10 @@ describe('publicPopupLayout — desktop modal sizing (v4 aspect-ratio fit)', () 
             viewportWidth: NaN,
             viewportHeight: 0,
         });
-        expect(style.width).toBeUndefined();
-        expect(style.maxHeight).toBe('100vh');
+        expect(style).toEqual({});
     });
 
     it('honours an explicit caller-supplied minDesktopWidth override', () => {
-        // Caller forces a tighter floor (e.g., for an embedded preview
-        // surface that can't bear the default 400 px). Portrait video
-        // at 480p would otherwise hit the 400 default.
         const style = getPublicPopupModalStyle({
             isFullscreen: false,
             isPlaybackLocked: false,
@@ -258,6 +252,6 @@ describe('publicPopupLayout — desktop modal sizing (v4 aspect-ratio fit)', () 
             minDesktopWidth: 240,
         });
         // height-bound = 480 * 9/16 = 270. Above 240 floor, used as-is.
-        expect(style.width).toBe('270px');
+        expect(style).toEqual({ width: '270px' });
     });
 });

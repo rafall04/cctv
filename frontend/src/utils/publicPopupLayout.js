@@ -105,43 +105,52 @@ export function getPublicPopupModalStyle({
     const verticalPaddingPx = Number(viewportVerticalPadding) >= 0
         ? Number(viewportVerticalPadding)
         : DEFAULT_PUBLIC_POPUP_VIEWPORT_VERTICAL_PADDING;
-    const modalStyle = {
-        maxHeight: verticalPaddingPx > 0
-            ? `calc(100vh - ${verticalPaddingPx}px)`
-            : '100vh',
-    };
 
     if (isPlaybackLocked) {
         // Non-live state (CORS-blocked, codec-incompatible, offline).
-        // Keep a stable rectangular shell — full aspect-fit reads as
-        // "this is live and important", which is the wrong vibe for
-        // an error screen.
-        return modalStyle;
+        // KEEP the max-height cap so the error card stays sensibly
+        // sized — full aspect-fit reads as "this is live and
+        // important" which is the wrong vibe for an error screen.
+        return {
+            maxHeight: verticalPaddingPx > 0
+                ? `calc(100vh - ${verticalPaddingPx}px)`
+                : '100vh',
+        };
     }
 
     const nextViewportWidth = Number(viewportWidth);
     const nextViewportHeight = Number(viewportHeight);
     if (!nextViewportWidth || !nextViewportHeight) {
-        return modalStyle;
+        return {};
     }
     if (nextViewportWidth < PUBLIC_POPUP_DESKTOP_BREAKPOINT) {
         // Mobile: Tailwind `w-full` handles edge-to-edge. JS sizing
-        // here would only fight the responsive class set.
-        return modalStyle;
+        // here would only fight the responsive class set. Backdrop
+        // scrolls when total content exceeds viewport.
+        return {};
     }
 
     const aspectRatio = Number(videoAspectRatio) || DEFAULT_PUBLIC_POPUP_LIVE_ASPECT_RATIO;
     if (aspectRatio <= 0) {
-        return modalStyle;
+        return {};
     }
 
     // Largest rectangle that fits inside the viewport while
     // respecting the camera's aspect ratio:
     //   width  = min(viewportWidth,  viewportHeight * aspectRatio)
     //   height = width / aspectRatio   (locked by body's aspect-ratio CSS)
-    // For a 16:9 camera in a 16:9 viewport the two arms tie and the
-    // modal spans edge-to-edge; for any other aspect mismatch the
-    // smaller arm wins and the modal centers with side margins.
+    //
+    // CRITICAL v6 change: we do NOT set `maxHeight` on the modal.
+    // Previously the maxHeight + flex-col + body's aspect-ratio caused
+    // a constraint conflict: the modal capped at 100vh, flex shrank
+    // the body shorter than (width / aspectRatio), the body's CSS
+    // aspect-ratio was violated, the <video> inside object-fit-
+    // contain'd into the misshapen body, and we got pillarbox bars
+    // showing the body bg on either side of the actual frame. With
+    // maxHeight gone, the body is free to stretch to its full
+    // aspect-derived height, the video fills it without letterbox,
+    // and the BACKDROP (set up to scroll in VideoPopup.jsx) handles
+    // overflow when total content > viewport height.
     const horizontalPaddingPx = Number(viewportHorizontalPadding) >= 0
         ? Number(viewportHorizontalPadding)
         : DEFAULT_PUBLIC_POPUP_VIEWPORT_HORIZONTAL_PADDING;
@@ -151,20 +160,15 @@ export function getPublicPopupModalStyle({
     const aspectFitWidth = Math.floor(Math.min(widthBoundWidth, heightBoundWidth));
 
     // Min-width floor for portrait cameras so the title bar + action
-    // buttons + share controls stay readable. The video itself still
-    // honours its aspect ratio inside via the body's aspect-ratio CSS;
-    // only the surrounding chrome gets a bit of extra room.
+    // buttons stay readable. The video itself still honours its aspect
+    // ratio inside via the body's aspect-ratio CSS.
     const minWidthFloor = Math.min(
         Number(minDesktopWidth) || PUBLIC_POPUP_MIN_DESKTOP_WIDTH,
         availableViewportWidth,
     );
     const finalModalWidth = Math.max(minWidthFloor, aspectFitWidth);
 
-    if (finalModalWidth > 0) {
-        modalStyle.width = `${finalModalWidth}px`;
-    }
-
-    return modalStyle;
+    return finalModalWidth > 0 ? { width: `${finalModalWidth}px` } : {};
 }
 
 export function getVideoAspectRatio(video) {
