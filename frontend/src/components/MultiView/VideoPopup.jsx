@@ -280,6 +280,30 @@ function VideoPopup({
             setVideoAspectRatio(nextAspectRatio);
         }
     }, []);
+
+    // Belt-and-braces aspect-ratio poll. Some upstreams (proxied
+    // external HLS in particular) take a beat longer than
+    // `loadedmetadata` fires to report a stable videoWidth /
+    // videoHeight — the popup would otherwise stay sized for the
+    // 16:9 default and the camera's native frame would letterbox
+    // inside, producing the "white space on the sides of the CCTV"
+    // the user reported. We poll for 5 seconds at 250 ms, then stop
+    // (or stop early once a non-null ratio lands and matches the
+    // current state).
+    useEffect(() => {
+        if (videoAspectRatio) return undefined;
+        if (!videoRef.current) return undefined;
+        let attempts = 0;
+        const handle = setInterval(() => {
+            attempts += 1;
+            syncVideoAspectRatio();
+            // Stop after ~5 s of polling. If metadata still hasn't
+            // landed by then, the stream is probably unhealthy and
+            // an aspect-ratio guess is the least of our worries.
+            if (attempts >= 20) clearInterval(handle);
+        }, 250);
+        return () => clearInterval(handle);
+    }, [videoAspectRatio, syncVideoAspectRatio, camera.id]);
     const requestVideoPlay = useCallback((target = videoRef.current) => {
         if (!target?.play) return;
         try {
@@ -1181,7 +1205,21 @@ function VideoPopup({
                 <div
                     ref={wrapperRef}
                     data-testid={bodyTestId}
-                    className={`relative bg-gray-100 dark:bg-black overflow-hidden ${isFullscreen ? 'flex-1 min-h-0' : `w-full ${!isVideoActive ? bodyMinHeightClass : ''}`}`}
+                    // Black background ALWAYS — even in light mode. Two
+                    // reasons:
+                    //   1. If the camera stream's reported aspect ratio
+                    //      drifts from the body's CSS aspect-ratio
+                    //      briefly during metadata load, the resulting
+                    //      `object-fit: contain` letterbox pillars
+                    //      would otherwise show the light-gray body bg,
+                    //      reading as "white space on the sides of the
+                    //      CCTV" — the exact bug the user reported.
+                    //      Black bars blend with the natural video
+                    //      letterbox.
+                    //   2. Videos are universally black-on-empty, so a
+                    //      black body bg matches user expectations
+                    //      regardless of theme.
+                    className={`relative bg-black overflow-hidden ${isFullscreen ? 'flex-1 min-h-0' : `w-full ${!isVideoActive ? bodyMinHeightClass : ''}`}`}
                     style={bodyStyle}
                     onDoubleClick={toggleFS}
                 >
