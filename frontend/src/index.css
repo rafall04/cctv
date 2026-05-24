@@ -155,6 +155,41 @@ body {
     .announcement-marquee-track {
         animation: none !important;
     }
+
+    /*
+     * Defense-in-depth: any decorative animation or transition that
+     * wasn't gated by the JS-level `shouldDisableAnimations()` helper
+     * is forced to settle instantly. Two important carve-outs:
+     *
+     *  1. We use `animation-duration: 0.01ms` + `iteration-count: 1`
+     *     instead of `animation: none` so loading indicators still
+     *     reach a perceivable resting state (a paused spinner stays
+     *     visible as a static ring instead of vanishing entirely).
+     *  2. `<video>` elements are exempt because video PLAYBACK isn't
+     *     a CSS animation — but a stray `transition` on opacity etc.
+     *     applied to the video container could fight with HLS.js's
+     *     own playback overlay rendering. Belt-and-braces.
+     *
+     * The Tailwind `animate-bounce` keyframe leaves its element
+     * displaced by translateY(-25%) at the 0% / 100% keyframe; under
+     * this rule a bounced element snaps to its bounced position.
+     * That's acceptable because bounce is only used on a 3s "max
+     * reached" toast in the public landing — a one-shot UI peek, not
+     * a persistent decorative motion.
+     */
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    video {
+        animation: none !important;
+        transition: none !important;
+    }
 }
 
 @keyframes announcementMarquee {
