@@ -1071,18 +1071,28 @@ function VideoPopup({
     ]);
 
     return (
-        <div ref={outerWrapperRef} className={`fixed inset-0 z-[1000000] ${isFullscreen ? 'bg-black dark:bg-black' : 'flex items-center justify-center bg-black/95 dark:bg-black/95 p-2 sm:p-4'}`} onClick={onClose}>
+        <div
+            ref={outerWrapperRef}
+            // Full-bleed backdrop: NO horizontal padding on desktop so
+            // the modal touches both edges of the viewport. Tiny safe-
+            // area padding stays on the smallest mobile sizes (`p-1`)
+            // so a stray gesture doesn't dismiss before users notice
+            // they're INSIDE the popup. Click on remaining backdrop
+            // still closes — but with a full-bleed modal there's
+            // usually no visible backdrop to click; ESC + the X button
+            // are the primary close controls.
+            className={`fixed inset-0 z-[1000000] ${isFullscreen ? 'bg-black dark:bg-black' : 'bg-black/95 dark:bg-black/95 p-1 sm:p-0'}`}
+            onClick={onClose}
+        >
             <div
                 ref={modalRef}
                 data-testid={modalTestId}
-                // Width is JS-driven via modalStyle.width (computed from
-                // video aspect ratio + viewport). `w-full` is the mobile
-                // fallback when getPublicPopupModalStyle returns no
-                // explicit width. We removed the old `max-w-5xl` (1024px)
-                // Tailwind cap because the JS now controls the cap
-                // dynamically — see DEFAULT_PUBLIC_POPUP_MAX_DESKTOP_WIDTH
-                // and minDesktopWidth for portrait-aspect cameras.
-                className={`relative bg-white dark:bg-gray-900 shadow-2xl flex flex-col ${isFullscreen ? 'w-full h-full overflow-hidden' : 'w-full overflow-x-hidden overflow-y-auto rounded-2xl border border-gray-200 dark:border-gray-800'}`}
+                // Full viewport width on desktop via `w-full` + modalStyle
+                // (which sets width:100vw on desktop). Rounded corners +
+                // border dropped on desktop — they read weird touching
+                // the viewport edge. Mobile keeps rounded for popup
+                // affordance.
+                className={`relative bg-white dark:bg-gray-900 shadow-2xl flex flex-col ${isFullscreen ? 'w-full h-full overflow-hidden' : 'w-full overflow-x-hidden overflow-y-auto sm:rounded-none rounded-2xl sm:border-0 border border-gray-200 dark:border-gray-800'}`}
                 style={modalStyle}
                 onClick={(e) => e.stopPropagation()}
             >
@@ -1099,9 +1109,17 @@ function VideoPopup({
                     />
                 )}
 
-                {/* Header Info - di atas video (hide in fullscreen) */}
+                {/* Header Info - di atas video (hide in fullscreen).
+                    Sticky so the camera name + close button stay anchored
+                    at the top while the user scrolls through the detail
+                    panel, ads, and related-camera strip below the body.
+                    `z-20` keeps it above the video which has its own
+                    overlay controls. */}
                 {!isFullscreen && (
-                    <div ref={headerRef} className="p-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                    <div
+                        ref={headerRef}
+                        className="sticky top-0 z-20 p-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50/95 dark:bg-gray-800/95 backdrop-blur-sm"
+                    >
                         <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                                 <h3 className="text-gray-900 dark:text-white font-bold text-sm sm:text-base truncate">{camera.name}</h3>
