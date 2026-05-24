@@ -189,4 +189,54 @@ describe('ExternalStreamCache', () => {
         expect(stats.name).toBe('external-segment');
         expect(stats.maxBytes).toBeGreaterThanOrEqual(50 * 1024 * 1024);
     });
+
+    describe('getStale fallback for upstream flakiness', () => {
+        it('returns null for an entry that is still fresh — caller should have used get()', () => {
+            const cache = new ExternalStreamCache({ defaultTtlMs: 5000 });
+            cache.set('k', { statusCode: 200, contentType: 'text/plain', body: 'fresh' });
+            expect(cache.getStale('k')).toBeNull();
+        });
+
+        it('returns an expired entry that is within the stale window', () => {
+            const cache = new ExternalStreamCache({ defaultTtlMs: 1000 });
+            cache.set('k', { statusCode: 200, contentType: 'text/plain', body: 'cached body' });
+
+            // Advance past expiry but inside the stale window.
+            vi.advanceTimersByTime(1000 + 500);
+            const stale = cache.getStale('k', 10000);
+            expect(stale).not.toBeNull();
+            expect(stale.body).toBe('cached body');
+            expect(stale.contentType).toBe('text/plain');
+        });
+
+        it('refuses to serve an entry older than the stale window', () => {
+            const cache = new ExternalStreamCache({ defaultTtlMs: 1000 });
+            cache.set('k', { statusCode: 200, contentType: 'text/plain', body: 'too old' });
+            // Expired by 11s, stale window of 10s → refuses.
+            vi.advanceTimersByTime(1000 + 11000);
+            expect(cache.getStale('k', 10000)).toBeNull();
+        });
+
+        it('does not promote the entry on stale read (stays at the head for natural LRU eviction)', () => {
+            const cache = new ExternalStreamCache({ defaultTtlMs: 1000, maxEntries: 2 });
+            cache.set('a', { statusCode: 200, contentType: 'text/plain', body: 'A' });
+            cache.set('b', { statusCode: 200, contentType: 'text/plain', body: 'B' });
+
+            // Expire then stale-read `a`.
+            vi.advanceTimersByTime(1500);
+            cache.getStale('a', 5000);
+            // Inserting a third entry should evict the oldest. Since we did
+            // NOT touch `a` on stale-read, `a` is still the oldest and gets
+            // evicted, NOT `b`.
+            cache.set('c', { statusCode: 200, contentType: 'text/plain', body: 'C' });
+            // `a` evicted, `b` and `c` remain.
+            const stats = cache.getStats();
+            expect(stats.entries).toBe(2);
+        });
+
+        it('returns null for an entry that does not exist', () => {
+            const cache = new ExternalStreamCache({ defaultTtlMs: 1000 });
+            expect(cache.getStale('missing', 10000)).toBeNull();
+        });
+    });
 });

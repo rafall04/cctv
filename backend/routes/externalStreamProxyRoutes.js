@@ -37,14 +37,37 @@ import {
 import { config } from '../config/config.js';
 
 const DEFAULT_TIMEOUT_MS = 30000;
-// Whitelist of file extensions allowed in the opaque `/external-segment`
-// path. `.m3u8` is included because a master playlist's entries are
-// themselves CHILD playlists (variant streams) — those URLs flow through
-// the same opaque-segment endpoint after rewriteOpaquePlaylist rewrites
-// them. The handler branches on extension below: `.m3u8` is fetched and
-// rewritten as text; the rest are streamed as binary media. Path
-// traversal (`..`) and absolute paths are rejected separately.
-const SEGMENT_FILENAME_PATTERN = /^[A-Za-z0-9_./-]+\.(ts|m4s|mp4|m3u8)$/;
+// Whitelist for the (decoded) path portion of an opaque `/external-segment`
+// filename. We extend the original `.ts`/`.m4s`/`.mp4`/`.m3u8` set with
+// the other HLS-related extensions a player may follow through one of
+// the rewritten directive-URI tags below:
+//   - .key / .bin → AES-128 encryption keys referenced by #EXT-X-KEY
+//   - .vtt / .webvtt → WebVTT subtitle segments referenced by
+//     #EXT-X-MEDIA TYPE=SUBTITLES alt renditions
+//   - .aac / .ac3 → raw audio segments occasionally used as alt-audio
+//     in #EXT-X-MEDIA renditions
+//   - .cmfv / .cmfa → CMAF video/audio segments
+// Other extensions stay refused (.txt, .html, .php, ...) because there
+// is no legitimate HLS use case for them — letting them through would
+// turn this endpoint into a generic open relay scoped to the camera's
+// base URL. Path traversal (`..`) and absolute paths are rejected
+// separately. This regex matches the PATH-ONLY portion; query strings
+// are split off in `resolveSegmentTargetUrl` before validation.
+const SEGMENT_FILENAME_PATTERN = /^[A-Za-z0-9_./-]+\.(ts|m4s|mp4|m3u8|key|bin|vtt|webvtt|aac|ac3|cmfv|cmfa)$/i;
+
+// HLS directive tags whose `URI="..."` attribute references a resource
+// the player will fetch (init segment, encryption key, alt rendition,
+// I-frame variant playlist, LL-HLS partial/preload, rendition report).
+// Without rewriting these, an upstream that embeds an ABSOLUTE gov URL
+// inside one of these tags will leak the host into the browser — the
+// player happily follows the absolute URL straight to the upstream,
+// bypassing the opaque proxy and triggering a CORS block.
+//
+// Tags intentionally NOT here either carry no URI (#EXT-X-VERSION,
+// #EXT-X-TARGETDURATION, #EXTINF, ...) or carry the URI on the NEXT
+// LINE so the existing standalone-line rewriter already handles them
+// (#EXT-X-STREAM-INF).
+const DIRECTIVE_URI_TAGS = /^#EXT-X-(MAP|KEY|SESSION-KEY|MEDIA|I-FRAME-STREAM-INF|PART|PRELOAD-HINT|RENDITION-REPORT)\b/i;
 
 function lookupExternalCamera(cameraId) {
     const parsed = Number.parseInt(cameraId, 10);
@@ -103,6 +126,16 @@ function getCameraBaseUrl(camera) {
  * uses to address it. We then re-emit it as
  * `/api/stream/{cameraId}/external-segment/{encodedPath}` so clients
  * never see the upstream host.
+ *
+ * Important details:
+ *   - The query string is preserved (URL-encoded into the opaque
+ *     filename) because some upstreams sign their segment URLs
+ *     (Wowza `wmsAuthSign`, signed CDNs, Shinobi monitor tokens) and
+ *     stripping the query would make the upstream refuse the segment
+ *     fetch with 401/403.
+ *   - Cross-host segment URLs collapse to their last path component;
+ *     the backend's `isExternalProxyUrlCompatible` will still refuse to
+ *     fetch them at request time, so this only matters for shape.
  */
 export function buildOpaqueSegmentUrl(cameraId, segmentLine, sourceUrl) {
     if (!segmentLine) return '';
@@ -119,6 +152,7 @@ export function buildOpaqueSegmentUrl(cameraId, segmentLine, sourceUrl) {
     // Use the path RELATIVE to the playlist's base URL when possible —
     // gives shorter, predictable opaque URLs for nested segments.
     let pathSuffix = '';
+    let querySuffix = '';
     try {
         const parsed = new URL(absolute);
         const baseParsed = new URL('.', sourceUrl);
@@ -131,30 +165,76 @@ export function buildOpaqueSegmentUrl(cameraId, segmentLine, sourceUrl) {
             // still validate against the camera's base URL when proxying.
             pathSuffix = parsed.pathname.split('/').pop() || '';
         }
+        // parsed.search includes the leading `?`. Tokenised CDNs and
+        // Wowza wmsAuthSign servers ride along here and MUST survive
+        // the round-trip — without the token the upstream refuses the
+        // segment fetch.
+        querySuffix = parsed.search || '';
     } catch {
         pathSuffix = absolute.split('/').pop() || '';
     }
 
     if (!pathSuffix) return '';
-    return `/api/stream/${cameraId}/external-segment/${encodeURIComponent(pathSuffix)}`;
+    // encodeURIComponent escapes `?`, `&`, `=` etc., so the entire
+    // path+query string round-trips safely through Fastify's `:filename`
+    // path-parameter without spilling into the routing layer.
+    return `/api/stream/${cameraId}/external-segment/${encodeURIComponent(pathSuffix + querySuffix)}`;
 }
 
 /**
- * Build the new opaque playlist body from the upstream m3u8 text.
- * Same shape as rewriteExternalPlaylist in hlsProxyRoutes — but the
- * output URLs are opaque, not /hls/proxy?url=... style.
+ * Rewrite every URI a player will fetch (standalone segment lines AND
+ * URI="..." attributes inside directive tags like #EXT-X-MAP,
+ * #EXT-X-KEY, #EXT-X-MEDIA) to opaque `/api/stream/.../external-segment`
+ * paths.
+ *
+ * The directive-URI rewrite is critical for any upstream that emits
+ * ABSOLUTE upstream URLs inside these tags. Without it the player
+ * happily follows the absolute URL straight to the gov host,
+ * triggering a CORS block in production and leaking the camera's
+ * source URL into the browser's network panel. Same-line-as-#
+ * directives that carry their URI on the FOLLOWING line
+ * (#EXT-X-STREAM-INF) are already covered by the standalone-line
+ * branch.
  */
 export function rewriteOpaquePlaylist(playlistText, sourceUrl, cameraId) {
     const lines = String(playlistText || '').split('\n');
     for (let index = 0; index < lines.length; index += 1) {
-        const line = lines[index].trim();
-        if (!line || line.startsWith('#')) continue;
+        const rawLine = lines[index];
+        const line = rawLine.trim();
+        if (!line) continue;
+
+        if (line.startsWith('#')) {
+            if (DIRECTIVE_URI_TAGS.test(line)) {
+                lines[index] = rewriteDirectiveUris(rawLine, sourceUrl, cameraId);
+            }
+            continue;
+        }
+
         const opaque = buildOpaqueSegmentUrl(cameraId, line, sourceUrl);
         if (opaque) {
             lines[index] = opaque;
         }
     }
     return lines.join('\n');
+}
+
+/**
+ * Replace every `URI="..."` attribute on an HLS directive line with
+ * an opaque proxy URL. Per the HLS spec, attribute values are always
+ * double-quoted, so a precise regex is enough here — no need to invoke
+ * an attribute-list parser.
+ *
+ * If buildOpaqueSegmentUrl returns an empty string (cross-host segment
+ * with no addressable path), the original URI is preserved untouched.
+ * The backend's segment handler will refuse such a fetch at request
+ * time, but leaving the original means HLS.js's own error path runs
+ * instead of producing a malformed playlist.
+ */
+function rewriteDirectiveUris(directiveLine, sourceUrl, cameraId) {
+    return directiveLine.replace(/URI="([^"]+)"/g, (match, uri) => {
+        const opaque = buildOpaqueSegmentUrl(cameraId, uri, sourceUrl);
+        return opaque ? `URI="${opaque}"` : match;
+    });
 }
 
 /**
@@ -180,14 +260,22 @@ export function resolveSegmentTargetUrl(camera, rawFilename, allowOptions) {
         return null;
     }
 
-    if (!SEGMENT_FILENAME_PATTERN.test(filename)) return null;
-    if (filename.includes('..')) return null;
-    if (filename.startsWith('/')) return null;
+    // Split path vs. query/fragment. The strict whitelist regex below
+    // applies only to the PATH part — the query is preserved verbatim
+    // and re-attached to the upstream URL because some sources sign
+    // their segment URLs (Wowza wmsAuthSign, signed CDNs).
+    const queryIndex = filename.search(/[?#]/);
+    const pathPart = queryIndex >= 0 ? filename.slice(0, queryIndex) : filename;
+    const querySuffix = queryIndex >= 0 ? filename.slice(queryIndex) : '';
+
+    if (!SEGMENT_FILENAME_PATTERN.test(pathPart)) return null;
+    if (pathPart.includes('..')) return null;
+    if (pathPart.startsWith('/')) return null;
 
     const baseUrl = getCameraBaseUrl(camera);
     if (!baseUrl) return null;
 
-    const targetUrl = baseUrl + filename;
+    const targetUrl = baseUrl + pathPart + querySuffix;
     if (!isExternalProxyUrlCompatible(camera.external_hls_url, targetUrl)) {
         return null;
     }
@@ -278,6 +366,25 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
             });
 
             if (response.status !== 200) {
+                // Stale-cache fallback. Pemda / gov HLS upstreams 5xx
+                // sporadically for 1–3 seconds at a time. Without this,
+                // the player gets a 500 response, retries 5x (each one
+                // also hitting the flaky upstream), and gives up with a
+                // misleading "CORS error" toast. By serving a slightly
+                // stale rewritten playlist body we cover the blink and
+                // the player walks through it.
+                const stale = playlistCache.getStale(cacheKey);
+                if (stale) {
+                    reply.header('Content-Type', stale.contentType);
+                    reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+                    reply.header('X-RAFNET-Proxy-Cache', 'STALE');
+                    cameraHealthService.recordRuntimeSignal(camera.id, {
+                        targetUrl: camera.external_hls_url,
+                        signalType: 'external_hls_playlist_proxy_stale',
+                        success: false,
+                    });
+                    return reply.send(stale.body);
+                }
                 reply.header('Content-Type', 'text/plain');
                 reply.header('Cache-Control', 'no-cache');
                 return reply.code(response.status).send('');
@@ -306,6 +413,15 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
             return reply.send(rewritten);
         } catch (error) {
             console.error(`[ExternalStreamProxy] playlist error camera=${camera.id}:`, error.message);
+            // Same stale-cache fallback for network / timeout errors —
+            // these are even more transient than the 5xx case above.
+            const stale = playlistCache.getStale(cacheKey);
+            if (stale) {
+                reply.header('Content-Type', stale.contentType);
+                reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+                reply.header('X-RAFNET-Proxy-Cache', 'STALE');
+                return reply.send(stale.body);
+            }
             return reply.code(502).send('');
         }
     });
@@ -328,7 +444,11 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
         // rewrite its segment lines (which use this same opaque scheme),
         // and serve as a playlist. The body is cached in playlistCache
         // with a short TTL so live playlists stay fresh.
-        const isPlaylistTarget = targetUrl.toLowerCase().endsWith('.m3u8');
+        //
+        // Inspect the path part only — query string (auth tokens like
+        // ?wmsAuthSign=...) must not flip the classification.
+        const targetPath = targetUrl.split('?')[0].toLowerCase();
+        const isPlaylistTarget = targetPath.endsWith('.m3u8');
         if (isPlaylistTarget) {
             const playlistCacheKey = `${camera.id}|nested|${targetUrl}`;
             const cachedPlaylist = playlistCache.get(playlistCacheKey);
@@ -354,6 +474,21 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
                 });
 
                 if (response.status !== 200) {
+                    // Same stale-cache fallback as the master endpoint —
+                    // child playlists are the layer where flaky upstreams
+                    // hurt the most (5x retries each → 5x upstream hits).
+                    const stalePlaylist = playlistCache.getStale(playlistCacheKey);
+                    if (stalePlaylist) {
+                        reply.header('Content-Type', stalePlaylist.contentType);
+                        reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+                        reply.header('X-RAFNET-Proxy-Cache', 'STALE');
+                        cameraHealthService.recordRuntimeSignal(camera.id, {
+                            targetUrl,
+                            signalType: 'external_hls_playlist_proxy_stale',
+                            success: false,
+                        });
+                        return reply.send(stalePlaylist.body);
+                    }
                     reply.header('Content-Type', 'text/plain');
                     reply.header('Cache-Control', 'no-cache');
                     return reply.code(response.status).send('');
@@ -384,6 +519,14 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
                 return reply.send(rewritten);
             } catch (error) {
                 console.error(`[ExternalStreamProxy] child playlist error camera=${camera.id} url=${targetUrl}:`, error.message);
+                // Network / timeout fallback for the child playlist.
+                const stalePlaylist = playlistCache.getStale(playlistCacheKey);
+                if (stalePlaylist) {
+                    reply.header('Content-Type', stalePlaylist.contentType);
+                    reply.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+                    reply.header('X-RAFNET-Proxy-Cache', 'STALE');
+                    return reply.send(stalePlaylist.body);
+                }
                 return reply.code(502).send('');
             }
         }
@@ -417,11 +560,17 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
                 return reply.code(response.status).send('');
             }
 
+            // Detect content-type from the path part only — auth tokens
+            // in the query string can contain arbitrary substrings,
+            // including `.ts` / `.mp4`, that would otherwise misclassify
+            // a non-media response.
             let contentType = 'application/octet-stream';
-            if (targetUrl.includes('.ts')) {
+            if (targetPath.endsWith('.ts')) {
                 contentType = 'video/mp2t';
-            } else if (targetUrl.includes('.mp4') || targetUrl.includes('.m4s')) {
+            } else if (targetPath.endsWith('.mp4') || targetPath.endsWith('.m4s')) {
                 contentType = 'video/mp4';
+            } else if (targetPath.endsWith('.vtt') || targetPath.endsWith('.webvtt')) {
+                contentType = 'text/vtt';
             }
 
             segmentCache.set(

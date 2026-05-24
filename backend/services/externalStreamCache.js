@@ -92,6 +92,33 @@ export class ExternalStreamCache {
         return entry;
     }
 
+    /**
+     * Stale-cache fallback: read an entry IGNORING its expiry, as long
+     * as it is no more than `maxStaleMs` past it. Use this only when
+     * the upstream has returned a non-200 and we want to keep the
+     * stream alive across a transient blink (gov / pemda HLS sources
+     * sporadically 5xx for a second or two; without stale fallback the
+     * player gives up after 5 retries with a misleading "CORS" error).
+     *
+     * Returns the same shape as get() (or null) so the caller can call
+     * sendCachedResponse without branching.
+     */
+    getStale(key, maxStaleMs = 10000) {
+        const entry = this.entries.get(key);
+        if (!entry) {
+            return null;
+        }
+        const age = nowMs() - entry.expiresAt;
+        if (age < 0 || age > maxStaleMs) {
+            // Either still fresh (caller should've used get()) or older
+            // than the stale window — treat as miss.
+            return null;
+        }
+        // Stale serve does NOT count as a hit and does NOT touch LRU —
+        // the entry is on its way out, no point promoting it.
+        return entry;
+    }
+
     set(key, { statusCode, contentType, body }, ttlMs = this.defaultTtlMs) {
         if (statusCode !== 200) {
             // Don't cache failures — see header comment.

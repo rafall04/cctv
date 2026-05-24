@@ -81,6 +81,89 @@ describe('externalStreamProxyRoutes — rewriteOpaquePlaylist', () => {
         expect(rewriteOpaquePlaylist('', playlistUrl, 7)).toBe('');
         expect(rewriteOpaquePlaylist(null, playlistUrl, 7)).toBe('');
     });
+
+    it('rewrites URI="..." inside #EXT-X-MAP so fMP4 init segments flow through the proxy', () => {
+        // Real-world bug: gov upstream emits an ABSOLUTE URI for the
+        // fMP4 init segment. Without rewriting, the player follows the
+        // raw upstream URL → cross-origin fetch → CORS block → 5
+        // retries → stream dies. The init URI MUST be opaque.
+        const input = [
+            '#EXTM3U',
+            '#EXT-X-VERSION:7',
+            '#EXT-X-TARGETDURATION:6',
+            '#EXT-X-MAP:URI="https://cctv.example.gov.id/live/cam7/init.mp4"',
+            '#EXTINF:6.0,',
+            'chunk_001.m4s',
+        ].join('\n');
+
+        const out = rewriteOpaquePlaylist(input, playlistUrl, 7);
+
+        expect(out).toContain('#EXT-X-MAP:URI="/api/stream/7/external-segment/init.mp4"');
+        // Raw upstream URL must NOT survive the rewrite anywhere.
+        expect(out).not.toContain('cctv.example.gov.id');
+    });
+
+    it('rewrites URI="..." inside #EXT-X-KEY so encryption keys flow through the proxy', () => {
+        const input = [
+            '#EXTM3U',
+            '#EXT-X-KEY:METHOD=AES-128,URI="https://cctv.example.gov.id/live/cam7/key.bin",IV=0x0',
+            '#EXTINF:6.0,',
+            'chunk_001.ts',
+        ].join('\n');
+
+        const out = rewriteOpaquePlaylist(input, playlistUrl, 7);
+
+        expect(out).toContain('URI="/api/stream/7/external-segment/key.bin"');
+        // The METHOD and IV attributes are preserved.
+        expect(out).toContain('METHOD=AES-128');
+        expect(out).toContain('IV=0x0');
+        expect(out).not.toContain('cctv.example.gov.id');
+    });
+
+    it('rewrites URI="..." inside #EXT-X-MEDIA alt rendition tags', () => {
+        // Alt audio / subtitle renditions reference child playlists
+        // by URI in the tag attribute. Same leak class as #EXT-X-MAP.
+        const input = [
+            '#EXTM3U',
+            '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="Default",URI="audio_only.m3u8"',
+            '#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="English",URI="subs/eng.vtt"',
+            '#EXT-X-STREAM-INF:BANDWIDTH=1000000,AUDIO="audio"',
+            'video.m3u8',
+        ].join('\n');
+
+        const out = rewriteOpaquePlaylist(input, playlistUrl, 7);
+
+        expect(out).toContain('URI="/api/stream/7/external-segment/audio_only.m3u8"');
+        expect(out).toContain('URI="/api/stream/7/external-segment/subs%2Feng.vtt"');
+        // Standalone segment line is rewritten the same way as before.
+        expect(out).toContain('/api/stream/7/external-segment/video.m3u8');
+    });
+
+    it('preserves the query string (auth token) when rewriting tokenised segment URLs', () => {
+        // Wowza / signed-CDN upstreams attach `?wmsAuthSign=...` or
+        // similar auth tokens to every segment URL. Without preserving
+        // the query, the backend's segment fetch is rejected with
+        // 401/403 and the stream stalls.
+        const input = [
+            '#EXTM3U',
+            '#EXTINF:6.0,',
+            'chunk_001.ts?wmsAuthSign=server%3Dabc%26token%3Dxyz',
+        ].join('\n');
+
+        const out = rewriteOpaquePlaylist(input, playlistUrl, 7);
+        const opaqueLine = out
+            .split('\n')
+            .find((line) => line.startsWith('/api/stream/7/external-segment/'));
+
+        expect(opaqueLine).toBeTruthy();
+        // The query string survives the rewrite (URL-encoded) — once
+        // the backend decodes the filename it can re-attach it to the
+        // upstream URL.
+        const decoded = decodeURIComponent(opaqueLine.split('/').pop());
+        expect(decoded).toContain('chunk_001.ts');
+        expect(decoded).toContain('wmsAuthSign');
+        expect(decoded).toContain('token');
+    });
 });
 
 describe('externalStreamProxyRoutes — resolveSegmentTargetUrl', () => {
@@ -143,6 +226,29 @@ describe('externalStreamProxyRoutes — resolveSegmentTargetUrl', () => {
         // not legal under the regex (no `://` allowed by the pattern),
         // so this should be refused outright.
         expect(resolveSegmentTargetUrl(camera, 'https%3A%2F%2Fevil.com%2Fseg.ts', allowOptions)).toBeNull();
+    });
+
+    it('preserves the query string when reconstructing a tokenised segment URL', () => {
+        // The full opaque filename includes URL-encoded query string.
+        // After decoding we expect the upstream URL to keep its auth
+        // token verbatim — Wowza wmsAuthSign and similar token schemes
+        // refuse fetches that strip the signature.
+        const opaqueFilename = encodeURIComponent('chunk_001.ts?wmsAuthSign=server%3Dabc&token=xyz');
+        expect(resolveSegmentTargetUrl(camera, opaqueFilename, allowOptions))
+            .toBe('https://cctv.example.gov.id/live/cam7/chunk_001.ts?wmsAuthSign=server%3Dabc&token=xyz');
+    });
+
+    it('accepts encryption-key (.key/.bin) and subtitle (.vtt) extensions for directive URI fetches', () => {
+        // Without these extensions the rewriter's #EXT-X-KEY /
+        // #EXT-X-MEDIA-rewrites would emit opaque URLs that the
+        // segment handler then rejects with 400 — same class of bug
+        // as the master/.m3u8 rejection that b271d1d fixed.
+        expect(resolveSegmentTargetUrl(camera, 'key.bin', allowOptions))
+            .toBe('https://cctv.example.gov.id/live/cam7/key.bin');
+        expect(resolveSegmentTargetUrl(camera, 'enc.key', allowOptions))
+            .toBe('https://cctv.example.gov.id/live/cam7/enc.key');
+        expect(resolveSegmentTargetUrl(camera, encodeURIComponent('subs/eng.vtt'), allowOptions))
+            .toBe('https://cctv.example.gov.id/live/cam7/subs/eng.vtt');
     });
 
     it('honors a global allowedHosts whitelist when configured', () => {

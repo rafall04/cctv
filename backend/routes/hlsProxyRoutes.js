@@ -908,30 +908,52 @@ async function endSessionWithTimeout(sessionId, options = {}) {
     }
 }
 
+// Directives whose URI="..." attribute references a fetchable resource
+// (init segment, encryption key, alt rendition, etc.). When an upstream
+// emits an ABSOLUTE URL in one of these, the player would otherwise
+// follow it straight to the upstream, triggering a CORS block in the
+// browser. Same class of bug as the new opaque proxy's rewriter — kept
+// in sync here so the legacy /hls/proxy fallback path (used by
+// direct-stream-mode cameras after CORS failure) doesn't leak either.
+const LEGACY_DIRECTIVE_URI_TAGS = /^#EXT-X-(MAP|KEY|SESSION-KEY|MEDIA|I-FRAME-STREAM-INF|PART|PRELOAD-HINT|RENDITION-REPORT)\b/i;
+
+function buildLegacyProxyUrl(uri, baseUrl, cameraId) {
+    let absoluteUrl = uri;
+    if (!uri.startsWith('http://') && !uri.startsWith('https://')) {
+        absoluteUrl = uri.startsWith('/')
+            ? new URL(uri, baseUrl).href
+            : baseUrl + uri;
+    }
+
+    const query = new URLSearchParams({ url: absoluteUrl });
+    if (cameraId !== null && cameraId !== undefined) {
+        query.set('cameraId', String(cameraId));
+    }
+    return `/hls/proxy?${query.toString()}`;
+}
+
 function rewriteExternalPlaylist(playlistText, sourceUrl, cameraId = null) {
     const baseUrlMatch = sourceUrl.match(/^(.*\/)/);
     const baseUrl = baseUrlMatch ? baseUrlMatch[1] : '';
     const lines = String(playlistText || '').split('\n');
 
     for (let index = 0; index < lines.length; index++) {
-        const line = lines[index].trim();
-        if (!line || line.startsWith('#')) {
+        const rawLine = lines[index];
+        const line = rawLine.trim();
+        if (!line) {
             continue;
         }
 
-        let absoluteUrl = line;
-        if (!line.startsWith('http://') && !line.startsWith('https://')) {
-            absoluteUrl = line.startsWith('/')
-                ? new URL(line, baseUrl).href
-                : baseUrl + line;
+        if (line.startsWith('#')) {
+            if (LEGACY_DIRECTIVE_URI_TAGS.test(line)) {
+                lines[index] = rawLine.replace(/URI="([^"]+)"/g, (match, uri) => (
+                    `URI="${buildLegacyProxyUrl(uri, baseUrl, cameraId)}"`
+                ));
+            }
+            continue;
         }
 
-        const query = new URLSearchParams({ url: absoluteUrl });
-        if (cameraId !== null && cameraId !== undefined) {
-            query.set('cameraId', String(cameraId));
-        }
-
-        lines[index] = `/hls/proxy?${query.toString()}`;
+        lines[index] = buildLegacyProxyUrl(line, baseUrl, cameraId);
     }
 
     return lines.join('\n');
