@@ -651,6 +651,10 @@ describe('MapView area filter visibility', () => {
     });
 
     it('mengikuti lebar modal popup shared yang dipakai grid view pada desktop', async () => {
+        // 1366×768 viewport, default 16:9 ratio, v2 video-priority sizing.
+        // Width = floor(floor(768 * 0.78) * 16/9) = floor(599 * 16/9) = 1064.
+        // Grid view popup hits the exact same number in its own test, so
+        // map + grid stay visually consistent.
         Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1366 });
         Object.defineProperty(window, 'innerHeight', { configurable: true, value: 768 });
 
@@ -663,7 +667,7 @@ describe('MapView area filter visibility', () => {
         const modal = await screen.findByTestId('map-popup-modal');
 
         await waitFor(() => {
-            expect(modal.style.width).toBe('1024px');
+            expect(modal.style.width).toBe('1064px');
         });
     });
 

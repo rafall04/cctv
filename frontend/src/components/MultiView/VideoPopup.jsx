@@ -1021,15 +1021,24 @@ function VideoPopup({
         isPlaybackLocked,
         videoAspectRatio,
     });
+    // Modal width is computed from the video target height (a fraction
+    // of the viewport) × aspect ratio — see getPublicPopupModalStyle.
+    // headerHeight / footerHeight are no longer subtracted from the
+    // calculation; the popup is allowed to grow past the viewport and
+    // scroll, with the video kept at a comfortable size regardless of
+    // how tall the title bar, detail panel, ads, and related strip
+    // turn out to be.
     const modalStyle = getPublicPopupModalStyle({
         isFullscreen,
         isPlaybackLocked,
         videoAspectRatio,
         viewportWidth: layoutMetrics.viewportWidth,
         viewportHeight: layoutMetrics.viewportHeight,
-        headerHeight: layoutMetrics.headerHeight,
-        footerHeight: layoutMetrics.footerHeight,
-        maxDesktopWidth: 1024,
+        // 1280 lifts the prior 1024 cap so on FHD / WQHD monitors the
+        // modal scales up before plateau-ing. Anything wider tends to
+        // make the chrome feel out of proportion; users on 4K+ have
+        // the Fullscreen button for edge-to-edge.
+        maxDesktopWidth: 1280,
     });
 
     // Check if animations should be disabled on low-end devices - **Validates: Requirements 5.2**
@@ -1063,7 +1072,20 @@ function VideoPopup({
 
     return (
         <div ref={outerWrapperRef} className={`fixed inset-0 z-[1000000] ${isFullscreen ? 'bg-black dark:bg-black' : 'flex items-center justify-center bg-black/95 dark:bg-black/95 p-2 sm:p-4'}`} onClick={onClose}>
-            <div ref={modalRef} data-testid={modalTestId} className={`relative bg-white dark:bg-gray-900 shadow-2xl flex flex-col ${isFullscreen ? 'w-full h-full overflow-hidden' : 'w-full max-w-5xl overflow-x-hidden overflow-y-auto rounded-2xl border border-gray-200 dark:border-gray-800'}`} style={modalStyle} onClick={(e) => e.stopPropagation()}>
+            <div
+                ref={modalRef}
+                data-testid={modalTestId}
+                // Width is JS-driven via modalStyle.width (computed from
+                // video aspect ratio + viewport). `w-full` is the mobile
+                // fallback when getPublicPopupModalStyle returns no
+                // explicit width. We removed the old `max-w-5xl` (1024px)
+                // Tailwind cap because the JS now controls the cap
+                // dynamically — see DEFAULT_PUBLIC_POPUP_MAX_DESKTOP_WIDTH
+                // and minDesktopWidth for portrait-aspect cameras.
+                className={`relative bg-white dark:bg-gray-900 shadow-2xl flex flex-col ${isFullscreen ? 'w-full h-full overflow-hidden' : 'w-full overflow-x-hidden overflow-y-auto rounded-2xl border border-gray-200 dark:border-gray-800'}`}
+                style={modalStyle}
+                onClick={(e) => e.stopPropagation()}
+            >
 
                 {showPopupTopBanner && (
                     <InlineAdSlot

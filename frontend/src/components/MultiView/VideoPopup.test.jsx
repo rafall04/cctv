@@ -540,7 +540,10 @@ describe('VideoPopup non-live states', () => {
         });
     });
 
-    it('membatasi lebar modal live grid desktop berdasarkan tinggi viewport yang tersedia', async () => {
+    it('sizes the modal so a 16:9 camera gets a deliberate fraction of viewport height (v2 video-priority)', async () => {
+        // 1366×768 viewport, default video-height fraction 0.78,
+        // default 16:9 ratio (no metadata yet on mount). Width = floor(
+        // floor(768 * 0.78) * 16/9) = floor(599 * 16/9) = 1064.
         Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1366 });
         Object.defineProperty(window, 'innerHeight', { configurable: true, value: 768 });
 
@@ -554,7 +557,7 @@ describe('VideoPopup non-live states', () => {
         const modal = screen.getByTestId('grid-popup-modal');
 
         await waitFor(() => {
-            expect(modal.style.width).toBe('1024px');
+            expect(modal.style.width).toBe('1064px');
         });
     });
 
