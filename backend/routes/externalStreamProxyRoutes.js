@@ -33,6 +33,7 @@ import {
     isExternalProxyUrlCompatible,
     createHlsHttpClient,
     safeAbort,
+    createHlsRouteState,
 } from './hlsProxyRoutes.js';
 import { config } from '../config/config.js';
 
@@ -356,9 +357,52 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
     const segmentCache = options.segmentCache || createSegmentCache();
     const baseClient = options.httpClient || createHlsHttpClient(timeout);
 
+    // Viewer-session tracking state. Shares the same HlsSessionStore +
+    // FixedWindowLimiter shape as the legacy /hls/proxy + internal /hls/*
+    // routes, so external_hls cameras get the SAME live/lifetime view
+    // counters that internal cameras already enjoyed. Tests can inject a
+    // shared state via `options.routeState` to keep session entries
+    // visible from outside the plugin.
+    const ownRouteState = !options.routeState;
+    const routeState = options.routeState || createHlsRouteState();
+    if (ownRouteState) {
+        routeState.start();
+    }
+
+    /**
+     * Attach the viewer-session heartbeat to a request without
+     * blocking the response if it fails. Playlist fetches create OR
+     * heartbeat the dedupe entry for this (identity, cameraId); segment
+     * fetches only heartbeat (no new sessions on segment hits, otherwise
+     * a 1000-segment view inflates the session count).
+     *
+     * Returns void — failures are logged but never propagate to the
+     * client. The HLS player must not see session bookkeeping errors.
+     */
+    async function trackViewerHeartbeat(request, cameraId, kind) {
+        if (!cameraId) return;
+        const identity = routeState.getViewerIdentity(request);
+        if (!identity || identity === 'unknown') return;
+        try {
+            if (kind === 'playlist') {
+                await routeState.getOrCreateSession(identity, cameraId, request);
+            } else {
+                await routeState.recordSegmentAccess(identity, cameraId);
+            }
+        } catch (error) {
+            // Don't crash the proxy because the view counter hiccuped.
+            console.error(`[ExternalStreamProxy] viewer session ${kind} error camera=${cameraId}:`, error.message);
+        }
+    }
+
     fastify.addHook('onClose', async () => {
         playlistCache.clear();
         segmentCache.clear();
+        if (ownRouteState) {
+            // Drain any pending session closes before tearing down so we
+            // don't leak open sessions on a graceful restart.
+            await routeState.stop();
+        }
     });
 
     // GET /api/stream/:cameraId/external.m3u8
@@ -371,6 +415,13 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
         if (!isExternalProxyTargetAllowed(camera.external_hls_url, allowOptions)) {
             return reply.code(400).send('Camera external URL not allowed');
         }
+
+        // Track viewer session BEFORE the cache check. The player
+        // refetches the master playlist every ~3s (HLS spec), so this
+        // is the heartbeat that keeps the session row alive. Each call
+        // is deduped by (identity, cameraId) inside HlsSessionStore —
+        // it does NOT create a new session per fetch.
+        await trackViewerHeartbeat(request, camera.id, 'playlist');
 
         const cacheKey = `${camera.id}|playlist`;
         const cached = playlistCache.get(cacheKey);
@@ -474,6 +525,13 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
         // ?wmsAuthSign=...) must not flip the classification.
         const targetPath = targetUrl.split('?')[0].toLowerCase();
         const isPlaylistTarget = targetPath.endsWith('.m3u8');
+
+        // Viewer-session heartbeat. Child playlists count as `playlist`
+        // (they re-arm the dedupe entry like the master), while binary
+        // segments count as `segment` (heartbeat only — no new session
+        // rows). Skipped for cache hits below would NOT keep the session
+        // alive, so we run it BEFORE the cache short-circuit.
+        await trackViewerHeartbeat(request, camera.id, isPlaylistTarget ? 'playlist' : 'segment');
         if (isPlaylistTarget) {
             const playlistCacheKey = `${camera.id}|nested|${targetUrl}`;
             const cachedPlaylist = playlistCache.get(playlistCacheKey);

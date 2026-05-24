@@ -1239,6 +1239,31 @@ async function handleExternalStreamProxy(state, request, reply) {
         const cacheKey = buildExternalCacheKey(url, externalCameraConfig?.cameraId ?? null);
         const cache = isTextFile ? state.playlistCache : state.segmentCache;
 
+        // Viewer-session heartbeat for external proxy traffic. Without
+        // this, external_hls cameras (proxy mode and direct-stream-with-
+        // CORS-fallback both land here) never get their `live` or
+        // `lifetime` view counter incremented — the frontend skips
+        // manual tracking when it thinks the backend proxy is doing it,
+        // and previously the backend was only recording HEALTH signals.
+        // HlsSessionStore dedupes by (identity, cameraId) so repeating
+        // calls every playlist refresh do NOT create new session rows.
+        if (externalCameraConfig?.cameraId) {
+            const identity = state.getViewerIdentity(request);
+            if (identity && identity !== 'unknown') {
+                try {
+                    if (isTextFile) {
+                        await state.getOrCreateSession(identity, externalCameraConfig.cameraId, request);
+                    } else {
+                        await state.recordSegmentAccess(identity, externalCameraConfig.cameraId);
+                    }
+                } catch (sessionError) {
+                    // Never let a viewer-counter hiccup take down the
+                    // actual stream — log and proceed with the proxy.
+                    console.error('[HLS Proxy] External viewer session error:', sessionError.message);
+                }
+            }
+        }
+
         // Fast path: serve from cache if a fresh entry exists. Cached entries
         // are always 200 (the cache module refuses to store anything else),
         // so this skips upstream entirely.
