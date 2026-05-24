@@ -540,11 +540,10 @@ describe('VideoPopup non-live states', () => {
         });
     });
 
-    it('spans the modal full viewport width on desktop (v3 full-bleed)', async () => {
-        // v3: no aspect-driven width any more. Modal is `100vw` so the
-        // camera image reads edge-to-edge. The body element inside
-        // uses aspect-ratio + max-height to keep video proportions
-        // sane and the chrome visible.
+    it('sizes the modal to the largest rectangle that fits the viewport at the cameras aspect ratio (v4)', async () => {
+        // 1366×768 viewport, default 16:9 ratio (no video metadata at
+        // mount). width-bound = 1366, height-bound = 768 * 16/9 ≈ 1365.
+        // The tighter height-bound wins → modal = 1365px wide.
         Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1366 });
         Object.defineProperty(window, 'innerHeight', { configurable: true, value: 768 });
 
@@ -558,7 +557,7 @@ describe('VideoPopup non-live states', () => {
         const modal = screen.getByTestId('grid-popup-modal');
 
         await waitFor(() => {
-            expect(modal.style.width).toBe('100vw');
+            expect(modal.style.width).toBe('1365px');
         });
     });
 

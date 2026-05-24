@@ -651,10 +651,9 @@ describe('MapView area filter visibility', () => {
     });
 
     it('mengikuti lebar modal popup shared yang dipakai grid view pada desktop', async () => {
-        // v3 full-bleed: both map + grid popups use the same
-        // getPublicPopupModalStyle helper, which now returns
-        // width:100vw on desktop. Map and grid stay visually
-        // consistent — both span the full viewport edge-to-edge.
+        // v4 aspect-fit: map + grid popups both go through the same
+        // helper. For a 16:9 default in a 1366×768 viewport the modal
+        // ends up at 1365 px wide (height-bound: 768 * 16/9 ≈ 1365).
         Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1366 });
         Object.defineProperty(window, 'innerHeight', { configurable: true, value: 768 });
 
@@ -667,7 +666,7 @@ describe('MapView area filter visibility', () => {
         const modal = await screen.findByTestId('map-popup-modal');
 
         await waitFor(() => {
-            expect(modal.style.width).toBe('100vw');
+            expect(modal.style.width).toBe('1365px');
         });
     });
 

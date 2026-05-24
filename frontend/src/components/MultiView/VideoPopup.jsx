@@ -1073,26 +1073,30 @@ function VideoPopup({
     return (
         <div
             ref={outerWrapperRef}
-            // Full-bleed backdrop: NO horizontal padding on desktop so
-            // the modal touches both edges of the viewport. Tiny safe-
-            // area padding stays on the smallest mobile sizes (`p-1`)
-            // so a stray gesture doesn't dismiss before users notice
-            // they're INSIDE the popup. Click on remaining backdrop
-            // still closes — but with a full-bleed modal there's
-            // usually no visible backdrop to click; ESC + the X button
-            // are the primary close controls.
-            className={`fixed inset-0 z-[1000000] ${isFullscreen ? 'bg-black dark:bg-black' : 'bg-black/95 dark:bg-black/95 p-1 sm:p-0'}`}
+            // Aspect-ratio-fit backdrop: modal is sized by camera aspect
+            // ratio (see getPublicPopupModalStyle). On 16:9 cameras in a
+            // 16:9 viewport the modal touches both edges anyway; for any
+            // other aspect mismatch (4:3 / 9:16 / panoramic) the modal
+            // centers with visible backdrop on the sides — clicking that
+            // backdrop closes the popup. ESC and the X in the sticky
+            // header are the explicit close paths.
+            className={`fixed inset-0 z-[1000000] ${isFullscreen ? 'bg-black dark:bg-black' : 'flex items-start justify-center bg-black/95 dark:bg-black/95'}`}
             onClick={onClose}
         >
             <div
                 ref={modalRef}
                 data-testid={modalTestId}
-                // Full viewport width on desktop via `w-full` + modalStyle
-                // (which sets width:100vw on desktop). Rounded corners +
-                // border dropped on desktop — they read weird touching
-                // the viewport edge. Mobile keeps rounded for popup
-                // affordance.
-                className={`relative bg-white dark:bg-gray-900 shadow-2xl flex flex-col ${isFullscreen ? 'w-full h-full overflow-hidden' : 'w-full overflow-x-hidden overflow-y-auto sm:rounded-none rounded-2xl sm:border-0 border border-gray-200 dark:border-gray-800'}`}
+                // Width is JS-driven via modalStyle (largest rectangle
+                // that fits inside the viewport while honouring the
+                // camera's native aspect ratio). `w-full` is the mobile
+                // fallback when getPublicPopupModalStyle returns no
+                // explicit width. Rounded corners + border give the
+                // centered card affordance for non-edge-to-edge sizes.
+                // `overflow-y-auto` so the modal scrolls internally
+                // when chrome (header + ads + related strip) plus
+                // body exceeds the viewport — the sticky header inside
+                // anchors to the modal's scroll context.
+                className={`relative bg-white dark:bg-gray-900 shadow-2xl flex flex-col ${isFullscreen ? 'w-full h-full overflow-hidden' : 'w-full overflow-x-hidden overflow-y-auto rounded-2xl border border-gray-200 dark:border-gray-800'}`}
                 style={modalStyle}
                 onClick={(e) => e.stopPropagation()}
             >
