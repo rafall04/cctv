@@ -6,7 +6,7 @@ MainFuncs: MultiViewVideoItem.
 SideEffects: Starts/stops viewer sessions, creates/destroys HLS instances, controls fullscreen/orientation, captures snapshots.
 */
 
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, useMemo, memo } from 'react';
 import Hls from 'hls.js';
 import flvjs from 'flv.js';
 import { Icons } from '../ui/Icons';
@@ -29,6 +29,16 @@ import {
     getPrimaryExternalUrl,
 } from '../../utils/cameraDelivery.js';
 
+// First-frame load timeout for browser-fed tile types (MJPEG, embed). If
+// the upstream never sends a single frame within this window we mark the
+// tile as error so the badge stops claiming LIVE indefinitely.
+const MJPEG_EMBED_LOAD_TIMEOUT_MS = 12000;
+// How far behind the live edge the player has to drift before we hard-
+// snap to liveSyncPosition. Mirrors the recovery in VideoPopup so a
+// background-tabbed multi-view tile doesn't stay buffered three minutes
+// behind real time after the user re-focuses.
+const LIVE_EDGE_LATENCY_SNAP_S = 10;
+
 // Now handles offline/maintenance cameras properly
 // **Validates: Requirements 1.1, 1.2, 1.3, 2.3, 4.1, 4.2, 4.3, 4.4, 6.1, 6.2, 6.3, 6.4, 7.1, 7.2, 7.3**
 // ============================================
@@ -48,8 +58,26 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
     const viewerSessionPendingRef = useRef(false);
     const viewerSessionActiveRef = useRef(true);
     const viewerSessionRunRef = useRef(0);
+    // Imperative handle to the zoom wrapper — replaces the legacy
+    // `wrapperRef.current.firstElementChild._zoomIn` reach-in pattern that
+    // broke whenever the tile's DOM structure was wrapped (error boundary,
+    // theme provider, etc.).
+    const zoomableRef = useRef(null);
+    // Snapshot toast auto-dismiss timer. Tracked in a ref so unmount can
+    // clear it and avoid the "Can't update state on unmounted component"
+    // warning when the user closes the tile mid-toast.
+    const snapshotTimerRef = useRef(null);
+    // Init-load watchdog for non-HLS tile types (MJPEG image, embed
+    // iframe). For HLS we rely on HLS.js's own error events; for these
+    // simpler element types the only way to know the upstream actually
+    // delivered something is to time out the first onLoad / onError.
+    const initLoadTimeoutRef = useRef(null);
 
-    // Handle close with fullscreen exit
+    // Handle close with fullscreen exit. Calls onRemove(camera.id) so the
+    // parent can pass a stable memoised onRemove without wrapping it in a
+    // per-tile arrow function — that wrapping defeats React.memo on this
+    // component and forces all sibling tiles to re-render whenever one
+    // updates.
     const handleClose = async () => {
         if (document.fullscreenElement) {
             try {
@@ -60,7 +88,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 console.error('Error exiting fullscreen:', error);
             }
         }
-        onRemove();
+        onRemove(camera.id);
     };
 
     // Check camera status first - same as VideoPopup
@@ -89,7 +117,10 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
 
     const url = camera.streams?.hls;
     const { branding } = useBranding();
-    const deviceTier = detectDeviceTier();
+    // detectDeviceTier reads from window/navigator; pinning it once per
+    // mount keeps every render+effect dep stable and removes a sneaky
+    // source of effect re-fires when nothing actually changed.
+    const deviceTier = useMemo(() => detectDeviceTier(), []);
     const { targetUrl: resolvedUrl, proxyFallbackUrl, isDirectStream } = resolveStreamUrl(camera, { forceProxy: forceProxyFallback });
     const effectiveUrl = resolvedUrl || url;
     const renderMode = getMultiViewRenderMode(camera);
@@ -104,6 +135,24 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
     const externalFrameUrl = renderMode === 'embed' ? embedUrl : null;
     const hasRenderableExternalUrl = Boolean(flvUrl || mjpegUrl || externalFrameUrl);
     const canCaptureSnapshot = renderMode === 'hls' || renderMode === 'flv';
+
+    // Reflect server-side camera state changes back into the tile's local
+    // status (originally pinned by useState's initializer at mount only).
+    // Without this, a camera that flips to `maintenance` mid-session keeps
+    // showing the live overlay until the user closes & reopens multi-view.
+    useEffect(() => {
+        if (isMaintenance) {
+            setStatus('maintenance');
+            return;
+        }
+        if (isOffline) {
+            setStatus('offline');
+        }
+        // Note: we don't downgrade live→degraded here. The HLS effect
+        // already handles `degraded` as a connecting variant, and pulling
+        // a playing tile back to degraded purely on prop flip would cause
+        // a visible flash.
+    }, [isMaintenance, isOffline]);
     const shouldTrackFrontendViewerSession = useCallback(() => {
         if (isMaintenance || isOffline) {
             return false;
@@ -360,8 +409,26 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             onError?.(camera.id, new Error('Video playback error'));
         };
 
+        // Live-edge sync: if the player ever gets more than
+        // LIVE_EDGE_LATENCY_SNAP_S seconds behind the live edge (mobile
+        // tab backgrounding, ad break, brief stall), snap forward so the
+        // tile resumes at "now" instead of grinding through stale segments
+        // that may already be 410-gone upstream. Mirrors the same recovery
+        // VideoPopup ships for single-camera mode.
+        const isExternal = camera.stream_source === 'external';
+        const handlePlaySync = () => {
+            if (cancelled || !hlsRef.current || !isExternal) return;
+            const liveEdge = hlsRef.current.liveSyncPosition;
+            if (typeof liveEdge !== 'number') return;
+            const latency = liveEdge - video.currentTime;
+            if (latency > LIVE_EDGE_LATENCY_SNAP_S) {
+                video.currentTime = liveEdge;
+            }
+        };
+
         video.addEventListener('playing', handlePlaying);
         video.addEventListener('error', handleError);
+        video.addEventListener('play', handlePlaySync);
 
         // Core initialization logic
         const performInit = async () => {
@@ -582,6 +649,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             if (initTimeout) clearTimeout(initTimeout);
             video.removeEventListener('playing', handlePlaying);
             video.removeEventListener('error', handleError);
+            video.removeEventListener('play', handlePlaySync);
             cleanupResources();
             if (hls) {
                 hls.destroy();
@@ -676,15 +744,41 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             setStatus('error');
             setLoadingStage(LoadingStage.ERROR);
             onError?.(camera.id, new Error('Format stream tidak didukung'));
-            return;
+            return undefined;
         }
 
-        setStatus('live');
-        setLoadingStage(LoadingStage.PLAYING);
-        clearStreamTimeout();
+        // Start in connecting state so the user sees a loading overlay
+        // instead of a blank black tile while the <img>/<iframe> fetches
+        // its first frame. The onLoad handler on those elements flips
+        // status → 'live' once the upstream actually responds.
+        setStatus('connecting');
+        setLoadingStage(LoadingStage.CONNECTING);
+
+        // Watchdog: if the upstream <img>/<iframe> never fires onLoad
+        // within MJPEG_EMBED_LOAD_TIMEOUT_MS, the gov source is silently
+        // dropping the connection. Surface an error so the user sees
+        // "Coba Lagi" instead of an indefinite spinner.
+        if (initLoadTimeoutRef.current) {
+            clearTimeout(initLoadTimeoutRef.current);
+        }
+        initLoadTimeoutRef.current = setTimeout(() => {
+            initLoadTimeoutRef.current = null;
+            setStatus((prev) => {
+                if (prev !== 'connecting') return prev;
+                setLoadingStage(LoadingStage.ERROR);
+                onError?.(camera.id, new Error('Stream tidak merespon'));
+                return 'error';
+            });
+        }, MJPEG_EMBED_LOAD_TIMEOUT_MS);
+
+        return () => {
+            if (initLoadTimeoutRef.current) {
+                clearTimeout(initLoadTimeoutRef.current);
+                initLoadTimeoutRef.current = null;
+            }
+        };
     }, [
         camera.id,
-        clearStreamTimeout,
         hasRenderableExternalUrl,
         isMaintenance,
         isOffline,
@@ -712,10 +806,7 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 await containerRef.current?.requestFullscreen?.();
 
                 // Reset zoom to 1.0 when entering fullscreen to avoid "auto zoom" effect
-                const wrapper = getZoomableWrapper();
-                if (wrapper && wrapper._reset) {
-                    wrapper._reset();
-                }
+                zoomableRef.current?.reset?.();
 
                 // Lock to landscape orientation on mobile
                 if (screen.orientation && screen.orientation.lock) {
@@ -723,8 +814,8 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                         await screen.orientation.lock('landscape').catch(() => {
                             screen.orientation.lock('landscape-primary').catch(() => { });
                         });
-                    } catch (err) {
-                        console.log('Orientation lock not supported');
+                    } catch {
+                        // Orientation lock not supported on this browser/device
                     }
                 }
             } else {
@@ -732,16 +823,13 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                 await document.exitFullscreen?.();
 
                 // Reset zoom when exiting fullscreen
-                const wrapper = getZoomableWrapper();
-                if (wrapper && wrapper._reset) {
-                    wrapper._reset();
-                }
+                zoomableRef.current?.reset?.();
 
                 // Unlock orientation
                 if (screen.orientation && screen.orientation.unlock) {
                     try {
                         screen.orientation.unlock();
-                    } catch (err) {
+                    } catch {
                         // Ignore unlock errors
                     }
                 }
@@ -768,14 +856,29 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             message: result.message
         });
 
-        setTimeout(() => setSnapshotNotification(null), 3000);
+        // Clear any in-flight dismissal timer before scheduling a new one.
+        // Without this, two snapshots within 3s would each schedule their
+        // own setTimeout — the second one resets the toast, but the first
+        // orphan timer keeps running until unmount.
+        if (snapshotTimerRef.current) {
+            clearTimeout(snapshotTimerRef.current);
+        }
+        snapshotTimerRef.current = setTimeout(() => {
+            snapshotTimerRef.current = null;
+            setSnapshotNotification(null);
+        }, 3000);
     };
 
-    // Get wrapper ref for zoom controls - directly access ZoomableVideo wrapper
-    const getZoomableWrapper = () => {
-        // ZoomableVideo is the first child of wrapperRef
-        return wrapperRef.current?.firstElementChild;
-    };
+    // Cancel any pending snapshot-toast timer on unmount so the late
+    // setState doesn't fire on a torn-down component (was causing the
+    // "Can't perform a React state update on an unmounted component"
+    // warning when users closed the tile mid-toast).
+    useEffect(() => () => {
+        if (snapshotTimerRef.current) {
+            clearTimeout(snapshotTimerRef.current);
+            snapshotTimerRef.current = null;
+        }
+    }, []);
 
     // Get status display info for multi-view - **Validates: Requirements 4.1, 4.2, 4.3, 4.4**
     const getStatusBadge = () => {
@@ -804,10 +907,25 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                         data-testid="multi-view-mjpeg"
                         className="h-full w-full object-contain bg-black"
                         onLoad={() => {
+                            // First frame received: cancel the watchdog
+                            // and flip to live. The browser keeps the MJPEG
+                            // connection open as a multipart stream so we
+                            // can't detect mid-stream stalls here — that
+                            // case still requires the user to retry.
+                            if (initLoadTimeoutRef.current) {
+                                clearTimeout(initLoadTimeoutRef.current);
+                                initLoadTimeoutRef.current = null;
+                            }
                             setStatus('live');
+                            setLoadingStage(LoadingStage.PLAYING);
+                            clearStreamTimeout();
                             startViewerSessionAfterPlayback();
                         }}
                         onError={() => {
+                            if (initLoadTimeoutRef.current) {
+                                clearTimeout(initLoadTimeoutRef.current);
+                                initLoadTimeoutRef.current = null;
+                            }
                             setStatus('error');
                             setLoadingStage(LoadingStage.ERROR);
                             onError?.(camera.id, new Error('MJPEG stream error'));
@@ -819,15 +937,32 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                         title={camera.name}
                         data-testid="multi-view-embed"
                         className="h-full w-full border-0 bg-black"
+                        // Defense-in-depth: untrusted upstream embed pages
+                        // (third-party gov streamers, Wowza-hosted players)
+                        // run with the minimum capabilities needed for
+                        // video. We still need allow-scripts + allow-same-
+                        // origin because most player frames rely on JS +
+                        // their own session cookies to stream.
+                        sandbox="allow-scripts allow-same-origin allow-presentation allow-popups-to-escape-sandbox"
                         allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
                         referrerPolicy="no-referrer"
                         onLoad={() => {
+                            // Iframe load only confirms the page HTML
+                            // arrived — actual video playback is opaque
+                            // cross-origin. Still our best signal that
+                            // the upstream is reachable.
+                            if (initLoadTimeoutRef.current) {
+                                clearTimeout(initLoadTimeoutRef.current);
+                                initLoadTimeoutRef.current = null;
+                            }
                             setStatus('live');
+                            setLoadingStage(LoadingStage.PLAYING);
+                            clearStreamTimeout();
                             startViewerSessionAfterPlayback();
                         }}
                     />
                 ) : (
-                    <ZoomableVideo videoRef={videoRef} status={status} maxZoom={3} onZoomChange={setZoom} isFullscreen={isFullscreen} />
+                    <ZoomableVideo ref={zoomableRef} videoRef={videoRef} status={status} maxZoom={3} onZoomChange={setZoom} isFullscreen={isFullscreen} />
                 )}
             </div>
 
@@ -853,19 +988,26 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                     <span className="ml-1 text-[8px] text-amber-400">retry {autoRetryCount}/3</span>
                 )}
             </div>
-            <button onClick={handleClose} className={`absolute top-2 right-2 z-10 p-1.5 bg-red-500/80 hover:bg-red-500 rounded-lg text-white shadow ${isFullscreen ? 'hidden' : ''}`}><Icons.X /></button>
+            <button
+                onClick={handleClose}
+                aria-label={`Tutup ${camera.name}`}
+                title="Tutup"
+                className={`absolute top-2 right-2 z-10 p-1.5 bg-red-500/80 hover:bg-red-500 rounded-lg text-white shadow ${isFullscreen ? 'hidden' : ''}`}
+            >
+                <Icons.X />
+            </button>
             {/* Overlay controls - render only on hover, no transition in fullscreen, hide in fullscreen */}
             <div className={`absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 z-10 ${isFullscreen ? 'hidden' : 'transition-opacity'}`}>
                 <div className="flex items-center justify-between gap-2">
                     <p className="text-white text-xs font-medium truncate flex-1">{camera.name}</p>
                     <div className="flex items-center gap-1">
-                        <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-1 bg-white/10 hover:bg-white/20 disabled:opacity-30 rounded text-white"><Icons.ZoomOut /></button>
-                        <span className="text-white/70 text-[10px] w-8 text-center">{Math.round(zoom * 100)}%</span>
-                        <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 3} className="p-1 bg-white/10 hover:bg-white/20 disabled:opacity-30 rounded text-white"><Icons.ZoomIn /></button>
-                        {zoom > 1 && <button onClick={() => getZoomableWrapper()?._reset?.()} className="p-1 bg-white/10 hover:bg-white/20 rounded text-white"><Icons.Reset /></button>}
+                        <button onClick={() => zoomableRef.current?.zoomOut?.()} disabled={zoom <= 1} aria-label="Zoom out" title="Zoom out" className="p-1 bg-white/10 hover:bg-white/20 disabled:opacity-30 rounded text-white"><Icons.ZoomOut /></button>
+                        <span className="text-white/70 text-[10px] w-8 text-center" aria-live="polite">{Math.round(zoom * 100)}%</span>
+                        <button onClick={() => zoomableRef.current?.zoomIn?.()} disabled={zoom >= 3} aria-label="Zoom in" title="Zoom in" className="p-1 bg-white/10 hover:bg-white/20 disabled:opacity-30 rounded text-white"><Icons.ZoomIn /></button>
+                        {zoom > 1 && <button onClick={() => zoomableRef.current?.reset?.()} aria-label="Reset zoom" title="Reset zoom" className="p-1 bg-white/10 hover:bg-white/20 rounded text-white"><Icons.Reset /></button>}
                         <div className="w-px h-4 bg-white/20 mx-1" />
-                        {status === 'live' && canCaptureSnapshot && <button onClick={takeSnapshot} className="p-1 bg-white/10 hover:bg-white/20 rounded text-white"><Icons.Image /></button>}
-                        <button onClick={toggleFS} className="p-1 bg-white/10 hover:bg-white/20 rounded text-white"><Icons.Fullscreen /></button>
+                        {status === 'live' && canCaptureSnapshot && <button onClick={takeSnapshot} aria-label="Ambil snapshot" title="Ambil snapshot" className="p-1 bg-white/10 hover:bg-white/20 rounded text-white"><Icons.Image /></button>}
+                        <button onClick={toggleFS} aria-label="Fullscreen" title="Fullscreen" className="p-1 bg-white/10 hover:bg-white/20 rounded text-white"><Icons.Fullscreen /></button>
                     </div>
                 </div>
             </div>
@@ -883,20 +1025,20 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                                 </span>
                                 <p className="max-w-[58vw] truncate text-xs font-medium text-white sm:max-w-[70vw]">{camera.name}</p>
                             </div>
-                            <button onClick={toggleFS} className="p-2 hover:bg-gray-700/50 dark:hover:bg-white/20 active:bg-gray-700/70 dark:active:bg-white/30 rounded-xl text-gray-900 dark:text-white bg-gray-200/80 dark:bg-white/10"><Icons.Fullscreen /></button>
+                            <button onClick={toggleFS} aria-label="Keluar fullscreen" title="Keluar fullscreen" className="p-2 hover:bg-gray-700/50 dark:hover:bg-white/20 active:bg-gray-700/70 dark:active:bg-white/30 rounded-xl text-gray-900 dark:text-white bg-gray-200/80 dark:bg-white/10"><Icons.Fullscreen /></button>
                         </div>
                     </div>
 
                     {/* Bottom controls - Always visible on mobile */}
                     <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-gray-200/90 dark:bg-gray-900/80 rounded-xl p-1 pointer-events-auto">
-                        <button onClick={() => getZoomableWrapper()?._zoomOut?.()} disabled={zoom <= 1} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 disabled:opacity-30 rounded text-gray-900 dark:text-white"><Icons.ZoomOut /></button>
-                        <span className="text-gray-900 dark:text-white text-xs w-12 text-center">{Math.round(zoom * 100)}%</span>
-                        <button onClick={() => getZoomableWrapper()?._zoomIn?.()} disabled={zoom >= 3} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 disabled:opacity-30 rounded text-gray-900 dark:text-white"><Icons.ZoomIn /></button>
-                        {zoom > 1 && <button onClick={() => getZoomableWrapper()?._reset?.()} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 rounded text-gray-900 dark:text-white"><Icons.Reset /></button>}
+                        <button onClick={() => zoomableRef.current?.zoomOut?.()} disabled={zoom <= 1} aria-label="Zoom out" title="Zoom out" className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 disabled:opacity-30 rounded text-gray-900 dark:text-white"><Icons.ZoomOut /></button>
+                        <span className="text-gray-900 dark:text-white text-xs w-12 text-center" aria-live="polite">{Math.round(zoom * 100)}%</span>
+                        <button onClick={() => zoomableRef.current?.zoomIn?.()} disabled={zoom >= 3} aria-label="Zoom in" title="Zoom in" className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 disabled:opacity-30 rounded text-gray-900 dark:text-white"><Icons.ZoomIn /></button>
+                        {zoom > 1 && <button onClick={() => zoomableRef.current?.reset?.()} aria-label="Reset zoom" title="Reset zoom" className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 rounded text-gray-900 dark:text-white"><Icons.Reset /></button>}
                         {status === 'live' && canCaptureSnapshot && (
                             <>
                                 <div className="w-px h-4 bg-gray-400 dark:bg-white/20 mx-1" />
-                                <button onClick={takeSnapshot} className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 rounded text-gray-900 dark:text-white"><Icons.Image /></button>
+                                <button onClick={takeSnapshot} aria-label="Ambil snapshot" title="Ambil snapshot" className="p-2 hover:bg-gray-700/30 dark:hover:bg-white/20 active:bg-gray-700/50 dark:active:bg-white/30 rounded text-gray-900 dark:text-white"><Icons.Image /></button>
                             </>
                         )}
                     </div>
@@ -922,13 +1064,23 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                         </div>
                         <p className="text-white text-xs font-medium mb-1">Timeout</p>
                         <p className="text-gray-400 text-[10px] mb-3">Loading terlalu lama</p>
-                        <button
-                            onClick={handleRetry}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary-600 text-white rounded-lg text-xs font-medium transition-colors"
-                        >
-                            <Icons.Reset />
-                            Coba Lagi
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                            <button
+                                onClick={handleRetry}
+                                aria-label="Coba sambungkan ulang stream"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary-600 text-white rounded-lg text-xs font-medium transition-colors"
+                            >
+                                <Icons.Reset />
+                                Coba Lagi
+                            </button>
+                            <button
+                                onClick={handleClose}
+                                aria-label="Tutup tile kamera"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-200 hover:bg-gray-300 dark:bg-white/10 dark:hover:bg-white/20 text-gray-900 dark:text-white rounded-lg text-xs font-medium transition-colors"
+                            >
+                                Tutup
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -965,13 +1117,23 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
                                 <p className="text-gray-400 text-[10px] mb-3">Kamera offline atau jaringan bermasalah</p>
                             </>
                         )}
-                        <button
-                            onClick={handleRetry}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary-600 text-white rounded-lg text-xs font-medium transition-colors"
-                        >
-                            <Icons.Reset />
-                            Coba Lagi
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                            <button
+                                onClick={handleRetry}
+                                aria-label="Coba sambungkan ulang stream"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary-600 text-white rounded-lg text-xs font-medium transition-colors"
+                            >
+                                <Icons.Reset />
+                                Coba Lagi
+                            </button>
+                            <button
+                                onClick={handleClose}
+                                aria-label="Tutup tile kamera"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-200 hover:bg-gray-300 dark:bg-white/10 dark:hover:bg-white/20 text-gray-900 dark:text-white rounded-lg text-xs font-medium transition-colors"
+                            >
+                                Tutup
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -1008,4 +1170,8 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
         </div>
     );
 }
-export default MultiViewVideoItem;
+// Memoised so that a status flip on one tile doesn't force its siblings to
+// re-render their entire HLS / video subtree. The parent passes stable
+// `camera` references (keyed by camera.id), plus useCallback'd onRemove /
+// onError / onStatusChange, so a shallow-equal compare is correct here.
+export default memo(MultiViewVideoItem);

@@ -150,9 +150,19 @@ vi.mock('../../contexts/BrandingContext', () => ({
     }),
 }));
 
-vi.mock('./ZoomableVideo', () => ({
-    default: ({ videoRef }) => <video ref={videoRef} data-testid="multi-view-video" />,
-}));
+vi.mock('./ZoomableVideo', async () => {
+    const { forwardRef } = await import('react');
+    return {
+        // Use forwardRef so the imperative `ref` prop from MultiViewVideoItem
+        // doesn't trigger React's "Function components cannot be given refs"
+        // warning in tests. The mock doesn't need to actually expose the
+        // zoom API — production code calls those methods through
+        // optional-chaining (zoomableRef.current?.zoomIn?.()).
+        default: forwardRef(function MockZoomableVideo({ videoRef }) {
+            return <video ref={videoRef} data-testid="multi-view-video" />;
+        }),
+    };
+});
 
 const baseCamera = {
     id: 31,

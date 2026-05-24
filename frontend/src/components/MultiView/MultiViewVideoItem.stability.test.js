@@ -114,4 +114,66 @@ describe('MultiViewVideoItem HLS stability', () => {
         expect(fullscreenTopBarBlock).toContain('truncate');
         expect(fullscreenTopBarBlock).toContain('max-w-');
     });
+
+    it('cancels the snapshot toast timer on unmount to avoid stale setState', () => {
+        // Without this guard, closing the tile within 3s of a snapshot
+        // would log the React "Can't update state on unmounted component"
+        // warning and leak the timer.
+        expect(source).toContain('snapshotTimerRef');
+        expect(source).toContain('clearTimeout(snapshotTimerRef.current)');
+    });
+
+    it('watchdogs MJPEG / embed first-frame load so a silent upstream surfaces an error', () => {
+        // <img>/<iframe> onLoad only fires once; if the upstream never
+        // delivers a single frame we'd otherwise sit on the spinner
+        // forever. The watchdog flips the tile to error after a bounded
+        // window so the user gets retry buttons.
+        expect(source).toContain('initLoadTimeoutRef');
+        expect(source).toContain('MJPEG_EMBED_LOAD_TIMEOUT_MS');
+    });
+
+    it('snaps the player back to the live edge when an external tile drifts too far behind', () => {
+        // Background-tab / mobile-suspend can leave a player tens of
+        // seconds behind real-time. We mirror VideoPopup's snap-to-live
+        // recovery so multi-view doesn't accumulate stale buffer either.
+        expect(source).toContain('LIVE_EDGE_LATENCY_SNAP_S');
+        expect(source).toContain('liveSyncPosition');
+        expect(source).toContain("addEventListener('play', handlePlaySync)");
+    });
+
+    it('sandboxes the external embed iframe to limit damage from a hostile upstream', () => {
+        // allow-scripts + allow-same-origin are required for most player
+        // pages; the absence of allow-top-navigation prevents a hijacked
+        // embed from yanking the parent window away from the public site.
+        expect(source).toContain('sandbox="allow-scripts allow-same-origin');
+    });
+
+    it('reflects server-side maintenance / offline flips back into the tile status', () => {
+        // useState's initialiser only runs once; without this effect the
+        // tile would keep claiming LIVE after the camera flipped to
+        // maintenance mid-session.
+        expect(source).toContain("setStatus('maintenance')");
+        expect(source).toContain("setStatus('offline')");
+        expect(source).toContain('[isMaintenance, isOffline]');
+    });
+
+    it('memoises the component so a sibling tile re-render does not destroy this tile\'s HLS', () => {
+        // memo() depends on the parent passing stable callbacks +
+        // a stable camera reference. The parent (MultiViewLayout) was
+        // updated in the same change-set to pass onRemove directly
+        // instead of wrapping it in a per-tile arrow.
+        expect(source).toContain('export default memo(MultiViewVideoItem)');
+        expect(layoutSource).not.toContain('onRemove={() => onRemove(');
+        expect(layoutSource).toContain('onRemove={onRemove}');
+    });
+
+    it('uses an imperative ref for zoom controls instead of reaching into wrapper DOM children', () => {
+        // The legacy getZoomableWrapper() pattern relied on
+        // wrapperRef.current.firstElementChild, which silently breaks any
+        // time the tile DOM gets an extra wrapping element (error
+        // boundary, theme provider, etc.). useImperativeHandle keeps the
+        // contract explicit.
+        expect(source).toContain('zoomableRef');
+        expect(source).not.toContain('getZoomableWrapper()');
+    });
 });

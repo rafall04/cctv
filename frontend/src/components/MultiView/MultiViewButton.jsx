@@ -32,11 +32,12 @@ function MultiViewButton({ count, onClick, maxReached, maxStreams = 3 }) {
 
             <button
                 onClick={onClick}
+                aria-label={`Buka Multi-View dengan ${count} kamera`}
                 className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-primary to-primary-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-105 transition-all"
             >
                 <Icons.Layout />
                 <span className="font-bold">Multi-View</span>
-                <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-sm font-bold">{count}</span>
+                <span className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-sm font-bold" aria-hidden="true">{count}</span>
             </button>
         </div>
     );
