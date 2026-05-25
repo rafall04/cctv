@@ -335,6 +335,109 @@ function sendRtspRequest({ host, port, request, timeoutMs = 4000 }) {
     });
 }
 
+/**
+ * Multi-request RTSP session over a single TCP connection.
+ *
+ * Why this exists separately from sendRtspRequest:
+ *   The Surabaya / Dishub edishub cameras (HIK Media Server V4.51.127
+ *   firmware, ~36.66.208.98) generate a fresh digest nonce for every
+ *   new TCP connection. If the challenge-response pair is split across
+ *   two sockets — like `sendRtspRequest` did originally — the second
+ *   socket sees a brand-new nonce, refuses our reply built from the
+ *   first socket's nonce, and the probe scores 401 → camera reported
+ *   offline despite being fully reachable. VLC and FFmpeg succeed
+ *   because they keep one socket open for the whole DESCRIBE → SETUP
+ *   → PLAY flow. We do the equivalent: one socket, two DESCRIBE
+ *   passes, settle after the second response (or any error along the
+ *   way).
+ */
+function runRtspChallengeResponseSession({ host, port, firstRequest, buildSecondRequest, timeoutMs = 4000 }) {
+    return new Promise((resolve) => {
+        const socket = new net.Socket();
+        let settled = false;
+        let buffer = '';
+        let stage = 'first';
+        let firstResponse = null;
+
+        const settle = (result) => {
+            if (settled) return;
+            settled = true;
+            socket.destroy();
+            resolve(result);
+        };
+
+        socket.setTimeout(timeoutMs);
+
+        const consumeResponse = () => {
+            // Parse one complete RTSP message header out of the
+            // buffer; only the head is needed — DESCRIBE bodies are
+            // SDP and ignored by the probe. Body length is bounded
+            // by Content-Length so we leave any trailing bytes in
+            // place for a possible second response.
+            const headerEnd = buffer.indexOf('\r\n\r\n');
+            if (headerEnd === -1) return null;
+            const headerChunk = buffer.slice(0, headerEnd + 4);
+            const contentLengthMatch = headerChunk.match(/Content-Length:\s*(\d+)/i);
+            const bodyLength = contentLengthMatch ? Number.parseInt(contentLengthMatch[1], 10) : 0;
+            const totalLength = headerChunk.length + (Number.isFinite(bodyLength) ? bodyLength : 0);
+            if (buffer.length < totalLength) return null;
+            const messageBytes = buffer.slice(0, totalLength);
+            buffer = buffer.slice(totalLength);
+            return parseRtspResponse(messageBytes) || { errorCode: 'request_error', raw: messageBytes };
+        };
+
+        socket.on('connect', () => {
+            socket.write(firstRequest);
+        });
+
+        socket.on('data', (chunk) => {
+            buffer += chunk.toString('utf8');
+            // Loop because data events may carry both responses if the
+            // server is fast / TCP coalesces. Without the loop, a
+            // batched read would leave the second response unparsed.
+            // eslint-disable-next-line no-constant-condition
+            while (true) {
+                const parsed = consumeResponse();
+                if (!parsed) return;
+
+                if (stage === 'first') {
+                    firstResponse = parsed;
+                    // Fast paths that don't need a second pass: a
+                    // direct 200 (auth not required) or a non-401
+                    // failure — return the first response as-is.
+                    if (parsed.statusCode !== 401) {
+                        settle({ firstResponse, authenticatedResponse: null });
+                        return;
+                    }
+                    const secondRequest = buildSecondRequest(parsed);
+                    if (!secondRequest) {
+                        settle({ firstResponse, authenticatedResponse: null });
+                        return;
+                    }
+                    stage = 'second';
+                    // Reuse the SAME socket so the server's per-
+                    // connection nonce is still valid.
+                    socket.write(secondRequest);
+                    continue;
+                }
+
+                settle({ firstResponse, authenticatedResponse: parsed });
+                return;
+            }
+        });
+
+        socket.on('timeout', () => {
+            settle({ firstResponse, authenticatedResponse: null, errorCode: 'ETIMEDOUT' });
+        });
+
+        socket.on('error', (error) => {
+            settle({ firstResponse, authenticatedResponse: null, errorCode: error?.code || 'request_error' });
+        });
+
+        socket.connect(port, host);
+    });
+}
+
 async function probeRtspSource(rtspUrl, timeoutMs = 4000) {
     let parsedUrl;
     try {
@@ -355,21 +458,51 @@ async function probeRtspSource(rtspUrl, timeoutMs = 4000) {
     const username = decodeURIComponent(parsedUrl.username || '');
     const password = decodeURIComponent(parsedUrl.password || '');
 
-    const firstResponse = await sendRtspRequest({
-        host,
-        port,
-        request: buildRtspRequest({
-            method: 'DESCRIBE',
-            uri: requestUri,
-            cseq: 1,
-        }),
-        timeoutMs,
+    const firstRequest = buildRtspRequest({
+        method: 'DESCRIBE',
+        uri: requestUri,
+        cseq: 1,
     });
 
-    if (!firstResponse || firstResponse.errorCode) {
+    // Run the whole challenge → response handshake on ONE TCP socket.
+    // See runRtspChallengeResponseSession's header for the rationale.
+    const session = await runRtspChallengeResponseSession({
+        host,
+        port,
+        firstRequest,
+        timeoutMs,
+        buildSecondRequest: (firstResponse) => {
+            const challenge = parseRtspAuthHeader(firstResponse.headers['www-authenticate']);
+            const authorization = challenge?.scheme === 'digest'
+                ? buildDigestAuthorization({
+                    method: 'DESCRIBE',
+                    uri: requestUri,
+                    username,
+                    password,
+                    challenge,
+                })
+                : challenge?.scheme === 'basic'
+                    ? buildBasicAuthorization({ username, password })
+                    : null;
+            if (!authorization) {
+                return null;
+            }
+            return buildRtspRequest({
+                method: 'DESCRIBE',
+                uri: requestUri,
+                cseq: 2,
+                authorization,
+            });
+        },
+    });
+
+    const firstResponse = session?.firstResponse || null;
+    const authenticatedResponse = session?.authenticatedResponse || null;
+
+    if (!firstResponse || (firstResponse.errorCode && !firstResponse.statusCode)) {
         return {
             online: false,
-            reason: firstResponse?.errorCode || 'internal_stream_unreachable',
+            reason: session?.errorCode || firstResponse?.errorCode || 'internal_stream_unreachable',
             details: {
                 probeTarget: rtspUrl,
                 rtspHost: host,
@@ -418,22 +551,14 @@ async function probeRtspSource(rtspUrl, timeoutMs = 4000) {
     }
 
     const challenge = parseRtspAuthHeader(firstResponse.headers['www-authenticate']);
-    const authorization = challenge?.scheme === 'digest'
-        ? buildDigestAuthorization({
-            method: 'DESCRIBE',
-            uri: requestUri,
-            username,
-            password,
-            challenge,
-        })
-        : challenge?.scheme === 'basic'
-            ? buildBasicAuthorization({ username, password })
-            : null;
 
-    if (!authorization) {
+    if (!authenticatedResponse) {
+        // buildSecondRequest returned null OR session bailed before
+        // we got a second response. Both map to "we tried to auth
+        // and could not".
         return {
             online: false,
-            reason: 'rtsp_auth_failed',
+            reason: session?.errorCode || 'rtsp_auth_failed',
             details: {
                 probeTarget: rtspUrl,
                 rtspHost: host,
@@ -444,22 +569,10 @@ async function probeRtspSource(rtspUrl, timeoutMs = 4000) {
         };
     }
 
-    const authenticatedResponse = await sendRtspRequest({
-        host,
-        port,
-        request: buildRtspRequest({
-            method: 'DESCRIBE',
-            uri: requestUri,
-            cseq: 2,
-            authorization,
-        }),
-        timeoutMs,
-    });
-
-    if (!authenticatedResponse || authenticatedResponse.errorCode) {
+    if (authenticatedResponse.errorCode && !authenticatedResponse.statusCode) {
         return {
             online: false,
-            reason: authenticatedResponse?.errorCode || 'internal_stream_unreachable',
+            reason: authenticatedResponse.errorCode,
             details: {
                 probeTarget: rtspUrl,
                 rtspHost: host,

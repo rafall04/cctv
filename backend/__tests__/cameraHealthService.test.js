@@ -190,13 +190,29 @@ function createReadableStream() {
 }
 
 async function createRtspTestServer(handler) {
+    // Session-aware mock. probeRtspSource now keeps a single TCP
+    // connection open across the challenge-response handshake (see the
+    // production runRtspChallengeResponseSession comment for why — HIK
+    // V4 firmware on the Surabaya cameras rotates the digest nonce
+    // every new connection, so the OLD socket-per-request mock pattern
+    // is no longer faithful to what the prod code does). Each request
+    // boundary in the same connection invokes the handler with an
+    // incrementing requestIndex; the handler decides whether to
+    // `socket.write(...)` (and stay alive for the next request) or
+    // `socket.end(...)` (and close).
     const server = net.createServer((socket) => {
         let requestBuffer = '';
+        let requestIndex = 0;
 
         socket.on('data', (chunk) => {
             requestBuffer += chunk.toString('utf8');
-            if (requestBuffer.includes('\r\n\r\n')) {
-                handler(socket, requestBuffer);
+            // Drain any number of full requests buffered together.
+            while (requestBuffer.includes('\r\n\r\n')) {
+                const boundary = requestBuffer.indexOf('\r\n\r\n') + 4;
+                const requestText = requestBuffer.slice(0, boundary);
+                requestBuffer = requestBuffer.slice(boundary);
+                requestIndex += 1;
+                handler(socket, requestText, requestIndex);
             }
         });
     });
@@ -390,13 +406,20 @@ describe('cameraHealthService weighted scoring', () => {
 });
 
 describe('cameraHealthService internal RTSP probe', () => {
-    it('marks RTSP online after digest auth succeeds', async () => {
-        let requestCount = 0;
-        const testServer = await createRtspTestServer((socket, requestText) => {
-            requestCount += 1;
-
-            if (requestCount === 1) {
-                socket.end([
+    it('marks RTSP online after digest auth succeeds on the SAME socket (Surabaya HIK firmware)', async () => {
+        // Regression: HIK Media Server V4.51.127 (Surabaya / Edishub
+        // CCTVs) generates a fresh digest nonce for every new TCP
+        // connection. If the second DESCRIBE lands on a different
+        // socket, the server rejects the auth with another 401 and
+        // the camera reports offline despite being fully reachable.
+        // The fix is to keep one socket open for both passes; this
+        // test pins that behaviour.
+        const testServer = await createRtspTestServer((socket, requestText, requestIndex) => {
+            if (requestIndex === 1) {
+                // 401 with challenge — but do NOT close the socket.
+                // The probe must reuse this connection for pass 2 so
+                // the nonce above stays valid.
+                socket.write([
                     'RTSP/1.0 401 Unauthorized',
                     'CSeq: 1',
                     'WWW-Authenticate: Digest realm="Surabaya", nonce="abc123", qop="auth"',
@@ -425,6 +448,70 @@ describe('cameraHealthService internal RTSP probe', () => {
             expect(result.details.rtspAuthScheme).toBe('digest');
         } finally {
             await testServer.close();
+        }
+    });
+
+    it('survives a server that rotates the digest nonce per TCP connection (Surabaya HIK regression)', async () => {
+        // Direct simulation of the Surabaya bug: each new connection
+        // yields a DIFFERENT nonce. The old probe (one socket per
+        // request) would never authenticate against such a server.
+        // The fixed probe stays on one socket so the nonce delivered
+        // with the 401 stays valid for the immediately-following
+        // DESCRIBE+Digest reply.
+        let connectionCount = 0;
+        const server = net.createServer((socket) => {
+            connectionCount += 1;
+            const connectionNonce = `nonce-conn-${connectionCount}`;
+            let buf = '';
+            let perConnIndex = 0;
+            socket.on('data', (chunk) => {
+                buf += chunk.toString('utf8');
+                while (buf.includes('\r\n\r\n')) {
+                    const boundary = buf.indexOf('\r\n\r\n') + 4;
+                    const requestText = buf.slice(0, boundary);
+                    buf = buf.slice(boundary);
+                    perConnIndex += 1;
+
+                    if (perConnIndex === 1) {
+                        socket.write([
+                            'RTSP/1.0 401 Unauthorized',
+                            'CSeq: 1',
+                            `WWW-Authenticate: Digest realm="HIK", nonce="${connectionNonce}", algorithm="MD5"`,
+                            '',
+                            '',
+                        ].join('\r\n'));
+                        continue;
+                    }
+
+                    // Validate the digest was built against THIS
+                    // connection's nonce — if the prod code opened a
+                    // new socket for pass 2, the server would see a
+                    // fresh perConnIndex===1, never reach this
+                    // branch, and we'd loop on 401s forever.
+                    expect(requestText).toContain(`nonce="${connectionNonce}"`);
+                    socket.end([
+                        'RTSP/1.0 200 OK',
+                        'CSeq: 2',
+                        'Content-Length: 0',
+                        '',
+                        '',
+                    ].join('\r\n'));
+                }
+            });
+        });
+        await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+        const port = server.address().port;
+
+        try {
+            const result = await probeRtspSource(`rtsp://admin:secret@127.0.0.1:${port}/ch1/main`, 2000);
+            expect(result.online).toBe(true);
+            expect(result.reason).toBe('rtsp_auth_ok');
+            // The connection count is the canary: the probe must
+            // accomplish auth in EXACTLY one TCP connection. Two or
+            // more means the regression has come back.
+            expect(connectionCount).toBe(1);
+        } finally {
+            await new Promise((resolve) => server.close(resolve));
         }
     });
 
