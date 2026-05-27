@@ -434,6 +434,22 @@ function runRtspChallengeResponseSession({ host, port, firstRequest, buildSecond
             settle({ firstResponse, authenticatedResponse: null, errorCode: error?.code || 'request_error' });
         });
 
+        // 'close' is the catch-all for "server hung up before we got
+        // pass 2's response". On Linux a remote-side `socket.end()`
+        // right after a 401 manifests as FIN → 'end' → 'close' WITHOUT
+        // any 'error' (the write into a half-closed socket can silently
+        // succeed at the syscall level, then the connection just goes
+        // away). Without this listener we'd sit on the inactivity
+        // timer for the full timeoutMs, delaying the fresh-socket
+        // fallback in probeRtspSource by a wasted 4 s per camera tick.
+        socket.on('close', () => {
+            settle({
+                firstResponse,
+                authenticatedResponse: null,
+                errorCode: stage === 'first' ? 'connection_closed_before_first_response' : 'connection_closed_before_auth_response',
+            });
+        });
+
         socket.connect(port, host);
     });
 }
@@ -497,7 +513,9 @@ async function probeRtspSource(rtspUrl, timeoutMs = 4000) {
     });
 
     const firstResponse = session?.firstResponse || null;
-    const authenticatedResponse = session?.authenticatedResponse || null;
+    // `let` — the hybrid fallback below may need to retry pass 2 on a
+    // fresh socket when the same-socket attempt bailed mid-write.
+    let authenticatedResponse = session?.authenticatedResponse || null;
 
     if (!firstResponse || (firstResponse.errorCode && !firstResponse.statusCode)) {
         return {
@@ -552,10 +570,57 @@ async function probeRtspSource(rtspUrl, timeoutMs = 4000) {
 
     const challenge = parseRtspAuthHeader(firstResponse.headers['www-authenticate']);
 
+    // Hybrid fallback. Many DVR / NVR firmwares (older Dahua, generic
+    // ONVIF cameras, the bulk of the user's "local CCTV" cluster) CLOSE
+    // the TCP connection right after sending the 401 challenge — they
+    // treat each request as a new session and expect the client to
+    // reconnect for the second DESCRIBE. The HIK Surabaya firmware does
+    // the opposite (keeps the connection open AND rotates the nonce per
+    // connection, so a new socket would get a new nonce and never
+    // authenticate).
+    //
+    // We pick the universally-compatible route: try the same-socket
+    // handshake first (which the previous commit added for HIK). If
+    // pass 2 didn't make it through — server closed the socket, write
+    // raced the close, ECONNRESET, ETIMEDOUT mid-write — fall back to
+    // a fresh-socket pass 2 with the EXACT challenge we received in
+    // pass 1. Firmware that ignores connection identity for nonce
+    // validity (the local CCTV majority) accepts this and returns 200;
+    // firmware that rotates the nonce (HIK Surabaya) already settled
+    // via the same-socket attempt above and never reaches this branch.
+    if (!authenticatedResponse && challenge) {
+        const fallbackAuthorization = challenge.scheme === 'digest'
+            ? buildDigestAuthorization({
+                method: 'DESCRIBE',
+                uri: requestUri,
+                username,
+                password,
+                challenge,
+            })
+            : challenge.scheme === 'basic'
+                ? buildBasicAuthorization({ username, password })
+                : null;
+
+        if (fallbackAuthorization) {
+            authenticatedResponse = await sendRtspRequest({
+                host,
+                port,
+                request: buildRtspRequest({
+                    method: 'DESCRIBE',
+                    uri: requestUri,
+                    cseq: 2,
+                    authorization: fallbackAuthorization,
+                }),
+                timeoutMs,
+            });
+        }
+    }
+
     if (!authenticatedResponse) {
-        // buildSecondRequest returned null OR session bailed before
-        // we got a second response. Both map to "we tried to auth
-        // and could not".
+        // Both the same-socket attempt AND the fresh-socket fallback
+        // failed (or buildSecondRequest returned null because the auth
+        // scheme is unsupported / username missing). Map to a single
+        // "tried to auth and could not" reason.
         return {
             online: false,
             reason: session?.errorCode || 'rtsp_auth_failed',

@@ -515,6 +515,77 @@ describe('cameraHealthService internal RTSP probe', () => {
         }
     });
 
+    it('falls back to a fresh socket when the server closes after the 401 (older Dahua / generic ONVIF regression)', async () => {
+        // The flip side of the Surabaya HIK case: a lot of older DVR /
+        // NVR firmwares close the TCP connection right after sending
+        // the 401, treating each request as a brand-new session. The
+        // probe must reconnect for pass 2 instead of riding the
+        // already-closed socket.
+        //
+        // This test stands up a server that:
+        //   - On connection #1: 401 then immediately `socket.end()`.
+        //   - On connection #2: expects DESCRIBE+Digest with the
+        //     original nonce, returns 200.
+        // The connection count being EXACTLY 2 pins that the fallback
+        // ran (and only ran once).
+        let connectionCount = 0;
+        const server = net.createServer((socket) => {
+            connectionCount += 1;
+            const captured = connectionCount;
+            let buf = '';
+            // Once we've sent a response and called socket.end(), the
+            // client's already-queued pass-2 bytes may still arrive on
+            // our side before TCP fully tears the connection down —
+            // emitting another 'data' event. Without this guard we'd
+            // try to socket.end() on an already-ended stream, which
+            // logs an ERR_STREAM_WRITE_AFTER_END unhandled error and
+            // pollutes the test output (the test functionally passes
+            // either way — it's pure noise).
+            let responded = false;
+            socket.on('data', (chunk) => {
+                if (responded) return;
+                buf += chunk.toString('utf8');
+                if (!buf.includes('\r\n\r\n')) return;
+
+                if (captured === 1) {
+                    // Pass 1: 401 challenge, then immediately HUP.
+                    socket.end([
+                        'RTSP/1.0 401 Unauthorized',
+                        'CSeq: 1',
+                        'WWW-Authenticate: Digest realm="Dahua", nonce="legacy-nonce-XYZ", algorithm="MD5"',
+                        '',
+                        '',
+                    ].join('\r\n'));
+                    responded = true;
+                    return;
+                }
+                // Pass 2 must arrive on a NEW connection AND carry the
+                // ORIGINAL nonce — the fallback's whole job is to
+                // honour what pass 1 issued.
+                expect(buf).toContain('nonce="legacy-nonce-XYZ"');
+                socket.end([
+                    'RTSP/1.0 200 OK',
+                    'CSeq: 2',
+                    'Content-Length: 0',
+                    '',
+                    '',
+                ].join('\r\n'));
+                responded = true;
+            });
+        });
+        await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+        const port = server.address().port;
+
+        try {
+            const result = await probeRtspSource(`rtsp://admin:secret@127.0.0.1:${port}/ch1/main`, 2000);
+            expect(result.online).toBe(true);
+            expect(result.reason).toBe('rtsp_auth_ok');
+            expect(connectionCount).toBe(2);
+        } finally {
+            await new Promise((resolve) => server.close(resolve));
+        }
+    });
+
     it('marks RTSP offline when auth challenge cannot be satisfied', async () => {
         const testServer = await createRtspTestServer((socket) => {
             socket.end([
