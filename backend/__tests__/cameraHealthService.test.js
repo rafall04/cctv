@@ -378,6 +378,38 @@ describe('cameraHealthService weighted scoring', () => {
         expect(service.healthState.get(camera.id).failureScore).toBeCloseTo(3.0);
     });
 
+    it('does NOT instantly hard-offline an internal camera on rtsp_stream_not_found (debounces via score)', () => {
+        // RC-B regression: a MediaMTX-owned single-session camera answers a
+        // transient 454/404 to an independent probe while streaming fine.
+        // One such probe must not force it offline; it debounces like any
+        // other failure and the MediaMTX fast-path resets the score.
+        const service = new CameraHealthService();
+        const camera = { id: 210, is_online: 1, delivery_type: 'internal_hls' };
+        service.ensureCameraState(camera.id, camera.is_online);
+
+        expect(service.applyWeightedScoring(camera, { online: false, reason: 'rtsp_stream_not_found' })).toBe(1);
+        let state = service.healthState.get(camera.id);
+        expect(state.effectiveOnline).toBe(true);
+        expect(state.failureScore).toBeCloseTo(1.0);
+
+        // Repeats still cross the threshold -> flagged for confirmation, so a
+        // genuinely-dead source is not masked forever.
+        expect(service.applyWeightedScoring(camera, { online: false, reason: 'rtsp_stream_not_found' })).toBe(1);
+        expect(service.applyWeightedScoring(camera, { online: false, reason: 'rtsp_stream_not_found' })).toBe(1);
+        state = service.healthState.get(camera.id);
+        expect(state.needsConfirmation).toBe(true);
+        expect(state.failureScore).toBeGreaterThanOrEqual(3.0);
+    });
+
+    it('still instantly hard-offlines an internal camera on a genuine config error (invalid_rtsp_url)', () => {
+        const service = new CameraHealthService();
+        const camera = { id: 211, is_online: 1, delivery_type: 'internal_hls' };
+        service.ensureCameraState(camera.id, camera.is_online);
+
+        expect(service.applyWeightedScoring(camera, { online: false, reason: 'invalid_rtsp_url' })).toBe(0);
+        expect(service.healthState.get(camera.id).effectiveOnline).toBe(false);
+    });
+
     it('switches online immediately after 1 success when score drops to 0', () => {
         const service = new CameraHealthService();
         const camera = { id: 3, is_online: 0 };

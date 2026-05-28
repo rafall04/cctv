@@ -811,6 +811,19 @@ function shouldForceOfflineForHardConfig(camera, reason) {
         return false;
     }
 
+    // Internal cameras whose RTSP session is owned by MediaMTX routinely
+    // answer a transient 404/454 ("stream/session not found") to an
+    // independent probe while actually streaming fine into MediaMTX —
+    // single-session firmware, on-demand teardown windows, and the
+    // post-restart settling period all cause it. Forcing them offline on a
+    // single such probe (instead of letting the weighted score + confirmation
+    // probe debounce, with the MediaMTX fast-path resetting the score) is what
+    // made local cameras flap offline. A genuinely-dead source returns 404
+    // every tick and still crosses the offline threshold after a few probes.
+    if (camera?.delivery_type === 'internal_hls' && reason === 'rtsp_stream_not_found') {
+        return false;
+    }
+
     if (reason !== 'missing_external_source_metadata') {
         return true;
     }
