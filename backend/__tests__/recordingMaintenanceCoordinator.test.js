@@ -64,7 +64,7 @@ describe('recordingMaintenanceCoordinator', () => {
         expect(() => createRecordingMaintenanceCoordinator({ recordingsBasePath: '/r', cleanupService: {}, onSegmentCreated: () => {} })).toThrow(/reconcileAll/);
     });
 
-    it('registerSchedulerTasks registers all five maintenance loops', () => {
+    it('registerSchedulerTasks registers all six maintenance loops', () => {
         const { deps } = createDeps();
         const coordinator = createRecordingMaintenanceCoordinator(deps);
         const scheduler = { register: vi.fn() };
@@ -75,6 +75,7 @@ describe('recordingMaintenanceCoordinator', () => {
         expect(names).toEqual([
             'bg_cleanup_build',
             'bg_cleanup_process',
+            'diagnostics_prune',
             'lifecycle_reconciler',
             'scheduled_cleanup',
             'segment_scanner',
@@ -84,6 +85,30 @@ describe('recordingMaintenanceCoordinator', () => {
             expect(typeof call[0].intervalMs).toBe('number');
             expect(call[0].intervalMs).toBeGreaterThan(0);
         }
+    });
+
+    it('pruneRecoveryDiagnostics delegates to the diagnostics repository and logs the count', () => {
+        const diagnosticsRepository = { pruneAbsentActiveDiagnostics: vi.fn().mockReturnValue(3) };
+        const { deps, logger } = createDeps({ diagnosticsRepository });
+        const coordinator = createRecordingMaintenanceCoordinator(deps);
+
+        const pruned = coordinator.pruneRecoveryDiagnostics();
+
+        expect(diagnosticsRepository.pruneAbsentActiveDiagnostics).toHaveBeenCalledTimes(1);
+        expect(pruned).toBe(3);
+        expect(logger.log).toHaveBeenCalledWith(expect.stringContaining('Resolved 3 recovery diagnostic'));
+    });
+
+    it('pruneRecoveryDiagnostics never throws when the repository errors', () => {
+        const diagnosticsRepository = {
+            pruneAbsentActiveDiagnostics: vi.fn(() => { throw new Error('db locked'); }),
+        };
+        const { deps, logger } = createDeps({ diagnosticsRepository });
+        const coordinator = createRecordingMaintenanceCoordinator(deps);
+
+        expect(() => coordinator.pruneRecoveryDiagnostics()).not.toThrow();
+        expect(coordinator.pruneRecoveryDiagnostics()).toBe(0);
+        expect(logger.error).toHaveBeenCalled();
     });
 
     it('cleanupOldSegments delegates to cleanupService.cleanupCamera with camera row', async () => {

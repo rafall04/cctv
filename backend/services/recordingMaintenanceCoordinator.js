@@ -12,6 +12,7 @@
 import { createRecordingRecoveryScanner } from './recordingRecoveryScanner.js';
 import { createRecordingBackgroundCleanupService } from './recordingBackgroundCleanupService.js';
 import { createRecordingEmergencyDiskService } from './recordingEmergencyDiskService.js';
+import recordingRecoveryDiagnosticsRepository from './recordingRecoveryDiagnosticsRepository.js';
 import {
     RECORDING_LIFECYCLE_RECONCILE_INTERVAL_MS,
     RECORDING_SCHEDULED_CLEANUP_INITIAL_DELAY_MS,
@@ -29,6 +30,7 @@ export function createRecordingMaintenanceCoordinator({
     execPromise,
     onSegmentCreated,
     reconcileAll,
+    diagnosticsRepository = recordingRecoveryDiagnosticsRepository,
     isShuttingDown = () => false,
     logger = console,
 } = {}) {
@@ -120,6 +122,19 @@ export function createRecordingMaintenanceCoordinator({
         return getEmergencyDiskService().runEmergencyCheck();
     }
 
+    function pruneRecoveryDiagnostics() {
+        try {
+            const pruned = diagnosticsRepository.pruneAbsentActiveDiagnostics?.() || 0;
+            if (pruned > 0) {
+                logger.log?.(`[Cleanup] Resolved ${pruned} recovery diagnostic(s) whose files are gone from disk`);
+            }
+            return pruned;
+        } catch (error) {
+            logger.error?.('[Cleanup] Error pruning recovery diagnostics:', error);
+            return 0;
+        }
+    }
+
     async function runScheduledCleanup() {
         try {
             const enabledCameras = query(
@@ -185,6 +200,12 @@ export function createRecordingMaintenanceCoordinator({
             intervalMs: RECORDING_LIFECYCLE_RECONCILE_INTERVAL_MS,
             initialDelayMs: RECORDING_LIFECYCLE_RECONCILE_INTERVAL_MS,
         });
+        scheduler.register({
+            name: 'diagnostics_prune',
+            task: () => pruneRecoveryDiagnostics(),
+            intervalMs: RECORDING_SCHEDULED_CLEANUP_INTERVAL_MS,
+            initialDelayMs: RECORDING_SCHEDULED_CLEANUP_INITIAL_DELAY_MS,
+        });
     }
 
     function startLegacyTimers(scheduleTimeout = setTimeout) {
@@ -207,6 +228,10 @@ export function createRecordingMaintenanceCoordinator({
             await runScheduledCleanup();
             scheduleTimeout(scheduledCleanupCycle, RECORDING_SCHEDULED_CLEANUP_INTERVAL_MS);
         };
+        const diagnosticsPruneCycle = async () => {
+            pruneRecoveryDiagnostics();
+            scheduleTimeout(diagnosticsPruneCycle, RECORDING_SCHEDULED_CLEANUP_INTERVAL_MS);
+        };
         const reconcileCycle = async () => {
             try {
                 if (!isShuttingDown()) {
@@ -223,6 +248,7 @@ export function createRecordingMaintenanceCoordinator({
         scheduleTimeout(buildCycle, bg.buildInitialDelayMs);
         scheduleTimeout(processCycle, bg.processIntervalMs);
         scheduleTimeout(scheduledCleanupCycle, RECORDING_SCHEDULED_CLEANUP_INITIAL_DELAY_MS);
+        scheduleTimeout(diagnosticsPruneCycle, RECORDING_SCHEDULED_CLEANUP_INITIAL_DELAY_MS);
         scheduleTimeout(reconcileCycle, RECORDING_LIFECYCLE_RECONCILE_INTERVAL_MS);
     }
 
@@ -241,6 +267,7 @@ export function createRecordingMaintenanceCoordinator({
         cleanupOldSegments,
         runScheduledCleanup,
         runEmergencyDiskCheck,
+        pruneRecoveryDiagnostics,
         registerSchedulerTasks,
         startLegacyTimers,
         ensureRecoveryScanner,

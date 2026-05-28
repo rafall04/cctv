@@ -223,4 +223,38 @@ describe('recordingRecoveryDiagnosticsRepository', () => {
             ]
         );
     });
+
+    it('prunes only active diagnostics whose files are gone from disk', async () => {
+        queryMock.mockReturnValue([
+            { id: 1, file_path: '/rec/cam1/pending/a.mp4.partial', quarantined_path: null },        // gone
+            { id: 2, file_path: '/rec/cam1/pending/b.mp4.partial', quarantined_path: null },        // present
+            { id: 3, file_path: '/rec/cam2/pending/c.mp4.partial', quarantined_path: '/q/c.mp4' },  // partial gone, quarantine present
+            { id: 4, file_path: null, quarantined_path: null },                                     // nothing -> gone
+        ]);
+        const present = new Set(['/rec/cam1/pending/b.mp4.partial', '/q/c.mp4']);
+        const repository = (await import('../services/recordingRecoveryDiagnosticsRepository.js')).default;
+
+        const pruned = repository.pruneAbsentActiveDiagnostics({ fileExists: (p) => present.has(p) });
+
+        expect(pruned).toBe(2);
+        const resolvedIds = executeMock.mock.calls
+            .filter((call) => /SET\s+active = 0/.test(call[0]))
+            .map((call) => call[1][0])
+            .sort((a, b) => a - b);
+        expect(resolvedIds).toEqual([1, 4]);
+        expect(resolvedIds).not.toContain(2);
+        expect(resolvedIds).not.toContain(3);
+    });
+
+    it('prunes nothing when every active diagnostic still has its file', async () => {
+        queryMock.mockReturnValue([
+            { id: 5, file_path: '/rec/cam1/pending/d.mp4.partial', quarantined_path: null },
+        ]);
+        const repository = (await import('../services/recordingRecoveryDiagnosticsRepository.js')).default;
+
+        const pruned = repository.pruneAbsentActiveDiagnostics({ fileExists: () => true });
+
+        expect(pruned).toBe(0);
+        expect(executeMock).not.toHaveBeenCalledWith(expect.stringMatching(/SET\s+active = 0/), expect.anything());
+    });
 });

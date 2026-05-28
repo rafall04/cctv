@@ -4,6 +4,7 @@
 // MainFuncs: upsertDiagnostic, clearDiagnostic, listActiveByCamera, summarizeActive.
 // SideEffects: Reads and writes recording_recovery_diagnostics rows.
 
+import { existsSync } from 'fs';
 import { execute, query, queryOne, transaction } from '../database/connectionPool.js';
 
 class RecordingRecoveryDiagnosticsRepository {
@@ -135,6 +136,57 @@ class RecordingRecoveryDiagnosticsRepository {
         });
 
         return run();
+    }
+
+    /**
+     * Resolve (active=0) any active diagnostic whose underlying file is gone.
+     *
+     * A diagnostic row only matters while its file still exists on disk. Once
+     * the segment retention/cleanup has deleted the .partial (and there is no
+     * quarantined copy), the row is just noise — but nothing else ever clears
+     * a terminal/unrecoverable row, so the dashboard kept counting long-dead
+     * files forever (e.g. "17 unrecoverable" stuck for days after the files
+     * were purged). This prunes exactly those orphaned rows. Rows whose file
+     * (or quarantined copy) still exists are left untouched.
+     *
+     * @param {object} opts
+     * @param {(path: string) => boolean} [opts.fileExists] existence checker (injectable for tests)
+     * @returns {number} how many rows were resolved
+     */
+    pruneAbsentActiveDiagnostics({ fileExists = existsSync } = {}) {
+        const rows = query(
+            `SELECT id, file_path, quarantined_path
+             FROM recording_recovery_diagnostics
+             WHERE active = 1`,
+            []
+        );
+
+        const absentIds = [];
+        for (const row of rows) {
+            const filePresent = Boolean(row.file_path) && fileExists(row.file_path);
+            const quarantinePresent = Boolean(row.quarantined_path) && fileExists(row.quarantined_path);
+            if (!filePresent && !quarantinePresent) {
+                absentIds.push(row.id);
+            }
+        }
+
+        if (absentIds.length === 0) {
+            return 0;
+        }
+
+        const run = transaction((ids) => {
+            for (const id of ids) {
+                execute(
+                    `UPDATE recording_recovery_diagnostics
+                     SET active = 0, resolved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                     WHERE id = ? AND active = 1`,
+                    [id]
+                );
+            }
+        });
+        run(absentIds);
+
+        return absentIds.length;
     }
 
     markTerminal({
