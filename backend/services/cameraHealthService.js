@@ -14,7 +14,8 @@ import { config } from '../config/config.js';
 import { query, queryOne, execute, transaction } from '../database/connectionPool.js';
 import {
     isTelegramConfigured,
-    sendCameraStatusNotifications
+    sendCameraStatusNotifications,
+    getTelegramAlertConfirmationMs
 } from './telegramService.js';
 import { getTimezone } from './timezoneService.js';
 import { recordingService } from './recordingService.js';
@@ -3026,6 +3027,13 @@ class CameraHealthService {
 
         try {
             this.cleanupProbeCache();
+            // Pick up operator-tuned anti-flap windows (settings are cached 60s,
+            // so this is cheap) before evaluating alert transitions this tick.
+            try {
+                this.telegramAlertConfirmationMs = getTelegramAlertConfirmationMs();
+            } catch (error) {
+                console.warn('[CameraHealth] Failed to load telegram alert windows, using defaults:', error.message);
+            }
             const activePaths = await this.getActivePaths();
             const candidateCameras = this.getEnabledCameraCandidates();
 

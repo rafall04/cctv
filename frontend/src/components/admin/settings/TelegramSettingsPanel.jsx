@@ -89,6 +89,7 @@ export default function TelegramSettingsPanel() {
         notificationTargets: [],
         notificationRules: [],
         healthAlertTargetId: '',
+        alertConfirmation: { downMs: 120000, upMs: 60000 },
     });
 
     const loadTelegramStatus = useCallback(async () => {
@@ -114,6 +115,10 @@ export default function TelegramSettingsPanel() {
                 notificationTargets: response.data.notificationTargets || [],
                 notificationRules: response.data.notificationRules || [],
                 healthAlertTargetId: response.data.healthAlertTargetId || '',
+                alertConfirmation: {
+                    downMs: response.data.alertConfirmation?.downMs ?? 120000,
+                    upMs: response.data.alertConfirmation?.upMs ?? 60000,
+                },
             });
             setError(null);
         } catch (requestError) {
@@ -175,6 +180,10 @@ export default function TelegramSettingsPanel() {
             notificationTargets: telegramStatus?.notificationTargets || [],
             notificationRules: telegramStatus?.notificationRules || [],
             healthAlertTargetId: telegramStatus?.healthAlertTargetId || '',
+            alertConfirmation: {
+                downMs: telegramStatus?.alertConfirmation?.downMs ?? 120000,
+                upMs: telegramStatus?.alertConfirmation?.upMs ?? 60000,
+            },
         });
         setError(null);
         setIsEditing(false);
@@ -225,7 +234,7 @@ export default function TelegramSettingsPanel() {
                     areaId: '',
                     cameraId: '',
                     events: ['offline', 'online'],
-                    ingestModes: ['always_on'],
+                    ingestModes: ['any'],
                 },
             ],
         }));
@@ -432,11 +441,48 @@ export default function TelegramSettingsPanel() {
                                 </select>
                             </div>
 
+                            <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-3">
+                                <div>
+                                    <h3 className="font-semibold text-gray-900 dark:text-white">Window Konfirmasi Alert (Anti-Flap)</h3>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">Alert DOWN/UP baru dikirim setelah status bertahan stabil selama waktu ini. Naikkan untuk meredam gangguan singkat; turunkan agar lebih cepat. Rentang 10–1800 detik.</p>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Konfirmasi DOWN (detik)</label>
+                                        <input
+                                            type="number"
+                                            min="10"
+                                            max="1800"
+                                            value={Math.round((formData.alertConfirmation?.downMs ?? 120000) / 1000)}
+                                            onChange={(event) => setFormData((prev) => ({
+                                                ...prev,
+                                                alertConfirmation: { ...prev.alertConfirmation, downMs: Math.round((Number(event.target.value) || 0) * 1000) },
+                                            }))}
+                                            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Konfirmasi UP (detik)</label>
+                                        <input
+                                            type="number"
+                                            min="10"
+                                            max="1800"
+                                            value={Math.round((formData.alertConfirmation?.upMs ?? 60000) / 1000)}
+                                            onChange={(event) => setFormData((prev) => ({
+                                                ...prev,
+                                                alertConfirmation: { ...prev.alertConfirmation, upMs: Math.round((Number(event.target.value) || 0) * 1000) },
+                                            }))}
+                                            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
                             <div className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 space-y-4">
                                 <div className="flex items-center justify-between gap-3">
                                     <div>
                                         <h3 className="font-semibold text-gray-900 dark:text-white">Routing Notifikasi CCTV</h3>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Default rule memakai internal always-on agar on-demand tidak membuat spam.</p>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400">Rule baru default-nya "Semua Mode" agar kamera on-demand maupun always-on sama-sama dialerti. Pilih mode tertentu hanya jika ingin mempersempit.</p>
                                     </div>
                                     <button type="button" onClick={addRule} className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium">
                                         Tambah Rule
@@ -497,13 +543,14 @@ export default function TelegramSettingsPanel() {
                                             <div>
                                                 <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Ingest</label>
                                                 <select
-                                                    value={rule.ingestModes?.[0] || 'always_on'}
+                                                    value={rule.ingestModes?.[0] || 'any'}
                                                     onChange={(event) => updateRule(index, { ingestModes: [event.target.value] })}
                                                     className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white"
                                                 >
+                                                    <option value="any">Semua Mode</option>
                                                     <option value="always_on">Always On</option>
                                                     <option value="on_demand">On Demand</option>
-                                                    <option value="any">Semua</option>
+                                                    <option value="external">Eksternal</option>
                                                 </select>
                                             </div>
                                             <div>

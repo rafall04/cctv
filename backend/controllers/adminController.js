@@ -136,6 +136,7 @@ export async function updateTelegramConfig(request, reply) {
             notificationTargets = [],
             notificationRules = [],
             healthAlertTargetId = '',
+            alertConfirmation,
         } = request.body;
 
         const settings = {
@@ -145,6 +146,8 @@ export async function updateTelegramConfig(request, reply) {
             notificationTargets: Array.isArray(notificationTargets) ? notificationTargets : [],
             notificationRules: Array.isArray(notificationRules) ? notificationRules : [],
             healthAlertTargetId: healthAlertTargetId || '',
+            // Pass through anti-flap windows; saveTelegramSettings normalizes/clamps.
+            alertConfirmation: alertConfirmation && typeof alertConfirmation === 'object' ? alertConfirmation : undefined,
             enabled: !!(botToken && (monitoringChatId || feedbackChatId || notificationTargets.length > 0))
         };
 

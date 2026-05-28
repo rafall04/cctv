@@ -103,6 +103,58 @@ describe('telegramService notification routing', () => {
         expect(payload.text).not.toContain('CCTV Surabaya');
     });
 
+    it('covers all ingest modes (on_demand + always_on + external) when a rule omits ingestModes', async () => {
+        // Precision fix: an unset ingestModes used to default to ['always_on'],
+        // silently dropping on-demand local cameras (the majority). It now
+        // defaults to 'any' so the rule covers every mode in its scope.
+        const telegram = await loadTelegramService({
+            botToken: '123456789:test',
+            monitoringChatId: '-100-main',
+            notificationTargets: [
+                { id: 'area-x', name: 'Area X', chatId: '-100-area' },
+            ],
+            notificationRules: [
+                {
+                    id: 'rule-area',
+                    enabled: true,
+                    targetId: 'area-x',
+                    scope: 'area',
+                    areaId: 7,
+                    events: ['offline'],
+                    // ingestModes intentionally omitted -> defaults to 'any'
+                },
+            ],
+        });
+
+        await telegram.sendCameraStatusNotifications('offline', [
+            { id: 10, name: 'Lokal OnDemand', area_id: 7, area_name: 'A', delivery_type: 'internal_hls' },
+            { id: 11, name: 'Lokal AlwaysOn', area_id: 7, area_name: 'A', delivery_type: 'internal_hls', internal_ingest_policy_override: 'always_on' },
+            { id: 12, name: 'Eksternal HLS', area_id: 7, area_name: 'A', delivery_type: 'external_hls' },
+        ], { bypassCooldown: true });
+
+        expect(global.fetch).toHaveBeenCalledTimes(1);
+        const payload = JSON.parse(global.fetch.mock.calls[0][1].body);
+        expect(payload.text).toContain('Lokal OnDemand');
+        expect(payload.text).toContain('Lokal AlwaysOn');
+        expect(payload.text).toContain('Eksternal HLS');
+    });
+
+    it('exposes default alert-confirmation windows when unset', async () => {
+        const telegram = await loadTelegramService({ botToken: '123456789:test', monitoringChatId: '-100-main' });
+        expect(telegram.getTelegramAlertConfirmationMs()).toEqual({ down: 120000, up: 60000 });
+    });
+
+    it('reads and clamps configured alert-confirmation windows', async () => {
+        const telegram = await loadTelegramService({
+            botToken: '123456789:test',
+            monitoringChatId: '-100-main',
+            alertConfirmation: { downMs: 180000, upMs: 5000 },
+        });
+        const conf = telegram.getTelegramAlertConfirmationMs();
+        expect(conf.down).toBe(180000);
+        expect(conf.up).toBe(10000); // below 10s floor -> clamped up
+    });
+
     it('includes per-camera detected DOWN time and alert send time in grouped notifications', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-05-13T07:23:00.000Z'));

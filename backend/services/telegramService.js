@@ -23,6 +23,30 @@ const LEGACY_MONITORING_TARGET_ID = 'legacy-monitoring';
 const VALID_EVENTS = new Set(['offline', 'online']);
 const MASKED_TOKEN_SUFFIX = '...';
 
+// Alert-confirmation windows (anti-flap): a DOWN/UP alert is only sent after the
+// camera has held the new state for this long. Operator-tunable via settings;
+// these defaults mirror telegramAlertConfirmationPolicy's built-ins.
+const DEFAULT_DOWN_CONFIRMATION_MS = 120 * 1000;
+const DEFAULT_UP_CONFIRMATION_MS = 60 * 1000;
+const MIN_CONFIRMATION_MS = 10 * 1000;       // floor: 10s
+const MAX_CONFIRMATION_MS = 30 * 60 * 1000;  // ceiling: 30min
+
+function clampConfirmationMs(value, fallback) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) {
+        return fallback;
+    }
+    return Math.min(MAX_CONFIRMATION_MS, Math.max(MIN_CONFIRMATION_MS, Math.round(n)));
+}
+
+function normalizeAlertConfirmation(raw = {}) {
+    const source = raw && typeof raw === 'object' ? raw : {};
+    return {
+        downMs: clampConfirmationMs(source.downMs, DEFAULT_DOWN_CONFIRMATION_MS),
+        upMs: clampConfirmationMs(source.upMs, DEFAULT_UP_CONFIRMATION_MS),
+    };
+}
+
 function isMaskedTelegramToken(value = '') {
     return typeof value === 'string' && value.endsWith(MASKED_TOKEN_SUFFIX);
 }
@@ -74,9 +98,13 @@ function normalizeTelegramRule(rule = {}) {
     const events = Array.isArray(rule.events)
         ? rule.events.filter((event) => VALID_EVENTS.has(event))
         : ['offline', 'online'];
+    // Default to 'any' so an unset rule covers ALL ingest modes (on_demand,
+    // always_on, external). The previous ['always_on'] default silently
+    // matched only always-on cameras, so on-demand local cameras (the
+    // majority) never produced an alert — the main Telegram precision gap.
     const ingestModes = Array.isArray(rule.ingestModes) && rule.ingestModes.length > 0
         ? rule.ingestModes
-        : ['always_on'];
+        : ['any'];
 
     return {
         id: String(rule.id || `${targetId}-${rule.scope || 'global'}`).trim(),
@@ -123,12 +151,12 @@ function normalizeTelegramSettings(settings = {}) {
 
     if (rules.length === 0 && settings.monitoringChatId) {
         rules.push({
-            id: 'default-always-on',
+            id: 'default-all-modes',
             enabled: true,
             targetId: LEGACY_MONITORING_TARGET_ID,
             scope: 'global',
             events: ['offline', 'online'],
-            ingestModes: ['always_on'],
+            ingestModes: ['any'],
         });
     }
 
@@ -139,6 +167,8 @@ function normalizeTelegramSettings(settings = {}) {
         // Which target receives recording-pipeline health alerts. Empty = fall
         // back to the monitoring chat.
         healthAlertTargetId: String(settings.healthAlertTargetId || '').trim(),
+        // Operator-tunable anti-flap windows for camera DOWN/UP alerts.
+        alertConfirmation: normalizeAlertConfirmation(settings.alertConfirmation),
     };
 }
 
@@ -398,6 +428,17 @@ function getTelegramSettings() {
 export function clearSettingsCache() {
     settingsCache = null;
     settingsCacheTime = 0;
+}
+
+/**
+ * Operator-configured anti-flap windows for camera DOWN/UP alerts.
+ * Returns `{ down, up }` in milliseconds, already clamped to sane bounds.
+ * The camera health loop reads this each tick (settings are cached 60s).
+ */
+export function getTelegramAlertConfirmationMs() {
+    const settings = getTelegramSettings();
+    const normalized = normalizeAlertConfirmation(settings.alertConfirmation);
+    return { down: normalized.downMs, up: normalized.upMs };
 }
 
 /**
@@ -756,6 +797,7 @@ export function getTelegramStatus() {
         notificationRules: settings.notificationRules || [],
         notificationRuleIssues,
         healthAlertTargetId: settings.healthAlertTargetId || '',
+        alertConfirmation: normalizeAlertConfirmation(settings.alertConfirmation),
     };
 }
 
