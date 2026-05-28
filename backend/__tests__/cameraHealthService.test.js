@@ -1882,6 +1882,62 @@ describe('cameraHealthService check loop', () => {
         }));
     });
 
+    it('strict/always_on camera trusts MediaMTX active stream instead of a colliding RTSP probe', async () => {
+        // Always-on single-session cameras: MediaMTX holds the only RTSP
+        // session, so an independent DESCRIBE always 454s. When MediaMTX is
+        // actively streaming, monitoring must report online from that signal
+        // and skip the probe entirely (otherwise the camera shows offline on
+        // every tick despite streaming fine).
+        const service = new CameraHealthService();
+        const probeSpy = vi.spyOn(service, 'getOrProbeInternalRtsp');
+        const camera = {
+            id: 220,
+            enabled: 1,
+            is_online: 1,
+            delivery_type: 'internal_hls',
+            stream_source: 'internal',
+            stream_key: 'always-220',
+            private_rtsp_url: 'rtsp://admin:secret@192.168.13.5:554/stream1',
+            internal_ingest_policy_override: 'always_on',
+        };
+        const activePaths = new Map([
+            ['always-220', { configured: true, ready: true, sourceReady: true, readers: 1 }],
+        ]);
+
+        const result = await service.evaluateCameraMonitoringStatus(camera, activePaths, { isOnline: 1, rawReason: 'mediamtx_path_ready' });
+
+        expect(result.monitoring_state).toBe('online');
+        expect(result.monitoring_reason).toBe('mediamtx_path_ready');
+        expect(probeSpy).not.toHaveBeenCalled();
+    });
+
+    it('strict/always_on camera still probes RTSP when MediaMTX is not serving the source', async () => {
+        const service = new CameraHealthService();
+        const probeSpy = vi.spyOn(service, 'getOrProbeInternalRtsp').mockResolvedValue({
+            online: false,
+            reason: 'rtsp_stream_not_found',
+            details: {},
+        });
+        const camera = {
+            id: 221,
+            enabled: 1,
+            is_online: 1,
+            delivery_type: 'internal_hls',
+            stream_source: 'internal',
+            stream_key: 'always-221',
+            private_rtsp_url: 'rtsp://admin:secret@192.168.13.6:554/stream1',
+            internal_ingest_policy_override: 'always_on',
+        };
+        const activePaths = new Map([
+            ['always-221', { configured: true, ready: false, sourceReady: false, readers: 0 }],
+        ]);
+
+        const result = await service.evaluateCameraMonitoringStatus(camera, activePaths, { isOnline: 0, rawReason: 'health_check_offline' });
+
+        expect(result.monitoring_state).toBe('offline');
+        expect(probeSpy).toHaveBeenCalledTimes(1);
+    });
+
     it('updates runtime offline immediately but delays Telegram DOWN until confirmation window passes', async () => {
         const telegram = await import('../services/telegramService.js');
         telegram.isTelegramConfigured.mockReturnValue(true);

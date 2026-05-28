@@ -2980,14 +2980,27 @@ class CameraHealthService {
 
     async evaluateCameraMonitoringStatus(camera, activePaths, streamResult) {
         if (shouldUseStrictInternalMonitoring(camera)) {
-            // Strict cameras (always_on / surabaya_private_rtsp) used to
-            // probe RTSP directly here, in addition to whatever
-            // verifyInternalRtspIfUncertain ran from evaluateCameraRaw a
-            // few microseconds earlier — two DESCRIBEs per tick to the
-            // same upstream. Routing through getOrProbeInternalRtsp keeps
-            // the strict semantics (probe each tick) but the within-tick
-            // double call collapses to a single network round-trip via
-            // the shared cache.
+            // Always-on / strict cameras keep MediaMTX connected to the source
+            // 24/7. When MediaMTX is actively serving the stream (ready, has a
+            // reader, or bytesReceived is growing) that IS definitive liveness
+            // — and an independent DESCRIBE would only collide with the single
+            // RTSP session MediaMTX already holds and come back 454
+            // ("session/stream not found"), reporting a perfectly-streaming
+            // camera as offline on EVERY tick. So trust MediaMTX when it is
+            // actively pulling, and only fall back to an RTSP probe when it is
+            // NOT (source dropped → session free → the probe is meaningful).
+            const pathName = camera.stream_key || `camera${camera.id}`;
+            const pathInfo = activePaths.get(pathName);
+            if (pathInfo && (pathInfo.ready || pathInfo.readers > 0 || pathInfo.sourceProgressing)) {
+                return {
+                    isOnline: 1,
+                    monitoring_state: 'online',
+                    monitoring_reason: (pathInfo.ready || pathInfo.readers > 0)
+                        ? 'mediamtx_path_ready'
+                        : 'mediamtx_source_active',
+                };
+            }
+
             const rtspResult = await this.getOrProbeInternalRtsp(camera);
             return {
                 isOnline: rtspResult.online ? 1 : 0,
