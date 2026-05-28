@@ -193,6 +193,20 @@ function parseRtspResponse(rawResponse) {
         }
         const headerName = line.slice(0, separatorIndex).trim().toLowerCase();
         const headerValue = line.slice(separatorIndex + 1).trim();
+        // A camera may send multiple WWW-Authenticate challenges on
+        // separate lines (e.g. `Digest ...` AND `Basic ...`). A naive
+        // last-wins assignment lets the weaker Basic challenge clobber
+        // the Digest one, so we fall back to Basic auth and some
+        // firmwares then reject the request (observed: RtpRtspFlyer
+        // cameras answering 454). Keep the Digest challenge if we have
+        // one already and the incoming line is not Digest.
+        if (headerName === 'www-authenticate' && headers[headerName]) {
+            const existingIsDigest = /^digest/i.test(headers[headerName]);
+            const incomingIsDigest = /^digest/i.test(headerValue);
+            if (existingIsDigest && !incomingIsDigest) {
+                continue;
+            }
+        }
         headers[headerName] = headerValue;
     }
 
@@ -1005,6 +1019,14 @@ async function batchProbe(cameras, probeFn) {
 
         if (deliveryType !== 'internal_hls' && primaryTarget) {
             try { hostname = new URL(primaryTarget).hostname; } catch {}
+        } else if (deliveryType === 'internal_hls' && camera.private_rtsp_url) {
+            // Group internal cameras by their actual NVR/camera host instead
+            // of one global '_internal_' bucket. Many channels share a single
+            // NVR with a tiny concurrent-session cap; lumping them together
+            // both failed to cap per-NVR concurrency (overloading one box →
+            // refused probes → false offline) and needlessly serialized
+            // cameras on different boxes. Per-host grouping fixes both.
+            try { hostname = `rtsp:${new URL(camera.private_rtsp_url).hostname}`; } catch {}
         }
         if (!domainGroups.has(hostname)) domainGroups.set(hostname, []);
         domainGroups.get(hostname).push(camera);
@@ -1045,6 +1067,11 @@ class CameraHealthService {
         this.probeCache = new Map();
         this.internalPathRepairBackoff = new Map();
         this.lastActivePathMap = new Map();
+        // Previous-tick bytesReceived per MediaMTX path name. Lets us tell a
+        // genuinely-receiving source (bytes growing) from a stalled/UDP-bound
+        // one (bytes flat) so we only fall back to an independent RTSP probe
+        // when MediaMTX is NOT actively pulling media.
+        this.prevPathBytes = new Map();
         // Per-camera RTSP DESCRIBE verification cache for the non-strict
         // path. Used to confirm that a "configured but idle" MediaMTX path
         // actually has a reachable source — otherwise UDP-transport
@@ -2285,15 +2312,42 @@ class CameraHealthService {
         };
     }
 
+    /**
+     * Fetch every item from a paginated MediaMTX v3 list endpoint.
+     *
+     * The MediaMTX API paginates at 100 items/page by default. Reading only
+     * the first page silently hides every camera beyond the first 100 — they
+     * look like they have no MediaMTX path, get pushed into the fragile
+     * independent RTSP probe, and flap offline. We request a large page size
+     * and still loop on pageCount as a defence in case the server caps it.
+     */
+    async fetchAllMediaMtxItems(listPath) {
+        const items = [];
+        const itemsPerPage = 1000;
+        let page = 0;
+        let pageCount = 1;
+
+        do {
+            const response = await axios.get(`${mediaMtxApiBaseUrl}${listPath}`, {
+                params: { page, itemsPerPage },
+                timeout: 5000,
+            });
+            const data = response?.data || {};
+            if (Array.isArray(data.items)) {
+                items.push(...data.items);
+            }
+            pageCount = Number.isFinite(data.pageCount) && data.pageCount > 0 ? data.pageCount : 1;
+            page += 1;
+        } while (page < pageCount);
+
+        return items;
+    }
+
     async getActivePaths() {
         const pathMap = new Map();
 
         try {
-            const configResponse = await axios.get(`${mediaMtxApiBaseUrl}/config/paths/list`, {
-                timeout: 5000
-            });
-
-            const configItems = configResponse.data?.items || [];
+            const configItems = await this.fetchAllMediaMtxItems('/config/paths/list');
             for (const item of configItems) {
                 pathMap.set(item.name, {
                     name: item.name,
@@ -2303,6 +2357,8 @@ class CameraHealthService {
                     readers: 0,
                     realViewerCount: 0,
                     hasInternalReaderOnly: false,
+                    bytesReceived: 0,
+                    sourceProgressing: false,
                 });
             }
         } catch (error) {
@@ -2310,11 +2366,9 @@ class CameraHealthService {
             return pathMap;
         }
 
+        const currentPathBytes = new Map();
         try {
-            const pathsResponse = await axios.get(`${mediaMtxApiBaseUrl}/paths/list`, {
-                timeout: 5000
-            });
-            const activeItems = pathsResponse.data?.items || [];
+            const activeItems = await this.fetchAllMediaMtxItems('/paths/list');
 
             for (const item of activeItems) {
                 const existing = pathMap.get(item.name) || {
@@ -2325,6 +2379,8 @@ class CameraHealthService {
                     readers: 0,
                     realViewerCount: 0,
                     hasInternalReaderOnly: false,
+                    bytesReceived: 0,
+                    sourceProgressing: false,
                 };
 
                 existing.ready = item.ready || false;
@@ -2333,12 +2389,24 @@ class CameraHealthService {
                 existing.realViewerCount = (item.readers || []).filter((reader) => mediaMtxService.constructor.isRealViewer(reader)).length;
                 existing.hasInternalReaderOnly = existing.readers > 0 && existing.realViewerCount === 0;
 
+                const bytesReceived = Number.isFinite(item.bytesReceived) ? item.bytesReceived : 0;
+                existing.bytesReceived = bytesReceived;
+                currentPathBytes.set(item.name, bytesReceived);
+                // "Progressing" = MediaMTX is actually pulling media right now.
+                // First sighting (no prior sample) trusts any positive byte
+                // count; subsequent ticks require growth so a stalled UDP
+                // source (bytes frozen) correctly falls through to a probe.
+                const priorBytes = this.prevPathBytes.get(item.name);
+                existing.sourceProgressing = bytesReceived > 0
+                    && (priorBytes === undefined ? true : bytesReceived > priorBytes);
+
                 pathMap.set(item.name, existing);
             }
         } catch (error) {
             console.warn('[CameraHealth] Failed to get active paths:', error.message);
         }
 
+        this.prevPathBytes = currentPathBytes;
         this.lastActivePathMap = pathMap;
         return pathMap;
     }
@@ -2618,6 +2686,8 @@ class CameraHealthService {
         baseDetails.reader_count = pathInfo?.readers ?? 0;
         baseDetails.real_viewer_count = pathInfo?.realViewerCount ?? 0;
         baseDetails.has_internal_reader_only = Boolean(pathInfo?.hasInternalReaderOnly);
+        baseDetails.bytes_received = pathInfo?.bytesReceived ?? 0;
+        baseDetails.source_progressing = Boolean(pathInfo?.sourceProgressing);
 
         if (pathInfo && (pathInfo.ready || pathInfo.sourceReady || pathInfo.readers > 0)) {
             // Strong positive signal — at least one real viewer is pulling
@@ -2633,9 +2703,23 @@ class CameraHealthService {
                 };
             }
 
-            // sourceReady=true but readers === 0 — could be a real idle
-            // path, or could be the UDP "bound port, no packets" trap.
-            // Verify against the RTSP source itself.
+            // sourceReady=true but readers === 0. MediaMTX owns the camera's
+            // RTSP session, so an independent DESCRIBE here would compete for
+            // the (often single) session slot and get refused (observed: 454
+            // Session Not Found) — a false offline for a camera that is
+            // actually streaming fine into MediaMTX. So if MediaMTX is truly
+            // receiving media (bytesReceived growing), trust it WITHOUT an
+            // independent probe. Only when bytes are flat — the UDP
+            // "bound port, no packets" trap — do we verify via RTSP, and in
+            // that state MediaMTX is not really pulling so the session is free.
+            if (pathInfo.sourceProgressing) {
+                return {
+                    online: true,
+                    reason: 'mediamtx_source_active',
+                    details: withProbeDetails(baseDetails),
+                };
+            }
+
             const verified = await this.verifyInternalRtspIfUncertain(
                 camera, baseDetails, 'mediamtx_path_source_ready_idle'
             );

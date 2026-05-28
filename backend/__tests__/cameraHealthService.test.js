@@ -903,6 +903,99 @@ describe('cameraHealthService external TLS policy', () => {
         expect(result.reason).toBe('internal_stream_unreachable');
     });
 
+    it('trusts MediaMTX without an independent RTSP probe when the source is actively receiving (sourceProgressing)', async () => {
+        // RC-B regression: cheap cameras (e.g. RtpRtspFlyer) allow a single
+        // RTSP session. MediaMTX owns it, so an independent DESCRIBE gets 454
+        // Session Not Found → the camera flaps offline despite streaming fine.
+        // When MediaMTX reports the source is actually pulling bytes, trust it
+        // and skip the colliding probe.
+        const service = new CameraHealthService();
+        const probeSpy = vi.spyOn(service, 'probeInternalRtspSource').mockResolvedValue({
+            online: false,
+            reason: 'rtsp_stream_not_found',
+            details: {},
+        });
+
+        const result = await service.evaluateCameraRaw({
+            id: 144,
+            enabled: 1,
+            is_online: 1,
+            delivery_type: 'internal_hls',
+            stream_source: 'internal',
+            stream_key: 'active-144',
+            private_rtsp_url: 'rtsp://admin:secret@192.168.14.3:554/stream1',
+            enable_recording: 1,
+        }, new Map([
+            ['active-144', { configured: true, ready: false, sourceReady: true, readers: 0, bytesReceived: 12345, sourceProgressing: true }],
+        ]));
+
+        expect(result.online).toBe(true);
+        expect(result.reason).toBe('mediamtx_source_active');
+        expect(probeSpy).not.toHaveBeenCalled();
+    });
+
+    it('still verifies the UDP trap when sourceReady but bytes are flat (sourceProgressing false)', async () => {
+        // Counterpart: a stalled/UDP-bound source reports sourceReady=true but
+        // bytesReceived is not growing, so we must still verify via RTSP and
+        // report the real (offline) state — bfa8091 behavior preserved.
+        const service = new CameraHealthService();
+        const probeSpy = vi.spyOn(service, 'probeInternalRtspSource').mockResolvedValue({
+            online: false,
+            reason: 'internal_stream_unreachable',
+            details: {},
+        });
+
+        const result = await service.evaluateCameraRaw({
+            id: 145,
+            enabled: 1,
+            is_online: 1,
+            delivery_type: 'internal_hls',
+            stream_source: 'internal',
+            stream_key: 'flat-145',
+            private_rtsp_url: 'rtsp://admin:secret@10.0.0.9:554/live',
+            enable_recording: 1,
+        }, new Map([
+            ['flat-145', { configured: true, ready: false, sourceReady: true, readers: 0, bytesReceived: 999, sourceProgressing: false }],
+        ]));
+
+        expect(result.online).toBe(false);
+        expect(probeSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('getActivePaths reads every page of the paginated MediaMTX API', async () => {
+        // RC-A regression: MediaMTX paginates at 100 items/page. Reading only
+        // page 0 hides every camera beyond the first 100 → they fall into the
+        // fragile RTSP probe and flap offline. getActivePaths must walk all
+        // pages and capture bytesReceived for the progressing check.
+        const service = new CameraHealthService();
+        axios.get.mockImplementation((url, opts) => {
+            const page = opts?.params?.page ?? 0;
+            const isConfig = url.includes('/config/paths/list');
+            const names = page === 0
+                ? Array.from({ length: 100 }, (_, i) => `p${i}`)
+                : ['p100', 'p101'];
+            return Promise.resolve({
+                data: {
+                    pageCount: 2,
+                    items: names.map((name) => (isConfig
+                        ? { name }
+                        : { name, ready: true, sourceReady: true, readers: [], bytesReceived: 1000 })),
+                },
+            });
+        });
+
+        const paths = await service.getActivePaths();
+
+        expect(paths.size).toBe(102);
+        expect(paths.has('p100')).toBe(true);
+        expect(paths.get('p100').ready).toBe(true);
+        expect(paths.get('p100').bytesReceived).toBe(1000);
+        // First sighting with positive bytes counts as progressing.
+        expect(paths.get('p100').sourceProgressing).toBe(true);
+
+        axios.get.mockReset();
+    });
+
     it('reuses the per-camera RTSP probe cache within the TTL window', async () => {
         // Probe is expensive; verify the cache works so we don't hammer
         // a dead source every tick.
