@@ -17,6 +17,35 @@ const mtxApi = axios.create({
     baseURL: `${config.mediamtx?.apiUrl || 'http://localhost:9997'}/v3`,
     timeout: 5000
 });
+
+/**
+ * Fetch every item from a paginated MediaMTX v3 list endpoint.
+ *
+ * The MediaMTX API paginates at 100 items/page. Reading only the first page
+ * silently drops every path beyond the first 100 — which made syncCameras
+ * think those paths were missing and re-POST them, producing a flood of
+ * `400` "path already exists" errors, and made path-existence checks lie.
+ * Request a large page size and still loop on pageCount as a safety net.
+ */
+async function fetchAllPagedItems(listPath) {
+    const items = [];
+    const itemsPerPage = 1000;
+    let page = 0;
+    let pageCount = 1;
+
+    do {
+        const response = await mtxApi.get(listPath, { params: { page, itemsPerPage } });
+        const data = response?.data || {};
+        if (Array.isArray(data.items)) {
+            items.push(...data.items);
+        }
+        pageCount = Number.isFinite(data.pageCount) && data.pageCount > 0 ? data.pageCount : 1;
+        page += 1;
+    } while (page < pageCount);
+
+    return items;
+}
+
 class MediaMtxService {
     constructor() {
         this.isOnline = false;
@@ -279,8 +308,7 @@ class MediaMtxService {
      */
     async getConfiguredPaths() {
         try {
-            const response = await mtxApi.get('/config/paths/list');
-            const items = response.data?.items || [];
+            const items = await fetchAllPagedItems('/config/paths/list');
             return items.map(item => item.name);
         } catch {
             return [];
@@ -293,11 +321,8 @@ class MediaMtxService {
      */
     async getMediaMtxPaths() {
         try {
-            const response = await mtxApi.get('/paths/list');
-            if (response.data && response.data.items) {
-                return response.data.items.map(item => item.name);
-            }
-            return [];
+            const items = await fetchAllPagedItems('/paths/list');
+            return items.map(item => item.name);
         } catch (error) {
             if (error.code !== 'ECONNREFUSED' && error.code !== 'ETIMEDOUT') {
                 console.error('[MediaMTX Service] Error fetching paths:', error.message);
@@ -387,8 +412,7 @@ class MediaMtxService {
      */
     async pathConfigExists(pathName) {
         try {
-            const response = await mtxApi.get('/config/paths/list');
-            const items = response.data?.items || [];
+            const items = await fetchAllPagedItems('/config/paths/list');
             return items.some(item => item.name === pathName);
         } catch {
             return false;
@@ -611,13 +635,12 @@ class MediaMtxService {
      */
     async getStats(debug = false) {
         try {
-            const [pathsRes, configRes] = await Promise.all([
-                mtxApi.get('/paths/list'),
+            const [paths, configRes] = await Promise.all([
+                fetchAllPagedItems('/paths/list'),
                 mtxApi.get('/config/global/get'),
             ]);
 
             // Get sessions/readers count from paths data
-            const paths = pathsRes.data?.items || [];
             const sessions = [];
 
             // Filter function to exclude internal/preload readers
