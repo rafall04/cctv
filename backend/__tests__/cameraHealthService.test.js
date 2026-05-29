@@ -2049,7 +2049,7 @@ describe('cameraHealthService check loop', () => {
                 name: 'Confirmed Telegram Internal',
                 alertDetectedAt: 1_000,
             }),
-        ]);
+        ], { bypassCooldown: true, detailed: true });
     });
 
     it('sends Telegram DOWN when monitoring resolves to a non-literal offline state (probe_failed)', async () => {
@@ -2105,7 +2105,7 @@ describe('cameraHealthService check loop', () => {
 
         expect(telegram.sendCameraStatusNotifications).toHaveBeenCalledWith('offline', [
             expect.objectContaining({ id: 67, alertDetectedAt: 1_000 }),
-        ]);
+        ], { bypassCooldown: true, detailed: true });
     });
 
     it('restores a persisted pending DOWN after a restart and still sends the alert', async () => {
@@ -2166,7 +2166,7 @@ describe('cameraHealthService check loop', () => {
         expect(getAlertStateMapMock).toHaveBeenCalledWith([68]);
         expect(telegram.sendCameraStatusNotifications).toHaveBeenCalledWith('offline', [
             expect.objectContaining({ id: 68, alertDetectedAt: 1_000 }),
-        ]);
+        ], { bypassCooldown: true, detailed: true });
         expect(upsertAlertStatesMock).toHaveBeenCalled();
     });
 
@@ -2218,7 +2218,7 @@ describe('cameraHealthService check loop', () => {
                 name: 'Confirmed Recovery Telegram Internal',
                 alertDetectedAt: 2_000,
             }),
-        ]);
+        ], { bypassCooldown: true, detailed: true });
     });
 });
 

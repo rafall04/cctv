@@ -14,6 +14,7 @@ import { resolveInternalIngestPolicy } from '../utils/internalIngestPolicy.js';
 // Cooldown tracking to prevent spam
 const notificationCooldowns = new Map();
 const COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+const TELEGRAM_SEND_TIMEOUT_MS = 10 * 1000; // bound each Telegram API call so a slow/hung request cannot block the caller
 
 // Cache for settings (refresh every 60 seconds)
 let settingsCache = null;
@@ -499,6 +500,8 @@ async function sendToTelegram(message, chatId) {
 
     const url = `https://api.telegram.org/bot${settings.botToken}/sendMessage`;
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), TELEGRAM_SEND_TIMEOUT_MS);
     try {
         const response = await fetch(url, {
             method: 'POST',
@@ -509,10 +512,11 @@ async function sendToTelegram(message, chatId) {
                 parse_mode: 'HTML',
                 disable_web_page_preview: true,
             }),
+            signal: controller.signal,
         });
 
         const data = await response.json();
-        
+
         if (!data.ok) {
             console.error('[Telegram] Failed:', data.description);
             return false;
@@ -522,22 +526,39 @@ async function sendToTelegram(message, chatId) {
     } catch (error) {
         console.error('[Telegram] Error:', error.message);
         return false;
+    } finally {
+        clearTimeout(timeout);
     }
 }
 
 export async function sendCameraStatusNotifications(eventType, cameras = [], options = {}) {
+    // When `options.detailed` is set the caller needs to know which cameras
+    // matched a notification target (`routedCameraIds`) and which actually had
+    // a message delivered (`deliveredCameraIds`) — the camera health loop uses
+    // this to only advance a confirmed alert once it has truly been sent, and to
+    // avoid retrying cameras that simply have no recipient. Other callers keep
+    // getting the legacy boolean.
+    const emptyDetail = { sent: false, routedCameraIds: [], deliveredCameraIds: [] };
+    const finish = (sent, routed, delivered) => (
+        options.detailed
+            ? { sent, routedCameraIds: Array.from(routed), deliveredCameraIds: Array.from(delivered) }
+            : sent
+    );
+
     if (!VALID_EVENTS.has(eventType) || cameras.length === 0) {
-        return false;
+        return options.detailed ? emptyDetail : false;
     }
 
     const settings = getTelegramSettings();
     if (!settings.botToken) {
         console.log('[Telegram] Bot not configured');
-        return false;
+        return options.detailed ? emptyDetail : false;
     }
 
     const targetsById = new Map(settings.notificationTargets.map((target) => [target.id, target]));
     const camerasByChatId = new Map();
+    const routedCameraIds = new Set();
+    const deliveredCameraIds = new Set();
 
     for (const camera of cameras) {
         for (const rule of settings.notificationRules) {
@@ -550,6 +571,7 @@ export async function sendCameraStatusNotifications(eventType, cameras = [], opt
                 continue;
             }
 
+            routedCameraIds.add(camera.id);
             if (!camerasByChatId.has(target.chatId)) {
                 camerasByChatId.set(target.chatId, {
                     target,
@@ -567,7 +589,7 @@ export async function sendCameraStatusNotifications(eventType, cameras = [], opt
             continue;
         }
 
-        const cooldownKey = `camera_status_${eventType}_${target.chatId}_${targetCameras.map((camera) => camera.id).sort().join('_')}`;
+        const cooldownKey = `camera_status_${eventType}_${target.chatId}_${targetCameras.map((camera) => camera.id).sort((a, b) => a - b).join('_')}`;
         if (!options.bypassCooldown && isInCooldown(cooldownKey)) {
             console.log(`[Telegram] Skipping ${eventType} group notification for ${target.name} (cooldown)`);
             continue;
@@ -580,10 +602,13 @@ export async function sendCameraStatusNotifications(eventType, cameras = [], opt
                 setCooldown(cooldownKey);
             }
             sentCount += 1;
+            for (const camera of targetCameras) {
+                deliveredCameraIds.add(camera.id);
+            }
         }
     }
 
-    return sentCount > 0;
+    return finish(sentCount > 0, routedCameraIds, deliveredCameraIds);
 }
 
 export async function sendMonitoringMessage(message) {

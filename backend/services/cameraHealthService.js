@@ -3108,6 +3108,13 @@ class CameraHealthService {
                 }
             }
             const alertStatePersistQueue = [];
+            // Cameras with a confirmed DOWN/UP transition whose advanced alert
+            // state must NOT be committed until the Telegram notification is
+            // actually delivered (or found to have no recipient). Committing
+            // before delivery means a failed send permanently drops the alert,
+            // because the next tick sees confirmedState already advanced and
+            // reports no transition. Keyed by camera id.
+            const pendingAlertCommits = new Map();
 
             for (const { result, camera: probedCamera } of probeResults) {
                 if (result.status !== 'fulfilled') {
@@ -3137,9 +3144,19 @@ class CameraHealthService {
                     downConfirmationMs: this.telegramAlertConfirmationMs.down,
                     upConfirmationMs: this.telegramAlertConfirmationMs.up,
                 });
-                this.telegramAlertState.set(camera.id, confirmedAlert.state);
-                alertStatePersistQueue.push({ cameraId: camera.id, state: confirmedAlert.state });
                 const alertTransition = confirmedAlert.transitionToSend;
+                if (alertTransition) {
+                    // Hold the advanced state until the notification is settled.
+                    // Keep the pre-transition state in memory/DB so an undelivered
+                    // alert is re-attempted on the next tick. (The confirmation
+                    // window has already elapsed, so the next tick re-confirms
+                    // immediately and retries.)
+                    this.telegramAlertState.set(camera.id, currentAlertState);
+                    pendingAlertCommits.set(camera.id, { state: confirmedAlert.state });
+                } else {
+                    this.telegramAlertState.set(camera.id, confirmedAlert.state);
+                    alertStatePersistQueue.push({ cameraId: camera.id, state: confirmedAlert.state });
+                }
 
                 if (statusChanged) {
                     await this.handleCameraStatusTransition(camera, camera.is_online, isOnline, rawReason);
@@ -3180,14 +3197,58 @@ class CameraHealthService {
                     );
                     const realOffline = wentOffline.filter(c => !flipFlopIds.has(c.id));
                     const realOnline = wentOnline.filter(c => !flipFlopIds.has(c.id));
-                    
+
+                    // A confirmed transition is only "settled" — and its advanced
+                    // alert state committed — once the notification is delivered,
+                    // or once we know the camera matched no notification target
+                    // (nothing to deliver, e.g. an area outside the alert scope).
+                    // A camera that was routed to a target but whose send failed
+                    // stays in its pre-transition state and is retried next tick.
+                    // bypassCooldown: the confirmation policy is the anti-flap gate
+                    // now, so the legacy 5-min cooldown must not swallow or delay a
+                    // confirmed transition (and would otherwise force endless
+                    // retries here while it is active).
+                    const settledCameraIds = new Set();
+                    const collectSettled = (cams, sendResult, onSettled) => {
+                        const routed = new Set(sendResult?.routedCameraIds || []);
+                        const delivered = new Set(sendResult?.deliveredCameraIds || []);
+                        for (const cam of cams) {
+                            if (delivered.has(cam.id) || !routed.has(cam.id)) {
+                                settledCameraIds.add(cam.id);
+                                onSettled(cam);
+                            }
+                        }
+                    };
+
+                    const dispatchAlert = async (event, cams) => {
+                        try {
+                            return await sendCameraStatusNotifications(event, cams, { bypassCooldown: true, detailed: true });
+                        } catch (err) {
+                            // Unknown delivery outcome -> treat every camera as
+                            // routed-but-undelivered so the alert is retried.
+                            console.error(`[CameraHealth] ${event} telegram send failed`, err);
+                            return { sent: false, routedCameraIds: cams.map(c => c.id), deliveredCameraIds: [] };
+                        }
+                    };
+
                     if (realOffline.length > 0) {
-                        for (const cam of realOffline) this.offlineSince.set(cam.id, Date.now());
-                        Promise.resolve(sendCameraStatusNotifications('offline', realOffline)).catch(e => console.error(e));
+                        const sendResult = await dispatchAlert('offline', realOffline);
+                        collectSettled(realOffline, sendResult, (cam) => this.offlineSince.set(cam.id, Date.now()));
                     }
                     if (realOnline.length > 0) {
-                        for (const cam of realOnline) this.offlineSince.delete(cam.id);
-                        Promise.resolve(sendCameraStatusNotifications('online', realOnline)).catch(e => console.error(e));
+                        const sendResult = await dispatchAlert('online', realOnline);
+                        collectSettled(realOnline, sendResult, (cam) => this.offlineSince.delete(cam.id));
+                    }
+
+                    const deliveredStatePersistQueue = [];
+                    for (const cameraId of settledCameraIds) {
+                        const pending = pendingAlertCommits.get(cameraId);
+                        if (!pending) continue;
+                        this.telegramAlertState.set(cameraId, pending.state);
+                        deliveredStatePersistQueue.push({ cameraId, state: pending.state });
+                    }
+                    if (deliveredStatePersistQueue.length > 0) {
+                        cameraTelegramAlertStateRepository.upsertStates(deliveredStatePersistQueue);
                     }
                 } catch (err) {
                     console.error('[CameraHealth] Error routing telegram notification', err);
