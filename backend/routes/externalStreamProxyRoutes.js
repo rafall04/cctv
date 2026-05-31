@@ -56,6 +56,53 @@ const DEFAULT_TIMEOUT_MS = 30000;
 // are split off in `resolveSegmentTargetUrl` before validation.
 const SEGMENT_FILENAME_PATTERN = /^[A-Za-z0-9_./-]+\.(ts|m4s|mp4|m3u8|key|bin|vtt|webvtt|aac|ac3|cmfv|cmfa)$/i;
 
+// Query params that identify a per-VIEWER session rather than the segment
+// content. Some upstreams (e.g. Diskominfo Bojonegoro) mint a fresh
+// `?session=...` on EVERY playlist fetch and stamp it onto each segment URL,
+// so the same immutable `_NNN.ts` bytes arrive under a different URL for each
+// poll. Keying the segment cache by the full URL then makes the cache (and the
+// Cloudflare edge) miss 100% of the time — every viewer, every poll, re-pulls
+// the origin. Stripping these params from the *cache key* (NOT from the
+// upstream fetch URL — the token is still required there) lets one fetch of a
+// given segment serve all viewers.
+//
+// Deliberately conservative: only params that are reused VERBATIM across the
+// segments of a single playlist belong here. Per-segment signed CDNs (Wowza
+// `wmsAuthSign`, signed-URL CDNs) mint a DIFFERENT token per segment, so their
+// token is part of the content identity and must stay in the key — those param
+// names are intentionally absent from this default set.
+const DEFAULT_CACHE_KEY_STRIP_PARAMS = ['session', 'sessionid', 'session_id', 'token'];
+
+/**
+ * Build the segment cache key. The token-bearing query params listed in
+ * `stripParams` are removed from the key so rotating per-viewer session tokens
+ * don't fragment the cache; every OTHER query param is preserved verbatim so
+ * genuinely-distinct resources keep distinct keys. The upstream fetch still
+ * uses the full `targetUrl` (with token) — only the KEY is normalised.
+ */
+export function buildSegmentCacheKey(cameraId, targetUrl, stripParams = DEFAULT_CACHE_KEY_STRIP_PARAMS) {
+    let keyUrl = targetUrl;
+    try {
+        const parsed = new URL(targetUrl);
+        let mutated = false;
+        for (const param of stripParams) {
+            if (parsed.searchParams.has(param)) {
+                parsed.searchParams.delete(param);
+                mutated = true;
+            }
+        }
+        // Only rebuild when we actually removed something, so URLs without a
+        // tracked token round-trip byte-for-byte (no surprise re-encoding).
+        if (mutated) {
+            keyUrl = parsed.toString();
+        }
+    } catch {
+        // Non-absolute / unparseable target — fall back to the raw string.
+        keyUrl = targetUrl;
+    }
+    return `${cameraId}|seg|${keyUrl}`;
+}
+
 // HLS directive tags whose `URI="..."` attribute references a resource
 // the player will fetch (init segment, encryption key, alt rendition,
 // I-frame variant playlist, LL-HLS partial/preload, rendition report).
@@ -357,6 +404,42 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
     const segmentCache = options.segmentCache || createSegmentCache();
     const baseClient = options.httpClient || createHlsHttpClient(timeout);
 
+    // Query params stripped from the SEGMENT cache key so rotating per-viewer
+    // session tokens (e.g. Bojonegoro's `?session=`) don't fragment the cache.
+    // The token is still sent upstream — only the key is normalised. See
+    // buildSegmentCacheKey + DEFAULT_CACHE_KEY_STRIP_PARAMS.
+    const cacheKeyStripParams = options.cacheKeyStripParams
+        ?? hlsConfig.externalProxyCacheKeyStripParams
+        ?? DEFAULT_CACHE_KEY_STRIP_PARAMS;
+
+    // Per-camera row cache. The opaque routes resolve the camera from the DB on
+    // EVERY playlist AND segment request (lookupExternalCamera). For a busy
+    // external camera with 2s segments that's ~30 synchronous SQLite reads per
+    // minute per viewer — pure overhead, since external_hls_url / proxy / tls
+    // mode change only when an admin edits the camera. The legacy /hls/* route
+    // already cached the camera id for 5 min; this restores parity for the
+    // opaque route with a short TTL so admin edits still take effect quickly.
+    // Negative lookups are cached briefly too, so a bad/probed id can't hammer
+    // the DB while still recovering fast once the camera appears.
+    const cameraCache = options.cameraCache || new Map();
+    const cameraCacheTtlMs = options.cameraCacheTtlMs ?? 30000;
+    const cameraNegativeCacheTtlMs = options.cameraNegativeCacheTtlMs ?? 5000;
+
+    function getCameraCached(cameraId) {
+        const key = String(cameraId);
+        const now = Date.now();
+        const cached = cameraCache.get(key);
+        if (cached && cached.expiresAt > now) {
+            return cached.camera;
+        }
+        const camera = lookupExternalCamera(cameraId);
+        cameraCache.set(key, {
+            camera,
+            expiresAt: now + (camera ? cameraCacheTtlMs : cameraNegativeCacheTtlMs),
+        });
+        return camera;
+    }
+
     // Viewer-session tracking state. Shares the same HlsSessionStore +
     // FixedWindowLimiter shape as the legacy /hls/proxy + internal /hls/*
     // routes, so external_hls cameras get the SAME live/lifetime view
@@ -398,6 +481,7 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
     fastify.addHook('onClose', async () => {
         playlistCache.clear();
         segmentCache.clear();
+        cameraCache.clear();
         if (ownRouteState) {
             // Drain any pending session closes before tearing down so we
             // don't leak open sessions on a graceful restart.
@@ -407,7 +491,7 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
 
     // GET /api/stream/:cameraId/external.m3u8
     fastify.get('/:cameraId/external.m3u8', async (request, reply) => {
-        const camera = lookupExternalCamera(request.params.cameraId);
+        const camera = getCameraCached(request.params.cameraId);
         if (!isCameraProxyable(camera)) {
             return reply.code(404).send('Camera not found or not proxyable');
         }
@@ -504,7 +588,7 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
 
     // GET /api/stream/:cameraId/external-segment/:filename
     fastify.get('/:cameraId/external-segment/:filename', async (request, reply) => {
-        const camera = lookupExternalCamera(request.params.cameraId);
+        const camera = getCameraCached(request.params.cameraId);
         if (!isCameraProxyable(camera)) {
             return reply.code(404).send('Camera not found or not proxyable');
         }
@@ -609,7 +693,7 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
             }
         }
 
-        const cacheKey = `${camera.id}|seg|${targetUrl}`;
+        const cacheKey = buildSegmentCacheKey(camera.id, targetUrl, cacheKeyStripParams);
         const cached = segmentCache.get(cacheKey);
         if (cached) {
             return sendCachedResponse(reply, cached);

@@ -11,6 +11,7 @@ import {
     buildOpaqueSegmentUrl,
     rewriteOpaquePlaylist,
     resolveSegmentTargetUrl,
+    buildSegmentCacheKey,
 } from '../routes/externalStreamProxyRoutes.js';
 
 describe('externalStreamProxyRoutes — buildOpaqueSegmentUrl', () => {
@@ -263,5 +264,65 @@ describe('externalStreamProxyRoutes — resolveSegmentTargetUrl', () => {
             allowedHosts: ['some-other-host.example'],
         });
         expect(denied).toBeNull();
+    });
+});
+
+describe('externalStreamProxyRoutes — buildSegmentCacheKey', () => {
+    // #1: token-rotating origins (e.g. Diskominfo Bojonegoro mints a fresh
+    // `?session=` on every playlist poll and stamps it onto each segment URL)
+    // used to fragment the segment cache 100% — the same immutable `_NNN.ts`
+    // bytes got a different key every poll, so the in-memory cache AND the
+    // Cloudflare edge missed every time and the VPS re-pulled the origin for
+    // every viewer on every poll. The key now drops the per-viewer session
+    // params; the token is still sent upstream (resolveSegmentTargetUrl keeps
+    // it on the fetch URL).
+
+    it('collapses a rotating session token so the same segment shares one cache key', () => {
+        const a = buildSegmentCacheKey(7, 'https://h.gov.id/live/seg_334829.ts?session=AAA');
+        const b = buildSegmentCacheKey(7, 'https://h.gov.id/live/seg_334829.ts?session=BBB');
+        expect(a).toBe(b);
+        // The token must not survive into the key.
+        expect(a).not.toContain('AAA');
+        expect(a).not.toContain('session=');
+    });
+
+    it('strips each of the default session-scope param names', () => {
+        for (const param of ['session', 'sessionid', 'session_id', 'token']) {
+            const a = buildSegmentCacheKey(7, `https://h/seg.ts?${param}=AAA`);
+            const b = buildSegmentCacheKey(7, `https://h/seg.ts?${param}=BBB`);
+            expect(a).toBe(b);
+        }
+    });
+
+    it('keeps a distinct key for two different cameras sharing the same upstream URL', () => {
+        const a = buildSegmentCacheKey(7, 'https://h/seg.ts?session=AAA');
+        const b = buildSegmentCacheKey(8, 'https://h/seg.ts?session=AAA');
+        expect(a).not.toBe(b);
+    });
+
+    it('does NOT collapse per-segment signed tokens (e.g. wmsAuthSign) — content identity must stay', () => {
+        // Wowza / signed-CDN upstreams mint a DIFFERENT signature per segment,
+        // so the signature is part of the resource identity and must remain in
+        // the key. wmsAuthSign is intentionally absent from the default strip list.
+        const a = buildSegmentCacheKey(7, 'https://h/seg.ts?wmsAuthSign=AAA');
+        const b = buildSegmentCacheKey(7, 'https://h/seg.ts?wmsAuthSign=BBB');
+        expect(a).not.toBe(b);
+    });
+
+    it('respects a custom strip list (e.g. an operator-tuned token param)', () => {
+        const a = buildSegmentCacheKey(7, 'https://h/seg.ts?sig=AAA', ['sig']);
+        const b = buildSegmentCacheKey(7, 'https://h/seg.ts?sig=BBB', ['sig']);
+        expect(a).toBe(b);
+    });
+
+    it('round-trips a token-free URL unchanged (no surprise re-encoding)', () => {
+        expect(buildSegmentCacheKey(7, 'https://h/live/seg_001.ts'))
+            .toBe('7|seg|https://h/live/seg_001.ts');
+    });
+
+    it('preserves non-token query params while dropping the session token', () => {
+        const key = buildSegmentCacheKey(7, 'https://h/seg.ts?session=AAA&q=720p');
+        expect(key).toContain('q=720p');
+        expect(key).not.toContain('session');
     });
 });
