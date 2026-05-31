@@ -27,7 +27,7 @@ import {
     TTL as EXTERNAL_CACHE_TTL,
 } from '../services/externalStreamCache.js';
 import {
-    fetchTextUpstream,
+    fetchTextUpstreamWithRetry,
     fetchBufferedBinaryUpstream,
     isExternalProxyTargetAllowed,
     isExternalProxyUrlCompatible,
@@ -440,6 +440,74 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
         return camera;
     }
 
+    // Master-playlist stale-while-revalidate store.
+    //
+    // The master is the single entry point for an external_hls stream, it is
+    // tiny (one variant line + a long-lived session token), and the
+    // Bojonegoro-class origin returns 500 on it ~5-10% of the time (measured) —
+    // a transient race when it mints the session token. A cold fetch that hits
+    // that blip used to fail the WHOLE stream for the viewer.
+    //
+    // This is a DEDICATED store, not the shared TTL playlistCache, on purpose:
+    // playlistCache.get() deletes an entry the moment it expires, so it can
+    // never back a stale fallback (the prior "stale" branch here was dead code).
+    // Here we keep the last good master and serve it:
+    //   - age < MASTER_FRESH_MS  -> serve as-is, no upstream contact
+    //   - age < MASTER_STALE_MS  -> serve immediately, revalidate in background
+    //   - older / absent         -> fetch now (with retry); on failure fall back
+    //                               to any copy we still hold, else passthrough
+    // The session token survives idle for tens of seconds (measured >32s) and
+    // the background refresh keeps it fresh, so a stale master still points at a
+    // fetchable child playlist. refreshMaster is deduped per camera so N viewers
+    // trigger at most ONE upstream refresh in flight.
+    const lastGoodMaster = options.lastGoodMaster || new Map(); // cameraId -> { body, contentType, storedAt }
+    const masterRefreshInflight = new Map(); // cameraId -> Promise
+    const MASTER_FRESH_MS = options.masterFreshMs ?? EXTERNAL_CACHE_TTL.PLAYLIST_MS;
+    const MASTER_STALE_MS = options.masterStaleMs ?? 60000;
+
+    async function refreshMaster(camera) {
+        const existing = masterRefreshInflight.get(camera.id);
+        if (existing) return existing;
+
+        const promise = (async () => {
+            const httpClient = pickHttpClient({
+                tlsMode: camera.external_tls_mode,
+                baseClient,
+                timeout,
+            });
+            const response = await fetchTextUpstreamWithRetry({
+                httpClient,
+                targetUrl: camera.external_hls_url,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept-Encoding': 'identity',
+                },
+                maxContentLength: hlsConfig.maxExternalPlaylistBytes,
+                maxBodyLength: hlsConfig.maxExternalPlaylistBytes,
+            });
+            if (response.status !== 200) {
+                const error = new Error(`master upstream status ${response.status}`);
+                error.statusCode = response.status;
+                throw error;
+            }
+            const rewritten = rewriteOpaquePlaylist(response.data, camera.external_hls_url, camera.id);
+            lastGoodMaster.set(camera.id, {
+                body: rewritten,
+                contentType: PLAYLIST_CONTENT_TYPE,
+                storedAt: Date.now(),
+            });
+            cameraHealthService.recordRuntimeSignal(camera.id, {
+                targetUrl: camera.external_hls_url,
+                signalType: 'external_hls_playlist_proxy',
+                success: true,
+            });
+            return rewritten;
+        })().finally(() => masterRefreshInflight.delete(camera.id));
+
+        masterRefreshInflight.set(camera.id, promise);
+        return promise;
+    }
+
     // Viewer-session tracking state. Shares the same HlsSessionStore +
     // FixedWindowLimiter shape as the legacy /hls/proxy + internal /hls/*
     // routes, so external_hls cameras get the SAME live/lifetime view
@@ -482,6 +550,8 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
         playlistCache.clear();
         segmentCache.clear();
         cameraCache.clear();
+        lastGoodMaster.clear();
+        masterRefreshInflight.clear();
         if (ownRouteState) {
             // Drain any pending session closes before tearing down so we
             // don't leak open sessions on a graceful restart.
@@ -629,7 +699,7 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
                     baseClient,
                     timeout,
                 });
-                const response = await fetchTextUpstream({
+                const response = await fetchTextUpstreamWithRetry({
                     httpClient,
                     targetUrl,
                     headers: {

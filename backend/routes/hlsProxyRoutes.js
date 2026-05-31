@@ -773,6 +773,62 @@ export async function fetchTextUpstream({
     });
 }
 
+// Retry wrapper for playlist fetches. Government / pemda HLS origins (measured
+// against data.bojonegorokab.go.id) return a 5xx on the master playlist ~5-10%
+// of the time — a transient race when they mint a fresh session token. The
+// playlist path historically had NO retry (only the binary-segment path did),
+// so a single blip on the entry-point playlist failed the whole stream for that
+// viewer. This retries ONLY transient failures:
+//   - 5xx responses (origin blip)
+//   - thrown network errors (timeout / reset)
+// A 4xx is returned immediately — it is a real client error (bad URL, 404,
+// auth) that retrying cannot fix. On exhausting retries the last 5xx response
+// is returned so the caller can run its own stale fallback; a network error
+// rethrows.
+export async function fetchTextUpstreamWithRetry({
+    httpClient,
+    targetUrl,
+    headers,
+    maxContentLength,
+    maxBodyLength,
+    maxRetries = 3,
+    retryDelayMs = 300,
+    sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+}) {
+    let lastError = null;
+    let lastResponse = null;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            const response = await fetchTextUpstream({
+                httpClient,
+                targetUrl,
+                headers,
+                maxContentLength,
+                maxBodyLength,
+            });
+            // Success or a non-retryable client status — return immediately.
+            if (response.status < 500) {
+                return response;
+            }
+            lastResponse = response;
+        } catch (error) {
+            lastError = error;
+        }
+
+        if (attempt < maxRetries - 1) {
+            await sleep(retryDelayMs);
+        }
+    }
+
+    if (lastResponse) {
+        // Exhausted retries but the origin kept answering (5xx). Hand the last
+        // response back so the caller can decide (stale fallback / passthrough).
+        return lastResponse;
+    }
+    throw lastError || new Error('Failed to fetch upstream text response');
+}
+
 // Binary helper only fetches/retries upstream responses and cleans failed attempts.
 export async function fetchBinaryUpstream({
     httpClient,
