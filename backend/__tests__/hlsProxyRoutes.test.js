@@ -14,6 +14,7 @@ import {
     fetchBufferedBinaryUpstream,
     fetchBinaryUpstream,
     fetchTextUpstream,
+    fetchTextUpstreamWithRetry,
     FixedWindowLimiter,
     HlsSessionStore,
     getViewerIdentity,
@@ -448,6 +449,105 @@ describe('upstream stream cleanup', () => {
             maxContentLength: 100,
             maxBodyLength: 100,
         });
+    });
+});
+
+describe('fetchTextUpstreamWithRetry', () => {
+    const noSleep = () => Promise.resolve();
+
+    it('returns the first successful response without retrying', async () => {
+        const httpClient = { get: vi.fn().mockResolvedValue({ status: 200, data: 'ok' }) };
+
+        const response = await fetchTextUpstreamWithRetry({
+            httpClient,
+            targetUrl: 'https://gov.example/master.m3u8',
+            headers: {},
+            sleep: noSleep,
+        });
+
+        expect(response.status).toBe(200);
+        expect(httpClient.get).toHaveBeenCalledTimes(1);
+    });
+
+    it('retries a 5xx blip then succeeds (the Bojonegoro master case)', async () => {
+        const httpClient = {
+            get: vi.fn()
+                .mockResolvedValueOnce({ status: 500, data: 'err' })
+                .mockResolvedValueOnce({ status: 500, data: 'err' })
+                .mockResolvedValueOnce({ status: 200, data: '#EXTM3U' }),
+        };
+
+        const response = await fetchTextUpstreamWithRetry({
+            httpClient,
+            targetUrl: 'https://gov.example/master.m3u8',
+            headers: {},
+            sleep: noSleep,
+        });
+
+        expect(response.status).toBe(200);
+        expect(response.data).toBe('#EXTM3U');
+        expect(httpClient.get).toHaveBeenCalledTimes(3);
+    });
+
+    it('does NOT retry a 4xx (real client error)', async () => {
+        const httpClient = { get: vi.fn().mockResolvedValue({ status: 404, data: 'nope' }) };
+
+        const response = await fetchTextUpstreamWithRetry({
+            httpClient,
+            targetUrl: 'https://gov.example/master.m3u8',
+            headers: {},
+            sleep: noSleep,
+        });
+
+        expect(response.status).toBe(404);
+        expect(httpClient.get).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns the last 5xx when all attempts fail (lets caller fall back to stale)', async () => {
+        const httpClient = { get: vi.fn().mockResolvedValue({ status: 500, data: 'err' }) };
+
+        const response = await fetchTextUpstreamWithRetry({
+            httpClient,
+            targetUrl: 'https://gov.example/master.m3u8',
+            headers: {},
+            maxRetries: 3,
+            sleep: noSleep,
+        });
+
+        expect(response.status).toBe(500);
+        expect(httpClient.get).toHaveBeenCalledTimes(3);
+    });
+
+    it('retries a thrown network error then rethrows after exhausting attempts', async () => {
+        const httpClient = { get: vi.fn().mockRejectedValue(new Error('ETIMEDOUT')) };
+
+        await expect(fetchTextUpstreamWithRetry({
+            httpClient,
+            targetUrl: 'https://gov.example/master.m3u8',
+            headers: {},
+            maxRetries: 2,
+            sleep: noSleep,
+        })).rejects.toThrow('ETIMEDOUT');
+
+        expect(httpClient.get).toHaveBeenCalledTimes(2);
+    });
+
+    it('recovers when a thrown error is followed by a success', async () => {
+        const httpClient = {
+            get: vi.fn()
+                .mockRejectedValueOnce(new Error('ECONNRESET'))
+                .mockResolvedValueOnce({ status: 200, data: 'ok' }),
+        };
+
+        const response = await fetchTextUpstreamWithRetry({
+            httpClient,
+            targetUrl: 'https://gov.example/master.m3u8',
+            headers: {},
+            sleep: noSleep,
+        });
+
+        expect(response.status).toBe(200);
+        expect(httpClient.get).toHaveBeenCalledTimes(2);
     });
 });
 
