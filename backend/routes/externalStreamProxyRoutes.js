@@ -27,6 +27,7 @@ import {
     TTL as EXTERNAL_CACHE_TTL,
 } from '../services/externalStreamCache.js';
 import {
+    fetchTextUpstream,
     fetchTextUpstreamWithRetry,
     fetchBufferedBinaryUpstream,
     isExternalProxyTargetAllowed,
