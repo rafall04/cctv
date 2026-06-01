@@ -27,7 +27,6 @@ import {
     TTL as EXTERNAL_CACHE_TTL,
 } from '../services/externalStreamCache.js';
 import {
-    fetchTextUpstream,
     fetchTextUpstreamWithRetry,
     fetchBufferedBinaryUpstream,
     isExternalProxyTargetAllowed,
@@ -578,82 +577,58 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
         // it does NOT create a new session per fetch.
         await trackViewerHeartbeat(request, camera.id, 'playlist');
 
-        const cacheKey = `${camera.id}|playlist`;
-        const cached = playlistCache.get(cacheKey);
-        if (cached) {
-            return sendCachedResponse(reply, cached);
+        // Stale-while-revalidate on the master. See the lastGoodMaster comment
+        // above for why the master gets this treatment (it is the single entry
+        // point, tiny, and the origin 500s on it ~5-10% of the time — a cold
+        // fetch that hits that blip used to fail the whole stream).
+        const now = Date.now();
+        const good = lastGoodMaster.get(camera.id);
+        const ageMs = good ? now - good.storedAt : Infinity;
+
+        // 1. Fresh enough — serve as-is, never touch the origin.
+        if (good && ageMs < MASTER_FRESH_MS) {
+            applyResponseCacheHeaders(reply, good.contentType);
+            reply.header('X-RAFNET-Proxy-Cache', 'HIT');
+            return reply.send(good.body);
         }
 
+        // 2. Stale but usable — serve instantly, revalidate in the background.
+        //    The origin's 5xx blips never reach the viewer in this path.
+        if (good && ageMs < MASTER_STALE_MS) {
+            void refreshMaster(camera).catch((error) => {
+                console.error(`[ExternalStreamProxy] master background refresh camera=${camera.id}:`, error.message);
+            });
+            applyResponseCacheHeaders(reply, good.contentType);
+            reply.header('X-RAFNET-Proxy-Cache', 'STALE-REVALIDATE');
+            return reply.send(good.body);
+        }
+
+        // 3. Cold (first viewer / server just started) or too stale — fetch now
+        //    with retry. On total failure, fall back to any copy we still hold;
+        //    only a truly cold failure reaches the client.
         try {
-            const httpClient = pickHttpClient({
-                tlsMode: camera.external_tls_mode,
-                baseClient,
-                timeout,
-            });
-            const response = await fetchTextUpstream({
-                httpClient,
-                targetUrl: camera.external_hls_url,
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    'Accept-Encoding': 'identity',
-                },
-                maxContentLength: hlsConfig.maxExternalPlaylistBytes,
-                maxBodyLength: hlsConfig.maxExternalPlaylistBytes,
-            });
-
-            if (response.status !== 200) {
-                // Stale-cache fallback. Pemda / gov HLS upstreams 5xx
-                // sporadically for 1–3 seconds at a time. Without this,
-                // the player gets a 500 response, retries 5x (each one
-                // also hitting the flaky upstream), and gives up with a
-                // misleading "CORS error" toast. By serving a slightly
-                // stale rewritten playlist body we cover the blink and
-                // the player walks through it.
-                const stale = playlistCache.getStale(cacheKey);
-                if (stale) {
-                    applyResponseCacheHeaders(reply, stale.contentType);
-                    reply.header('X-RAFNET-Proxy-Cache', 'STALE');
-                    cameraHealthService.recordRuntimeSignal(camera.id, {
-                        targetUrl: camera.external_hls_url,
-                        signalType: 'external_hls_playlist_proxy_stale',
-                        success: false,
-                    });
-                    return reply.send(stale.body);
-                }
-                reply.header('Content-Type', 'text/plain');
-                reply.header('Cache-Control', 'no-cache');
-                return reply.code(response.status).send('');
-            }
-
-            const rewritten = rewriteOpaquePlaylist(response.data, camera.external_hls_url, camera.id);
-            const contentType = PLAYLIST_CONTENT_TYPE;
-
-            playlistCache.set(
-                cacheKey,
-                { statusCode: 200, contentType, body: rewritten },
-                EXTERNAL_CACHE_TTL.PLAYLIST_MS
-            );
-
-            cameraHealthService.recordRuntimeSignal(camera.id, {
-                targetUrl: camera.external_hls_url,
-                signalType: 'external_hls_playlist_proxy',
-                success: true,
-            });
-
-            applyResponseCacheHeaders(reply, contentType);
+            const body = await refreshMaster(camera);
+            applyResponseCacheHeaders(reply, PLAYLIST_CONTENT_TYPE);
             reply.header('X-RAFNET-Proxy-Cache', 'MISS');
-            return reply.send(rewritten);
+            return reply.send(body);
         } catch (error) {
             console.error(`[ExternalStreamProxy] playlist error camera=${camera.id}:`, error.message);
-            // Same stale-cache fallback for network / timeout errors —
-            // these are even more transient than the 5xx case above.
-            const stale = playlistCache.getStale(cacheKey);
-            if (stale) {
-                applyResponseCacheHeaders(reply, stale.contentType);
+            if (good) {
+                applyResponseCacheHeaders(reply, good.contentType);
                 reply.header('X-RAFNET-Proxy-Cache', 'STALE');
-                return reply.send(stale.body);
+                cameraHealthService.recordRuntimeSignal(camera.id, {
+                    targetUrl: camera.external_hls_url,
+                    signalType: 'external_hls_playlist_proxy_stale',
+                    success: false,
+                });
+                return reply.send(good.body);
             }
-            return reply.code(502).send('');
+            const status = Number.isInteger(error?.statusCode) && error.statusCode >= 400
+                ? error.statusCode
+                : 502;
+            reply.header('Content-Type', 'text/plain');
+            reply.header('Cache-Control', 'no-cache');
+            return reply.code(status).send('');
         }
     });
 
