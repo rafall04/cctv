@@ -121,3 +121,42 @@ describe('externalStreamProxyRoutes — master stale-while-revalidate wiring', (
         expect(block).toContain('fetchTextUpstreamWithRetry');
     });
 });
+
+describe('externalStreamProxyRoutes — in-flight fetch de-duplication', () => {
+    // Without de-dup, N concurrent viewers of the same freshly-rotated segment
+    // each fire their own upstream fetch (N origin hits + N RAM buffers) — a
+    // thundering herd that peaks exactly when a camera is popular. The segment
+    // and child-playlist handlers must route through the deduping helpers.
+
+    it('defines deduping helpers backed by in-flight maps', () => {
+        expect(source).toContain('function fetchSegmentDeduped(');
+        expect(source).toContain('function fetchChildPlaylistDeduped(');
+        expect(source).toContain('segmentFetchInflight');
+        expect(source).toContain('childFetchInflight');
+    });
+
+    it('the segment handler fetches via fetchSegmentDeduped (not a raw buffered fetch)', () => {
+        // Find the binary-segment branch (after the isPlaylistTarget block) and
+        // assert it goes through the deduper.
+        const segKeyIdx = source.indexOf('buildSegmentCacheKey(camera.id, targetUrl, cacheKeyStripParams)');
+        expect(segKeyIdx).toBeGreaterThan(-1);
+        const block = source.slice(segKeyIdx);
+        expect(block).toContain('fetchSegmentDeduped(camera, targetUrl, targetPath, cacheKey)');
+    });
+
+    it('the child-playlist handler fetches via fetchChildPlaylistDeduped', () => {
+        expect(source).toContain('fetchChildPlaylistDeduped(camera, targetUrl, playlistCacheKey)');
+    });
+
+    it('clears the in-flight maps on plugin close (no leak across restarts)', () => {
+        expect(source).toContain('segmentFetchInflight.clear()');
+        expect(source).toContain('childFetchInflight.clear()');
+    });
+
+    it('deletes the in-flight entry when each fetch settles', () => {
+        // finally() must remove the key so a failed fetch does not wedge all
+        // future callers onto a rejected promise.
+        expect(source).toContain('childFetchInflight.delete(playlistCacheKey)');
+        expect(source).toContain('segmentFetchInflight.delete(cacheKey)');
+    });
+});

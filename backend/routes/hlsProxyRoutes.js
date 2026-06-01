@@ -895,6 +895,7 @@ export async function fetchBufferedBinaryUpstream({
     sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 }) {
     let lastError = null;
+    let lastResult = null;
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         const controller = new AbortController();
@@ -905,6 +906,23 @@ export async function fetchBufferedBinaryUpstream({
                 responseType: 'arraybuffer',
                 signal: controller.signal,
             });
+
+            // Retry transient upstream 5xx the same way the playlist path does:
+            // the Bojonegoro-class origin 500s ~5-25% of the time on segments
+            // too, and a single blip used to pass straight through as a broken
+            // chunk (the player shows a red/canceled request and stalls). A 4xx
+            // is a real client error — return it immediately, never retry.
+            if (response.status >= 500 && attempt < maxRetries - 1) {
+                safeAbort(controller);
+                lastResult = {
+                    controller,
+                    response,
+                    status: response.status,
+                    data: Buffer.from(response.data || []),
+                };
+                await sleep(retryDelayMs);
+                continue;
+            }
 
             return {
                 controller,
@@ -922,6 +940,12 @@ export async function fetchBufferedBinaryUpstream({
         }
     }
 
+    // Exhausted retries on a 5xx (no thrown error): hand the last response back
+    // so the caller can passthrough the status / fall back, rather than turning
+    // a 5xx into a 502.
+    if (lastResult) {
+        return lastResult;
+    }
     throw lastError || new Error('Failed to fetch upstream binary buffer');
 }
 

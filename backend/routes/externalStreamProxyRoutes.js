@@ -465,6 +465,16 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
     const MASTER_FRESH_MS = options.masterFreshMs ?? EXTERNAL_CACHE_TTL.PLAYLIST_MS;
     const MASTER_STALE_MS = options.masterStaleMs ?? 60000;
 
+    // In-flight de-duplication for segments and child playlists. When N viewers
+    // request the SAME live segment/child within the cold-fetch window (cache
+    // miss, e.g. a freshly-rotated segment), without this each viewer fires its
+    // own upstream fetch — N origin hits + N buffers in RAM (a thundering herd
+    // that hits hardest exactly when a camera is popular). Keyed by the cache
+    // key, so concurrent callers share ONE upstream fetch and one buffer; the
+    // result is cached, so requests after it resolves are plain cache hits.
+    const segmentFetchInflight = new Map(); // cacheKey -> Promise<{status, contentType?, body?}>
+    const childFetchInflight = new Map();   // playlistCacheKey -> Promise<{status, contentType?, body?}>
+
     async function refreshMaster(camera) {
         const existing = masterRefreshInflight.get(camera.id);
         if (existing) return existing;
@@ -505,6 +515,98 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
         })().finally(() => masterRefreshInflight.delete(camera.id));
 
         masterRefreshInflight.set(camera.id, promise);
+        return promise;
+    }
+
+    // Fetch a child playlist once for all concurrent callers of the same URL.
+    // Returns { status, contentType?, body? }. On 200 the rewritten body is
+    // cached; non-200 returns the status so the caller runs its stale fallback.
+    function fetchChildPlaylistDeduped(camera, targetUrl, playlistCacheKey) {
+        const existing = childFetchInflight.get(playlistCacheKey);
+        if (existing) return existing;
+
+        const promise = (async () => {
+            const httpClient = pickHttpClient({ tlsMode: camera.external_tls_mode, baseClient, timeout });
+            const response = await fetchTextUpstreamWithRetry({
+                httpClient,
+                targetUrl,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept-Encoding': 'identity',
+                },
+                maxContentLength: hlsConfig.maxExternalPlaylistBytes,
+                maxBodyLength: hlsConfig.maxExternalPlaylistBytes,
+            });
+            if (response.status !== 200) {
+                return { status: response.status };
+            }
+            // Pass the CHILD playlist's URL as sourceUrl so segment entries
+            // resolve relative to the child's directory (may differ from master).
+            const rewritten = rewriteOpaquePlaylist(response.data, targetUrl, camera.id);
+            playlistCache.set(
+                playlistCacheKey,
+                { statusCode: 200, contentType: PLAYLIST_CONTENT_TYPE, body: rewritten },
+                EXTERNAL_CACHE_TTL.PLAYLIST_MS
+            );
+            cameraHealthService.recordRuntimeSignal(camera.id, {
+                targetUrl,
+                signalType: 'external_hls_playlist_proxy',
+                success: true,
+            });
+            return { status: 200, contentType: PLAYLIST_CONTENT_TYPE, body: rewritten };
+        })().finally(() => childFetchInflight.delete(playlistCacheKey));
+
+        childFetchInflight.set(playlistCacheKey, promise);
+        return promise;
+    }
+
+    // Fetch a binary segment once for all concurrent callers of the same key.
+    // Returns { status, contentType?, body? }. On 200 the buffer is cached.
+    function fetchSegmentDeduped(camera, targetUrl, targetPath, cacheKey) {
+        const existing = segmentFetchInflight.get(cacheKey);
+        if (existing) return existing;
+
+        const promise = (async () => {
+            const httpClient = pickHttpClient({ tlsMode: camera.external_tls_mode, baseClient, timeout });
+            const { controller, response, data } = await fetchBufferedBinaryUpstream({
+                httpClient,
+                targetUrl,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept-Encoding': 'identity',
+                },
+                maxRetries: 3,
+            });
+            if (response.status !== 200) {
+                safeAbort(controller);
+                return { status: response.status };
+            }
+            // Detect content-type from the path part only — auth tokens in the
+            // query string can contain `.ts`/`.mp4` substrings that would
+            // otherwise misclassify the response.
+            let contentType = 'application/octet-stream';
+            if (targetPath.endsWith('.ts')) {
+                contentType = 'video/mp2t';
+            } else if (targetPath.endsWith('.mp4') || targetPath.endsWith('.m4s')) {
+                contentType = 'video/mp4';
+            } else if (targetPath.endsWith('.vtt') || targetPath.endsWith('.webvtt')) {
+                contentType = 'text/vtt';
+            }
+            segmentCache.set(
+                cacheKey,
+                { statusCode: 200, contentType, body: data },
+                EXTERNAL_CACHE_TTL.SEGMENT_MS
+            );
+            cameraHealthService.recordRuntimeSignal(camera.id, {
+                targetUrl,
+                signalType: 'external_hls_segment_proxy',
+                success: true,
+            });
+            safeAbort(controller);
+            return { status: 200, contentType, body: data };
+        })().finally(() => segmentFetchInflight.delete(cacheKey));
+
+        segmentFetchInflight.set(cacheKey, promise);
         return promise;
     }
 
@@ -552,6 +654,8 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
         cameraCache.clear();
         lastGoodMaster.clear();
         masterRefreshInflight.clear();
+        segmentFetchInflight.clear();
+        childFetchInflight.clear();
         if (ownRouteState) {
             // Drain any pending session closes before tearing down so we
             // don't leak open sessions on a graceful restart.
@@ -670,26 +774,13 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
             }
 
             try {
-                const httpClient = pickHttpClient({
-                    tlsMode: camera.external_tls_mode,
-                    baseClient,
-                    timeout,
-                });
-                const response = await fetchTextUpstreamWithRetry({
-                    httpClient,
-                    targetUrl,
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                        'Accept-Encoding': 'identity',
-                    },
-                    maxContentLength: hlsConfig.maxExternalPlaylistBytes,
-                    maxBodyLength: hlsConfig.maxExternalPlaylistBytes,
-                });
+                // De-duped: concurrent viewers of the same child playlist share
+                // one upstream fetch (the retry helper absorbs origin 5xx blips).
+                const result = await fetchChildPlaylistDeduped(camera, targetUrl, playlistCacheKey);
 
-                if (response.status !== 200) {
-                    // Same stale-cache fallback as the master endpoint —
-                    // child playlists are the layer where flaky upstreams
-                    // hurt the most (5x retries each → 5x upstream hits).
+                if (result.status !== 200) {
+                    // Stale-cache fallback — child playlists are where flaky
+                    // upstreams hurt most (polled every ~2s).
                     const stalePlaylist = playlistCache.getStale(playlistCacheKey);
                     if (stalePlaylist) {
                         applyResponseCacheHeaders(reply, stalePlaylist.contentType);
@@ -703,29 +794,12 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
                     }
                     reply.header('Content-Type', 'text/plain');
                     reply.header('Cache-Control', 'no-cache');
-                    return reply.code(response.status).send('');
+                    return reply.code(result.status).send('');
                 }
 
-                // Pass the CHILD playlist's URL as sourceUrl so segment
-                // entries inside resolve relative to the child's directory
-                // (which may differ from the master's).
-                const rewritten = rewriteOpaquePlaylist(response.data, targetUrl, camera.id);
-                const contentType = PLAYLIST_CONTENT_TYPE;
-                playlistCache.set(
-                    playlistCacheKey,
-                    { statusCode: 200, contentType, body: rewritten },
-                    EXTERNAL_CACHE_TTL.PLAYLIST_MS
-                );
-
-                cameraHealthService.recordRuntimeSignal(camera.id, {
-                    targetUrl,
-                    signalType: 'external_hls_playlist_proxy',
-                    success: true,
-                });
-
-                applyResponseCacheHeaders(reply, contentType);
+                applyResponseCacheHeaders(reply, result.contentType);
                 reply.header('X-RAFNET-Proxy-Cache', 'MISS');
-                return reply.send(rewritten);
+                return reply.send(result.body);
             } catch (error) {
                 console.error(`[ExternalStreamProxy] child playlist error camera=${camera.id} url=${targetUrl}:`, error.message);
                 // Network / timeout fallback for the child playlist.
@@ -746,66 +820,26 @@ export default async function externalStreamProxyRoutes(fastify, options = {}) {
         }
 
         try {
-            const httpClient = pickHttpClient({
-                tlsMode: camera.external_tls_mode,
-                baseClient,
-                timeout,
-            });
-            const { controller, response, data } = await fetchBufferedBinaryUpstream({
-                httpClient,
-                targetUrl,
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    'Accept-Encoding': 'identity',
-                },
-                maxRetries: 3,
-            });
+            // De-duped: N concurrent viewers of the same freshly-rotated segment
+            // share ONE upstream fetch + one RAM buffer instead of a thundering
+            // herd of N origin pulls. The result is cached, so any request that
+            // arrives after it resolves is a plain cache hit.
+            const result = await fetchSegmentDeduped(camera, targetUrl, targetPath, cacheKey);
 
-            if (response.status !== 200) {
-                safeAbort(controller);
+            if (result.status !== 200) {
                 reply.header('Content-Type', 'text/plain');
                 reply.header('Cache-Control', 'no-cache');
-                return reply.code(response.status).send('');
+                return reply.code(result.status).send('');
             }
 
-            // Detect content-type from the path part only — auth tokens
-            // in the query string can contain arbitrary substrings,
-            // including `.ts` / `.mp4`, that would otherwise misclassify
-            // a non-media response.
-            let contentType = 'application/octet-stream';
-            if (targetPath.endsWith('.ts')) {
-                contentType = 'video/mp2t';
-            } else if (targetPath.endsWith('.mp4') || targetPath.endsWith('.m4s')) {
-                contentType = 'video/mp4';
-            } else if (targetPath.endsWith('.vtt') || targetPath.endsWith('.webvtt')) {
-                contentType = 'text/vtt';
-            }
-
-            segmentCache.set(
-                cacheKey,
-                { statusCode: 200, contentType, body: data },
-                EXTERNAL_CACHE_TTL.SEGMENT_MS
-            );
-
-            cameraHealthService.recordRuntimeSignal(camera.id, {
-                targetUrl,
-                signalType: 'external_hls_segment_proxy',
-                success: true,
-            });
-
-            // Segment responses get edge-cacheable Cache-Control headers
-            // via applyResponseCacheHeaders. Opaque URL is deterministic
-            // per upstream segment, so Cloudflare caches by URL → with N
-            // concurrent viewers of the same camera the origin only sees
-            // the FIRST hit per segment; the remaining (N-1) viewers get
-            // served straight from Cloudflare's edge. For an HLS camera
-            // with ~10 viewers and 6s segments, this drops origin egress
-            // bandwidth by ~10x.
-            applyResponseCacheHeaders(reply, contentType);
-            reply.header('Content-Length', String(data.length));
+            // Edge-cacheable Cache-Control headers (set in applyResponseCacheHeaders):
+            // the opaque URL is deterministic per upstream segment, so once a
+            // Cloudflare Cache Rule is enabled for /external-segment/* the edge
+            // serves repeat viewers without ever touching this origin.
+            applyResponseCacheHeaders(reply, result.contentType);
+            reply.header('Content-Length', String(result.body.length));
             reply.header('X-RAFNET-Proxy-Cache', 'MISS');
-            safeAbort(controller);
-            return reply.send(data);
+            return reply.send(result.body);
         } catch (error) {
             console.error(`[ExternalStreamProxy] segment error camera=${camera.id} url=${targetUrl}:`, error.message);
             return reply.code(502).send('');

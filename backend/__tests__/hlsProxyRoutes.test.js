@@ -593,6 +593,63 @@ describe('buffered external binary fetch', () => {
         expect(httpClient.get).toHaveBeenCalledTimes(2);
         expect([...result.data]).toEqual([9, 8]);
     });
+
+    it('retries a 5xx blip then succeeds (segment parity with the playlist path)', async () => {
+        const httpClient = {
+            get: vi.fn()
+                .mockResolvedValueOnce({ status: 500, data: Uint8Array.from([0]).buffer })
+                .mockResolvedValueOnce({ status: 200, data: Uint8Array.from([7, 7]).buffer }),
+        };
+
+        const result = await fetchBufferedBinaryUpstream({
+            httpClient,
+            targetUrl: 'https://example.com/seg.ts',
+            headers: {},
+            maxRetries: 3,
+            retryDelayMs: 0,
+            sleep: async () => {},
+        });
+
+        expect(result.status).toBe(200);
+        expect([...result.data]).toEqual([7, 7]);
+        expect(httpClient.get).toHaveBeenCalledTimes(2);
+    });
+
+    it('does NOT retry a 4xx and returns it immediately', async () => {
+        const httpClient = {
+            get: vi.fn().mockResolvedValue({ status: 404, data: Uint8Array.from([]).buffer }),
+        };
+
+        const result = await fetchBufferedBinaryUpstream({
+            httpClient,
+            targetUrl: 'https://example.com/seg.ts',
+            headers: {},
+            maxRetries: 3,
+            retryDelayMs: 0,
+            sleep: async () => {},
+        });
+
+        expect(result.status).toBe(404);
+        expect(httpClient.get).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns the last 5xx (not a throw) when all attempts fail, so the caller can passthrough', async () => {
+        const httpClient = {
+            get: vi.fn().mockResolvedValue({ status: 503, data: Uint8Array.from([]).buffer }),
+        };
+
+        const result = await fetchBufferedBinaryUpstream({
+            httpClient,
+            targetUrl: 'https://example.com/seg.ts',
+            headers: {},
+            maxRetries: 3,
+            retryDelayMs: 0,
+            sleep: async () => {},
+        });
+
+        expect(result.status).toBe(503);
+        expect(httpClient.get).toHaveBeenCalledTimes(3);
+    });
 });
 
 describe('external proxy validation', () => {
