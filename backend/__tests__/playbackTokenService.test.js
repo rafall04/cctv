@@ -358,7 +358,7 @@ describe('playbackTokenService', () => {
                 scope_type: 'all',
                 camera_ids_json: '[]',
                 playback_window_hours: 720,
-                expires_at: '2026-06-05 12:00:00',
+                expires_at: '2099-01-01 12:00:00',
                 revoked_at: null,
                 last_used_at: null,
                 use_count: 0,
