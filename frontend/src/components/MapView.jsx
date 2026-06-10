@@ -19,6 +19,7 @@ import { createTransformThrottle } from '../utils/rafThrottle';
 import { getTimeoutDuration } from '../hooks/useStreamTimeout';
 import { preloadHls } from '../utils/preloadManager';
 import { resolveStreamUrl } from '../utils/directStreamHelper';
+import { getEffectiveDeliveryType, isHlsDeliveryType } from '../utils/cameraDelivery.js';
 import CodecBadge from './CodecBadge';
 import VideoPopup from './MultiView/VideoPopup.jsx';
 import { useBranding } from '../contexts/BrandingContext';
@@ -805,10 +806,19 @@ const VideoModal = memo(({ camera, onClose }) => {
         }
     }, []);
 
+    // Proxied HLS is tracked by the backend HLS proxy; only direct/external streams that bypass the
+    // proxy need a frontend-owned session. Mirrors VideoPopup / MultiViewVideoItem so one viewer is
+    // never double-counted (frontend + proxy). See MapView.viewerSession.stability.test.js.
+    const shouldTrackFrontendViewerSession =
+        !isHlsDeliveryType(getEffectiveDeliveryType(camera))
+        || resolveStreamUrl(camera, { forceProxy: forceProxyFallback }).isDirectStream;
+
     // Viewer session tracking - track when user starts/stops watching
     useEffect(() => {
         // Don't track if camera is offline or in maintenance
         if (isNonPlayable) return;
+        // Backend-proxied HLS is already counted by the proxy — skip to avoid double-counting.
+        if (!shouldTrackFrontendViewerSession) return;
 
         let sessionId = null;
 
@@ -831,7 +841,7 @@ const VideoModal = memo(({ camera, onClose }) => {
                 });
             }
         };
-    }, [camera.id, isNonPlayable]);
+    }, [camera.id, isNonPlayable, shouldTrackFrontendViewerSession]);
 
     // HLS setup - samakan state non-live dengan grid view
     useEffect(() => {
