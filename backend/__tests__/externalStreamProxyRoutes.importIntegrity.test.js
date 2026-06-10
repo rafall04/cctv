@@ -25,13 +25,13 @@ import { describe, expect, it } from 'vitest';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const source = fs.readFileSync(
-    path.join(dirname, '..', 'routes', 'externalStreamProxyRoutes.js'),
+    path.join(dirname, '..', 'services', 'externalStreamProxyService.js'),
     'utf8',
 );
 
 // Extract the names imported from ./hlsProxyRoutes.js (the helper module).
 function importedNamesFromHlsProxyRoutes(src) {
-    const match = src.match(/import\s*\{([^}]*)\}\s*from\s*'\.\/hlsProxyRoutes\.js'/);
+    const match = src.match(/import\s*\{([^}]*)\}\s*from\s*'\.\.\/services\/hlsProxyService\.js'/);
     if (!match) return new Set();
     return new Set(
         match[1]
@@ -78,7 +78,7 @@ describe('externalStreamProxyRoutes — import/call-site integrity', () => {
         for (const name of referenced) {
             const isCalledOrUsed = new RegExp(`\\b${name}\\b`).test(
                 // strip the import line itself before checking usage
-                source.replace(/import\s*\{[^}]*\}\s*from\s*'\.\/hlsProxyRoutes\.js'/, ''),
+                source.replace(/import\s*\{[^}]*\}\s*from\s*'\.\.\/services\/hlsProxyService\.js'/, ''),
             );
             if (isCalledOrUsed) {
                 expect(imported.has(name)).toBe(true);

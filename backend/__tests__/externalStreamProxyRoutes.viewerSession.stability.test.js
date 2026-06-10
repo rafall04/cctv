@@ -20,11 +20,12 @@ import { describe, expect, it } from 'vitest';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const opaqueSource = fs.readFileSync(
-    path.join(dirname, '..', 'routes', 'externalStreamProxyRoutes.js'),
+    path.join(dirname, '..', 'services', 'externalStreamProxyService.js'),
     'utf8',
 );
+// handleExternalStreamProxy (the legacy /hls/proxy handler) now lives in the service module.
 const legacySource = fs.readFileSync(
-    path.join(dirname, '..', 'routes', 'hlsProxyRoutes.js'),
+    path.join(dirname, '..', 'services', 'hlsProxyService.js'),
     'utf8',
 );
 
@@ -91,8 +92,7 @@ describe('hlsProxyRoutes /hls/proxy?url=... — viewer session tracking', () => 
         // accurate across the rare camera that flips between proxy
         // and direct-stream within the same session.
         const blockStart = legacySource.indexOf('async function handleExternalStreamProxy');
-        const blockEnd = legacySource.indexOf('export default async function hlsProxyRoutes', blockStart);
-        const block = legacySource.slice(blockStart, blockEnd);
+        const block = legacySource.slice(blockStart); // handler is the last function in the service module
         expect(block).toContain('state.getOrCreateSession');
         expect(block).toContain('state.recordSegmentAccess');
     });
@@ -101,8 +101,7 @@ describe('hlsProxyRoutes /hls/proxy?url=... — viewer session tracking', () => 
         // Belt-and-braces: if viewer-session DB write fails, the
         // upstream proxy must still serve the playlist / segment.
         const blockStart = legacySource.indexOf('async function handleExternalStreamProxy');
-        const blockEnd = legacySource.indexOf('export default async function hlsProxyRoutes', blockStart);
-        const block = legacySource.slice(blockStart, blockEnd);
+        const block = legacySource.slice(blockStart); // handler is the last function in the service module
         expect(block).toContain('External viewer session error');
     });
 });

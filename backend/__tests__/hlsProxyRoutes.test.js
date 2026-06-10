@@ -22,7 +22,7 @@ import {
     isExternalProxyTargetAllowed,
     isTrustedProxy,
     resolveExternalCameraProxyConfig,
-} from '../routes/hlsProxyRoutes.js';
+} from '../services/hlsProxyService.js';
 
 function createRequest(overrides = {}) {
     return {

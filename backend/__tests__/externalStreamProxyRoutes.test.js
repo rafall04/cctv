@@ -12,7 +12,7 @@ import {
     rewriteOpaquePlaylist,
     resolveSegmentTargetUrl,
     buildSegmentCacheKey,
-} from '../routes/externalStreamProxyRoutes.js';
+} from '../services/externalStreamProxyService.js';
 
 describe('externalStreamProxyRoutes — buildOpaqueSegmentUrl', () => {
     const playlistUrl = 'https://cctv.example.gov.id/live/cam7/playlist.m3u8';
