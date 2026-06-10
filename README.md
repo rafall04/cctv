@@ -301,7 +301,7 @@ paths:
 
 ### Security Features
 
-- JWT-based authentication (24h expiration)
+- JWT-based authentication (short-lived ~1h access token via `JWT_EXPIRATION`, plus 7d refresh-token rotation)
 - Password hashing with bcrypt
 - Brute force protection (max 5 attempts, 15min lockout)
 - CSRF protection
@@ -492,7 +492,7 @@ sqlite3 /var/www/cctv/backend/data/cctv.db "SELECT * FROM cameras WHERE enable_r
 
 - **Deployment:** [deployment/AAPANEL_QUICK_SETUP.md](deployment/AAPANEL_QUICK_SETUP.md)
 - **Security:** [SECURITY.md](SECURITY.md)
-- **Steering Rules:** [.kiro/steering/](. kiro/steering/)
+- **Agent & Contributor Guide:** [AGENTS.md](AGENTS.md), [SYSTEM_MAP.md](SYSTEM_MAP.md)
 
 ## 🤝 Contributing
 

@@ -79,7 +79,6 @@ SideEffects: None; documentation only.
   - `backend/services/cameraHealthService.js`
   - `backend/services/cameraService.js`
   - `frontend/src/components/MapView.jsx`
-  - `backend/services/recordingService.js`
   - `frontend/src/pages/AreaManagement.jsx`
   - `frontend/src/pages/Playback.jsx`
   - `backend/routes/hlsProxyRoutes.js`
@@ -90,6 +89,29 @@ SideEffects: None; documentation only.
   - Prefer `frontend/src/components/admin/settings/`; `frontend/src/components/settings/` now contains compatibility re-exports only.
 - Keep full-scope frontend lint passing before adding new feature surfaces.
 - Add Header Docs to active entrypoints that still lack them before modifying those files.
+
+## Known Rule Deviations (conformance gaps)
+
+Snapshot from the 2026-06-09 conformance audit — places where code does not yet follow the rules in `AGENTS.md`. Do not rely on or propagate these gaps; update this list as items are fixed.
+
+**Resolved 2026-06-09 (were live gate/security issues):**
+- ✅ ~~Committed Telegram phone-home~~ — `backend/config/constants.js` no longer hardcodes the bot token/chat id; `sendInstallationNotification` is now env-opt-in (`SETUP_NOTIFY_BOT_TOKEN` / `SETUP_NOTIFY_CHAT_ID`) and OFF by default. **Owner follow-up:** change admin passwords on any deployment installed with the OLD code — `backend/database/setup.js:141` sent the generated admin username + plaintext password (+ domain/IP) to a hardcoded Telegram chat on every `npm run setup-db`.
+- ✅ ~~Frontend lint RED~~ — `TelegramSettingsPanel.jsx:485` quotes escaped (`&quot;`); `npm run lint` passes.
+- ✅ ~~Orphan test~~ — `recordingMaintenanceService.test.js` removed; coverage retained by `recordingMaintenanceCoordinator.test.js` + `recordingMaintenanceStateRepository.test.js`.
+
+**Structural rule violations:**
+- **DB dual-connection — hazard mitigated, full convergence deferred:** `database/database.js` now sets `busy_timeout=5000` (matching connectionPool), removing the SQLITE_BUSY asymmetry that was the concrete hazard. The 16 modules below still use its own single connection rather than `connectionPool` — full convergence is **deferred**, and is NOT a mechanical import swap: connectionPool's separate read/write connections break the read-after-write consistency those modules rely on (proven — `cameraRuntimeStateService` reads back its just-written row and gets the pre-write state). Needs a per-module audit. Modules: `adminController`, `adminDashboardService`, `apiKeyService`, `backupService`, `brandingService`, `bruteForceProtection`, `feedbackService`, `notificationDiagnosticsService`, `passwordExpiry`, `passwordHistory`, `saweriaService`, `settingsService`, `telegramService`, `thumbnailService`, `timezoneService`, `userService`.
+- **Parameterized-SQL — hardened, full param deferred:** `viewerAnalyticsService.js` and `adminDashboardService.js` still interpolate dates into SQL, but every interpolated value now passes a strict `sqlDate()` guard (throws on anything not `YYYY-MM-DD`), so injection is structurally impossible (values were already server-generated / regex-validated). Full `?`-parameterization (10+ queries, one uses the filter twice) is **deferred** — these analytics services have no tests to verify a rewrite. `playbackViewerSessionService.js:39-55` is the correct `?`-param reference.
+- ✅ **Routes not thin — RESOLVED 2026-06-09 (3 of 3):** `configRoutes.js` → `services/appConfigService.js` (route 45 lines, 0 DB); `hlsProxyRoutes.js` (was 1585) → helper/class library to `services/hlsProxyService.js`, leaving a 154-line route; `externalStreamProxyRoutes.js` (was 848) → the whole stateful SWR/dedup proxy plugin to `services/externalStreamProxyService.js` (moved byte-exact via `git mv`), leaving a thin re-export route. All importers + source-text guard tests repointed; full backend suite green. **Caveat:** the external-proxy handlers have no unit test (source-text guards + pure-helper unit tests only) — run a live stream check before relying on it in prod.
+- ✅ **Frontend context perf — fixed 2026-06-09:** all 7 React contexts (`Theme`, `Toast`, `Branding`, `Timezone`, `Camera`, `Notification`, `Security`) now memoize their `value` with `useMemo`, stabilizing handlers with `useCallback` where they were recreated each render (notably `ThemeContext.toggleTheme` and `TimezoneContext`'s formatters + `loadTimezone`). Verified: lint + 487 frontend tests + build all green.
+- **External URL exposure:** public read models emit `external_*_url` to anonymous clients without credential stripping (privacy / proxy-bypass — not an RTSP/credential leak).
+
+**Partial / lower severity:**
+- Area mutations lack audit logging (camera mutations have it).
+- Prod env template does not set `API_KEY_REQUIRE_KEYS=true` (empty-keys-table bypass stays open).
+- `Playback` route is eager-imported in `App.jsx` (not lazy, against the lazy-load guidance).
+- Auth/security services (`authService`, `authController`, `bruteForceProtection`, `sessionManager`, `apiKeyService`, `securityAuditLogger`) have no dedicated tests.
+- vitest coverage has no thresholds (coverage reported, never enforced).
 
 ## Local Map Policy
 

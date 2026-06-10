@@ -61,7 +61,7 @@ This document outlines the security architecture and best practices for the RAF 
 **JWT Configuration**:
 ```env
 JWT_SECRET=<strong-random-string>  # Change in production!
-JWT_EXPIRATION=24h
+JWT_EXPIRATION=1h
 ```
 
 **Password Security**:

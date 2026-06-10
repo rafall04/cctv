@@ -48,10 +48,6 @@ frontend/build/
 *.swo
 *~
 
-# Kiro IDE
-.kiro/
-.agent/
-
 # OS
 .DS_Store
 Thumbs.db

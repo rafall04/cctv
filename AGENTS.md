@@ -2,6 +2,8 @@
 
 This file provides guidelines for AI agents working in this repository.
 
+> **Current conformance gaps:** the code does not yet follow every rule below. See "Known Rule Deviations" in [SYSTEM_MAP.md](SYSTEM_MAP.md) for the precise list (with `file:line`) so you don't rely on or propagate a known gap.
+
 ## Project Overview
 
 RAF NET Secure CCTV Hub - A secure, high-performance video streaming system that isolates private IP cameras from public exposure while providing public web access to camera streams.
@@ -41,7 +43,7 @@ npm run migrate-security
 npm test
 
 # Run tests in watch mode
-npm test:watch
+npm run test:watch
 
 # Run a single test file
 npm test -- cameraHealthService.test.js
@@ -74,7 +76,7 @@ npm run lint
 npm test
 
 # Run tests in watch mode
-npm test:watch
+npm run test:watch
 
 # Run a single test file
 npm test -- CameraManagement.test.jsx
@@ -137,11 +139,11 @@ frontend/src/
 │   │   ├── LandingCamerasSection.jsx
 │   │   ├── LandingFilterDropdown.jsx
 │   │   └── LandingStatsBar.jsx
-│   │   └── playback/           # Playback page components
-│   │       ├── PlaybackHeader.jsx
-│   │       ├── PlaybackVideo.jsx
-│   │       ├── PlaybackTimeline.jsx
-│   │       └── PlaybackSegmentList.jsx
+│   ├── playback/               # Playback presentation components
+│   │   ├── PlaybackHeader.jsx
+│   │   ├── PlaybackVideo.jsx
+│   │   ├── PlaybackTimeline.jsx
+│   │   └── PlaybackSegmentList.jsx
 │   ├── admin/                 # Admin-specific components
 │   │   ├── CameraCard.jsx
 │   │   ├── StatsWidget.jsx
@@ -166,15 +168,19 @@ frontend/src/
 
 ### Current Issues to Fix
 
-1. **Pages yang perlu dipecah** (>500 baris):
-   - `ViewerAnalytics.jsx` - pecah ke charts/widgets
-   - `CameraManagement.jsx` - gunakan pattern CRUD
-   - `Dashboard.jsx` - pecah ke widgets
+> For the authoritative, maintained list see "Stabilization Priorities" in
+> [SYSTEM_MAP.md](SYSTEM_MAP.md). The notes below reflect the latest audit.
 
-2. **Components yang perlu dipindahkan**:
-   - `components/LandingPageSimple.jsx` → `components/landing/`
-   - `components/AdminLayout.jsx` → `layouts/`
-   - `components/settings/*` → `components/admin/settings/`
+1. **Pages still oversized (>500 lines)** — extract page state into `hooks/` and split into widgets:
+   - `pages/AreaManagement.jsx` (~800 lines)
+   - `pages/ViewerAnalytics.jsx` (~500 lines)
+   - (`CameraManagement.jsx` ~180 lines and `Dashboard.jsx` ~280 lines are already decomposed via hooks/sub-components — use them as the reference pattern.)
+
+2. **Legacy duplicate locations** — the new path is canonical; the old path is now a
+   compatibility re-export shim to be phased out:
+   - `components/LandingPageSimple.jsx` → prefer `components/landing/LandingPageSimple.jsx`
+   - `components/AdminLayout.jsx` → prefer `layouts/AdminLayout.jsx`
+   - `components/settings/*` → prefer `components/admin/settings/*`
 
 ---
 
@@ -192,7 +198,7 @@ frontend/src/
 ### Backend (Node.js/Fastify)
 
 **File Naming:**
-- Use kebab-case: `cameraController.js`, `mediaMtxService.js`, `authMiddleware.js`
+- Use camelCase: `cameraController.js`, `mediaMtxService.js`, `authMiddleware.js`
 
 **Imports:**
 - Use relative imports with `.js` extension
@@ -346,7 +352,7 @@ All API responses should follow this format:
 ## Security Guidelines
 
 - Never expose RTSP URLs to frontend - only HLS stream URLs
-- Use JWT for authentication with 24h expiration
+- Use JWT for authentication: short-lived access token (~1h, `JWT_EXPIRATION`) + refresh-token rotation (~7d)
 - Hash passwords with bcrypt
 - Implement rate limiting on auth endpoints
 - Validate and sanitize all user inputs
@@ -358,7 +364,7 @@ All API responses should follow this format:
 ## Testing
 
 - Tests go in `__tests__/` directory for backend
-- Tests go in `src/__tests__/` for frontend (with `setup.js`)
+- Frontend tests are co-located beside source as `*.test.jsx`/`*.spec.jsx` (only `setup.js` lives in `src/__tests__/`)
 - Use vitest for both backend and frontend
 - Backend uses `node` environment, frontend uses `jsdom`
 - Use property-based testing with `fast-check` for critical logic
