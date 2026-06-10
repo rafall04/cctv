@@ -4,6 +4,16 @@ import mediaMtxService from './mediaMtxService.js';
 import viewerSessionService from './viewerSessionService.js';
 import { getTimezone, formatDateTime } from './timezoneService.js';
 
+// Guard: every date interpolated into analytics SQL must be a strict YYYY-MM-DD literal.
+// Values here are server-generated (getDateWithOffset), so this is defense-in-depth that
+// makes SQL injection structurally impossible.
+function sqlDate(value) {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        throw new Error(`Unsafe SQL date literal: ${String(value)}`);
+    }
+    return value;
+}
+
 export function getCameraOperationalState(camera) {
     if (camera?.status === 'maintenance') {
         return 'maintenance';
@@ -277,9 +287,9 @@ class AdminDashboardService {
             const timezone = getTimezone();
             const date = new Date();
             date.setDate(date.getDate() + days);
-            return date.toLocaleDateString('sv-SE', {
+            return sqlDate(date.toLocaleDateString('sv-SE', {
                 timeZone: timezone
-            });
+            }));
         };
 
         const tableExists = queryOne(`

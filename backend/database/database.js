@@ -7,8 +7,8 @@ import { config } from '../config/config.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const dbPath = config.database.path.startsWith('/') 
-  ? config.database.path 
+const dbPath = config.database.path.startsWith('/')
+  ? config.database.path
   : join(__dirname, '..', config.database.path);
 
 console.log('Database connection info:');
@@ -33,6 +33,18 @@ db.pragma('foreign_keys = ON');
 
 // Enable WAL mode for better concurrency
 db.pragma('journal_mode = WAL');
+
+// Match connectionPool's busy_timeout so a write WAITS for the lock (up to 5s) instead of
+// throwing SQLITE_BUSY immediately when connectionPool's writer holds it. This removes the
+// concrete dual-connection hazard (the asymmetry the audit flagged).
+//
+// NOTE: this module intentionally keeps its OWN single connection rather than delegating to
+// connectionPool. The modules that import it rely on read-after-write consistency on one
+// connection; connectionPool's separate read/write connections do NOT provide that (a read
+// after a write — especially inside a transaction — returns the pre-write state), which breaks
+// those modules. Full convergence onto connectionPool is deferred and needs a per-module audit —
+// see "Known Rule Deviations" in SYSTEM_MAP.md.
+db.pragma('busy_timeout = 5000');
 
 // Helper function to run queries with error handling
 export function query(sql, params = []) {

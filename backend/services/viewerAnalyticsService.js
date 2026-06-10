@@ -7,20 +7,30 @@ import { getTimezone } from './timezoneService.js';
  * Responsible for querying and standardizing analytics from viewer sessions.
  */
 
+// Guard: every date interpolated into analytics SQL must be a strict YYYY-MM-DD literal.
+// These values are server-generated (getDate/getDateWithOffset) or regex-validated (customDate),
+// so this is defense-in-depth that makes SQL injection structurally impossible.
+function sqlDate(value) {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        throw new Error(`Unsafe SQL date literal: ${String(value)}`);
+    }
+    return value;
+}
+
 function getDate() {
     const timezone = getTimezone();
-    return new Date().toLocaleDateString('sv-SE', {
+    return sqlDate(new Date().toLocaleDateString('sv-SE', {
         timeZone: timezone
-    });
+    }));
 }
 
 function getDateWithOffset(days) {
     const timezone = getTimezone();
     const date = new Date();
     date.setDate(date.getDate() + days);
-    return date.toLocaleDateString('sv-SE', {
+    return sqlDate(date.toLocaleDateString('sv-SE', {
         timeZone: timezone
-    });
+    }));
 }
 
 class ViewerAnalyticsService {
@@ -38,11 +48,11 @@ class ViewerAnalyticsService {
         if (period.startsWith('date:')) {
             const customDate = period.substring(5);
             if (/^\d{4}-\d{2}-\d{2}$/.test(customDate)) {
-                dateFilter = `AND date(started_at) = '${customDate}'`;
+                dateFilter = `AND date(started_at) = '${sqlDate(customDate)}'`;
                 const prevDate = new Date(customDate);
                 prevDate.setDate(prevDate.getDate() - 1);
                 const prevDateStr = prevDate.toISOString().split('T')[0];
-                previousDateFilter = `AND date(started_at) = '${prevDateStr}'`;
+                previousDateFilter = `AND date(started_at) = '${sqlDate(prevDateStr)}'`;
                 periodDays = 1;
             } else {
                 dateFilter = `AND date(started_at) >= '${getDateWithOffset(-7)}'`;
