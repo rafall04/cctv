@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { brandingService } from '../services/brandingService';
 
 const BrandingContext = createContext();
@@ -100,8 +100,10 @@ export function BrandingProvider({ children }) {
         await loadBranding();
     }, [loadBranding]);
 
+    const value = useMemo(() => ({ branding, loading, refreshBranding }), [branding, loading, refreshBranding]);
+
     return (
-        <BrandingContext.Provider value={{ branding, loading, refreshBranding }}>
+        <BrandingContext.Provider value={value}>
             {children}
         </BrandingContext.Provider>
     );

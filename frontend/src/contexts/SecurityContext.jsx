@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { fetchCsrfToken, clearCsrfToken } from '../services/apiClient';
 
 /**
@@ -90,12 +90,12 @@ export function SecurityProvider({ children }) {
         };
     }, [initializeCsrf]);
 
-    const value = {
+    const value = useMemo(() => ({
         csrfReady,
         csrfError,
         refreshCsrf,
         clearSecurity,
-    };
+    }), [csrfReady, csrfError, refreshCsrf, clearSecurity]);
 
     return (
         <SecurityContext.Provider value={value}>

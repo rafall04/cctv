@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 
 const ThemeContext = createContext();
 
@@ -60,18 +60,22 @@ export function ThemeProvider({ children }) {
         return () => mediaQuery.removeEventListener('change', handleChange);
     }, [isManualTheme]);
 
-    const toggleTheme = () => {
+    const toggleTheme = useCallback(() => {
         // Mark as manual theme selection
         setIsManualTheme(true);
         localStorage.setItem('themeManual', 'true');
-        
-        setTheme(prev => prev === 'dark' ? 'light' : 'dark');
-    };
 
-    const isDark = theme === 'dark';
+        setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+    }, []);
+
+    const value = useMemo(() => ({
+        theme,
+        isDark: theme === 'dark',
+        toggleTheme,
+    }), [theme, toggleTheme]);
 
     return (
-        <ThemeContext.Provider value={{ theme, isDark, toggleTheme }}>
+        <ThemeContext.Provider value={value}>
             {children}
         </ThemeContext.Provider>
     );

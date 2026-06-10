@@ -6,7 +6,7 @@
  * SideEffects: Loads timezone setting from backend and formats display-only timestamps.
  */
 
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { adminAPI } from '../services/api';
 
 const TimezoneContext = createContext();
@@ -92,11 +92,7 @@ export function TimezoneProvider({ children }) {
     const [timezone, setTimezone] = useState('Asia/Jakarta'); // Default
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        loadTimezone();
-    }, []);
-
-    const loadTimezone = async () => {
+    const loadTimezone = useCallback(async () => {
         try {
             const { data } = await adminAPI.get('/api/settings/timezone', {
                 skipGlobalErrorNotification: true,
@@ -109,9 +105,13 @@ export function TimezoneProvider({ children }) {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
-    const formatDateTime = (date, options = {}) => {
+    useEffect(() => {
+        loadTimezone();
+    }, [loadTimezone]);
+
+    const formatDateTime = useCallback((date, options = {}) => {
         const { storage, formatOptions } = splitDateFormatOptions(options);
         const dateObj = parseBackendDateInput(date, { storage });
         return new Intl.DateTimeFormat('id-ID', {
@@ -125,9 +125,9 @@ export function TimezoneProvider({ children }) {
             hour12: false,
             ...formatOptions
         }).format(dateObj);
-    };
+    }, [timezone]);
 
-    const formatDate = (date, options = {}) => {
+    const formatDate = useCallback((date, options = {}) => {
         const { storage, formatOptions } = splitDateFormatOptions(options);
         const dateObj = parseBackendDateInput(date, { storage });
         return new Intl.DateTimeFormat('id-ID', {
@@ -137,9 +137,9 @@ export function TimezoneProvider({ children }) {
             day: '2-digit',
             ...formatOptions
         }).format(dateObj);
-    };
+    }, [timezone]);
 
-    const formatTime = (date, options = {}) => {
+    const formatTime = useCallback((date, options = {}) => {
         const { storage, formatOptions } = splitDateFormatOptions(options);
         const dateObj = parseBackendDateInput(date, { storage });
         return new Intl.DateTimeFormat('id-ID', {
@@ -150,18 +150,20 @@ export function TimezoneProvider({ children }) {
             hour12: false,
             ...formatOptions
         }).format(dateObj);
-    };
+    }, [timezone]);
+
+    const value = useMemo(() => ({
+        timezone,
+        loading,
+        formatDateTime,
+        formatDate,
+        formatTime,
+        getLocalDateInputValue: (date = new Date()) => getLocalDateInputValue(date, timezone),
+        refreshTimezone: loadTimezone,
+    }), [timezone, loading, formatDateTime, formatDate, formatTime, loadTimezone]);
 
     return (
-        <TimezoneContext.Provider value={{ 
-            timezone, 
-            loading,
-            formatDateTime,
-            formatDate,
-            formatTime,
-            getLocalDateInputValue: (date = new Date()) => getLocalDateInputValue(date, timezone),
-            refreshTimezone: loadTimezone
-        }}>
+        <TimezoneContext.Provider value={value}>
             {children}
         </TimezoneContext.Provider>
     );

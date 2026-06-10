@@ -6,7 +6,7 @@
  * SideEffects: Fetches public camera/area data, schedules visible-tab refresh timers, listens for browser resume events.
  */
 
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { cameraService } from '../services/cameraService';
 import { areaService } from '../services/areaService';
 import { REQUEST_POLICY } from '../services/requestPolicy';
@@ -202,7 +202,7 @@ export function CameraProvider({ children, autoRefresh = true }) {
         };
     }, [autoRefresh, refreshData]);
 
-    const value = {
+    const value = useMemo(() => ({
         cameras,
         areas,
         loading,
@@ -212,7 +212,7 @@ export function CameraProvider({ children, autoRefresh = true }) {
         backgroundRefreshError,
         deviceTier,
         refreshData
-    };
+    }), [cameras, areas, loading, initialLoadError, backgroundRefreshError, deviceTier, refreshData]);
 
     return (
         <CameraContext.Provider value={value}>

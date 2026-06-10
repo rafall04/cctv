@@ -6,7 +6,7 @@ MainFuncs: NotificationProvider, useNotification, getNotificationConfig.
 SideEffects: Schedules and clears notification dismissal timers.
 */
 
-import { createContext, useContext, useState, useCallback, useRef } from 'react';
+import { createContext, useContext, useState, useCallback, useRef, useMemo } from 'react';
 
 /**
  * Notification Context
@@ -150,7 +150,7 @@ export function NotificationProvider({ children }) {
         return showNotification({ type: 'info', title, message });
     }, [showNotification]);
 
-    const value = {
+    const value = useMemo(() => ({
         notifications,
         showNotification,
         dismissNotification,
@@ -159,7 +159,7 @@ export function NotificationProvider({ children }) {
         error,
         warning,
         info,
-    };
+    }), [notifications, showNotification, dismissNotification, clearAll, success, error, warning, info]);
 
     return (
         <NotificationContext.Provider value={value}>

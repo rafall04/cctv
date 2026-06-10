@@ -6,7 +6,7 @@ MainFuncs: ToastProvider, useToast, Toast.
 SideEffects: Schedules timeout-based toast dismissal.
 */
 
-import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import { Icons } from '../components/ui/Icons';
 
 // Toast Component
@@ -76,8 +76,10 @@ export function ToastProvider({ children }) {
         setToasts(prev => prev.filter(t => t.id !== id));
     }, []);
 
+    const value = useMemo(() => ({ addToast }), [addToast]);
+
     return (
-        <ToastContext.Provider value={{ addToast }}>
+        <ToastContext.Provider value={value}>
             {children}
             <ToastContainer toasts={toasts} removeToast={removeToast} />
         </ToastContext.Provider>
