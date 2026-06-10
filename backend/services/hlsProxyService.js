@@ -28,6 +28,10 @@ const DEFAULT_HLS_CONFIG = {
     maxSessionCacheEntriesPerCamera: 1000,
     sessionCacheTtlMs: 25000,
     sessionCleanupIntervalMs: 10000,
+    // Coalesce per-request viewer-session heartbeats to at most one DB write per this window per
+    // session. MUST stay well under viewerSessionService SESSION_TIMEOUT (15s) or an active session
+    // could be reaped as stale between heartbeats. 10s = 5s safety margin.
+    heartbeatDbThrottleMs: 10000,
     cameraIdCacheTtlMs: 300000,
     maxExternalPlaylistBytes: 1024 * 1024,
     maxSessionCreatesPerWindow: 12,
@@ -304,6 +308,10 @@ export class HlsSessionStore {
             lastPlaylistAt: now,
             lastSegmentAt: 0,
             lastTouchedAt: now,
+            // Last time a heartbeat was actually written to the DB for this session. The session was
+            // just INSERTed with a fresh last_heartbeat, so the DB is current as of `now`. Used to
+            // throttle per-request DB heartbeats (see getOrCreateSession / recordSegmentAccess).
+            lastDbHeartbeatAt: now,
             expiresAt: now + this.options.sessionCacheTtlMs,
         };
 
@@ -408,8 +416,18 @@ export class HlsSessionStore {
         const existing = this.entries.get(dedupKey);
 
         if (existing) {
+            const throttleMs = this.options.heartbeatDbThrottleMs ?? 0;
+            const heartbeatDue = !existing.lastDbHeartbeatAt
+                || (now - existing.lastDbHeartbeatAt) >= throttleMs;
+            if (!heartbeatDue) {
+                // Throttled: the in-memory entry is fresh and the last DB heartbeat is within the
+                // throttle window (< session timeout), so the session is still alive — skip the DB write.
+                this.touchSession(identity, cameraId, 'playlist', now);
+                return existing.sessionId;
+            }
             const alive = await heartbeat(existing.sessionId);
             if (alive) {
+                existing.lastDbHeartbeatAt = now;
                 this.touchSession(identity, cameraId, 'playlist', now);
                 return existing.sessionId;
             }
@@ -442,13 +460,24 @@ export class HlsSessionStore {
             return null;
         }
 
+        const now = Date.now();
+        const throttleMs = this.options.heartbeatDbThrottleMs ?? 0;
+        const heartbeatDue = !entry.lastDbHeartbeatAt
+            || (now - entry.lastDbHeartbeatAt) >= throttleMs;
+        if (!heartbeatDue) {
+            // Throttled: refresh in-memory liveness only; skip the per-segment DB heartbeat write.
+            this.touchSession(identity, cameraId, 'segment', now);
+            return entry.sessionId;
+        }
+
         const alive = await heartbeat(entry.sessionId);
         if (!alive) {
             this.removeSessionEntry(identity, cameraId);
             return null;
         }
 
-        this.touchSession(identity, cameraId, 'segment');
+        entry.lastDbHeartbeatAt = now;
+        this.touchSession(identity, cameraId, 'segment', now);
         return entry.sessionId;
     }
 

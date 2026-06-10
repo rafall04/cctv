@@ -131,6 +131,28 @@ describe('HlsSessionStore', () => {
         expect(heartbeat).toHaveBeenCalledTimes(1);
     });
 
+    it('throttles DB heartbeats to one write per heartbeatDbThrottleMs window', async () => {
+        const store = new HlsSessionStore({ sessionCacheTtlMs: 25000, heartbeatDbThrottleMs: 10000 });
+        const heartbeat = vi.fn(async () => true);
+
+        // Seed an entry whose last DB heartbeat is "now" → throttle window is open.
+        store.setSessionEntry('viewer-throttle', 12, 'session-12', Date.now());
+
+        // Accesses inside the window refresh liveness in-memory but write no DB heartbeat.
+        await store.recordSegmentAccess('viewer-throttle', 12, heartbeat);
+        await store.recordSegmentAccess('viewer-throttle', 12, heartbeat);
+        expect(heartbeat).toHaveBeenCalledTimes(0);
+
+        // Age the last DB heartbeat past the window → exactly one write on the next access.
+        store.getSessionEntry('viewer-throttle', 12).lastDbHeartbeatAt = Date.now() - 10001;
+        await store.recordSegmentAccess('viewer-throttle', 12, heartbeat);
+        expect(heartbeat).toHaveBeenCalledTimes(1);
+
+        // Window closed again immediately afterwards → still just one write.
+        await store.recordSegmentAccess('viewer-throttle', 12, heartbeat);
+        expect(heartbeat).toHaveBeenCalledTimes(1);
+    });
+
     it('removes dead session on heartbeat failure', async () => {
         const store = new HlsSessionStore({ sessionCacheTtlMs: 25000 });
         const heartbeat = vi.fn(async () => false);
