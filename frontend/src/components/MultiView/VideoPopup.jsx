@@ -8,7 +8,6 @@
 
 import { useRef, useState, useEffect, useCallback, useLayoutEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import flvjs from 'flv.js';
 import { Icons } from '../ui/Icons.jsx';
 import CodecBadge from '../CodecBadge.jsx';
 import CameraViewerStatsBadges from '../common/CameraViewerStatsBadges.jsx';
@@ -20,7 +19,7 @@ import { LoadingStage, createStreamError } from '../../utils/streamLoaderTypes';
 import { createFallbackHandler } from '../../utils/fallbackHandler';
 import { getHLSConfig } from '../../utils/hlsConfig';
 import { cleanupMediaResources } from '../../utils/mediaResourceCleanup';
-import { preloadHls } from '../../utils/preloadManager';
+import { preloadHls, preloadFlv } from '../../utils/preloadManager';
 import { resolveStreamUrl } from '../../utils/directStreamHelper';
 import { useStreamTimeout } from '../../hooks/useStreamTimeout';
 import { viewerService } from '../../services/viewerService';
@@ -158,9 +157,10 @@ function VideoPopup({
     const [showTroubleshooting, setShowTroubleshooting] = useState(false);
     const [forceProxyFallback, setForceProxyFallback] = useState(false);
     const [videoAspectRatio, setVideoAspectRatio] = useState(null);
-    const [flvPlaybackSupported, setFlvPlaybackSupported] = useState(() => (
-        typeof window !== 'undefined' ? flvjs.isSupported() : false
-    ));
+    // Optimistic: mount the <video> for FLV cameras so the (now lazy-loaded) flv.js init effect can
+    // attach to it; that effect calls the real flvjs.isSupported() and flips this to false on a
+    // browser that can't actually play FLV. flv.js is never loaded for HLS-only viewing.
+    const [flvPlaybackSupported, setFlvPlaybackSupported] = useState(true);
     // Ad-height state used to feed back into the modal sizing math which
     // caused the live CCTV to shrink every time an ad creative loaded.
     // The math no longer reads these values (publicPopupLayout.js), so we
@@ -269,10 +269,6 @@ function VideoPopup({
             setErrorType(effectiveUrl ? null : 'unknown');
         }
     }, [availabilityState, deliveryType, effectiveUrl, isHlsCamera, isMaintenance, isOffline, isStreamResolving, streamCapabilities.popup]);
-
-    useEffect(() => {
-        setFlvPlaybackSupported(typeof window !== 'undefined' ? flvjs.isSupported() : false);
-    }, [camera.id]);
 
     const syncVideoAspectRatio = useCallback(() => {
         const nextAspectRatio = getVideoAspectRatio(videoRef.current);
@@ -810,41 +806,11 @@ function VideoPopup({
         if (isMaintenance || isOffline || isStreamResolving || deliveryType !== 'external_flv') return;
         if (!videoRef.current) return;
 
-        if (!flvjs.isSupported()) {
-            setFlvPlaybackSupported(false);
-            setStatus(popupEmbedUrl ? 'playing' : 'error');
-            setLoadingStage(popupEmbedUrl ? LoadingStage.BUFFERING : LoadingStage.ERROR);
-            setErrorType(popupEmbedUrl ? null : 'media');
-            return;
-        }
-
-        if (!effectiveUrl) {
-            setStatus('error');
-            setLoadingStage(LoadingStage.ERROR);
-            setErrorType('unknown');
-            return;
-        }
-
-        setFlvPlaybackSupported(true);
         const video = videoRef.current;
         let cancelled = false;
+        let player = null;
         const streamRunId = streamRunIdRef.current;
         const isStaleStreamRun = () => cancelled || streamRunId !== streamRunIdRef.current;
-        const player = flvjs.createPlayer({
-            type: 'flv',
-            isLive: true,
-            url: effectiveUrl,
-        }, {
-            enableStashBuffer: false,
-            stashInitialSize: 128,
-            autoCleanupSourceBuffer: true,
-        });
-        flvRef.current = player;
-
-        setStatus('connecting');
-        setLoadingStage(LoadingStage.CONNECTING);
-        setErrorType(null);
-        setVideoAspectRatio(null);
 
         const handlePlaying = () => {
             if (isStaleStreamRun()) return;
@@ -869,18 +835,59 @@ function VideoPopup({
             reportRuntimeFailure('external_flv_runtime_error');
         };
 
-        video.addEventListener('playing', handlePlaying);
-        video.addEventListener('loadedmetadata', handleLoadedMetadata);
-        video.addEventListener('error', handleFatalError);
-        player.on(flvjs.Events.ERROR, handleFatalError);
+        // flv.js is loaded on demand (only external_flv cameras need it) so HLS-only viewing never
+        // downloads it. See utils/preloadManager.preloadFlv.
+        preloadFlv().then((flvjs) => {
+            if (isStaleStreamRun()) return;
 
-        try {
-            player.attachMediaElement(video);
-            player.load();
-            requestVideoPlay(video);
-        } catch {
+            if (!flvjs.isSupported()) {
+                setFlvPlaybackSupported(false);
+                setStatus(popupEmbedUrl ? 'playing' : 'error');
+                setLoadingStage(popupEmbedUrl ? LoadingStage.BUFFERING : LoadingStage.ERROR);
+                setErrorType(popupEmbedUrl ? null : 'media');
+                return;
+            }
+
+            if (!effectiveUrl) {
+                setStatus('error');
+                setLoadingStage(LoadingStage.ERROR);
+                setErrorType('unknown');
+                return;
+            }
+
+            setFlvPlaybackSupported(true);
+            player = flvjs.createPlayer({
+                type: 'flv',
+                isLive: true,
+                url: effectiveUrl,
+            }, {
+                enableStashBuffer: false,
+                stashInitialSize: 128,
+                autoCleanupSourceBuffer: true,
+            });
+            flvRef.current = player;
+
+            setStatus('connecting');
+            setLoadingStage(LoadingStage.CONNECTING);
+            setErrorType(null);
+            setVideoAspectRatio(null);
+
+            video.addEventListener('playing', handlePlaying);
+            video.addEventListener('loadedmetadata', handleLoadedMetadata);
+            video.addEventListener('error', handleFatalError);
+            player.on(flvjs.Events.ERROR, handleFatalError);
+
+            try {
+                player.attachMediaElement(video);
+                player.load();
+                requestVideoPlay(video);
+            } catch {
+                handleFatalError();
+            }
+        }).catch(() => {
+            if (isStaleStreamRun()) return;
             handleFatalError();
-        }
+        });
 
         return () => {
             cancelled = true;

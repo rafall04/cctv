@@ -8,7 +8,7 @@ SideEffects: Starts/stops viewer sessions, creates/destroys HLS instances, contr
 
 import { useRef, useState, useEffect, useCallback, useMemo, memo } from 'react';
 import Hls from 'hls.js';
-import flvjs from 'flv.js';
+import { preloadFlv } from '../../utils/preloadManager';
 import { Icons } from '../ui/Icons';
 import ZoomableVideo from './ZoomableVideo';
 import { detectDeviceTier } from '../../utils/deviceDetector';
@@ -689,23 +689,9 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             return;
         }
 
-        if (!flvjs.isSupported()) {
-            setStatus('error');
-            setLoadingStage(LoadingStage.ERROR);
-            onError?.(camera.id, new Error('Browser tidak mendukung FLV'));
-            return;
-        }
-
         const video = videoRef.current;
-        const player = flvjs.createPlayer({
-            type: 'flv',
-            url: flvUrl,
-            isLive: true,
-            cors: true,
-        });
-        flvRef.current = player;
-        setStatus('connecting');
-        setLoadingStage(LoadingStage.LOADING);
+        let cancelled = false;
+        let player = null;
 
         const markLive = () => {
             setStatus('live');
@@ -719,17 +705,48 @@ function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDel
             onError?.(camera.id, new Error('FLV stream error'));
         };
 
-        video.addEventListener('playing', markLive);
-        video.addEventListener('error', markError);
-        player.attachMediaElement(video);
-        player.load();
-        video.play().catch(() => { });
-        player.on(flvjs.Events.ERROR, markError);
+        // flv.js is loaded on demand (only external_flv tiles need it) so the HLS-only majority
+        // never downloads it. See utils/preloadManager.preloadFlv.
+        preloadFlv().then((flvjs) => {
+            if (cancelled) return;
+
+            if (!flvjs.isSupported()) {
+                setStatus('error');
+                setLoadingStage(LoadingStage.ERROR);
+                onError?.(camera.id, new Error('Browser tidak mendukung FLV'));
+                return;
+            }
+
+            player = flvjs.createPlayer({
+                type: 'flv',
+                url: flvUrl,
+                isLive: true,
+                cors: true,
+            });
+            flvRef.current = player;
+            setStatus('connecting');
+            setLoadingStage(LoadingStage.LOADING);
+
+            video.addEventListener('playing', markLive);
+            video.addEventListener('error', markError);
+            player.attachMediaElement(video);
+            player.load();
+            video.play().catch(() => { });
+            player.on(flvjs.Events.ERROR, markError);
+        }).catch(() => {
+            if (cancelled) return;
+            setStatus('error');
+            setLoadingStage(LoadingStage.ERROR);
+            onError?.(camera.id, new Error('Gagal memuat pemutar FLV'));
+        });
 
         return () => {
+            cancelled = true;
             video.removeEventListener('playing', markLive);
             video.removeEventListener('error', markError);
-            player.destroy();
+            if (player) {
+                player.destroy();
+            }
             if (flvRef.current === player) {
                 flvRef.current = null;
             }

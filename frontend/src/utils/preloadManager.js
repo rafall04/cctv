@@ -36,15 +36,51 @@ export const preloadHls = async () => {
     return preloadPromise;
 };
 
+/** @type {typeof import('flv.js').default | null} */
+let flvModule = null;
+
+/** @type {Promise<typeof import('flv.js').default> | null} */
+let flvPreloadPromise = null;
+
+/**
+ * Preload flv.js module on demand. Only external_flv cameras need it, so keeping it a dynamic
+ * import keeps the (large) flv.js library out of the bundle for the HLS-only majority of viewers.
+ * @returns {Promise<typeof import('flv.js').default>} flv.js module
+ */
+export const preloadFlv = async () => {
+    if (flvModule) {
+        return flvModule;
+    }
+
+    if (flvPreloadPromise) {
+        return flvPreloadPromise;
+    }
+
+    flvPreloadPromise = import('flv.js')
+        .then((module) => {
+            flvModule = module.default;
+            return flvModule;
+        })
+        .catch((error) => {
+            flvPreloadPromise = null;
+            throw error;
+        });
+
+    return flvPreloadPromise;
+};
+
 /**
  * Reset preload state (for testing)
  */
 export const resetPreloadState = () => {
     hlsModule = null;
     preloadPromise = null;
+    flvModule = null;
+    flvPreloadPromise = null;
 };
 
 export default {
     preloadHls,
+    preloadFlv,
     resetPreloadState,
 };
