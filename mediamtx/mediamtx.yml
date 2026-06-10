@@ -11,7 +11,12 @@ apiAddress: :9997
 # HLS settings - OPTIMIZED MODE (Stability + Memory Efficiency)
 hls: yes
 hlsAddress: :8888
-hlsAlwaysRemux: yes
+# NO (not yes): let per-path sourceOnDemand actually take effect — idle on_demand cameras
+# (public / Surabaya) close instead of being remuxed 24/7. always_on (local/priority) cameras are
+# kept muxer-warm by the backend streamWarmer (periodic HLS pings) for instant first-viewer TTFF,
+# so this does NOT slow them down. Recording is unaffected: it pulls RTSP/HTTP directly (its own
+# ffmpeg -i), never MediaMTX HLS — see backend/services/recordingStarter.js.
+hlsAlwaysRemux: no
 hlsAllowOrigin: '*'
 # Segment duration: 2s (sweet spot for stability + reasonable latency)
 hlsSegmentDuration: 2s

@@ -30,12 +30,12 @@ class StreamWarmer {
         // Initial trigger to start RTSP connection
         await this.triggerStream(pathName);
 
-        // Keep stream alive by triggering every 30 seconds
-        // This prevents sourceOnDemandCloseAfter from closing the connection
-        // Reduced from 5s to 30s to lower CPU usage
+        // Re-warm every 10s. This is now load-bearing (hlsAlwaysRemux:no): the HLS muxer closes
+        // after idle, so we must re-touch it well within that window to keep always_on cameras at
+        // instant TTFF. Cheap — one HEAD per warmed path per cycle, straight to MediaMTX.
         const intervalId = setInterval(async () => {
             await this.triggerStream(pathName);
-        }, 30000);
+        }, 10000);
 
         this.warmStreams.set(pathName, intervalId);
     }
@@ -57,30 +57,27 @@ class StreamWarmer {
      * Uses MediaMTX API first (no reader created), falls back to HEAD request
      */
     async triggerStream(pathName) {
+        // Keep the HLS MUXER warm, not just the source. Under hlsAlwaysRemux:no the muxer is
+        // created lazily and closes after idle, so we must touch the HLS endpoint every cycle to
+        // keep segments ready for instant first-viewer TTFF on always_on (priority/local) cameras.
         try {
-            // Method 1: Check path via MediaMTX API - this doesn't create a reader
-            // but triggers sourceOnDemand if the path is configured
-            const response = await axios.get(
+            // Path-existence check only: skip paths MediaMTX doesn't know (404).
+            // Do NOT early-return on sourceReady — a ready SOURCE is not a warm MUXER.
+            await axios.get(
                 `${this.mediamtxApiUrl}/v3/paths/get/${pathName}`,
                 { timeout: 5000 }
             );
-            
-            // If path exists and source is ready, we're good
-            if (response.data?.sourceReady) {
-                return;
-            }
-            
-            // If source not ready, try to trigger via HLS HEAD request
-            await this.triggerViaHLS(pathName);
         } catch (error) {
-            // Path might not exist or MediaMTX API error
-            // Try HLS trigger as fallback
             if (error.response?.status === 404) {
-                // Path doesn't exist in MediaMTX - skip
+                // Path not configured in MediaMTX - nothing to warm.
                 return;
             }
-            await this.triggerViaHLS(pathName);
+            // Other MediaMTX API errors: still attempt to warm the muxer below.
         }
+
+        // Touch the HLS endpoint to create/keep the muxer warm. Hits MediaMTX directly (:8888),
+        // NOT the backend proxy, so this does NOT create or inflate a viewer session.
+        await this.triggerViaHLS(pathName);
     }
 
     /**

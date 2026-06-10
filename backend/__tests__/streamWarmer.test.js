@@ -63,6 +63,12 @@ describe('streamWarmer policy filtering', () => {
             },
         ]);
 
+        // Drain the fire-and-forget warmStream() microtask chains (initial triggerStream → HLS
+        // muxer warm → interval registration) so warmer state is settled before we assert on it.
+        for (let i = 0; i < 10; i++) {
+            await Promise.resolve();
+        }
+
         expect(summary).toEqual({
             total: 2,
             warmed: 1,
@@ -75,6 +81,18 @@ describe('streamWarmer policy filtering', () => {
         );
         expect(axiosGetMock).not.toHaveBeenCalledWith(
             'http://localhost:9997/v3/paths/get/remote-key',
+            expect.anything()
+        );
+
+        // The warmed always_on camera must have its HLS muxer touched (kept warm for fast TTFF
+        // under hlsAlwaysRemux:no — a ready source alone is not a warm muxer).
+        expect(axiosHeadMock).toHaveBeenCalledWith(
+            'http://localhost:8888/local-key/index.m3u8',
+            { timeout: 15000 }
+        );
+        // The on_demand camera is never warmed (no HLS touch → stays light).
+        expect(axiosHeadMock).not.toHaveBeenCalledWith(
+            'http://localhost:8888/remote-key/index.m3u8',
             expect.anything()
         );
 

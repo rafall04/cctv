@@ -14,7 +14,8 @@ apiAddress: :9997
 # HLS settings - OPTIMIZED FOR RAM DISK
 hls: yes
 hlsAddress: :8888
-hlsAlwaysRemux: yes
+# NO: let per-path sourceOnDemand close idle on_demand cameras; always_on kept warm by backend streamWarmer.
+hlsAlwaysRemux: no
 hlsAllowOrigin: '*'
 
 # CRITICAL: Write HLS segments to RAM disk (/dev/shm)
