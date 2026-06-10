@@ -482,7 +482,7 @@ export default function TelegramSettingsPanel() {
                                 <div className="flex items-center justify-between gap-3">
                                     <div>
                                         <h3 className="font-semibold text-gray-900 dark:text-white">Routing Notifikasi CCTV</h3>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Rule baru default-nya "Semua Mode" agar kamera on-demand maupun always-on sama-sama dialerti. Pilih mode tertentu hanya jika ingin mempersempit.</p>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400">Rule baru default-nya &quot;Semua Mode&quot; agar kamera on-demand maupun always-on sama-sama dialerti. Pilih mode tertentu hanya jika ingin mempersempit.</p>
                                     </div>
                                     <button type="button" onClick={addRule} className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium">
                                         Tambah Rule
