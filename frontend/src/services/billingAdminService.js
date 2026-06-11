@@ -74,6 +74,21 @@ export const billingAdminService = {
         return response.data;
     },
 
+    async getPaymentGateway() {
+        const response = await apiClient.get('/api/admin/billing/payment-gateway');
+        return response.data;
+    },
+
+    async updatePaymentGateway(payload) {
+        const response = await apiClient.put('/api/admin/billing/payment-gateway', payload);
+        return response.data;
+    },
+
+    async testPaymentGateway() {
+        const response = await apiClient.post('/api/admin/billing/payment-gateway/test');
+        return response.data;
+    },
+
     async getRegistrations() {
         const response = await apiClient.get('/api/admin/billing/registrations');
         return response.data;

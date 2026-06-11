@@ -54,6 +54,21 @@ describe('customerService', () => {
         expect(getMock).toHaveBeenCalledWith('/api/customer/topup/12');
     });
 
+    it('loads payment options', async () => {
+        await customerService.getPaymentOptions();
+        expect(getMock).toHaveBeenCalledWith('/api/customer/payment-options');
+    });
+
+    it('sends the chosen method with the top-up when provided', async () => {
+        await customerService.createTopup(25000, 'va:bca');
+        expect(postMock).toHaveBeenCalledWith('/api/customer/topup', { amount: 25000, method: 'va:bca' });
+    });
+
+    it('omits method when none chosen', async () => {
+        await customerService.createTopup(25000);
+        expect(postMock).toHaveBeenCalledWith('/api/customer/topup', { amount: 25000 });
+    });
+
     it('switches plans via plan_key', async () => {
         await customerService.switchPlan('hemat');
         expect(postMock).toHaveBeenCalledWith('/api/customer/plan', { plan_key: 'hemat' });

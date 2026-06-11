@@ -12,6 +12,7 @@ import billingAdminService from '../services/billingAdminService';
 import { cameraService } from '../services/cameraService';
 import { useNotification } from '../contexts/NotificationContext';
 import BillingPlansTab from '../components/admin/BillingPlansTab';
+import PaymentGatewayTab from '../components/admin/PaymentGatewayTab';
 
 function formatRupiah(value) {
     return `Rp${Number(value || 0).toLocaleString('id-ID')}`;
@@ -138,6 +139,7 @@ export default function BillingManagement() {
         { key: 'subscriptions', label: `Langganan (${subscriptions.length})` },
         { key: 'payments', label: `Pembayaran (${payments.length})` },
         { key: 'plans', label: `Paket & Trial (${plans.length})` },
+        { key: 'gateway', label: 'Gateway Pembayaran' },
     ];
 
     return (
@@ -494,6 +496,8 @@ export default function BillingManagement() {
                     {tab === 'plans' && (
                         <BillingPlansTab plans={plans} regSettings={regSettings} run={run} busy={busy} />
                     )}
+
+                    {tab === 'gateway' && <PaymentGatewayTab />}
 
                     {tab === 'payments' && (
                         <div className="overflow-x-auto">

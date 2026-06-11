@@ -35,7 +35,22 @@ function TopupPanel({ onCompleted }) {
     const [pending, setPending] = useState(null);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
+    const [methods, setMethods] = useState([]);
+    const [selectedMethod, setSelectedMethod] = useState('');
     const pollRef = useRef(null);
+
+    useEffect(() => {
+        let mounted = true;
+        customerService.getPaymentOptions?.().then((res) => {
+            if (mounted && res?.success && Array.isArray(res.data?.methods)) {
+                setMethods(res.data.methods);
+                if (res.data.methods.length > 0) {
+                    setSelectedMethod(res.data.methods[0].key);
+                }
+            }
+        }).catch(() => {});
+        return () => { mounted = false; };
+    }, []);
 
     const stopPolling = useCallback(() => {
         if (pollRef.current) {
@@ -76,7 +91,7 @@ function TopupPanel({ onCompleted }) {
         }
         setSubmitting(true);
         try {
-            const response = await customerService.createTopup(finalAmount);
+            const response = await customerService.createTopup(finalAmount, selectedMethod || null);
             if (response.success) {
                 setPending(response.data);
                 if (response.data.status === 'pending') {
@@ -107,7 +122,16 @@ function TopupPanel({ onCompleted }) {
                         </p>
                     </div>
                 )}
-                {pending.status === 'pending' && !pending.qris?.qr_url && (
+                {pending.status === 'pending' && !pending.qris?.qr_url && pending.qris?.va_number && (
+                    <div className="mt-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{pending.qris.payment_name || 'Virtual Account'}</p>
+                        <p className="mt-0.5 select-all font-mono text-lg font-bold tracking-wider text-gray-900 dark:text-white">{pending.qris.va_number}</p>
+                        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            Transfer tepat {formatRupiah(pending.amount)} ke nomor di atas via m-banking/ATM. Saldo masuk otomatis setelah terbayar.
+                        </p>
+                    </div>
+                )}
+                {pending.status === 'pending' && !pending.qris?.qr_url && !pending.qris?.va_number && (
                     <p className="mt-3 rounded-lg bg-gray-50 p-3 text-sm text-gray-600 dark:bg-gray-800 dark:text-gray-300">
                         {pending.instructions || 'Bayar ke admin sesuai nominal, saldo akan dikonfirmasi manual oleh admin.'}
                     </p>
@@ -131,6 +155,23 @@ function TopupPanel({ onCompleted }) {
     return (
         <form onSubmit={handleSubmit} className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
             <h3 className="font-semibold text-gray-900 dark:text-white">Isi Saldo</h3>
+
+            {methods.length > 1 && (
+                <div className="mt-3">
+                    <label htmlFor="topup-method" className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Metode Pembayaran</label>
+                    <select
+                        id="topup-method"
+                        value={selectedMethod}
+                        onChange={(e) => setSelectedMethod(e.target.value)}
+                        className="w-full rounded-xl border border-gray-300 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary dark:border-gray-700 dark:bg-gray-900/50 dark:text-white"
+                    >
+                        {methods.map((m) => (
+                            <option key={m.key} value={m.key}>{m.label}</option>
+                        ))}
+                    </select>
+                </div>
+            )}
+
             <div className="mt-3 grid grid-cols-3 gap-2">
                 {PRESET_AMOUNTS.map((preset) => (
                     <button

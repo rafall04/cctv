@@ -29,8 +29,13 @@ export const customerService = {
         return response.data;
     },
 
-    async createTopup(amount) {
-        const response = await apiClient.post('/api/customer/topup', { amount });
+    async getPaymentOptions() {
+        const response = await apiClient.get('/api/customer/payment-options');
+        return response.data;
+    },
+
+    async createTopup(amount, method = null) {
+        const response = await apiClient.post('/api/customer/topup', method ? { amount, method } : { amount });
         return response.data;
     },
 
