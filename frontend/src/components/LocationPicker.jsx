@@ -253,6 +253,17 @@ const LocationPicker = ({
     const [mapType, setMapType] = useState(MAP_TYPES.HYBRID);
     const [loadingGPS, setLoadingGPS] = useState(false);
     const [gpsError, setGpsError] = useState(null);
+    // Manual numeric entry: local strings so partial typing ("-7." ) is allowed;
+    // committed on blur. Kept in sync when position changes via GPS/map/search.
+    const [latInput, setLatInput] = useState(position ? String(position[0]) : '');
+    const [lngInput, setLngInput] = useState(position ? String(position[1]) : '');
+    const [manualError, setManualError] = useState('');
+
+    useEffect(() => {
+        setLatInput(position ? String(position[0]) : '');
+        setLngInput(position ? String(position[1]) : '');
+        setManualError('');
+    }, [position]);
 
     // Load map center from backend on mount
     useEffect(() => {
@@ -302,6 +313,32 @@ const LocationPicker = ({
         setPosition(null);
         onLocationChange('', '');
     }, [onLocationChange]);
+
+    // Commit manually-typed coordinates on blur. Both empty = clear; otherwise both
+    // must be valid numbers in range, else show an inline error and keep the input.
+    const handleManualCommit = useCallback(() => {
+        const latStr = latInput.trim();
+        const lngStr = lngInput.trim();
+        if (latStr === '' && lngStr === '') {
+            setManualError('');
+            handleClear();
+            return;
+        }
+        const lat = Number(latStr);
+        const lng = Number(lngStr);
+        if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+            setManualError('Latitude harus angka -90 sampai 90');
+            return;
+        }
+        if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
+            setManualError('Longitude harus angka -180 sampai 180');
+            return;
+        }
+        setManualError('');
+        setPosition([lat, lng]);
+        setMapCenter([lat, lng]);
+        onLocationChange(lat.toFixed(6), lng.toFixed(6));
+    }, [latInput, lngInput, handleClear, onLocationChange]);
 
     // GPS detection - get current location from device
     const handleUseGPS = useCallback(() => {
@@ -357,17 +394,38 @@ const LocationPicker = ({
                     data-testid="location-picker-collapsed-panel"
                 >
                     <div className="min-w-0 flex-1">
-                        {position ? (
-                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-                                <span className="text-gray-700 dark:text-gray-200">
-                                    <span className="font-semibold text-gray-800 dark:text-white">Lat:</span> {position[0].toFixed(6)}
-                                </span>
-                                <span className="text-gray-700 dark:text-gray-200">
-                                    <span className="font-semibold text-gray-800 dark:text-white">Lng:</span> {position[1].toFixed(6)}
-                                </span>
-                            </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
+                                Latitude
+                                <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={latInput}
+                                    onChange={(e) => setLatInput(e.target.value)}
+                                    onBlur={handleManualCommit}
+                                    placeholder="-7.150700"
+                                    aria-label="Latitude"
+                                    className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                                />
+                            </label>
+                            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">
+                                Longitude
+                                <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={lngInput}
+                                    onChange={(e) => setLngInput(e.target.value)}
+                                    onBlur={handleManualCommit}
+                                    placeholder="111.881500"
+                                    aria-label="Longitude"
+                                    className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                                />
+                            </label>
+                        </div>
+                        {manualError ? (
+                            <p className="mt-1 text-xs text-red-500">{manualError}</p>
                         ) : (
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Belum ada koordinat</p>
+                            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Ketik koordinat langsung, atau pakai GPS / peta.</p>
                         )}
                     </div>
                     <div className="flex flex-wrap items-center gap-2 sm:justify-end" data-testid="location-picker-actions">

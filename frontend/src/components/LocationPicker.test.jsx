@@ -53,8 +53,9 @@ describe('LocationPicker basemap toggle', () => {
         render(<LocationPicker latitude="" longitude="" onLocationChange={vi.fn()} />);
 
         expect(screen.queryByText('Lokasi Kamera')).toBeNull();
-        expect(screen.getByText('Belum ada koordinat').className)
-            .toContain('dark:text-gray-400');
+        // Manual coordinate inputs render empty when no coordinate is set.
+        expect(screen.getByLabelText('Latitude').value).toBe('');
+        expect(screen.getByLabelText('Longitude').value).toBe('');
         expect(screen.getByTestId('location-picker-collapsed-panel').className)
             .toContain('sm:flex-row');
         expect(screen.getByRole('button', { name: 'Pilih di Peta' }).className)
@@ -104,6 +105,40 @@ describe('LocationPicker basemap toggle', () => {
         expect(screen.getByText(/Lng: 111.881500/)).toBeTruthy();
         expect(screen.getByTestId('location-picker-marker').textContent)
             .toContain('-7.1507,111.8815');
+    });
+
+    it('menerima input koordinat manual yang valid dan meneruskannya', () => {
+        const onLocationChange = vi.fn();
+        render(<LocationPicker latitude="" longitude="" onLocationChange={onLocationChange} />);
+
+        fireEvent.change(screen.getByLabelText('Latitude'), { target: { value: '-7.25' } });
+        fireEvent.change(screen.getByLabelText('Longitude'), { target: { value: '112.08' } });
+        fireEvent.blur(screen.getByLabelText('Longitude'));
+
+        expect(onLocationChange).toHaveBeenCalledWith('-7.250000', '112.080000');
+    });
+
+    it('menolak koordinat manual di luar range tanpa memanggil onLocationChange', () => {
+        const onLocationChange = vi.fn();
+        render(<LocationPicker latitude="" longitude="" onLocationChange={onLocationChange} />);
+
+        fireEvent.change(screen.getByLabelText('Latitude'), { target: { value: '999' } });
+        fireEvent.change(screen.getByLabelText('Longitude'), { target: { value: '0' } });
+        fireEvent.blur(screen.getByLabelText('Latitude'));
+
+        expect(onLocationChange).not.toHaveBeenCalled();
+        expect(screen.getByText(/Latitude harus angka/)).toBeTruthy();
+    });
+
+    it('mengosongkan koordinat saat kedua input dikosongkan', () => {
+        const onLocationChange = vi.fn();
+        render(<LocationPicker latitude="-7.15" longitude="111.88" onLocationChange={onLocationChange} />);
+
+        fireEvent.change(screen.getByLabelText('Latitude'), { target: { value: '' } });
+        fireEvent.change(screen.getByLabelText('Longitude'), { target: { value: '' } });
+        fireEvent.blur(screen.getByLabelText('Latitude'));
+
+        expect(onLocationChange).toHaveBeenCalledWith('', '');
     });
 
     it('menampilkan aksi hapus hanya saat koordinat tersedia dan hierarchy action tetap konsisten', () => {
