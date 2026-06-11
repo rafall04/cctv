@@ -38,6 +38,10 @@ const cameraBodyProperties = {
     location: { type: 'string', maxLength: 120 },
     description: { type: 'string', maxLength: 200 },
     private_rtsp_url: { type: 'string', minLength: 8, maxLength: 500 },
+    // LocationPicker emits fixed(6) strings; allow empty string to clear. Range is
+    // re-validated in customerCameraService with friendly messages.
+    latitude: { type: ['number', 'string'], maxLength: 32 },
+    longitude: { type: ['number', 'string'], maxLength: 32 },
 };
 
 export default async function customerRoutes(fastify) {

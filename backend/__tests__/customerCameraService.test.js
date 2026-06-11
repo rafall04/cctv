@@ -84,6 +84,8 @@ function seedSchema() {
             name TEXT NOT NULL,
             description TEXT,
             location TEXT,
+            latitude REAL,
+            longitude REAL,
             owner_user_id INTEGER,
             camera_class TEXT NOT NULL DEFAULT 'community',
             billing_status TEXT,
@@ -185,6 +187,42 @@ describe('customerCameraService', () => {
         const sub = db.prepare('SELECT * FROM camera_subscriptions WHERE camera_id = ?').get(created.id);
         expect(sub.monthly_price).toBe(20000);
         expect(sub.status).toBe('active');
+    });
+
+    it('forwards validated latitude/longitude to cameraService', async () => {
+        await customerCameraService.createOwnCamera(CUSTOMER, {
+            name: 'Kamera Geo',
+            private_rtsp_url: 'rtsp://192.168.1.10:554/ch1',
+            latitude: '-7.150700',
+            longitude: '111.881500',
+        }, { user: CUSTOMER });
+
+        expect(createCameraMock).toHaveBeenCalledWith(
+            expect.objectContaining({ latitude: -7.1507, longitude: 111.8815 }),
+            expect.anything()
+        );
+    });
+
+    it('rejects out-of-range coordinates with a 400 before creating', async () => {
+        await expect(customerCameraService.createOwnCamera(CUSTOMER, {
+            name: 'Kamera Salah', private_rtsp_url: 'rtsp://192.168.1.10/ch1', latitude: '999', longitude: '0',
+        }, { user: CUSTOMER })).rejects.toMatchObject({ statusCode: 400 });
+
+        await expect(customerCameraService.createOwnCamera(CUSTOMER, {
+            name: 'Kamera Salah', private_rtsp_url: 'rtsp://192.168.1.10/ch1', latitude: '0', longitude: 'abc',
+        }, { user: CUSTOMER })).rejects.toMatchObject({ statusCode: 400 });
+
+        expect(createCameraMock).not.toHaveBeenCalled();
+    });
+
+    it('passes latitude/longitude through on update (incl. clearing via empty string)', async () => {
+        db.prepare("INSERT INTO cameras (id, name, owner_user_id, camera_class) VALUES (70, 'Geo Edit', 42, 'subscriber')").run();
+
+        await customerCameraService.updateOwnCamera(CUSTOMER, 70, {
+            latitude: '1.234567', longitude: '',
+        }, { user: CUSTOMER });
+
+        expect(updateCameraMock).toHaveBeenCalledWith(70, { latitude: 1.234567, longitude: null }, expect.anything());
     });
 
     it('enforces the plan camera limit', async () => {

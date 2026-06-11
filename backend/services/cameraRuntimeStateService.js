@@ -19,9 +19,17 @@ function normalizeOnlineFlag(value) {
     return value === true || value === 1 ? 1 : 0;
 }
 
+// Backfill is self-healing, not on the critical path: the read models LEFT JOIN
+// camera_runtime_state and tolerate a missing row, and the 30s health-check loop
+// upserts runtime rows anyway. So the INSERT…SELECT only needs to run occasionally,
+// not on every camera-list HTTP request (admin + public landing + public map all
+// hit it). Throttling it removes a write-lock acquisition from every such request.
+const SEED_THROTTLE_MS = 30 * 1000;
+
 class CameraRuntimeStateService {
     constructor() {
         this.tableSupport = null;
+        this._lastSeedAt = 0;
     }
 
     hasRuntimeTable() {
@@ -160,10 +168,18 @@ class CameraRuntimeStateService {
         return nextState;
     }
 
-    seedMissingRows() {
+    seedMissingRows({ force = false } = {}) {
         if (!this.hasRuntimeTable()) {
             return;
         }
+
+        // Throttle: skip the write entirely when we seeded recently. `force`
+        // bypasses it for the rare path that genuinely needs an immediate backfill.
+        const now = Date.now();
+        if (!force && now - this._lastSeedAt < SEED_THROTTLE_MS) {
+            return;
+        }
+        this._lastSeedAt = now;
 
         execute(`
             INSERT INTO camera_runtime_state (

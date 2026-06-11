@@ -52,6 +52,22 @@ function normalizeTextField(value, { label, min = 0, max = 120, required = false
     return text;
 }
 
+// Parse an optional coordinate. Empty → null (clears it); non-numeric or out-of-range
+// → 400 with a friendly message instead of silently dropping to null like the admin path.
+function parseCoordinate(value, { label, min, max } = {}) {
+    if (value === undefined || value === null || value === '') {
+        return null;
+    }
+    const num = Number(value);
+    if (!Number.isFinite(num)) {
+        throw badRequest(`${label} tidak valid`);
+    }
+    if (num < min || num > max) {
+        throw badRequest(`${label} harus antara ${min} dan ${max}`);
+    }
+    return num;
+}
+
 class CustomerCameraService {
     async createOwnCamera(user, data, request) {
         const planState = billingPlanService.getUserPlanState(user.id);
@@ -68,6 +84,8 @@ class CustomerCameraService {
         const name = normalizeTextField(data.name, { label: 'Nama kamera', min: 2, max: 100, required: true });
         const location = normalizeTextField(data.location, { label: 'Lokasi', max: 120 });
         const description = normalizeTextField(data.description, { label: 'Deskripsi', max: 200 });
+        const latitude = parseCoordinate(data.latitude, { label: 'Latitude', min: -90, max: 90 });
+        const longitude = parseCoordinate(data.longitude, { label: 'Longitude', min: -180, max: 180 });
         const rtsp = validateCustomerRtspUrl(data.private_rtsp_url);
         if (!rtsp.ok) {
             throw badRequest(rtsp.message);
@@ -80,6 +98,8 @@ class CustomerCameraService {
             private_rtsp_url: rtsp.url,
             description,
             location,
+            latitude,
+            longitude,
             enabled: 1,
             stream_source: 'internal',
             delivery_type: 'internal_hls',
@@ -120,13 +140,19 @@ class CustomerCameraService {
             }
             payload.private_rtsp_url = rtsp.url;
         }
+        if (data.latitude !== undefined) {
+            payload.latitude = parseCoordinate(data.latitude, { label: 'Latitude', min: -90, max: 90 });
+        }
+        if (data.longitude !== undefined) {
+            payload.longitude = parseCoordinate(data.longitude, { label: 'Longitude', min: -180, max: 180 });
+        }
         if (Object.keys(payload).length === 0) {
             throw badRequest('Tidak ada field yang diubah');
         }
 
         await cameraService.updateCamera(cameraId, payload, request);
         return queryOne(
-            'SELECT id, name, description, location, camera_class, billing_status FROM cameras WHERE id = ?',
+            'SELECT id, name, description, location, latitude, longitude, camera_class, billing_status FROM cameras WHERE id = ?',
             [cameraId]
         );
     }
