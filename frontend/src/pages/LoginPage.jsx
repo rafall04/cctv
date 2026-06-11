@@ -211,12 +211,15 @@ export default function LoginPage() {
                     }
                 }
                 
+                // Customers land on their portal; staff (admin/viewer) on the dashboard.
+                const destination = result.user?.role === 'customer' ? '/my' : '/admin/dashboard';
+
                 // Show success toast (Requirements: 2.10)
-                showSuccess('Login Successful', 'Welcome back! Redirecting to dashboard...');
-                
+                showSuccess('Login Successful', 'Welcome back! Redirecting...');
+
                 // Small delay to show the toast before redirect
                 setTimeout(() => {
-                    navigate('/admin/dashboard');
+                    navigate(destination);
                 }, 500);
             } else {
                 handleLoginError(result);

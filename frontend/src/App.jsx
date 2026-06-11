@@ -21,6 +21,7 @@ import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import Playback from './pages/Playback';
 import ProtectedRoute from './components/ProtectedRoute';
+import CustomerRoute from './components/CustomerRoute';
 import lazyWithRetry from './utils/lazyWithRetry';
 
 // Lazy load admin pages for better code splitting
@@ -43,6 +44,26 @@ const SponsorManagement = lazyWithRetry(() => import('./pages/SponsorManagement'
 const AdsManagement = lazyWithRetry(() => import('./pages/AdsManagement'), 'ads-management');
 const RecordingDashboard = lazyWithRetry(() => import('./pages/RecordingDashboard'), 'recording-dashboard');
 const AreaPublicPage = lazyWithRetry(() => import('./pages/AreaPublicPage'), 'area-public-page');
+const BillingManagement = lazyWithRetry(() => import('./pages/BillingManagement'), 'billing-management');
+const CustomerLayout = lazyWithRetry(() => import('./layouts/CustomerLayout'), 'customer-layout');
+const MyCameras = lazyWithRetry(() => import('./pages/customer/MyCameras'), 'my-cameras');
+const MyWallet = lazyWithRetry(() => import('./pages/customer/MyWallet'), 'my-wallet');
+
+function CustomerPageRoute({ children }) {
+    return (
+        <CustomerRoute>
+            <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading...</div>}>
+                <CustomerLayout>
+                    <ErrorBoundary>
+                        <Suspense fallback={<div className="p-6">Loading...</div>}>
+                            {children}
+                        </Suspense>
+                    </ErrorBoundary>
+                </CustomerLayout>
+            </Suspense>
+        </CustomerRoute>
+    );
+}
 
 function AdminPageRoute({ children, adminOnly = false }) {
     return (
@@ -84,6 +105,24 @@ function App() {
                     </Suspense>
                 } />
                 <Route path="/admin/login" element={<LoginPage />} />
+
+                {/* Customer portal (role: customer) */}
+                <Route
+                    path="/my"
+                    element={
+                        <CustomerPageRoute>
+                            <MyCameras />
+                        </CustomerPageRoute>
+                    }
+                />
+                <Route
+                    path="/my/wallet"
+                    element={
+                        <CustomerPageRoute>
+                            <MyWallet />
+                        </CustomerPageRoute>
+                    }
+                />
 
                 {/* Protected admin routes */}
                 <Route
@@ -227,6 +266,14 @@ function App() {
                     element={
                         <AdminPageRoute>
                             <RecordingDashboard />
+                        </AdminPageRoute>
+                    }
+                />
+                <Route
+                    path="/admin/billing"
+                    element={
+                        <AdminPageRoute adminOnly>
+                            <BillingManagement />
                         </AdminPageRoute>
                     }
                 />

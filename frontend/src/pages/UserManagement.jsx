@@ -158,7 +158,7 @@ export default function UserManagement() {
     const [showSelfDeleteWarning, setShowSelfDeleteWarning] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
     const [passwordUser, setPasswordUser] = useState(null);
-    const [formData, setFormData] = useState({ username: '', password: '', role: 'admin' });
+    const [formData, setFormData] = useState({ username: '', password: '', role: 'admin', phone: '', email: '' });
     const [passwordData, setPasswordData] = useState({ password: '', confirmPassword: '' });
     const [error, setError] = useState('');
     const [passwordError, setPasswordError] = useState('');
@@ -187,7 +187,7 @@ export default function UserManagement() {
 
     const openAddModal = () => {
         setEditingUser(null);
-        setFormData({ username: '', password: '', role: 'admin' });
+        setFormData({ username: '', password: '', role: 'admin', phone: '', email: '' });
         setError('');
         setFieldErrors({});
         setShowModal(true);
@@ -195,7 +195,7 @@ export default function UserManagement() {
 
     const openEditModal = (user) => {
         setEditingUser(user);
-        setFormData({ username: user.username, password: '', role: user.role });
+        setFormData({ username: user.username, password: '', role: user.role, phone: user.phone || '', email: user.email || '' });
         setError('');
         setFieldErrors({});
         setShowModal(true);
@@ -258,9 +258,11 @@ export default function UserManagement() {
         try {
             let result;
             if (editingUser) {
-                result = await userService.updateUser(editingUser.id, { 
-                    username: formData.username, 
-                    role: formData.role 
+                result = await userService.updateUser(editingUser.id, {
+                    username: formData.username,
+                    role: formData.role,
+                    phone: formData.phone || undefined,
+                    email: formData.email || undefined,
                 });
                 if (result.success) {
                     success('User Updated', `${formData.username} has been updated successfully`);
@@ -457,7 +459,9 @@ export default function UserManagement() {
                                             <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
                                                 user.role === 'admin'
                                                     ? 'bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400'
-                                                    : 'bg-blue-100 dark:bg-primary/20 text-primary-600 dark:text-blue-400'
+                                                    : user.role === 'customer'
+                                                        ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                                                        : 'bg-blue-100 dark:bg-primary/20 text-primary-600 dark:text-blue-400'
                                             }`}>
                                                 {user.role}
                                             </span>
@@ -603,8 +607,27 @@ export default function UserManagement() {
                                 <select id="user-role" name="role" value={formData.role} onChange={handleChange} className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary">
                                     <option value="admin">Admin</option>
                                     <option value="viewer">Viewer</option>
+                                    <option value="customer">Customer (Pelanggan Sewa)</option>
                                 </select>
+                                {formData.role === 'customer' && (
+                                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                        Pelanggan hanya bisa mengakses portal /my (kamera miliknya + saldo), tidak bisa membuka halaman admin.
+                                    </p>
+                                )}
                             </div>
+
+                            {formData.role === 'customer' && (
+                                <>
+                                    <div>
+                                        <label htmlFor="user-phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">No. HP (untuk tagihan)</label>
+                                        <input id="user-phone" name="phone" type="text" value={formData.phone} onChange={handleChange} placeholder="08xxxxxxxxxx" className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary" />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="user-email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Email (opsional)</label>
+                                        <input id="user-email" name="email" type="email" value={formData.email} onChange={handleChange} placeholder="pelanggan@email.com" className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary" />
+                                    </div>
+                                </>
+                            )}
 
                             <div className="flex gap-3 pt-2">
                                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" disabled={submitting}>Cancel</button>
