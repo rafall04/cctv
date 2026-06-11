@@ -32,6 +32,8 @@ const CUSTOMER_CAMERA_PROJECTION = `
     c.name,
     c.description,
     c.location,
+    c.latitude,
+    c.longitude,
     c.status,
     c.is_online,
     c.last_online_check,

@@ -7,8 +7,10 @@
  * SideEffects: Creates/updates the camera via API on submit.
  */
 
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import customerService from '../../services/customerService';
+
+const LocationPicker = lazy(() => import('../LocationPicker'));
 
 const inputClass = 'w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary';
 
@@ -19,6 +21,8 @@ export default function CameraFormModal({ camera = null, onClose, onSaved }) {
         location: camera?.location || '',
         description: camera?.description || '',
         private_rtsp_url: '',
+        latitude: camera?.latitude ?? '',
+        longitude: camera?.longitude ?? '',
     });
     const [error, setError] = useState('');
     const [submitting, setSubmitting] = useState(false);
@@ -26,6 +30,10 @@ export default function CameraFormModal({ camera = null, onClose, onSaved }) {
     const handleChange = (e) => {
         setForm({ ...form, [e.target.name]: e.target.value });
         setError('');
+    };
+
+    const handleLocationChange = (lat, lng) => {
+        setForm((current) => ({ ...current, latitude: lat, longitude: lng }));
     };
 
     const handleSubmit = async (e) => {
@@ -36,10 +44,14 @@ export default function CameraFormModal({ camera = null, onClose, onSaved }) {
         }
         setSubmitting(true);
         try {
+            // Coordinates are always sent (empty string clears them) so editing
+            // a camera to "no location" works; create defaults to empty = null.
             const payload = {
                 name: form.name.trim(),
                 location: form.location.trim() || undefined,
                 description: form.description.trim() || undefined,
+                latitude: form.latitude === '' || form.latitude === null ? '' : String(form.latitude),
+                longitude: form.longitude === '' || form.longitude === null ? '' : String(form.longitude),
             };
             if (form.private_rtsp_url.trim()) {
                 payload.private_rtsp_url = form.private_rtsp_url.trim();
@@ -62,13 +74,13 @@ export default function CameraFormModal({ camera = null, onClose, onSaved }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
             <div
-                className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-800 dark:bg-gray-900"
+                className="my-auto flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-900"
                 onClick={(e) => e.stopPropagation()}
             >
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                <h3 className="shrink-0 border-b border-gray-200 p-5 text-lg font-bold text-gray-900 dark:border-gray-800 dark:text-white">
                     {isEdit ? `Edit ${camera.name}` : 'Tambah Kamera'}
                 </h3>
-                <form onSubmit={handleSubmit} className="mt-3 space-y-3">
+                <form onSubmit={handleSubmit} className="flex-1 space-y-3 overflow-y-auto p-5">
                     <div>
                         <label htmlFor="cam-name" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Nama kamera</label>
                         <input id="cam-name" name="name" value={form.name} onChange={handleChange} required minLength={2} maxLength={100} className={inputClass} placeholder="Kamera Depan Toko" />
@@ -88,6 +100,22 @@ export default function CameraFormModal({ camera = null, onClose, onSaved }) {
                         <input id="cam-rtsp" name="private_rtsp_url" value={form.private_rtsp_url} onChange={handleChange} maxLength={500} className={inputClass} placeholder="rtsp://user:pass@ip-kamera:554/stream" />
                         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                             Dari aplikasi kamera/NVR Anda. Pastikan kamera bisa diakses dari jaringan RAF NET.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Lokasi di Peta (opsional)
+                        </label>
+                        <Suspense fallback={<div className="flex h-10 items-center justify-center rounded-lg bg-gray-100 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">Memuat peta…</div>}>
+                            <LocationPicker
+                                latitude={form.latitude}
+                                longitude={form.longitude}
+                                onLocationChange={handleLocationChange}
+                            />
+                        </Suspense>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Pakai tombol GPS atau buka peta untuk menandai titik kamera Anda.
                         </p>
                     </div>
 

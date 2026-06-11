@@ -36,28 +36,26 @@ export default function MyCameras() {
     const [busyId, setBusyId] = useState(null);
 
     const reload = useCallback(async () => {
-        try {
-            const response = await customerService.getMyCameras();
-            if (response.success) {
-                setCameras(response.data || []);
-                setError(null);
-            } else {
-                setError(response.message || 'Gagal memuat kamera');
-            }
-        } catch {
-            setError('Gagal memuat kamera. Coba muat ulang halaman.');
-        } finally {
-            setLoading(false);
+        // Cameras + plan load in parallel (plan powers the add-button/limit
+        // indicator and is best-effort — its failure never blocks the list).
+        const [camerasResult, planResult] = await Promise.allSettled([
+            customerService.getMyCameras(),
+            customerService.getPlan(),
+        ]);
+
+        if (camerasResult.status === 'fulfilled' && camerasResult.value?.success) {
+            setCameras(camerasResult.value.data || []);
+            setError(null);
+        } else {
+            setError(camerasResult.value?.message || 'Gagal memuat kamera. Coba muat ulang halaman.');
         }
-        // Plan state powers the add-button/limit indicator; best-effort only.
-        try {
-            const planResponse = await customerService.getPlan?.();
-            if (planResponse?.success) {
-                setPlanState(planResponse.data);
-            }
-        } catch {
-            setPlanState(null);
-        }
+        setLoading(false);
+
+        setPlanState(
+            planResult.status === 'fulfilled' && planResult.value?.success
+                ? planResult.value.data
+                : null
+        );
     }, []);
 
     useEffect(() => {
