@@ -8,6 +8,7 @@
 
 import {
     getAllAreas,
+    getPublicAreas,
     getAreaById,
     createArea,
     updateArea,
@@ -25,10 +26,10 @@ import {
 import { cacheMiddleware } from '../middleware/cacheMiddleware.js';
 
 export default async function areaRoutes(fastify, options) {
-    // Public endpoints - for landing page filter
+    // Public endpoints - for landing page filter (community camera counts only)
     fastify.get('/public', {
         preHandler: cacheMiddleware(30000),
-        handler: getAllAreas,
+        handler: getPublicAreas,
     });
     
     fastify.get('/filters', {

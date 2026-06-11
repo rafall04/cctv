@@ -12,6 +12,7 @@ import jwt from 'jsonwebtoken';
 import { sanitizeCameraThumbnailList } from './thumbnailPathService.js';
 import cameraHealthService from './cameraHealthService.js';
 import cameraViewStatsService from './cameraViewStatsService.js';
+import { getAccessInfo, canViewLive } from './cameraAccessService.js';
 import {
     getEffectiveDeliveryType,
     getStreamCapabilities,
@@ -124,11 +125,25 @@ class StreamService {
         };
     }
 
-    getStreamUrls(cameraId, requestHost) {
+    getStreamUrls(cameraId, requestHost, user = null) {
+        // Tenancy gate first: non-community cameras (owner_private/subscriber) are only
+        // visible to staff or their owner, and subscriber cameras must be billing-active.
+        const accessInfo = getAccessInfo(cameraId);
+        const access = canViewLive({ info: accessInfo, user });
+        if (!access.allowed) {
+            const err = new Error(
+                access.reason === 'subscription_suspended'
+                    ? 'Camera suspended - subscription payment required'
+                    : 'Camera not found or disabled'
+            );
+            err.statusCode = access.statusCode === 402 ? 402 : 404;
+            throw err;
+        }
+
         const camera = queryOne(
             `SELECT ${SHARED_CAMERA_STREAM_WITH_AREA_PROJECTION}
-             FROM cameras c 
-             LEFT JOIN areas a ON c.area_id = a.id 
+             FROM cameras c
+             LEFT JOIN areas a ON c.area_id = a.id
              WHERE c.id = ? AND c.enabled = 1`,
             [cameraId]
         );
@@ -192,9 +207,9 @@ class StreamService {
     getAllActiveStreams(requestHost) {
         const cameras = query(
             `SELECT ${SHARED_CAMERA_STREAM_WITH_AREA_PROJECTION}
-             FROM cameras c 
-             LEFT JOIN areas a ON c.area_id = a.id 
-             WHERE c.enabled = 1 
+             FROM cameras c
+             LEFT JOIN areas a ON c.area_id = a.id
+             WHERE c.enabled = 1 AND c.camera_class = 'community'
              ORDER BY c.is_tunnel ASC, c.id ASC`
         );
         const statsByCamera = cameraViewStatsService.getPublicStatsByCamera();
@@ -208,7 +223,7 @@ class StreamService {
         return sanitizeCameraThumbnailList(camerasWithStreams);
     }
 
-    generateStreamToken(cameraId, requestHost) {
+    generateStreamToken(cameraId, requestHost, user = null) {
         const camera = queryOne(
             'SELECT id, stream_key, enabled FROM cameras WHERE id = ?',
             [cameraId]
@@ -217,6 +232,21 @@ class StreamService {
         if (!camera || !camera.enabled) {
             const err = new Error('Camera not found or disabled');
             err.statusCode = 404;
+            throw err;
+        }
+
+        // Non-community cameras only hand out stream tokens to staff or the owner,
+        // and a suspended subscriber camera hands them to staff only. The /hls proxy
+        // independently re-checks billing on every playlist fetch, so a token issued
+        // moments before a suspension cannot outlive it by more than the access-cache TTL.
+        const access = canViewLive({ info: getAccessInfo(cameraId), user });
+        if (!access.allowed) {
+            const err = new Error(
+                access.reason === 'subscription_suspended'
+                    ? 'Camera suspended - subscription payment required'
+                    : 'Camera not found or disabled'
+            );
+            err.statusCode = access.statusCode === 402 ? 402 : 404;
             throw err;
         }
 

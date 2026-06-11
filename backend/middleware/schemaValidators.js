@@ -348,7 +348,15 @@ export const createUserSchema = {
             },
             role: {
                 type: 'string',
-                enum: ['admin', 'viewer']
+                enum: ['admin', 'viewer', 'customer']
+            },
+            phone: {
+                type: 'string',
+                maxLength: 30
+            },
+            email: {
+                type: 'string',
+                maxLength: 120
             }
         },
         additionalProperties: false
@@ -367,7 +375,15 @@ export const updateUserSchema = {
             },
             role: {
                 type: 'string',
-                enum: ['admin', 'viewer']
+                enum: ['admin', 'viewer', 'customer']
+            },
+            phone: {
+                type: 'string',
+                maxLength: 30
+            },
+            email: {
+                type: 'string',
+                maxLength: 120
             }
         },
         additionalProperties: false

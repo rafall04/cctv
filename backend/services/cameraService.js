@@ -18,6 +18,7 @@ import {
 } from './securityAuditLogger.js';
 import { invalidateCache } from '../middleware/cacheMiddleware.js';
 import { cacheGetOrSetSync, cacheInvalidate, cacheKey, CacheNamespace } from './cacheService.js';
+import { invalidateCameraAccessCache } from './cameraAccessService.js';
 import { sanitizeCameraThumbnail, sanitizeCameraThumbnailList } from './thumbnailPathService.js';
 import cameraHealthService from './cameraHealthService.js';
 import cameraRuntimeStateService from './cameraRuntimeStateService.js';
@@ -212,6 +213,12 @@ const ADMIN_CAMERA_LIST_PROJECTION = `
     c.group_name,
     c.area_id,
     c.enabled,
+    c.owner_user_id,
+    CASE
+        WHEN c.camera_class IN ('community', 'owner_private', 'subscriber') THEN c.camera_class
+        ELSE 'community'
+    END as camera_class,
+    c.billing_status,
     c.is_tunnel,
     c.latitude,
     c.longitude,
@@ -1326,6 +1333,8 @@ class CameraService {
         invalidateCache('/api/stream');
         cacheInvalidate(`${CacheNamespace.CAMERAS}:`);
         cacheInvalidate(`${CacheNamespace.STATS}:camera-`);
+        // Tenancy gate cache: class/owner/billing changes must hit live streams fast.
+        invalidateCameraAccessCache();
         console.log('[Cache] Camera cache invalidated');
     }
 
@@ -1349,7 +1358,7 @@ class CameraService {
             FROM cameras c
             LEFT JOIN areas a ON c.area_id = a.id
             LEFT JOIN camera_runtime_state crs ON crs.camera_id = c.id
-            WHERE c.enabled = 1
+            WHERE c.enabled = 1 AND c.camera_class = 'community'
             ORDER BY c.is_tunnel ASC, c.id ASC
         `)).map((camera) => cameraHealthService.enrichCameraAvailability(camera)), CAMERA_READ_MODEL_TTL_MS);
     }
@@ -1369,7 +1378,7 @@ class CameraService {
                 WHERE is_active = 1
                 GROUP BY camera_id
             ) active ON active.camera_id = c.id
-            WHERE c.enabled = 1
+            WHERE c.enabled = 1 AND c.camera_class = 'community'
             ORDER BY c.is_tunnel ASC, c.id ASC
         `))
             .map(sanitizePublicLandingCamera)

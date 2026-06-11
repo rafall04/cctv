@@ -14,6 +14,22 @@ export async function getAllAreas(request, reply) {
     }
 }
 
+// Public landing-page variant: camera counts include community-class cameras only,
+// so rented/private cameras never leak (even as a count) into public surfaces.
+export async function getPublicAreas(request, reply) {
+    try {
+        const result = areaService.getAllAreas({ publicOnly: true });
+        return reply.send({
+            success: true,
+            data: result.areas,
+            cached: result.isCached
+        });
+    } catch (error) {
+        console.error('Get public areas error:', error);
+        return reply.code(500).send({ success: false, message: 'Internal server error' });
+    }
+}
+
 export async function getAreaFilters(request, reply) {
     try {
         const result = areaService.getAreaFilters();

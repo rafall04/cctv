@@ -9,12 +9,13 @@
 import Fastify from 'fastify';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { getAllAreasMock } = vi.hoisted(() => ({
-    getAllAreasMock: vi.fn(),
+const { getPublicAreasMock } = vi.hoisted(() => ({
+    getPublicAreasMock: vi.fn(),
 }));
 
 vi.mock('../controllers/areaController.js', () => ({
-    getAllAreas: getAllAreasMock,
+    getAllAreas: vi.fn(),
+    getPublicAreas: getPublicAreasMock,
     getAreaById: vi.fn(),
     createArea: vi.fn(),
     updateArea: vi.fn(),
@@ -37,8 +38,8 @@ vi.mock('../middleware/schemaValidators.js', () => ({
 
 describe('areaRoutes public cache', () => {
     beforeEach(() => {
-        getAllAreasMock.mockReset();
-        getAllAreasMock.mockImplementation((_request, reply) => reply.send({
+        getPublicAreasMock.mockReset();
+        getPublicAreasMock.mockImplementation((_request, reply) => reply.send({
             success: true,
             data: [{ id: 1, name: 'Area 1' }],
         }));
@@ -56,7 +57,7 @@ describe('areaRoutes public cache', () => {
         expect(second.statusCode).toBe(200);
         expect(first.headers['x-cache']).toBe('MISS');
         expect(second.headers['x-cache']).toBe('HIT');
-        expect(getAllAreasMock).toHaveBeenCalledTimes(1);
+        expect(getPublicAreasMock).toHaveBeenCalledTimes(1);
         await fastify.close();
     });
 });

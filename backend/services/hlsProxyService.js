@@ -21,6 +21,10 @@ import {
     createSegmentCache,
     TTL as EXTERNAL_CACHE_TTL,
 } from '../services/externalStreamCache.js';
+import {
+    getAccessInfo as getCameraAccessInfo,
+    canViewLive as checkCanViewLive,
+} from '../services/cameraAccessService.js';
 
 const IPV4_MAPPED_PREFIX = '::ffff:';
 const DEFAULT_HLS_CONFIG = {
@@ -1295,6 +1299,72 @@ export function verifyStreamToken(request, reply, done) {
     }
 }
 
+/**
+ * Resolve the authenticated user (if any) for an HLS request from the JWT
+ * cookie or Authorization header. Pure best-effort: invalid/absent tokens
+ * yield null instead of an error, because community streams stay public.
+ */
+export function resolveHlsViewerUser(request) {
+    let token = request.cookies?.token || null;
+    if (!token) {
+        const authHeader = request.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            token = authHeader.substring(7);
+        }
+    }
+    if (!token) {
+        return null;
+    }
+    try {
+        const decoded = jwt.verify(token, config.jwt.secret);
+        // Stream-access tokens are handled separately (request.streamToken);
+        // only treat real user sessions as a user here.
+        if (decoded?.type === 'stream_access') {
+            return null;
+        }
+        return decoded?.id ? decoded : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Propagate a stream-access token into every URI of an HLS playlist so child
+ * playlists, #EXT-X-MAP init segments, and media segments inherit the token.
+ * Only called for gated (non-community) cameras — community playlists are
+ * served byte-identical to upstream.
+ */
+export function propagateTokenInPlaylist(playlistText, token) {
+    if (!playlistText || !token) {
+        return playlistText;
+    }
+    const encoded = encodeURIComponent(token);
+    const appendToken = (uri) => {
+        if (!uri || /^https?:\/\//i.test(uri)) {
+            // Absolute upstream URIs never occur for MediaMTX internal paths;
+            // leave them untouched rather than leaking the token off-origin.
+            return uri;
+        }
+        return `${uri}${uri.includes('?') ? '&' : '?'}token=${encoded}`;
+    };
+
+    return playlistText.split('\n').map((line) => {
+        const trimmed = line.trim();
+        if (!trimmed) {
+            return line;
+        }
+        if (trimmed.startsWith('#')) {
+            // #EXT-X-MAP:URI="init.mp4" and #EXT-X-PART:...URI="..." carry
+            // fetchable URIs inside attribute lists — rewrite those too.
+            if (/URI="/.test(trimmed)) {
+                return line.replace(/URI="([^"]+)"/g, (match, uri) => `URI="${appendToken(uri)}"`);
+            }
+            return line;
+        }
+        return appendToken(trimmed);
+    }).join('\n');
+}
+
 function buildExternalCacheKey(url, cameraId) {
     // cameraId is stamped into the rewritten playlist body, so two cameras
     // pointing at the same upstream URL must not share a playlist cache
@@ -1343,6 +1413,26 @@ export async function handleExternalStreamProxy(state, request, reply) {
             : null;
         if (cameraId && !externalCameraConfig) {
             return reply.code(400).send('Invalid cameraId parameter');
+        }
+
+        // Tenancy gate for camera-bound external proxying: non-community
+        // cameras require an authorized viewer; suspended subscriber → 402.
+        // (Without a cameraId there is no camera context to gate — and the
+        // upstream URLs of non-community cameras never appear in any public
+        // payload, since all public read models filter to community-class.)
+        if (externalCameraConfig?.cameraId) {
+            const accessInfo = getCameraAccessInfo(externalCameraConfig.cameraId);
+            if (accessInfo && accessInfo.camera_class !== 'community') {
+                const access = checkCanViewLive({
+                    info: accessInfo,
+                    user: resolveHlsViewerUser(request),
+                    streamToken: request.streamToken || null,
+                });
+                if (!access.allowed) {
+                    reply.header('Cache-Control', 'no-store');
+                    return reply.code(access.statusCode === 402 ? 402 : 403).send('');
+                }
+            }
         }
 
         const isTextFile = url.includes('.m3u8');

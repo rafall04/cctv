@@ -24,6 +24,9 @@ import { originValidatorMiddleware } from './middleware/originValidator.js';
 import { csrfMiddleware } from './middleware/csrfProtection.js';
 import { inputSanitizerMiddleware } from './middleware/inputSanitizer.js';
 import { schemaErrorHandler } from './middleware/schemaValidators.js';
+import { customerAccessPolicyHook } from './middleware/customerAccessPolicy.js';
+import { getAccessInfo as getCameraAccessInfo, canViewLive as canViewCameraLive } from './services/cameraAccessService.js';
+import { resolveHlsViewerUser } from './services/hlsProxyService.js';
 
 // Import services
 import { startDailyCleanup, stopDailyCleanup, logSecurityEvent, SECURITY_EVENTS } from './services/securityAuditLogger.js';
@@ -134,12 +137,43 @@ await fastify.register(cookie, {
     parseOptions: {},
 });
 
+// Tenancy gate for thumbnails: files are named {cameraId}.jpg, so rented/private
+// camera snapshots must not be fetchable by guessing ids. Community thumbnails
+// stay public. Runs in onRequest, before the static handler below.
+fastify.addHook('onRequest', async (request, reply) => {
+    if (!request.url.startsWith('/api/thumbnails/')) {
+        return;
+    }
+    const fileName = request.url.slice('/api/thumbnails/'.length).split('?')[0];
+    const idMatch = /^(\d+)(?:_temp)?\.jpg$/i.exec(fileName);
+    if (!idMatch) {
+        return;
+    }
+    const info = getCameraAccessInfo(Number(idMatch[1]));
+    if (!info || info.camera_class === 'community') {
+        return;
+    }
+    const access = canViewCameraLive({ info, user: resolveHlsViewerUser(request) });
+    if (!access.allowed) {
+        reply.header('Cache-Control', 'no-store');
+        return reply.code(403).send({ success: false, message: 'Forbidden' });
+    }
+    // Authorized viewers of gated thumbnails must not populate shared caches.
+    reply.header('Cache-Control', 'private, no-store');
+});
+
 // Register Static File Serving for thumbnails
 await fastify.register(fastifyStatic, {
     root: join(__dirname, 'data', 'thumbnails'),
     prefix: '/api/thumbnails/',
     decorateReply: false // Don't override reply.sendFile
 });
+
+// Customer-role lockout (deny-by-default): authenticated `customer` users may
+// only reach whitelisted endpoints. Added at the ROOT scope so it covers every
+// route registered below, present and future. Runs in the preHandler phase —
+// after route-level onRequest auth has populated request.user.
+fastify.addHook('preHandler', customerAccessPolicyHook);
 
 // ============================================
 // 1. SECURITY HEADERS MIDDLEWARE (FIRST)

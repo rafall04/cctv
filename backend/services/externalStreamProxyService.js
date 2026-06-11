@@ -21,6 +21,7 @@ Design vs the legacy /hls/proxy?url=...&cameraId=... route:
 import https from 'https';
 import { queryOne } from '../database/connectionPool.js';
 import cameraHealthService from '../services/cameraHealthService.js';
+import { getAccessInfo, canViewLive } from '../services/cameraAccessService.js';
 import {
     createPlaylistCache,
     createSegmentCache,
@@ -34,6 +35,8 @@ import {
     createHlsHttpClient,
     safeAbort,
     createHlsRouteState,
+    verifyStreamToken,
+    resolveHlsViewerUser,
 } from '../services/hlsProxyService.js';
 import { config } from '../config/config.js';
 
@@ -151,6 +154,35 @@ function isCameraProxyable(camera) {
     if (camera.stream_source !== 'external') return false;
     if (!camera.external_hls_url) return false;
     if (camera.external_use_proxy === 0 || camera.external_use_proxy === false) return false;
+    return true;
+}
+
+/**
+ * Tenancy/billing gate for the external proxy entry points. Community
+ * cameras pass untouched. owner_private/subscriber cameras require a
+ * staff/owner JWT (cookie or Bearer) or a camera-bound stream token
+ * (?token=), and subscriber-class additionally requires billing_status
+ * 'active'. Opaque child-segment URLs do not carry ?token=, so tokened
+ * viewers cover the master fetch only — portal players rely on the
+ * same-origin JWT cookie, which rides on every request.
+ *
+ * Returns true when the request was denied (response already sent).
+ */
+function denyIfNotViewable(request, reply, cameraId) {
+    const info = getAccessInfo(cameraId);
+    if (!info || info.camera_class === 'community') {
+        return false;
+    }
+    const access = canViewLive({
+        info,
+        user: resolveHlsViewerUser(request),
+        streamToken: request.streamToken || null,
+    });
+    if (access.allowed) {
+        return false;
+    }
+    reply.header('Cache-Control', 'no-store');
+    reply.code(access.statusCode === 402 ? 402 : 403).send('');
     return true;
 }
 
@@ -664,10 +696,14 @@ export async function registerExternalStreamProxyRoutes(fastify, options = {}) {
     });
 
     // GET /api/stream/:cameraId/external.m3u8
-    fastify.get('/:cameraId/external.m3u8', async (request, reply) => {
+    fastify.get('/:cameraId/external.m3u8', { preHandler: verifyStreamToken }, async (request, reply) => {
         const camera = getCameraCached(request.params.cameraId);
         if (!isCameraProxyable(camera)) {
             return reply.code(404).send('Camera not found or not proxyable');
+        }
+
+        if (denyIfNotViewable(request, reply, camera.id)) {
+            return reply;
         }
 
         if (!isExternalProxyTargetAllowed(camera.external_hls_url, allowOptions)) {
@@ -737,10 +773,14 @@ export async function registerExternalStreamProxyRoutes(fastify, options = {}) {
     });
 
     // GET /api/stream/:cameraId/external-segment/:filename
-    fastify.get('/:cameraId/external-segment/:filename', async (request, reply) => {
+    fastify.get('/:cameraId/external-segment/:filename', { preHandler: verifyStreamToken }, async (request, reply) => {
         const camera = getCameraCached(request.params.cameraId);
         if (!isCameraProxyable(camera)) {
             return reply.code(404).send('Camera not found or not proxyable');
+        }
+
+        if (denyIfNotViewable(request, reply, camera.id)) {
+            return reply;
         }
 
         const targetUrl = resolveSegmentTargetUrl(camera, request.params.filename, allowOptions);

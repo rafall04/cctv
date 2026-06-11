@@ -14,11 +14,11 @@ import {
 
 class UserService {
     getAllUsers() {
-        return query(`SELECT id, username, role, created_at FROM users ORDER BY id ASC`);
+        return query(`SELECT id, username, role, phone, email, created_at FROM users ORDER BY id ASC`);
     }
 
     getUserById(id) {
-        const user = queryOne(`SELECT id, username, role, created_at FROM users WHERE id = ?`, [id]);
+        const user = queryOne(`SELECT id, username, role, phone, email, created_at FROM users WHERE id = ?`, [id]);
         if (!user) {
             const err = new Error('User not found');
             err.statusCode = 404;
@@ -28,7 +28,7 @@ class UserService {
     }
 
     async createUser(data, request) {
-        const { username, password, role } = data;
+        const { username, password, role, phone, email } = data;
 
         if (!username || !password) {
             const err = new Error('Username and password are required');
@@ -68,8 +68,8 @@ class UserService {
         const passwordHash = await bcrypt.hash(password, 10);
 
         const result = execute(
-            'INSERT INTO users (username, password_hash, role, password_changed_at) VALUES (?, ?, ?, ?)',
-            [username, passwordHash, role || 'admin', new Date().toISOString()]
+            'INSERT INTO users (username, password_hash, role, phone, email, password_changed_at) VALUES (?, ?, ?, ?, ?, ?)',
+            [username, passwordHash, role || 'admin', phone || null, email || null, new Date().toISOString()]
         );
 
         addPasswordToHistory(result.lastInsertRowid, passwordHash);
@@ -95,7 +95,7 @@ class UserService {
     }
 
     async updateUser(id, data, request) {
-        const { username, role } = data;
+        const { username, role, phone, email } = data;
 
         const existingUser = queryOne('SELECT id, username FROM users WHERE id = ?', [id]);
         if (!existingUser) {
@@ -121,6 +121,16 @@ class UserService {
         if (role !== undefined) {
             updates.push('role = ?');
             values.push(role);
+        }
+
+        if (phone !== undefined) {
+            updates.push('phone = ?');
+            values.push(phone || null);
+        }
+
+        if (email !== undefined) {
+            updates.push('email = ?');
+            values.push(email || null);
         }
 
         if (updates.length === 0) {

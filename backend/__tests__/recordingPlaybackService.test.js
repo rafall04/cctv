@@ -267,11 +267,45 @@ describe('recordingPlaybackService', () => {
 
         const result = recordingPlaybackService.getSegments(10, {
             query: { scope: 'admin' },
-            user: { id: 1 },
+            user: { id: 1, role: 'admin' },
         });
 
         expect(result.playback_policy.accessMode).toBe('admin_full');
         expect(result.segments).toHaveLength(2);
+    });
+
+    it('rejects admin playback scope for authenticated non-staff (customer) users', () => {
+        queryOneMock.mockReturnValueOnce({
+            id: 10,
+            name: 'CCTV ALUN',
+            public_playback_mode: 'admin_only',
+            public_playback_preview_minutes: null,
+        });
+
+        expect(() => recordingPlaybackService.getSegments(10, {
+            query: { scope: 'admin' },
+            user: { id: 7, role: 'customer' },
+        })).toThrow('Unauthorized playback access');
+    });
+
+    it('denies public playback for non-community cameras even via playback token', () => {
+        validateRequestForCameraMock.mockReturnValue({
+            id: 20,
+            scope_type: 'all',
+            effective_playback_window_hours: 12,
+        });
+
+        const access = recordingPlaybackService.resolvePlaybackAccess({
+            id: 5,
+            camera_class: 'subscriber',
+            public_playback_mode: 'inherit',
+            public_playback_preview_minutes: 10,
+        }, { query: {}, url: '/api/recordings/5/segments', cookies: { raf_playback_token: 'token' } });
+
+        expect(access.accessMode).toBe('public_denied');
+        expect(access.deniedReason).toBe('camera_admin_only');
+        // Token validation must not even be consulted for rented cameras.
+        expect(validateRequestForCameraMock).not.toHaveBeenCalled();
     });
 
     it('blocks public playback for admin-only cameras', () => {

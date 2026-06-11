@@ -19,7 +19,25 @@ import {
     fetchBinaryUpstream,
     cleanupUpstreamResponse,
     attachAbortCleanup,
+    resolveHlsViewerUser,
+    propagateTokenInPlaylist,
 } from '../services/hlsProxyService.js';
+import {
+    getAccessInfo,
+    getAccessInfoByStreamKey,
+    canViewLive,
+} from '../services/cameraAccessService.js';
+
+// Resolve tenancy info for an /hls path segment: UUID stream keys hit the
+// stream_key index; legacy "camera<id>" paths fall back to the numeric id.
+function resolveHlsAccessInfo(cameraPath) {
+    const byKey = getAccessInfoByStreamKey(cameraPath);
+    if (byKey) {
+        return byKey;
+    }
+    const legacyMatch = /^camera(\d+)$/.exec(cameraPath || '');
+    return legacyMatch ? getAccessInfo(Number(legacyMatch[1])) : null;
+}
 
 export default async function hlsProxyRoutes(fastify, _options) {
     const mediamtxHlsUrl = config.mediamtx?.hlsUrlInternal || 'http://localhost:8888';
@@ -34,7 +52,7 @@ export default async function hlsProxyRoutes(fastify, _options) {
         applyHlsCorsHeaders(request, reply);
     });
 
-    fastify.get('/proxy', async (request, reply) => handleExternalStreamProxy(state, request, reply));
+    fastify.get('/proxy', { preHandler: verifyStreamToken }, async (request, reply) => handleExternalStreamProxy(state, request, reply));
 
     fastify.get('/*', { preHandler: verifyStreamToken }, async (request, reply) => {
         const fullPath = request.params['*'];
@@ -48,6 +66,28 @@ export default async function hlsProxyRoutes(fastify, _options) {
         const isTextFile = fileName.endsWith('.m3u8');
         const identity = state.getViewerIdentity(request);
         const cameraId = state.extractCameraId(cameraPath, identity);
+
+        // Tenancy gate: owner_private/subscriber streams require an authorized
+        // viewer (owner/staff JWT or camera-bound stream token), and subscriber
+        // streams additionally require billing_status=active. Community streams
+        // skip all of this and behave exactly as before. The access info is
+        // cached (30s TTL), so suspension propagates to live streams within
+        // seconds without a DB hit per segment.
+        const accessInfo = resolveHlsAccessInfo(cameraPath);
+        const isGatedCamera = !!accessInfo && accessInfo.camera_class !== 'community';
+        if (isGatedCamera) {
+            const access = canViewLive({
+                info: accessInfo,
+                user: resolveHlsViewerUser(request),
+                streamToken: request.streamToken || null,
+            });
+            if (!access.allowed) {
+                reply.header('Content-Type', 'text/plain');
+                reply.header('Cache-Control', 'no-store');
+                const code = access.statusCode === 402 ? 402 : 403;
+                return reply.code(code).send('');
+            }
+        }
 
         if (cameraId && isTextFile) {
             try {
@@ -105,6 +145,12 @@ export default async function hlsProxyRoutes(fastify, _options) {
                         success: true,
                     });
                 }
+                // Gated playlists: forward the viewer's stream token into child
+                // playlist/segment URIs so the whole HLS tree stays authorized.
+                if (isGatedCamera && typeof request.query.token === 'string' && request.query.token) {
+                    reply.header('Cache-Control', 'no-store');
+                    return reply.send(propagateTokenInPlaylist(response.data, request.query.token));
+                }
                 return reply.send(response.data);
             }
 
@@ -128,7 +174,15 @@ export default async function hlsProxyRoutes(fastify, _options) {
             // (recordSegmentAccess) will stop firing for cache hits,
             // but the playlist refresh every ~3s already keeps the
             // viewer session warm well inside its 25s TTL.
-            applyLegacyCacheHeaders(reply, contentType);
+            //
+            // Gated (non-community) segments must NEVER hit the edge cache:
+            // a cached segment would be served to any requester without
+            // passing the tenancy/billing gate above.
+            if (isGatedCamera) {
+                reply.header('Cache-Control', 'private, no-store');
+            } else {
+                applyLegacyCacheHeaders(reply, contentType);
+            }
 
             attachAbortCleanup({
                 request,

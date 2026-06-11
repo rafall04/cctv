@@ -213,6 +213,11 @@ class RecordingPlaybackService {
                 name,
                 enabled,
                 enable_recording,
+                owner_user_id,
+                CASE
+                    WHEN camera_class IN ('community', 'owner_private', 'subscriber') THEN camera_class
+                    ELSE 'community'
+                END as camera_class,
                 public_playback_mode,
                 public_playback_preview_minutes
             FROM cameras
@@ -236,7 +241,12 @@ class RecordingPlaybackService {
         const requestedScope = request?.query?.scope === 'admin' ? 'admin' : 'public';
 
         if (requestedScope === 'admin') {
-            if (!request?.user?.id) {
+            // Staff only. `customer` JWTs are authenticated but must never
+            // unlock admin_full playback — the product is live-only for
+            // subscribers, and these routes use optionalAuth (the global
+            // customer lockout hook does not cover them).
+            const role = request?.user?.role;
+            if (!request?.user?.id || (role !== 'admin' && role !== 'viewer')) {
                 const err = new Error('Unauthorized playback access');
                 err.statusCode = 401;
                 throw err;
@@ -249,6 +259,21 @@ class RecordingPlaybackService {
                 notice: null,
                 contact: null,
                 deniedReason: null,
+            };
+        }
+
+        // Rented/private cameras never expose public playback — not even via
+        // playback tokens (those are a public-hub sharing feature). The rental
+        // product is live-only; recordings stay staff-only. This sits BEFORE
+        // token validation so an 'all'-scoped token cannot unlock them.
+        if (camera.camera_class && camera.camera_class !== 'community') {
+            return {
+                accessMode: 'public_denied',
+                isPublicPreview: false,
+                previewMinutes: 0,
+                notice: null,
+                contact: null,
+                deniedReason: 'camera_admin_only',
             };
         }
 

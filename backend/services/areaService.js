@@ -201,20 +201,24 @@ class AreaService {
         console.log('[Cache] Area cache invalidated');
     }
 
-    getAllAreas() {
-        const cached = cache.get(CACHE_ALL_AREAS);
+    getAllAreas({ publicOnly = false } = {}) {
+        // Public variant counts only community cameras so rented/private cameras
+        // never leak (even as a count) into the landing-page area filter.
+        const cacheKeyName = publicOnly ? `${CACHE_ALL_AREAS}:public` : CACHE_ALL_AREAS;
+        const cached = cache.get(cacheKeyName);
         if (cached) {
             return { areas: cached, isCached: true };
         }
 
+        const cameraCountFilter = publicOnly ? "AND c.camera_class = 'community'" : '';
         const areas = query(`
-            SELECT a.*, 
-                   (SELECT COUNT(*) FROM cameras c WHERE c.area_id = a.id) as camera_count
-            FROM areas a 
+            SELECT a.*,
+                   (SELECT COUNT(*) FROM cameras c WHERE c.area_id = a.id ${cameraCountFilter}) as camera_count
+            FROM areas a
             ORDER BY a.kecamatan, a.kelurahan, a.rw, a.rt, a.name ASC
         `);
 
-        cache.set(CACHE_ALL_AREAS, areas, CacheTTL.LONG);
+        cache.set(cacheKeyName, areas, CacheTTL.LONG);
         return { areas, isCached: false };
     }
 

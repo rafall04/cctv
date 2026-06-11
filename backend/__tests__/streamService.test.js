@@ -8,6 +8,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import streamService from '../services/streamService.js';
+import { invalidateCameraAccessCache } from '../services/cameraAccessService.js';
 
 const { queryMock, queryOneMock, viewStatsMock } = vi.hoisted(() => ({
     queryMock: vi.fn(),
@@ -45,6 +46,9 @@ describe('streamService camera response routing', () => {
         queryOneMock.mockReset();
         viewStatsMock.mockReset();
         viewStatsMock.mockReturnValue({});
+        // The tenancy gate caches access rows for 30s — clear between tests so
+        // each test's queryOne mock fully controls what the gate sees.
+        invalidateCameraAccessCache();
     });
 
     it('routes external_hls streams.hls through the opaque /api/stream proxy when external_use_proxy is enabled (default)', () => {
@@ -226,6 +230,18 @@ describe('streamService camera response routing', () => {
 
     it('keeps internal RTSP available to backend stream health while sanitizing public getStreamUrls output', () => {
         queryOneMock.mockImplementation((sql) => {
+            // The tenancy gate (cameraAccessService) does a slim lookup first;
+            // answer it with a community-class row so the public flow proceeds.
+            if (sql.includes('camera_class')) {
+                return {
+                    id: 31,
+                    stream_key: 'camera31',
+                    enabled: 1,
+                    owner_user_id: null,
+                    camera_class: 'community',
+                    billing_status: null,
+                };
+            }
             expect(sql).toContain('c.private_rtsp_url');
             return {
                 id: 31,
