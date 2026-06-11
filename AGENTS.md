@@ -107,10 +107,17 @@ npm test -- CameraManagement.test.jsx -t "test name"
   auto-resume + charge on top-up. Money columns are INTEGER rupiah only — never float.
 - Admin manages everything at `/admin/billing` (assign camera→customer, harga, suspend/resume/cancel,
   manual top-up, mark-paid, plan catalog, registration settings). Gateway drivers: `manual` (default),
-  `midtrans` (`MIDTRANS_SERVER_KEY`; webhook signature-verified), or `ipaymu` (`IPAYMU_VA`+`IPAYMU_API_KEY`;
+  `midtrans` (webhook signature-verified), or `ipaymu` (credentials from admin/settings;
   callbacks carry no signature so the webhook NEVER trusts the body — it re-queries the iPaymu API, and
   customer status polls do the same re-check throttled). Webhooks under `/api/billing/webhook/*` are
   exempt from CSRF/API-key validation.
+- Gateway config is admin-editable (NO .env needed): `paymentSettingsService` resolves every value
+  DB(settings) -> env -> default, so old `.env` deployments keep working until an admin overrides. The
+  `/admin/billing` -> Gateway Pembayaran tab sets active gateway, iPaymu VA/API key + sandbox/production,
+  Midtrans server key, public base URL, and the curated enabled payment methods/banks (`ipaymu_methods`:
+  QRIS/VA-bank/cstore; admin toggles + can add custom `method:channel`). Secrets are write-only —
+  `getAdminView()` returns only a `*_set` flag + masked hint, never the raw key. Customer top-up shows
+  only enabled methods (`GET /api/customer/payment-options`), rendering QR / VA number / payment code.
 - Account plans (paket): `billing_plans` sets price_per_camera + max_cameras (+ trial via is_trial/
   trial_days). Customers self-switch at `/my/paket` (repricing all their subscriptions; trial once per
   account — `users.trial_used`); active trial days are charge-free, expired trial suspends all cameras
