@@ -396,21 +396,21 @@ class BillingPlanService {
 
         const plan = settings.default_plan;
         const passwordHash = await bcrypt.hash(password, 10);
-        const trialEndsAt = plan?.is_trial
-            ? new Date(Date.now() + plan.trial_days * 24 * 3600 * 1000).toISOString()
-            : null;
 
+        // Self-registration is APPROVAL-GATED: the account starts 'pending' and
+        // cannot log in until an admin approves. The plan is recorded now, but the
+        // trial clock (trial_ends_at/trial_used/plan_started_at) is deliberately NOT
+        // started until approval — otherwise the free trial would tick down while
+        // the customer is still waiting and unable to use the account.
         const result = execute(
-            `INSERT INTO users (username, password_hash, role, phone, email, plan_id, plan_started_at, trial_ends_at, trial_used, password_changed_at)
-             VALUES (?, ?, 'customer', ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?)`,
+            `INSERT INTO users (username, password_hash, role, phone, email, plan_id, account_status, password_changed_at)
+             VALUES (?, ?, 'customer', ?, ?, ?, 'pending', ?)`,
             [
                 cleanUsername,
                 passwordHash,
                 cleanPhone,
                 email ? String(email).trim() : null,
                 plan?.id ?? null,
-                trialEndsAt,
-                plan?.is_trial ? 1 : 0,
                 new Date().toISOString(),
             ]
         );
@@ -419,20 +419,124 @@ class BillingPlanService {
 
         execute(
             'INSERT INTO audit_logs (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)',
-            [userId, 'CUSTOMER_REGISTERED', `Self-registration: ${cleanUsername} (plan: ${plan?.key || 'none'})`, request?.ip || null]
+            [userId, 'CUSTOMER_REGISTERED', `Self-registration (pending approval): ${cleanUsername} (plan: ${plan?.key || 'none'})`, request?.ip || null]
         );
         logSecurityEvent(SECURITY_EVENTS.ADMIN_ACTION, {
             action: 'customer_self_registered',
             username: cleanUsername,
             planKey: plan?.key || null,
+            status: 'pending',
         }, request);
 
         return {
             id: userId,
             username: cleanUsername,
             role: 'customer',
+            status: 'pending',
+            plan: plan ? { key: plan.key, name: plan.name, is_trial: plan.is_trial === 1 } : null,
+        };
+    }
+
+    // ------------------------------------------------------------------
+    // Registration approval (admin)
+    // ------------------------------------------------------------------
+
+    listPendingRegistrations() {
+        return query(`
+            SELECT u.id, u.username, u.phone, u.email, u.created_at, u.account_status,
+                   bp.key AS plan_key, bp.name AS plan_name, bp.is_trial AS plan_is_trial,
+                   bp.trial_days AS plan_trial_days, bp.max_cameras AS plan_max_cameras,
+                   bp.price_per_camera AS plan_price_per_camera
+            FROM users u
+            LEFT JOIN billing_plans bp ON bp.id = u.plan_id
+            WHERE u.role = 'customer' AND u.account_status = 'pending'
+            ORDER BY u.created_at ASC, u.id ASC
+        `);
+    }
+
+    countPendingRegistrations() {
+        return queryOne(
+            "SELECT COUNT(*) AS n FROM users WHERE role = 'customer' AND account_status = 'pending'"
+        ).n;
+    }
+
+    approveCustomer(userId, request = null) {
+        const user = queryOne(
+            'SELECT id, username, role, plan_id, account_status FROM users WHERE id = ?',
+            [userId]
+        );
+        if (!user) {
+            throw notFound('User tidak ditemukan');
+        }
+        if (user.role !== 'customer') {
+            throw badRequest('Hanya akun pelanggan yang perlu persetujuan');
+        }
+        if (user.account_status === 'approved') {
+            throw badRequest('Akun sudah disetujui');
+        }
+
+        // Start the plan clock now that the customer can actually use the account.
+        const plan = user.plan_id ? this.getPlanById(user.plan_id) : null;
+        const trialEndsAt = plan?.is_trial
+            ? new Date(Date.now() + plan.trial_days * 24 * 3600 * 1000).toISOString()
+            : null;
+
+        execute(
+            `UPDATE users
+             SET account_status = 'approved',
+                 plan_started_at = CURRENT_TIMESTAMP,
+                 trial_ends_at = ?,
+                 trial_used = CASE WHEN ? = 1 THEN 1 ELSE trial_used END
+             WHERE id = ?`,
+            [trialEndsAt, plan?.is_trial ? 1 : 0, userId]
+        );
+
+        if (request) {
+            logAdminAction({
+                action: 'customer_registration_approved',
+                customerId: Number(userId),
+                username: user.username,
+                planKey: plan?.key || null,
+            }, request);
+        }
+
+        return {
+            id: Number(userId),
+            username: user.username,
+            account_status: 'approved',
             plan: plan ? { key: plan.key, name: plan.name, is_trial: plan.is_trial === 1, trial_ends_at: trialEndsAt } : null,
         };
+    }
+
+    rejectCustomer(userId, request = null) {
+        const user = queryOne(
+            'SELECT id, username, role, account_status FROM users WHERE id = ?',
+            [userId]
+        );
+        if (!user) {
+            throw notFound('User tidak ditemukan');
+        }
+        if (user.role !== 'customer') {
+            throw badRequest('Hanya akun pelanggan yang perlu persetujuan');
+        }
+        if (user.account_status === 'approved') {
+            throw badRequest('Akun sudah disetujui — tidak bisa ditolak. Nonaktifkan via kelola pelanggan.');
+        }
+
+        execute(
+            "UPDATE users SET account_status = 'rejected' WHERE id = ?",
+            [userId]
+        );
+
+        if (request) {
+            logAdminAction({
+                action: 'customer_registration_rejected',
+                customerId: Number(userId),
+                username: user.username,
+            }, request);
+        }
+
+        return { id: Number(userId), username: user.username, account_status: 'rejected' };
     }
 }
 

@@ -40,7 +40,7 @@ class AuthService {
         const attemptCount = getCurrentAttemptCount(username, clientIp);
 
         const user = queryOne(
-            'SELECT id, username, password_hash, role FROM users WHERE username = ?',
+            'SELECT id, username, password_hash, role, account_status FROM users WHERE username = ?',
             [username]
         );
 
@@ -77,6 +77,29 @@ class AuthService {
 
             const err = new Error('Invalid credentials');
             err.statusCode = 401;
+            throw err;
+        }
+
+        // Approval gate (runs AFTER password verification so it never leaks which
+        // accounts exist). Self-registered customers stay 'pending' until an admin
+        // approves; 'rejected' ones are declined. Staff and approved customers pass.
+        if (user.account_status === 'pending' || user.account_status === 'rejected') {
+            // Password was correct — clear the failed-attempt counter, but issue no session.
+            trackSuccessfulLogin(username, clientIp);
+            logAuthAttempt(false, {
+                username,
+                ip_address: clientIp,
+                user_id: user.id,
+                reason: `account_${user.account_status}`,
+            }, request);
+
+            const err = new Error(
+                user.account_status === 'pending'
+                    ? 'Akun Anda menunggu persetujuan admin. Anda akan bisa login setelah disetujui.'
+                    : 'Pendaftaran Anda ditolak. Silakan hubungi admin.'
+            );
+            err.statusCode = 403;
+            err.reason = user.account_status === 'pending' ? 'pending_approval' : 'registration_rejected';
             throw err;
         }
 

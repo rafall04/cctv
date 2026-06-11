@@ -27,7 +27,7 @@ export async function listCustomers(request, reply) {
     try {
         const customers = query(`
             SELECT u.id, u.username, u.phone, u.email, u.created_at,
-                   u.plan_id, u.trial_ends_at,
+                   u.plan_id, u.trial_ends_at, u.account_status,
                    bp.name AS plan_name, bp.key AS plan_key, bp.is_trial AS plan_is_trial,
                    bp.max_cameras AS plan_max_cameras,
                    COALESCE(w.balance, 0) AS balance,
@@ -84,6 +84,32 @@ export async function changeCustomerPlan(request, reply) {
         return reply.send({ success: true, message: 'Paket pelanggan diubah', data: state });
     } catch (error) {
         return handleError(reply, error, 'Change customer plan error:');
+    }
+}
+
+export async function listRegistrations(request, reply) {
+    try {
+        return reply.send({ success: true, data: billingPlanService.listPendingRegistrations() });
+    } catch (error) {
+        return handleError(reply, error, 'List registrations error:');
+    }
+}
+
+export async function approveRegistration(request, reply) {
+    try {
+        const result = billingPlanService.approveCustomer(request.params.id, request);
+        return reply.send({ success: true, message: 'Pendaftaran disetujui', data: result });
+    } catch (error) {
+        return handleError(reply, error, 'Approve registration error:');
+    }
+}
+
+export async function rejectRegistration(request, reply) {
+    try {
+        const result = billingPlanService.rejectCustomer(request.params.id, request);
+        return reply.send({ success: true, message: 'Pendaftaran ditolak', data: result });
+    } catch (error) {
+        return handleError(reply, error, 'Reject registration error:');
     }
 }
 

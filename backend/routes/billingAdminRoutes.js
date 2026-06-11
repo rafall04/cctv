@@ -22,6 +22,9 @@ import {
     changeCustomerPlan,
     getRegistrationSettings,
     updateRegistrationSettings,
+    listRegistrations,
+    approveRegistration,
+    rejectRegistration,
 } from '../controllers/billingAdminController.js';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 
@@ -168,6 +171,11 @@ export default async function billingAdminRoutes(fastify) {
             },
         },
     }, changeCustomerPlan);
+
+    // Pending self-registrations awaiting approval
+    fastify.get('/registrations', { onRequest: guard }, listRegistrations);
+    fastify.post('/registrations/:id/approve', { onRequest: guard, schema: idParamSchema }, approveRegistration);
+    fastify.post('/registrations/:id/reject', { onRequest: guard, schema: idParamSchema }, rejectRegistration);
 
     // Self-registration settings (enabled + default plan for new signups)
     fastify.get('/registration-settings', { onRequest: guard }, getRegistrationSettings);

@@ -50,6 +50,11 @@ export async function login(request, reply) {
         if (error.statusCode === 401) {
             return reply.code(401).send({ success: false, message: error.message });
         }
+        // Approval gate (pending/rejected): surface the reason so the frontend can
+        // show the real message instead of the generic CSRF/security 403 copy.
+        if (error.statusCode === 403 && error.reason) {
+            return reply.code(403).send({ success: false, message: error.message, reason: error.reason });
+        }
         console.error('Login error:', error);
         return reply.code(500).send({
             success: false,
@@ -98,6 +103,7 @@ export async function registerInfo(request, reply) {
             success: true,
             data: {
                 enabled: settings.enabled,
+                requires_approval: true,
                 default_plan: plan ? {
                     key: plan.key,
                     name: plan.name,

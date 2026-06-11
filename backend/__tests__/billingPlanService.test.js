@@ -64,7 +64,9 @@ function seedSchema() {
             plan_started_at TEXT,
             trial_ends_at TEXT,
             trial_used INTEGER NOT NULL DEFAULT 0,
-            password_changed_at TEXT
+            account_status TEXT NOT NULL DEFAULT 'approved',
+            password_changed_at TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
         CREATE TABLE billing_plans (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -257,11 +259,14 @@ describe('billingPlanService', () => {
             });
 
             expect(result.role).toBe('customer');
+            expect(result.status).toBe('pending');
             expect(result.plan.key).toBe('trial');
             const row = db.prepare('SELECT * FROM users WHERE username = ?').get('warung_bu_sri');
             expect(row.phone).toBe('081234567890');
-            expect(row.trial_used).toBe(1);
-            expect(row.trial_ends_at).toBeTruthy();
+            expect(row.account_status).toBe('pending');
+            // Trial clock is NOT started at registration — it begins on admin approval.
+            expect(row.trial_used).toBe(0);
+            expect(row.trial_ends_at).toBe(null);
             expect(db.prepare('SELECT * FROM wallets WHERE user_id = ?').get(row.id)).toBeTruthy();
         });
 
@@ -297,9 +302,72 @@ describe('billingPlanService', () => {
             });
             expect(result.plan.key).toBe('basic');
             expect(result.plan.is_trial).toBe(false);
-            const row = db.prepare('SELECT trial_ends_at, trial_used FROM users WHERE username = ?').get('langsung_bayar');
+            const row = db.prepare('SELECT trial_ends_at, trial_used, account_status FROM users WHERE username = ?').get('langsung_bayar');
             expect(row.trial_ends_at).toBe(null);
             expect(row.trial_used).toBe(0);
+            expect(row.account_status).toBe('pending');
+        });
+    });
+
+    describe('registration approval', () => {
+        async function registerPending(username = 'calon_pelanggan', phone = '081299990001') {
+            const res = await billingPlanService.registerCustomer({ username, password: STRONG_PASSWORD, phone });
+            return res.id;
+        }
+
+        it('lists only pending customer registrations', async () => {
+            await registerPending('calon_a', '081299990001');
+            await registerPending('calon_b', '081299990002');
+
+            const pending = billingPlanService.listPendingRegistrations();
+            expect(pending.map((p) => p.username).sort()).toEqual(['calon_a', 'calon_b']);
+            expect(pending[0].plan_key).toBe('trial');
+            expect(billingPlanService.countPendingRegistrations()).toBe(2);
+        });
+
+        it('approve starts the trial clock and flips status to approved', async () => {
+            const id = await registerPending();
+            const result = billingPlanService.approveCustomer(id);
+
+            expect(result.account_status).toBe('approved');
+            const row = db.prepare('SELECT account_status, trial_ends_at, trial_used, plan_started_at FROM users WHERE id = ?').get(id);
+            expect(row.account_status).toBe('approved');
+            expect(row.trial_used).toBe(1);
+            expect(row.trial_ends_at).toBeTruthy();
+            expect(row.plan_started_at).toBeTruthy();
+            expect(billingPlanService.countPendingRegistrations()).toBe(0);
+        });
+
+        it('approve on a non-trial default plan does not set a trial window', async () => {
+            billingPlanService.updateRegistrationSettings({ default_plan_key: 'basic' });
+            const id = await registerPending('bayar_dulu', '081299990009');
+            billingPlanService.approveCustomer(id);
+
+            const row = db.prepare('SELECT account_status, trial_ends_at, trial_used FROM users WHERE id = ?').get(id);
+            expect(row.account_status).toBe('approved');
+            expect(row.trial_ends_at).toBe(null);
+            expect(row.trial_used).toBe(0);
+        });
+
+        it('reject flips status to rejected and removes it from the pending list', async () => {
+            const id = await registerPending();
+            const result = billingPlanService.rejectCustomer(id);
+
+            expect(result.account_status).toBe('rejected');
+            expect(db.prepare('SELECT account_status FROM users WHERE id = ?').get(id).account_status).toBe('rejected');
+            expect(billingPlanService.countPendingRegistrations()).toBe(0);
+        });
+
+        it('refuses to approve/reject an already-approved account', async () => {
+            const id = await registerPending();
+            billingPlanService.approveCustomer(id);
+            expect(() => billingPlanService.approveCustomer(id)).toThrowError(expect.objectContaining({ statusCode: 400 }));
+            expect(() => billingPlanService.rejectCustomer(id)).toThrowError(expect.objectContaining({ statusCode: 400 }));
+        });
+
+        it('refuses to approve a non-customer user', async () => {
+            db.prepare("INSERT INTO users (id, username, role, account_status) VALUES (500, 'staff', 'admin', 'approved')").run();
+            expect(() => billingPlanService.approveCustomer(500)).toThrowError(expect.objectContaining({ statusCode: 400 }));
         });
     });
 });
