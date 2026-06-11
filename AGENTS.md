@@ -94,6 +94,23 @@ npm test -- CameraManagement.test.jsx -t "test name"
 - Public playback API uses `/api/recordings/:cameraId/segments`, `/stream/:filename`, and `/playlist.m3u8`
 - Playback viewer tracking is separate from live viewer tracking and uses `/api/playback-viewer/*`
 
+### Current Subscriber Rental/Billing Workflow
+
+- Camera classes: `community` (public hub, default), `owner_private`, `subscriber` (rented, live-only).
+  Non-community cameras must NEVER appear on any public surface (landing/map/stream list/area pages/
+  trending/discovery/public playback/thumbnails) — all public queries filter `camera_class = 'community'`
+  and `cameraAccessService.canViewLive` gates per-camera endpoints (`/api/stream/:id`, `/hls/*`, proxies).
+- Role `customer` logs in at the shared login and lands on `/my` (portal: Kamera Saya + Saldo & Tagihan).
+  Customers are denied-by-default on every other auth-required endpoint (`customerAccessPolicy`).
+- Billing is prepaid: wallet balance, daily prorated charge (`monthly_price/30`, local date, idempotent by
+  `charge:{subscriptionId}:{date}` unique reference), suspend on empty balance (streams 402 within ~30s),
+  auto-resume + charge on top-up. Money columns are INTEGER rupiah only — never float.
+- Admin manages everything at `/admin/billing` (assign camera→customer, harga, suspend/resume/cancel,
+  manual top-up, mark-paid). Gateway drivers: `manual` (default) or `midtrans` (`BILLING_GATEWAY`,
+  `MIDTRANS_SERVER_KEY`); webhook `/api/billing/webhook/midtrans` is signature-verified and exempt from
+  CSRF/API-key validation.
+- Subscriber product is live-only: no public playback, no playback-token access, recordings stay staff-only.
+
 ---
 
 ## Project Structure

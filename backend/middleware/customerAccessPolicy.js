@@ -17,8 +17,7 @@ import { logAuthorizationFailure } from '../services/securityAuditLogger.js';
 // customers keep the same anonymous/public access as everyone else.
 const CUSTOMER_ALLOWED_PREFIXES = [
     '/api/auth/',          // logout, refresh, verify, csrf
-    '/api/users/profile',  // own profile read/update
-    '/api/users/change-own-password',
+    '/api/users/profile',  // own profile read/update + /profile/password (prefix match)
     '/api/customer/',      // the customer portal API
 ];
 
