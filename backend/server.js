@@ -55,6 +55,10 @@ import recordingRoutes from './routes/recordingRoutes.js';
 import playbackTokenRoutes from './routes/playbackTokenRoutes.js';
 import brandingRoutes from './routes/brandingRoutes.js';
 import publicGrowthRoutes from './routes/publicGrowthRoutes.js';
+import customerRoutes from './routes/customerRoutes.js';
+import billingAdminRoutes from './routes/billingAdminRoutes.js';
+import billingWebhookRoutes from './routes/billingWebhookRoutes.js';
+import billingService from './services/billingService.js';
 // thumbnailRoutes removed - @fastify/static handles thumbnails
 import mediaMtxService from './services/mediaMtxService.js';
 import streamWarmer from './services/streamWarmer.js';
@@ -322,6 +326,9 @@ await fastify.register(saweriaRoutes, { prefix: '/api/saweria' });
 await fastify.register(recordingRoutes, { prefix: '/api' });
 await fastify.register(playbackTokenRoutes, { prefix: '/api' });
 await fastify.register(brandingRoutes, { prefix: '/api/branding' });
+await fastify.register(customerRoutes, { prefix: '/api/customer' });
+await fastify.register(billingAdminRoutes, { prefix: '/api/admin/billing' });
+await fastify.register(billingWebhookRoutes, { prefix: '/api/billing' });
 // thumbnailRoutes removed - @fastify/static handles /api/thumbnails/* automatically
 
 // ============================================
@@ -487,6 +494,10 @@ const start = async () => {
         // Start thumbnail generation service
         await thumbnailService.start();
         console.log('[Thumbnail] Thumbnail generation service started (5min interval)');
+
+        // Prepaid billing: hourly tick, idempotent per local day (suspends empty
+        // wallets, resumes topped-up ones). Cheap no-op when nothing is due.
+        billingService.startBillingScheduler();
     } catch (err) {
         fastify.log.error(err);
         process.exit(1);
@@ -515,6 +526,7 @@ const shutdown = async () => {
         viewerSessionService.stopCleanup();
         playbackViewerSessionService.stopCleanup();
         thumbnailService.stop();
+        billingService.stopBillingScheduler();
         stopDailyCleanup();
         
         // Cleanup MediaMTX paths to prevent zombie connections

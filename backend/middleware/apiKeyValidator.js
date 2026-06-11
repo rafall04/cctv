@@ -30,7 +30,8 @@ export const API_KEY_VALIDATOR_CONFIG = {
     publicPrefixes: [
         '/api/public/',
         '/api/stream/',
-        '/hls/'                 // HLS proxy - public streaming endpoint
+        '/hls/',                // HLS proxy - public streaming endpoint
+        '/api/billing/webhook'  // Payment gateway webhooks - authenticated by gateway signature
     ],
     // Whether to enforce API key validation (can be disabled for development)
     enabled: process.env.API_KEY_VALIDATION_ENABLED !== 'false',
