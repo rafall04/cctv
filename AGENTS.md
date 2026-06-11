@@ -106,9 +106,19 @@ npm test -- CameraManagement.test.jsx -t "test name"
   `charge:{subscriptionId}:{date}` unique reference), suspend on empty balance (streams 402 within ~30s),
   auto-resume + charge on top-up. Money columns are INTEGER rupiah only — never float.
 - Admin manages everything at `/admin/billing` (assign camera→customer, harga, suspend/resume/cancel,
-  manual top-up, mark-paid). Gateway drivers: `manual` (default) or `midtrans` (`BILLING_GATEWAY`,
-  `MIDTRANS_SERVER_KEY`); webhook `/api/billing/webhook/midtrans` is signature-verified and exempt from
-  CSRF/API-key validation.
+  manual top-up, mark-paid, plan catalog, registration settings). Gateway drivers: `manual` (default),
+  `midtrans` (`MIDTRANS_SERVER_KEY`; webhook signature-verified), or `ipaymu` (`IPAYMU_VA`+`IPAYMU_API_KEY`;
+  callbacks carry no signature so the webhook NEVER trusts the body — it re-queries the iPaymu API, and
+  customer status polls do the same re-check throttled). Webhooks under `/api/billing/webhook/*` are
+  exempt from CSRF/API-key validation.
+- Account plans (paket): `billing_plans` sets price_per_camera + max_cameras (+ trial via is_trial/
+  trial_days). Customers self-switch at `/my/paket` (repricing all their subscriptions; trial once per
+  account — `users.trial_used`); active trial days are charge-free, expired trial suspends all cameras
+  until a paid plan is chosen.
+- Self-service: customers add/edit/delete their own cameras at `/my` within the plan's max_cameras;
+  customer RTSP URLs pass `utils/rtspUrlPolicy.js` (rtsp/rtsps only; loopback/link-local/multicast and
+  `BILLING_RTSP_BLOCKED_HOSTS` blocked; RFC1918 allowed — ISP reality). Self-registration at `/daftar`
+  (`POST /api/auth/register`, unique phone, admin toggle + default plan in `/admin/billing` Paket tab).
 - Subscriber product is live-only: no public playback, no playback-token access, recordings stay staff-only.
 
 ---

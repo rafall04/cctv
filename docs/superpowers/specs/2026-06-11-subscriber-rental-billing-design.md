@@ -142,6 +142,31 @@ Admin (`/api/admin/billing/*`, requireAdmin): `GET/POST customers`, `POST topup-
 - Admin: new `/admin/billing` page (customers, subscriptions, payments, manual top-up);
   UserManagement role dropdown gains `customer` + phone/email fields.
 
+## V2 addendum — plans, trial, self-service, iPaymu (same day)
+
+- **Account plans** (`billing_plans`): per-camera monthly price + `max_cameras` cap + optional
+  trial (`is_trial`, `trial_days`). Admin CRUD at `/admin/billing` → Paket & Trial; price edits
+  reprice every live subscription of users on that plan. Users carry `plan_id`,
+  `plan_started_at`, `trial_ends_at`, `trial_used`.
+- **Trial semantics**: active trial days are charge-free (daily tick skips the wallet);
+  expiry suspends all the user's cameras regardless of balance — recovery is choosing a paid
+  plan (switch reprices + resumes through the normal charge path). Trial is once per account
+  (`trial_used`); admin may re-grant. Self-registration requires a unique phone number to
+  raise the cost of trial farming.
+- **Self-service cameras**: customers add/edit/delete their own cameras within
+  `plan.max_cameras`. Customer-supplied RTSP URLs pass `utils/rtspUrlPolicy.js`: rtsp/rtsps
+  only, loopback/link-local/multicast literals and the `BILLING_RTSP_BLOCKED_HOSTS` env list
+  blocked; RFC1918 stays ALLOWED because RAF NET's cameras legitimately live on ISP-private
+  ranges. Residual SSRF risk (hostnames, DNS rebinding) accepted for v1 — admins can audit
+  self-added cameras in the camera list.
+- **Self-registration**: `/daftar` → `POST /api/auth/register` (CSRF + auth rate-limit bucket,
+  API-key-exempt), lands on the admin-configured default plan; toggle + default plan live in
+  settings (`billing_registration_enabled`, `billing_default_plan_key`).
+- **iPaymu driver** (`BILLING_GATEWAY=ipaymu`): direct QRIS via API v2 with the documented
+  HMAC-SHA256 signature; callbacks are unsigned so the webhook treats the body as a hint and
+  re-queries the transaction (signed) before exactly-once crediting; customer status polls do
+  the same re-check (15s throttle) so webhook-less deployments still confirm.
+
 ## Out of scope (deliberate, phase 4+)
 
 Concurrent-viewer caps per camera, per-tenant egress metering, WA/Telegram low-balance
