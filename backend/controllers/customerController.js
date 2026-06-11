@@ -10,6 +10,8 @@
 import { query } from '../database/connectionPool.js';
 import walletService from '../services/walletService.js';
 import billingService from '../services/billingService.js';
+import billingPlanService from '../services/billingPlanService.js';
+import customerCameraService from '../services/customerCameraService.js';
 import paymentService from '../services/paymentService.js';
 import cameraHealthService from '../services/cameraHealthService.js';
 import { sanitizeCameraThumbnailList } from '../services/thumbnailPathService.js';
@@ -109,5 +111,63 @@ export async function getMyPayments(request, reply) {
         return reply.send({ success: true, data: payments });
     } catch (error) {
         return handleError(reply, error, 'Get customer payments error:');
+    }
+}
+
+export async function getMyPlan(request, reply) {
+    try {
+        const state = billingPlanService.getUserPlanState(request.user.id);
+        return reply.send({ success: true, data: state });
+    } catch (error) {
+        return handleError(reply, error, 'Get customer plan error:');
+    }
+}
+
+export async function listAvailablePlans(request, reply) {
+    try {
+        const plans = billingPlanService.listPlans({ activeOnly: true });
+        return reply.send({ success: true, data: plans });
+    } catch (error) {
+        return handleError(reply, error, 'List plans error:');
+    }
+}
+
+export async function switchMyPlan(request, reply) {
+    try {
+        const state = billingPlanService.changeUserPlan(
+            request.user.id,
+            request.body?.plan_key,
+            { byAdmin: false, request }
+        );
+        return reply.send({ success: true, message: 'Paket berhasil diubah', data: state });
+    } catch (error) {
+        return handleError(reply, error, 'Switch plan error:');
+    }
+}
+
+export async function createMyCamera(request, reply) {
+    try {
+        const created = await customerCameraService.createOwnCamera(request.user, request.body || {}, request);
+        return reply.send({ success: true, message: 'Kamera berhasil ditambahkan', data: created });
+    } catch (error) {
+        return handleError(reply, error, 'Create own camera error:');
+    }
+}
+
+export async function updateMyCamera(request, reply) {
+    try {
+        const updated = await customerCameraService.updateOwnCamera(request.user, request.params.id, request.body || {}, request);
+        return reply.send({ success: true, message: 'Kamera diperbarui', data: updated });
+    } catch (error) {
+        return handleError(reply, error, 'Update own camera error:');
+    }
+}
+
+export async function deleteMyCamera(request, reply) {
+    try {
+        const deleted = await customerCameraService.deleteOwnCamera(request.user, request.params.id, request);
+        return reply.send({ success: true, message: 'Kamera dihapus', data: deleted });
+    } catch (error) {
+        return handleError(reply, error, 'Delete own camera error:');
     }
 }

@@ -7,6 +7,7 @@
  */
 
 import authService from '../services/authService.js';
+import billingPlanService from '../services/billingPlanService.js';
 import { getAuthCookieOptions } from '../utils/authCookieOptions.js';
 
 export async function login(request, reply) {
@@ -54,6 +55,63 @@ export async function login(request, reply) {
             success: false,
             message: 'Internal server error',
         });
+    }
+}
+
+/**
+ * Public self-registration for the rental product (role customer only). The
+ * frontend logs in afterwards via the normal /login flow, so lockout,
+ * fingerprinting, and cookie policy stay in one code path.
+ */
+export async function register(request, reply) {
+    try {
+        const { username, password, phone, email } = request.body || {};
+        const user = await billingPlanService.registerCustomer(
+            { username, password, phone, email },
+            request
+        );
+        return reply.send({
+            success: true,
+            message: 'Pendaftaran berhasil — silakan login',
+            data: { user },
+        });
+    } catch (error) {
+        if (error.statusCode && error.statusCode < 500) {
+            return reply.code(error.statusCode).send({
+                success: false,
+                message: error.message,
+                errors: error.errors,
+                requirements: error.requirements,
+            });
+        }
+        console.error('Register error:', error);
+        return reply.code(500).send({ success: false, message: 'Internal server error' });
+    }
+}
+
+/** Public: tells the register page whether self-registration is open and what the default plan looks like. */
+export async function registerInfo(request, reply) {
+    try {
+        const settings = billingPlanService.getRegistrationSettings();
+        const plan = settings.default_plan;
+        return reply.send({
+            success: true,
+            data: {
+                enabled: settings.enabled,
+                default_plan: plan ? {
+                    key: plan.key,
+                    name: plan.name,
+                    description: plan.description,
+                    price_per_camera: plan.price_per_camera,
+                    max_cameras: plan.max_cameras,
+                    is_trial: plan.is_trial === 1,
+                    trial_days: plan.trial_days,
+                } : null,
+            },
+        });
+    } catch (error) {
+        console.error('Register info error:', error);
+        return reply.code(500).send({ success: false, message: 'Internal server error' });
     }
 }
 

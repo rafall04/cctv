@@ -29,6 +29,9 @@ const HOURLY_TICK_MS = 60 * 60 * 1000;
 const INITIAL_TICK_DELAY_MS = 20 * 1000;
 
 export function dailyCostOf(monthlyPrice) {
+    if (!monthlyPrice || monthlyPrice <= 0) {
+        return 0; // free (trial/admin-free) subscriptions never touch the wallet
+    }
     return Math.max(1, Math.round(monthlyPrice / 30));
 }
 
@@ -77,8 +80,8 @@ class BillingService {
             err.statusCode = 400;
             throw err;
         }
-        if (!Number.isInteger(price) || price <= 0) {
-            const err = new Error('monthly_price must be a positive integer (rupiah)');
+        if (!Number.isInteger(price) || price < 0) {
+            const err = new Error('monthly_price must be a non-negative integer (rupiah)');
             err.statusCode = 400;
             throw err;
         }
@@ -296,6 +299,25 @@ class BillingService {
             return { status: 'active', charged: false };
         }
 
+        // Trial gate: while the owner's trial is running, the day is free; once it
+        // has expired the subscription suspends until the user picks a paid plan
+        // (plan switch reprices and resumes through this same path).
+        const trial = this._getOwnerTrialState(subscription.user_id);
+        if (trial.onTrialPlan) {
+            if (trial.active) {
+                this._markActiveWithoutCharge(subscription, today);
+                return { status: 'active', charged: false };
+            }
+            this._suspend(subscription);
+            return { status: 'suspended', charged: false, reason: 'trial_expired' };
+        }
+
+        // Zero-priced paid subscriptions (admin freebies) stay active without wallet ops.
+        if (daily <= 0) {
+            this._markActiveWithoutCharge(subscription, today);
+            return { status: 'active', charged: false };
+        }
+
         try {
             const result = walletService.chargeOnce({
                 userId: subscription.user_id,
@@ -318,22 +340,63 @@ class BillingService {
             return { status: 'active', charged: !result.alreadyCharged };
         } catch (error) {
             if (error.statusCode === 402) {
-                if (subscription.status !== 'suspended') {
-                    execute(
-                        `UPDATE camera_subscriptions
-                         SET status = 'suspended', suspended_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-                         WHERE id = ?`,
-                        [subscription.id]
-                    );
-                }
-                execute(
-                    "UPDATE cameras SET billing_status = 'suspended', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                    [subscription.camera_id]
-                );
-                cameraService.invalidateCameraCache();
+                this._suspend(subscription);
                 return { status: 'suspended', charged: false };
             }
             throw error;
+        }
+    }
+
+    _markActiveWithoutCharge(subscription, today) {
+        execute(
+            `UPDATE camera_subscriptions
+             SET status = 'active', last_charged_date = ?, suspended_at = NULL, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+            [today, subscription.id]
+        );
+        execute(
+            "UPDATE cameras SET billing_status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            [subscription.camera_id]
+        );
+        cameraService.invalidateCameraCache();
+    }
+
+    _suspend(subscription) {
+        if (subscription.status !== 'suspended') {
+            execute(
+                `UPDATE camera_subscriptions
+                 SET status = 'suspended', suspended_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ?`,
+                [subscription.id]
+            );
+        }
+        execute(
+            "UPDATE cameras SET billing_status = 'suspended', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            [subscription.camera_id]
+        );
+        cameraService.invalidateCameraCache();
+    }
+
+    /**
+     * Owner trial snapshot, read fresh per charge decision. billing_plans may not
+     * exist on very old DBs mid-migration — treat lookup failures as "not on trial".
+     */
+    _getOwnerTrialState(userId) {
+        try {
+            const row = queryOne(
+                `SELECT u.trial_ends_at, COALESCE(bp.is_trial, 0) AS is_trial
+                 FROM users u
+                 LEFT JOIN billing_plans bp ON bp.id = u.plan_id
+                 WHERE u.id = ?`,
+                [userId]
+            );
+            if (!row || row.is_trial !== 1) {
+                return { onTrialPlan: false, active: false };
+            }
+            const active = !!row.trial_ends_at && new Date(row.trial_ends_at).getTime() > Date.now();
+            return { onTrialPlan: true, active };
+        } catch {
+            return { onTrialPlan: false, active: false };
         }
     }
 

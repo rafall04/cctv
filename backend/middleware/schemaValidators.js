@@ -32,6 +32,36 @@ export const loginSchema = {
     }
 };
 
+export const registerSchema = {
+    body: {
+        type: 'object',
+        required: ['username', 'password', 'phone'],
+        properties: {
+            username: {
+                type: 'string',
+                minLength: 3,
+                maxLength: 50,
+                pattern: '^[a-zA-Z0-9_-]+$'
+            },
+            password: {
+                type: 'string',
+                minLength: 12,
+                maxLength: 128
+            },
+            phone: {
+                type: 'string',
+                minLength: 9,
+                maxLength: 20
+            },
+            email: {
+                type: 'string',
+                maxLength: 120
+            }
+        },
+        additionalProperties: false
+    }
+};
+
 export const refreshTokenSchema = {
     body: {
         type: 'object',
@@ -459,6 +489,14 @@ export const updateProfileSchema = {
                 minLength: 3,
                 maxLength: 50,
                 pattern: '^[a-zA-Z0-9_-]+$'
+            },
+            phone: {
+                type: 'string',
+                maxLength: 30
+            },
+            email: {
+                type: 'string',
+                maxLength: 120
             }
         },
         additionalProperties: false

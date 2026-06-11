@@ -16,6 +16,12 @@ import {
     listPayments,
     markPaymentPaid,
     runCharges,
+    listPlansAdmin,
+    createPlan,
+    updatePlan,
+    changeCustomerPlan,
+    getRegistrationSettings,
+    updateRegistrationSettings,
 } from '../controllers/billingAdminController.js';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 
@@ -102,4 +108,80 @@ export default async function billingAdminRoutes(fastify) {
     fastify.get('/payments', { onRequest: guard }, listPayments);
     fastify.post('/payments/:id/mark-paid', { onRequest: guard, schema: idParamSchema }, markPaymentPaid);
     fastify.post('/charges/run', { onRequest: guard }, runCharges);
+
+    // Plan catalog (paket) + trial customization
+    fastify.get('/plans', { onRequest: guard }, listPlansAdmin);
+    fastify.post('/plans', {
+        onRequest: guard,
+        schema: {
+            body: {
+                type: 'object',
+                required: ['key', 'name', 'price_per_camera', 'max_cameras'],
+                properties: {
+                    key: { type: 'string', minLength: 2, maxLength: 40 },
+                    name: { type: 'string', minLength: 2, maxLength: 60 },
+                    description: { type: 'string', maxLength: 200 },
+                    price_per_camera: { type: 'integer', minimum: 0 },
+                    max_cameras: { type: 'integer', minimum: 1, maximum: 100 },
+                    is_trial: { type: 'boolean' },
+                    trial_days: { type: ['integer', 'null'], minimum: 1, maximum: 90 },
+                    active: { type: 'boolean' },
+                    sort_order: { type: 'integer' },
+                },
+                additionalProperties: false,
+            },
+        },
+    }, createPlan);
+    fastify.put('/plans/:id', {
+        onRequest: guard,
+        schema: {
+            ...idParamSchema,
+            body: {
+                type: 'object',
+                properties: {
+                    name: { type: 'string', minLength: 2, maxLength: 60 },
+                    description: { type: 'string', maxLength: 200 },
+                    price_per_camera: { type: 'integer', minimum: 0 },
+                    max_cameras: { type: 'integer', minimum: 1, maximum: 100 },
+                    is_trial: { type: 'boolean' },
+                    trial_days: { type: ['integer', 'null'], minimum: 1, maximum: 90 },
+                    active: { type: 'boolean' },
+                    sort_order: { type: 'integer' },
+                },
+                additionalProperties: false,
+            },
+        },
+    }, updatePlan);
+
+    // Change a customer's plan (admin override — may pick inactive plans / re-grant trial)
+    fastify.put('/customers/:id/plan', {
+        onRequest: guard,
+        schema: {
+            ...idParamSchema,
+            body: {
+                type: 'object',
+                properties: {
+                    plan_key: { type: 'string', minLength: 2, maxLength: 40 },
+                    plan_id: { type: 'integer', minimum: 1 },
+                },
+                additionalProperties: false,
+            },
+        },
+    }, changeCustomerPlan);
+
+    // Self-registration settings (enabled + default plan for new signups)
+    fastify.get('/registration-settings', { onRequest: guard }, getRegistrationSettings);
+    fastify.put('/registration-settings', {
+        onRequest: guard,
+        schema: {
+            body: {
+                type: 'object',
+                properties: {
+                    enabled: { type: 'boolean' },
+                    default_plan_key: { type: 'string', minLength: 2, maxLength: 40 },
+                },
+                additionalProperties: false,
+            },
+        },
+    }, updateRegistrationSettings);
 }

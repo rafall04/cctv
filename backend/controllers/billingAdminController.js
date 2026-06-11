@@ -10,6 +10,7 @@
 
 import { query } from '../database/connectionPool.js';
 import billingService from '../services/billingService.js';
+import billingPlanService from '../services/billingPlanService.js';
 import walletService from '../services/walletService.js';
 import paymentService from '../services/paymentService.js';
 import { logAdminAction } from '../services/securityAuditLogger.js';
@@ -26,6 +27,9 @@ export async function listCustomers(request, reply) {
     try {
         const customers = query(`
             SELECT u.id, u.username, u.phone, u.email, u.created_at,
+                   u.plan_id, u.trial_ends_at,
+                   bp.name AS plan_name, bp.key AS plan_key, bp.is_trial AS plan_is_trial,
+                   bp.max_cameras AS plan_max_cameras,
                    COALESCE(w.balance, 0) AS balance,
                    (SELECT COUNT(*) FROM cameras c WHERE c.owner_user_id = u.id) AS camera_count,
                    (SELECT COUNT(*) FROM camera_subscriptions cs
@@ -34,12 +38,69 @@ export async function listCustomers(request, reply) {
                      WHERE cs.user_id = u.id AND cs.status = 'suspended') AS suspended_subscriptions
             FROM users u
             LEFT JOIN wallets w ON w.user_id = u.id
+            LEFT JOIN billing_plans bp ON bp.id = u.plan_id
             WHERE u.role = 'customer'
             ORDER BY u.id ASC
         `);
         return reply.send({ success: true, data: customers });
     } catch (error) {
         return handleError(reply, error, 'List customers error:');
+    }
+}
+
+export async function listPlansAdmin(request, reply) {
+    try {
+        return reply.send({ success: true, data: billingPlanService.listPlans() });
+    } catch (error) {
+        return handleError(reply, error, 'List plans error:');
+    }
+}
+
+export async function createPlan(request, reply) {
+    try {
+        const plan = billingPlanService.createPlan(request.body || {}, request);
+        return reply.send({ success: true, message: 'Paket dibuat', data: plan });
+    } catch (error) {
+        return handleError(reply, error, 'Create plan error:');
+    }
+}
+
+export async function updatePlan(request, reply) {
+    try {
+        const plan = billingPlanService.updatePlan(request.params.id, request.body || {}, request);
+        return reply.send({ success: true, message: 'Paket diperbarui', data: plan });
+    } catch (error) {
+        return handleError(reply, error, 'Update plan error:');
+    }
+}
+
+export async function changeCustomerPlan(request, reply) {
+    try {
+        const state = billingPlanService.changeUserPlan(
+            request.params.id,
+            request.body?.plan_key ?? request.body?.plan_id,
+            { byAdmin: true, request }
+        );
+        return reply.send({ success: true, message: 'Paket pelanggan diubah', data: state });
+    } catch (error) {
+        return handleError(reply, error, 'Change customer plan error:');
+    }
+}
+
+export async function getRegistrationSettings(request, reply) {
+    try {
+        return reply.send({ success: true, data: billingPlanService.getRegistrationSettings() });
+    } catch (error) {
+        return handleError(reply, error, 'Get registration settings error:');
+    }
+}
+
+export async function updateRegistrationSettings(request, reply) {
+    try {
+        const settings = billingPlanService.updateRegistrationSettings(request.body || {}, request);
+        return reply.send({ success: true, message: 'Pengaturan registrasi disimpan', data: settings });
+    } catch (error) {
+        return handleError(reply, error, 'Update registration settings error:');
     }
 }
 

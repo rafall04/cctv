@@ -14,8 +14,31 @@ import {
     createTopup,
     getTopupStatus,
     getMyPayments,
+    getMyPlan,
+    listAvailablePlans,
+    switchMyPlan,
+    createMyCamera,
+    updateMyCamera,
+    deleteMyCamera,
 } from '../controllers/customerController.js';
 import { authMiddleware, requireCustomerOrAdmin } from '../middleware/authMiddleware.js';
+
+const cameraIdParam = {
+    params: {
+        type: 'object',
+        required: ['id'],
+        properties: {
+            id: { type: 'string', pattern: '^[0-9]+$' },
+        },
+    },
+};
+
+const cameraBodyProperties = {
+    name: { type: 'string', minLength: 2, maxLength: 100 },
+    location: { type: 'string', maxLength: 120 },
+    description: { type: 'string', maxLength: 200 },
+    private_rtsp_url: { type: 'string', minLength: 8, maxLength: 500 },
+};
 
 export default async function customerRoutes(fastify) {
     const guard = [authMiddleware, requireCustomerOrAdmin];
@@ -24,6 +47,53 @@ export default async function customerRoutes(fastify) {
     fastify.get('/summary', { onRequest: guard }, getMySummary);
     fastify.get('/wallet', { onRequest: guard }, getMyWallet);
     fastify.get('/payments', { onRequest: guard }, getMyPayments);
+
+    // Plan (paket) self-service
+    fastify.get('/plan', { onRequest: guard }, getMyPlan);
+    fastify.get('/plans', { onRequest: guard }, listAvailablePlans);
+    fastify.post('/plan', {
+        onRequest: guard,
+        schema: {
+            body: {
+                type: 'object',
+                required: ['plan_key'],
+                properties: {
+                    plan_key: { type: 'string', minLength: 2, maxLength: 40 },
+                },
+                additionalProperties: false,
+            },
+        },
+    }, switchMyPlan);
+
+    // Camera self-service (bounded by plan max_cameras + RTSP policy)
+    fastify.post('/cameras', {
+        onRequest: guard,
+        schema: {
+            body: {
+                type: 'object',
+                required: ['name', 'private_rtsp_url'],
+                properties: cameraBodyProperties,
+                additionalProperties: false,
+            },
+        },
+    }, createMyCamera);
+
+    fastify.put('/cameras/:id', {
+        onRequest: guard,
+        schema: {
+            ...cameraIdParam,
+            body: {
+                type: 'object',
+                properties: cameraBodyProperties,
+                additionalProperties: false,
+            },
+        },
+    }, updateMyCamera);
+
+    fastify.delete('/cameras/:id', {
+        onRequest: guard,
+        schema: cameraIdParam,
+    }, deleteMyCamera);
 
     fastify.post('/topup', {
         onRequest: guard,

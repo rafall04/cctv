@@ -1,0 +1,146 @@
+/**
+ * Purpose: Customer self-service camera CRUD — bounded by the account plan's max_cameras,
+ *          RTSP URL policy-checked, always subscriber-class, never exposing other tenants.
+ * Caller: customerRoutes (POST/PUT/DELETE /api/customer/cameras*).
+ * Deps: connectionPool, cameraService (create/update/delete + MediaMTX sync),
+ *       billingService (subscription wiring), billingPlanService (plan/limit state),
+ *       rtspUrlPolicy.
+ * MainFuncs: createOwnCamera, updateOwnCamera, deleteOwnCamera.
+ * SideEffects: Creates/updates/deletes cameras + camera_subscriptions; MediaMTX path changes
+ *              happen inside cameraService.
+ */
+
+import { queryOne, execute } from '../database/connectionPool.js';
+import cameraService from './cameraService.js';
+import billingService from './billingService.js';
+import billingPlanService from './billingPlanService.js';
+import { validateCustomerRtspUrl } from '../utils/rtspUrlPolicy.js';
+
+function badRequest(message) {
+    const err = new Error(message);
+    err.statusCode = 400;
+    return err;
+}
+
+function assertOwnCamera(userId, cameraId) {
+    const camera = queryOne(
+        'SELECT id, name, owner_user_id, camera_class FROM cameras WHERE id = ?',
+        [cameraId]
+    );
+    if (!camera || Number(camera.owner_user_id) !== Number(userId)) {
+        const err = new Error('Kamera tidak ditemukan');
+        err.statusCode = 404;
+        throw err;
+    }
+    return camera;
+}
+
+function normalizeTextField(value, { label, min = 0, max = 120, required = false } = {}) {
+    const text = value === undefined || value === null ? '' : String(value).trim();
+    if (!text) {
+        if (required) {
+            throw badRequest(`${label} wajib diisi`);
+        }
+        return null;
+    }
+    if (text.length < min) {
+        throw badRequest(`${label} minimal ${min} karakter`);
+    }
+    if (text.length > max) {
+        throw badRequest(`${label} maksimal ${max} karakter`);
+    }
+    return text;
+}
+
+class CustomerCameraService {
+    async createOwnCamera(user, data, request) {
+        const planState = billingPlanService.getUserPlanState(user.id);
+        if (!planState.plan) {
+            throw badRequest('Akun belum punya paket — pilih paket dulu di menu Paket');
+        }
+        if (planState.trial_expired) {
+            throw badRequest('Trial sudah berakhir — upgrade ke paket berbayar untuk menambah kamera');
+        }
+        if (planState.used_cameras >= planState.max_cameras) {
+            throw badRequest(`Paket ${planState.plan.name} maksimal ${planState.max_cameras} kamera — upgrade paket untuk menambah`);
+        }
+
+        const name = normalizeTextField(data.name, { label: 'Nama kamera', min: 2, max: 100, required: true });
+        const location = normalizeTextField(data.location, { label: 'Lokasi', max: 120 });
+        const description = normalizeTextField(data.description, { label: 'Deskripsi', max: 200 });
+        const rtsp = validateCustomerRtspUrl(data.private_rtsp_url);
+        if (!rtsp.ok) {
+            throw badRequest(rtsp.message);
+        }
+
+        // cameraService handles stream_key generation, MediaMTX path add, cache busts,
+        // and the audit log (request.user = the customer — truthful trail).
+        const created = await cameraService.createCamera({
+            name,
+            private_rtsp_url: rtsp.url,
+            description,
+            location,
+            enabled: 1,
+            stream_source: 'internal',
+            delivery_type: 'internal_hls',
+        }, request);
+
+        // Tenancy + billing wiring: subscriber class, owner, plan-priced subscription
+        // (day-one charge / trial handling happens inside assignSubscription).
+        const subscription = billingService.assignSubscription({
+            camera_id: created.id,
+            user_id: user.id,
+            monthly_price: planState.plan.price_per_camera,
+        }, request);
+
+        return {
+            id: created.id,
+            name,
+            subscription_status: subscription?.status || 'active',
+        };
+    }
+
+    async updateOwnCamera(user, cameraId, data, request) {
+        assertOwnCamera(user.id, cameraId);
+
+        const payload = {};
+        if (data.name !== undefined) {
+            payload.name = normalizeTextField(data.name, { label: 'Nama kamera', min: 2, max: 100, required: true });
+        }
+        if (data.location !== undefined) {
+            payload.location = normalizeTextField(data.location, { label: 'Lokasi', max: 120 });
+        }
+        if (data.description !== undefined) {
+            payload.description = normalizeTextField(data.description, { label: 'Deskripsi', max: 200 });
+        }
+        if (data.private_rtsp_url !== undefined) {
+            const rtsp = validateCustomerRtspUrl(data.private_rtsp_url);
+            if (!rtsp.ok) {
+                throw badRequest(rtsp.message);
+            }
+            payload.private_rtsp_url = rtsp.url;
+        }
+        if (Object.keys(payload).length === 0) {
+            throw badRequest('Tidak ada field yang diubah');
+        }
+
+        await cameraService.updateCamera(cameraId, payload, request);
+        return queryOne(
+            'SELECT id, name, description, location, camera_class, billing_status FROM cameras WHERE id = ?',
+            [cameraId]
+        );
+    }
+
+    async deleteOwnCamera(user, cameraId, request) {
+        const camera = assertOwnCamera(user.id, cameraId);
+
+        // Drop the billing link first so a delete can never leave a charging
+        // subscription behind; ledger history (wallet_transactions) is untouched.
+        execute('DELETE FROM camera_subscriptions WHERE camera_id = ?', [cameraId]);
+        await cameraService.deleteCamera(cameraId, request);
+
+        return { id: Number(cameraId), name: camera.name };
+    }
+}
+
+export default new CustomerCameraService();

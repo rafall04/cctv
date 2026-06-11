@@ -256,7 +256,7 @@ class UserService {
 
     getProfile(request) {
         const user = queryOne(
-            `SELECT id, username, role, created_at, password_changed_at FROM users WHERE id = ?`,
+            `SELECT id, username, role, phone, email, created_at, password_changed_at FROM users WHERE id = ?`,
             [request.user.id]
         );
 
@@ -275,7 +275,7 @@ class UserService {
     }
 
     async updateProfile(data, request) {
-        const { username } = data;
+        const { username, phone, email } = data;
         const userId = request.user.id;
 
         if (username) {
@@ -287,6 +287,23 @@ class UserService {
             }
 
             execute('UPDATE users SET username = ? WHERE id = ?', [username, userId]);
+        }
+
+        if (phone !== undefined) {
+            const cleanPhone = phone ? String(phone).replace(/[\s-]/g, '') : null;
+            if (cleanPhone) {
+                const duplicatePhone = queryOne('SELECT id FROM users WHERE phone = ? AND id != ?', [cleanPhone, userId]);
+                if (duplicatePhone) {
+                    const err = new Error('Nomor HP sudah dipakai akun lain');
+                    err.statusCode = 400;
+                    throw err;
+                }
+            }
+            execute('UPDATE users SET phone = ? WHERE id = ?', [cleanPhone, userId]);
+        }
+
+        if (email !== undefined) {
+            execute('UPDATE users SET email = ? WHERE id = ?', [email || null, userId]);
         }
 
         execute(

@@ -19,6 +19,8 @@ export const API_KEY_VALIDATOR_CONFIG = {
     publicEndpoints: [
         '/health',
         '/api/auth/login',
+        '/api/auth/register',
+        '/api/auth/register-info',
         '/api/cameras/active',
         '/api/stream',
         '/api/areas/public',
