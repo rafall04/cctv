@@ -56,6 +56,8 @@ beforeEach(() => {
         DROP TABLE IF EXISTS wallet_transactions;
         DROP TABLE IF EXISTS payments;
         DROP TABLE IF EXISTS users;
+        DROP TABLE IF EXISTS settings;
+        CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT, description TEXT, updated_at TEXT DEFAULT CURRENT_TIMESTAMP);
         CREATE TABLE users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL,
@@ -366,5 +368,32 @@ describe('paymentService ipaymu driver', () => {
         });
         await expect(paymentService.createTopup(42, 25000)).rejects.toMatchObject({ statusCode: 502 });
         expect(db.prepare("SELECT COUNT(*) AS n FROM payments WHERE gateway='ipaymu'").get().n).toBe(0);
+    });
+
+    it('uses the admin-curated method (VA bank) and stores the VA number', async () => {
+        // Configure gateway + an enabled VA method entirely via settings (no .env).
+        db.prepare("INSERT INTO settings (key,value) VALUES ('billing_gateway','ipaymu')").run();
+        db.prepare("INSERT INTO settings (key,value) VALUES ('ipaymu_va','0000-db')").run();
+        db.prepare("INSERT INTO settings (key,value) VALUES ('ipaymu_api_key','db-key')").run();
+        db.prepare(`INSERT INTO settings (key,value) VALUES ('ipaymu_methods', ?)`).run(JSON.stringify([
+            { method: 'qris', channel: 'qris', label: 'QRIS', enabled: false },
+            { method: 'va', channel: 'bca', label: 'VA BCA', enabled: true },
+        ]));
+
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+            ok: true,
+            json: async () => ({ Status: 200, Data: { TransactionId: 999, PaymentNo: '7001234567890', PaymentName: 'BCA' } }),
+        });
+
+        const payment = await paymentService.createTopup(42, 25000, 'va:bca');
+
+        // Request used the chosen VA method/channel.
+        const sentBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+        expect(sentBody.paymentMethod).toBe('va');
+        expect(sentBody.paymentChannel).toBe('bca');
+        // Stored instructions carry the VA number for the customer to transfer to.
+        expect(payment.qris.method).toBe('va');
+        expect(payment.qris.va_number).toBe('7001234567890');
+        expect(payment.qris.payment_name).toBe('BCA');
     });
 });

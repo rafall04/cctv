@@ -13,6 +13,7 @@ import billingService from '../services/billingService.js';
 import billingPlanService from '../services/billingPlanService.js';
 import walletService from '../services/walletService.js';
 import paymentService from '../services/paymentService.js';
+import paymentSettingsService from '../services/paymentSettingsService.js';
 import { logAdminAction } from '../services/securityAuditLogger.js';
 
 function handleError(reply, error, fallback) {
@@ -110,6 +111,32 @@ export async function rejectRegistration(request, reply) {
         return reply.send({ success: true, message: 'Pendaftaran ditolak', data: result });
     } catch (error) {
         return handleError(reply, error, 'Reject registration error:');
+    }
+}
+
+export async function getPaymentGateway(request, reply) {
+    try {
+        return reply.send({ success: true, data: paymentSettingsService.getAdminView() });
+    } catch (error) {
+        return handleError(reply, error, 'Get payment gateway error:');
+    }
+}
+
+export async function updatePaymentGateway(request, reply) {
+    try {
+        const data = paymentSettingsService.updateConfig(request.body || {}, request);
+        return reply.send({ success: true, message: 'Pengaturan gateway disimpan', data });
+    } catch (error) {
+        return handleError(reply, error, 'Update payment gateway error:');
+    }
+}
+
+export async function testPaymentGateway(request, reply) {
+    try {
+        const result = await paymentService.testIpaymuConnection();
+        return reply.send({ success: true, data: result });
+    } catch (error) {
+        return handleError(reply, error, 'Test payment gateway error:');
     }
 }
 

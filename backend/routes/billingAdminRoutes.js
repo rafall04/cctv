@@ -25,6 +25,9 @@ import {
     listRegistrations,
     approveRegistration,
     rejectRegistration,
+    getPaymentGateway,
+    updatePaymentGateway,
+    testPaymentGateway,
 } from '../controllers/billingAdminController.js';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 
@@ -176,6 +179,12 @@ export default async function billingAdminRoutes(fastify) {
     fastify.get('/registrations', { onRequest: guard }, listRegistrations);
     fastify.post('/registrations/:id/approve', { onRequest: guard, schema: idParamSchema }, approveRegistration);
     fastify.post('/registrations/:id/reject', { onRequest: guard, schema: idParamSchema }, rejectRegistration);
+
+    // Payment gateway config (active gateway, iPaymu/Midtrans creds, enabled methods/banks).
+    // Body schema is intentionally permissive (nested methods array); the service validates.
+    fastify.get('/payment-gateway', { onRequest: guard }, getPaymentGateway);
+    fastify.put('/payment-gateway', { onRequest: guard }, updatePaymentGateway);
+    fastify.post('/payment-gateway/test', { onRequest: guard }, testPaymentGateway);
 
     // Self-registration settings (enabled + default plan for new signups)
     fastify.get('/registration-settings', { onRequest: guard }, getRegistrationSettings);

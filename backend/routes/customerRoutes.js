@@ -20,6 +20,7 @@ import {
     createMyCamera,
     updateMyCamera,
     deleteMyCamera,
+    getPaymentOptions,
 } from '../controllers/customerController.js';
 import { authMiddleware, requireCustomerOrAdmin } from '../middleware/authMiddleware.js';
 
@@ -51,6 +52,7 @@ export default async function customerRoutes(fastify) {
     fastify.get('/summary', { onRequest: guard }, getMySummary);
     fastify.get('/wallet', { onRequest: guard }, getMyWallet);
     fastify.get('/payments', { onRequest: guard }, getMyPayments);
+    fastify.get('/payment-options', { onRequest: guard }, getPaymentOptions);
 
     // Plan (paket) self-service
     fastify.get('/plan', { onRequest: guard }, getMyPlan);
@@ -107,6 +109,7 @@ export default async function customerRoutes(fastify) {
                 required: ['amount'],
                 properties: {
                     amount: { type: 'integer', minimum: 1 },
+                    method: { type: 'string', maxLength: 40 },
                 },
                 additionalProperties: false,
             },

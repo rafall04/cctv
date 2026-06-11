@@ -13,6 +13,7 @@ import billingService from '../services/billingService.js';
 import billingPlanService from '../services/billingPlanService.js';
 import customerCameraService from '../services/customerCameraService.js';
 import paymentService from '../services/paymentService.js';
+import paymentSettingsService from '../services/paymentSettingsService.js';
 import cameraHealthService from '../services/cameraHealthService.js';
 import { sanitizeCameraThumbnailList } from '../services/thumbnailPathService.js';
 
@@ -86,10 +87,19 @@ export async function getMyWallet(request, reply) {
     }
 }
 
+export async function getPaymentOptions(request, reply) {
+    try {
+        return reply.send({ success: true, data: paymentSettingsService.getCustomerPaymentOptions() });
+    } catch (error) {
+        return handleError(reply, error, 'Get payment options error:');
+    }
+}
+
 export async function createTopup(request, reply) {
     try {
         const amount = Number(request.body?.amount);
-        const payment = await paymentService.createTopup(request.user.id, amount);
+        const method = request.body?.method || null;
+        const payment = await paymentService.createTopup(request.user.id, amount, method);
         return reply.send({ success: true, message: 'Permintaan top-up dibuat', data: payment });
     } catch (error) {
         return handleError(reply, error, 'Create topup error:');

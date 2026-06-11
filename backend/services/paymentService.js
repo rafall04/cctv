@@ -6,14 +6,16 @@
  * MainFuncs: createTopup, getPayment, markPaid, handleMidtransWebhook, verifyMidtransSignature.
  * SideEffects: Writes payments rows; credits wallets; calls Midtrans API when configured.
  *
- * Gateway drivers (env BILLING_GATEWAY, default 'manual'):
+ * Gateway selection + credentials come from paymentSettingsService (admin-editable
+ * settings table, falling back to env). Drivers:
  *   manual   — customer creates a top-up request and pays out-of-band (cash/transfer/static
  *              QRIS); an admin confirms with mark-paid. No external dependency.
- *   midtrans — QRIS via Midtrans Core API (env MIDTRANS_SERVER_KEY, MIDTRANS_API_BASE).
+ *   midtrans — QRIS via Midtrans Core API (server key from settings/MIDTRANS_SERVER_KEY).
  *              The webhook is verified with the documented SHA-512 signature
  *              (order_id + status_code + gross_amount + server_key).
- *   ipaymu   — QRIS via iPaymu API v2 direct payment (env IPAYMU_VA, IPAYMU_API_KEY,
- *              IPAYMU_PRODUCTION/IPAYMU_BASE_URL, BILLING_PUBLIC_BASE_URL for notifyUrl).
+ *   ipaymu   — iPaymu API v2 direct payment, method/channel chosen from the admin-curated
+ *              list (QRIS / VA bank / convenience store). Credentials + enabled methods are
+ *              all configured in the admin page (no .env required).
  *              iPaymu callbacks carry no verifiable signature, so the webhook NEVER
  *              trusts its body: it re-queries the transaction status from the iPaymu
  *              API (signed request) before crediting. The same re-query also runs on
@@ -30,6 +32,7 @@ import crypto from 'crypto';
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import walletService from './walletService.js';
 import billingService from './billingService.js';
+import paymentSettingsService from './paymentSettingsService.js';
 import { logAdminAction } from './securityAuditLogger.js';
 
 const MIN_TOPUP = 10000;       // Rp10.000 — below this, QRIS fees eat the margin
@@ -37,8 +40,10 @@ const MAX_TOPUP = 5000000;     // sanity cap
 const MANUAL_EXPIRY_HOURS = 48;
 const MIDTRANS_EXPIRY_MINUTES = 30;
 
+// Gateway selection + credentials now come from the admin-editable settings (DB),
+// falling back to env for backward compatibility. See paymentSettingsService.
 function getGatewayName() {
-    return (process.env.BILLING_GATEWAY || 'manual').toLowerCase();
+    return paymentSettingsService.getGatewayConfig().gateway;
 }
 
 function assertTopupAmount(amount) {
@@ -57,13 +62,8 @@ const IPAYMU_EXPIRY_MINUTES = 30;
 const IPAYMU_RECHECK_THROTTLE_MS = 15000;
 
 function getIpaymuConfig() {
-    const va = process.env.IPAYMU_VA;
-    const apiKey = process.env.IPAYMU_API_KEY;
-    const baseUrl = (process.env.IPAYMU_BASE_URL
-        || (process.env.IPAYMU_PRODUCTION === 'true'
-            ? 'https://my.ipaymu.com'
-            : 'https://sandbox.ipaymu.com')).replace(/\/$/, '');
-    return { va, apiKey, baseUrl };
+    const { ipaymu } = paymentSettingsService.getGatewayConfig();
+    return { va: ipaymu.va, apiKey: ipaymu.apiKey, baseUrl: ipaymu.baseUrl };
 }
 
 /**
@@ -143,7 +143,7 @@ export function verifyMidtransSignature({ order_id, status_code, gross_amount, s
 }
 
 class PaymentService {
-    async createTopup(userId, amount) {
+    async createTopup(userId, amount, methodKey = null) {
         assertTopupAmount(amount);
         const gateway = getGatewayName();
 
@@ -151,15 +151,17 @@ class PaymentService {
             return this._createMidtransTopup(userId, amount);
         }
         if (gateway === 'ipaymu') {
-            return this._createIpaymuTopup(userId, amount);
+            return this._createIpaymuTopup(userId, amount, methodKey);
         }
         return this._createManualTopup(userId, amount);
     }
 
-    async _createIpaymuTopup(userId, amount) {
+    async _createIpaymuTopup(userId, amount, methodKey = null) {
         const customer = queryOne('SELECT username, phone, email FROM users WHERE id = ?', [userId]);
-        const publicBase = (process.env.BILLING_PUBLIC_BASE_URL
-            || (process.env.FRONTEND_DOMAIN ? `https://${process.env.FRONTEND_DOMAIN}` : '')).replace(/\/$/, '');
+        const { publicBaseUrl } = paymentSettingsService.getGatewayConfig();
+        // Admin-curated method (VA bank / QRIS / convenience store). Falls back to the
+        // first enabled method (and finally QRIS) so a stale pick can't break the charge.
+        const chosen = paymentSettingsService.resolveIpaymuMethod(methodKey);
         const referenceId = `topup-${userId}-${Date.now()}`;
 
         const { httpOk, body } = await ipaymuRequest('/api/v2/payment/direct', {
@@ -167,17 +169,17 @@ class PaymentService {
             phone: customer?.phone || '081234567890',
             email: customer?.email || `user${userId}@noemail.local`,
             amount,
-            notifyUrl: publicBase ? `${publicBase}/api/billing/webhook/ipaymu` : undefined,
+            notifyUrl: publicBaseUrl ? `${publicBaseUrl}/api/billing/webhook/ipaymu` : undefined,
             referenceId,
-            paymentMethod: 'qris',
-            paymentChannel: 'qris',
+            paymentMethod: chosen.method,
+            paymentChannel: chosen.channel,
             comments: 'Top-up saldo CCTV',
         });
 
         const data = body?.Data || body?.data;
         if (!httpOk || !data?.TransactionId) {
             console.error('[Payment] iPaymu charge failed:', body?.Message || body?.message || 'unknown');
-            const err = new Error('Gagal membuat QRIS - coba lagi sebentar lagi');
+            const err = new Error('Gagal membuat pembayaran - coba lagi sebentar lagi');
             err.statusCode = 502;
             throw err;
         }
@@ -192,9 +194,16 @@ class PaymentService {
                 userId,
                 String(data.TransactionId),
                 amount,
+                // Method-agnostic instruction blob (kept under qris_payload for schema
+                // compatibility): QR for qris, VA number for va, payment code for cstore.
                 JSON.stringify({
+                    method: chosen.method,
+                    channel: chosen.channel,
+                    label: chosen.label,
                     qr_string: data.QrString || null,
                     qr_url: data.QrImage || data.QrTemplate || null,
+                    va_number: data.PaymentNo || data.VaNumber || null,
+                    payment_name: data.PaymentName || chosen.label || null,
                     reference_id: referenceId,
                 }),
                 expiresAt,
@@ -298,16 +307,14 @@ class PaymentService {
     }
 
     async _createMidtransTopup(userId, amount) {
-        const serverKey = process.env.MIDTRANS_SERVER_KEY;
+        const { midtrans } = paymentSettingsService.getGatewayConfig();
+        const serverKey = midtrans.serverKey;
         if (!serverKey) {
-            const err = new Error('Midtrans is not configured (MIDTRANS_SERVER_KEY missing)');
+            const err = new Error('Midtrans belum dikonfigurasi (server key kosong)');
             err.statusCode = 503;
             throw err;
         }
-        const apiBase = process.env.MIDTRANS_API_BASE
-            || (process.env.MIDTRANS_PRODUCTION === 'true'
-                ? 'https://api.midtrans.com'
-                : 'https://api.sandbox.midtrans.com');
+        const apiBase = midtrans.apiBase;
 
         const orderId = `topup-${userId}-${Date.now()}`;
         const response = await fetch(`${apiBase}/v2/charge`, {
@@ -410,7 +417,7 @@ class PaymentService {
      * verified so Midtrans stops retrying.
      */
     handleMidtransWebhook(body) {
-        const serverKey = process.env.MIDTRANS_SERVER_KEY;
+        const serverKey = paymentSettingsService.getGatewayConfig().midtrans.serverKey;
         if (!verifyMidtransSignature(body, serverKey)) {
             const err = new Error('Invalid webhook signature');
             err.statusCode = 403;
@@ -485,6 +492,32 @@ class PaymentService {
                 "UPDATE payments SET status = 'expired', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'",
                 [payment.id]
             );
+        }
+    }
+
+    /**
+     * Admin "Cek Saldo iPaymu" — a read-only signed balance call that proves the
+     * configured VA + API key + mode actually work, WITHOUT creating any transaction.
+     * Always resolves (never throws) so the admin UI can show a clean ok/error.
+     */
+    async testIpaymuConnection() {
+        const { va, apiKey } = getIpaymuConfig();
+        if (!va || !apiKey) {
+            return { ok: false, message: 'VA / API key belum diisi.' };
+        }
+        try {
+            const { httpOk, body } = await ipaymuRequest('/api/v2/balance', { account: va });
+            const status = Number(body?.Status);
+            if (httpOk && (status === 200 || body?.Success === true)) {
+                const balance = body?.Data?.Balance ?? body?.Data?.balance ?? null;
+                return { ok: true, message: 'Koneksi iPaymu berhasil.', balance };
+            }
+            return {
+                ok: false,
+                message: body?.Message || body?.message || 'Gagal — periksa VA, API key, dan mode (sandbox/produksi).',
+            };
+        } catch (error) {
+            return { ok: false, message: error.message || 'Gagal menghubungi iPaymu.' };
         }
     }
 
