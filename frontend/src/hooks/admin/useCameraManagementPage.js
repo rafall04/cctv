@@ -46,7 +46,13 @@ export function useCameraManagementPage() {
     const [showModal, setShowModal] = useState(false);
     const [editingCamera, setEditingCamera] = useState(null);
     const [modalError, setModalError] = useState('');
-    const [, setLoadingEditCameraId] = useState(null);
+    const [loadingDetail, setLoadingDetail] = useState(false);
+    // Dirty refs survive the async detail fetch (closures would capture stale state).
+    // formDirtyRef: any field edited. rtspDirtyRef: the RTSP field specifically edited —
+    // RTSP is detail-only (stripped from the list), so we must not clobber a value the
+    // admin typed while the background detail was still loading.
+    const formDirtyRef = useRef(false);
+    const rtspDirtyRef = useRef(false);
     const [deletingId, setDeletingId] = useState(null);
     const [togglingId, setTogglingId] = useState(null);
     const [togglingMaintenanceId, setTogglingMaintenanceId] = useState(null);
@@ -172,37 +178,72 @@ export function useCameraManagementPage() {
         setShowModal(false);
         setModalError('');
         setEditingCamera(null);
+        setLoadingDetail(false);
     }, []);
 
     const openAddModal = useCallback(() => {
         setEditingCamera(null);
+        formDirtyRef.current = false;
+        rtspDirtyRef.current = false;
+        setLoadingDetail(false);
         resetWith(defaultCameraFormValues, getCameraValidationRules('internal_hls'));
         setModalError('');
         setShowModal(true);
     }, [resetWith]);
 
-    const openEditModal = useCallback(async (camera) => {
+    // Open the edit modal INSTANTLY with the row data we already have (no network
+    // wait), then load the full detail (incl. private_rtsp_url, which the list
+    // projection strips) in the background. Submit is disabled until detail lands so
+    // a half-loaded form can't be saved, and the RTSP field is only backfilled when
+    // the admin hasn't typed into it.
+    const openEditModal = useCallback((camera) => {
         setModalError('');
-        setLoadingEditCameraId(camera.id);
+        formDirtyRef.current = false;
+        rtspDirtyRef.current = false;
 
-        try {
-            const response = await cameraService.getCameraById(camera.id);
-            const fullCamera = response?.success ? response.data : camera;
-            const formValues = mapCameraToFormValues(fullCamera);
-            setEditingCamera(fullCamera);
-            resetWith(formValues, getCameraValidationRules(formValues.delivery_type));
-            setShowModal(true);
-        } catch (error) {
-            console.error('Load camera detail error:', error);
-            showError('Load Camera Failed', error.response?.data?.message || 'Failed to load full camera detail.');
-        } finally {
-            setLoadingEditCameraId(null);
-        }
-    }, [resetWith, showError]);
+        const rowValues = mapCameraToFormValues(camera);
+        setEditingCamera(camera);
+        resetWith(rowValues, getCameraValidationRules(rowValues.delivery_type));
+        setShowModal(true);
+        setLoadingDetail(true);
+
+        cameraService.getCameraById(camera.id)
+            .then((response) => {
+                if (!mountedRef.current || !response?.success || !response.data) {
+                    return;
+                }
+                const detail = response.data;
+                setEditingCamera(detail);
+
+                if (!formDirtyRef.current) {
+                    // Form still pristine — adopt the full detail wholesale.
+                    const fullValues = mapCameraToFormValues(detail);
+                    resetWith(fullValues, getCameraValidationRules(fullValues.delivery_type));
+                } else if (!rtspDirtyRef.current) {
+                    // Admin edited other fields but not RTSP — backfill it so saving
+                    // an internal camera can't wipe the (still-loading) RTSP URL.
+                    setFieldValue('private_rtsp_url', detail.private_rtsp_url || '');
+                }
+            })
+            .catch((error) => {
+                console.error('Load camera detail error:', error);
+                showError('Load Camera Failed', error.response?.data?.message || 'Failed to load full camera detail.');
+            })
+            .finally(() => {
+                if (mountedRef.current) {
+                    setLoadingDetail(false);
+                }
+            });
+    }, [resetWith, setFieldValue, showError]);
 
     const handleFormChange = useCallback((event) => {
         const { name, value, type, checked } = event.target;
         const newValue = type === 'checkbox' ? checked : value;
+
+        formDirtyRef.current = true;
+        if (name === 'private_rtsp_url') {
+            rtspDirtyRef.current = true;
+        }
 
         if (name === 'delivery_type') {
             updateRules(getCameraValidationRules(newValue));
@@ -444,6 +485,7 @@ export function useCameraManagementPage() {
         loadError,
         showModal,
         editingCamera,
+        loadingDetail,
         deletingId,
         togglingId,
         togglingMaintenanceId,

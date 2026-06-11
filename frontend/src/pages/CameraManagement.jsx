@@ -37,6 +37,7 @@ export default function CameraManagement() {
         loadError,
         showModal,
         editingCamera,
+        loadingDetail,
         deletingId,
         togglingId,
         togglingMaintenanceId,
@@ -182,6 +183,7 @@ export default function CameraManagement() {
                 formData={formData}
                 modalError={modalError}
                 isSubmitting={isSubmitting}
+                loadingDetail={loadingDetail}
                 getFieldError={getFieldError}
                 onClose={closeModal}
                 onSubmit={submitCamera}

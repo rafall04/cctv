@@ -15,16 +15,46 @@ function failure(error, fallback) {
     };
 }
 
+// Map center rarely changes but was re-fetched on EVERY camera modal open
+// (LocationPicker mount) — a network round-trip that made Add/Edit feel slow.
+// Cache it for a few minutes (and dedupe concurrent fetches) so repeated modal
+// opens are instant; the TTL still lets an admin's change surface without reload.
+const MAP_CENTER_TTL_MS = 5 * 60 * 1000;
+let mapCenterCache = null;
+let mapCenterCachedAt = 0;
+let mapCenterInFlight = null;
+
+export function invalidateMapCenterCache() {
+    mapCenterCache = null;
+    mapCenterCachedAt = 0;
+    mapCenterInFlight = null;
+}
+
 export const settingsService = {
-    // Public - get map default center
+    // Public - get map default center (cached; see invalidateMapCenterCache)
     getMapCenter: async () => {
-        try {
-            const response = await apiClient.get('/api/settings/map-center');
-            return response.data;
-        } catch (error) {
-            console.error('Get map center error:', error);
-            return failure(error, 'Failed to fetch map center');
+        if (mapCenterCache && Date.now() - mapCenterCachedAt < MAP_CENTER_TTL_MS) {
+            return mapCenterCache;
         }
+        if (mapCenterInFlight) {
+            return mapCenterInFlight;
+        }
+        mapCenterInFlight = (async () => {
+            try {
+                const response = await apiClient.get('/api/settings/map-center');
+                if (response.data?.success) {
+                    mapCenterCache = response.data;
+                    mapCenterCachedAt = Date.now();
+                }
+                return response.data;
+            } catch (error) {
+                console.error('Get map center error:', error);
+                return failure(error, 'Failed to fetch map center');
+            } finally {
+                mapCenterInFlight = null;
+            }
+        })();
+        return mapCenterInFlight;
     },
 
     getPublicLandingPageSettings: async () => {
@@ -81,6 +111,8 @@ export const settingsService = {
             const response = await apiClient.put('/api/settings/map_default_center', {
                 value: { latitude, longitude, zoom, name }
             });
+            // Bust the read cache so the new center is picked up immediately.
+            invalidateMapCenterCache();
             return response.data;
         } catch (error) {
             console.error('Update map center error:', error);
