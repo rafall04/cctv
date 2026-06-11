@@ -9,6 +9,7 @@ SideEffects: Starts/stops viewer sessions, creates/destroys HLS instances, contr
 import { useRef, useState, useEffect, useCallback, useMemo, memo } from 'react';
 import Hls from 'hls.js';
 import { preloadFlv } from '../../utils/preloadManager';
+import { usePauseOnHidden } from '../../hooks/usePauseOnHidden.js';
 import { Icons } from '../ui/Icons';
 import ZoomableVideo from './ZoomableVideo';
 import { detectDeviceTier } from '../../utils/deviceDetector';
@@ -44,6 +45,7 @@ const LIVE_EDGE_LATENCY_SNAP_S = 10;
 // ============================================
 function MultiViewVideoItem({ camera, onRemove, onError, onStatusChange, initDelay = 0 }) {
     const videoRef = useRef(null);
+    usePauseOnHidden(videoRef);
     const wrapperRef = useRef(null);
     const containerRef = useRef(null);
     const hlsRef = useRef(null);

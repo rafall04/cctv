@@ -20,6 +20,7 @@ import { createFallbackHandler } from '../../utils/fallbackHandler';
 import { getHLSConfig } from '../../utils/hlsConfig';
 import { cleanupMediaResources } from '../../utils/mediaResourceCleanup';
 import { preloadHls, preloadFlv } from '../../utils/preloadManager';
+import { usePauseOnHidden } from '../../hooks/usePauseOnHidden.js';
 import { resolveStreamUrl } from '../../utils/directStreamHelper';
 import { useStreamTimeout } from '../../hooks/useStreamTimeout';
 import { viewerService } from '../../services/viewerService';
@@ -72,6 +73,7 @@ function VideoPopup({
 }) {
     const [searchParams] = useSearchParams();
     const videoRef = useRef(null);
+    usePauseOnHidden(videoRef);
     const wrapperRef = useRef(null);
     const modalRef = useRef(null);
     const outerWrapperRef = useRef(null); // Add ref for outer wrapper

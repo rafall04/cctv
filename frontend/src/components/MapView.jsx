@@ -18,6 +18,7 @@ import { viewerService } from '../services/viewerService';
 import { createTransformThrottle } from '../utils/rafThrottle';
 import { getTimeoutDuration } from '../hooks/useStreamTimeout';
 import { preloadHls } from '../utils/preloadManager';
+import { usePauseOnHidden } from '../hooks/usePauseOnHidden.js';
 import { resolveStreamUrl } from '../utils/directStreamHelper';
 import { getEffectiveDeliveryType, isHlsDeliveryType } from '../utils/cameraDelivery.js';
 import CodecBadge from './CodecBadge';
@@ -418,6 +419,7 @@ const bucketCamerasByCoordinate = (cameras, zoom) => {
 // Menggunakan ref-based state untuk pan/zoom agar tidak trigger re-render
 const VideoModal = memo(({ camera, onClose }) => {
     const videoRef = useRef(null);
+    usePauseOnHidden(videoRef);
     const videoWrapperRef = useRef(null);
     const modalRef = useRef(null);
     const outerWrapperRef = useRef(null);
