@@ -48,6 +48,8 @@ const BillingManagement = lazyWithRetry(() => import('./pages/BillingManagement'
 const CustomerLayout = lazyWithRetry(() => import('./layouts/CustomerLayout'), 'customer-layout');
 const MyCameras = lazyWithRetry(() => import('./pages/customer/MyCameras'), 'my-cameras');
 const MyWallet = lazyWithRetry(() => import('./pages/customer/MyWallet'), 'my-wallet');
+const MyPlan = lazyWithRetry(() => import('./pages/customer/MyPlan'), 'my-plan');
+const RegisterPage = lazyWithRetry(() => import('./pages/RegisterPage'), 'register-page');
 
 function CustomerPageRoute({ children }) {
     return (
@@ -105,6 +107,11 @@ function App() {
                     </Suspense>
                 } />
                 <Route path="/admin/login" element={<LoginPage />} />
+                <Route path="/daftar" element={
+                    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading...</div>}>
+                        <RegisterPage />
+                    </Suspense>
+                } />
 
                 {/* Customer portal (role: customer) */}
                 <Route
@@ -112,6 +119,14 @@ function App() {
                     element={
                         <CustomerPageRoute>
                             <MyCameras />
+                        </CustomerPageRoute>
+                    }
+                />
+                <Route
+                    path="/my/paket"
+                    element={
+                        <CustomerPageRoute>
+                            <MyPlan />
                         </CustomerPageRoute>
                     }
                 />

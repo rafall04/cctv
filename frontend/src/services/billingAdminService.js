@@ -53,6 +53,36 @@ export const billingAdminService = {
         const response = await apiClient.post('/api/admin/billing/charges/run');
         return response.data;
     },
+
+    async getPlans() {
+        const response = await apiClient.get('/api/admin/billing/plans');
+        return response.data;
+    },
+
+    async createPlan(payload) {
+        const response = await apiClient.post('/api/admin/billing/plans', payload);
+        return response.data;
+    },
+
+    async updatePlan(id, payload) {
+        const response = await apiClient.put(`/api/admin/billing/plans/${id}`, payload);
+        return response.data;
+    },
+
+    async changeCustomerPlan(customerId, planKey) {
+        const response = await apiClient.put(`/api/admin/billing/customers/${customerId}/plan`, { plan_key: planKey });
+        return response.data;
+    },
+
+    async getRegistrationSettings() {
+        const response = await apiClient.get('/api/admin/billing/registration-settings');
+        return response.data;
+    },
+
+    async updateRegistrationSettings(payload) {
+        const response = await apiClient.put('/api/admin/billing/registration-settings', payload);
+        return response.data;
+    },
 };
 
 export default billingAdminService;

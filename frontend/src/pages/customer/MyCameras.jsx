@@ -1,16 +1,17 @@
 /*
- * Purpose: Customer "Kamera Saya" page — grid of owned cameras with billing badge and a
- *          tokened live player modal (live-only product surface).
+ * Purpose: Customer "Kamera Saya" page — grid of owned cameras with billing badge, a tokened
+ *          live player modal, and self-service add/edit/delete bounded by the account plan.
  * Caller: App.jsx /my route inside CustomerLayout.
- * Deps: customerService, CustomerLivePlayer, formatRupiah.
+ * Deps: customerService, CustomerLivePlayer, CameraFormModal, formatRupiah.
  * MainFuncs: MyCameras.
- * SideEffects: Fetches owned cameras on mount.
+ * SideEffects: Fetches owned cameras + plan state; camera mutations via customerService.
  */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import customerService from '../../services/customerService';
 import CustomerLivePlayer from '../../components/customer/CustomerLivePlayer';
+import CameraFormModal from '../../components/customer/CameraFormModal';
 import { formatRupiah } from '../../layouts/CustomerLayout';
 import { buildApiAssetUrl } from '../../config/config';
 
@@ -26,25 +27,63 @@ function statusInfo(camera) {
 
 export default function MyCameras() {
     const [cameras, setCameras] = useState([]);
+    const [planState, setPlanState] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [notice, setNotice] = useState(null);
     const [activeCamera, setActiveCamera] = useState(null);
+    const [formCamera, setFormCamera] = useState(undefined); // undefined=closed, null=add, object=edit
+    const [busyId, setBusyId] = useState(null);
+
+    const reload = useCallback(async () => {
+        try {
+            const response = await customerService.getMyCameras();
+            if (response.success) {
+                setCameras(response.data || []);
+                setError(null);
+            } else {
+                setError(response.message || 'Gagal memuat kamera');
+            }
+        } catch {
+            setError('Gagal memuat kamera. Coba muat ulang halaman.');
+        } finally {
+            setLoading(false);
+        }
+        // Plan state powers the add-button/limit indicator; best-effort only.
+        try {
+            const planResponse = await customerService.getPlan?.();
+            if (planResponse?.success) {
+                setPlanState(planResponse.data);
+            }
+        } catch {
+            setPlanState(null);
+        }
+    }, []);
 
     useEffect(() => {
-        let isMounted = true;
-        customerService.getMyCameras()
-            .then((response) => {
-                if (!isMounted) return;
-                if (response.success) {
-                    setCameras(response.data || []);
-                } else {
-                    setError(response.message || 'Gagal memuat kamera');
-                }
-            })
-            .catch(() => isMounted && setError('Gagal memuat kamera. Coba muat ulang halaman.'))
-            .finally(() => isMounted && setLoading(false));
-        return () => { isMounted = false; };
-    }, []);
+        reload();
+    }, [reload]);
+
+    const handleDelete = async (camera) => {
+        if (!window.confirm(`Hapus kamera "${camera.name}"? Tagihan kamera ini berhenti dan stream-nya dimatikan.`)) {
+            return;
+        }
+        setBusyId(camera.id);
+        setNotice(null);
+        try {
+            const response = await customerService.deleteCamera(camera.id);
+            if (response.success) {
+                setNotice({ type: 'ok', text: `Kamera "${camera.name}" dihapus.` });
+                await reload();
+            } else {
+                setNotice({ type: 'error', text: response.message || 'Gagal menghapus kamera' });
+            }
+        } catch (err) {
+            setNotice({ type: 'error', text: err.response?.data?.message || 'Gagal menghapus kamera' });
+        } finally {
+            setBusyId(null);
+        }
+    };
 
     if (loading) {
         return <div className="py-16 text-center text-gray-500 dark:text-gray-400">Memuat kamera…</div>;
@@ -58,76 +97,143 @@ export default function MyCameras() {
         );
     }
 
-    if (cameras.length === 0) {
-        return (
-            <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-16 text-center dark:border-gray-700 dark:bg-gray-900">
-                <p className="text-4xl">📷</p>
-                <h2 className="mt-3 font-semibold text-gray-900 dark:text-white">Belum ada kamera</h2>
-                <p className="mx-auto mt-1 max-w-md text-sm text-gray-500 dark:text-gray-400">
-                    Kamera yang Anda sewa akan muncul di sini setelah admin menghubungkannya ke akun Anda.
-                </p>
-            </div>
-        );
-    }
+    const canAdd = planState?.can_add_camera;
+    const limitLabel = planState?.plan
+        ? `${planState.used_cameras}/${planState.max_cameras} kamera (${planState.plan.name})`
+        : null;
 
     return (
         <>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {cameras.map((camera) => {
-                    const status = statusInfo(camera);
-                    const suspended = camera.billing_status === 'suspended';
-                    return (
-                        <button
-                            key={camera.id}
-                            onClick={() => setActiveCamera(camera)}
-                            className="group overflow-hidden rounded-2xl border border-gray-200 bg-white text-left shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
-                        >
-                            <div className="relative aspect-video bg-gray-200 dark:bg-gray-800">
-                                {camera.thumbnail_path ? (
-                                    <img
-                                        src={buildApiAssetUrl(camera.thumbnail_path)}
-                                        alt={camera.name}
-                                        loading="lazy"
-                                        className={`h-full w-full object-cover ${suspended ? 'opacity-40 grayscale' : ''}`}
-                                    />
-                                ) : (
-                                    <div className="flex h-full w-full items-center justify-center text-3xl">📹</div>
-                                )}
-                                <span className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-xs font-semibold ${status.className}`}>
-                                    {status.label}
-                                </span>
-                                {!suspended && (
-                                    <span className="absolute inset-0 hidden items-center justify-center bg-black/40 text-white group-hover:flex">
-                                        ▶ Lihat Live
-                                    </span>
-                                )}
-                            </div>
-                            <div className="p-3">
-                                <h3 className="truncate font-semibold text-gray-900 dark:text-white">{camera.name}</h3>
-                                <p className="truncate text-xs text-gray-500 dark:text-gray-400">
-                                    {camera.location || camera.area_name || '—'}
-                                </p>
-                                {camera.monthly_price && (
-                                    <p className="mt-1 text-xs font-medium text-gray-600 dark:text-gray-300">
-                                        {formatRupiah(camera.monthly_price)}/bulan
-                                    </p>
-                                )}
-                                {suspended && (
-                                    <p className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
-                                        Saldo habis —{' '}
-                                        <Link to="/my/wallet" className="underline" onClick={(e) => e.stopPropagation()}>
-                                            isi saldo
-                                        </Link>{' '}
-                                        untuk mengaktifkan.
-                                    </p>
-                                )}
-                            </div>
-                        </button>
-                    );
-                })}
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <div className="text-sm text-gray-600 dark:text-gray-300">
+                    {limitLabel || 'Kamera yang Anda sewa'}
+                    {planState?.plan && !canAdd && !planState.trial_expired && planState.used_cameras >= planState.max_cameras && (
+                        <span className="ml-2 text-xs text-amber-600 dark:text-amber-400">
+                            Penuh — <Link to="/my/paket" className="underline">upgrade paket</Link> untuk menambah.
+                        </span>
+                    )}
+                    {planState?.trial_expired && (
+                        <span className="ml-2 text-xs text-amber-600 dark:text-amber-400">
+                            Trial berakhir — <Link to="/my/paket" className="underline">pilih paket</Link> agar kamera aktif lagi.
+                        </span>
+                    )}
+                </div>
+                {planState?.plan && (
+                    <button
+                        onClick={() => setFormCamera(null)}
+                        disabled={!canAdd}
+                        className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        + Tambah Kamera
+                    </button>
+                )}
             </div>
+
+            {notice && (
+                <div className={`mb-4 rounded-xl px-4 py-3 text-sm ${notice.type === 'ok'
+                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                    : 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                }`}>
+                    {notice.text}
+                </div>
+            )}
+
+            {cameras.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-16 text-center dark:border-gray-700 dark:bg-gray-900">
+                    <p className="text-4xl">📷</p>
+                    <h2 className="mt-3 font-semibold text-gray-900 dark:text-white">Belum ada kamera</h2>
+                    <p className="mx-auto mt-1 max-w-md text-sm text-gray-500 dark:text-gray-400">
+                        {planState?.plan
+                            ? 'Tambahkan kamera pertama Anda dengan tombol "+ Tambah Kamera" di atas.'
+                            : 'Pilih paket dulu di menu Paket, lalu tambahkan kamera Anda sendiri — atau hubungi admin.'}
+                    </p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {cameras.map((camera) => {
+                        const status = statusInfo(camera);
+                        const suspended = camera.billing_status === 'suspended';
+                        return (
+                            <div
+                                key={camera.id}
+                                className="group overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
+                            >
+                                <button
+                                    onClick={() => setActiveCamera(camera)}
+                                    className="relative block aspect-video w-full bg-gray-200 text-left dark:bg-gray-800"
+                                >
+                                    {camera.thumbnail_path ? (
+                                        <img
+                                            src={buildApiAssetUrl(camera.thumbnail_path)}
+                                            alt={camera.name}
+                                            loading="lazy"
+                                            className={`h-full w-full object-cover ${suspended ? 'opacity-40 grayscale' : ''}`}
+                                        />
+                                    ) : (
+                                        <div className="flex h-full w-full items-center justify-center text-3xl">📹</div>
+                                    )}
+                                    <span className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-xs font-semibold ${status.className}`}>
+                                        {status.label}
+                                    </span>
+                                    {!suspended && (
+                                        <span className="absolute inset-0 hidden items-center justify-center bg-black/40 text-white group-hover:flex">
+                                            ▶ Lihat Live
+                                        </span>
+                                    )}
+                                </button>
+                                <div className="p-3">
+                                    <h3 className="truncate font-semibold text-gray-900 dark:text-white">{camera.name}</h3>
+                                    <p className="truncate text-xs text-gray-500 dark:text-gray-400">
+                                        {camera.location || camera.area_name || '—'}
+                                    </p>
+                                    {camera.monthly_price && (
+                                        <p className="mt-1 text-xs font-medium text-gray-600 dark:text-gray-300">
+                                            {formatRupiah(camera.monthly_price)}/bulan
+                                        </p>
+                                    )}
+                                    {suspended && (
+                                        <p className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
+                                            Saldo habis —{' '}
+                                            <Link to="/my/wallet" className="underline">isi saldo</Link>{' '}
+                                            untuk mengaktifkan.
+                                        </p>
+                                    )}
+                                    <div className="mt-2 flex gap-1">
+                                        <button
+                                            onClick={() => setFormCamera(camera)}
+                                            disabled={busyId === camera.id}
+                                            className="rounded-lg px-2 py-1 text-xs text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                                        >
+                                            ✏️ Edit
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(camera)}
+                                            disabled={busyId === camera.id}
+                                            className="rounded-lg px-2 py-1 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/30"
+                                        >
+                                            🗑 Hapus
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
             {activeCamera && (
                 <CustomerLivePlayer camera={activeCamera} onClose={() => setActiveCamera(null)} />
+            )}
+            {formCamera !== undefined && (
+                <CameraFormModal
+                    camera={formCamera}
+                    onClose={() => setFormCamera(undefined)}
+                    onSaved={async () => {
+                        setFormCamera(undefined);
+                        setNotice({ type: 'ok', text: 'Kamera tersimpan.' });
+                        await reload();
+                    }}
+                />
             )}
         </>
     );

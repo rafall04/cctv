@@ -52,6 +52,7 @@ export default function CustomerLayout({ children }) {
 
     const tabs = [
         { label: 'Kamera Saya', path: '/my' },
+        { label: 'Paket', path: '/my/paket' },
         { label: 'Saldo & Tagihan', path: '/my/wallet' },
     ];
 

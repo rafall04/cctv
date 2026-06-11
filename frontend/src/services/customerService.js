@@ -38,6 +38,36 @@ export const customerService = {
         const response = await apiClient.get(`/api/customer/topup/${paymentId}`);
         return response.data;
     },
+
+    async getPlan() {
+        const response = await apiClient.get('/api/customer/plan');
+        return response.data;
+    },
+
+    async getPlans() {
+        const response = await apiClient.get('/api/customer/plans');
+        return response.data;
+    },
+
+    async switchPlan(planKey) {
+        const response = await apiClient.post('/api/customer/plan', { plan_key: planKey });
+        return response.data;
+    },
+
+    async createCamera(payload) {
+        const response = await apiClient.post('/api/customer/cameras', payload);
+        return response.data;
+    },
+
+    async updateCamera(id, payload) {
+        const response = await apiClient.put(`/api/customer/cameras/${id}`, payload);
+        return response.data;
+    },
+
+    async deleteCamera(id) {
+        const response = await apiClient.delete(`/api/customer/cameras/${id}`);
+        return response.data;
+    },
 };
 
 export default customerService;

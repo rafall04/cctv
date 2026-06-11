@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import billingAdminService from '../services/billingAdminService';
 import { cameraService } from '../services/cameraService';
 import { useNotification } from '../contexts/NotificationContext';
+import BillingPlansTab from '../components/admin/BillingPlansTab';
 
 function formatRupiah(value) {
     return `Rp${Number(value || 0).toLocaleString('id-ID')}`;
@@ -40,6 +41,8 @@ export default function BillingManagement() {
     const [subscriptions, setSubscriptions] = useState([]);
     const [payments, setPayments] = useState([]);
     const [cameras, setCameras] = useState([]);
+    const [plans, setPlans] = useState([]);
+    const [regSettings, setRegSettings] = useState(null);
     const [loading, setLoading] = useState(true);
 
     const [assignForm, setAssignForm] = useState({ camera_id: '', user_id: '', monthly_price: 20000 });
@@ -49,16 +52,20 @@ export default function BillingManagement() {
     const reload = useCallback(async () => {
         setLoading(true);
         try {
-            const [customersRes, subsRes, paymentsRes, camerasRes] = await Promise.all([
+            const [customersRes, subsRes, paymentsRes, camerasRes, plansRes, regRes] = await Promise.all([
                 billingAdminService.getCustomers(),
                 billingAdminService.getSubscriptions(),
                 billingAdminService.getPayments(),
                 cameraService.getAllCameras(),
+                billingAdminService.getPlans(),
+                billingAdminService.getRegistrationSettings(),
             ]);
             if (customersRes.success) setCustomers(customersRes.data || []);
             if (subsRes.success) setSubscriptions(subsRes.data || []);
             if (paymentsRes.success) setPayments(paymentsRes.data || []);
             if (camerasRes.success) setCameras(camerasRes.data || []);
+            if (plansRes.success) setPlans(plansRes.data || []);
+            if (regRes.success) setRegSettings(regRes.data || null);
         } catch (err) {
             console.error('Load billing data error:', err);
             showError('Gagal memuat', 'Data billing tidak dapat dimuat.');
@@ -126,6 +133,7 @@ export default function BillingManagement() {
         { key: 'customers', label: `Pelanggan (${customers.length})` },
         { key: 'subscriptions', label: `Langganan (${subscriptions.length})` },
         { key: 'payments', label: `Pembayaran (${payments.length})` },
+        { key: 'plans', label: `Paket & Trial (${plans.length})` },
     ];
 
     return (
@@ -173,6 +181,7 @@ export default function BillingManagement() {
                                         <tr className="text-left text-xs uppercase text-gray-500 dark:text-gray-400">
                                             <th className="px-3 py-2">Pelanggan</th>
                                             <th className="px-3 py-2">Kontak</th>
+                                            <th className="px-3 py-2">Paket</th>
                                             <th className="px-3 py-2 text-right">Saldo</th>
                                             <th className="px-3 py-2 text-center">Kamera</th>
                                             <th className="px-3 py-2 text-center">Status</th>
@@ -183,8 +192,33 @@ export default function BillingManagement() {
                                             <tr key={customer.id} className="bg-white dark:bg-gray-900">
                                                 <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">{customer.username}</td>
                                                 <td className="px-3 py-2 text-gray-500 dark:text-gray-400">{customer.phone || customer.email || '—'}</td>
+                                                <td className="px-3 py-2">
+                                                    <select
+                                                        value={customer.plan_key || ''}
+                                                        disabled={busy}
+                                                        onChange={(e) => {
+                                                            if (e.target.value && window.confirm(`Ubah paket ${customer.username} ke ${e.target.value}? Harga kamera menyesuaikan.`)) {
+                                                                run(
+                                                                    () => billingAdminService.changeCustomerPlan(customer.id, e.target.value),
+                                                                    'Paket pelanggan diubah'
+                                                                );
+                                                            }
+                                                        }}
+                                                        className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-900/50 dark:text-white"
+                                                    >
+                                                        <option value="">(tanpa paket)</option>
+                                                        {plans.map((plan) => (
+                                                            <option key={plan.id} value={plan.key}>{plan.name}</option>
+                                                        ))}
+                                                    </select>
+                                                    {customer.plan_is_trial === 1 && customer.trial_ends_at && (
+                                                        <p className="mt-0.5 text-[10px] text-gray-400">
+                                                            trial s/d {String(customer.trial_ends_at).slice(0, 10)}
+                                                        </p>
+                                                    )}
+                                                </td>
                                                 <td className="px-3 py-2 text-right font-semibold text-gray-900 dark:text-white">{formatRupiah(customer.balance)}</td>
-                                                <td className="px-3 py-2 text-center">{customer.camera_count}</td>
+                                                <td className="px-3 py-2 text-center">{customer.camera_count}{customer.plan_max_cameras ? `/${customer.plan_max_cameras}` : ''}</td>
                                                 <td className="px-3 py-2 text-center">
                                                     {customer.suspended_subscriptions > 0 ? (
                                                         <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${SUB_STATUS_BADGES.suspended}`}>
@@ -200,8 +234,8 @@ export default function BillingManagement() {
                                         ))}
                                         {customers.length === 0 && (
                                             <tr>
-                                                <td colSpan="5" className="px-3 py-8 text-center text-gray-500 dark:text-gray-400">
-                                                    Belum ada pelanggan. Buat user dengan role <code>customer</code> di halaman Users.
+                                                <td colSpan="6" className="px-3 py-8 text-center text-gray-500 dark:text-gray-400">
+                                                    Belum ada pelanggan. Pelanggan bisa daftar mandiri di <code>/daftar</code>, atau buat user role <code>customer</code> di halaman Users.
                                                 </td>
                                             </tr>
                                         )}
@@ -377,6 +411,10 @@ export default function BillingManagement() {
                                 </div>
                             </form>
                         </div>
+                    )}
+
+                    {tab === 'plans' && (
+                        <BillingPlansTab plans={plans} regSettings={regSettings} run={run} busy={busy} />
                     )}
 
                     {tab === 'payments' && (

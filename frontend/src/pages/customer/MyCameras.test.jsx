@@ -11,12 +11,19 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
-const { getMyCamerasMock } = vi.hoisted(() => ({
+const { getMyCamerasMock, getPlanMock } = vi.hoisted(() => ({
     getMyCamerasMock: vi.fn(),
+    getPlanMock: vi.fn(),
 }));
 
 vi.mock('../../services/customerService', () => ({
-    default: { getMyCameras: getMyCamerasMock },
+    default: {
+        getMyCameras: getMyCamerasMock,
+        getPlan: getPlanMock,
+        createCamera: vi.fn(),
+        updateCamera: vi.fn(),
+        deleteCamera: vi.fn(),
+    },
 }));
 
 vi.mock('../../components/customer/CustomerLivePlayer', () => ({
@@ -36,6 +43,8 @@ function renderPage() {
 describe('MyCameras', () => {
     beforeEach(() => {
         getMyCamerasMock.mockReset();
+        getPlanMock.mockReset();
+        getPlanMock.mockResolvedValue({ success: true, data: { plan: null, used_cameras: 0, max_cameras: 0, can_add_camera: false } });
     });
 
     it('shows the empty state when the customer has no cameras', async () => {
@@ -86,6 +95,31 @@ describe('MyCameras', () => {
         await waitFor(() => {
             expect(screen.getByText(/Gagal memuat kamera/)).toBeTruthy();
         });
+    });
+
+    it('shows the plan limit indicator and disables add when the quota is full', async () => {
+        getMyCamerasMock.mockResolvedValue({
+            success: true,
+            data: [{ id: 1, name: 'Kamera Toko', is_online: 1, billing_status: 'active', monthly_price: 20000 }],
+        });
+        getPlanMock.mockResolvedValue({
+            success: true,
+            data: {
+                plan: { id: 2, key: 'basic', name: 'Basic' },
+                used_cameras: 1,
+                max_cameras: 1,
+                can_add_camera: false,
+                trial_expired: false,
+            },
+        });
+        renderPage();
+
+        await waitFor(() => {
+            expect(screen.getByText(/1\/1 kamera \(Basic\)/)).toBeTruthy();
+        });
+        const addButton = screen.getByRole('button', { name: /Tambah Kamera/ });
+        expect(addButton.disabled).toBe(true);
+        expect(screen.getByText(/upgrade paket/)).toBeTruthy();
     });
 });
 

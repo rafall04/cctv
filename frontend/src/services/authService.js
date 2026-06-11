@@ -94,6 +94,46 @@ export const authService = {
     },
 
     /**
+     * Customer self-registration. The caller logs in afterwards via login().
+     * @returns {Promise<Object>} { success, message, errors? }
+     */
+    async register({ username, password, phone, email }) {
+        try {
+            await fetchCsrfToken();
+            const response = await apiClient.post('/api/auth/register', {
+                username,
+                password,
+                phone,
+                ...(email ? { email } : {}),
+            });
+            return response.data;
+        } catch (error) {
+            const data = error.response?.data || {};
+            return {
+                success: false,
+                message: data.message || 'Pendaftaran gagal. Coba lagi.',
+                errors: data.errors || null,
+            };
+        }
+    },
+
+    /**
+     * Public info for the register page: whether self-registration is open and
+     * what the default plan (e.g. trial) looks like.
+     */
+    async registerInfo() {
+        try {
+            const response = await apiClient.get('/api/auth/register-info', {
+                skipGlobalErrorNotification: true,
+                skipAuthRefresh: true,
+            });
+            return response.data;
+        } catch {
+            return { success: false, data: { enabled: false, default_plan: null } };
+        }
+    },
+
+    /**
      * Logout and clear all session data
      */
     async logout() {

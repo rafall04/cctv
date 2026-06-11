@@ -488,8 +488,14 @@ export default function LoginPage() {
                         </button>
                     </form>
 
-                    {/* Back Link */}
-                    <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700/50">
+                    {/* Register + Back Links */}
+                    <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700/50 space-y-3">
+                        <p className="text-center text-sm text-gray-500 dark:text-gray-400">
+                            Mau sewa CCTV?{' '}
+                            <a href="/daftar" className="font-semibold text-primary hover:underline">
+                                Daftar pelanggan baru
+                            </a>
+                        </p>
                         <a
                             href="/"
                             className="flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-sky-400 transition-colors"

@@ -8,13 +8,15 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { getMock, postMock } = vi.hoisted(() => ({
+const { getMock, postMock, putMock, deleteMock } = vi.hoisted(() => ({
     getMock: vi.fn(),
     postMock: vi.fn(),
+    putMock: vi.fn(),
+    deleteMock: vi.fn(),
 }));
 
 vi.mock('./apiClient', () => ({
-    default: { get: getMock, post: postMock },
+    default: { get: getMock, post: postMock, put: putMock, delete: deleteMock },
 }));
 
 import customerService from './customerService';
@@ -50,5 +52,24 @@ describe('customerService', () => {
     it('polls a top-up status by payment id', async () => {
         await customerService.getTopupStatus(12);
         expect(getMock).toHaveBeenCalledWith('/api/customer/topup/12');
+    });
+
+    it('switches plans via plan_key', async () => {
+        await customerService.switchPlan('hemat');
+        expect(postMock).toHaveBeenCalledWith('/api/customer/plan', { plan_key: 'hemat' });
+    });
+
+    it('creates, updates, and deletes own cameras through the customer endpoints', async () => {
+        putMock.mockResolvedValue({ data: { success: true } });
+        deleteMock.mockResolvedValue({ data: { success: true } });
+
+        await customerService.createCamera({ name: 'Cam', private_rtsp_url: 'rtsp://x/1' });
+        expect(postMock).toHaveBeenCalledWith('/api/customer/cameras', { name: 'Cam', private_rtsp_url: 'rtsp://x/1' });
+
+        await customerService.updateCamera(5, { name: 'Baru' });
+        expect(putMock).toHaveBeenCalledWith('/api/customer/cameras/5', { name: 'Baru' });
+
+        await customerService.deleteCamera(5);
+        expect(deleteMock).toHaveBeenCalledWith('/api/customer/cameras/5');
     });
 });
