@@ -96,7 +96,14 @@ export async function createTopup(request, reply) {
 
 export async function getTopupStatus(request, reply) {
     try {
-        const payment = paymentService.getPayment(request.params.id, request.user.id);
+        // Ownership check first (throws 404 for other users' payments) …
+        let payment = paymentService.getPayment(request.params.id, request.user.id);
+        // … then opportunistically re-verify pending iPaymu payments against the
+        // gateway so polling confirms even without a reachable webhook.
+        if (payment.gateway === 'ipaymu' && payment.status === 'pending') {
+            await paymentService.syncIpaymuPayment(payment.id);
+            payment = paymentService.getPayment(request.params.id, request.user.id);
+        }
         return reply.send({ success: true, data: payment });
     } catch (error) {
         return handleError(reply, error, 'Get topup status error:');

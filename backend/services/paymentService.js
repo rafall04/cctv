@@ -12,6 +12,13 @@
  *   midtrans — QRIS via Midtrans Core API (env MIDTRANS_SERVER_KEY, MIDTRANS_API_BASE).
  *              The webhook is verified with the documented SHA-512 signature
  *              (order_id + status_code + gross_amount + server_key).
+ *   ipaymu   — QRIS via iPaymu API v2 direct payment (env IPAYMU_VA, IPAYMU_API_KEY,
+ *              IPAYMU_PRODUCTION/IPAYMU_BASE_URL, BILLING_PUBLIC_BASE_URL for notifyUrl).
+ *              iPaymu callbacks carry no verifiable signature, so the webhook NEVER
+ *              trusts its body: it re-queries the transaction status from the iPaymu
+ *              API (signed request) before crediting. The same re-query also runs on
+ *              customer status polls (throttled), so deployments that cannot receive
+ *              webhooks still confirm within one poll interval.
  *
  * Exactly-once crediting: confirmation flows through _confirmPayment, which flips
  * status pending→paid with a guarded UPDATE (`WHERE status = 'pending'`) — the wallet
@@ -42,6 +49,84 @@ function assertTopupAmount(amount) {
     }
 }
 
+// ----------------------------------------------------------------------
+// iPaymu API v2 helpers
+// ----------------------------------------------------------------------
+
+const IPAYMU_EXPIRY_MINUTES = 30;
+const IPAYMU_RECHECK_THROTTLE_MS = 15000;
+
+function getIpaymuConfig() {
+    const va = process.env.IPAYMU_VA;
+    const apiKey = process.env.IPAYMU_API_KEY;
+    const baseUrl = (process.env.IPAYMU_BASE_URL
+        || (process.env.IPAYMU_PRODUCTION === 'true'
+            ? 'https://my.ipaymu.com'
+            : 'https://sandbox.ipaymu.com')).replace(/\/$/, '');
+    return { va, apiKey, baseUrl };
+}
+
+/**
+ * iPaymu v2 request signature:
+ *   stringToSign = "{METHOD}:{VA}:{lowercase sha256(jsonBody)}:{API_KEY}"
+ *   signature    = HMAC-SHA256(stringToSign, API_KEY) hex
+ * Sent via `va`, `signature`, `timestamp` (YYYYMMDDhhmmss) headers.
+ */
+export function buildIpaymuSignature({ method = 'POST', va, apiKey, body }) {
+    const bodyHash = crypto.createHash('sha256').update(body, 'utf8').digest('hex').toLowerCase();
+    const stringToSign = `${method.toUpperCase()}:${va}:${bodyHash}:${apiKey}`;
+    return crypto.createHmac('sha256', apiKey).update(stringToSign, 'utf8').digest('hex');
+}
+
+function ipaymuTimestamp(now = new Date()) {
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+}
+
+async function ipaymuRequest(path, payload) {
+    const { va, apiKey, baseUrl } = getIpaymuConfig();
+    if (!va || !apiKey) {
+        const err = new Error('iPaymu is not configured (IPAYMU_VA / IPAYMU_API_KEY missing)');
+        err.statusCode = 503;
+        throw err;
+    }
+    const body = JSON.stringify(payload);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    try {
+        const response = await fetch(`${baseUrl}${path}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                va,
+                signature: buildIpaymuSignature({ method: 'POST', va, apiKey, body }),
+                timestamp: ipaymuTimestamp(),
+            },
+            body,
+            signal: controller.signal,
+        });
+        const json = await response.json().catch(() => ({}));
+        return { httpOk: response.ok, body: json };
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+/** Normalize iPaymu transaction-check payloads into {paid, expired, amount}. */
+export function interpretIpaymuTransaction(data) {
+    if (!data) {
+        return { paid: false, expired: false, amount: null };
+    }
+    const statusDesc = String(data.StatusDesc ?? data.status_desc ?? '').toLowerCase();
+    const statusCode = Number(data.Status ?? data.status);
+    const paid = statusDesc === 'berhasil' || statusDesc === 'success' || statusCode === 1 || statusCode === 6;
+    const expired = statusDesc.includes('expired') || statusDesc.includes('kadaluarsa') || statusCode === -2;
+    const rawAmount = data.Amount ?? data.amount ?? data.Total ?? data.total ?? null;
+    const amount = rawAmount === null ? null : Math.round(Number.parseFloat(rawAmount));
+    return { paid, expired, amount: Number.isFinite(amount) ? amount : null };
+}
+
 export function verifyMidtransSignature({ order_id, status_code, gross_amount, signature_key }, serverKey) {
     if (!order_id || !status_code || !gross_amount || !signature_key || !serverKey) {
         return false;
@@ -65,7 +150,137 @@ class PaymentService {
         if (gateway === 'midtrans') {
             return this._createMidtransTopup(userId, amount);
         }
+        if (gateway === 'ipaymu') {
+            return this._createIpaymuTopup(userId, amount);
+        }
         return this._createManualTopup(userId, amount);
+    }
+
+    async _createIpaymuTopup(userId, amount) {
+        const customer = queryOne('SELECT username, phone, email FROM users WHERE id = ?', [userId]);
+        const publicBase = (process.env.BILLING_PUBLIC_BASE_URL
+            || (process.env.FRONTEND_DOMAIN ? `https://${process.env.FRONTEND_DOMAIN}` : '')).replace(/\/$/, '');
+        const referenceId = `topup-${userId}-${Date.now()}`;
+
+        const { httpOk, body } = await ipaymuRequest('/api/v2/payment/direct', {
+            name: customer?.username || `user-${userId}`,
+            phone: customer?.phone || '081234567890',
+            email: customer?.email || `user${userId}@noemail.local`,
+            amount,
+            notifyUrl: publicBase ? `${publicBase}/api/billing/webhook/ipaymu` : undefined,
+            referenceId,
+            paymentMethod: 'qris',
+            paymentChannel: 'qris',
+            comments: 'Top-up saldo CCTV',
+        });
+
+        const data = body?.Data || body?.data;
+        if (!httpOk || !data?.TransactionId) {
+            console.error('[Payment] iPaymu charge failed:', body?.Message || body?.message || 'unknown');
+            const err = new Error('Gagal membuat QRIS - coba lagi sebentar lagi');
+            err.statusCode = 502;
+            throw err;
+        }
+
+        const expiresAt = data.Expired
+            ? new Date(data.Expired).toISOString()
+            : new Date(Date.now() + IPAYMU_EXPIRY_MINUTES * 60 * 1000).toISOString();
+        const result = execute(
+            `INSERT INTO payments (user_id, gateway, gateway_ref, amount, status, qris_payload, expires_at)
+             VALUES (?, 'ipaymu', ?, ?, 'pending', ?, ?)`,
+            [
+                userId,
+                String(data.TransactionId),
+                amount,
+                JSON.stringify({
+                    qr_string: data.QrString || null,
+                    qr_url: data.QrImage || data.QrTemplate || null,
+                    reference_id: referenceId,
+                }),
+                expiresAt,
+            ]
+        );
+        return this.getPayment(result.lastInsertRowid);
+    }
+
+    /**
+     * Re-check a pending iPaymu payment against the gateway (signed request) and
+     * confirm/expire it accordingly. Safe to call repeatedly: throttled by
+     * updated_at, and crediting stays exactly-once via _confirmPayment. Called by
+     * the webhook (mandatory verification) and by customer status polls (fallback
+     * for deployments that cannot receive webhooks).
+     */
+    async syncIpaymuPayment(paymentId) {
+        const payment = queryOne('SELECT * FROM payments WHERE id = ?', [paymentId]);
+        if (!payment || payment.gateway !== 'ipaymu' || payment.status !== 'pending') {
+            return payment;
+        }
+        // SQLite CURRENT_TIMESTAMP is "YYYY-MM-DD HH:MM:SS" (UTC) — normalize to ISO.
+        const updatedAtMs = payment.updated_at
+            ? new Date(`${String(payment.updated_at).replace(' ', 'T')}Z`).getTime()
+            : 0;
+        if (Number.isFinite(updatedAtMs) && Date.now() - updatedAtMs < IPAYMU_RECHECK_THROTTLE_MS) {
+            return payment;
+        }
+        // Stamp the attempt first so concurrent polls don't stampede the gateway.
+        execute('UPDATE payments SET updated_at = CURRENT_TIMESTAMP WHERE id = ?', [payment.id]);
+
+        try {
+            const { body } = await ipaymuRequest('/api/v2/transaction', {
+                transactionId: Number(payment.gateway_ref) || payment.gateway_ref,
+            });
+            const status = interpretIpaymuTransaction(body?.Data || body?.data);
+
+            if (status.paid) {
+                if (status.amount !== null && status.amount < payment.amount) {
+                    console.error(`[Payment] iPaymu amount mismatch for payment ${payment.id}: ${status.amount} < ${payment.amount}`);
+                    return queryOne('SELECT * FROM payments WHERE id = ?', [payment.id]);
+                }
+                this._confirmPayment(payment);
+            } else if (status.expired) {
+                execute(
+                    "UPDATE payments SET status = 'expired', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'pending'",
+                    [payment.id]
+                );
+            }
+        } catch (error) {
+            console.error('[Payment] iPaymu status check failed:', error.message);
+        }
+        return queryOne('SELECT * FROM payments WHERE id = ?', [payment.id]);
+    }
+
+    /**
+     * iPaymu notify handler. The body is untrusted (no signature) — it only tells
+     * us WHICH payment to re-verify against the iPaymu API.
+     */
+    async handleIpaymuWebhook(body) {
+        const trxId = body?.trx_id ?? body?.transaction_id ?? body?.trxId ?? null;
+        const referenceId = body?.reference_id ?? body?.referenceId ?? null;
+
+        let payment = null;
+        if (trxId) {
+            payment = queryOne(
+                "SELECT * FROM payments WHERE gateway = 'ipaymu' AND gateway_ref = ?",
+                [String(trxId)]
+            );
+        }
+        if (!payment && referenceId) {
+            payment = queryOne(
+                "SELECT * FROM payments WHERE gateway = 'ipaymu' AND qris_payload LIKE ?",
+                [`%"reference_id":"${String(referenceId).replace(/"/g, '')}"%`]
+            );
+        }
+        if (!payment) {
+            return { handled: false, reason: 'unknown_transaction' };
+        }
+        if (payment.status !== 'pending') {
+            return { handled: true, status: payment.status };
+        }
+
+        // Force an immediate re-check regardless of the poll throttle.
+        execute("UPDATE payments SET updated_at = datetime('now', '-1 minute') WHERE id = ?", [payment.id]);
+        const synced = await this.syncIpaymuPayment(payment.id);
+        return { handled: true, status: synced?.status || 'pending' };
     }
 
     _createManualTopup(userId, amount) {
