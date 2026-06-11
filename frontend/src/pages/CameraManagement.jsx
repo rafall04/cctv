@@ -19,6 +19,7 @@ import {
 const EMPTY_CAMERA_FILTERS = {
     search: '',
     areaId: 'all',
+    cameraClass: 'all',
     deliveryType: 'all',
     healthMode: 'all',
     availabilityState: 'all',
@@ -83,6 +84,16 @@ export default function CameraManagement() {
                             {areas.map((area) => (
                                 <option key={area.id} value={String(area.id)}>{area.name}</option>
                             ))}
+                        </select>
+                        <select
+                            value={filters.cameraClass}
+                            onChange={(event) => setFilters((current) => ({ ...current, cameraClass: event.target.value }))}
+                            className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition focus:border-transparent focus:ring-2 focus:ring-sky-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                        >
+                            <option value="all">Semua Kelas</option>
+                            <option value="community">Community (Publik)</option>
+                            <option value="subscriber">Subscriber (Sewa)</option>
+                            <option value="owner_private">Owner Private</option>
                         </select>
                         <select
                             value={filters.deliveryType}

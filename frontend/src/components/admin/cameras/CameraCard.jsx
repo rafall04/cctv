@@ -6,7 +6,13 @@ MainFuncs: CameraCard, CameraBadge, getResolvedIngestPolicy, getIngestBadge.
 SideEffects: Emits edit/delete/toggle callbacks only.
 */
 
+import { memo } from 'react';
 import CameraStatusActions from './CameraStatusActions';
+
+const CAMERA_CLASS_BADGE = {
+    subscriber: { label: 'Subscriber', className: 'bg-fuchsia-600/90 text-white', title: 'Kamera sewaan pelanggan' },
+    owner_private: { label: 'Owner Private', className: 'bg-purple-600/90 text-white', title: 'Kamera privat operator' },
+};
 
 function CameraBadge({ condition, className, title, children }) {
     if (!condition) {
@@ -52,7 +58,7 @@ function getIngestBadge(camera) {
     };
 }
 
-export default function CameraCard({
+function CameraCard({
     camera,
     deletingId,
     togglingId,
@@ -64,6 +70,7 @@ export default function CameraCard({
     onToggleMaintenance,
     onRefreshStream,
 }) {
+    const classBadge = CAMERA_CLASS_BADGE[camera.camera_class];
     const availabilityTone = camera.availability_state === 'online'
         ? 'bg-emerald-500/90 text-white'
         : (camera.availability_state === 'degraded'
@@ -126,6 +133,16 @@ export default function CameraCard({
                     </svg>
                 </div>
                 <div className="absolute top-3 right-3 flex flex-wrap justify-end gap-2 max-w-[85%]">
+                    <CameraBadge condition={Boolean(classBadge)} className={classBadge?.className} title={classBadge?.title}>
+                        {classBadge?.label}
+                    </CameraBadge>
+                    <CameraBadge
+                        condition={camera.camera_class === 'subscriber' && camera.billing_status === 'suspended'}
+                        className="bg-amber-500/90 text-white"
+                        title="Langganan ditangguhkan (saldo/trial habis)"
+                    >
+                        Suspended
+                    </CameraBadge>
                     <CameraBadge condition={camera.stream_source === 'internal'} className="bg-emerald-600/90 text-white" title="Stream internal melalui MediaMTX">
                         Internal
                     </CameraBadge>
@@ -222,3 +239,9 @@ export default function CameraCard({
         </div>
     );
 }
+
+// Memoized: with hundreds of cameras, every filter keystroke re-renders the page.
+// Without memo each card re-builds its badge array (~10 spans) on every such render,
+// which is the dominant jank. The action callbacks are useCallback-stable in the
+// page hook, and the per-card *Id props only change for the one acting card.
+export default memo(CameraCard);

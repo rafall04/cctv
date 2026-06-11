@@ -35,6 +35,7 @@ export function useCameraManagementPage() {
     const [filters, setFilters] = useState({
         search: '',
         areaId: 'all',
+        cameraClass: 'all',
         deliveryType: 'all',
         healthMode: 'all',
         availabilityState: 'all',
@@ -407,6 +408,10 @@ export function useCameraManagementPage() {
             }
 
             if (filters.areaId !== 'all' && String(camera.area_id || '') !== filters.areaId) {
+                return false;
+            }
+
+            if (filters.cameraClass !== 'all' && (camera.camera_class || 'community') !== filters.cameraClass) {
                 return false;
             }
 
