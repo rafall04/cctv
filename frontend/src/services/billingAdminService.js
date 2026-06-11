@@ -74,6 +74,21 @@ export const billingAdminService = {
         return response.data;
     },
 
+    async getRegistrations() {
+        const response = await apiClient.get('/api/admin/billing/registrations');
+        return response.data;
+    },
+
+    async approveRegistration(id) {
+        const response = await apiClient.post(`/api/admin/billing/registrations/${id}/approve`);
+        return response.data;
+    },
+
+    async rejectRegistration(id) {
+        const response = await apiClient.post(`/api/admin/billing/registrations/${id}/reject`);
+        return response.data;
+    },
+
     async getRegistrationSettings() {
         const response = await apiClient.get('/api/admin/billing/registration-settings');
         return response.data;

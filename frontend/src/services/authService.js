@@ -78,7 +78,17 @@ export const authService = {
             }
             
             if (response?.status === 403) {
-                // CSRF or API key issue
+                // Registration approval gate (pending/rejected) carries a `reason`
+                // and a human message — surface it instead of the generic CSRF copy.
+                const reason = response.data?.reason;
+                if (reason === 'pending_approval' || reason === 'registration_rejected') {
+                    return {
+                        success: false,
+                        message: response.data?.message || 'Akun belum bisa login.',
+                        reason,
+                    };
+                }
+                // Otherwise it's a CSRF / API key issue
                 return {
                     success: false,
                     message: 'Security validation failed. Please refresh the page.',

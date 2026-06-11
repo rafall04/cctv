@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { authService } from '../services/authService';
 
 const inputClass = 'w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary';
@@ -18,13 +18,13 @@ function formatRupiah(value) {
 }
 
 export default function RegisterPage() {
-    const navigate = useNavigate();
     const [info, setInfo] = useState(null);
     const [infoLoading, setInfoLoading] = useState(true);
     const [form, setForm] = useState({ username: '', password: '', confirm: '', phone: '', email: '' });
     const [error, setError] = useState('');
     const [errorList, setErrorList] = useState([]);
     const [submitting, setSubmitting] = useState(false);
+    const [submitted, setSubmitted] = useState(false);
 
     useEffect(() => {
         let isMounted = true;
@@ -67,13 +67,10 @@ export default function RegisterPage() {
             return;
         }
 
-        // Auto-login through the normal flow (lockout/fingerprint/cookies intact).
-        const login = await authService.login(form.username.trim(), form.password);
-        if (login.success) {
-            navigate('/my');
-        } else {
-            navigate('/admin/login');
-        }
+        // Approval-gated: the account is created 'pending' and CANNOT log in until an
+        // admin approves it, so there is no auto-login — show a confirmation instead.
+        setSubmitted(true);
+        setSubmitting(false);
     };
 
     const plan = info?.default_plan;
@@ -84,7 +81,19 @@ export default function RegisterPage() {
                 <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-800 dark:bg-gray-900">
                     <h1 className="text-xl font-bold text-gray-900 dark:text-white">Daftar Sewa CCTV</h1>
 
-                    {infoLoading ? (
+                    {submitted ? (
+                        <div className="mt-4 space-y-3 text-center">
+                            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-2xl dark:bg-emerald-900/40">⏳</div>
+                            <h2 className="font-semibold text-gray-900 dark:text-white">Pendaftaran terkirim!</h2>
+                            <p className="text-sm text-gray-600 dark:text-gray-300">
+                                Akun Anda <b>menunggu persetujuan admin</b>. Anda akan bisa login setelah disetujui
+                                {plan?.is_trial ? <> — dan masa trial {plan.trial_days} hari baru mulai dihitung saat akun disetujui</> : null}.
+                            </p>
+                            <Link to="/admin/login" className="inline-block rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-600">
+                                Ke halaman login
+                            </Link>
+                        </div>
+                    ) : infoLoading ? (
                         <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">Memuat…</p>
                     ) : !info?.enabled ? (
                         <div className="mt-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
@@ -92,6 +101,9 @@ export default function RegisterPage() {
                         </div>
                     ) : (
                         <>
+                            <div className="mt-3 rounded-xl bg-sky-50 p-3 text-xs text-sky-800 dark:bg-sky-900/30 dark:text-sky-200">
+                                ℹ️ Pendaftaran perlu <b>persetujuan admin</b> sebelum bisa login.
+                            </div>
                             {plan && (
                                 <div className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">
                                     {plan.is_trial ? (

@@ -43,6 +43,7 @@ export default function BillingManagement() {
     const [cameras, setCameras] = useState([]);
     const [plans, setPlans] = useState([]);
     const [regSettings, setRegSettings] = useState(null);
+    const [registrations, setRegistrations] = useState([]);
     const [loading, setLoading] = useState(true);
 
     const [assignForm, setAssignForm] = useState({ camera_id: '', user_id: '', monthly_price: 20000 });
@@ -52,13 +53,14 @@ export default function BillingManagement() {
     const reload = useCallback(async () => {
         setLoading(true);
         try {
-            const [customersRes, subsRes, paymentsRes, camerasRes, plansRes, regRes] = await Promise.all([
+            const [customersRes, subsRes, paymentsRes, camerasRes, plansRes, regRes, regsRes] = await Promise.all([
                 billingAdminService.getCustomers(),
                 billingAdminService.getSubscriptions(),
                 billingAdminService.getPayments(),
                 cameraService.getAllCameras(),
                 billingAdminService.getPlans(),
                 billingAdminService.getRegistrationSettings(),
+                billingAdminService.getRegistrations(),
             ]);
             if (customersRes.success) setCustomers(customersRes.data || []);
             if (subsRes.success) setSubscriptions(subsRes.data || []);
@@ -66,6 +68,7 @@ export default function BillingManagement() {
             if (camerasRes.success) setCameras(camerasRes.data || []);
             if (plansRes.success) setPlans(plansRes.data || []);
             if (regRes.success) setRegSettings(regRes.data || null);
+            if (regsRes.success) setRegistrations(regsRes.data || []);
         } catch (err) {
             console.error('Load billing data error:', err);
             showError('Gagal memuat', 'Data billing tidak dapat dimuat.');
@@ -130,6 +133,7 @@ export default function BillingManagement() {
     };
 
     const tabs = [
+        { key: 'registrations', label: `Persetujuan${registrations.length ? ` (${registrations.length})` : ''}`, highlight: registrations.length > 0 },
         { key: 'customers', label: `Pelanggan (${customers.length})` },
         { key: 'subscriptions', label: `Langganan (${subscriptions.length})` },
         { key: 'payments', label: `Pembayaran (${payments.length})` },
@@ -159,12 +163,15 @@ export default function BillingManagement() {
                     <button
                         key={t.key}
                         onClick={() => setTab(t.key)}
-                        className={`border-b-2 px-3 py-2 text-sm font-medium transition-colors ${tab === t.key
+                        className={`relative border-b-2 px-3 py-2 text-sm font-medium transition-colors ${tab === t.key
                             ? 'border-primary text-primary'
-                            : 'border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'
+                            : `border-transparent hover:text-gray-800 dark:hover:text-gray-200 ${t.highlight ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'}`
                         }`}
                     >
                         {t.label}
+                        {t.highlight && tab !== t.key && (
+                            <span className="absolute -right-0.5 top-1 h-2 w-2 rounded-full bg-amber-500" />
+                        )}
                     </button>
                 ))}
             </div>
@@ -173,6 +180,69 @@ export default function BillingManagement() {
                 <div className="py-16 text-center text-gray-500 dark:text-gray-400">Memuat data billing…</div>
             ) : (
                 <>
+                    {tab === 'registrations' && (
+                        <div className="overflow-x-auto">
+                            <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
+                                Pendaftar baru lewat halaman <code>/daftar</code> menunggu persetujuan. Mereka belum bisa login sampai disetujui; masa trial baru mulai saat disetujui.
+                            </p>
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="text-left text-xs uppercase text-gray-500 dark:text-gray-400">
+                                        <th className="px-3 py-2">Calon Pelanggan</th>
+                                        <th className="px-3 py-2">Kontak</th>
+                                        <th className="px-3 py-2">Paket Dipilih</th>
+                                        <th className="px-3 py-2">Daftar</th>
+                                        <th className="px-3 py-2 text-right">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                                    {registrations.map((reg) => (
+                                        <tr key={reg.id} className="bg-white dark:bg-gray-900">
+                                            <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">{reg.username}</td>
+                                            <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{reg.phone || reg.email || '—'}</td>
+                                            <td className="px-3 py-2 text-gray-600 dark:text-gray-300">
+                                                {reg.plan_name || '—'}
+                                                {reg.plan_is_trial === 1 && reg.plan_trial_days ? (
+                                                    <span className="ml-1 text-xs text-emerald-600 dark:text-emerald-400">trial {reg.plan_trial_days} hari</span>
+                                                ) : null}
+                                            </td>
+                                            <td className="px-3 py-2 text-gray-500 dark:text-gray-400">{String(reg.created_at || '').slice(0, 16)}</td>
+                                            <td className="px-3 py-2 text-right">
+                                                <div className="flex justify-end gap-1">
+                                                    <button
+                                                        onClick={() => run(() => billingAdminService.approveRegistration(reg.id), 'Pendaftaran disetujui')}
+                                                        disabled={busy}
+                                                        className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+                                                    >
+                                                        Setujui
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            if (window.confirm(`Tolak pendaftaran ${reg.username}? Akun tidak akan bisa login.`)) {
+                                                                run(() => billingAdminService.rejectRegistration(reg.id), 'Pendaftaran ditolak');
+                                                            }
+                                                        }}
+                                                        disabled={busy}
+                                                        className="rounded-lg px-3 py-1 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/30"
+                                                    >
+                                                        Tolak
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {registrations.length === 0 && (
+                                        <tr>
+                                            <td colSpan="5" className="px-3 py-10 text-center text-gray-500 dark:text-gray-400">
+                                                Tidak ada pendaftaran yang menunggu persetujuan. 🎉
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
                     {tab === 'customers' && (
                         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                             <div className="lg:col-span-2 overflow-x-auto">
@@ -190,7 +260,15 @@ export default function BillingManagement() {
                                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                                         {customers.map((customer) => (
                                             <tr key={customer.id} className="bg-white dark:bg-gray-900">
-                                                <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">{customer.username}</td>
+                                                <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">
+                                                    {customer.username}
+                                                    {customer.account_status === 'pending' && (
+                                                        <span className="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">menunggu</span>
+                                                    )}
+                                                    {customer.account_status === 'rejected' && (
+                                                        <span className="ml-1 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-900/40 dark:text-red-300">ditolak</span>
+                                                    )}
+                                                </td>
                                                 <td className="px-3 py-2 text-gray-500 dark:text-gray-400">{customer.phone || customer.email || '—'}</td>
                                                 <td className="px-3 py-2">
                                                     <select
