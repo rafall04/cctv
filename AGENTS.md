@@ -119,6 +119,11 @@ npm test -- CameraManagement.test.jsx -t "test name"
   customer RTSP URLs pass `utils/rtspUrlPolicy.js` (rtsp/rtsps only; loopback/link-local/multicast and
   `BILLING_RTSP_BLOCKED_HOSTS` blocked; RFC1918 allowed — ISP reality). Self-registration at `/daftar`
   (`POST /api/auth/register`, unique phone, admin toggle + default plan in `/admin/billing` Paket tab).
+- Registration approval: self-registered customers start `users.account_status='pending'` and CANNOT log
+  in (login → 403 `reason: pending_approval`) until an admin approves them in `/admin/billing` →
+  Persetujuan tab. The plan/trial clock starts ON APPROVAL (deferred at signup) so the trial isn't
+  consumed while waiting. `account_status` defaults to `'approved'` — existing and admin-created users
+  are never locked out; declined accounts are `'rejected'` (login → 403 `reason: registration_rejected`).
 - Subscriber product is live-only: no public playback, no playback-token access, recordings stay staff-only.
 
 ---
