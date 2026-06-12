@@ -14,6 +14,7 @@ import billingPlanService from '../services/billingPlanService.js';
 import walletService from '../services/walletService.js';
 import paymentService from '../services/paymentService.js';
 import paymentSettingsService from '../services/paymentSettingsService.js';
+import customerCameraIpService from '../services/customerCameraIpService.js';
 import { logAdminAction } from '../services/securityAuditLogger.js';
 
 function handleError(reply, error, fallback) {
@@ -146,6 +147,17 @@ export async function listPaymentGatewayChannels(request, reply) {
         return reply.send({ success: true, data: result });
     } catch (error) {
         return handleError(reply, error, 'List payment gateway channels error:');
+    }
+}
+
+// Public/private IP list of subscriber cameras for ISP-broadband routing (host/IP only,
+// no RTSP credentials). DDNS hostnames are resolved best-effort.
+export async function listCustomerCameraIps(request, reply) {
+    try {
+        const data = await customerCameraIpService.listEndpointsResolved();
+        return reply.send({ success: true, data });
+    } catch (error) {
+        return handleError(reply, error, 'List customer camera IPs error:');
     }
 }
 

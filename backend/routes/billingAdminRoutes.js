@@ -29,6 +29,7 @@ import {
     updatePaymentGateway,
     testPaymentGateway,
     listPaymentGatewayChannels,
+    listCustomerCameraIps,
 } from '../controllers/billingAdminController.js';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 
@@ -111,6 +112,9 @@ export default async function billingAdminRoutes(fastify) {
             },
         },
     }, setCameraClass);
+
+    // Subscriber camera host/IP list for ISP-broadband routing (host/IP only, no RTSP creds).
+    fastify.get('/camera-ips', { onRequest: guard }, listCustomerCameraIps);
 
     fastify.get('/payments', { onRequest: guard }, listPayments);
     fastify.post('/payments/:id/mark-paid', { onRequest: guard, schema: idParamSchema }, markPaymentPaid);

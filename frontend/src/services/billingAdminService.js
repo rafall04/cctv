@@ -94,6 +94,11 @@ export const billingAdminService = {
         return response.data;
     },
 
+    async getCameraIps() {
+        const response = await apiClient.get('/api/admin/billing/camera-ips');
+        return response.data;
+    },
+
     async getRegistrations() {
         const response = await apiClient.get('/api/admin/billing/registrations');
         return response.data;
