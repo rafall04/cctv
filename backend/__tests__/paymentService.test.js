@@ -115,6 +115,24 @@ describe('paymentService', () => {
         expect(walletService.getBalance(42)).toBe(0); // nothing credited yet
     });
 
+    it('reuses a non-expired pending top-up of the same amount (no duplicate gateway charge)', async () => {
+        const first = await paymentService.createTopup(42, 25000);
+        const second = await paymentService.createTopup(42, 25000);
+        expect(second.id).toBe(first.id); // same row reused, not a new transaction
+        expect(db.prepare("SELECT COUNT(*) AS n FROM payments WHERE user_id=42 AND amount=25000 AND status='pending'").get().n).toBe(1);
+
+        // A different amount makes a fresh request.
+        const third = await paymentService.createTopup(42, 30000);
+        expect(third.id).not.toBe(first.id);
+    });
+
+    it('does NOT reuse an expired pending top-up (creates a fresh one)', async () => {
+        const first = await paymentService.createTopup(42, 25000);
+        db.prepare("UPDATE payments SET expires_at = '2000-01-01T00:00:00.000Z' WHERE id = ?").run(first.id);
+        const second = await paymentService.createTopup(42, 25000);
+        expect(second.id).not.toBe(first.id);
+    });
+
     it('rejects out-of-range top-up amounts', async () => {
         await expect(paymentService.createTopup(42, 500)).rejects.toMatchObject({ statusCode: 400 });
         await expect(paymentService.createTopup(42, 99999999)).rejects.toMatchObject({ statusCode: 400 });

@@ -83,6 +83,23 @@ function ipaymuTimestamp(now = new Date()) {
     return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
 }
 
+/**
+ * Buyer email for customers who never provided one. Uses a REAL domain (the deployment's
+ * public base URL host, e.g. api-cctv.raf.my.id) instead of the invalid `.local` TLD that
+ * payment gateways flag as a suspicious buyer.
+ */
+function fallbackBuyerEmail(userId, publicBaseUrl) {
+    let host = 'rafnet.id';
+    try {
+        if (publicBaseUrl) {
+            host = new URL(publicBaseUrl).hostname || host;
+        }
+    } catch {
+        // keep default host
+    }
+    return `user${userId}@${host}`;
+}
+
 async function ipaymuRequest(path, payload, { method = 'POST' } = {}) {
     const { va, apiKey, baseUrl } = getIpaymuConfig();
     if (!va || !apiKey) {
@@ -184,6 +201,21 @@ class PaymentService {
         assertTopupAmount(amount);
         const gateway = getGatewayName();
 
+        // Reuse a still-valid pending top-up of the same gateway+amount instead of opening a
+        // duplicate gateway transaction. Repeatedly creating identical unpaid charges spams the
+        // gateway and feeds iPaymu's fraud check ("Suspicious buyer"); this also means tapping
+        // the same amount twice just shows the existing QR/VA. A different amount makes a fresh one.
+        const reusable = queryOne(
+            `SELECT id FROM payments
+             WHERE user_id = ? AND gateway = ? AND amount = ? AND status = 'pending'
+               AND (expires_at IS NULL OR expires_at > ?)
+             ORDER BY id DESC LIMIT 1`,
+            [userId, gateway, amount, new Date().toISOString()]
+        );
+        if (reusable) {
+            return this.getPayment(reusable.id, userId);
+        }
+
         if (gateway === 'midtrans') {
             return this._createMidtransTopup(userId, amount);
         }
@@ -204,7 +236,8 @@ class PaymentService {
         const { httpOk, body } = await ipaymuRequest('/api/v2/payment/direct', {
             name: customer?.username || `user-${userId}`,
             phone: customer?.phone || '081234567890',
-            email: customer?.email || `user${userId}@noemail.local`,
+            // A real-domain fallback (not the invalid `.local` TLD, which gateways flag as suspicious).
+            email: customer?.email || fallbackBuyerEmail(userId, publicBaseUrl),
             amount,
             notifyUrl: publicBaseUrl ? `${publicBaseUrl}/api/billing/webhook/ipaymu` : undefined,
             referenceId,
