@@ -69,6 +69,28 @@ export default function MyCameras() {
         reload();
     }, [reload]);
 
+    const togglePublic = async (camera) => {
+        const makePublic = !camera.is_public;
+        if (makePublic && !window.confirm(`Tampilkan "${camera.name}" di hub publik RAF NET? Siapa pun bisa menontonnya selama saldo aktif.`)) {
+            return;
+        }
+        setBusyId(camera.id);
+        setNotice(null);
+        try {
+            const response = await customerService.updateCamera(camera.id, { is_public: makePublic });
+            if (response.success) {
+                setNotice({ type: 'ok', text: makePublic ? `"${camera.name}" kini tampil di hub publik.` : `"${camera.name}" disembunyikan dari publik.` });
+                await reload();
+            } else {
+                setNotice({ type: 'error', text: response.message || 'Gagal mengubah visibilitas' });
+            }
+        } catch (err) {
+            setNotice({ type: 'error', text: err.response?.data?.message || 'Gagal mengubah visibilitas' });
+        } finally {
+            setBusyId(null);
+        }
+    };
+
     const handleDelete = async (camera) => {
         if (!window.confirm(`Hapus kamera "${camera.name}"? Tagihan kamera ini berhenti dan stream-nya dimatikan.`)) {
             return;
@@ -194,6 +216,9 @@ export default function MyCameras() {
                                                 {camera.area_name}
                                             </span>
                                         )}
+                                        {camera.is_public ? (
+                                            <span className="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">🌐 Publik</span>
+                                        ) : null}
                                     </div>
                                     <p className="truncate text-xs text-gray-500 dark:text-gray-400">
                                         {camera.location || '—'}
@@ -210,7 +235,15 @@ export default function MyCameras() {
                                             untuk mengaktifkan.
                                         </p>
                                     )}
-                                    <div className="mt-2 flex gap-1">
+                                    <div className="mt-2 flex flex-wrap gap-1">
+                                        <button
+                                            onClick={() => togglePublic(camera)}
+                                            disabled={busyId === camera.id}
+                                            title={camera.is_public ? 'Sembunyikan dari hub publik' : 'Tampilkan di hub publik'}
+                                            className="rounded-lg px-2 py-1 text-xs text-sky-700 transition-colors hover:bg-sky-50 disabled:opacity-50 dark:text-sky-300 dark:hover:bg-sky-900/30"
+                                        >
+                                            {camera.is_public ? '🔒 Privatkan' : '🌐 Publikkan'}
+                                        </button>
                                         <button
                                             onClick={() => setFormCamera(camera)}
                                             disabled={busyId === camera.id}

@@ -14,7 +14,12 @@ import { queryOne, execute } from '../database/connectionPool.js';
 import cameraService from './cameraService.js';
 import billingService from './billingService.js';
 import billingPlanService from './billingPlanService.js';
+import { invalidateCameraAccessCache } from './cameraAccessService.js';
 import { validateCustomerRtspUrl } from '../utils/rtspUrlPolicy.js';
+
+function parseIsPublic(value) {
+    return value === true || value === 1 || value === '1' || value === 'true' ? 1 : 0;
+}
 
 // Customers PICK from the admin-curated public areas (which carry the real geo:
 // desa/kelurahan/kecamatan + map point) — they never create areas, so there's a single
@@ -107,6 +112,7 @@ class CustomerCameraService {
         const longitude = parseCoordinate(data.longitude, { label: 'Longitude', min: -180, max: 180 });
         // Chosen from the admin-curated public areas (validated to exist), or null.
         const areaId = resolveAreaId(data.area_id);
+        const isPublic = parseIsPublic(data.is_public);
         const rtsp = validateCustomerRtspUrl(data.private_rtsp_url);
         if (!rtsp.ok) {
             throw badRequest(rtsp.message);
@@ -127,6 +133,13 @@ class CustomerCameraService {
             delivery_type: 'internal_hls',
         }, request);
 
+        // Publish flag (subscriber-only column; default private). Shows on the public hub
+        // only while actively paid — enforced by PUBLIC_LIVE_SQL + canViewLive.
+        if (isPublic) {
+            execute('UPDATE cameras SET is_public = 1 WHERE id = ?', [created.id]);
+            invalidateCameraAccessCache(created.id);
+        }
+
         // Tenancy + billing wiring: subscriber class, owner, plan-priced subscription
         // (day-one charge / trial handling happens inside assignSubscription).
         const subscription = billingService.assignSubscription({
@@ -139,6 +152,7 @@ class CustomerCameraService {
             id: created.id,
             name,
             area_id: areaId,
+            is_public: isPublic,
             subscription_status: subscription?.status || 'active',
         };
     }
@@ -173,14 +187,28 @@ class CustomerCameraService {
         if (data.area_id !== undefined) {
             payload.area_id = resolveAreaId(data.area_id);
         }
+        // is_public is a subscriber-only column handled outside cameraService; treat as a
+        // valid standalone change so the customer can flip publish without editing anything else.
+        const isPublicProvided = data.is_public !== undefined;
 
-        if (Object.keys(payload).length === 0) {
+        if (Object.keys(payload).length === 0 && !isPublicProvided) {
             throw badRequest('Tidak ada field yang diubah');
         }
 
-        await cameraService.updateCamera(cameraId, payload, request);
+        if (Object.keys(payload).length > 0) {
+            await cameraService.updateCamera(cameraId, payload, request);
+        }
+        if (isPublicProvided) {
+            execute(
+                'UPDATE cameras SET is_public = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                [parseIsPublic(data.is_public), cameraId]
+            );
+            // Take effect on public surfaces immediately (the access cache has a 30s TTL).
+            invalidateCameraAccessCache(cameraId);
+            cameraService.invalidateCameraCache();
+        }
         return queryOne(
-            'SELECT id, name, description, location, latitude, longitude, camera_class, billing_status, area_id FROM cameras WHERE id = ?',
+            'SELECT id, name, description, location, latitude, longitude, camera_class, billing_status, area_id, is_public FROM cameras WHERE id = ?',
             [cameraId]
         );
     }

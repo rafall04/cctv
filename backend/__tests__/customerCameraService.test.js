@@ -91,6 +91,7 @@ function seedSchema() {
             camera_class TEXT NOT NULL DEFAULT 'community',
             billing_status TEXT,
             area_id INTEGER,
+            is_public INTEGER NOT NULL DEFAULT 0,
             updated_at TEXT
         );
         CREATE TABLE areas (
@@ -218,6 +219,19 @@ describe('customerCameraService', () => {
             area_id: 999,
         }, { user: CUSTOMER })).rejects.toMatchObject({ statusCode: 400 });
         expect(createCameraMock).not.toHaveBeenCalled();
+    });
+
+    it('publishes on create and toggles is_public on update (standalone change)', async () => {
+        const created = await customerCameraService.createOwnCamera(CUSTOMER, {
+            name: 'Kamera Publik', private_rtsp_url: 'rtsp://192.168.1.10:554/ch1', is_public: true,
+        }, { user: CUSTOMER });
+        expect(created.is_public).toBe(1);
+        expect(db.prepare('SELECT is_public FROM cameras WHERE id = ?').get(created.id).is_public).toBe(1);
+
+        // Flip OFF with no other fields — must still be accepted (not "no field changed").
+        const updated = await customerCameraService.updateOwnCamera(CUSTOMER, created.id, { is_public: false }, { user: CUSTOMER });
+        expect(updated.is_public).toBe(0);
+        expect(db.prepare('SELECT is_public FROM cameras WHERE id = ?').get(created.id).is_public).toBe(0);
     });
 
     it('forwards validated latitude/longitude to cameraService', async () => {

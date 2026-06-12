@@ -17,7 +17,7 @@ export const STAFF_ROLES = new Set(['admin', 'viewer']);
 // 30s TTL: suspension/resume and class changes take effect on live streams within
 // this window without putting a DB lookup on every HLS segment request.
 const ACCESS_CACHE_TTL_MS = 30000;
-const ACCESS_PROJECTION = 'id, stream_key, enabled, owner_user_id, camera_class, billing_status';
+const ACCESS_PROJECTION = 'id, stream_key, enabled, owner_user_id, camera_class, billing_status, is_public';
 
 const cacheById = new Map();
 const cacheByStreamKey = new Map();
@@ -34,7 +34,13 @@ function normalizeInfo(row) {
         owner_user_id: row.owner_user_id ?? null,
         camera_class: cameraClass,
         billing_status: row.billing_status || null,
+        is_public: row.is_public === 1 || row.is_public === true,
     };
+}
+
+// A published, actively-paid subscriber camera is public-live just like a community one.
+function isPublishedSubscriber(info) {
+    return !!info && info.camera_class === 'subscriber' && info.is_public && info.billing_status === 'active';
 }
 
 function readCache(map, key, now) {
@@ -110,7 +116,7 @@ export function getAccessInfoByStreamKey(streamKey) {
 }
 
 export function isPublicCamera(info) {
-    return !!info && info.camera_class === 'community';
+    return !!info && (info.camera_class === 'community' || isPublishedSubscriber(info));
 }
 
 export function isStaff(user) {
@@ -137,6 +143,13 @@ export function canViewLive({ info, user = null, streamToken = null }) {
     }
 
     if (info.camera_class === 'community') {
+        return { allowed: true };
+    }
+
+    // A subscriber camera the owner published is public-live while actively paid — anyone
+    // may view it, no token/login. When it suspends (billing_status !== 'active') it falls
+    // through and only the owner/staff/token can see it, so it disappears from the public.
+    if (isPublishedSubscriber(info)) {
         return { allowed: true };
     }
 

@@ -1,4 +1,5 @@
 import { query, queryOne, execute } from '../database/connectionPool.js';
+import { PUBLIC_LIVE_SQL } from '../utils/cameraVisibility.js';
 import cache, { CacheTTL, CacheNamespace, cacheKey } from './cacheService.js';
 import cameraHealthService from './cameraHealthService.js';
 import mediaMtxService from './mediaMtxService.js';
@@ -210,7 +211,7 @@ class AreaService {
             return { areas: cached, isCached: true };
         }
 
-        const cameraCountFilter = publicOnly ? "AND c.camera_class = 'community'" : '';
+        const cameraCountFilter = publicOnly ? `AND ${PUBLIC_LIVE_SQL}` : '';
         const areas = query(`
             SELECT a.*,
                    (SELECT COUNT(*) FROM cameras c WHERE c.area_id = a.id ${cameraCountFilter}) as camera_count

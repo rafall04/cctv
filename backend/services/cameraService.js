@@ -19,6 +19,7 @@ import {
 import { invalidateCache } from '../middleware/cacheMiddleware.js';
 import { cacheGetOrSetSync, cacheInvalidate, cacheKey, CacheNamespace } from './cacheService.js';
 import { invalidateCameraAccessCache } from './cameraAccessService.js';
+import { PUBLIC_LIVE_SQL } from '../utils/cameraVisibility.js';
 import { sanitizeCameraThumbnail, sanitizeCameraThumbnailList } from './thumbnailPathService.js';
 import cameraHealthService from './cameraHealthService.js';
 import cameraRuntimeStateService from './cameraRuntimeStateService.js';
@@ -1358,7 +1359,7 @@ class CameraService {
             FROM cameras c
             LEFT JOIN areas a ON c.area_id = a.id
             LEFT JOIN camera_runtime_state crs ON crs.camera_id = c.id
-            WHERE c.enabled = 1 AND c.camera_class = 'community'
+            WHERE c.enabled = 1 AND ${PUBLIC_LIVE_SQL}
             ORDER BY c.is_tunnel ASC, c.id ASC
         `)).map((camera) => cameraHealthService.enrichCameraAvailability(camera)), CAMERA_READ_MODEL_TTL_MS);
     }
@@ -1378,7 +1379,7 @@ class CameraService {
                 WHERE is_active = 1
                 GROUP BY camera_id
             ) active ON active.camera_id = c.id
-            WHERE c.enabled = 1 AND c.camera_class = 'community'
+            WHERE c.enabled = 1 AND ${PUBLIC_LIVE_SQL}
             ORDER BY c.is_tunnel ASC, c.id ASC
         `))
             .map(sanitizePublicLandingCamera)

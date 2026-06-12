@@ -7,6 +7,7 @@
  */
 
 import { query, queryOne } from '../database/connectionPool.js';
+import { PUBLIC_LIVE_SQL } from '../utils/cameraVisibility.js';
 
 const PUBLIC_CAMERA_COLUMNS = `
     c.id,
@@ -126,7 +127,7 @@ export function getPublicAreaBySlug(areaSlug) {
             COALESCE(SUM(cvs.total_live_views), 0) AS total_views,
             MAX(c.created_at) AS latest_camera_at
         FROM areas a
-        LEFT JOIN cameras c ON c.area_id = a.id AND c.enabled = 1 AND c.camera_class = 'community'
+        LEFT JOIN cameras c ON c.area_id = a.id AND c.enabled = 1 AND ${PUBLIC_LIVE_SQL}
         LEFT JOIN camera_view_stats cvs ON cvs.camera_id = c.id
         WHERE a.slug = ?
            OR (a.slug IS NULL AND LOWER(REPLACE(a.name, ' ', '-')) = ?)
@@ -163,7 +164,7 @@ export function getPublicAreaCameras(areaSlug) {
         LEFT JOIN areas a ON a.id = c.area_id
         LEFT JOIN camera_view_stats cvs ON cvs.camera_id = c.id
         ${getActiveViewerJoin()}
-        WHERE c.enabled = 1 AND c.camera_class = 'community'
+        WHERE c.enabled = 1 AND ${PUBLIC_LIVE_SQL}
           AND (a.slug = ? OR (a.slug IS NULL AND LOWER(REPLACE(a.name, ' ', '-')) = ?))
         ORDER BY c.is_tunnel ASC, c.id ASC
     `, [normalizedAreaSlug, normalizedAreaSlug]).map(sanitizeCamera);
@@ -181,7 +182,7 @@ export function getTrendingCameras({ areaSlug = '', limit = 10 } = {}) {
         LEFT JOIN areas a ON a.id = c.area_id
         LEFT JOIN camera_view_stats cvs ON cvs.camera_id = c.id
         ${getActiveViewerJoin()}
-        WHERE c.enabled = 1 AND c.camera_class = 'community'
+        WHERE c.enabled = 1 AND ${PUBLIC_LIVE_SQL}
           ${areaFilter}
         ORDER BY COALESCE(cvs.total_live_views, 0) DESC, c.name COLLATE NOCASE ASC, c.id ASC
         LIMIT ?
@@ -196,7 +197,7 @@ export function getPublicDiscovery({ limit = 6 } = {}) {
         LEFT JOIN areas a ON a.id = c.area_id
         LEFT JOIN camera_view_stats cvs ON cvs.camera_id = c.id
         ${getActiveViewerJoin()}
-        WHERE c.enabled = 1 AND c.camera_class = 'community'
+        WHERE c.enabled = 1 AND ${PUBLIC_LIVE_SQL}
     `;
 
     const liveNow = query(`
@@ -235,7 +236,7 @@ export function getPublicDiscovery({ limit = 6 } = {}) {
             COALESCE(SUM(active.viewer_count), 0) AS live_viewers,
             MAX(c.created_at) AS latest_camera_at
         FROM areas a
-        JOIN cameras c ON c.area_id = a.id AND c.enabled = 1 AND c.camera_class = 'community'
+        JOIN cameras c ON c.area_id = a.id AND c.enabled = 1 AND ${PUBLIC_LIVE_SQL}
         LEFT JOIN camera_view_stats cvs ON cvs.camera_id = c.id
         ${getActiveViewerJoin()}
         GROUP BY a.id

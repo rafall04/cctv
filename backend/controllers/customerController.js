@@ -45,6 +45,7 @@ const CUSTOMER_CAMERA_PROJECTION = `
     c.thumbnail_path,
     c.thumbnail_updated_at,
     c.area_id,
+    c.is_public,
     a.name AS area_name
 `;
 

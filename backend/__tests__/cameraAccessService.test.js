@@ -115,6 +115,37 @@ describe('cameraAccessService', () => {
         });
     });
 
+    describe('published subscriber cameras (is_public toggle)', () => {
+        it('allows ANYONE (anonymous) on a published, actively-paid subscriber camera', () => {
+            const info = { ...cameraRow({ is_public: true, billing_status: 'active' }), enabled: true };
+            expect(canViewLive({ info, user: null }).allowed).toBe(true);
+            expect(isPublicCamera(info)).toBe(true);
+        });
+
+        it('hides a published camera from the public the moment it suspends', () => {
+            const info = { ...cameraRow({ is_public: true, billing_status: 'suspended' }), enabled: true };
+            expect(canViewLive({ info, user: null }).allowed).toBe(false); // anonymous can no longer see it
+            expect(isPublicCamera(info)).toBe(false);
+            // Owner still reaches it to learn it's suspended (402).
+            expect(canViewLive({ info, user: { id: 42, role: 'customer' } }).statusCode).toBe(402);
+        });
+
+        it('keeps a PRIVATE subscriber camera hidden from anonymous viewers', () => {
+            const info = { ...cameraRow({ is_public: false, billing_status: 'active' }), enabled: true };
+            const result = canViewLive({ info, user: null });
+            expect(result.allowed).toBe(false);
+            expect(result.statusCode).toBe(403);
+            expect(isPublicCamera(info)).toBe(false);
+        });
+
+        it('normalizeInfo maps is_public 1 → true through getAccessInfo', () => {
+            queryOneMock.mockReturnValue(cameraRow({ is_public: 1, billing_status: 'active' }));
+            const info = getAccessInfo(7);
+            expect(info.is_public).toBe(true);
+            expect(canViewLive({ info, user: null }).allowed).toBe(true);
+        });
+    });
+
     describe('access info lookup + cache', () => {
         it('normalizes unknown classes to community and caches by id', () => {
             queryOneMock.mockReturnValue(cameraRow({ camera_class: 'weird_value' }));

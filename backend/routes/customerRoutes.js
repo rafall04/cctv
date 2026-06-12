@@ -48,6 +48,9 @@ const cameraBodyProperties = {
     // service validates the area exists. Subscriber cameras stay hidden publicly via
     // the camera_class filter, so reusing the public area_id is safe.
     area_id: { type: ['integer', 'string', 'null'] },
+    // Publish this (paid) camera onto the public hub. Visible publicly only while
+    // actively paid; suspended → auto-hidden. Default private.
+    is_public: { type: ['boolean', 'integer', 'string'] },
 };
 
 export default async function customerRoutes(fastify) {

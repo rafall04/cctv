@@ -24,6 +24,7 @@ export default function CameraFormModal({ camera = null, areas = [], onClose, on
         latitude: camera?.latitude ?? '',
         longitude: camera?.longitude ?? '',
         area_id: camera?.area_id ? String(camera.area_id) : '',
+        is_public: !!camera?.is_public,
     });
     const [error, setError] = useState('');
     const [submitting, setSubmitting] = useState(false);
@@ -55,6 +56,7 @@ export default function CameraFormModal({ camera = null, areas = [], onClose, on
                 longitude: form.longitude === '' || form.longitude === null ? '' : String(form.longitude),
                 // '' clears the area; otherwise the chosen public-area id (backend validates it exists).
                 area_id: form.area_id === '' || form.area_id === null ? '' : Number(form.area_id),
+                is_public: !!form.is_public,
             };
             if (form.private_rtsp_url.trim()) {
                 payload.private_rtsp_url = form.private_rtsp_url.trim();
@@ -109,6 +111,21 @@ export default function CameraFormModal({ camera = null, areas = [], onClose, on
                         </select>
                         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Pilih wilayah dari daftar. Belum ada wilayah Anda? Kosongkan saja — titik peta tetap tersimpan, atau minta admin menambahkannya.</p>
                     </div>
+
+                    <label className="flex items-start gap-2 rounded-xl border border-gray-200 p-3 dark:border-gray-700/50">
+                        <input
+                            type="checkbox"
+                            checked={form.is_public}
+                            onChange={(e) => { setForm({ ...form, is_public: e.target.checked }); setError(''); }}
+                            className="mt-0.5"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">
+                            Tampilkan di hub publik
+                            <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+                                Kamera muncul di peta &amp; daftar publik RAF NET — hanya selama saldo aktif. Bisa diubah kapan saja.
+                            </span>
+                        </span>
+                    </label>
                     <div>
                         <label htmlFor="cam-rtsp" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
                             URL RTSP {isEdit && <span className="font-normal text-gray-400">(kosongkan jika tidak diganti)</span>}

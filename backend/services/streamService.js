@@ -13,6 +13,7 @@ import { sanitizeCameraThumbnailList } from './thumbnailPathService.js';
 import cameraHealthService from './cameraHealthService.js';
 import cameraViewStatsService from './cameraViewStatsService.js';
 import { getAccessInfo, canViewLive } from './cameraAccessService.js';
+import { PUBLIC_LIVE_SQL } from '../utils/cameraVisibility.js';
 import {
     getEffectiveDeliveryType,
     getStreamCapabilities,
@@ -209,7 +210,7 @@ class StreamService {
             `SELECT ${SHARED_CAMERA_STREAM_WITH_AREA_PROJECTION}
              FROM cameras c
              LEFT JOIN areas a ON c.area_id = a.id
-             WHERE c.enabled = 1 AND c.camera_class = 'community'
+             WHERE c.enabled = 1 AND ${PUBLIC_LIVE_SQL}
              ORDER BY c.is_tunnel ASC, c.id ASC`
         );
         const statsByCamera = cameraViewStatsService.getPublicStatsByCamera();
