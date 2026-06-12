@@ -1,10 +1,12 @@
 /*
- * Purpose: Admin billing page — customer balances, camera subscription assignment/lifecycle,
- *          manual top-up, payment confirmation (manual gateway), and ops charge trigger.
- * Caller: App.jsx /admin/billing (adminOnly) inside AdminLayout.
- * Deps: billingAdminService, cameraService (camera picker), useNotification.
- * MainFuncs: BillingManagement (tabs: Pelanggan / Langganan / Pembayaran).
- * SideEffects: Fetches billing data; mutations via billingAdminService.
+ * Purpose: Admin billing page shell — fetches billing data and renders responsive per-tab
+ *          components (Persetujuan / Pelanggan / Langganan / Pembayaran / Paket / Gateway).
+ *          Each data tab is a table on desktop and stacked cards on mobile.
+ * Caller: App.jsx /admin/billing (adminOnly) inside AdminLayout (which already supplies page
+ *         padding + bottom-dock spacing, so this page adds none horizontally).
+ * Deps: billingAdminService, cameraService, per-tab components.
+ * MainFuncs: BillingManagement.
+ * SideEffects: Fetches billing data; mutations via billingAdminService through `run`.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -13,27 +15,10 @@ import { cameraService } from '../services/cameraService';
 import { useNotification } from '../contexts/NotificationContext';
 import BillingPlansTab from '../components/admin/BillingPlansTab';
 import PaymentGatewayTab from '../components/admin/PaymentGatewayTab';
-
-function formatRupiah(value) {
-    return `Rp${Number(value || 0).toLocaleString('id-ID')}`;
-}
-
-const SUB_STATUS_BADGES = {
-    active: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
-    suspended: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
-    cancelled: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
-};
-
-const PAY_STATUS_BADGES = {
-    pending: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
-    paid: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
-    expired: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
-    failed: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-    cancelled: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
-};
-
-const inputClass = 'w-full px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary';
-const cardClass = 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4';
+import RegistrationsTab from '../components/admin/billing/RegistrationsTab';
+import CustomersTab from '../components/admin/billing/CustomersTab';
+import SubscriptionsTab from '../components/admin/billing/SubscriptionsTab';
+import PaymentsTab from '../components/admin/billing/PaymentsTab';
 
 export default function BillingManagement() {
     const { success, error: showError } = useNotification();
@@ -46,9 +31,6 @@ export default function BillingManagement() {
     const [regSettings, setRegSettings] = useState(null);
     const [registrations, setRegistrations] = useState([]);
     const [loading, setLoading] = useState(true);
-
-    const [assignForm, setAssignForm] = useState({ camera_id: '', user_id: '', monthly_price: 20000 });
-    const [topupForm, setTopupForm] = useState({ user_id: '', amount: 25000, note: '' });
     const [busy, setBusy] = useState(false);
 
     const reload = useCallback(async () => {
@@ -107,32 +89,6 @@ export default function BillingManagement() {
         [cameras, subscriptions]
     );
 
-    const handleAssign = async (e) => {
-        e.preventDefault();
-        const ok = await run(
-            () => billingAdminService.assignSubscription({
-                camera_id: parseInt(assignForm.camera_id, 10),
-                user_id: parseInt(assignForm.user_id, 10),
-                monthly_price: parseInt(assignForm.monthly_price, 10),
-            }),
-            'Kamera di-assign'
-        );
-        if (ok) setAssignForm({ camera_id: '', user_id: '', monthly_price: 20000 });
-    };
-
-    const handleManualTopup = async (e) => {
-        e.preventDefault();
-        const ok = await run(
-            () => billingAdminService.manualTopup({
-                user_id: parseInt(topupForm.user_id, 10),
-                amount: parseInt(topupForm.amount, 10),
-                note: topupForm.note || undefined,
-            }),
-            'Saldo ditambahkan'
-        );
-        if (ok) setTopupForm({ user_id: '', amount: 25000, note: '' });
-    };
-
     const tabs = [
         { key: 'registrations', label: `Persetujuan${registrations.length ? ` (${registrations.length})` : ''}`, highlight: registrations.length > 0 },
         { key: 'customers', label: `Pelanggan (${customers.length})` },
@@ -143,36 +99,37 @@ export default function BillingManagement() {
     ];
 
     return (
-        <div className="p-4 sm:p-6 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Billing Pelanggan</h1>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+        <div className="space-y-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <h1 className="text-xl font-bold text-gray-900 dark:text-white sm:text-2xl">Billing Pelanggan</h1>
+                    <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
                         Sewa CCTV prabayar — saldo dipotong harian, kamera ditangguhkan otomatis saat saldo habis.
                     </p>
                 </div>
                 <button
                     onClick={() => run(() => billingAdminService.runCharges(), 'Charge dijalankan')}
                     disabled={busy}
-                    className="rounded-xl border border-gray-300 px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                    className="shrink-0 whitespace-nowrap rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
                 >
-                    Jalankan charge harian sekarang
+                    Jalankan charge harian
                 </button>
             </div>
 
-            <div className="flex gap-1 border-b border-gray-200 dark:border-gray-800">
+            {/* Horizontally scrollable on small screens so all 6 tabs stay reachable without squishing. */}
+            <div className="-mx-1 flex gap-1 overflow-x-auto border-b border-gray-200 px-1 [scrollbar-width:none] dark:border-gray-800 [&::-webkit-scrollbar]:hidden">
                 {tabs.map((t) => (
                     <button
                         key={t.key}
                         onClick={() => setTab(t.key)}
-                        className={`relative border-b-2 px-3 py-2 text-sm font-medium transition-colors ${tab === t.key
+                        className={`relative shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${tab === t.key
                             ? 'border-primary text-primary'
                             : `border-transparent hover:text-gray-800 dark:hover:text-gray-200 ${t.highlight ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'}`
                         }`}
                     >
                         {t.label}
                         {t.highlight && tab !== t.key && (
-                            <span className="absolute -right-0.5 top-1 h-2 w-2 rounded-full bg-amber-500" />
+                            <span className="absolute right-0.5 top-1 h-2 w-2 rounded-full bg-amber-500" />
                         )}
                     </button>
                 ))}
@@ -182,381 +139,14 @@ export default function BillingManagement() {
                 <div className="py-16 text-center text-gray-500 dark:text-gray-400">Memuat data billing…</div>
             ) : (
                 <>
-                    {tab === 'registrations' && (
-                        <div className="overflow-x-auto">
-                            <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
-                                Pendaftar baru lewat halaman <code>/daftar</code> menunggu persetujuan. Mereka belum bisa login sampai disetujui; masa trial baru mulai saat disetujui.
-                            </p>
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="text-left text-xs uppercase text-gray-500 dark:text-gray-400">
-                                        <th className="px-3 py-2">Calon Pelanggan</th>
-                                        <th className="px-3 py-2">Kontak</th>
-                                        <th className="px-3 py-2">Paket Dipilih</th>
-                                        <th className="px-3 py-2">Daftar</th>
-                                        <th className="px-3 py-2 text-right">Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                                    {registrations.map((reg) => (
-                                        <tr key={reg.id} className="bg-white dark:bg-gray-900">
-                                            <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">{reg.username}</td>
-                                            <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{reg.phone || reg.email || '—'}</td>
-                                            <td className="px-3 py-2 text-gray-600 dark:text-gray-300">
-                                                {reg.plan_name || '—'}
-                                                {reg.plan_is_trial === 1 && reg.plan_trial_days ? (
-                                                    <span className="ml-1 text-xs text-emerald-600 dark:text-emerald-400">trial {reg.plan_trial_days} hari</span>
-                                                ) : null}
-                                            </td>
-                                            <td className="px-3 py-2 text-gray-500 dark:text-gray-400">{String(reg.created_at || '').slice(0, 16)}</td>
-                                            <td className="px-3 py-2 text-right">
-                                                <div className="flex justify-end gap-1">
-                                                    <button
-                                                        onClick={() => run(() => billingAdminService.approveRegistration(reg.id), 'Pendaftaran disetujui')}
-                                                        disabled={busy}
-                                                        className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
-                                                    >
-                                                        Setujui
-                                                    </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            if (window.confirm(`Tolak pendaftaran ${reg.username}? Akun tidak akan bisa login.`)) {
-                                                                run(() => billingAdminService.rejectRegistration(reg.id), 'Pendaftaran ditolak');
-                                                            }
-                                                        }}
-                                                        disabled={busy}
-                                                        className="rounded-lg px-3 py-1 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/30"
-                                                    >
-                                                        Tolak
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {registrations.length === 0 && (
-                                        <tr>
-                                            <td colSpan="5" className="px-3 py-10 text-center text-gray-500 dark:text-gray-400">
-                                                Tidak ada pendaftaran yang menunggu persetujuan. 🎉
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-
-                    {tab === 'customers' && (
-                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                            <div className="lg:col-span-2 overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="text-left text-xs uppercase text-gray-500 dark:text-gray-400">
-                                            <th className="px-3 py-2">Pelanggan</th>
-                                            <th className="px-3 py-2">Kontak</th>
-                                            <th className="px-3 py-2">Paket</th>
-                                            <th className="px-3 py-2 text-right">Saldo</th>
-                                            <th className="px-3 py-2 text-center">Kamera</th>
-                                            <th className="px-3 py-2 text-center">Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                                        {customers.map((customer) => (
-                                            <tr key={customer.id} className="bg-white dark:bg-gray-900">
-                                                <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">
-                                                    {customer.username}
-                                                    {customer.account_status === 'pending' && (
-                                                        <span className="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">menunggu</span>
-                                                    )}
-                                                    {customer.account_status === 'rejected' && (
-                                                        <span className="ml-1 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-900/40 dark:text-red-300">ditolak</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-3 py-2 text-gray-500 dark:text-gray-400">{customer.phone || customer.email || '—'}</td>
-                                                <td className="px-3 py-2">
-                                                    <select
-                                                        value={customer.plan_key || ''}
-                                                        disabled={busy}
-                                                        onChange={(e) => {
-                                                            if (e.target.value && window.confirm(`Ubah paket ${customer.username} ke ${e.target.value}? Harga kamera menyesuaikan.`)) {
-                                                                run(
-                                                                    () => billingAdminService.changeCustomerPlan(customer.id, e.target.value),
-                                                                    'Paket pelanggan diubah'
-                                                                );
-                                                            }
-                                                        }}
-                                                        className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-900 dark:border-gray-700 dark:bg-gray-900/50 dark:text-white"
-                                                    >
-                                                        <option value="">(tanpa paket)</option>
-                                                        {plans.map((plan) => (
-                                                            <option key={plan.id} value={plan.key}>{plan.name}</option>
-                                                        ))}
-                                                    </select>
-                                                    {customer.plan_is_trial === 1 && customer.trial_ends_at && (
-                                                        <p className="mt-0.5 text-[10px] text-gray-400">
-                                                            trial s/d {String(customer.trial_ends_at).slice(0, 10)}
-                                                        </p>
-                                                    )}
-                                                </td>
-                                                <td className="px-3 py-2 text-right font-semibold text-gray-900 dark:text-white">{formatRupiah(customer.balance)}</td>
-                                                <td className="px-3 py-2 text-center">{customer.camera_count}{customer.plan_max_cameras ? `/${customer.plan_max_cameras}` : ''}</td>
-                                                <td className="px-3 py-2 text-center">
-                                                    {customer.suspended_subscriptions > 0 ? (
-                                                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${SUB_STATUS_BADGES.suspended}`}>
-                                                            {customer.suspended_subscriptions} ditangguhkan
-                                                        </span>
-                                                    ) : (
-                                                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${SUB_STATUS_BADGES.active}`}>
-                                                            OK
-                                                        </span>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {customers.length === 0 && (
-                                            <tr>
-                                                <td colSpan="6" className="px-3 py-8 text-center text-gray-500 dark:text-gray-400">
-                                                    Belum ada pelanggan. Pelanggan bisa daftar mandiri di <code>/daftar</code>, atau buat user role <code>customer</code> di halaman Users.
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                            <form onSubmit={handleManualTopup} className={cardClass}>
-                                <h3 className="font-semibold text-gray-900 dark:text-white">Top-up Manual</h3>
-                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                    Untuk pembayaran tunai/transfer langsung ke admin.
-                                </p>
-                                <div className="mt-3 space-y-2">
-                                    <select
-                                        value={topupForm.user_id}
-                                        onChange={(e) => setTopupForm({ ...topupForm, user_id: e.target.value })}
-                                        required
-                                        className={inputClass}
-                                    >
-                                        <option value="">Pilih pelanggan…</option>
-                                        {customers.map((c) => (
-                                            <option key={c.id} value={c.id}>{c.username} ({formatRupiah(c.balance)})</option>
-                                        ))}
-                                    </select>
-                                    <input
-                                        type="number"
-                                        min="1000"
-                                        step="1000"
-                                        value={topupForm.amount}
-                                        onChange={(e) => setTopupForm({ ...topupForm, amount: e.target.value })}
-                                        required
-                                        className={inputClass}
-                                        placeholder="Nominal"
-                                    />
-                                    <input
-                                        type="text"
-                                        value={topupForm.note}
-                                        onChange={(e) => setTopupForm({ ...topupForm, note: e.target.value })}
-                                        className={inputClass}
-                                        placeholder="Catatan (opsional)"
-                                    />
-                                    <button
-                                        type="submit"
-                                        disabled={busy}
-                                        className="w-full rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-600 disabled:opacity-50"
-                                    >
-                                        Tambah Saldo
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    )}
-
+                    {tab === 'registrations' && <RegistrationsTab registrations={registrations} run={run} busy={busy} />}
+                    {tab === 'customers' && <CustomersTab customers={customers} plans={plans} run={run} busy={busy} />}
                     {tab === 'subscriptions' && (
-                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                            <div className="lg:col-span-2 overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="text-left text-xs uppercase text-gray-500 dark:text-gray-400">
-                                            <th className="px-3 py-2">Kamera</th>
-                                            <th className="px-3 py-2">Pelanggan</th>
-                                            <th className="px-3 py-2 text-right">Harga/bulan</th>
-                                            <th className="px-3 py-2 text-center">Status</th>
-                                            <th className="px-3 py-2 text-right">Aksi</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                                        {subscriptions.map((sub) => (
-                                            <tr key={sub.id} className="bg-white dark:bg-gray-900">
-                                                <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">{sub.camera_name}</td>
-                                                <td className="px-3 py-2 text-gray-600 dark:text-gray-300">
-                                                    {sub.customer_username}
-                                                    <span className="ml-1 text-xs text-gray-400">({formatRupiah(sub.wallet_balance || 0)})</span>
-                                                </td>
-                                                <td className="px-3 py-2 text-right">{formatRupiah(sub.monthly_price)}</td>
-                                                <td className="px-3 py-2 text-center">
-                                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${SUB_STATUS_BADGES[sub.status] || ''}`}>
-                                                        {sub.status}
-                                                    </span>
-                                                </td>
-                                                <td className="px-3 py-2 text-right">
-                                                    <div className="flex justify-end gap-1">
-                                                        {sub.status !== 'cancelled' && (
-                                                            <button
-                                                                onClick={() => run(
-                                                                    () => billingAdminService.updateSubscription(sub.id, {
-                                                                        status: sub.status === 'active' ? 'suspended' : 'active',
-                                                                    }),
-                                                                    sub.status === 'active' ? 'Langganan ditangguhkan' : 'Langganan diaktifkan'
-                                                                )}
-                                                                disabled={busy}
-                                                                className="rounded-lg px-2 py-1 text-xs text-gray-600 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:text-gray-300 dark:hover:bg-gray-800"
-                                                            >
-                                                                {sub.status === 'active' ? 'Tangguhkan' : 'Aktifkan'}
-                                                            </button>
-                                                        )}
-                                                        {sub.status !== 'cancelled' && (
-                                                            <button
-                                                                onClick={() => {
-                                                                    if (window.confirm(`Hentikan langganan ${sub.camera_name}? Stream akan diblokir.`)) {
-                                                                        run(
-                                                                            () => billingAdminService.updateSubscription(sub.id, { status: 'cancelled' }),
-                                                                            'Langganan dihentikan'
-                                                                        );
-                                                                    }
-                                                                }}
-                                                                disabled={busy}
-                                                                className="rounded-lg px-2 py-1 text-xs text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/30"
-                                                            >
-                                                                Hentikan
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {subscriptions.length === 0 && (
-                                            <tr>
-                                                <td colSpan="5" className="px-3 py-8 text-center text-gray-500 dark:text-gray-400">
-                                                    Belum ada langganan. Assign kamera ke pelanggan lewat form di samping.
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                            <form onSubmit={handleAssign} className={cardClass}>
-                                <h3 className="font-semibold text-gray-900 dark:text-white">Assign Kamera ke Pelanggan</h3>
-                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                    Kamera menjadi kelas <code>subscriber</code>: hilang dari publik, hanya bisa dilihat pelanggan, dan mulai ditagih hari ini.
-                                </p>
-                                <div className="mt-3 space-y-2">
-                                    <select
-                                        value={assignForm.camera_id}
-                                        onChange={(e) => setAssignForm({ ...assignForm, camera_id: e.target.value })}
-                                        required
-                                        className={inputClass}
-                                    >
-                                        <option value="">Pilih kamera…</option>
-                                        {assignableCameras.map((camera) => (
-                                            <option key={camera.id} value={camera.id}>
-                                                #{camera.id} {camera.name} ({camera.camera_class || 'community'})
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <select
-                                        value={assignForm.user_id}
-                                        onChange={(e) => setAssignForm({ ...assignForm, user_id: e.target.value })}
-                                        required
-                                        className={inputClass}
-                                    >
-                                        <option value="">Pilih pelanggan…</option>
-                                        {customers.map((c) => (
-                                            <option key={c.id} value={c.id}>{c.username}</option>
-                                        ))}
-                                    </select>
-                                    <input
-                                        type="number"
-                                        min="1000"
-                                        step="1000"
-                                        value={assignForm.monthly_price}
-                                        onChange={(e) => setAssignForm({ ...assignForm, monthly_price: e.target.value })}
-                                        required
-                                        className={inputClass}
-                                        placeholder="Harga per bulan (mis. 20000)"
-                                    />
-                                    <button
-                                        type="submit"
-                                        disabled={busy}
-                                        className="w-full rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-600 disabled:opacity-50"
-                                    >
-                                        Assign & Mulai Tagih
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
+                        <SubscriptionsTab subscriptions={subscriptions} assignableCameras={assignableCameras} customers={customers} run={run} busy={busy} />
                     )}
-
-                    {tab === 'plans' && (
-                        <BillingPlansTab plans={plans} regSettings={regSettings} run={run} busy={busy} />
-                    )}
-
+                    {tab === 'payments' && <PaymentsTab payments={payments} run={run} busy={busy} />}
+                    {tab === 'plans' && <BillingPlansTab plans={plans} regSettings={regSettings} run={run} busy={busy} />}
                     {tab === 'gateway' && <PaymentGatewayTab />}
-
-                    {tab === 'payments' && (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="text-left text-xs uppercase text-gray-500 dark:text-gray-400">
-                                        <th className="px-3 py-2">ID</th>
-                                        <th className="px-3 py-2">Pelanggan</th>
-                                        <th className="px-3 py-2">Gateway</th>
-                                        <th className="px-3 py-2 text-right">Nominal</th>
-                                        <th className="px-3 py-2 text-center">Status</th>
-                                        <th className="px-3 py-2">Dibuat</th>
-                                        <th className="px-3 py-2 text-right">Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                                    {payments.map((payment) => (
-                                        <tr key={payment.id} className="bg-white dark:bg-gray-900">
-                                            <td className="px-3 py-2 text-gray-500 dark:text-gray-400">#{payment.id}</td>
-                                            <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">{payment.username || payment.user_id}</td>
-                                            <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{payment.gateway}</td>
-                                            <td className="px-3 py-2 text-right font-semibold">{formatRupiah(payment.amount)}</td>
-                                            <td className="px-3 py-2 text-center">
-                                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${PAY_STATUS_BADGES[payment.status] || ''}`}>
-                                                    {payment.status}
-                                                </span>
-                                            </td>
-                                            <td className="px-3 py-2 text-gray-500 dark:text-gray-400">{payment.created_at}</td>
-                                            <td className="px-3 py-2 text-right">
-                                                {payment.status === 'pending' && (
-                                                    <button
-                                                        onClick={() => {
-                                                            if (window.confirm(`Konfirmasi pembayaran ${formatRupiah(payment.amount)} dari ${payment.username}? Saldo akan dikreditkan.`)) {
-                                                                run(
-                                                                    () => billingAdminService.markPaymentPaid(payment.id),
-                                                                    'Pembayaran dikonfirmasi'
-                                                                );
-                                                            }
-                                                        }}
-                                                        disabled={busy}
-                                                        className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
-                                                    >
-                                                        Konfirmasi Bayar
-                                                    </button>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {payments.length === 0 && (
-                                        <tr>
-                                            <td colSpan="7" className="px-3 py-8 text-center text-gray-500 dark:text-gray-400">
-                                                Belum ada pembayaran.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
                 </>
             )}
         </div>
