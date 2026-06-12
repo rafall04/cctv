@@ -74,18 +74,9 @@ export const customerService = {
         return response.data;
     },
 
+    // Read-only list of admin-curated public areas, for the camera area picker.
     async getAreas() {
         const response = await apiClient.get('/api/customer/areas');
-        return response.data;
-    },
-
-    async createArea(name) {
-        const response = await apiClient.post('/api/customer/areas', { name });
-        return response.data;
-    },
-
-    async deleteArea(id) {
-        const response = await apiClient.delete(`/api/customer/areas/${id}`);
         return response.data;
     },
 };

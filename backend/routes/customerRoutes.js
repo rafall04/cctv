@@ -22,8 +22,6 @@ import {
     deleteMyCamera,
     getPaymentOptions,
     listMyAreas,
-    createMyArea,
-    deleteMyArea,
 } from '../controllers/customerController.js';
 import { authMiddleware, requireCustomerOrAdmin } from '../middleware/authMiddleware.js';
 
@@ -46,9 +44,10 @@ const cameraBodyProperties = {
     // re-validated in customerCameraService with friendly messages.
     latitude: { type: ['number', 'string'], maxLength: 32 },
     longitude: { type: ['number', 'string'], maxLength: 32 },
-    // Customer's own area (customer_areas.id) or '' / null to clear. Ownership is
-    // validated in the service so a guessed id can't attach to another tenant's area.
-    customer_area_id: { type: ['integer', 'string', 'null'] },
+    // Public area (areas.id) chosen from the admin list, or '' / null to clear. The
+    // service validates the area exists. Subscriber cameras stay hidden publicly via
+    // the camera_class filter, so reusing the public area_id is safe.
+    area_id: { type: ['integer', 'string', 'null'] },
 };
 
 export default async function customerRoutes(fastify) {
@@ -107,22 +106,8 @@ export default async function customerRoutes(fastify) {
         schema: cameraIdParam,
     }, deleteMyCamera);
 
-    // "Area Saya" — per-customer private grouping (separate namespace from public areas)
+    // Read-only public area list for the camera area picker (customers pick, never create).
     fastify.get('/areas', { onRequest: guard }, listMyAreas);
-    fastify.post('/areas', {
-        onRequest: guard,
-        schema: {
-            body: {
-                type: 'object',
-                required: ['name'],
-                properties: {
-                    name: { type: 'string', minLength: 1, maxLength: 40 },
-                },
-                additionalProperties: false,
-            },
-        },
-    }, createMyArea);
-    fastify.delete('/areas/:id', { onRequest: guard, schema: cameraIdParam }, deleteMyArea);
 
     fastify.post('/topup', {
         onRequest: guard,

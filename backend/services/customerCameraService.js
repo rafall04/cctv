@@ -14,8 +14,26 @@ import { queryOne, execute } from '../database/connectionPool.js';
 import cameraService from './cameraService.js';
 import billingService from './billingService.js';
 import billingPlanService from './billingPlanService.js';
-import customerAreaService from './customerAreaService.js';
 import { validateCustomerRtspUrl } from '../utils/rtspUrlPolicy.js';
+
+// Customers PICK from the admin-curated public areas (which carry the real geo:
+// desa/kelurahan/kecamatan + map point) — they never create areas, so there's a single
+// shared "Dander" instead of admin's + a customer duplicate. Subscriber cameras with a
+// public area_id stay hidden from every public surface via the camera_class='community'
+// filter, so reusing area_id is safe. '' / null clears it.
+function resolveAreaId(areaId) {
+    if (areaId === undefined || areaId === null || areaId === '') {
+        return null;
+    }
+    const id = Number(areaId);
+    if (!Number.isInteger(id) || id <= 0) {
+        throw badRequest('Area tidak valid');
+    }
+    if (!queryOne('SELECT id FROM areas WHERE id = ?', [id])) {
+        throw badRequest('Area tidak ditemukan');
+    }
+    return id;
+}
 
 function badRequest(message) {
     const err = new Error(message);
@@ -87,16 +105,15 @@ class CustomerCameraService {
         const description = normalizeTextField(data.description, { label: 'Deskripsi', max: 200 });
         const latitude = parseCoordinate(data.latitude, { label: 'Latitude', min: -90, max: 90 });
         const longitude = parseCoordinate(data.longitude, { label: 'Longitude', min: -180, max: 180 });
-        // Resolve to the customer's OWN area (or null). Throws if they reference an area
-        // that isn't theirs — the per-tenant guard for the picker.
-        const customerAreaId = customerAreaService.resolveOwnAreaId(user.id, data.customer_area_id);
+        // Chosen from the admin-curated public areas (validated to exist), or null.
+        const areaId = resolveAreaId(data.area_id);
         const rtsp = validateCustomerRtspUrl(data.private_rtsp_url);
         if (!rtsp.ok) {
             throw badRequest(rtsp.message);
         }
 
         // cameraService handles stream_key generation, MediaMTX path add, cache busts,
-        // and the audit log (request.user = the customer — truthful trail).
+        // area_id storage, and the audit log (request.user = the customer — truthful trail).
         const created = await cameraService.createCamera({
             name,
             private_rtsp_url: rtsp.url,
@@ -104,15 +121,11 @@ class CustomerCameraService {
             location,
             latitude,
             longitude,
+            area_id: areaId,
             enabled: 1,
             stream_source: 'internal',
             delivery_type: 'internal_hls',
         }, request);
-
-        // Private grouping link (subscriber-only column; never the public area_id).
-        if (customerAreaId !== null) {
-            execute('UPDATE cameras SET customer_area_id = ? WHERE id = ?', [customerAreaId, created.id]);
-        }
 
         // Tenancy + billing wiring: subscriber class, owner, plan-priced subscription
         // (day-one charge / trial handling happens inside assignSubscription).
@@ -125,7 +138,7 @@ class CustomerCameraService {
         return {
             id: created.id,
             name,
-            customer_area_id: customerAreaId,
+            area_id: areaId,
             subscription_status: subscription?.status || 'active',
         };
     }
@@ -156,28 +169,18 @@ class CustomerCameraService {
         if (data.longitude !== undefined) {
             payload.longitude = parseCoordinate(data.longitude, { label: 'Longitude', min: -180, max: 180 });
         }
-        // Area is a subscriber-only column handled outside cameraService; resolve to the
-        // customer's OWN area (or null to clear). Treated as a valid standalone change.
-        const areaProvided = data.customer_area_id !== undefined;
-        const customerAreaId = areaProvided
-            ? customerAreaService.resolveOwnAreaId(user.id, data.customer_area_id)
-            : undefined;
+        // Area is a normal camera field (public area_id, validated to exist); '' clears it.
+        if (data.area_id !== undefined) {
+            payload.area_id = resolveAreaId(data.area_id);
+        }
 
-        if (Object.keys(payload).length === 0 && !areaProvided) {
+        if (Object.keys(payload).length === 0) {
             throw badRequest('Tidak ada field yang diubah');
         }
 
-        if (Object.keys(payload).length > 0) {
-            await cameraService.updateCamera(cameraId, payload, request);
-        }
-        if (areaProvided) {
-            execute(
-                'UPDATE cameras SET customer_area_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                [customerAreaId, cameraId]
-            );
-        }
+        await cameraService.updateCamera(cameraId, payload, request);
         return queryOne(
-            'SELECT id, name, description, location, latitude, longitude, camera_class, billing_status, customer_area_id FROM cameras WHERE id = ?',
+            'SELECT id, name, description, location, latitude, longitude, camera_class, billing_status, area_id FROM cameras WHERE id = ?',
             [cameraId]
         );
     }

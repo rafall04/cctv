@@ -12,7 +12,6 @@ import { Link } from 'react-router-dom';
 import customerService from '../../services/customerService';
 import CustomerLivePlayer from '../../components/customer/CustomerLivePlayer';
 import CameraFormModal from '../../components/customer/CameraFormModal';
-import AreaManagerModal from '../../components/customer/AreaManagerModal';
 import { formatRupiah } from '../../layouts/CustomerLayout';
 import { buildApiAssetUrl } from '../../config/config';
 
@@ -35,7 +34,6 @@ export default function MyCameras() {
     const [notice, setNotice] = useState(null);
     const [activeCamera, setActiveCamera] = useState(null);
     const [formCamera, setFormCamera] = useState(undefined); // undefined=closed, null=add, object=edit
-    const [showAreas, setShowAreas] = useState(false);
     const [busyId, setBusyId] = useState(null);
 
     const reload = useCallback(async () => {
@@ -70,20 +68,6 @@ export default function MyCameras() {
     useEffect(() => {
         reload();
     }, [reload]);
-
-    // Create an area inline from the camera form; refresh the list and return the new
-    // area so the form can select it immediately.
-    const handleAreaCreated = useCallback(async (name) => {
-        const res = await customerService.createArea(name);
-        if (res.success) {
-            const list = await customerService.getAreas();
-            if (list.success) {
-                setAreas(list.data || []);
-            }
-            return res.data;
-        }
-        return null;
-    }, []);
 
     const handleDelete = async (camera) => {
         if (!window.confirm(`Hapus kamera "${camera.name}"? Tagihan kamera ini berhenti dan stream-nya dimatikan.`)) {
@@ -139,23 +123,15 @@ export default function MyCameras() {
                         </span>
                     )}
                 </div>
-                <div className="flex items-center gap-2">
+                {planState?.plan && (
                     <button
-                        onClick={() => setShowAreas(true)}
-                        className="rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                        onClick={() => setFormCamera(null)}
+                        disabled={!canAdd}
+                        className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                        Kelola Area
+                        + Tambah Kamera
                     </button>
-                    {planState?.plan && (
-                        <button
-                            onClick={() => setFormCamera(null)}
-                            disabled={!canAdd}
-                            className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            + Tambah Kamera
-                        </button>
-                    )}
-                </div>
+                )}
             </div>
 
             {notice && (
@@ -213,9 +189,9 @@ export default function MyCameras() {
                                 <div className="p-3">
                                     <div className="flex items-center gap-1.5">
                                         <h3 className="truncate font-semibold text-gray-900 dark:text-white">{camera.name}</h3>
-                                        {camera.customer_area_name && (
+                                        {camera.area_name && (
                                             <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                                                {camera.customer_area_name}
+                                                {camera.area_name}
                                             </span>
                                         )}
                                     </div>
@@ -264,20 +240,12 @@ export default function MyCameras() {
                 <CameraFormModal
                     camera={formCamera}
                     areas={areas}
-                    onAreaCreated={handleAreaCreated}
                     onClose={() => setFormCamera(undefined)}
                     onSaved={async () => {
                         setFormCamera(undefined);
                         setNotice({ type: 'ok', text: 'Kamera tersimpan.' });
                         await reload();
                     }}
-                />
-            )}
-            {showAreas && (
-                <AreaManagerModal
-                    areas={areas}
-                    onClose={() => setShowAreas(false)}
-                    onChanged={reload}
                 />
             )}
         </>

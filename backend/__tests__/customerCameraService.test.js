@@ -59,7 +59,7 @@ function seedSchema() {
         DROP TABLE IF EXISTS wallets;
         DROP TABLE IF EXISTS wallet_transactions;
         DROP TABLE IF EXISTS camera_subscriptions;
-        DROP TABLE IF EXISTS customer_areas;
+        DROP TABLE IF EXISTS areas;
         DROP TABLE IF EXISTS cameras;
         DROP TABLE IF EXISTS users;
         CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT, description TEXT, updated_at TEXT);
@@ -90,15 +90,14 @@ function seedSchema() {
             owner_user_id INTEGER,
             camera_class TEXT NOT NULL DEFAULT 'community',
             billing_status TEXT,
-            customer_area_id INTEGER,
+            area_id INTEGER,
             updated_at TEXT
         );
-        CREATE TABLE customer_areas (
+        CREATE TABLE areas (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            owner_user_id INTEGER NOT NULL,
             name TEXT NOT NULL,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(owner_user_id, name)
+            kelurahan TEXT,
+            kecamatan TEXT
         );
         CREATE TABLE wallets (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -128,6 +127,7 @@ function seedSchema() {
         VALUES (1, 'trial', 'Trial', 0, 1, 1, 3),
                (2, 'hemat', 'Hemat', 20000, 2, 0, NULL);
         INSERT INTO wallets (user_id, balance) VALUES (42, 100000);
+        INSERT INTO areas (id, name, kecamatan) VALUES (5, 'Dander', 'Dander');
     `);
 }
 
@@ -198,24 +198,24 @@ describe('customerCameraService', () => {
         expect(sub.status).toBe('active');
     });
 
-    it('attaches the customer own area on create', async () => {
-        db.prepare("INSERT INTO customer_areas (id, owner_user_id, name) VALUES (5, 42, 'Rumah')").run();
-        const created = await customerCameraService.createOwnCamera(CUSTOMER, {
-            name: 'Kamera Rumah',
+    it('passes the chosen public area_id through to cameraService on create', async () => {
+        await customerCameraService.createOwnCamera(CUSTOMER, {
+            name: 'Kamera Dander',
             private_rtsp_url: 'rtsp://192.168.1.10:554/ch1',
-            customer_area_id: 5,
+            area_id: 5,
         }, { user: CUSTOMER });
 
-        expect(created.customer_area_id).toBe(5);
-        expect(db.prepare('SELECT customer_area_id FROM cameras WHERE id = ?').get(created.id).customer_area_id).toBe(5);
+        expect(createCameraMock).toHaveBeenCalledWith(
+            expect.objectContaining({ area_id: 5 }),
+            expect.anything()
+        );
     });
 
-    it('refuses to attach another tenant area id (cross-tenant guard) and creates nothing', async () => {
-        db.prepare("INSERT INTO customer_areas (id, owner_user_id, name) VALUES (9, 99, 'Punya Siti')").run();
+    it('refuses an area_id that does not exist and creates nothing', async () => {
         await expect(customerCameraService.createOwnCamera(CUSTOMER, {
-            name: 'Nyolong Area',
+            name: 'Area Ngaco',
             private_rtsp_url: 'rtsp://192.168.1.10:554/ch1',
-            customer_area_id: 9,
+            area_id: 999,
         }, { user: CUSTOMER })).rejects.toMatchObject({ statusCode: 400 });
         expect(createCameraMock).not.toHaveBeenCalled();
     });

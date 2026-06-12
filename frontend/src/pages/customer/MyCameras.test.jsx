@@ -25,8 +25,6 @@ vi.mock('../../services/customerService', () => ({
         createCamera: vi.fn(),
         updateCamera: vi.fn(),
         deleteCamera: vi.fn(),
-        createArea: vi.fn(),
-        deleteArea: vi.fn(),
     },
 }));
 
