@@ -33,6 +33,8 @@ export default function PaymentGatewayTab() {
     const [midtransKey, setMidtransKey] = useState('');
     const [midtransProduction, setMidtransProduction] = useState(false);
     const [newMethod, setNewMethod] = useState({ method: '', channel: '', label: '' });
+    const [fetchingChannels, setFetchingChannels] = useState(false);
+    const [liveChannels, setLiveChannels] = useState(null); // null = not fetched yet
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -80,6 +82,33 @@ export default function PaymentGatewayTab() {
         }
         setMethods((prev) => [...prev, { method, channel, label: newMethod.label.trim() || `${method.toUpperCase()} ${channel.toUpperCase()}`, enabled: true }]);
         setNewMethod({ method: '', channel: '', label: '' });
+    };
+
+    // Pull the live method/channel list straight from the configured iPaymu account — the
+    // authoritative source for valid codes (e.g. whether QRIS is `qris` or `mpm`).
+    const fetchChannels = async () => {
+        setFetchingChannels(true);
+        try {
+            const res = await billingAdminService.getPaymentGatewayChannels();
+            const data = res.data || {};
+            if (data.ok) {
+                setLiveChannels(data.channels || []);
+                success('Channel dimuat', data.message || `Ditemukan ${data.channels?.length || 0} channel.`);
+            } else {
+                setLiveChannels([]);
+                showError('Gagal', data.message || 'Tidak bisa mengambil channel dari iPaymu.');
+            }
+        } catch (err) {
+            setLiveChannels([]);
+            showError('Gagal', err.response?.data?.message || 'Gagal menghubungi iPaymu.');
+        } finally {
+            setFetchingChannels(false);
+        }
+    };
+
+    const addLiveChannel = (ch) => {
+        if (methods.some((m) => m.method === ch.method && m.channel === ch.channel)) return;
+        setMethods((prev) => [...prev, { method: ch.method, channel: ch.channel, label: ch.label || `${ch.method.toUpperCase()} ${ch.channel.toUpperCase()}`, enabled: true }]);
     };
 
     const handleSave = async () => {
@@ -210,6 +239,36 @@ export default function PaymentGatewayTab() {
                             <input value={newMethod.channel} onChange={(e) => setNewMethod({ ...newMethod, channel: e.target.value })} placeholder="channel (bca)" className={inputClass} />
                             <input value={newMethod.label} onChange={(e) => setNewMethod({ ...newMethod, label: e.target.value })} placeholder="Label (VA BCA)" className={inputClass} />
                             <button type="button" onClick={addMethod} className="rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">+ Tambah</button>
+                        </div>
+
+                        {/* Authoritative: pull the real method:channel codes from the iPaymu account so
+                            QRIS/bank codes are never a guess. Save credentials first so this uses them. */}
+                        <div className="mt-4 border-t border-gray-100 pt-3 dark:border-gray-800">
+                            <div className="flex flex-wrap items-center gap-3">
+                                <button type="button" onClick={fetchChannels} disabled={fetchingChannels} className="rounded-xl border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
+                                    {fetchingChannels ? 'Mengambil…' : 'Ambil channel dari iPaymu'}
+                                </button>
+                                <span className="text-xs text-gray-400 dark:text-gray-500">Simpan kredensial dulu agar memakai akun yang benar.</span>
+                            </div>
+                            {liveChannels && liveChannels.length > 0 && (
+                                <div className="mt-3 space-y-1">
+                                    {liveChannels.map((ch) => {
+                                        const exists = methods.some((m) => m.method === ch.method && m.channel === ch.channel);
+                                        return (
+                                            <div key={`${ch.method}:${ch.channel}`} className="flex items-center gap-2 rounded-lg bg-gray-50 px-2 py-1.5 dark:bg-gray-800/50">
+                                                <span className="flex-1 text-sm text-gray-800 dark:text-gray-200">{ch.label}</span>
+                                                <span className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] text-gray-500 dark:bg-gray-800 dark:text-gray-400">{ch.method}:{ch.channel}</span>
+                                                <button type="button" onClick={() => addLiveChannel(ch)} disabled={exists} className="text-xs font-medium text-primary hover:underline disabled:text-gray-400 disabled:no-underline dark:disabled:text-gray-600">
+                                                    {exists ? 'sudah ada' : '+ Tambah'}
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                            {liveChannels && liveChannels.length === 0 && (
+                                <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">Tidak ada channel yang dikembalikan — cek kredensial &amp; mode, atau aktifkan channel di dashboard iPaymu.</p>
+                            )}
                         </div>
                     </div>
                 )}

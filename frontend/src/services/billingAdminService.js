@@ -89,6 +89,11 @@ export const billingAdminService = {
         return response.data;
     },
 
+    async getPaymentGatewayChannels() {
+        const response = await apiClient.get('/api/admin/billing/payment-gateway/channels');
+        return response.data;
+    },
+
     async getRegistrations() {
         const response = await apiClient.get('/api/admin/billing/registrations');
         return response.data;

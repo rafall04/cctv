@@ -28,6 +28,7 @@ import {
     getPaymentGateway,
     updatePaymentGateway,
     testPaymentGateway,
+    listPaymentGatewayChannels,
 } from '../controllers/billingAdminController.js';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 
@@ -185,6 +186,8 @@ export default async function billingAdminRoutes(fastify) {
     fastify.get('/payment-gateway', { onRequest: guard }, getPaymentGateway);
     fastify.put('/payment-gateway', { onRequest: guard }, updatePaymentGateway);
     fastify.post('/payment-gateway/test', { onRequest: guard }, testPaymentGateway);
+    // Live method/channel list straight from the configured iPaymu account (source of truth).
+    fastify.get('/payment-gateway/channels', { onRequest: guard }, listPaymentGatewayChannels);
 
     // Self-registration settings (enabled + default plan for new signups)
     fastify.get('/registration-settings', { onRequest: guard }, getRegistrationSettings);

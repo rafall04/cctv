@@ -83,27 +83,32 @@ function ipaymuTimestamp(now = new Date()) {
     return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
 }
 
-async function ipaymuRequest(path, payload) {
+async function ipaymuRequest(path, payload, { method = 'POST' } = {}) {
     const { va, apiKey, baseUrl } = getIpaymuConfig();
     if (!va || !apiKey) {
         const err = new Error('iPaymu is not configured (IPAYMU_VA / IPAYMU_API_KEY missing)');
         err.statusCode = 503;
         throw err;
     }
-    const body = JSON.stringify(payload);
+    const verb = method.toUpperCase();
+    const isGet = verb === 'GET';
+    // iPaymu signs sha256(JSON body). A GET carries no body, and the official samples
+    // sign the literal "{}" for it (payment_channel.php). POST signs the real payload.
+    const body = isGet ? '{}' : JSON.stringify(payload || {});
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
     try {
         const response = await fetch(`${baseUrl}${path}`, {
-            method: 'POST',
+            method: verb,
             headers: {
                 'Content-Type': 'application/json',
                 Accept: 'application/json',
                 va,
-                signature: buildIpaymuSignature({ method: 'POST', va, apiKey, body }),
+                signature: buildIpaymuSignature({ method: verb, va, apiKey, body }),
                 timestamp: ipaymuTimestamp(),
             },
-            body,
+            // A GET must not send a request body.
+            ...(isGet ? {} : { body }),
             signal: controller.signal,
         });
         const json = await response.json().catch(() => ({}));
@@ -111,6 +116,38 @@ async function ipaymuRequest(path, payload) {
     } finally {
         clearTimeout(timeout);
     }
+}
+
+/**
+ * Flatten an iPaymu /api/v2/payment-channels response into a flat list of
+ * {method, channel, label}. The API groups channels by payment method:
+ *   Data: [{ Code:'va', Name:'Virtual Account', Channels:[{Code:'bca',Name:'BCA'},…] }, …]
+ * so a group's Code is the `paymentMethod` and each channel's Code is the
+ * `paymentChannel` — exactly the two values _createIpaymuTopup sends.
+ */
+export function normalizeIpaymuChannels(data) {
+    if (!Array.isArray(data)) {
+        return [];
+    }
+    const out = [];
+    const seen = new Set();
+    for (const group of data) {
+        const method = String(group?.Code ?? group?.code ?? '').trim().toLowerCase();
+        if (!method) continue;
+        const groupName = String(group?.Name ?? group?.name ?? method);
+        const channels = group?.Channels ?? group?.channels ?? [];
+        if (!Array.isArray(channels)) continue;
+        for (const ch of channels) {
+            const channel = String(ch?.Code ?? ch?.code ?? '').trim().toLowerCase();
+            if (!channel) continue;
+            const key = `${method}:${channel}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            const chName = String(ch?.Name ?? ch?.name ?? channel);
+            out.push({ method, channel, label: `${groupName} — ${chName}`.slice(0, 60) });
+        }
+    }
+    return out;
 }
 
 /** Normalize iPaymu transaction-check payloads into {paid, expired, amount}. */
@@ -518,6 +555,35 @@ class PaymentService {
             };
         } catch (error) {
             return { ok: false, message: error.message || 'Gagal menghubungi iPaymu.' };
+        }
+    }
+
+    /**
+     * Admin "Ambil channel dari iPaymu" — read-only signed GET of the account's live
+     * payment-channel list. This is iPaymu's OWN source of truth for valid
+     * paymentMethod:paymentChannel codes, so the admin never has to guess (e.g. whether
+     * QRIS is `qris` or `mpm`) — they fetch the real codes and add them in one click.
+     * Always resolves (never throws) so the admin UI can render a clean ok/error.
+     */
+    async getIpaymuPaymentChannels() {
+        const { va, apiKey } = getIpaymuConfig();
+        if (!va || !apiKey) {
+            return { ok: false, message: 'VA / API key belum diisi.', channels: [] };
+        }
+        try {
+            const { httpOk, body } = await ipaymuRequest('/api/v2/payment-channels', null, { method: 'GET' });
+            const ok = httpOk && (Number(body?.Status) === 200 || body?.Success === true);
+            if (!ok) {
+                return {
+                    ok: false,
+                    message: body?.Message || body?.message || 'Gagal — periksa VA, API key, dan mode (sandbox/produksi).',
+                    channels: [],
+                };
+            }
+            const channels = normalizeIpaymuChannels(body?.Data ?? body?.data);
+            return { ok: true, message: `Ditemukan ${channels.length} channel aktif di akun iPaymu.`, channels };
+        } catch (error) {
+            return { ok: false, message: error.message || 'Gagal menghubungi iPaymu.', channels: [] };
         }
     }
 

@@ -36,6 +36,7 @@ import paymentService, {
     verifyMidtransSignature,
     buildIpaymuSignature,
     interpretIpaymuTransaction,
+    normalizeIpaymuChannels,
 } from '../services/paymentService.js';
 import walletService from '../services/walletService.js';
 
@@ -395,5 +396,73 @@ describe('paymentService ipaymu driver', () => {
         expect(payment.qris.method).toBe('va');
         expect(payment.qris.va_number).toBe('7001234567890');
         expect(payment.qris.payment_name).toBe('BCA');
+    });
+});
+
+describe('iPaymu payment-channels (live source of truth)', () => {
+    it('flattens grouped channel data into {method, channel, label}, deduping & skipping junk', () => {
+        const flat = normalizeIpaymuChannels([
+            { Code: 'va', Name: 'Virtual Account', Channels: [
+                { Code: 'bca', Name: 'BCA' },
+                { Code: 'bni', Name: 'BNI' },
+                { Code: 'bca', Name: 'BCA dup' }, // duplicate method:channel → dropped
+            ] },
+            { Code: 'qris', Name: 'QRIS', Channels: [{ Code: 'mpm', Name: 'QRIS MPM' }] }, // reveals real QRIS code
+            { Code: 'cstore', Name: 'Convenience Store', Channels: [{ Code: 'indomaret', Name: 'Indomaret' }] },
+            { Code: '', Channels: [{ Code: 'x' }] }, // no method → skipped
+            { Code: 'ewallet', Channels: 'not-an-array' }, // bad channels → skipped
+        ]);
+        expect(flat).toEqual([
+            { method: 'va', channel: 'bca', label: 'Virtual Account — BCA' },
+            { method: 'va', channel: 'bni', label: 'Virtual Account — BNI' },
+            { method: 'qris', channel: 'mpm', label: 'QRIS — QRIS MPM' },
+            { method: 'cstore', channel: 'indomaret', label: 'Convenience Store — Indomaret' },
+        ]);
+    });
+
+    it('returns [] for non-array / empty payloads instead of throwing', () => {
+        expect(normalizeIpaymuChannels(null)).toEqual([]);
+        expect(normalizeIpaymuChannels(undefined)).toEqual([]);
+        expect(normalizeIpaymuChannels({})).toEqual([]);
+        expect(normalizeIpaymuChannels([])).toEqual([]);
+    });
+
+    it('getIpaymuPaymentChannels signs a GET with the sha256("{}") body convention', async () => {
+        process.env.IPAYMU_VA = '0000001234567890';
+        process.env.IPAYMU_API_KEY = 'ipaymu-test-key';
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+            ok: true,
+            json: async () => ({ Status: 200, Data: [
+                { Code: 'qris', Name: 'QRIS', Channels: [{ Code: 'mpm', Name: 'QRIS MPM' }] },
+            ] }),
+        });
+
+        const result = await paymentService.getIpaymuPaymentChannels();
+
+        expect(result.ok).toBe(true);
+        expect(result.channels).toEqual([{ method: 'qris', channel: 'mpm', label: 'QRIS — QRIS MPM' }]);
+
+        const [url, options] = fetchMock.mock.calls[0];
+        expect(String(url)).toContain('/api/v2/payment-channels');
+        expect(options.method).toBe('GET');
+        expect(options.body).toBeUndefined(); // a GET sends no body
+
+        // Signature must be HMAC over GET:VA:sha256('{}'):apiKey (the documented GET convention).
+        const va = '0000001234567890';
+        const apiKey = 'ipaymu-test-key';
+        const emptyHash = crypto.createHash('sha256').update('{}', 'utf8').digest('hex').toLowerCase();
+        const expected = crypto.createHmac('sha256', apiKey)
+            .update(`GET:${va}:${emptyHash}:${apiKey}`, 'utf8')
+            .digest('hex');
+        expect(options.headers.signature).toBe(expected);
+
+        delete process.env.IPAYMU_VA;
+        delete process.env.IPAYMU_API_KEY;
+        vi.restoreAllMocks();
+    });
+
+    it('getIpaymuPaymentChannels fails soft (ok:false, channels:[]) without credentials', async () => {
+        const result = await paymentService.getIpaymuPaymentChannels();
+        expect(result).toMatchObject({ ok: false, channels: [] });
     });
 });

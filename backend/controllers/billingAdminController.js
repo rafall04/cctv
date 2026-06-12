@@ -140,6 +140,15 @@ export async function testPaymentGateway(request, reply) {
     }
 }
 
+export async function listPaymentGatewayChannels(request, reply) {
+    try {
+        const result = await paymentService.getIpaymuPaymentChannels();
+        return reply.send({ success: true, data: result });
+    } catch (error) {
+        return handleError(reply, error, 'List payment gateway channels error:');
+    }
+}
+
 export async function getRegistrationSettings(request, reply) {
     try {
         return reply.send({ success: true, data: billingPlanService.getRegistrationSettings() });
