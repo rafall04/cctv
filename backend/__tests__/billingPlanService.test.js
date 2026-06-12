@@ -191,7 +191,7 @@ describe('billingPlanService', () => {
             expect(first.trial_active).toBe(true);
             expect(user().trial_used).toBe(1);
 
-            walletService.credit({ userId: 42, amount: 5000 }); // afford the paid switch (balance gate)
+            walletService.credit({ userId: 42, amount: 25000 }); // afford the paid switch (Basic = ~1 month Rp25.000)
             billingPlanService.changeUserPlan(42, 'basic');
             expect(() => billingPlanService.changeUserPlan(42, 'trial'))
                 .toThrowError(expect.objectContaining({ statusCode: 400 }));
@@ -205,7 +205,7 @@ describe('billingPlanService', () => {
             db.prepare("UPDATE cameras SET owner_user_id = 42, camera_class = 'subscriber', billing_status = 'suspended' WHERE id = 7").run();
             db.prepare(`INSERT INTO camera_subscriptions (camera_id, user_id, monthly_price, status)
                         VALUES (7, 42, 0, 'suspended')`).run();
-            walletService.credit({ userId: 42, amount: 10000 });
+            walletService.credit({ userId: 42, amount: 25000 }); // ~1 month of hemat (gate)
 
             const state = billingPlanService.changeUserPlan(42, 'hemat');
 
@@ -214,25 +214,25 @@ describe('billingPlanService', () => {
             expect(sub.monthly_price).toBe(20000);
             expect(sub.status).toBe('active');
             // Day charged at the NEW price (20000/30 ≈ 667).
-            expect(walletService.getBalance(42)).toBe(10000 - 667);
+            expect(walletService.getBalance(42)).toBe(25000 - 667);
         });
 
         // --- Balance gate (self-service) + charge-on-switch (admin path) ---
 
-        it('BLOCKS a self-service switch to a paid plan when saldo cannot cover a day', () => {
+        it('BLOCKS a self-service switch to a paid plan when saldo is below ~1 month', () => {
             db.prepare("UPDATE cameras SET owner_user_id = 42, camera_class = 'subscriber', billing_status = 'active' WHERE id = 7").run();
             db.prepare(`INSERT INTO camera_subscriptions (camera_id, user_id, monthly_price, status) VALUES (7, 42, 0, 'active')`).run();
             expect(walletService.getBalance(42)).toBe(0);
 
-            // hemat = 20000/cam → 1 day ≈ 667; balance 0 → blocked, NOTHING changes.
+            // hemat = 20000/cam → needs ~1 month (Rp20.000); balance 0 → blocked, NOTHING changes.
             expect(() => billingPlanService.changeUserPlan(42, 'hemat'))
                 .toThrowError(expect.objectContaining({ statusCode: 400 }));
             expect(billingPlanService.getUserPlanState(42).plan?.key).not.toBe('hemat');
             expect(db.prepare('SELECT status FROM camera_subscriptions WHERE camera_id = 7').get().status).toBe('active');
         });
 
-        it('ALLOWS the paid switch once saldo covers a day', () => {
-            walletService.credit({ userId: 42, amount: 1000 }); // > 1 day of hemat (≈667)
+        it('ALLOWS the paid switch once saldo covers ~1 month', () => {
+            walletService.credit({ userId: 42, amount: 20000 }); // = 1 month of hemat (Rp20.000)
             const state = billingPlanService.changeUserPlan(42, 'hemat');
             expect(state.plan.key).toBe('hemat');
         });
@@ -269,14 +269,14 @@ describe('billingPlanService', () => {
             db.prepare("UPDATE cameras SET owner_user_id = 42, camera_class = 'subscriber', billing_status = 'active' WHERE id = 7").run();
             db.prepare(`INSERT INTO camera_subscriptions (camera_id, user_id, monthly_price, status, last_charged_date)
                         VALUES (7, 42, 0, 'active', ?)`).run(today);
-            walletService.credit({ userId: 42, amount: 5000 });
+            walletService.credit({ userId: 42, amount: 25000 }); // ~1 month of hemat (gate)
 
             billingPlanService.changeUserPlan(42, 'hemat');
 
             const sub = db.prepare('SELECT * FROM camera_subscriptions WHERE camera_id = 7').get();
             expect(sub.status).toBe('active');
             expect(sub.last_charged_date).toBe(today);
-            expect(walletService.getBalance(42)).toBe(5000 - 667); // 20000/30 ≈ 667
+            expect(walletService.getBalance(42)).toBe(25000 - 667); // 20000/30 ≈ 667
         });
 
         it('does not double-charge a day already genuinely paid when switching between paid plans', () => {
@@ -285,16 +285,16 @@ describe('billingPlanService', () => {
             db.prepare("UPDATE cameras SET owner_user_id = 42, camera_class = 'subscriber', billing_status = 'active' WHERE id = 7").run();
             db.prepare(`INSERT INTO camera_subscriptions (id, camera_id, user_id, monthly_price, status, last_charged_date)
                         VALUES (55, 7, 42, 25000, 'active', ?)`).run(today);
-            walletService.credit({ userId: 42, amount: 10000 });
+            walletService.credit({ userId: 42, amount: 25000 }); // ~1 month of hemat (gate)
             // Today's real charge already taken at the old price (reference = charge:{subId}:{date}).
             walletService.chargeOnce({ userId: 42, amount: 833, reference: `charge:55:${today}`, note: 'old price' });
-            expect(walletService.getBalance(42)).toBe(10000 - 833);
+            expect(walletService.getBalance(42)).toBe(25000 - 833);
 
             billingPlanService.changeUserPlan(42, 'hemat'); // 20000
 
             const sub = db.prepare('SELECT * FROM camera_subscriptions WHERE camera_id = 7').get();
             expect(sub.status).toBe('active');
-            expect(walletService.getBalance(42)).toBe(10000 - 833); // idempotent: no second deduction
+            expect(walletService.getBalance(42)).toBe(25000 - 833); // idempotent: no second deduction
         });
     });
 

@@ -29,7 +29,7 @@ const STATUS_LABELS = {
     cancelled: { text: 'Dibatalkan', className: 'text-gray-500' },
 };
 
-function TopupPanel({ onCompleted }) {
+function TopupPanel({ onCompleted, resumable = [] }) {
     const [amount, setAmount] = useState(PRESET_AMOUNTS[0]);
     const [customAmount, setCustomAmount] = useState('');
     const [pending, setPending] = useState(null);
@@ -153,6 +153,26 @@ function TopupPanel({ onCompleted }) {
     }
 
     return (
+        <div className="space-y-4">
+        {resumable.length > 0 && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800/50 dark:bg-amber-900/20">
+                <h3 className="font-semibold text-amber-800 dark:text-amber-300">Top-up belum dibayar</h3>
+                <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">Masih bisa dipakai — klik untuk lanjutkan pembayaran.</p>
+                <div className="mt-2 space-y-1.5">
+                    {resumable.map((p) => (
+                        <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => { setPending(p); startPolling(p.id); }}
+                            className="flex w-full items-center justify-between rounded-xl border border-amber-200 bg-white px-3 py-2 text-left text-sm transition-colors hover:bg-amber-100/60 dark:border-amber-800/50 dark:bg-gray-900 dark:hover:bg-amber-900/30"
+                        >
+                            <span className="font-medium text-gray-900 dark:text-white">{formatRupiah(p.amount)}</span>
+                            <span className="text-xs text-amber-700 dark:text-amber-400">Lihat QR / bayar →</span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+        )}
         <form onSubmit={handleSubmit} className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
             <h3 className="font-semibold text-gray-900 dark:text-white">Isi Saldo</h3>
 
@@ -205,28 +225,39 @@ function TopupPanel({ onCompleted }) {
                 {submitting ? 'Memproses…' : 'Lanjutkan Top-up'}
             </button>
         </form>
+        </div>
     );
 }
 
 export default function MyWallet() {
     const [summary, setSummary] = useState(null);
     const [wallet, setWallet] = useState(null);
+    const [payments, setPayments] = useState([]);
     const [loading, setLoading] = useState(true);
 
     const reload = useCallback(async () => {
         try {
-            const [summaryRes, walletRes] = await Promise.all([
+            const [summaryRes, walletRes, paymentsRes] = await Promise.all([
                 customerService.getSummary(),
                 customerService.getWallet(),
+                customerService.getPayments(),
             ]);
             if (summaryRes.success) setSummary(summaryRes.data);
             if (walletRes.success) setWallet(walletRes.data);
+            if (paymentsRes.success) setPayments(paymentsRes.data || []);
         } catch {
             // page-level skeleton stays; ledger errors are non-fatal
         } finally {
             setLoading(false);
         }
     }, []);
+
+    // Pending top-ups that are still payable (not expired) — so a created-but-unpaid QR/VA
+    // is never lost on navigation/refresh and the customer can resume it.
+    const now = Date.now();
+    const pendingTopups = payments.filter(
+        (p) => p.status === 'pending' && (!p.expires_at || new Date(p.expires_at).getTime() > now)
+    );
 
     useEffect(() => {
         reload();
@@ -312,7 +343,7 @@ export default function MyWallet() {
             </div>
 
             <div>
-                <TopupPanel onCompleted={reload} />
+                <TopupPanel onCompleted={reload} resumable={pendingTopups} />
             </div>
         </div>
     );
