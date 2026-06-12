@@ -11,18 +11,22 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
-const { getMyCamerasMock, getPlanMock } = vi.hoisted(() => ({
+const { getMyCamerasMock, getPlanMock, getAreasMock } = vi.hoisted(() => ({
     getMyCamerasMock: vi.fn(),
     getPlanMock: vi.fn(),
+    getAreasMock: vi.fn(),
 }));
 
 vi.mock('../../services/customerService', () => ({
     default: {
         getMyCameras: getMyCamerasMock,
         getPlan: getPlanMock,
+        getAreas: getAreasMock,
         createCamera: vi.fn(),
         updateCamera: vi.fn(),
         deleteCamera: vi.fn(),
+        createArea: vi.fn(),
+        deleteArea: vi.fn(),
     },
 }));
 
@@ -44,7 +48,9 @@ describe('MyCameras', () => {
     beforeEach(() => {
         getMyCamerasMock.mockReset();
         getPlanMock.mockReset();
+        getAreasMock.mockReset();
         getPlanMock.mockResolvedValue({ success: true, data: { plan: null, used_cameras: 0, max_cameras: 0, can_add_camera: false } });
+        getAreasMock.mockResolvedValue({ success: true, data: [] });
     });
 
     it('shows the empty state when the customer has no cameras', async () => {

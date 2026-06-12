@@ -14,6 +14,7 @@ import { queryOne, execute } from '../database/connectionPool.js';
 import cameraService from './cameraService.js';
 import billingService from './billingService.js';
 import billingPlanService from './billingPlanService.js';
+import customerAreaService from './customerAreaService.js';
 import { validateCustomerRtspUrl } from '../utils/rtspUrlPolicy.js';
 
 function badRequest(message) {
@@ -86,6 +87,9 @@ class CustomerCameraService {
         const description = normalizeTextField(data.description, { label: 'Deskripsi', max: 200 });
         const latitude = parseCoordinate(data.latitude, { label: 'Latitude', min: -90, max: 90 });
         const longitude = parseCoordinate(data.longitude, { label: 'Longitude', min: -180, max: 180 });
+        // Resolve to the customer's OWN area (or null). Throws if they reference an area
+        // that isn't theirs — the per-tenant guard for the picker.
+        const customerAreaId = customerAreaService.resolveOwnAreaId(user.id, data.customer_area_id);
         const rtsp = validateCustomerRtspUrl(data.private_rtsp_url);
         if (!rtsp.ok) {
             throw badRequest(rtsp.message);
@@ -105,6 +109,11 @@ class CustomerCameraService {
             delivery_type: 'internal_hls',
         }, request);
 
+        // Private grouping link (subscriber-only column; never the public area_id).
+        if (customerAreaId !== null) {
+            execute('UPDATE cameras SET customer_area_id = ? WHERE id = ?', [customerAreaId, created.id]);
+        }
+
         // Tenancy + billing wiring: subscriber class, owner, plan-priced subscription
         // (day-one charge / trial handling happens inside assignSubscription).
         const subscription = billingService.assignSubscription({
@@ -116,6 +125,7 @@ class CustomerCameraService {
         return {
             id: created.id,
             name,
+            customer_area_id: customerAreaId,
             subscription_status: subscription?.status || 'active',
         };
     }
@@ -146,13 +156,28 @@ class CustomerCameraService {
         if (data.longitude !== undefined) {
             payload.longitude = parseCoordinate(data.longitude, { label: 'Longitude', min: -180, max: 180 });
         }
-        if (Object.keys(payload).length === 0) {
+        // Area is a subscriber-only column handled outside cameraService; resolve to the
+        // customer's OWN area (or null to clear). Treated as a valid standalone change.
+        const areaProvided = data.customer_area_id !== undefined;
+        const customerAreaId = areaProvided
+            ? customerAreaService.resolveOwnAreaId(user.id, data.customer_area_id)
+            : undefined;
+
+        if (Object.keys(payload).length === 0 && !areaProvided) {
             throw badRequest('Tidak ada field yang diubah');
         }
 
-        await cameraService.updateCamera(cameraId, payload, request);
+        if (Object.keys(payload).length > 0) {
+            await cameraService.updateCamera(cameraId, payload, request);
+        }
+        if (areaProvided) {
+            execute(
+                'UPDATE cameras SET customer_area_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                [customerAreaId, cameraId]
+            );
+        }
         return queryOne(
-            'SELECT id, name, description, location, latitude, longitude, camera_class, billing_status FROM cameras WHERE id = ?',
+            'SELECT id, name, description, location, latitude, longitude, camera_class, billing_status, customer_area_id FROM cameras WHERE id = ?',
             [cameraId]
         );
     }

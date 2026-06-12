@@ -73,6 +73,21 @@ export const customerService = {
         const response = await apiClient.delete(`/api/customer/cameras/${id}`);
         return response.data;
     },
+
+    async getAreas() {
+        const response = await apiClient.get('/api/customer/areas');
+        return response.data;
+    },
+
+    async createArea(name) {
+        const response = await apiClient.post('/api/customer/areas', { name });
+        return response.data;
+    },
+
+    async deleteArea(id) {
+        const response = await apiClient.delete(`/api/customer/areas/${id}`);
+        return response.data;
+    },
 };
 
 export default customerService;

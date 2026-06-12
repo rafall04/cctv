@@ -14,7 +14,7 @@ const LocationPicker = lazy(() => import('../LocationPicker'));
 
 const inputClass = 'w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700/50 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary';
 
-export default function CameraFormModal({ camera = null, onClose, onSaved }) {
+export default function CameraFormModal({ camera = null, areas = [], onAreaCreated, onClose, onSaved }) {
     const isEdit = !!camera;
     const [form, setForm] = useState({
         name: camera?.name || '',
@@ -23,13 +23,40 @@ export default function CameraFormModal({ camera = null, onClose, onSaved }) {
         private_rtsp_url: '',
         latitude: camera?.latitude ?? '',
         longitude: camera?.longitude ?? '',
+        customer_area_id: camera?.customer_area_id ? String(camera.customer_area_id) : '',
     });
     const [error, setError] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const [newAreaMode, setNewAreaMode] = useState(false);
+    const [newAreaName, setNewAreaName] = useState('');
+    const [creatingArea, setCreatingArea] = useState(false);
 
     const handleChange = (e) => {
         setForm({ ...form, [e.target.name]: e.target.value });
         setError('');
+    };
+
+    const handleCreateArea = async () => {
+        const clean = newAreaName.trim();
+        if (!clean || !onAreaCreated) {
+            return;
+        }
+        setCreatingArea(true);
+        setError('');
+        try {
+            const area = await onAreaCreated(clean);
+            if (area?.id) {
+                setForm((current) => ({ ...current, customer_area_id: String(area.id) }));
+                setNewAreaName('');
+                setNewAreaMode(false);
+            } else {
+                setError('Gagal membuat area');
+            }
+        } catch (err) {
+            setError(err.response?.data?.message || 'Gagal membuat area');
+        } finally {
+            setCreatingArea(false);
+        }
     };
 
     const handleLocationChange = (lat, lng) => {
@@ -52,6 +79,8 @@ export default function CameraFormModal({ camera = null, onClose, onSaved }) {
                 description: form.description.trim() || undefined,
                 latitude: form.latitude === '' || form.latitude === null ? '' : String(form.latitude),
                 longitude: form.longitude === '' || form.longitude === null ? '' : String(form.longitude),
+                // '' clears the area; otherwise the chosen own-area id (backend validates ownership).
+                customer_area_id: form.customer_area_id === '' || form.customer_area_id === null ? '' : Number(form.customer_area_id),
             };
             if (form.private_rtsp_url.trim()) {
                 payload.private_rtsp_url = form.private_rtsp_url.trim();
@@ -92,6 +121,43 @@ export default function CameraFormModal({ camera = null, onClose, onSaved }) {
                     <div>
                         <label htmlFor="cam-desc" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Deskripsi (opsional)</label>
                         <input id="cam-desc" name="description" value={form.description} onChange={handleChange} maxLength={200} className={inputClass} />
+                    </div>
+
+                    <div>
+                        <label htmlFor="cam-area" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Area (opsional)</label>
+                        {newAreaMode ? (
+                            <div className="flex gap-2">
+                                <input
+                                    value={newAreaName}
+                                    onChange={(e) => setNewAreaName(e.target.value)}
+                                    maxLength={40}
+                                    autoFocus
+                                    className={inputClass}
+                                    placeholder="Nama area baru (mis. Rumah)"
+                                />
+                                <button type="button" onClick={handleCreateArea} disabled={creatingArea || !newAreaName.trim()} className="shrink-0 rounded-xl bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-600 disabled:opacity-50">
+                                    {creatingArea ? '…' : 'Buat'}
+                                </button>
+                                <button type="button" onClick={() => { setNewAreaMode(false); setNewAreaName(''); }} className="shrink-0 rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
+                                    Batal
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex gap-2">
+                                <select id="cam-area" name="customer_area_id" value={form.customer_area_id} onChange={handleChange} className={inputClass}>
+                                    <option value="">— Tanpa area —</option>
+                                    {areas.map((area) => (
+                                        <option key={area.id} value={area.id}>{area.name}</option>
+                                    ))}
+                                </select>
+                                {onAreaCreated && (
+                                    <button type="button" onClick={() => setNewAreaMode(true)} className="shrink-0 whitespace-nowrap rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800">
+                                        + Baru
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Pengelompokan pribadi kamera Anda — hanya Anda yang melihatnya.</p>
                     </div>
                     <div>
                         <label htmlFor="cam-rtsp" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">

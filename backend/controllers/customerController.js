@@ -12,6 +12,7 @@ import walletService from '../services/walletService.js';
 import billingService from '../services/billingService.js';
 import billingPlanService from '../services/billingPlanService.js';
 import customerCameraService from '../services/customerCameraService.js';
+import customerAreaService from '../services/customerAreaService.js';
 import paymentService from '../services/paymentService.js';
 import paymentSettingsService from '../services/paymentSettingsService.js';
 import cameraHealthService from '../services/cameraHealthService.js';
@@ -44,7 +45,8 @@ const CUSTOMER_CAMERA_PROJECTION = `
     c.delivery_type,
     c.thumbnail_path,
     c.thumbnail_updated_at,
-    a.name AS area_name
+    c.customer_area_id,
+    ca.name AS customer_area_name
 `;
 
 export async function getMyCameras(request, reply) {
@@ -54,7 +56,7 @@ export async function getMyCameras(request, reply) {
             `SELECT ${CUSTOMER_CAMERA_PROJECTION},
                     cs.monthly_price, cs.status AS subscription_status, cs.last_charged_date
              FROM cameras c
-             LEFT JOIN areas a ON a.id = c.area_id
+             LEFT JOIN customer_areas ca ON ca.id = c.customer_area_id AND ca.owner_user_id = c.owner_user_id
              LEFT JOIN camera_subscriptions cs ON cs.camera_id = c.id AND cs.status != 'cancelled'
              WHERE c.owner_user_id = ?
              ORDER BY c.id ASC`,
@@ -64,6 +66,32 @@ export async function getMyCameras(request, reply) {
         return reply.send({ success: true, data: cameras });
     } catch (error) {
         return handleError(reply, error, 'Get customer cameras error:');
+    }
+}
+
+export async function listMyAreas(request, reply) {
+    try {
+        return reply.send({ success: true, data: customerAreaService.listOwnAreas(request.user.id) });
+    } catch (error) {
+        return handleError(reply, error, 'List customer areas error:');
+    }
+}
+
+export async function createMyArea(request, reply) {
+    try {
+        const area = customerAreaService.createOwnArea(request.user.id, request.body?.name);
+        return reply.send({ success: true, message: 'Area dibuat', data: area });
+    } catch (error) {
+        return handleError(reply, error, 'Create customer area error:');
+    }
+}
+
+export async function deleteMyArea(request, reply) {
+    try {
+        const removed = customerAreaService.deleteOwnArea(request.user.id, request.params.id);
+        return reply.send({ success: true, message: 'Area dihapus', data: removed });
+    } catch (error) {
+        return handleError(reply, error, 'Delete customer area error:');
     }
 }
 
