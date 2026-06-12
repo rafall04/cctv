@@ -31,13 +31,13 @@ const KEYS = {
 
 export const SUPPORTED_GATEWAYS = ['manual', 'midtrans', 'ipaymu'];
 
-// iPaymu Direct API v2 method/channel presets. Only QRIS is enabled by default because
-// its channel code is known-good (matches the original hardcoded flow); the bank VA and
-// convenience-store presets ship DISABLED so an admin consciously turns on (and can verify
-// against their iPaymu account) the ones they want. Admins can also add custom rows, so a
-// new iPaymu channel never requires a code change.
+// iPaymu Direct API v2 method/channel presets. QRIS is enabled by default; its channel is
+// `mpm` (verified against the live /payment-channels list — `qris:qris` is NOT a valid combo
+// and makes iPaymu 500). The bank VA and convenience-store presets ship DISABLED so an admin
+// consciously turns on the ones they want. Admins can verify/add the exact codes via the
+// "Ambil channel dari iPaymu" button, so a new channel never requires a code change.
 export const DEFAULT_IPAYMU_METHODS = [
-    { method: 'qris', channel: 'qris', label: 'QRIS (semua e-wallet & m-banking)', enabled: true },
+    { method: 'qris', channel: 'mpm', label: 'QRIS (semua e-wallet & m-banking)', enabled: true },
     { method: 'va', channel: 'bca', label: 'Virtual Account BCA', enabled: false },
     { method: 'va', channel: 'bni', label: 'Virtual Account BNI', enabled: false },
     { method: 'va', channel: 'bri', label: 'Virtual Account BRI', enabled: false },
@@ -178,7 +178,7 @@ class PaymentSettingsService {
             const found = enabled.find((m) => methodKeyOf(m) === methodKey);
             if (found) return found;
         }
-        return enabled[0] || { method: 'qris', channel: 'qris', label: 'QRIS', enabled: true };
+        return enabled[0] || { method: 'qris', channel: 'mpm', label: 'QRIS', enabled: true };
     }
 
     /** Admin-facing view — NEVER exposes raw secrets. */

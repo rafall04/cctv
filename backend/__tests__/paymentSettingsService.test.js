@@ -41,7 +41,8 @@ describe('paymentSettingsService resolution', () => {
         const cfg = paymentSettingsService.getGatewayConfig();
         expect(cfg.gateway).toBe('manual');
         expect(cfg.ipaymu.methods).toHaveLength(DEFAULT_IPAYMU_METHODS.length);
-        expect(paymentSettingsService.getEnabledIpaymuMethods().map((m) => m.channel)).toEqual(['qris']);
+        // Default QRIS channel is `mpm` (the valid iPaymu code; `qris` is invalid → 500).
+        expect(paymentSettingsService.getEnabledIpaymuMethods().map((m) => m.channel)).toEqual(['mpm']);
     });
 
     it('falls back to env when DB has no setting (backward compat)', () => {

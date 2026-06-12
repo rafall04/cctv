@@ -367,7 +367,8 @@ describe('paymentService ipaymu driver', () => {
             ok: false,
             json: async () => ({ Status: 401, Message: 'unauthorized' }),
         });
-        await expect(paymentService.createTopup(42, 25000)).rejects.toMatchObject({ statusCode: 502 });
+        // 502 + expose so the customer sees a friendly gateway message, not a generic 500.
+        await expect(paymentService.createTopup(42, 25000)).rejects.toMatchObject({ statusCode: 502, expose: true });
         expect(db.prepare("SELECT COUNT(*) AS n FROM payments WHERE gateway='ipaymu'").get().n).toBe(0);
     });
 

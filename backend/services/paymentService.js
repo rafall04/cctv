@@ -216,8 +216,9 @@ class PaymentService {
         const data = body?.Data || body?.data;
         if (!httpOk || !data?.TransactionId) {
             console.error('[Payment] iPaymu charge failed:', body?.Message || body?.message || 'unknown');
-            const err = new Error('Gagal membuat pembayaran - coba lagi sebentar lagi');
+            const err = new Error('Pembayaran gagal dibuat di gateway. Coba metode pembayaran lain, atau ulangi sebentar lagi.');
             err.statusCode = 502;
+            err.expose = true; // friendly message goes to the customer, not a generic 500
             throw err;
         }
 
@@ -374,6 +375,7 @@ class PaymentService {
             console.error('[Payment] Midtrans charge failed:', body.status_message || response.status);
             const err = new Error('Gagal membuat QRIS - coba lagi sebentar lagi');
             err.statusCode = 502;
+            err.expose = true;
             throw err;
         }
 

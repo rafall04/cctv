@@ -21,6 +21,12 @@ function handleError(reply, error, fallback) {
     if (error.statusCode && error.statusCode < 500) {
         return reply.code(error.statusCode).send({ success: false, message: error.message });
     }
+    // Gateway/upstream errors flagged `expose` carry a customer-safe message — surface it
+    // (with its real 5xx status) instead of a generic "Internal server error".
+    if (error.expose && error.statusCode) {
+        console.error(fallback, error.message);
+        return reply.code(error.statusCode).send({ success: false, message: error.message });
+    }
     console.error(fallback, error);
     return reply.code(500).send({ success: false, message: 'Internal server error' });
 }
