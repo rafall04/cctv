@@ -305,9 +305,11 @@ class BillingPlanService {
             [plan.price_per_camera, userId]
         );
 
-        // Run the resume/charge path so "active" still means "paid for today":
-        // paid switches charge at the new price, trial switches resume charge-free.
-        billingService.tryResumeForUser(userId);
+        // Re-bill TODAY at the new price so "active" always means "paid for today":
+        // a paid switch charges immediately (0 balance → suspended on the spot, no free
+        // window), a trial switch stays charge-free, an expired trial suspends. Idempotent
+        // per day, so a day already paid is never double-charged.
+        billingService.applyPlanChangeForUser(userId);
 
         if (request) {
             logAdminAction({

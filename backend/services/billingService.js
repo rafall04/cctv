@@ -456,6 +456,37 @@ class BillingService {
         return { resumedCameraIds: resumed };
     }
 
+    /**
+     * Re-evaluate EVERY non-cancelled subscription of a user for `today` after a plan
+     * change, forcing a fresh charge-or-suspend at the new price. Unlike tryResumeForUser
+     * (which only touches suspended subs), this also re-bills currently-active subs — so
+     * switching onto a paid plan cannot ride a trial/already-marked day for free: a
+     * 0-balance account is suspended on the spot (stream → 402), not next tick.
+     *
+     * Idempotent per local day: chargeOnce keys on `charge:{subId}:{date}`, so a day
+     * already genuinely paid is a no-op (the sub stays active, no double charge); only a
+     * day that was free/unbilled (trial day) actually deducts on the switch to a paid plan.
+     */
+    applyPlanChangeForUser(userId, now = new Date()) {
+        const today = localDateString(now);
+        const subscriptions = query(
+            "SELECT * FROM camera_subscriptions WHERE user_id = ? AND status != 'cancelled'",
+            [userId]
+        );
+        const outcomes = [];
+        for (const subscription of subscriptions) {
+            try {
+                // Null last_charged_date so _chargeAndSync re-evaluates today at the NEW
+                // price instead of short-circuiting on the trial/already-marked day.
+                const outcome = this._chargeAndSync({ ...subscription, last_charged_date: null }, today);
+                outcomes.push({ cameraId: subscription.camera_id, status: outcome.status });
+            } catch (error) {
+                console.error(`[Billing] Plan-change recharge failed for subscription ${subscription.id}:`, error.message);
+            }
+        }
+        return outcomes;
+    }
+
     // ------------------------------------------------------------------
     // Read models
     // ------------------------------------------------------------------

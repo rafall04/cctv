@@ -37,7 +37,7 @@ vi.mock('../services/securityAuditLogger.js', () => ({
 }));
 
 import billingPlanService from '../services/billingPlanService.js';
-import billingService from '../services/billingService.js';
+import billingService, { localDateString } from '../services/billingService.js';
 import walletService from '../services/walletService.js';
 
 const STRONG_PASSWORD = 'Kamera!Aman2026#Sekali';
@@ -214,6 +214,66 @@ describe('billingPlanService', () => {
             expect(sub.status).toBe('active');
             // Day charged at the NEW price (20000/30 ≈ 667).
             expect(walletService.getBalance(42)).toBe(10000 - 667);
+        });
+
+        // --- Regression: charge-on-switch closes the "0 balance still streams" leak ---
+        // Before the fix, switching from a trial-marked (free) day to a paid plan left the
+        // camera active until the NEXT daily tick, so a 0-balance account streamed free for
+        // up to ~24h. changeUserPlan now re-bills today at the new price on the spot.
+
+        it('suspends immediately when switching from an active trial day to a paid plan with zero balance', () => {
+            const today = localDateString();
+            const endsAt = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
+            db.prepare("UPDATE users SET plan_id = 1, trial_ends_at = ?, trial_used = 1 WHERE id = 42").run(endsAt);
+            db.prepare("UPDATE cameras SET owner_user_id = 42, camera_class = 'subscriber', billing_status = 'active' WHERE id = 7").run();
+            // Trial-free day: marked active for TODAY with no charge row, monthly_price 0.
+            db.prepare(`INSERT INTO camera_subscriptions (camera_id, user_id, monthly_price, status, last_charged_date)
+                        VALUES (7, 42, 0, 'active', ?)`).run(today);
+            expect(walletService.getBalance(42)).toBe(0);
+
+            const state = billingPlanService.changeUserPlan(42, 'hemat');
+
+            expect(state.plan.key).toBe('hemat');
+            const sub = db.prepare('SELECT * FROM camera_subscriptions WHERE camera_id = 7').get();
+            expect(sub.monthly_price).toBe(20000);
+            expect(sub.status).toBe('suspended');                 // no free window
+            expect(db.prepare('SELECT billing_status FROM cameras WHERE id = 7').get().billing_status).toBe('suspended');
+            expect(walletService.getBalance(42)).toBe(0);         // suspended, never goes negative
+        });
+
+        it('charges today at the new price (stays active) when the wallet can cover the switch', () => {
+            const today = localDateString();
+            const endsAt = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
+            db.prepare("UPDATE users SET plan_id = 1, trial_ends_at = ?, trial_used = 1 WHERE id = 42").run(endsAt);
+            db.prepare("UPDATE cameras SET owner_user_id = 42, camera_class = 'subscriber', billing_status = 'active' WHERE id = 7").run();
+            db.prepare(`INSERT INTO camera_subscriptions (camera_id, user_id, monthly_price, status, last_charged_date)
+                        VALUES (7, 42, 0, 'active', ?)`).run(today);
+            walletService.credit({ userId: 42, amount: 5000 });
+
+            billingPlanService.changeUserPlan(42, 'hemat');
+
+            const sub = db.prepare('SELECT * FROM camera_subscriptions WHERE camera_id = 7').get();
+            expect(sub.status).toBe('active');
+            expect(sub.last_charged_date).toBe(today);
+            expect(walletService.getBalance(42)).toBe(5000 - 667); // 20000/30 ≈ 667
+        });
+
+        it('does not double-charge a day already genuinely paid when switching between paid plans', () => {
+            const today = localDateString();
+            db.prepare("UPDATE users SET plan_id = 2 WHERE id = 42").run(); // basic 25000
+            db.prepare("UPDATE cameras SET owner_user_id = 42, camera_class = 'subscriber', billing_status = 'active' WHERE id = 7").run();
+            db.prepare(`INSERT INTO camera_subscriptions (id, camera_id, user_id, monthly_price, status, last_charged_date)
+                        VALUES (55, 7, 42, 25000, 'active', ?)`).run(today);
+            walletService.credit({ userId: 42, amount: 10000 });
+            // Today's real charge already taken at the old price (reference = charge:{subId}:{date}).
+            walletService.chargeOnce({ userId: 42, amount: 833, reference: `charge:55:${today}`, note: 'old price' });
+            expect(walletService.getBalance(42)).toBe(10000 - 833);
+
+            billingPlanService.changeUserPlan(42, 'hemat'); // 20000
+
+            const sub = db.prepare('SELECT * FROM camera_subscriptions WHERE camera_id = 7').get();
+            expect(sub.status).toBe('active');
+            expect(walletService.getBalance(42)).toBe(10000 - 833); // idempotent: no second deduction
         });
     });
 
