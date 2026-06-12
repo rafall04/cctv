@@ -22,6 +22,7 @@
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import walletService from './walletService.js';
 import cameraService from './cameraService.js';
+import { invalidateCameraAccessCache } from './cameraAccessService.js';
 import { getTimezone } from './timezoneService.js';
 import { logAdminAction } from './securityAuditLogger.js';
 
@@ -487,6 +488,38 @@ class BillingService {
         return outcomes;
     }
 
+    /**
+     * Integrity self-heal: a subscriber camera whose owner_user_id no longer exists is an
+     * ORPHAN (e.g. the customer row was removed out-of-band). Such a camera must never keep
+     * streaming or showing publicly, so we unpublish + suspend it (non-destructive, reversible
+     * if the owner is later restored) and log loudly for review. Runs on scheduler start and
+     * is callable by an admin. Returns the cameras it healed.
+     */
+    healOrphanedSubscriberCameras() {
+        const orphans = query(`
+            SELECT id, name, owner_user_id FROM cameras
+            WHERE camera_class = 'subscriber'
+              AND owner_user_id IS NOT NULL
+              AND owner_user_id NOT IN (SELECT id FROM users)
+        `);
+        for (const cam of orphans) {
+            execute(
+                "UPDATE cameras SET is_public = 0, billing_status = 'suspended', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                [cam.id]
+            );
+            execute(
+                "UPDATE camera_subscriptions SET status = 'suspended', suspended_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE camera_id = ? AND status != 'cancelled'",
+                [cam.id]
+            );
+            invalidateCameraAccessCache(cam.id);
+            console.error(`[Billing][INTEGRITY] Orphaned subscriber camera ${cam.id} (${cam.name}) — owner ${cam.owner_user_id} missing → unpublished + suspended. RESTORE the owner or reassign the camera.`);
+        }
+        if (orphans.length > 0) {
+            cameraService.invalidateCameraCache();
+        }
+        return { healed: orphans.length, cameraIds: orphans.map((c) => c.id) };
+    }
+
     // ------------------------------------------------------------------
     // Read models
     // ------------------------------------------------------------------
@@ -553,6 +586,16 @@ class BillingService {
     startBillingScheduler() {
         if (this._timer || this._initialTimer) {
             return;
+        }
+        // Integrity sweep on boot: orphaned subscriber cameras (owner removed) get
+        // unpublished + suspended so a deleted customer's camera can never linger public.
+        try {
+            const healed = this.healOrphanedSubscriberCameras();
+            if (healed.healed > 0) {
+                console.warn(`[Billing] Startup integrity: healed ${healed.healed} orphaned subscriber camera(s): ${healed.cameraIds.join(', ')}`);
+            }
+        } catch (error) {
+            console.error('[Billing] Startup orphan heal failed:', error.message);
         }
         this._initialTimer = setTimeout(() => {
             this._initialTimer = null;

@@ -417,6 +417,21 @@ All API responses should follow this format:
 - Use migrations in `backend/database/migrations/`
 - All table names use snake_case: `cameras`, `areas`, `users`
 
+### Production data safety (LEARNED FROM A REAL INCIDENT — a customer row was lost)
+
+- **NEVER mutate the production DB to "verify" a change.** No inserting/deleting temp rows on the live
+  DB. Verify via the API with a throwaway/test account, or inside a transaction you **ROLL BACK**, or
+  against a **copy** of `cctv.db`. (Root cause of the incident: a verify script inserted temp users with
+  explicit high IDs, which bumped `AUTOINCREMENT`; a real customer then registered into that same ID and
+  was overwritten + deleted by the script's `INSERT OR REPLACE` + `DELETE`.)
+- **NEVER use `INSERT OR REPLACE` for ad-hoc/test rows.** On ANY primary-key or UNIQUE conflict it
+  silently **DELETES** the conflicting (possibly real) row first. Use plain `INSERT` (fails loudly) or
+  `INSERT OR IGNORE`. Never hand-pick explicit IDs that can collide with the autoincrement range.
+- **Always back up `data/cctv.db` before any manual DB operation** and keep the pre-op copy.
+- Defense-in-depth: a subscriber camera whose owner no longer exists is auto-healed (unpublished +
+  suspended, never left public) on backend boot by `billingService.healOrphanedSubscriberCameras()`
+  (also `POST /api/admin/billing/heal-orphans`). Prevention above is still the real safeguard.
+
 ---
 
 ## Environment Configuration

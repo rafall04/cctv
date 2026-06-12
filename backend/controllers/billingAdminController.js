@@ -277,6 +277,16 @@ export async function runCharges(request, reply) {
     }
 }
 
+export async function healOrphans(request, reply) {
+    try {
+        const result = billingService.healOrphanedSubscriberCameras();
+        logAdminAction({ action: 'billing_orphans_healed', ...result }, request);
+        return reply.send({ success: true, message: `${result.healed} kamera yatim ditangani`, data: result });
+    } catch (error) {
+        return handleError(reply, error, 'Heal orphans error:');
+    }
+}
+
 export async function listPromos(request, reply) {
     try {
         return reply.send({ success: true, data: promoService.listPromos() });

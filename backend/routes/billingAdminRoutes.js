@@ -34,6 +34,7 @@ import {
     createPromo,
     updatePromo,
     deletePromo,
+    healOrphans,
 } from '../controllers/billingAdminController.js';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 
@@ -123,6 +124,8 @@ export default async function billingAdminRoutes(fastify) {
     fastify.get('/payments', { onRequest: guard }, listPayments);
     fastify.post('/payments/:id/mark-paid', { onRequest: guard, schema: idParamSchema }, markPaymentPaid);
     fastify.post('/charges/run', { onRequest: guard }, runCharges);
+    // Integrity: unpublish + suspend subscriber cameras whose owner no longer exists.
+    fastify.post('/heal-orphans', { onRequest: guard }, healOrphans);
 
     // Plan catalog (paket) + trial customization
     fastify.get('/plans', { onRequest: guard }, listPlansAdmin);
