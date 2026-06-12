@@ -505,12 +505,15 @@ class BillingService {
     listSubscriptions() {
         return query(
             `SELECT cs.*, c.name AS camera_name, c.billing_status AS camera_billing_status,
+                    c.is_online AS camera_is_online, c.is_public AS camera_is_public, c.area_id,
+                    a.name AS area_name,
                     u.username AS customer_username, w.balance AS wallet_balance
              FROM camera_subscriptions cs
              JOIN cameras c ON c.id = cs.camera_id
+             LEFT JOIN areas a ON a.id = c.area_id
              JOIN users u ON u.id = cs.user_id
              LEFT JOIN wallets w ON w.user_id = cs.user_id
-             ORDER BY cs.id DESC`
+             ORDER BY a.name COLLATE NOCASE ASC, cs.id DESC`
         );
     }
 

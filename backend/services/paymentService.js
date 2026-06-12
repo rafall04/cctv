@@ -33,6 +33,7 @@ import { query, queryOne, execute } from '../database/connectionPool.js';
 import walletService from './walletService.js';
 import billingService from './billingService.js';
 import paymentSettingsService from './paymentSettingsService.js';
+import promoService from './promoService.js';
 import { logAdminAction } from './securityAuditLogger.js';
 
 const MIN_TOPUP = 10000;       // Rp10.000 — below this, QRIS fees eat the margin
@@ -197,32 +198,46 @@ export function verifyMidtransSignature({ order_id, status_code, gross_amount, s
 }
 
 class PaymentService {
-    async createTopup(userId, amount, methodKey = null) {
+    async createTopup(userId, amount, methodKey = null, promoCode = null) {
         assertTopupAmount(amount);
         const gateway = getGatewayName();
+
+        // Validate the promo up-front (throws on invalid) so the customer gets immediate
+        // feedback; the bonus is only CREDITED when the top-up is confirmed.
+        const promo = promoCode ? promoService.validateForTopup(promoCode, userId, amount) : null;
 
         // Reuse a still-valid pending top-up of the same gateway+amount instead of opening a
         // duplicate gateway transaction. Repeatedly creating identical unpaid charges spams the
         // gateway and feeds iPaymu's fraud check ("Suspicious buyer"); this also means tapping
-        // the same amount twice just shows the existing QR/VA. A different amount makes a fresh one.
-        const reusable = queryOne(
-            `SELECT id FROM payments
-             WHERE user_id = ? AND gateway = ? AND amount = ? AND status = 'pending'
-               AND (expires_at IS NULL OR expires_at > ?)
-             ORDER BY id DESC LIMIT 1`,
-            [userId, gateway, amount, new Date().toISOString()]
-        );
-        if (reusable) {
-            return this.getPayment(reusable.id, userId);
+        // the same amount twice just shows the existing QR/VA. Skipped when a promo is supplied
+        // so the bonus lands on a fresh payment. A different amount makes a fresh one.
+        if (!promo) {
+            const reusable = queryOne(
+                `SELECT id FROM payments
+                 WHERE user_id = ? AND gateway = ? AND amount = ? AND status = 'pending'
+                   AND (expires_at IS NULL OR expires_at > ?)
+                 ORDER BY id DESC LIMIT 1`,
+                [userId, gateway, amount, new Date().toISOString()]
+            );
+            if (reusable) {
+                return this.getPayment(reusable.id, userId);
+            }
         }
 
+        let payment;
         if (gateway === 'midtrans') {
-            return this._createMidtransTopup(userId, amount);
+            payment = await this._createMidtransTopup(userId, amount);
+        } else if (gateway === 'ipaymu') {
+            payment = await this._createIpaymuTopup(userId, amount, methodKey);
+        } else {
+            payment = await this._createManualTopup(userId, amount);
         }
-        if (gateway === 'ipaymu') {
-            return this._createIpaymuTopup(userId, amount, methodKey);
+
+        if (promo && promo.bonus > 0) {
+            execute('UPDATE payments SET promo_code = ?, promo_bonus = ? WHERE id = ?', [promo.code, promo.bonus, payment.id]);
+            return this.getPayment(payment.id, userId);
         }
-        return this._createManualTopup(userId, amount);
+        return payment;
     }
 
     async _createIpaymuTopup(userId, amount, methodKey = null) {
@@ -547,6 +562,13 @@ class PaymentService {
             note: `Top-up via ${payment.gateway}`,
         });
 
+        // Promo top-up bonus — credited exactly once (idempotent + capped in promoService).
+        try {
+            promoService.applyTopupBonus(payment);
+        } catch (error) {
+            console.error('[Payment] Promo bonus failed:', error.message);
+        }
+
         // Re-activate any suspended cameras this balance now covers.
         try {
             billingService.tryResumeForUser(payment.user_id);
@@ -642,6 +664,8 @@ class PaymentService {
             amount: payment.amount,
             status: payment.status,
             qris,
+            promo_code: payment.promo_code || null,
+            promo_bonus: payment.promo_bonus || 0,
             expires_at: payment.expires_at,
             paid_at: payment.paid_at,
             created_at: payment.created_at,

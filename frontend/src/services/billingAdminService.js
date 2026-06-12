@@ -99,6 +99,26 @@ export const billingAdminService = {
         return response.data;
     },
 
+    async getPromos() {
+        const response = await apiClient.get('/api/admin/billing/promos');
+        return response.data;
+    },
+
+    async createPromo(payload) {
+        const response = await apiClient.post('/api/admin/billing/promos', payload);
+        return response.data;
+    },
+
+    async updatePromo(id, payload) {
+        const response = await apiClient.put(`/api/admin/billing/promos/${id}`, payload);
+        return response.data;
+    },
+
+    async deletePromo(id) {
+        const response = await apiClient.delete(`/api/admin/billing/promos/${id}`);
+        return response.data;
+    },
+
     async getRegistrations() {
         const response = await apiClient.get('/api/admin/billing/registrations');
         return response.data;

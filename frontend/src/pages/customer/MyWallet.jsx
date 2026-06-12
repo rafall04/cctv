@@ -37,6 +37,10 @@ function TopupPanel({ onCompleted, resumable = [] }) {
     const [error, setError] = useState('');
     const [methods, setMethods] = useState([]);
     const [selectedMethod, setSelectedMethod] = useState('');
+    const [promoCode, setPromoCode] = useState('');
+    const [giftCode, setGiftCode] = useState('');
+    const [giftBusy, setGiftBusy] = useState(false);
+    const [giftMsg, setGiftMsg] = useState(null);
     const pollRef = useRef(null);
 
     useEffect(() => {
@@ -91,7 +95,7 @@ function TopupPanel({ onCompleted, resumable = [] }) {
         }
         setSubmitting(true);
         try {
-            const response = await customerService.createTopup(finalAmount, selectedMethod || null);
+            const response = await customerService.createTopup(finalAmount, selectedMethod || null, promoCode.trim() || null);
             if (response.success) {
                 setPending(response.data);
                 if (response.data.status === 'pending') {
@@ -107,12 +111,38 @@ function TopupPanel({ onCompleted, resumable = [] }) {
         }
     };
 
+    const handleRedeemGift = async () => {
+        const code = giftCode.trim();
+        if (!code) return;
+        setGiftBusy(true);
+        setGiftMsg(null);
+        try {
+            const res = await customerService.redeemPromo(code);
+            if (res.success) {
+                setGiftMsg({ type: 'ok', text: res.message || 'Hadiah masuk ke saldo.' });
+                setGiftCode('');
+                onCompleted();
+            } else {
+                setGiftMsg({ type: 'error', text: res.message || 'Gagal menukar kode' });
+            }
+        } catch (err) {
+            setGiftMsg({ type: 'error', text: err.response?.data?.message || 'Gagal menukar kode' });
+        } finally {
+            setGiftBusy(false);
+        }
+    };
+
     if (pending) {
         const statusLabel = STATUS_LABELS[pending.status] || STATUS_LABELS.pending;
         return (
             <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
                 <h3 className="font-semibold text-gray-900 dark:text-white">Top-up {formatRupiah(pending.amount)}</h3>
                 <p className={`mt-1 text-sm font-medium ${statusLabel.className}`}>{statusLabel.text}</p>
+                {pending.promo_bonus > 0 && (
+                    <p className="mt-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                        + Bonus {formatRupiah(pending.promo_bonus)}{pending.promo_code ? ` (${pending.promo_code})` : ''} setelah pembayaran berhasil
+                    </p>
+                )}
 
                 {pending.status === 'pending' && pending.qris?.qr_url && (
                     <div className="mt-3 flex flex-col items-center gap-2">
@@ -216,6 +246,14 @@ function TopupPanel({ onCompleted, resumable = [] }) {
                 onChange={(e) => setCustomAmount(e.target.value)}
                 className="mt-2 w-full rounded-xl border border-gray-300 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary dark:border-gray-700 dark:bg-gray-900/50 dark:text-white"
             />
+            <input
+                type="text"
+                value={promoCode}
+                onChange={(e) => { setPromoCode(e.target.value); setError(''); }}
+                maxLength={40}
+                placeholder="Kode promo (opsional)"
+                className="mt-2 w-full rounded-xl border border-gray-300 bg-gray-50 px-4 py-2.5 text-sm uppercase text-gray-900 placeholder:normal-case focus:outline-none focus:ring-2 focus:ring-primary dark:border-gray-700 dark:bg-gray-900/50 dark:text-white"
+            />
             {error && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>}
             <button
                 type="submit"
@@ -225,6 +263,34 @@ function TopupPanel({ onCompleted, resumable = [] }) {
                 {submitting ? 'Memproses…' : 'Lanjutkan Top-up'}
             </button>
         </form>
+
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+            <h3 className="font-semibold text-gray-900 dark:text-white">Tukar Kode Hadiah</h3>
+            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Punya kode hadiah? Tukar jadi saldo langsung.</p>
+            <div className="mt-2 flex gap-2">
+                <input
+                    type="text"
+                    value={giftCode}
+                    onChange={(e) => { setGiftCode(e.target.value); setGiftMsg(null); }}
+                    maxLength={40}
+                    placeholder="Kode hadiah"
+                    className="w-full rounded-xl border border-gray-300 bg-gray-50 px-3 py-2 text-sm uppercase text-gray-900 placeholder:normal-case focus:outline-none focus:ring-2 focus:ring-primary dark:border-gray-700 dark:bg-gray-900/50 dark:text-white"
+                />
+                <button
+                    type="button"
+                    onClick={handleRedeemGift}
+                    disabled={giftBusy || !giftCode.trim()}
+                    className="shrink-0 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-600 disabled:opacity-50"
+                >
+                    {giftBusy ? '…' : 'Tukar'}
+                </button>
+            </div>
+            {giftMsg && (
+                <p className={`mt-2 text-sm ${giftMsg.type === 'ok' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {giftMsg.text}
+                </p>
+            )}
+        </div>
         </div>
     );
 }
@@ -338,6 +404,28 @@ export default function MyWallet() {
                         </div>
                     ) : (
                         <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Belum ada transaksi.</p>
+                    )}
+                </div>
+
+                <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+                    <h3 className="font-semibold text-gray-900 dark:text-white">Riwayat Pembayaran</h3>
+                    {payments.length ? (
+                        <div className="mt-2 divide-y divide-gray-100 dark:divide-gray-800">
+                            {payments.map((p) => {
+                                const st = STATUS_LABELS[p.status] || { text: p.status, className: 'text-gray-500' };
+                                return (
+                                    <div key={p.id} className="flex items-center justify-between py-2 text-sm">
+                                        <div className="min-w-0">
+                                            <p className="font-medium text-gray-900 dark:text-white">{formatRupiah(p.amount)}</p>
+                                            <p className="truncate text-xs text-gray-500 dark:text-gray-400">{p.gateway} · {p.created_at}</p>
+                                        </div>
+                                        <span className={`shrink-0 text-xs font-semibold ${st.className}`}>{st.text}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Belum ada pembayaran.</p>
                     )}
                 </div>
             </div>

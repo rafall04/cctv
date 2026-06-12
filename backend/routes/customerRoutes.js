@@ -22,6 +22,8 @@ import {
     deleteMyCamera,
     getPaymentOptions,
     listMyAreas,
+    validatePromo,
+    redeemPromo,
 } from '../controllers/customerController.js';
 import { authMiddleware, requireCustomerOrAdmin } from '../middleware/authMiddleware.js';
 
@@ -121,11 +123,26 @@ export default async function customerRoutes(fastify) {
                 properties: {
                     amount: { type: 'integer', minimum: 1 },
                     method: { type: 'string', maxLength: 40 },
+                    promo: { type: 'string', maxLength: 40 },
                 },
                 additionalProperties: false,
             },
         },
     }, createTopup);
+
+    // Promo codes: preview a top-up bonus, or redeem an instant gift-credit code.
+    fastify.get('/promo/validate', { onRequest: guard }, validatePromo);
+    fastify.post('/promo/redeem', {
+        onRequest: guard,
+        schema: {
+            body: {
+                type: 'object',
+                required: ['code'],
+                properties: { code: { type: 'string', minLength: 3, maxLength: 40 } },
+                additionalProperties: false,
+            },
+        },
+    }, redeemPromo);
 
     fastify.get('/topup/:id', {
         onRequest: guard,

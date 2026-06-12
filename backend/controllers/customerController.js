@@ -13,6 +13,7 @@ import billingService from '../services/billingService.js';
 import billingPlanService from '../services/billingPlanService.js';
 import customerCameraService from '../services/customerCameraService.js';
 import paymentService from '../services/paymentService.js';
+import promoService from '../services/promoService.js';
 import paymentSettingsService from '../services/paymentSettingsService.js';
 import cameraHealthService from '../services/cameraHealthService.js';
 import { sanitizeCameraThumbnailList } from '../services/thumbnailPathService.js';
@@ -121,10 +122,30 @@ export async function createTopup(request, reply) {
     try {
         const amount = Number(request.body?.amount);
         const method = request.body?.method || null;
-        const payment = await paymentService.createTopup(request.user.id, amount, method);
+        const promo = request.body?.promo || null;
+        const payment = await paymentService.createTopup(request.user.id, amount, method, promo);
         return reply.send({ success: true, message: 'Permintaan top-up dibuat', data: payment });
     } catch (error) {
         return handleError(reply, error, 'Create topup error:');
+    }
+}
+
+export async function validatePromo(request, reply) {
+    try {
+        const amount = Number(request.query?.amount) || 0;
+        const result = promoService.validateForTopup(request.query?.code, request.user.id, amount);
+        return reply.send({ success: true, data: result });
+    } catch (error) {
+        return handleError(reply, error, 'Validate promo error:');
+    }
+}
+
+export async function redeemPromo(request, reply) {
+    try {
+        const result = promoService.redeemGift(request.body?.code, request.user.id, request);
+        return reply.send({ success: true, message: `Hadiah Rp${Number(result.bonus).toLocaleString('id-ID')} masuk ke saldo`, data: result });
+    } catch (error) {
+        return handleError(reply, error, 'Redeem promo error:');
     }
 }
 

@@ -5,12 +5,27 @@
  * Deps: billingAdminService, billingFormat helpers.
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import billingAdminService from '../../../services/billingAdminService';
 import { formatRupiah, StatusBadge, SUB_STATUS_BADGES, cardClass, inputClass, DesktopTable } from './billingFormat';
 
 export default function SubscriptionsTab({ subscriptions, assignableCameras, customers, run, busy }) {
     const [assignForm, setAssignForm] = useState({ camera_id: '', user_id: '', monthly_price: 20000 });
+
+    // Per-area monitoring: how many customer cameras live in each area + how many online/suspended.
+    const areaSummary = useMemo(() => {
+        const map = new Map();
+        for (const sub of subscriptions) {
+            if (sub.status === 'cancelled') continue;
+            const key = sub.area_name || 'Tanpa area';
+            const g = map.get(key) || { area: key, total: 0, online: 0, suspended: 0 };
+            g.total += 1;
+            if (sub.camera_is_online === 1) g.online += 1;
+            if (sub.status === 'suspended') g.suspended += 1;
+            map.set(key, g);
+        }
+        return [...map.values()].sort((a, b) => b.total - a.total);
+    }, [subscriptions]);
 
     const toggleStatus = (sub) => run(
         () => billingAdminService.updateSubscription(sub.id, { status: sub.status === 'active' ? 'suspended' : 'active' }),
@@ -83,6 +98,22 @@ export default function SubscriptionsTab({ subscriptions, assignableCameras, cus
                     </div>
                 ) : (
                     <>
+                        {/* Monitoring: customer cameras per area */}
+                        <div className="mb-3 rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-900">
+                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Monitoring per Area</h3>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                                {areaSummary.map((g) => (
+                                    <div key={g.area} className="rounded-xl border border-gray-200 px-3 py-1.5 dark:border-gray-700">
+                                        <p className="text-sm font-medium text-gray-900 dark:text-white">{g.area}</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                                            {g.total} kamera · <span className="text-emerald-600 dark:text-emerald-400">{g.online} online</span>
+                                            {g.suspended > 0 && <> · <span className="text-amber-600 dark:text-amber-400">{g.suspended} suspend</span></>}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
                         {/* Desktop: table */}
                         <DesktopTable minWidth="min-w-[560px]">
                             <thead>
@@ -97,7 +128,12 @@ export default function SubscriptionsTab({ subscriptions, assignableCameras, cus
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                                 {subscriptions.map((sub) => (
                                     <tr key={sub.id} className="bg-white dark:bg-gray-900">
-                                        <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">{sub.camera_name}</td>
+                                        <td className="px-3 py-2">
+                                            <p className="font-medium text-gray-900 dark:text-white">{sub.camera_name}</p>
+                                            <p className="text-xs text-gray-400">
+                                                {sub.area_name || 'Tanpa area'} · {sub.camera_is_online === 1 ? 'online' : 'offline'}{sub.camera_is_public ? ' · publik' : ''}
+                                            </p>
+                                        </td>
                                         <td className="px-3 py-2 text-gray-600 dark:text-gray-300">
                                             {sub.customer_username}<span className="ml-1 text-xs text-gray-400">({formatRupiah(sub.wallet_balance || 0)})</span>
                                         </td>
@@ -116,6 +152,9 @@ export default function SubscriptionsTab({ subscriptions, assignableCameras, cus
                                     <div className="flex items-start justify-between gap-2">
                                         <div className="min-w-0">
                                             <p className="truncate font-semibold text-gray-900 dark:text-white">{sub.camera_name}</p>
+                                            <p className="truncate text-xs text-gray-400">
+                                                {sub.area_name || 'Tanpa area'} · {sub.camera_is_online === 1 ? 'online' : 'offline'}
+                                            </p>
                                             <p className="truncate text-sm text-gray-500 dark:text-gray-400">
                                                 {sub.customer_username} · {formatRupiah(sub.wallet_balance || 0)}
                                             </p>

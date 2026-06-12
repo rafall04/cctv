@@ -30,6 +30,10 @@ import {
     testPaymentGateway,
     listPaymentGatewayChannels,
     listCustomerCameraIps,
+    listPromos,
+    createPromo,
+    updatePromo,
+    deletePromo,
 } from '../controllers/billingAdminController.js';
 import { authMiddleware, requireAdmin } from '../middleware/authMiddleware.js';
 
@@ -192,6 +196,12 @@ export default async function billingAdminRoutes(fastify) {
     fastify.post('/payment-gateway/test', { onRequest: guard }, testPaymentGateway);
     // Live method/channel list straight from the configured iPaymu account (source of truth).
     fastify.get('/payment-gateway/channels', { onRequest: guard }, listPaymentGatewayChannels);
+
+    // Promo codes (top-up bonus % / flat + gift credit). Service validates the body.
+    fastify.get('/promos', { onRequest: guard }, listPromos);
+    fastify.post('/promos', { onRequest: guard }, createPromo);
+    fastify.put('/promos/:id', { onRequest: guard, schema: idParamSchema }, updatePromo);
+    fastify.delete('/promos/:id', { onRequest: guard, schema: idParamSchema }, deletePromo);
 
     // Self-registration settings (enabled + default plan for new signups)
     fastify.get('/registration-settings', { onRequest: guard }, getRegistrationSettings);

@@ -15,6 +15,7 @@ import { cameraService } from '../services/cameraService';
 import { useNotification } from '../contexts/NotificationContext';
 import BillingPlansTab from '../components/admin/BillingPlansTab';
 import PaymentGatewayTab from '../components/admin/PaymentGatewayTab';
+import PromoTab from '../components/admin/PromoTab';
 import RegistrationsTab from '../components/admin/billing/RegistrationsTab';
 import CustomersTab from '../components/admin/billing/CustomersTab';
 import SubscriptionsTab from '../components/admin/billing/SubscriptionsTab';
@@ -95,6 +96,7 @@ export default function BillingManagement() {
         { key: 'subscriptions', label: `Langganan (${subscriptions.length})` },
         { key: 'payments', label: `Pembayaran (${payments.length})` },
         { key: 'plans', label: `Paket & Trial (${plans.length})` },
+        { key: 'promos', label: 'Promo' },
         { key: 'gateway', label: 'Gateway Pembayaran' },
     ];
 
@@ -146,6 +148,7 @@ export default function BillingManagement() {
                     )}
                     {tab === 'payments' && <PaymentsTab payments={payments} run={run} busy={busy} />}
                     {tab === 'plans' && <BillingPlansTab plans={plans} regSettings={regSettings} run={run} busy={busy} />}
+                    {tab === 'promos' && <PromoTab />}
                     {tab === 'gateway' && <PaymentGatewayTab />}
                 </>
             )}

@@ -34,8 +34,21 @@ export const customerService = {
         return response.data;
     },
 
-    async createTopup(amount, method = null) {
-        const response = await apiClient.post('/api/customer/topup', method ? { amount, method } : { amount });
+    async createTopup(amount, method = null, promo = null) {
+        const body = { amount };
+        if (method) body.method = method;
+        if (promo) body.promo = promo;
+        const response = await apiClient.post('/api/customer/topup', body);
+        return response.data;
+    },
+
+    async validatePromo(code, amount) {
+        const response = await apiClient.get('/api/customer/promo/validate', { params: { code, amount } });
+        return response.data;
+    },
+
+    async redeemPromo(code) {
+        const response = await apiClient.post('/api/customer/promo/redeem', { code });
         return response.data;
     },
 

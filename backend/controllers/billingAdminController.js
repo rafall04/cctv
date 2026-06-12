@@ -15,6 +15,7 @@ import walletService from '../services/walletService.js';
 import paymentService from '../services/paymentService.js';
 import paymentSettingsService from '../services/paymentSettingsService.js';
 import customerCameraIpService from '../services/customerCameraIpService.js';
+import promoService from '../services/promoService.js';
 import { logAdminAction } from '../services/securityAuditLogger.js';
 
 function handleError(reply, error, fallback) {
@@ -273,5 +274,40 @@ export async function runCharges(request, reply) {
         return reply.send({ success: true, data: summary });
     } catch (error) {
         return handleError(reply, error, 'Run charges error:');
+    }
+}
+
+export async function listPromos(request, reply) {
+    try {
+        return reply.send({ success: true, data: promoService.listPromos() });
+    } catch (error) {
+        return handleError(reply, error, 'List promos error:');
+    }
+}
+
+export async function createPromo(request, reply) {
+    try {
+        const promo = promoService.createPromo(request.body || {}, request);
+        return reply.send({ success: true, message: 'Kode promo dibuat', data: promo });
+    } catch (error) {
+        return handleError(reply, error, 'Create promo error:');
+    }
+}
+
+export async function updatePromo(request, reply) {
+    try {
+        const promo = promoService.updatePromo(request.params.id, request.body || {}, request);
+        return reply.send({ success: true, message: 'Kode promo diperbarui', data: promo });
+    } catch (error) {
+        return handleError(reply, error, 'Update promo error:');
+    }
+}
+
+export async function deletePromo(request, reply) {
+    try {
+        const result = promoService.deletePromo(request.params.id, request);
+        return reply.send({ success: true, message: 'Kode promo dihapus', data: result });
+    } catch (error) {
+        return handleError(reply, error, 'Delete promo error:');
     }
 }
