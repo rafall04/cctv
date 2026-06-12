@@ -191,6 +191,7 @@ describe('billingPlanService', () => {
             expect(first.trial_active).toBe(true);
             expect(user().trial_used).toBe(1);
 
+            walletService.credit({ userId: 42, amount: 5000 }); // afford the paid switch (balance gate)
             billingPlanService.changeUserPlan(42, 'basic');
             expect(() => billingPlanService.changeUserPlan(42, 'trial'))
                 .toThrowError(expect.objectContaining({ statusCode: 400 }));
@@ -216,29 +217,49 @@ describe('billingPlanService', () => {
             expect(walletService.getBalance(42)).toBe(10000 - 667);
         });
 
-        // --- Regression: charge-on-switch closes the "0 balance still streams" leak ---
-        // Before the fix, switching from a trial-marked (free) day to a paid plan left the
-        // camera active until the NEXT daily tick, so a 0-balance account streamed free for
-        // up to ~24h. changeUserPlan now re-bills today at the new price on the spot.
+        // --- Balance gate (self-service) + charge-on-switch (admin path) ---
 
-        it('suspends immediately when switching from an active trial day to a paid plan with zero balance', () => {
-            const today = localDateString();
-            const endsAt = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
-            db.prepare("UPDATE users SET plan_id = 1, trial_ends_at = ?, trial_used = 1 WHERE id = 42").run(endsAt);
+        it('BLOCKS a self-service switch to a paid plan when saldo cannot cover a day', () => {
             db.prepare("UPDATE cameras SET owner_user_id = 42, camera_class = 'subscriber', billing_status = 'active' WHERE id = 7").run();
-            // Trial-free day: marked active for TODAY with no charge row, monthly_price 0.
+            db.prepare(`INSERT INTO camera_subscriptions (camera_id, user_id, monthly_price, status) VALUES (7, 42, 0, 'active')`).run();
+            expect(walletService.getBalance(42)).toBe(0);
+
+            // hemat = 20000/cam → 1 day ≈ 667; balance 0 → blocked, NOTHING changes.
+            expect(() => billingPlanService.changeUserPlan(42, 'hemat'))
+                .toThrowError(expect.objectContaining({ statusCode: 400 }));
+            expect(billingPlanService.getUserPlanState(42).plan?.key).not.toBe('hemat');
+            expect(db.prepare('SELECT status FROM camera_subscriptions WHERE camera_id = 7').get().status).toBe('active');
+        });
+
+        it('ALLOWS the paid switch once saldo covers a day', () => {
+            walletService.credit({ userId: 42, amount: 1000 }); // > 1 day of hemat (≈667)
+            const state = billingPlanService.changeUserPlan(42, 'hemat');
+            expect(state.plan.key).toBe('hemat');
+        });
+
+        it('free trial plan is NOT balance-gated (0 saldo still allowed)', () => {
+            expect(walletService.getBalance(42)).toBe(0);
+            const state = billingPlanService.changeUserPlan(42, 'trial');
+            expect(state.plan.key).toBe('trial');
+        });
+
+        it('admin override bypasses the gate AND charge-on-switch suspends a 0-saldo camera', () => {
+            const today = localDateString();
+            db.prepare("UPDATE users SET plan_id = 1, trial_ends_at = ?, trial_used = 1 WHERE id = 42")
+                .run(new Date(Date.now() + 24 * 3600 * 1000).toISOString());
+            db.prepare("UPDATE cameras SET owner_user_id = 42, camera_class = 'subscriber', billing_status = 'active' WHERE id = 7").run();
             db.prepare(`INSERT INTO camera_subscriptions (camera_id, user_id, monthly_price, status, last_charged_date)
                         VALUES (7, 42, 0, 'active', ?)`).run(today);
             expect(walletService.getBalance(42)).toBe(0);
 
-            const state = billingPlanService.changeUserPlan(42, 'hemat');
-
+            // Admin assigns a paid plan despite 0 saldo → gate bypassed, but the camera
+            // suspends on the spot (no free window) via applyPlanChangeForUser.
+            const state = billingPlanService.changeUserPlan(42, 'hemat', { byAdmin: true });
             expect(state.plan.key).toBe('hemat');
             const sub = db.prepare('SELECT * FROM camera_subscriptions WHERE camera_id = 7').get();
             expect(sub.monthly_price).toBe(20000);
-            expect(sub.status).toBe('suspended');                 // no free window
-            expect(db.prepare('SELECT billing_status FROM cameras WHERE id = 7').get().billing_status).toBe('suspended');
-            expect(walletService.getBalance(42)).toBe(0);         // suspended, never goes negative
+            expect(sub.status).toBe('suspended');
+            expect(walletService.getBalance(42)).toBe(0); // never goes negative
         });
 
         it('charges today at the new price (stays active) when the wallet can cover the switch', () => {

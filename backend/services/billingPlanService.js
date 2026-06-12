@@ -21,7 +21,7 @@
 import bcrypt from 'bcrypt';
 import { query, queryOne, execute } from '../database/connectionPool.js';
 import walletService from './walletService.js';
-import billingService from './billingService.js';
+import billingService, { dailyCostOf } from './billingService.js';
 import { validatePassword, getPasswordRequirements } from './passwordValidator.js';
 import { logAdminAction, logSecurityEvent, SECURITY_EVENTS } from './securityAuditLogger.js';
 
@@ -287,6 +287,20 @@ class BillingPlanService {
                 throw badRequest('Trial hanya bisa dipakai satu kali per akun');
             }
             trialEndsAt = new Date(Date.now() + plan.trial_days * 24 * 3600 * 1000).toISOString();
+        }
+
+        // Self-service balance gate: a customer may not switch ONTO a paid plan unless their
+        // saldo covers at least one day at the new price (per current camera, min one). Admin
+        // overrides bypass it; trial/free plans are exempt. This stops "ganti paket tanpa bayar".
+        if (!byAdmin && !plan.is_trial && plan.price_per_camera > 0) {
+            const required = dailyCostOf(plan.price_per_camera) * Math.max(ownedCameras, 1);
+            const balance = walletService.getBalance(userId);
+            if (balance < required) {
+                throw badRequest(
+                    `Saldo belum cukup untuk paket ${plan.name} — butuh minimal Rp${required.toLocaleString('id-ID')} `
+                    + `(saldo Anda Rp${balance.toLocaleString('id-ID')}). Isi saldo dulu di menu Saldo & Tagihan.`
+                );
+            }
         }
 
         execute(
