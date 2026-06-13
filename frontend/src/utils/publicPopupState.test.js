@@ -45,9 +45,9 @@ describe('publicPopupState', () => {
         expect(shouldShowPublicPopupRetry({ status: 'timeout', errorType: 'timeout' })).toBe(true);
 
         const corsState = getPublicPopupOverlayState({ status: 'error', loadingStage: 'error', errorType: 'cors' });
-        expect(corsState.title).toBe('Stream Eksternal Diblokir');
-        expect(corsState.canRetry).toBe(false);
-        expect(shouldShowPublicPopupRetry({ status: 'error', errorType: 'cors' })).toBe(false);
+        expect(corsState.title).toBe('Kamera Tidak Dapat Ditampilkan');
+        expect(corsState.canRetry).toBe(true);
+        expect(shouldShowPublicPopupRetry({ status: 'error', errorType: 'cors' })).toBe(true);
         expect(isPublicPopupPlaybackLocked('error')).toBe(true);
     });
 

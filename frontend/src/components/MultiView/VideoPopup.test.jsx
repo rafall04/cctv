@@ -239,7 +239,7 @@ describe('VideoPopup non-live states', () => {
         expect(startSessionMock).not.toHaveBeenCalled();
     });
 
-    it('menampilkan status cors dan menyembunyikan control playback saat stream eksternal diblokir', async () => {
+    it('menampilkan error stream eksternal dengan opsi coba lagi dan menyembunyikan kontrol playback', async () => {
         render(
             <VideoPopup
                 camera={{ ...baseCamera, id: 14, stream_source: 'external' }}
@@ -262,13 +262,14 @@ describe('VideoPopup non-live states', () => {
         });
 
         await waitFor(() => {
-            expect(screen.getByText('Stream Eksternal Diblokir')).toBeTruthy();
+            expect(screen.getByText('Kamera Tidak Dapat Ditampilkan')).toBeTruthy();
         });
 
         expect(screen.getByText('ERROR')).toBeTruthy();
         expect(screen.queryByTitle('Zoom In')).toBeNull();
         expect(screen.queryByTitle('Fullscreen')).toBeNull();
-        expect(screen.queryByRole('button', { name: /coba lagi/i })).toBeNull();
+        // External network errors are usually transient now → retry is offered.
+        expect(screen.getAllByRole('button', { name: /coba lagi/i }).length).toBeGreaterThan(0);
     });
 
     it('tetap menyediakan retry untuk network error recoverable', async () => {

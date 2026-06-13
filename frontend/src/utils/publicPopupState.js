@@ -26,10 +26,14 @@ const ERROR_VARIANTS = {
         canRetry: true,
     },
     cors: {
-        title: 'Stream Eksternal Diblokir',
-        description: 'Server pihak ketiga tidak mengizinkan akses lintas domain (CORS). Hubungi penyedia stream atau coba akses langsung URL-nya.',
+        // External network failures land here. They're usually a temporary
+        // upstream/provider hiccup, NOT a permanent block — so use plain
+        // language (no "CORS"/"lintas domain" jargon) and allow a retry
+        // instead of presenting an unactionable dead end.
+        title: 'Kamera Tidak Dapat Ditampilkan',
+        description: 'Stream dari penyedia eksternal ini sedang tidak bisa diakses dari sini. Coba lagi beberapa saat lagi.',
         variant: 'cors',
-        canRetry: false,
+        canRetry: true,
     },
     unknown: {
         title: 'CCTV Tidak Terkoneksi',
