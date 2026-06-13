@@ -386,8 +386,9 @@ describe('paymentService ipaymu driver', () => {
             ok: false,
             json: async () => ({ Status: 401, Message: 'unauthorized' }),
         });
-        // 502 + expose so the customer sees a friendly gateway message, not a generic 500.
-        await expect(paymentService.createTopup(42, 25000)).rejects.toMatchObject({ statusCode: 502, expose: true });
+        // 400 + expose so the customer sees a friendly gateway message (a 5xx would be treated as
+        // an infra failure by nginx/Service-Worker and could trigger retries).
+        await expect(paymentService.createTopup(42, 25000)).rejects.toMatchObject({ statusCode: 400, expose: true });
         // No payable (pending) row is created …
         expect(db.prepare("SELECT COUNT(*) AS n FROM payments WHERE gateway='ipaymu' AND status='pending'").get().n).toBe(0);
         // … but the failed attempt IS persisted with the gateway reason, so an admin can see WHY.

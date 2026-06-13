@@ -280,15 +280,19 @@ function TopupPanel({ onCompleted, resumable = [] }) {
                     </button>
                 ))}
             </div>
-            <input
-                type="number"
-                min="10000"
-                step="1000"
-                placeholder="Nominal lain (min Rp10.000)"
-                value={customAmount}
-                onChange={(e) => setCustomAmount(e.target.value)}
-                className="mt-2 w-full rounded-xl border border-gray-300 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary dark:border-gray-700 dark:bg-gray-900/50 dark:text-white"
-            />
+            {/* Thousand-separator display: store raw digits, render "10000" as "10.000" (id-ID)
+                so the customer reads the nominal at a glance. inputMode=numeric → numeric keypad. */}
+            <div className="relative mt-2">
+                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-gray-400">Rp</span>
+                <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Nominal lain (min 10.000)"
+                    value={customAmount ? Number(customAmount).toLocaleString('id-ID') : ''}
+                    onChange={(e) => { setCustomAmount(e.target.value.replace(/\D/g, '')); setError(''); }}
+                    className="w-full rounded-xl border border-gray-300 bg-gray-50 py-2.5 pl-10 pr-4 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary dark:border-gray-700 dark:bg-gray-900/50 dark:text-white"
+                />
+            </div>
             <input
                 type="text"
                 value={promoCode}

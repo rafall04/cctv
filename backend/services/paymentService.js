@@ -268,9 +268,17 @@ class PaymentService {
             // Persist the failed attempt so an admin can see WHY (e.g. "Suspicious buyer")
             // instead of the failure vanishing. gateway_ref is made unique via referenceId.
             this._recordFailedAttempt({ userId, gateway: 'ipaymu', gatewayRef: `failed-${referenceId}`, amount, reason: gatewayMsg });
-            const err = new Error('Pembayaran gagal dibuat di gateway. Coba metode pembayaran lain, atau ulangi sebentar lagi.');
-            err.statusCode = 502;
-            err.expose = true; // friendly message goes to the customer, not a generic 500
+            // A gateway business-rejection is a 400 (NOT 5xx): a 5xx makes nginx/Service-Worker/
+            // browser treat it as an infra failure (Failed to fetch) and can trigger retries that
+            // pile up more rejections; a clean 4xx reliably delivers the message to the customer.
+            // "Suspicious buyer" is an account/email reputation flag — changing payment method does
+            // NOT help, so don't suggest it; point the customer to admin instead.
+            const flagged = /suspicious|buyer|fraud|blacklist|blocked/i.test(gatewayMsg);
+            const err = new Error(flagged
+                ? 'Pembayaran untuk akun ini sedang ditolak oleh gateway. Coba lagi nanti, atau hubungi admin RAF NET untuk memverifikasi akun Anda.'
+                : 'Pembayaran gagal dibuat di gateway. Coba sebentar lagi, atau pilih metode pembayaran lain.');
+            err.statusCode = 400;
+            err.expose = true; // friendly message goes to the customer, not a generic error
             throw err;
         }
 
@@ -427,8 +435,9 @@ class PaymentService {
             const gatewayMsg = body.status_message || `HTTP ${response.status}`;
             console.error('[Payment] Midtrans charge failed:', gatewayMsg);
             this._recordFailedAttempt({ userId, gateway: 'midtrans', gatewayRef: `failed-${orderId}`, amount, reason: gatewayMsg });
-            const err = new Error('Gagal membuat QRIS - coba lagi sebentar lagi');
-            err.statusCode = 502;
+            // 400 (not 5xx) so the message reaches the customer cleanly (see iPaymu note above).
+            const err = new Error('Gagal membuat QRIS — coba lagi sebentar lagi.');
+            err.statusCode = 400;
             err.expose = true;
             throw err;
         }
