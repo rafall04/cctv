@@ -109,7 +109,7 @@ export default function Footer({ saweriaEnabled, saweriaLink, branding }) {
                 <SponsorStrip />
 
                 <div className="border-t border-gray-100 pt-4 dark:border-gray-800">
-                    <p className="text-center text-xs text-gray-400 dark:text-gray-500">
+                    <p className="text-center text-xs text-gray-500 dark:text-gray-400">
                         &copy; {new Date().getFullYear()} {branding.company_name} &bull; {branding.copyright_text}
                     </p>
                 </div>

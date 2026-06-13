@@ -127,7 +127,7 @@ export default function FilterDropdown({ selected, onChange, kecamatans = [], ke
                                             <span className="truncate">{area.name}</span>
                                         </span>
                                         {(area.kelurahan || area.kecamatan) && (
-                                            <span className="text-[10px] text-gray-400 ml-4 block truncate">
+                                            <span className="text-[10px] text-gray-500 dark:text-gray-400 ml-4 block truncate">
                                                 {[area.rt && `RT ${area.rt}`, area.rw && `RW ${area.rw}`, area.kelurahan, area.kecamatan].filter(Boolean).join(', ')}
                                             </span>
                                         )}
@@ -174,7 +174,7 @@ export default function FilterDropdown({ selected, onChange, kecamatans = [], ke
                                             <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-primary' : 'bg-green-500'}`}></span>
                                             <span className="truncate">{kel}</span>
                                         </span>
-                                        {kec && <span className="text-[10px] text-gray-400 ml-4 block">{kec}</span>}
+                                        {kec && <span className="text-[10px] text-gray-500 dark:text-gray-400 ml-4 block">{kec}</span>}
                                     </div>
                                     <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ml-2 ${count > 0 ? 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300' : 'bg-gray-50 dark:bg-gray-800 text-gray-400'}`}>
                                         {count}
