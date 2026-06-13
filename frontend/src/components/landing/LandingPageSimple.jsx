@@ -21,6 +21,8 @@ import LandingDiscoveryStrip from './LandingDiscoveryStrip';
 import LandingQuickAccessStrip from './LandingQuickAccessStrip';
 import LandingSmartFeed from './LandingSmartFeed';
 import DeferUntilVisible from './DeferUntilVisible';
+import useDeferredMount from '../../hooks/public/useDeferredMount';
+import { GridSkeleton, CameraCardSkeleton } from '../ui/Skeleton';
 
 const FeedbackWidget = lazyWithRetry(() => import('../FeedbackWidget'), 'feedback-widget-inline');
 const SaweriaSupport = lazyWithRetry(() => import('../SaweriaSupport'), 'saweria-support-inline');
@@ -192,6 +194,18 @@ function SimpleStatusOverview({ disableHeavyEffects = false }) {
     );
 }
 
+// Cheap placeholder shown for one frame while the heavy camera workspace mounts under the lite
+// experience — mirrors the real section's outer spacing so revealing the grid does not shift layout.
+function CamerasMountSkeleton() {
+    return (
+        <section className="py-8 pb-16 sm:py-12 sm:pb-24" aria-hidden="true">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <GridSkeleton items={6} columns={2} SkeletonComponent={CameraCardSkeleton} />
+            </div>
+        </section>
+    );
+}
+
 export default function LandingPageSimple({
     onCameraClick,
     onAddMulti,
@@ -223,6 +237,10 @@ export default function LandingPageSimple({
     const { branding } = useBranding();
     const showFooterBanner = shouldRenderAdSlot(adsConfig, 'footerBanner', isAdsMobileViewport());
     const shouldRenderFloatingWidgets = !hideFloatingWidgets;
+    // Under the lite experience, let the cheap shell (header/status/discovery) paint first, then mount
+    // the heavy camera workspace (filters + search index + cards) a frame later — kills the first-paint
+    // freeze on weak CPUs. Capable devices mount it synchronously (no skeleton flash).
+    const camerasReady = useDeferredMount({ enabled: disableHeavyEffects });
 
     // Secondary discovery strips below the fold. Under the lite experience they are mounted only when
     // scrolled near the viewport, trimming initial mount/paint work on constrained devices.
@@ -276,7 +294,7 @@ export default function LandingPageSimple({
                 : quickAccessSection}
 
             <main className="flex-1 min-h-0 pb-4 sm:pb-6">
-                {CamerasSection && (
+                {CamerasSection && (camerasReady ? (
                     <CamerasSection
                         onCameraClick={onCameraClick}
                         onAddMulti={onAddMulti}
@@ -290,7 +308,9 @@ export default function LandingPageSimple({
                         isFavorite={isFavorite}
                         disableHeavyEffects={disableHeavyEffects}
                     />
-                )}
+                ) : (
+                    <CamerasMountSkeleton />
+                ))}
             </main>
 
             {showFooterBanner && (

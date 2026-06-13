@@ -107,7 +107,7 @@ const apiClient = axios.create({
  */
 export async function fetchCsrfToken() {
     try {
-        const response = await axios.get(`${API_URL}/api/auth/csrf`, {
+        const response = await axios.get(`${getApiUrl()}/api/auth/csrf`, {
             withCredentials: true,
             headers: {
                 'X-API-Key': API_KEY,
@@ -160,6 +160,12 @@ function isStateChangingMethod(method) {
 // Request interceptor - Add security headers
 apiClient.interceptors.request.use(
     async (config) => {
+        // Resolve the API base URL per request. The runtime config can load AFTER this module is first
+        // evaluated (bootstrap no longer blocks first paint on it), so reading getApiUrl() live keeps the
+        // base correct everywhere — same-origin relative fallback until config resolves, then the
+        // resolved URL — instead of freezing whatever value was captured at import time.
+        config.baseURL = getApiUrl();
+
         // Add API key to all requests
         if (API_KEY) {
             config.headers['X-API-Key'] = API_KEY;
@@ -243,7 +249,7 @@ apiClient.interceptors.response.use(
 
                 try {
                     const csrf = await getCsrfToken();
-                    const response = await axios.post(`${API_URL}/api/auth/refresh`, {}, {
+                    const response = await axios.post(`${getApiUrl()}/api/auth/refresh`, {}, {
                         withCredentials: true,
                         headers: {
                             ...(API_KEY && { 'X-API-Key': API_KEY }),

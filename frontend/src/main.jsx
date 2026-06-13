@@ -13,14 +13,14 @@ import { registerServiceWorker } from './utils/registerServiceWorker.js';
 import './index.css';
 
 async function bootstrap() {
-    // Overlap the runtime-config network round-trip with the App chunk download/parse instead of
-    // serializing them — removes one blocking round-trip before first paint on slow links. App still
-    // renders only after config resolves, so getApiUrl() is ready before any API call.
-    const [, appModule] = await Promise.all([
-        loadRuntimeConfig(),
-        import('./App.jsx'),
-    ]);
-    const { default: App } = appModule;
+    // Don't block first paint on the runtime-config network round-trip. Kick it off (it caches itself
+    // for getApiUrl()) and render as soon as the App chunk is parsed. apiClient resolves its base URL
+    // per request, so early calls use the same-origin relative fallback and later calls pick up the
+    // resolved config — one fewer round-trip before the page appears.
+    loadRuntimeConfig().catch((error) => {
+        console.warn('Runtime config load failed; using fallback:', error?.message);
+    });
+    const { default: App } = await import('./App.jsx');
     ReactDOM.createRoot(document.getElementById('root')).render(
         <React.StrictMode>
             <App />
