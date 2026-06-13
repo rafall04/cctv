@@ -15,6 +15,7 @@ const svc = vi.hoisted(() => ({
 vi.mock('../services/billingAdminService', () => ({ default: svc }));
 vi.mock('../services/cameraService', () => ({ cameraService: { getAllCameras: vi.fn().mockResolvedValue({ success: true, data: [] }) } }));
 vi.mock('../contexts/NotificationContext', () => ({ useNotification: () => ({ success: vi.fn(), error: vi.fn() }) }));
+vi.mock('../contexts/ConfirmContext', () => ({ useConfirm: () => () => Promise.resolve(true) }));
 // Heavy sub-tabs not under test here.
 vi.mock('../components/admin/BillingPlansTab', () => ({ default: () => <div>plans-tab</div> }));
 vi.mock('../components/admin/PaymentGatewayTab', () => ({ default: () => <div>gateway-tab</div> }));
