@@ -10,8 +10,16 @@ import jwt from '@fastify/jwt';
 import cookie from '@fastify/cookie';
 import fastifyStatic from '@fastify/static';
 import { config, assertSecureConfig } from './config/config.js';
+import dns from 'node:dns';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+
+// Prefer IPv4 for all outbound DNS. Node 17+ resolves "verbatim" (often IPv6
+// first); on hosts with broken/unrouted IPv6 (this VPS has working IPv4 but dead
+// IPv6 to api.telegram.org & payment gateways), global fetch() then intermittently
+// throws "fetch failed" before falling back. Forcing ipv4first uses the working
+// route directly. Harmless where IPv6 works. Must run before any outbound fetch.
+dns.setDefaultResultOrder('ipv4first');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -502,9 +510,17 @@ const start = async () => {
 
         // Interactive Telegram bot: long-polls for /commands & approve/manage button
         // taps. Idle (re-checks every 15s) until a bot token is configured, so it is
-        // safe to start unconditionally and activates the moment a token is saved.
-        telegramBotService.start();
-        console.log('[TelegramBot] Customer-management bot started (long-polling)');
+        // safe to start the moment a token is saved.
+        // Under pm2 cluster_mode every worker would poll getUpdates on the same token →
+        // Telegram 409 (only one poller allowed per token). Run it on a single worker
+        // only: NODE_APP_INSTANCE is unset in fork mode and '0' on the first cluster worker.
+        const botWorker = process.env.NODE_APP_INSTANCE;
+        if (botWorker === undefined || botWorker === '0') {
+            telegramBotService.start();
+            console.log('[TelegramBot] Customer-management bot started (long-polling)');
+        } else {
+            console.log(`[TelegramBot] Not started on cluster worker #${botWorker} (poller runs only on worker 0)`);
+        }
     } catch (err) {
         fastify.log.error(err);
         process.exit(1);
