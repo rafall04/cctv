@@ -7,8 +7,9 @@
  * SideEffects: Creates/updates the camera via API on submit.
  */
 
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useState, useRef } from 'react';
 import customerService from '../../services/customerService';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 const LocationPicker = lazy(() => import('../LocationPicker'));
 
@@ -28,6 +29,11 @@ export default function CameraFormModal({ camera = null, areas = [], onClose, on
     });
     const [error, setError] = useState('');
     const [submitting, setSubmitting] = useState(false);
+
+    const dialogRef = useRef(null);
+    // This modal had no prior ESC/focus handling — the hook adds focus-trap,
+    // return-focus, and ESC-to-close (consistent with the backdrop click).
+    useFocusTrap(dialogRef, { onEscape: onClose });
 
     const handleChange = (e) => {
         setForm({ ...form, [e.target.name]: e.target.value });
@@ -79,6 +85,10 @@ export default function CameraFormModal({ camera = null, areas = [], onClose, on
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
             <div
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label={isEdit ? `Edit ${camera.name}` : 'Tambah Kamera'}
                 className="my-auto flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-900"
                 onClick={(e) => e.stopPropagation()}
             >
