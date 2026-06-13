@@ -100,8 +100,10 @@ class TelegramBotService {
                     continue;
                 }
                 if (!this.tokenSeen) {
-                    // Token just became available (boot, or admin set it live). Discard any
-                    // backlog so we never replay stale taps after downtime, then go live.
+                    // Token just became available (boot, or admin set it live). Verify the
+                    // token + surface the #1 silent-failure cause (a stale webhook blocks
+                    // getUpdates), then discard backlog so stale taps aren't replayed.
+                    await this.logBotHealth();
                     this.offset = undefined;
                     await this.drainBacklog();
                     this.tokenSeen = true;
@@ -125,7 +127,13 @@ class TelegramBotService {
                     continue;
                 }
                 if (!data.ok) {
-                    console.error('[TelegramBot] getUpdates failed:', data.description);
+                    // 409 = a webhook OR another poller owns this token's update stream.
+                    // Either way getUpdates returns nothing until that is resolved.
+                    if (/conflict/i.test(data.description || '')) {
+                        console.error('[TelegramBot] getUpdates 409 CONFLICT — another process is polling this bot token, or a webhook is set. Run ONE server per token and remove any webhook (deleteWebhook).');
+                    } else {
+                        console.error('[TelegramBot] getUpdates failed:', data.description);
+                    }
                     await this.sleep(API_ERROR_BACKOFF_MS);
                     continue;
                 }
@@ -167,6 +175,32 @@ class TelegramBotService {
         if (discarded > 0) {
             console.log(`[TelegramBot] Discarded ${discarded} backlog update(s) on start`);
         }
+    }
+
+    /**
+     * One-shot health probe logged when the bot goes live. Confirms the token works
+     * (getMe), warns loudly about a webhook that would silently block long-polling, and
+     * prints the resolved command allow-list so an operator can see who may control it.
+     */
+    async logBotHealth() {
+        const me = await callTelegramApi('getMe', {});
+        if (me?.ok) {
+            console.log(`[TelegramBot] Connected as @${me.result?.username} (id ${me.result?.id})`);
+        } else {
+            console.warn('[TelegramBot] getMe failed — bot token may be invalid:', me?.description || 'no response');
+        }
+
+        const hook = await callTelegramApi('getWebhookInfo', {});
+        if (hook?.ok && hook.result?.url) {
+            console.warn(`[TelegramBot] ⚠️ A webhook is set on this bot (${hook.result.url}). Long-polling getUpdates will return 409 until it is removed — call deleteWebhook on this bot token.`);
+        }
+
+        const { commandChatIds } = getBotRuntimeConfig();
+        console.log(
+            `[TelegramBot] Authorized command chats: ${commandChatIds.length
+                ? commandChatIds.join(', ')
+                : '(NONE — approvals/commands are disabled. Set "Chat ID Admin Bot" or a monitoring chat in Settings → Telegram.)'}`
+        );
     }
 
     // ---------------------------------------------------------------------
@@ -396,6 +430,7 @@ class TelegramBotService {
         const chatId = message.chat?.id;
         const actor = this.actorOf(message.from);
         const authorized = isCommandChat(chatId);
+        console.log(`[TelegramBot] /${parsed.command} from chat ${chatId} (authorized=${authorized})`);
 
         // Pre-auth commands so an operator can discover their Chat ID and verify setup.
         if (parsed.command === 'start' || parsed.command === 'help') {
@@ -441,6 +476,7 @@ class TelegramBotService {
         const actor = this.actorOf(cq.from);
 
         if (!isCommandChat(chatId)) {
+            console.log(`[TelegramBot] Denied button tap from unauthorized chat ${chatId}`);
             return this.answerCallback(cq.id, '⛔ Tidak diizinkan', { alert: true });
         }
         const decoded = presenter.decodeCallback(cq.data);

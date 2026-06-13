@@ -192,6 +192,33 @@ describe('notifyNewRegistration', () => {
     });
 });
 
+describe('every command produces a response (authorized chat)', () => {
+    const commands = ['/start', '/help', '/id', '/pending', '/customers', '/customer 1', '/stats', '/topup 1 50000', '/suspend 1', '/resume 1', '/plan 1'];
+
+    it.each(commands)('responds to %s', async (text) => {
+        h.listPendingRegistrations.mockReturnValue([]);
+        h.listPlans.mockReturnValue([]);
+        h.query.mockReturnValue([]);
+        h.queryOne.mockReturnValue({ id: 1, username: 'budi', phone: '0812', email: null, plan_id: null, account_status: 'approved', n: 0, total: 0 });
+        h.getCustomerBillingSummary.mockReturnValue({ balance: 0, daily_cost: 0, estimated_days_left: null, low_balance: false, subscriptions: [] });
+        h.tryResumeForUser.mockReturnValue({ resumedCameraIds: [] });
+
+        await bot.handleMessage({ chat: { id: '-100' }, from: { id: 1, username: 'a' }, text });
+
+        expect(h.callTelegramApi).toHaveBeenCalledWith('sendMessage', expect.objectContaining({ chat_id: '-100' }));
+    });
+});
+
+describe('logBotHealth', () => {
+    it('probes getMe + getWebhookInfo so a bad token / stale webhook is visible', async () => {
+        h.callTelegramApi.mockResolvedValue({ ok: true, result: { username: 'RafBot', id: 5, url: '' } });
+        await bot.logBotHealth();
+        const methods = h.callTelegramApi.mock.calls.map((c) => c[0]);
+        expect(methods).toContain('getMe');
+        expect(methods).toContain('getWebhookInfo');
+    });
+});
+
 describe('poll loop', () => {
     it('drains backlog on start, then handles a live update and advances the offset', async () => {
         let liveCalls = 0;
