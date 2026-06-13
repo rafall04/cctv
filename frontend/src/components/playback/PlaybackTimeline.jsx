@@ -104,7 +104,7 @@ export default function PlaybackTimeline({
                                     left: `${startOffset}%`,
                                     width: `${width}%`
                                 }}
-                                title={`Missing: ${Math.round(gap.duration / 60)} minutes`}
+                                title={`Hilang: ${Math.round(gap.duration / 60)} menit`}
                             />
                         );
                     })}
@@ -113,15 +113,15 @@ export default function PlaybackTimeline({
                 <div className="flex items-center gap-6 mt-3 text-xs text-gray-600 dark:text-gray-400">
                     <div className="flex items-center gap-2">
                         <div className="w-4 h-4 bg-emerald-500 rounded"></div>
-                        <span>Available</span>
+                        <span>Tersedia</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <div className="w-4 h-4 bg-primary-500 rounded"></div>
-                        <span>Playing</span>
+                        <span>Diputar</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <div className="w-4 h-4 bg-red-500/30 rounded"></div>
-                        <span>Missing</span>
+                        <span>Hilang</span>
                     </div>
                 </div>
             </div>

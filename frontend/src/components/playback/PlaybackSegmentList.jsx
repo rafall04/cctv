@@ -30,7 +30,7 @@ export default function PlaybackSegmentList({
     return (
         <div className="bg-white dark:bg-gray-900 rounded-lg sm:rounded-xl p-3 sm:p-4 md:p-6 shadow-lg">
             <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-3 sm:mb-4">
-                Recording Segments ({segments.length})
+                Segmen Rekaman ({segments.length})
             </h2>
             
             {segments.length > 0 ? (
@@ -71,12 +71,12 @@ export default function PlaybackSegmentList({
                                                 </div>
                                                 {!isLikelyCompatible && (
                                                     <span className="px-1.5 sm:px-2 py-0.5 text-xs bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 rounded flex-shrink-0">
-                                                        May not play
+                                                        Mungkin tak bisa diputar
                                                     </span>
                                                 )}
                                             </div>
                                             <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-500 truncate">
-                                                Durasi: {Math.round(segment.duration / 60)} menit • Size: {formatFileSize(segment.file_size)}
+                                                Durasi: {Math.round(segment.duration / 60)} menit • Ukuran: {formatFileSize(segment.file_size)}
                                             </div>
                                         </div>
                                     </div>
@@ -86,7 +86,7 @@ export default function PlaybackSegmentList({
                                             <svg className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
                                                 <circle cx="12" cy="12" r="10"/>
                                             </svg>
-                                            <span className="hidden sm:inline text-sm font-medium">Playing</span>
+                                            <span className="hidden sm:inline text-sm font-medium">Diputar</span>
                                         </div>
                                     )}
                                 </div>
