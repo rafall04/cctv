@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 
 export default function PlaybackTimeline({
     segments,
@@ -9,6 +9,8 @@ export default function PlaybackTimeline({
     formatTimestamp,
 }) {
     const timelineRef = useRef(null);
+    const [hoverPercent, setHoverPercent] = useState(null);
+    const [hoverLabel, setHoverLabel] = useState('');
 
     const getTimelineData = () => {
         if (segments.length === 0) return { start: null, end: null, duration: 0, gaps: [], sortedSegments: [] };
@@ -65,6 +67,22 @@ export default function PlaybackTimeline({
         onTimelineClick(targetTime);
     };
 
+    // Hover-time hint: show the timestamp under the cursor + a thin marker so
+    // scrubbing isn't blind (you can see where a click will seek before clicking).
+    const handleTimelineHover = (e) => {
+        if (!timelineRef.current || !timelineData.duration || !timelineData.start) return;
+        const rect = timelineRef.current.getBoundingClientRect();
+        const pct = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+        const absMs = timelineData.start.getTime() + pct * timelineData.duration * 1000;
+        setHoverPercent(pct * 100);
+        setHoverLabel(new Date(absMs).toLocaleTimeString('id-ID'));
+    };
+
+    const handleTimelineLeave = () => {
+        setHoverPercent(null);
+        setHoverLabel('');
+    };
+
     if (!timelineData.start) return null;
 
     return (
@@ -74,12 +92,15 @@ export default function PlaybackTimeline({
             <div className="mb-4 sm:mb-6">
                 <div className="flex justify-between text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">
                     <span>{timelineData.start.toLocaleTimeString('id-ID')}</span>
+                    {hoverLabel && <span className="font-semibold text-gray-900 dark:text-white">{hoverLabel}</span>}
                     <span>{timelineData.end.toLocaleTimeString('id-ID')}</span>
                 </div>
                 
-                <div 
+                <div
                     ref={timelineRef}
                     onClick={handleTimelineClick}
+                    onMouseMove={handleTimelineHover}
+                    onMouseLeave={handleTimelineLeave}
                     className="relative h-8 sm:h-10 md:h-12 bg-gray-200 dark:bg-gray-800 rounded-lg overflow-hidden cursor-pointer"
                 >
                     {timelineData.sortedSegments.map((segment, idx) => {
@@ -127,6 +148,13 @@ export default function PlaybackTimeline({
                         <div
                             className="pointer-events-none absolute top-0 bottom-0 z-10 w-0.5 bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.45)]"
                             style={{ left: `${playheadOffset}%` }}
+                            aria-hidden="true"
+                        />
+                    )}
+                    {hoverPercent !== null && (
+                        <div
+                            className="pointer-events-none absolute top-0 bottom-0 z-[5] w-px bg-white/60"
+                            style={{ left: `${hoverPercent}%` }}
                             aria-hidden="true"
                         />
                     )}
