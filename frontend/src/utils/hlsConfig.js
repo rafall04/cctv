@@ -2,8 +2,9 @@
  * HLS Configuration Module
  * Provides device-adaptive HLS.js configurations based on device tier
  * 
- * SMOOTH SYNCHRONIZED MODE - Balance between sync and stability
- * - liveSyncDurationCount: 2 (4s buffer, eliminates freeze while maintaining sync)
+ * RESILIENT LIVE MODE - Cushion against packet-loss bursts on weak links
+ * - lowLatencyMode: false (server must also run hlsVariant: fmp4, NOT lowLatency)
+ * - liveSyncDurationCount: 3 (~6s behind live edge — rides out jitter/loss, e.g. Telkomsel->Cloudflare SIN)
  * - Standard buffer lengths for smooth playback
  * - Balanced timeouts for reliability
  * 
@@ -30,9 +31,10 @@ const HLS_CONFIGS = {
         maxBufferHole: 0.5,
         // AUTO quality - let HLS.js decide
         startLevel: -1,
-        // SMOOTH PLAYBACK: 2 segments buffer (4s) - eliminates freeze, maintains sync
-        liveSyncDurationCount: 2,
-        liveMaxLatencyDurationCount: 5,
+        // RIDE-OUT BUFFER: start ~3 segments (~6s) behind live edge to absorb
+        // packet-loss bursts on weak links (e.g. Telkomsel->SIN). lowLatencyMode stays false.
+        liveSyncDurationCount: 3,
+        liveMaxLatencyDurationCount: 9,
         // Balanced timeouts for reliability
         fragLoadingTimeOut: 30000,
         fragLoadingMaxRetry: 3,
@@ -54,9 +56,10 @@ const HLS_CONFIGS = {
         maxBufferSize: 18 * 1000 * 1000,
         maxBufferHole: 0.5,
         startLevel: -1,
-        // SMOOTH PLAYBACK: 2 segments buffer (4s) - eliminates freeze, maintains sync
-        liveSyncDurationCount: 2,
-        liveMaxLatencyDurationCount: 5,
+        // RIDE-OUT BUFFER: start ~3 segments (~6s) behind live edge to absorb
+        // packet-loss bursts on weak links (e.g. Telkomsel->SIN). lowLatencyMode stays false.
+        liveSyncDurationCount: 3,
+        liveMaxLatencyDurationCount: 9,
         fragLoadingTimeOut: 30000,
         fragLoadingMaxRetry: 4,
         fragLoadingRetryDelay: 1000,
@@ -77,9 +80,10 @@ const HLS_CONFIGS = {
         maxBufferSize: 25 * 1000 * 1000,
         maxBufferHole: 0.5,
         startLevel: -1,
-        // SMOOTH PLAYBACK: 2 segments buffer (4s) - eliminates freeze, maintains sync
-        liveSyncDurationCount: 2,
-        liveMaxLatencyDurationCount: 5,
+        // RIDE-OUT BUFFER: start ~3 segments (~6s) behind live edge to absorb
+        // packet-loss bursts on weak links (e.g. Telkomsel->SIN). lowLatencyMode stays false.
+        liveSyncDurationCount: 3,
+        liveMaxLatencyDurationCount: 9,
         fragLoadingTimeOut: 30000,
         fragLoadingMaxRetry: 5,
         fragLoadingRetryDelay: 1000,
@@ -108,8 +112,8 @@ const MOBILE_PHONE_CONFIG = {
     maxMaxBufferLength: 15,
     maxBufferSize: 10 * 1000 * 1000,
     startLevel: -1,
-    liveSyncDurationCount: 2,
-    liveMaxLatencyDurationCount: 5,
+    liveSyncDurationCount: 3,
+    liveMaxLatencyDurationCount: 9,
     fragLoadingTimeOut: 10000,
     fragLoadingRetryDelay: 1000,
     levelLoadingTimeOut: 10000,
@@ -124,8 +128,8 @@ const MOBILE_TABLET_CONFIG = {
     maxMaxBufferLength: 22,
     maxBufferSize: 15 * 1000 * 1000,
     startLevel: -1,
-    liveSyncDurationCount: 2,
-    liveMaxLatencyDurationCount: 5,
+    liveSyncDurationCount: 3,
+    liveMaxLatencyDurationCount: 9,
     fragLoadingTimeOut: 10000,
     fragLoadingRetryDelay: 1000,
     levelLoadingTimeOut: 10000,

@@ -18,14 +18,26 @@ hlsAddress: :8888
 # ffmpeg -i), never MediaMTX HLS — see backend/services/recordingStarter.js.
 hlsAlwaysRemux: no
 hlsAllowOrigin: '*'
-# Segment duration: 2s (sweet spot for stability + reasonable latency)
+# CRITICAL: MediaMTX's DEFAULT hlsVariant is `lowLatency`. Leaving this key unset
+# (or merely commenting it out) does NOT disable LL-HLS — MediaMTX silently runs
+# Low-Latency HLS (0.25s parts + blocking playlist reloads + ~0.6s hold-back).
+# That mode collapses on high-latency / lossy mobile links: e.g. Telkomsel routes
+# this zone to the Cloudflare Singapore (SIN) PoP over a lossy peering leg, so the
+# client cannot keep the sub-second request cadence -> permanent rebuffering, while
+# fixed-line ISPs (CGK PoP, clean path) play fine. `fmp4` = regular (non-LL) fMP4
+# segments and is also REQUIRED for HEVC/H.265 over HLS (our cameras are HEVC).
+# Must be set EXPLICITLY — do not rely on commenting `lowLatency` out.
+hlsVariant: fmp4
+# Segment duration: 2s (sweet spot for stability + reasonable latency).
+# NOTE: actual segment length is max(this, camera GOP/keyframe interval); a camera
+# with a 4s keyframe interval still yields ~4s segments. Lower the camera's I-frame
+# interval if you want shorter, more loss-resilient segments.
 hlsSegmentDuration: 2s
-# Segment count: 7 (optimized - 14s buffer, 30% less RAM usage)
-# History: 7 segments × 2s = 14s (sufficient for stable playback, saves RAM)
+# Segment count: 10 (~20s playlist window) — enough history for the client to keep
+# a buffer cushion and recover from packet-loss bursts on weak connections.
 hlsSegmentCount: 10
 # RAM Disk storage for instant access
 hlsDirectory: /dev/shm/mediamtx-live
-# NOTE: hlsPartDuration REMOVED - No LL-HLS (reduces CPU load)
 
 # WebRTC settings
 webrtc: yes

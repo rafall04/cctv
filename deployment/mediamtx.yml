@@ -22,16 +22,17 @@ hlsAllowOrigin: '*'
 # This eliminates disk I/O bottleneck for live streaming
 hlsDirectory: /dev/shm/mediamtx-live
 
-# Segment settings - 2s segments for stability
+# CRITICAL: set hlsVariant EXPLICITLY. MediaMTX's DEFAULT is `lowLatency`, so
+# commenting the line out does NOT disable LL-HLS — it silently runs it (0.25s
+# parts + blocking reloads + ~0.6s hold-back), which collapses on lossy/high-RTT
+# mobile links (e.g. Telkomsel -> Cloudflare SIN). `fmp4` = regular (non-LL) fMP4
+# segments, also REQUIRED for HEVC/H.265 over HLS.
+hlsVariant: fmp4
+
+# Segment settings - 2s target (actual = max(2s, camera keyframe interval))
 hlsSegmentDuration: 2s
-hlsSegmentCount: 7
-
-# CRITICAL: DO NOT use lowLatency variant (causes issues)
-# Use standard HLS for maximum compatibility
-# hlsVariant: lowLatency  # DISABLED
-
-# Playlist settings
-# hlsPartDuration: 1s  # DISABLED - enables LL-HLS which requires 7+ segments
+# 10 segments (~20s window) gives the client room to ride out packet-loss bursts
+hlsSegmentCount: 10
 hlsSegmentMaxSize: 50M
 
 # Write queue size - increased for better throughput
