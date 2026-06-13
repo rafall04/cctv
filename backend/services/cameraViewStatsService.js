@@ -25,6 +25,12 @@ const EMPTY_VIEW_STATS = Object.freeze({
     last_viewed_at: null,
 });
 
+// Minimum watch time (seconds) for a completed session to count toward the public
+// lifetime "views" counter. Filters out bots/crawlers/preconnects/instant bounces,
+// whose sessions end with duration ~0. A genuine live viewer easily clears this:
+// the manual heartbeat is 5s and proxied-HLS refreshes the playlist every ~3s.
+const MIN_COUNTABLE_VIEW_SECONDS = 5;
+
 function toNonNegativeInteger(value) {
     const numericValue = Number.parseInt(value, 10);
     return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : 0;
@@ -51,6 +57,14 @@ class CameraViewStatsService {
         }
 
         const normalizedDuration = toNonNegativeInteger(durationSeconds);
+
+        // Sub-threshold sessions are not real views (bots/instant bounce, duration ~0).
+        // viewer_session_history still recorded every session upstream — only this public
+        // lifetime counter is gated, so analytics/bounce-rate stay complete.
+        if (normalizedDuration < MIN_COUNTABLE_VIEW_SECONDS) {
+            return false;
+        }
+
         const timestamp = viewedAt || new Date().toISOString().slice(0, 19).replace('T', ' ');
 
         execute(`

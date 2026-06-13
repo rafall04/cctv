@@ -46,6 +46,35 @@ describe('cameraViewStatsService', () => {
         expect(cacheInvalidateMock).toHaveBeenCalledWith('stats:camera_view_stats');
     });
 
+    it('does not count a sub-threshold session as a view (bot/instant bounce)', async () => {
+        const executeSpy = vi.spyOn(connectionPool, 'execute').mockReturnValue({ changes: 1 });
+        const { default: cameraViewStatsService } = await import('../services/cameraViewStatsService.js');
+
+        const counted = cameraViewStatsService.recordCompletedLiveView({
+            cameraId: 1168,
+            durationSeconds: 3,
+            viewedAt: '2026-05-05 12:30:00',
+        });
+
+        expect(counted).toBe(false);
+        expect(executeSpy).not.toHaveBeenCalled();
+        expect(cacheInvalidateMock).not.toHaveBeenCalled();
+    });
+
+    it('counts a session at exactly the minimum threshold', async () => {
+        const executeSpy = vi.spyOn(connectionPool, 'execute').mockReturnValue({ changes: 1 });
+        const { default: cameraViewStatsService } = await import('../services/cameraViewStatsService.js');
+
+        const counted = cameraViewStatsService.recordCompletedLiveView({
+            cameraId: 1168,
+            durationSeconds: 5,
+            viewedAt: '2026-05-05 12:30:00',
+        });
+
+        expect(counted).toBe(true);
+        expect(executeSpy).toHaveBeenCalledTimes(1);
+    });
+
     it('loads public stats in one aggregate query keyed by camera id', async () => {
         vi.spyOn(connectionPool, 'query').mockReturnValue([
             {

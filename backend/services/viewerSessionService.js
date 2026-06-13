@@ -10,13 +10,15 @@
  * - Store session history for analytics
  * - Auto-cleanup stale sessions (no heartbeat for 15s)
  * - Get real IP from proxy headers
- * 
- * Timing Configuration:
- * - Frontend heartbeat: every 5 seconds
- * - Backend session timeout: 15 seconds (no heartbeat)
- * - Backend cleanup interval: every 5 seconds
- * - Max staleness: ~20 seconds (15s timeout + 5s cleanup)
- * 
+ *
+ * Timing Configuration (keep this block in sync with the constants below):
+ * - Manual-path heartbeat: every 5s (frontend viewerService)
+ * - Proxied-HLS path: re-armed by the ~3s playlist refresh; DB heartbeat throttled
+ *   to 10s in hlsProxyService (still < SESSION_TIMEOUT, so sessions stay alive)
+ * - Backend session timeout: 15 seconds (no heartbeat) — SESSION_TIMEOUT
+ * - Backend cleanup interval: every 20 seconds — CLEANUP_INTERVAL
+ * - Max staleness of the "live" count: ~35s (15s timeout + up to 20s cleanup)
+ *
  * Timezone: All timestamps use configured timezone from system settings
  */
 
@@ -116,9 +118,12 @@ const SESSION_TIMEOUT = 15;
 const HISTORY_RETENTION_DAYS = 90;
 const RETENTION_RUN_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
-// Cleanup interval in milliseconds - OPTIMIZED (reduced from 5s to 60s)
-// Less frequent cleanup reduces database writes while maintaining effectiveness
-const CLEANUP_INTERVAL = 60000;
+// Cleanup interval in milliseconds. Balances live-count freshness against DB load:
+// a viewer who closes the tab without /stop stops counting as "live" within
+// SESSION_TIMEOUT + this interval (~35s). The cleanup SELECT only triggers writes
+// when stale sessions actually exist, so cost scales with viewer turnover — not the
+// interval — which is why 20s is safe (was 60s, which left the live count stale ~75s).
+const CLEANUP_INTERVAL = 20000;
 
 class ViewerSessionService {
     constructor() {
